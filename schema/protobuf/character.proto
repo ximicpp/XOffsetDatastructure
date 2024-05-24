@@ -1,0 +1,44 @@
+syntax = "proto3";
+package protobuf_test;
+
+message Skill {
+    uint32 id = 1;
+    uint32 level = 2;
+}
+
+message Item {
+    uint32 id = 1;
+    uint64 uuid = 2;
+    uint32 number = 3;
+    uint64 timestamp = 4;
+}
+
+message Equip {
+    uint32 id = 1;
+    uint64 uuid = 2;
+    uint32 number = 3;
+    uint64 timestamp = 4;
+    uint32 level = 5;
+    repeated float attributes = 6;
+}
+
+message Position {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+
+message Character {
+    uint64 id = 1;
+    string name = 2;
+    uint32 level = 3;
+    float healthpoint = 4;
+    float manapoint = 5;
+    float speed = 6;
+    Position pos = 7;
+    repeated Position path = 8;
+    repeated float attributes = 9;
+    map<uint64, Item> items = 10;
+    repeated Equip equips = 11;
+    repeated Skill skills = 12;
+}
