@@ -6,6 +6,8 @@
 #include <boost/interprocess/offset_ptr.hpp>
 #include "xconfig.hpp"
 #include "xmisc.hpp"
+#include <map>
+
 
 namespace XOffsetDatastructure
 {
@@ -32,6 +34,10 @@ namespace XOffsetDatastructure
 		using pointer = boost::interprocess::offset_ptr<T>;
 #elif OFFSET_DATA_STRUCTURE_POINTER_TYPE == 1
 		using pointer = T*;
+#endif
+
+#ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
+		std::map<void *, std::size_t> allocMap;
 #endif
 
 		XSimpleAllocator() = default;
@@ -66,7 +72,17 @@ namespace XOffsetDatastructure
 				boost::leaf::throw_exception(boost::leaf::new_error(XOffsetDatastructure::XBadAllocExceptionLeaf{chunkNum * CHUNK_SIZE}));
 #endif
 			}
-			// std::cout << "Allocate: " << totalSize << std::endl;
+#ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
+			allocMap[ptr] = chunkNum * CHUNK_SIZE - totalSize;
+			std::size_t sum = 0;
+			for (auto &item : allocMap)
+			{
+				sum += item.second;
+				std::cout << item.first << " " << item.second << std::endl;
+			}
+			std::cout << "intra-chunk fragments after malloc: " << sum << std::endl;
+#endif
+			// std::cout << "Allocate: " << totalSize << " " <<  chunkNum * CHUNK_SIZE << std::endl;
 #if OFFSET_DATA_STRUCTURE_POINTER_TYPE == 0
 			DEBUG_PRINT_BLOCK(storagePointer.get());
 #elif OFFSET_DATA_STRUCTURE_POINTER_TYPE == 1
@@ -84,7 +100,17 @@ namespace XOffsetDatastructure
 			std::size_t chunkNum = (totalSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
 #if OFFSET_DATA_STRUCTURE_POINTER_TYPE == 0
 			storagePointer->freeN(ptr.get(), chunkNum, CHUNK_SIZE);
-			// std::cout << "Deallocate: " << totalSize << std::endl;
+#ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
+			allocMap.erase(ptr.get());
+			std::size_t sum = 0;
+			for (auto &item : allocMap)
+			{
+				sum += item.second;
+				std::cout << item.first << " " << item.second << std::endl;
+			}
+			std::cout << "intra-chunk fragments after free: " << sum << std::endl;
+#endif
+			// std::cout << "Allocate: " << -int(totalSize) << " " <<  -int(chunkNum * CHUNK_SIZE) << std::endl;
 			DEBUG_PRINT_BLOCK(storagePointer.get());
 #elif OFFSET_DATA_STRUCTURE_POINTER_TYPE == 1
 			storagePointer->freeN(ptr, chunkNum, CHUNK_SIZE);
