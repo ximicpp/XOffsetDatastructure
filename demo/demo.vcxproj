@@ -119,7 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)schema\capnproto;$(SolutionDir)schema\flatbuffers;$(SolutionDir)schema\protobuf;$(SolutionDir)xoffsetdatastructure;$(SolutionDir)libs\boost_1_81_0\;$(SolutionDir)libs\msgpack\include;$(SolutionDir)libs\flatbuffers\include;$(SolutionDir)libs\protobuf\include;$(SolutionDir)libs\capnproto\include;$(SolutionDir)libs\zlib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)schema\capnproto;$(SolutionDir)schema\flatbuffers;$(SolutionDir)schema\protobuf;$(SolutionDir)xoffsetdatastructure;$(SolutionDir)libs\boost_1_81_0\;$(SolutionDir)libs\msgpack\include;$(SolutionDir)libs\flatbuffers\include;$(SolutionDir)libs\protobuf\include;$(SolutionDir)libs\capnproto\include;$(SolutionDir)libs\zlib\include;$(SolutionDir)misc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -128,12 +128,15 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)libs\protobuf\lib;$(SolutionDir)libs\capnproto\lib;$(SolutionDir)libs\zlib\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\misc\zlibcompressor.cpp" />
     <ClCompile Include="xdemo.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\misc\zlibcompressor.hpp" />
     <ClInclude Include="..\xoffsetdatastructure\xconfig.hpp" />
     <ClInclude Include="..\xoffsetdatastructure\xmisc.hpp" />
     <ClInclude Include="..\xoffsetdatastructure\xsimpleallocator.hpp" />
