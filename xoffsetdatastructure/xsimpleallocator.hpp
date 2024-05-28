@@ -37,7 +37,11 @@ namespace XOffsetDatastructure
 #endif
 
 #ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
-		std::map<void *, std::size_t> allocMap;
+		std::map<void *, std::size_t>& getAllocMap()
+		{
+			static std::map<void *, std::size_t> allocMap;
+			return allocMap;
+		}
 #endif
 
 		XSimpleAllocator() = default;
@@ -73,6 +77,7 @@ namespace XOffsetDatastructure
 #endif
 			}
 #ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
+			auto& allocMap = getAllocMap();
 			allocMap[ptr] = chunkNum * CHUNK_SIZE - totalSize;
 			std::size_t sum = 0;
 			for (auto &item : allocMap)
@@ -101,6 +106,7 @@ namespace XOffsetDatastructure
 #if OFFSET_DATA_STRUCTURE_POINTER_TYPE == 0
 			storagePointer->freeN(ptr.get(), chunkNum, CHUNK_SIZE);
 #ifdef OFFSET_DATA_STRUCTURE_DEBUG_MODE
+			auto& allocMap = getAllocMap();
 			allocMap.erase(ptr.get());
 			std::size_t sum = 0;
 			for (auto &item : allocMap)
