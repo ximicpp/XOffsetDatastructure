@@ -10,6 +10,7 @@
 #define OFFSET_DATA_STRUCTURE_EXCEPTION_HANDLE_TYPE 0 // 0: exception, 1: longjmp ("forced" unwinding) 2: boost leaf
 #define OFFSET_DATA_STRUCTURE_STORAGE_ALGORITHM 1     // 0: simple storage freelist, 1: simple storage bitmap
 #define OFFSET_DATA_STRUCTURE_POINTER_TYPE 0          // 0: boost::interprocess::offset_ptr<T>, 1: void*. Just for test
+#define OFFSET_DATA_STRUCTURE_CUSTOM_CONTAINER_GROWTH_FACTOR 0 // 0: use default, 1: use custom growth factor
 
 namespace XOffsetDatastructure
 {
