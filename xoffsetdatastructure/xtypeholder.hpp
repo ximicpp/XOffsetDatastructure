@@ -55,6 +55,13 @@ namespace XOffsetDatastructure
         void expand(std::size_t num)
         {
             num = (num + XOffsetDatastructure::CHUNK_SIZE - 1) / XOffsetDatastructure::CHUNK_SIZE * XOffsetDatastructure::CHUNK_SIZE;
+#if OFFSET_DATA_STRUCTURE_STORAGE_ALGORITHM == 1
+            assert(num < XOffsetDatastructure::CHUNK_SIZE * XOffsetDatastructure::XStorageBitmap<std::size_t>::MAX_CHUNK_NUM);
+            if (num >= XOffsetDatastructure::CHUNK_SIZE * XOffsetDatastructure::XStorageBitmap<std::size_t>::MAX_CHUNK_NUM)
+            {
+                throw std::runtime_error("oversize error");
+            }
+#endif
             // std::cout << "expanding begin" << std::endl;
             auto oldData = mBuffer.data();
             DEBUG_PRINT_BLOCK((reinterpret_cast<XSimpleStorage *>(&mBuffer.front())));
