@@ -15,6 +15,16 @@
 
 namespace XOffsetDatastructure
 {
+	struct growth_factor_custom
+	// : boost::container::dtl::grow_factor_ratio<0, 3, 2> // growth_factor_50
+	// : boost::container::dtl::grow_factor_ratio<0, 8, 5> // growth_factor_60
+	// : boost::container::dtl::grow_factor_ratio<0, 7, 5>	// 40
+	// : boost::container::dtl::grow_factor_ratio<0, 13, 10>	// 30
+	// : boost::container::dtl::grow_factor_ratio<0, 6, 5>	// 20
+	: boost::container::dtl::grow_factor_ratio<0, 11, 10>	// 10
+	//: boost::container::dtl::grow_factor_ratio<0, 2, 1>	// 100
+	{};
+
 #if OFFSET_DATA_STRUCTURE_STORAGE_ALGORITHM == 0
 	using XSimpleStorage = XOffsetDatastructure::XSimpleStorageFreelist<std::size_t>;
 #elif OFFSET_DATA_STRUCTURE_STORAGE_ALGORITHM == 1
@@ -25,7 +35,7 @@ namespace XOffsetDatastructure
 	template <typename T>
 	using XVector = boost::container::vector<T, XOffsetDatastructure::XSimpleAllocator<T, XSimpleStorage>>;
 #elif OFFSET_DATA_STRUCTURE_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option = boost::container::vector_options_t< boost::container::growth_factor<boost::container::growth_factor_50> >;
+	using vector_option = boost::container::vector_options_t< boost::container::growth_factor<growth_factor_custom> >;
 	template <typename T>
 	using XVector = boost::container::vector<T, XOffsetDatastructure::XSimpleAllocator<T, XSimpleStorage>, vector_option>;
 #endif
@@ -35,7 +45,7 @@ namespace XOffsetDatastructure
 	using XSet = boost::container::flat_set<T, std::less<T>, XOffsetDatastructure::XSimpleAllocator<T, XSimpleStorage>>;
 	// using XSet = boost::container::set<T, std::less<T>, XOffsetDatastructure::XSimpleAllocator<T, XSimpleStorage>>;
 #elif OFFSET_DATA_STRUCTURE_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option_flatset = boost::container::vector_options_t< boost::container::growth_factor<boost::container::growth_factor_50> >;
+	using vector_option_flatset = boost::container::vector_options_t< boost::container::growth_factor<growth_factor_custom> >;
 	template <typename T>
 	using XVector_flatset = boost::container::vector<T, XOffsetDatastructure::XSimpleAllocator<T, XSimpleStorage>, vector_option_flatset>;
 	template <typename T>
@@ -47,7 +57,7 @@ namespace XOffsetDatastructure
 	using XMap = boost::container::flat_map<K, V, std::less<K>, XOffsetDatastructure::XSimpleAllocator<std::pair<K, V>, XSimpleStorage>>;
 	// using XMap = boost::container::map<K, V, std::less<K>, XOffsetDatastructure::XSimpleAllocator<std::pair<const K, V>, XSimpleStorage>>;
 #elif OFFSET_DATA_STRUCTURE_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option_flatmap = boost::container::vector_options_t< boost::container::growth_factor<boost::container::growth_factor_50> >;
+	using vector_option_flatmap = boost::container::vector_options_t< boost::container::growth_factor<growth_factor_custom> >;
 	template <typename K, typename V>
 	using XVector_flatmap = boost::container::vector<std::pair<K, V>, XOffsetDatastructure::XSimpleAllocator<std::pair<K, V>, XSimpleStorage>, vector_option_flatmap>;
 	template <typename K, typename V>
