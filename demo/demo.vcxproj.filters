@@ -18,9 +18,6 @@
     <ClCompile Include="xdemo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\misc\zlibcompressor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\xoffsetdatastructure\xconfig.hpp">
@@ -42,9 +39,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\xoffsetdatastructure\xtypes.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\misc\zlibcompressor.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
