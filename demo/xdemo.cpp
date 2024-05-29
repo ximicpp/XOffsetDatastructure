@@ -8,7 +8,6 @@
 #include <numeric>
 #include "xtypes.hpp"
 #include "xtypeholder.hpp"
-#include "zlibcompressor.hpp"
 
 using namespace XOffsetDatastructure;
 
@@ -110,10 +109,6 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 	RETRY_IF_BAD_ALLOC(mSetPtr->insert(-1), holder);
 	rootptr->mInt = 5;
 	holder.trim();
-
-	auto compressedSize = compressAndDecompress(holder.getBuffer().data(), holder.getBuffer().size());
-	std::cout << "raw size: " << holder.getBuffer().size() << std::endl;
-	std::cout << "compressed size: " << compressedSize << std::endl;
 
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
