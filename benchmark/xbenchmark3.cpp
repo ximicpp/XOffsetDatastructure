@@ -1658,7 +1658,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
         randomString += charset[dis(gen)];
     }
     XOffsetDatastructure::XTypeHolder<Character> r1;
-    r1.expand(1024 * 32);
+    r1.expand(1024 * 16);
     auto start1 = std::chrono::high_resolution_clock::now();
     auto rootptr = r1.getOffsetPtr();
     gen.seed(0);
@@ -1701,7 +1701,6 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
     if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
     
     auto finish1 = std::chrono::high_resolution_clock::now();
-    r1.trim();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
     // std::cout << "path: " << rootptr->path.capacity() << " " << rootptr->path.size() << std::endl;
@@ -1752,6 +1751,8 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
     }
     auto finish2 = std::chrono::high_resolution_clock::now();
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
+
+    r1.trim();
 
     auto bufSize = r1.getBuffer().size();
     std::vector<std::byte> data2(r1.getBuffer().size());
