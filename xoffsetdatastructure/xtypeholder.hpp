@@ -32,7 +32,7 @@ namespace XOffsetDatastructure
 #endif
         {
             int n = 1;
-            assert(*(std::byte *)&n == 1); // little endian.
+            assert(*(uint8_t*)&n == 1); // little endian.
             mBuffer.resize(dataSize + headerSize);
             XSimpleStorage *storage = new (reinterpret_cast<void *>(&mBuffer.front())) XSimpleStorage();
             DEBUG_SET_BASE_ADDR(storage, &mBuffer.front());
@@ -46,7 +46,7 @@ namespace XOffsetDatastructure
             : mBuffer(std::move(externalBuffer))
         {
             int n = 1;
-            assert(*(std::byte *)&n == 1); // little endian.
+            assert(*(uint8_t *)&n == 1); // little endian.
             // std::swap(externalBuffer, mBuffer);
             // mBuffer = std::move(externalBuffer);
             mPtr = reinterpret_cast<T *>(headerSize + reinterpret_cast<intptr_t>(mBuffer.data()));

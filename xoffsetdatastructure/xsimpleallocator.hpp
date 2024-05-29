@@ -62,6 +62,7 @@ namespace XOffsetDatastructure
 			return pointer(malloc(totalSize));
 #endif
 			std::size_t chunkNum = (totalSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
+			// std::cout << "allocate " << chunkNum << std::endl;
 			T *ptr = reinterpret_cast<T *>(storagePointer->mallocN(chunkNum, CHUNK_SIZE));
 			if (ptr == nullptr)
 			{

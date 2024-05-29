@@ -56,14 +56,21 @@ namespace XOffsetDatastructure
         size_type trimBuffer()
         {
             auto index = mBitArray.FindTailClearBits(mSize - 1);
+            // std::cout << "trimBuffer index: " << index << std::endl;
+            // std::cout << mBitArray.toString() << std::endl;
+            // printBlockStatus();
             if (index == -1)
             {
                 return 0;
             }
             assert(index < mSize);
             // mBitArray.setBits(index, mSize - 1, true);
-            mBitArray.SetBits(index, mSize - index);
-            return (mSize - index) * CHUNK_SIZE;
+            mBitArray.clearBits(index, mSize - index);
+            auto size = (mSize - index) * CHUNK_SIZE;
+            mSize = index;
+            // std::cout << mBitArray.toString() << std::endl;
+            // printBlockStatus();
+            return size;
         }
 
         void initBuffer(void *start, size_type size)
@@ -72,7 +79,7 @@ namespace XOffsetDatastructure
             assert(size % CHUNK_SIZE == 0);
             mSize = size / CHUNK_SIZE;
             // mBitArray.setBits(0, mSize - 1, false);
-            mBitArray.clearBits(0, mSize);
+            mBitArray.clearBits(0, MAX_CHUNK_NUM);
             mStartPointer = start;
         }
 
@@ -89,6 +96,8 @@ namespace XOffsetDatastructure
             assert(size / CHUNK_SIZE >= mSize);
             auto oldSize = mSize;
             mSize = size / CHUNK_SIZE;
+            if (mSize * CHUNK_SIZE != size)
+                throw std::runtime_error("oversize error");
             // mBitArray.setBits(oldSize, mSize - 1, false);
             mBitArray.clearBits(oldSize, mSize - oldSize);
             mStartPointer = start;
@@ -98,14 +107,14 @@ namespace XOffsetDatastructure
         {
             assert(partition_size == CHUNK_SIZE);
             // std::cout << mBitArray.toString() << std::endl;
-            // std::cout << "malloc n: " << n << std::endl;
+            // std::cout << "malloc n: " << numChunks << std::endl;
             auto startIndex = mBitArray.findClearBitsAndSet(numChunks, 0);
             // std::cout << mBitArray.toString() << std::endl;
             if (startIndex == -1)
             {
                 return nullptr;
             }
-            // std::cout << "after malloc startIndex: " << startIndex << " n: " << n << std::endl;
+            // std::cout << "after malloc startIndex: " << startIndex << " n: " << numChunks << std::endl;
 #if OFFSET_DATA_STRUCTURE_POINTER_TYPE == 0
             return static_cast<void *>(static_cast<std::byte *>(mStartPointer.get()) + startIndex * CHUNK_SIZE);
 #elif OFFSET_DATA_STRUCTURE_POINTER_TYPE == 1
@@ -133,13 +142,13 @@ namespace XOffsetDatastructure
             int inter_chunk_fragments = 0;
             for (auto i = 0; i < mSize; ++i)
             {
-                std::cout << mBitArray.getBit(i);
+                // std::cout << mBitArray.getBit(i);
                 if (!mBitArray.getBit(i))
                 {
                     ++inter_chunk_fragments;
                 }
             }
-            std::cout << std::endl;
+            // std::cout << std::endl;
             std::cout << "inter chunk fragments: " << 1.0f * inter_chunk_fragments / mSize << std::endl;
 
             // std::cout << mBitArray.toString() << std::endl;
