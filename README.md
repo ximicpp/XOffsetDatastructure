@@ -119,11 +119,11 @@ The data read/write performance of XOffsetDatastructure is comparable to that of
 
 XOffsetDatastructure can be used directly as base data structures in memory.  
 
-    | Containers               | Read/Write(100 thousand times, ms) |
-    | ------------------------ | ---------------------------------- |
-    | std::*                   | 68.0446                            |
-    | boost::*                 | 56.273                             |
-    | XOffsetDatastructure::*  | 49.8465                            |
+| Containers               | Read/Write(100 thousand times, ms) |
+| ------------------------ | ---------------------------------- |
+| std::*                   | 68.0446                            |
+| boost::*                 | 56.273                             |
+| XOffsetDatastructure::*  | 49.8465                            |
 
 ### 2.5 Pointer Validity
 
@@ -146,49 +146,48 @@ The performance statistics of XOffsetDatastructure are presented in this chapter
 The advantage of XOffsetDatastructure in terms of encoding and decoding performance is evident. The encoding and decoding time is almost zero due to zero-encoding and zero-decoding.    
 Note: Cista++(offset)[\[7\]](https://cista.rocks/), Cista++(raw)[\[8\]](https://cista.rocks/), zpp::bits[\[9\]](https://github.com/eyalz800/zpp_bits) are some modern C++ serialization libraries.  
 
-    | Algorithms           | Encoding/Decoding(100 thousand times, ms) |
-    | -------------------- | ----------------------------------------- |
-    | Cap'n Proto          | 259.225                                   |
-    | Cista++(offset)      | 584.549                                   |
-    | Cista++(raw)         | 531.557                                   |
-    | FlatBuffers          | 679.442                                   |
-    | MessagePack          | 957.7                                     |
-    | XOffsetDatastructure | 0.0530667                                 |
-    | zpp::bits            | 453.136                                   |
-    | Protocol Buffers     | 1578.06                                   |
+| Algorithms           | Encoding/Decoding(100 thousand times, ms) |
+| -------------------- | ----------------------------------------- |
+| Cap'n Proto          | 259.225                                   |
+| Cista++(offset)      | 584.549                                   |
+| Cista++(raw)         | 531.557                                   |
+| FlatBuffers          | 679.442                                   |
+| MessagePack          | 957.7                                     |
+| XOffsetDatastructure | 0.0530667                                 |
+| zpp::bits            | 453.136                                   |
+| Protocol Buffers     | 1578.06                                   |
 
 ### 3.2 Read and Write Performance
 
 XOffsetDatastructure has advantages in read and write performance.    
 Note: For solutions that lack support for in-place and non-in-place modifications, consider using STL for in-memory read and write.  
 
-    | Algorithms          | Containers Implementation| Read/Write             |
-    |                     |                          |(100 thousand times, ms)|
-    | ------------------- | ------------------------ | ---------------------- |
-    | Cap'n Proto         | std::*                   | 68.0446                |
-    | Cista++(offset)     | cista::offset::*         | 69.2177                |
-    | Cista++(raw)        | cista::raw:*             | 65.5362                |
-    | FlatBuffers         | std::*                   | 68.0446                |
-    | MessagePack         | std::*                   | 68.0446                |
-    | XOffsetDatastructure| XOffsetDatastructure::*  | 49.8465                |
-    | zpp::bits           | std::*                   | 75.3239                |
-    | Protocol Buffers    | google::protobuf::*      | 56.5378                |
+| Algorithms          | Containers Implementation| Read/Write (100 thousand times, ms)  |
+| ------------------- | ------------------------ | ------------------------------------ |
+| Cap'n Proto         | std::*                   | 68.0446                              |
+| Cista++(offset)     | cista::offset::*         | 69.2177                              |
+| Cista++(raw)        | cista::raw:*             | 65.5362                              |
+| FlatBuffers         | std::*                   | 68.0446                              |
+| MessagePack         | std::*                   | 68.0446                              |
+| XOffsetDatastructure| XOffsetDatastructure::*  | 49.8465                              |
+| zpp::bits           | std::*                   | 75.3239                              |
+| Protocol Buffers    | google::protobuf::*      | 56.5378                              |
 
 ### 3.3 Message Size
 
 The message size comparison is shown in the table below. The difference between the compressed message sizes is not significant, and XOffsetDatastructure is slightly superior compared to the other solutions.    
 Note: The compressed message size is crucial because network messages are typically transmitted in compressed form.
 
-    | Algorithms           | Wire Format Size (zlib/normal, bytes) |
-    | -------------------- | ------------------------------------- |
-    | Cap'n Proto          | 3205/3656                             |
-    | Cista++(offset)      | 3336/5392                             |
-    | Cista++(raw)         | 3294/5392                             |
-    | FlatBuffers          | 3247/3672                             |
-    | MessagePack          | 3064/3222                             |
-    | XOffsetDatastructure | 2749/5656                             |
-    | zpp::bits            | 2769/2916                             |
-    | Protocol Buffers     | 3759/4100                             |
+| Algorithms           | Wire Format Size (zlib/normal, bytes) |
+| -------------------- | ------------------------------------- |
+| Cap'n Proto          | 3205/3656                             |
+| Cista++(offset)      | 3336/5392                             |
+| Cista++(raw)         | 3294/5392                             |
+| FlatBuffers          | 3247/3672                             |
+| MessagePack          | 3064/3222                             |
+| XOffsetDatastructure | 2749/5656                             |
+| zpp::bits            | 2769/2916                             |
+| Protocol Buffers     | 3759/4100                             |
 
 ## 4. How
 
@@ -301,11 +300,11 @@ We have implemented auto-resizing in three ways:
 
 The performance of the three options is compared below:  
 
-    | Method    | Time (ms) |
-    |-----------|-----------|
-    | Exception | 1735      |
-    | longjmp   | 1395      |
-    | Leaf      | 3177      |
+| Method    | Time (ms) |
+|-----------|-----------|
+| Exception | 1735      |
+| longjmp   | 1395      |
+| Leaf      | 3177      |
 
 ## 5. Limitations and Plans
 
@@ -333,16 +332,16 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 
 ## 7. Appendix
 
-| Growth Factor  | Wire Format Size  | Read/Write  |  Encoding/Decoding  |
-| -------------- | ----------------- | ----------- | ------------------- |
-| 0.1            | 3992/2671         | 50.1851ms   | 0.03455ms           |
-| 0.2            | 4568/2709         | 51.327ms    | 0.02648ms           |
-| 0.3            | 4952/2740         | 53.6701ms   | 0.0272ms            |
-| 0.4            | 4760/2755         | 51.2758ms   | 0.02699ms           |
-| 0.5            | 8344/2782         | 51.5814ms   | 0.03568ms           |
-| 0.6            | 5656/2749         | 51.2941ms   | 0.02678ms           |
-| 0.7            | 8408/2849         | 52.3287ms   | 0.02724ms           |
-| 0.8            | 7064/2700         | 52.4735ms   | 0.02808ms           |
-| 0.9            | 8344/2742         | 50.7637ms   | 0.02616ms           |
-| 1.0            | 9624/2743         | 50.7227ms   | 0.0262ms            |
+| Growth Factor  | Wire Format Size  | Read/Write  | Encoding/Decoding  |
+| -------------- | ----------------- | ----------- | ------------------ |
+| 0.1            | 3992/2671         | 50.1851ms   | 0.03455ms          |
+| 0.2            | 4568/2709         | 51.327ms    | 0.02648ms          |
+| 0.3            | 4952/2740         | 53.6701ms   | 0.0272ms           |
+| 0.4            | 4760/2755         | 51.2758ms   | 0.02699ms          |
+| 0.5            | 8344/2782         | 51.5814ms   | 0.03568ms          |
+| 0.6            | 5656/2749         | 51.2941ms   | 0.02678ms          |
+| 0.7            | 8408/2849         | 52.3287ms   | 0.02724ms          |
+| 0.8            | 7064/2700         | 52.4735ms   | 0.02808ms          |
+| 0.9            | 8344/2742         | 50.7637ms   | 0.02616ms          |
+| 1.0            | 9624/2743         | 50.7227ms   | 0.0262ms           |
 
