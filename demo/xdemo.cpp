@@ -78,7 +78,7 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 		RETRY_IF_BAD_ALLOC(mSetPtr->insert(i), holder);
 	}
 
-	for (auto i = 0; i < 32; ++i)
+	for (auto i = 0; i < 16; ++i)
 	{
 		std::string key = "stringinset" + std::to_string(i);
 		RETRY_IF_BAD_ALLOC(rootptr->mComplexMap.emplace(std::piecewise_construct,
