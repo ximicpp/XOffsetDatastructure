@@ -16,13 +16,16 @@
 namespace XOffsetDatastructure
 {
 	struct growth_factor_custom
-	// : boost::container::dtl::grow_factor_ratio<0, 3, 2> // growth_factor_50
-	// : boost::container::dtl::grow_factor_ratio<0, 8, 5> // growth_factor_60
-	// : boost::container::dtl::grow_factor_ratio<0, 7, 5>	// 40
+	// : boost::container::dtl::grow_factor_ratio<0, 15, 10> // growth_factor_50
+	// : boost::container::dtl::grow_factor_ratio<0, 16, 10> // growth_factor_60
+	// : boost::container::dtl::grow_factor_ratio<0, 14, 10>	// 40
 	// : boost::container::dtl::grow_factor_ratio<0, 13, 10>	// 30
-	// : boost::container::dtl::grow_factor_ratio<0, 6, 5>	// 20
+	// : boost::container::dtl::grow_factor_ratio<0, 12, 10>	// 20
 	: boost::container::dtl::grow_factor_ratio<0, 11, 10>	// 10
-	//: boost::container::dtl::grow_factor_ratio<0, 2, 1>	// 100
+	// : boost::container::dtl::grow_factor_ratio<0, 17, 10> // growth_factor_70
+	// : boost::container::dtl::grow_factor_ratio<0, 18, 10> // growth_factor_80
+	// : boost::container::dtl::grow_factor_ratio<0, 19, 10> // growth_factor_90
+	// : boost::container::dtl::grow_factor_ratio<0, 2, 1>	// 100
 	{};
 
 #if OFFSET_DATA_STRUCTURE_STORAGE_ALGORITHM == 0
