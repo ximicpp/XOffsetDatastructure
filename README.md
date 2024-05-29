@@ -330,3 +330,19 @@ Efficiently processing compatibility is an issue that needs to be continued.
 XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization in the game industry by utilizing zero-encoding and zero-decoding.  
 
 XOffsetDatastructure is also a collection of high-performance data structures designed for efficient read and in-place/non-in-place write, with performance comparable to STL.   
+
+## 7. Appendix
+
+| Growth Factor  | Wire Format Size  | Read/Write  |  Encoding/Decoding  |
+| -------------- | ----------------- | ----------- | ------------------- |
+| 0.1            | 3992/2671         | 50.1851ms   | 0.03455ms           |
+| 0.2            | 4568/2709         | 51.327ms    | 0.02648ms           |
+| 0.3            | 4952/2740         | 53.6701ms   | 0.0272ms            |
+| 0.4            | 4760/2755         | 51.2758ms   | 0.02699ms           |
+| 0.5            | 8344/2782         | 51.5814ms   | 0.03568ms           |
+| 0.6            | 5656/2749         | 51.2941ms   | 0.02678ms           |
+| 0.7            | 8408/2849         | 52.3287ms   | 0.02724ms           |
+| 0.8            | 7064/2700         | 52.4735ms   | 0.02808ms           |
+| 0.9            | 8344/2742         | 50.7637ms   | 0.02616ms           |
+| 1.0            | 9624/2743         | 50.7227ms   | 0.0262ms            |
+
