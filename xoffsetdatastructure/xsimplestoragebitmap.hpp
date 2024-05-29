@@ -31,7 +31,7 @@ namespace XOffsetDatastructure
     {
     public:
         typedef SizeType size_type;
-        constexpr static size_type MAX_CHUNK_NUM = 1024;
+        constexpr static size_type MAX_CHUNK_NUM = 2048;
 
     private:
 #if OFFSET_DATA_STRUCTURE_POINTER_TYPE == 0
@@ -79,7 +79,7 @@ namespace XOffsetDatastructure
             assert(size % CHUNK_SIZE == 0);
             mSize = size / CHUNK_SIZE;
             // mBitArray.setBits(0, mSize - 1, false);
-            mBitArray.clearBits(0, MAX_CHUNK_NUM);
+            mBitArray.clearBits(0, mSize);
             mStartPointer = start;
         }
 
