@@ -84,13 +84,19 @@ namespace XOffsetDatastructure
 #endif
         void trim()
         {
+            DEBUG_PRINT_BLOCK((reinterpret_cast<XSimpleStorage*>(&mBuffer.front())));
             XSimpleStorage *storage = reinterpret_cast<XSimpleStorage *>(&mBuffer.front());
             auto trimSize = storage->trimBuffer();
-            // std::cout << "mBuffer.size() before trimming: " << mBuffer.size() << std::endl;
-            // std::cout << "trimSize: " << trimSize << std::endl;
+            std::cout << "mBuffer.size() before trimming: " << mBuffer.size() << std::endl;
+            std::cout << "trimSize: " << trimSize << std::endl;
             mBuffer.resize(mBuffer.size() - trimSize);
-            // std::cout << "mBuffer.size() after trimming: " << mBuffer.size() << std::endl;
+            // std::cout << "shrink_to_fit: "<< &mBuffer.front() << std::endl;
+            mBuffer.shrink_to_fit(); // realloc
+            mPtr = reinterpret_cast<T *>(headerSize + reinterpret_cast<intptr_t>(mBuffer.data())); // After shrink_to_fit, mPtr needs to be updated.
+            // std::cout << "shrink_to_fit: "<< &mBuffer.front() << std::endl;
+            std::cout << "mBuffer.size() after trimming: " << mBuffer.size() << std::endl;
             storage->setBuffer(&mBuffer.front() + headerSize, mBuffer.size() - headerSize);
+            DEBUG_PRINT_BLOCK((reinterpret_cast<XSimpleStorage*>(&mBuffer.front())));
         }
         inline T *operator->()
         {
