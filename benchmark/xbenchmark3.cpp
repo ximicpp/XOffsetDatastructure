@@ -20,7 +20,6 @@
 #include "character_generated.h"
 #include <ctime>
 
-
 constexpr bool WriteToFile = false;
 
 namespace benchmark3
@@ -498,12 +497,12 @@ namespace benchmark3_cistaoffset
         cista::offset::vector<int> ids;
         cista::offset::vector<cista::offset::string> strings;
 
-        bool operator==(const RecordOffset&other)
+        bool operator==(const RecordOffset &other)
         {
             return (ids == other.ids && strings == other.strings);
         }
 
-        bool operator!=(const RecordOffset&other)
+        bool operator!=(const RecordOffset &other)
         {
             return !(*this == other);
         }
@@ -565,8 +564,9 @@ zppbits_serialization_test3(size_t iterations)
         r1.skills.emplace_back(disInt32(gen), disInt32(gen));
     }
     auto x = disInt32(gen);
-    
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+
+    if (x != 1837058832)
+        throw std::logic_error("Random number sequence is inconsistent.");
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -596,12 +596,12 @@ zppbits_serialization_test3(size_t iterations)
             r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
         }
         r1.attributes.emplace_back(disFloat(gen));
-        
+
         auto itemUuid0 = disInt64(gen);
         Item item = {disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)};
         r1.items[itemUuid0] = item;
         r1.items.erase(itemUuid0);
-        
+
         r1.attributes.pop_back();
         for (auto i = 0; i < 8; ++i)
         {
@@ -616,33 +616,35 @@ zppbits_serialization_test3(size_t iterations)
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
 
     std::vector<std::byte> data;
-    zpp::bits::out out{ data };
+    zpp::bits::out out{data};
     out(r1);
     Character r2;
-    zpp::bits::in in{ data };
+    zpp::bits::in in{data};
     in(r2);
 
     auto len1 = out.position();
     auto len2 = in.position();
     assert(len1 == len2);
 
-    if (r1 != r2) {
+    if (r1 != r2)
+    {
         throw std::logic_error("offsetdatastructure's case: deserialization failed");
     }
 
-	if (WriteToFile)
-	{
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-		ofs.write(reinterpret_cast<char*>(data.data()), len1);
-		ofs.close();
-	}
-    
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(reinterpret_cast<char *>(data.data()), len1);
+        ofs.close();
+    }
+
     auto compressedSize = compressAndDecompress(data.data(), len1);
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (size_t it = 0; it < iterations; it++) {
+    for (size_t it = 0; it < iterations; it++)
+    {
         // Record r1;
         // for (size_t i = 0; i < kIntegers.size(); i++) {
         //     r1.ids.push_back(kIntegers[i]);
@@ -652,10 +654,10 @@ zppbits_serialization_test3(size_t iterations)
         //     r1.strings.emplace_back(strval);
         // }
         std::vector<std::byte> data;
-        zpp::bits::out out{ data };
+        zpp::bits::out out{data};
         out(r1);
         Character r2;
-        zpp::bits::in in{ data };
+        zpp::bits::in in{data};
         in(r2);
     }
     auto finish = std::chrono::high_resolution_clock::now();
@@ -719,24 +721,25 @@ flatbuffers_serialization_test3(size_t iterations)
             r1.skills.emplace_back(disInt32(gen), disInt32(gen));
         }
         auto x = disInt32(gen);
-        if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+        if (x != 1837058832)
+            throw std::logic_error("Random number sequence is inconsistent.");
         auto finish1 = std::chrono::high_resolution_clock::now();
         duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
         // test write performance
         auto start2 = std::chrono::high_resolution_clock::now();
-        //for (size_t it = 0; it < iterations; it++)
+        // for (size_t it = 0; it < iterations; it++)
         //{
-        //    r1.healthpoint += 1;
-        //    r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
-        //    r1.attributes.emplace_back(disFloat(gen));
-        //    auto itemUuid = disInt64(gen);
-        //    r1.items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
-        //    r1.items.erase(itemUuid);
-        //    r1.attributes.pop_back();
-        //    r1.path.pop_back();
-        //    r1.healthpoint -= 1;
-        //}
+        //     r1.healthpoint += 1;
+        //     r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
+        //     r1.attributes.emplace_back(disFloat(gen));
+        //     auto itemUuid = disInt64(gen);
+        //     r1.items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
+        //     r1.items.erase(itemUuid);
+        //     r1.attributes.pop_back();
+        //     r1.path.pop_back();
+        //     r1.healthpoint -= 1;
+        // }
         auto finish2 = std::chrono::high_resolution_clock::now();
         duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
     }
@@ -753,7 +756,7 @@ flatbuffers_serialization_test3(size_t iterations)
             equipBuilder.add_number(disInt32(gen));
             equipBuilder.add_timestamp(disInt64(gen));
             equipBuilder.add_level(disInt32(gen));
-            std::vector<float> attributes = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat (gen)};
+            std::vector<float> attributes = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
             auto attributesOffset = builder.CreateVector(attributes);
             equipBuilder.add_attributes(attributesOffset);
             flatbuffers::Offset<flatbuffers_test::Equip> equipOffset = equipBuilder.Finish();
@@ -797,7 +800,6 @@ flatbuffers_serialization_test3(size_t iterations)
         auto attributesOffset2 = builder.CreateVector(attributes);
         characterBuilder.add_attributes(attributesOffset2);
 
-
         auto itementriesOffset = builder.CreateVectorOfStructs(itementries);
         characterBuilder.add_items(itementriesOffset);
 
@@ -811,17 +813,18 @@ flatbuffers_serialization_test3(size_t iterations)
         characterBuilder.add_skills(skillsOffset);
 
         auto x = disInt32(gen);
-        if (x != 23126686)  throw std::logic_error("Random number sequence is inconsistent.");
+        if (x != 23126686)
+            throw std::logic_error("Random number sequence is inconsistent.");
         auto characterOffset = characterBuilder.Finish();
         builder.Finish(characterOffset);
 
-        uint8_t* bufferPtr = builder.GetBufferPointer();
+        uint8_t *bufferPtr = builder.GetBufferPointer();
         originalSize = builder.GetSize();
-        auto p = reinterpret_cast<char*>(builder.GetBufferPointer());
+        auto p = reinterpret_cast<char *>(builder.GetBufferPointer());
         auto sz = builder.GetSize();
         std::vector<char> buf(p, p + sz);
 
-        flatbuffers::Verifier verifier(reinterpret_cast<const uint8_t*>(bufferPtr), originalSize);
+        flatbuffers::Verifier verifier(reinterpret_cast<const uint8_t *>(bufferPtr), originalSize);
         if (!flatbuffers_test::VerifyCharacterBuffer(verifier))
         {
             std::cout << "Serialized data is invalid! " << originalSize << std::endl;
@@ -829,39 +832,41 @@ flatbuffers_serialization_test3(size_t iterations)
         // std::cout << "Serialized data is valid. "<< originalSize << std::endl;
 
         {
-            const flatbuffers_test::Character* rcharacter = flatbuffers_test::GetCharacter(buf.data());
+            const flatbuffers_test::Character *rcharacter = flatbuffers_test::GetCharacter(buf.data());
             auto requips = rcharacter->equips();
             // std::cout << requips->size() << std::endl;
             auto requip = requips->Get(1);
             auto rskills = rcharacter->skills();
             // std::cout << rskills->size() << std::endl;
-            const flatbuffers_test::Skill* skill = rskills->Get(3);
-            const flatbuffers::Vector<const flatbuffers_test::Position*>* rpath = rcharacter->path();
+            const flatbuffers_test::Skill *skill = rskills->Get(3);
+            const flatbuffers::Vector<const flatbuffers_test::Position *> *rpath = rcharacter->path();
             // std::cout << rpath->size() << std::endl;
-            const flatbuffers_test::Position* pos = rpath->Get(15);
+            const flatbuffers_test::Position *pos = rpath->Get(15);
             // std::cout << rpath->size() << " " << rskills->size() << std::endl;
-            if (rpath->size() != 16 || rskills->size() != 4) {
+            if (rpath->size() != 16 || rskills->size() != 4)
+            {
                 throw std::logic_error("flatbuffer's case: deserialization failed");
             }
-            const flatbuffers::Vector<const flatbuffers_test::ItemsEntry*>* rItementries = rcharacter->items();
-            const flatbuffers_test::ItemsEntry* rItementry = rItementries->Get(63);
+            const flatbuffers::Vector<const flatbuffers_test::ItemsEntry *> *rItementries = rcharacter->items();
+            const flatbuffers_test::ItemsEntry *rItementry = rItementries->Get(63);
             const flatbuffers_test::Item ritem = rItementry->value();
             // std::cout << rItementries->size() << " " << ritem.uuid() << std::endl;
         }
-   
+
         if (WriteToFile)
         {
             std::string functionName = __func__;
             std::string fileName = functionName + ".bin";
-        	std::ofstream ofs(fileName, std::ios::binary);
-        	ofs.write(reinterpret_cast<char*>(bufferPtr), originalSize);
-        	ofs.close();
+            std::ofstream ofs(fileName, std::ios::binary);
+            ofs.write(reinterpret_cast<char *>(bufferPtr), originalSize);
+            ofs.close();
         }
-        
+
         compressedSize = compressAndDecompress(bufferPtr, originalSize);
 
         auto start = std::chrono::high_resolution_clock::now();
-        for (size_t it = 0; it < iterations; it++) {
+        for (size_t it = 0; it < iterations; it++)
+        {
             flatbuffers::FlatBufferBuilder builder;
             flatbuffers_test::CharacterBuilder characterBuilder(builder);
 
@@ -875,7 +880,7 @@ flatbuffers_serialization_test3(size_t iterations)
                 equipBuilder.add_number(disInt32(gen));
                 equipBuilder.add_timestamp(disInt64(gen));
                 equipBuilder.add_level(disInt32(gen));
-                std::vector<float> attributes = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat (gen)};
+                std::vector<float> attributes = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
                 auto attributesOffset = builder.CreateVector(attributes);
                 equipBuilder.add_attributes(attributesOffset);
                 flatbuffers::Offset<flatbuffers_test::Equip> equipOffset = equipBuilder.Finish();
@@ -928,14 +933,15 @@ flatbuffers_serialization_test3(size_t iterations)
                 skills.push_back(skill);
             }
             auto x = disInt32(gen);
-            if (x != 23126686)  throw std::logic_error("Random number sequence is inconsistent.");
+            if (x != 23126686)
+                throw std::logic_error("Random number sequence is inconsistent.");
             auto skillsOffset = builder.CreateVectorOfStructs(skills);
             characterBuilder.add_skills(skillsOffset);
 
             auto characterOffset = characterBuilder.Finish();
             builder.Finish(characterOffset);
 
-            uint8_t* bufferPtr = builder.GetBufferPointer();
+            uint8_t *bufferPtr = builder.GetBufferPointer();
 
             auto r2 = flatbuffers_test::GetCharacter(bufferPtr);
             (void)r2->path()[0];
@@ -974,7 +980,7 @@ capnproto_serialization_test3(size_t iterations)
         r1.healthpoint = disFloat(gen);
         r1.manapoint = disFloat(gen);
         r1.speed = disFloat(gen);
-        r1.pos = { disFloat(gen), disFloat(gen), disFloat(gen) };
+        r1.pos = {disFloat(gen), disFloat(gen), disFloat(gen)};
         for (auto i = 0; i < 64; ++i)
         {
             r1.items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
@@ -995,7 +1001,7 @@ capnproto_serialization_test3(size_t iterations)
             equip.number = disInt32(gen);
             equip.timestamp = disInt64(gen);
             equip.level = disInt32(gen);
-            equip.attributes = { disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen) };
+            equip.attributes = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
             r1.equips.push_back(equip);
         }
         for (auto i = 0; i < 4; ++i)
@@ -1004,7 +1010,8 @@ capnproto_serialization_test3(size_t iterations)
         }
         auto x = disInt32(gen);
 
-        if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+        if (x != 1837058832)
+            throw std::logic_error("Random number sequence is inconsistent.");
         auto finish1 = std::chrono::high_resolution_clock::now();
         duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -1034,12 +1041,12 @@ capnproto_serialization_test3(size_t iterations)
                 r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
             }
             r1.attributes.emplace_back(disFloat(gen));
-            
+
             auto itemUuid0 = disInt64(gen);
             benchmark3_msgpack::Item item = {disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)};
             r1.items[itemUuid0] = item;
             r1.items.erase(itemUuid0);
-            
+
             r1.attributes.pop_back();
             for (auto i = 0; i < 8; ++i)
             {
@@ -1053,7 +1060,7 @@ capnproto_serialization_test3(size_t iterations)
         auto finish2 = std::chrono::high_resolution_clock::now();
         duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
     }
-      
+
     capnp::MallocMessageBuilder message;
     auto r1 = message.getRoot<capnp_character_test::Character>();
     gen.seed(0);
@@ -1116,8 +1123,9 @@ capnproto_serialization_test3(size_t iterations)
     // std::cout << r1.getEquips()[7].getTimestamp() << std::endl;
     // std::cout << r1.getSkills()[2].getLevel() << std::endl;
     auto x = disInt32(gen);
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
-    
+    if (x != 1837058832)
+        throw std::logic_error("Random number sequence is inconsistent.");
+
     // check if we can deserialize back
     kj::ArrayPtr<const kj::ArrayPtr<const capnp::word>> serialized = message.getSegmentsForOutput();
     kj::Array<capnp::word> dataArr = capnp::messageToFlatArray(message);
@@ -1125,20 +1133,21 @@ capnproto_serialization_test3(size_t iterations)
     auto r2 = reader.getRoot<capnp_character_test::Character>();
     auto size = dataArr.size() * sizeof(capnp::word);
 
-	if (WriteToFile)
-	{
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-		ofs.write(reinterpret_cast<char*>(dataArr.begin()), size);
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(reinterpret_cast<char *>(dataArr.begin()), size);
         // ofs.write(serializedAllInOne.data(), serializedAllInOne.size());
-		ofs.close();
-	}
+        ofs.close();
+    }
 
-    auto compressedSize = compressAndDecompress(reinterpret_cast<char*>(dataArr.begin()), size); 
+    auto compressedSize = compressAndDecompress(reinterpret_cast<char *>(dataArr.begin()), size);
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (size_t ii = 0; ii < iterations; ii++) {
+    for (size_t ii = 0; ii < iterations; ii++)
+    {
         capnp::MallocMessageBuilder message;
         auto r1 = message.getRoot<capnp_character_test::Character>();
         gen.seed(0);
@@ -1199,8 +1208,9 @@ capnproto_serialization_test3(size_t iterations)
         }
         auto x = disInt32(gen);
         // std::cout << r1.toString().flatten().cStr() << std::endl;
-        if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
-        //serialization
+        if (x != 1837058832)
+            throw std::logic_error("Random number sequence is inconsistent.");
+        // serialization
         kj::ArrayPtr<const kj::ArrayPtr<const capnp::word>> serialized = message.getSegmentsForOutput();
         kj::Array<capnp::word> dataArr = capnp::messageToFlatArray(message);
         // deserialization
@@ -1211,12 +1221,12 @@ capnproto_serialization_test3(size_t iterations)
     }
     auto finish = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
-    
+
     return benchmark3::Result("capnproto", std::to_string(CAPNP_VERSION), size, compressedSize, duration, duration1, duration2);
 }
 
 benchmark3::Result
-msgpack_serialization_test3(size_t iterations)
+msgpack_serialization_test3(size_t iterations, std::vector<benchmark3_msgpack::Character>& unitVector)
 {
     using namespace benchmark3_msgpack;
     std::random_device rd;
@@ -1269,8 +1279,9 @@ msgpack_serialization_test3(size_t iterations)
         r1.skills.emplace_back(disInt32(gen), disInt32(gen));
     }
     auto x = disInt32(gen);
-    
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+
+    if (x != 1837058832)
+        throw std::logic_error("Random number sequence is inconsistent.");
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -1300,12 +1311,12 @@ msgpack_serialization_test3(size_t iterations)
             r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
         }
         r1.attributes.emplace_back(disFloat(gen));
-        
+
         auto itemUuid0 = disInt64(gen);
         Item item = {disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)};
         r1.items[itemUuid0] = item;
         r1.items.erase(itemUuid0);
-        
+
         r1.attributes.pop_back();
         for (auto i = 0; i < 8; ++i)
         {
@@ -1319,6 +1330,8 @@ msgpack_serialization_test3(size_t iterations)
     auto finish2 = std::chrono::high_resolution_clock::now();
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
 
+    unitVector.push_back(r1);
+
     Character r2;
     msgpack::sbuffer sbuf;
     msgpack::pack(sbuf, r1);
@@ -1331,14 +1344,14 @@ msgpack_serialization_test3(size_t iterations)
         throw std::logic_error("msgpack's case: deserialization failed");
     }
 
-	if (WriteToFile)
-	{
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-		ofs.write(serialized.data(), serialized.size());
-		ofs.close();
-	}
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(serialized.data(), serialized.size());
+        ofs.close();
+    }
 
     auto compressedSize = compressAndDecompress(serialized.data(), serialized.size());
 
@@ -1418,7 +1431,8 @@ benchmark3::Result cistaraw_serialization_test3(size_t iterations)
     //     r1.strings.emplace_back(strval);
     // }
     auto x = disInt32(gen);
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+    if (x != 1837058832)
+        throw std::logic_error("Random number sequence is inconsistent.");
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -1450,12 +1464,12 @@ benchmark3::Result cistaraw_serialization_test3(size_t iterations)
             r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
         }
         r1.attributes.emplace_back(disFloat(gen));
-        
+
         auto itemUuid0 = disInt64(gen);
         Item item = {disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)};
         r1.items[itemUuid0] = item;
         r1.items.erase(itemUuid0);
-        
+
         r1.attributes.pop_back();
         for (auto i = 0; i < 8; ++i)
         {
@@ -1473,9 +1487,10 @@ benchmark3::Result cistaraw_serialization_test3(size_t iterations)
 
     std::vector<unsigned char> buf;
     buf = cista::serialize(r1);
-    Character* r2 = cista::raw::deserialize<Character>(buf);
+    Character *r2 = cista::raw::deserialize<Character>(buf);
     // Character* r2 = cista::raw::deserialize<Character>(buf);  // deserialize fail when gen.seed(0)
-    if (r1 != *r2) {
+    if (r1 != *r2)
+    {
         throw std::logic_error("offsetdatastructure's case: deserialization failed");
     }
     if (buf.size() != buf2.size())
@@ -1483,19 +1498,20 @@ benchmark3::Result cistaraw_serialization_test3(size_t iterations)
         throw std::logic_error("offsetdatastructure's case: deserialization failed");
     }
 
-	if (WriteToFile)
-	{
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-		ofs.write(reinterpret_cast<char*>(buf.data()), buf.size());
-		ofs.close();
-	}
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(reinterpret_cast<char *>(buf.data()), buf.size());
+        ofs.close();
+    }
 
     auto compressedSize = compressAndDecompress(buf.data(), buf.size());
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (size_t it = 0; it < iterations; it++) {
+    for (size_t it = 0; it < iterations; it++)
+    {
         std::vector<unsigned char> buf;
         buf = cista::serialize(r1);
         Character r2 = *cista::raw::deserialize<Character>(buf);
@@ -1562,8 +1578,9 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
         r1.skills.emplace_back(disInt32(gen), disInt32(gen));
     }
     auto x = disInt32(gen);
-    
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
+
+    if (x != 1837058832)
+        throw std::logic_error("Random number sequence is inconsistent.");
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -1593,12 +1610,12 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
             r1.path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
         }
         r1.attributes.emplace_back(disFloat(gen));
-        
+
         auto itemUuid0 = disInt64(gen);
         Item item = {disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)};
         r1.items[itemUuid0] = item;
         r1.items.erase(itemUuid0);
-        
+
         r1.attributes.pop_back();
         for (auto i = 0; i < 8; ++i)
         {
@@ -1615,23 +1632,25 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
     std::vector<unsigned char> buf;
     buf = cista::serialize(r1);
     Character *r2 = cista::offset::deserialize<Character>(buf);
-    if (r1 != *r2) {
+    if (r1 != *r2)
+    {
         throw std::logic_error("offsetdatastructure's case: deserialization failed");
     }
 
-	if (WriteToFile)
-	{
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-        ofs.write(reinterpret_cast<char*>(buf.data()), buf.size());
-		ofs.close();
-	}
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(reinterpret_cast<char *>(buf.data()), buf.size());
+        ofs.close();
+    }
 
     auto compressedSize = compressAndDecompress(buf.data(), buf.size());
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (size_t it = 0; it < iterations; it++) {
+    for (size_t it = 0; it < iterations; it++)
+    {
         std::vector<unsigned char> buf;
         buf = cista::serialize(r1);
         Character r2 = *cista::offset::deserialize<Character>(buf);
@@ -1642,9 +1661,10 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
     return benchmark3::Result(libName, "1.0.0", buf.size(), compressedSize, duration, duration1, duration2);
 }
 
-benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
+benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> &unitVector)
 {
     using namespace benchmark3_offsetdatastructure;
+    benchmark3::Result ret("offsetdatastructure", "1.0.0", 0, 0, 0, 0, 0);
     std::random_device rd;
     std::mt19937_64 gen(0);
     std::uniform_int_distribution<uint64_t> disInt64;
@@ -1698,8 +1718,9 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
         rootptr->skills.emplace_back(disInt32(gen), disInt32(gen));
     }
     auto x = disInt32(gen);
-    if (x != 1837058832)  throw std::logic_error("Random number sequence is inconsistent.");
-    
+    if (x != 1837058832)
+         throw std::logic_error("Random number sequence is inconsistent.");
+
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
 
@@ -1753,6 +1774,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
 
     r1.trim();
+    unitVector.push_back(r1);
 
     auto bufSize = r1.getBuffer().size();
     std::vector<std::byte> data2(r1.getBuffer().size());
@@ -1762,15 +1784,15 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
     {
         throw std::logic_error("offsetdatastructure's case: deserialization failed");
     }
-    
-	if (WriteToFile)
-	{
+
+    if (WriteToFile)
+    {
         std::string functionName = __func__;
         std::string fileName = functionName + ".bin";
-		std::ofstream ofs(fileName, std::ios::binary);
-		ofs.write(reinterpret_cast<const char *>(r1.getBuffer().data()), r1.getBuffer().size());
-		ofs.close();
-	}
+        std::ofstream ofs(fileName, std::ios::binary);
+        ofs.write(reinterpret_cast<const char *>(r1.getBuffer().data()), r1.getBuffer().size());
+        ofs.close();
+    }
 
     auto compressedSize = compressAndDecompress(r1.getBuffer().data(), r1.getBuffer().size());
 
@@ -1817,39 +1839,55 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations)
         //     rootptr->skills.emplace_back(disInt32(gen), disInt32(gen));
         // }
         // r1.trim();
-        // serialization 
-        const std::vector<std::byte>& buf = r1.getBuffer();
-        
+        // serialization
+        const std::vector<std::byte> &buf = r1.getBuffer();
+
         // deserialization
-        XOffsetDatastructure::XTypeHolder<Character> r2(const_cast<std::vector<std::byte>&>(buf));
+        XOffsetDatastructure::XTypeHolder<Character> r2(const_cast<std::vector<std::byte> &>(buf));
     }
     auto finish = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
+
     return benchmark3::Result("offsetdatastructure", "1.0.0", bufSize, compressedSize, duration, duration1, duration2);
 }
 
 int main()
 {
-    auto iterNum = 100000;
+    auto iterNum = 1; // 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
+    std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
+    std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
+    // for (auto i = 0; i < 1000; ++i)
+    // {
+    //     std::cout << "iteration: " << i << std::endl;
+    //     // auto result = cistaraw_serialization_test3(iterNum);
+    //     // results["cistaraw"].push_back(result);
+    //     // result = cistaoffset_serialization_test3(iterNum);
+    //     // results["cistaoffse"].push_back(result);
+    //     // result = capnproto_serialization_test3(iterNum);
+    //     // results["capnproto"].push_back(result);
+    //     // result = flatbuffers_serialization_test3(iterNum);
+    //     // results["flatbuffers"].push_back(result);
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
+    //     results["offsetdatastructure"].push_back(result);
+    //     // result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
+    //     // results["msgpack"].push_back(result);
+    //     // result = zppbits_serialization_test3(iterNum);
+    //     // results["zppbits"].push_back(result);
+    // }
     for (auto i = 0; i < 1; ++i)
     {
         std::cout << "iteration: " << i << std::endl;
-        auto result = cistaraw_serialization_test3(iterNum);
-        results["cistaraw"].push_back(result);
-        result = cistaoffset_serialization_test3(iterNum);
-        results["cistaoffse"].push_back(result);
-        result = capnproto_serialization_test3(iterNum);
-        results["capnproto"].push_back(result);
-        result = flatbuffers_serialization_test3(iterNum);
-        results["flatbuffers"].push_back(result);
-        result = offsetdatastructure_serialization_test3(iterNum);
+        auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
         results["offsetdatastructure"].push_back(result);
-        result = msgpack_serialization_test3(iterNum);
-        results["msgpack"].push_back(result);
-        result = zppbits_serialization_test3(iterNum);
-        results["zppbits"].push_back(result);
     }
+
+    // for (auto i = 0; i < 10000; ++i)
+    // {
+    //     std::cout << "iteration: " << i << std::endl;
+    //     auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
+    //     results["msgpack"].push_back(result);
+    // }
     for (const auto &result : results)
     {
         std::cout << result.first << ":" << std::endl;
