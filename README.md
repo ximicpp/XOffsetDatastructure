@@ -332,6 +332,8 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 
 ## 7. Appendix
 
+### 7.1 Growth Factor
+
 | Growth Factor  | Wire Format Size  | Read/Write  | Encoding/Decoding  |
 | -------------- | ----------------- | ----------- | ------------------ |
 | 0.1            | 3992/2671         | 50.1851ms   | 0.03455ms          |
@@ -344,4 +346,34 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 | 0.8            | 7064/2700         | 52.4735ms   | 0.02808ms          |
 | 0.9            | 8344/2742         | 50.7637ms   | 0.02616ms          |
 | 1.0            | 9624/2743         | 50.7227ms   | 0.0262ms           |
+
+
+### 7.2 Memory Usage
+
+10000 units
+
+| Algorithms               | Containers Implementation| Memory Usage (10 thousand units, MB) |
+| ------------------------ | ------------------------ | ------------------------------------ |
+| MessagePack              | std::*                   | 135                                  |
+| XOffsetDatastructure(10) | XOffsetDatastructure::*  | 125                                  |
+| XOffsetDatastructure(60) | XOffsetDatastructure::*  | 182                                  |
+| XOffsetDatastructure(30) | XOffsetDatastructure::*  | 160                                  |
+
+XOffsetDatastructure(10)
+111111111111111111111111111111111111100111111110000111111111
+inter chunk fragments: 0.1
+
+XOffsetDatastructure(30)
+111100000111111111111000001111110001111111111111111111111111111111111111111
+inter chunk fragments: 0.173333
+
+XOffsetDatastructure(60)
+11110111000000111111100000000000111111111111111111111111111111111111111111111111111111
+inter chunk fragments: 0.209302
+
+XOffsetDatastructure(100)
+1111011100111111000000000000000000000000000000000000000000000000000011111111111111111111111111111111111111111111111111111111111111111111111111111111
+inter chunk fragments: 0.371622
+
+### 7.3 Compaction
 
