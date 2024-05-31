@@ -145,13 +145,13 @@ namespace XOffsetDatastructure
             int inter_chunk_fragments = 0;
             for (auto i = 0; i < mSize; ++i)
             {
-                // std::cout << mBitArray.getBit(i);
+                std::cout << mBitArray.getBit(i);
                 if (!mBitArray.getBit(i))
                 {
                     ++inter_chunk_fragments;
                 }
             }
-            // std::cout << std::endl;
+            std::cout << std::endl;
             std::cout << "inter chunk fragments: " << 1.0f * inter_chunk_fragments / mSize << std::endl;
 
             // std::cout << mBitArray.toString() << std::endl;
