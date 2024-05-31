@@ -39,7 +39,7 @@ public:
 	XString mString;
 };
 
-void writeData(const std::string &datafile, boost::container::vector<double> &writeTimes, bool writeFile = true)
+std::size_t writeData(const std::string &datafile, boost::container::vector<double> &writeTimes, bool writeFile = true)
 {
 	auto start = std::chrono::high_resolution_clock::now();
 	XTypeHolder<TestType> holder;
@@ -61,24 +61,24 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 		RETRY_IF_BAD_ALLOC(rootptr->TestTypeInnerObj.mVector.push_back(64 + i), holder);
 	}
 
-	for (auto i = 0; i < 12; ++i)
+	for (auto i = 0; i < 6; ++i)
 	{
 		RETRY_IF_BAD_ALLOC(rootptr->mVector.push_back(1024 + i), holder);
 		RETRY_IF_BAD_ALLOC(rootptr->mSet.insert(1024 - i), holder);
 	}
-	for (auto i = 0; i < 16; ++i)
+	for (auto i = 0; i < 10; ++i)
 	{
 		RETRY_IF_BAD_ALLOC(rootptr->mStringVector.emplace_back("abcdefghijklmnopqrstuvwxyz", holder.getStorage()), holder);
 	}
 	// XTypeHolderOffsetPtr<XSet<int>> mSetPtr = holder.getOffsetPtr<XSet<int>>(reinterpret_cast<char*>(&(rootptr->mSet)));
 	auto mSetPtr = holder.getOffsetPtr<XSet<int>>(rootptr->mSet);
-	for (auto i = 0; i < 16; ++i)
+	for (auto i = 0; i < 13; ++i)
 	{
 		RETRY_IF_BAD_ALLOC(rootptr->mStringSet.emplace("stringinset", holder.getStorage()), holder);
 		RETRY_IF_BAD_ALLOC(mSetPtr->insert(i), holder);
 	}
 
-	for (auto i = 0; i < 16; ++i)
+	for (auto i = 0; i < 7; ++i)
 	{
 		std::string key = "stringinset" + std::to_string(i);
 		RETRY_IF_BAD_ALLOC(rootptr->mComplexMap.emplace(std::piecewise_construct,
@@ -94,7 +94,7 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 		RETRY_IF_BAD_ALLOC((*vecPtr = {7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12, 7, 8, 9, 10, 11, 12,}), holder);
 	}
 
-	for (auto i = 0; i < 12; ++i)
+	for (auto i = 0; i < 6; ++i)
 	{
 		RETRY_IF_BAD_ALLOC(rootptr->mXXTypeVector.emplace_back(holder.getStorage()), holder);
  		rootptr->mXXTypeVector.back().mInt = i;
@@ -109,6 +109,7 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 	RETRY_IF_BAD_ALLOC(mSetPtr->insert(-1), holder);
 	rootptr->mInt = 5;
 	holder.trim();
+	std::size_t storageSize = holder.getBuffer().size();
 
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
@@ -120,9 +121,10 @@ void writeData(const std::string &datafile, boost::container::vector<double> &wr
 		ofs.write(reinterpret_cast<const char*>(holder.getBuffer().data()), holder.getBuffer().size());
 		ofs.close();
 	}
+	return storageSize;
 }
 
-void readData(const std::string &datafile, boost::container::vector<double> &readTimes)
+std::size_t readData(const std::string &datafile, boost::container::vector<double> &readTimes)
 {
 	std::ifstream ifs(datafile, std::ios::binary);
 	ifs.seekg(0, std::ios::end);
@@ -188,6 +190,8 @@ void readData(const std::string &datafile, boost::container::vector<double> &rea
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	readTimes.push_back(elapsed_seconds.count());
+
+	return storageSize;
 }
 
 int main()
@@ -195,6 +199,7 @@ int main()
 	bool forceRemove = true;
 	const std::string datafile("data.bin");
 	const int numRuns = 0;
+	std::size_t storageSize = 0;
 	boost::container::vector<double> writeTimes(numRuns);
 	boost::container::vector<double> readTimes(numRuns);
 	if (forceRemove)
@@ -203,18 +208,18 @@ int main()
 	}
 	if (!std::filesystem::exists(datafile))
 	{
-		writeData(datafile, writeTimes);
+		storageSize = writeData(datafile, writeTimes);
 	}
 	readData(datafile, readTimes);
 	for (int i = 0; i < numRuns; ++i)
 	{
-		writeData(datafile, writeTimes, false);
+		storageSize = writeData(datafile, writeTimes, false);
 		readData(datafile, readTimes);
 	}
 	double writeTimeAvg = std::accumulate(writeTimes.begin(), writeTimes.end(), 0.0) / numRuns;
 	double readTimeAvg = std::accumulate(readTimes.begin(), readTimes.end(), 0.0) / numRuns;
 	std::cout << std::left << std::setw(25) << "Average writeData time:" << std::right << std::setw(10) << std::fixed << std::setprecision(3) << writeTimeAvg * 1000 << " ms" << std::endl;
 	std::cout << std::left << std::setw(25) << "Average readData time:" << std::right << std::setw(10) << std::fixed << std::setprecision(3) << readTimeAvg * 1000 << " ms" << std::endl;
-
+	std::cout << "storageSize: " << storageSize << std::endl;
 	return 0;
 }
