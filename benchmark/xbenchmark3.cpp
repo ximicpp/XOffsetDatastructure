@@ -1691,7 +1691,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     rootptr->pos = {disFloat(gen), disFloat(gen), disFloat(gen)};
     if (ContianerPreAllocation)
     {
-        rootptr->items.reserve(64);
+        rootptr->items.reserve(66);
         for (auto i = 0; i < 64; ++i)
         {
             rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
@@ -1779,6 +1779,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
         rootptr->pos = {disFloat(gen), disFloat(gen), disFloat(gen)};
         for (auto i = 0; i < 4; ++i)
         {
+            rootptr->equips.pop_back();
             rootptr->equips.emplace_back(r1.getStorage());
             auto &equip = rootptr->equips.back();
             equip.id = disInt32(gen);
@@ -1788,8 +1789,8 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
             equip.level = disInt32(gen);
             auto attributesPtr = r1.getOffsetPtr<XOffsetDatastructure::XVector<float>>(equip.attributes);
             *attributesPtr = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
-            rootptr->equips.pop_back();
         }
+
         for (auto i = 0; i < 8; ++i)
         {
             rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
@@ -1803,6 +1804,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
             rootptr->path.pop_back();
         }
         rootptr->attributes.pop_back();
+
         rootptr->speed -= 1;
         rootptr->manapoint -= 1;
         rootptr->healthpoint -= 1;
@@ -1891,7 +1893,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 0; // 100000;
+    auto iterNum = 10; // 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
     std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
