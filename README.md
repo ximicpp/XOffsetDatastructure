@@ -350,7 +350,7 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 
 ### 7.2 Memory Usage
 
-10000 units
+#### 7.2.1 10000 units
 
 | Algorithms               | Containers Implementation| Memory Usage (10 thousand units, MB) |
 | ------------------------ | ------------------------ | ------------------------------------ |
@@ -359,6 +359,7 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 | XOffsetDatastructure(60) | XOffsetDatastructure::*  | 182                                  |
 | XOffsetDatastructure(30) | XOffsetDatastructure::*  | 160                                  |
 
+#### 7.2.2 Growth Factor
 XOffsetDatastructure(10)
 111111111111111111111111111111111111100111111110000111111111
 inter chunk fragments: 0.1
@@ -374,6 +375,46 @@ inter chunk fragments: 0.209302
 XOffsetDatastructure(100)
 1111011100111111000000000000000000000000000000000000000000000000000011111111111111111111111111111111111111111111111111111111111111111111111111111111
 inter chunk fragments: 0.371622
+
+#### 7.2.3 Pre-allocation
+
+iterations 0
+1111111111111111111111111111111111111111111111111111111111
+inter chunk fragments: 0
+offsetdatastructure:
+ offsetdatastructure      1.0.0       3864       2915  
+
+iterations 10
+1111111111111111111111111111111111111110011111000111111111111111111
+inter chunk fragments: 0.0746269
+offsetdatastructure:
+ offsetdatastructure      1.0.0       4440       3133   
+
+
+111111111111111111111111111111111111101111111111111
+inter chunk fragments: 0.0196078
+1111111111111111111111111111111111111111111111111111111111
+inter chunk fragments: 0
+offsetdatastructure:
+ offsetdatastructure      1.0.0       3416       2472          0ms     17.984ms          0ms          0ms 
+ offsetdatastructure      1.0.0       3864       2915          0ms    12.8333ms          0ms          0ms 
+
+
+11111111111111111111111111111111111111111111111111
+inter chunk fragments: 0
+offsetdatastructure:
+ offsetdatastructure      1.0.0       3416       2472          0ms    17.6407ms     0.0001ms          0ms 
+ offsetdatastructure      1.0.0       3352       2454     0.0001ms    17.5932ms     0.0001ms          0ms 
+
+
+11111111111111111111111111111111111111111111111101001000000011111111
+inter chunk fragments: 0.147059
+1111111111111111111111111111111111111111111111111111111111
+inter chunk fragments: 0
+offsetdatastructure:
+ offsetdatastructure      1.0.0       4504       3037          0ms    16.2511ms          0ms          0ms 
+ offsetdatastructure      1.0.0       3864       2915          0ms    14.9141ms          0ms          0ms 
+ 
 
 ### 7.3 Compaction
 
