@@ -430,6 +430,17 @@ offsetdatastructure:
  offsetdatastructure      1.0.0       3864       2915          0ms    14.9141ms          0ms          0ms 
 
 
+items(flatmap) pre alloc:
+growth factor 0.6
+offsetdatastructure      1.0.0       5080       2933
+growth factor 0.6 items pre alloc
+offsetdatastructure      1.0.0       3800       2893
+
+growth factor 0.1
+offsetdatastructure      1.0.0       3864       2915 
+growth factor 0.1 items pre alloc
+offsetdatastructure      1.0.0       3800       2893 
+
 ### 7.3 Compaction
 
 

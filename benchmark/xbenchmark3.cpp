@@ -1689,12 +1689,13 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     rootptr->manapoint = disFloat(gen);
     rootptr->speed = disFloat(gen);
     rootptr->pos = {disFloat(gen), disFloat(gen), disFloat(gen)};
-    for (auto i = 0; i < 64; ++i)
-    {
-        rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
-    }
     if (ContianerPreAllocation)
     {
+        rootptr->items.reserve(64);
+        for (auto i = 0; i < 64; ++i)
+        {
+            rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
+        }
         rootptr->path.resize(16);
         for (auto i = 0; i < 16; ++i)
         {
@@ -1725,6 +1726,10 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     }
     else
     {
+        for (auto i = 0; i < 64; ++i)
+        {
+            rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
+        }
         for (auto i = 0; i < 16; ++i)
         {
             rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
@@ -1886,7 +1891,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 10; // 100000;
+    auto iterNum = 0; // 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
     std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
