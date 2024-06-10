@@ -1775,7 +1775,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
         for (auto i = 0; i < 4; ++i)
         {
             rootptr->equips.emplace_back(r1.getStorage());
-            auto equip = rootptr->equips.back();
+            auto &equip = rootptr->equips.back();
             equip.id = disInt32(gen);
             equip.uuid = disInt64(gen);
             equip.number = disInt32(gen);
@@ -1886,7 +1886,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 0; // 100000;
+    auto iterNum = 10; // 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
     std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
@@ -1911,6 +1911,12 @@ int main()
     for (auto i = 0; i < 1; ++i)
     {
         std::cout << "iteration: " << i << std::endl;
+        auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
+        results["msgpack"].push_back(result);
+    }
+    for (auto i = 0; i < 1; ++i)
+    {
+        std::cout << "iteration: " << i << std::endl;
         auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
         results["offsetdatastructure"].push_back(result);
     }
@@ -1920,12 +1926,7 @@ int main()
         auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true);
         results["offsetdatastructure"].push_back(result);
     }
-    // for (auto i = 0; i < 10000; ++i)
-    // {
-    //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
-    //     results["msgpack"].push_back(result);
-    // }
+
     for (const auto &result : results)
     {
         std::cout << result.first << ":" << std::endl;
