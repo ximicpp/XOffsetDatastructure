@@ -1226,7 +1226,7 @@ capnproto_serialization_test3(size_t iterations)
 }
 
 benchmark3::Result
-msgpack_serialization_test3(size_t iterations, std::vector<benchmark3_msgpack::Character>& unitVector)
+msgpack_serialization_test3(size_t iterations, std::vector<benchmark3_msgpack::Character> &unitVector)
 {
     using namespace benchmark3_msgpack;
     std::random_device rd;
@@ -1661,7 +1661,7 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
     return benchmark3::Result(libName, "1.0.0", buf.size(), compressedSize, duration, duration1, duration2);
 }
 
-benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> &unitVector)
+benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> &unitVector, bool ContianerPreAllocation = false)
 {
     using namespace benchmark3_offsetdatastructure;
     benchmark3::Result ret("offsetdatastructure", "1.0.0", 0, 0, 0, 0, 0);
@@ -1693,33 +1693,66 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     {
         rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
     }
-    for (auto i = 0; i < 16; ++i)
+    if (ContianerPreAllocation)
     {
-        rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
+        rootptr->path.resize(16);
+        for (auto i = 0; i < 16; ++i)
+        {
+            rootptr->path[i] = {disFloat(gen), disFloat(gen), disFloat(gen)};
+        }
+        rootptr->attributes.resize(16);
+        for (auto i = 0; i < 16; ++i)
+        {
+            rootptr->attributes[i] = disFloat(gen);
+        }
+        rootptr->equips.resize(8, r1.getStorage());
+        for (auto i = 0; i < 8; ++i)
+        {
+            auto &equip = rootptr->equips[i];
+            equip.id = disInt32(gen);
+            equip.uuid = disInt64(gen);
+            equip.number = disInt32(gen);
+            equip.timestamp = disInt64(gen);
+            equip.level = disInt32(gen);
+            auto attributesPtr = r1.getOffsetPtr<XOffsetDatastructure::XVector<float>>(equip.attributes);
+            *attributesPtr = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
+        }
+        rootptr->skills.resize(4);
+        for (auto i = 0; i < 4; ++i)
+        {
+            rootptr->skills[i] = {disInt32(gen), disInt32(gen)};
+        }
     }
-    for (auto i = 0; i < 16; ++i)
+    else
     {
-        rootptr->attributes.emplace_back(disFloat(gen));
-    }
-    for (auto i = 0; i < 8; ++i)
-    {
-        rootptr->equips.emplace_back(r1.getStorage());
-        auto equip = rootptr->equips.back();
-        equip.id = disInt32(gen);
-        equip.uuid = disInt64(gen);
-        equip.number = disInt32(gen);
-        equip.timestamp = disInt64(gen);
-        equip.level = disInt32(gen);
-        auto attributesPtr = r1.getOffsetPtr<XOffsetDatastructure::XVector<float>>(equip.attributes);
-        *attributesPtr = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
-    }
-    for (auto i = 0; i < 4; ++i)
-    {
-        rootptr->skills.emplace_back(disInt32(gen), disInt32(gen));
+        for (auto i = 0; i < 16; ++i)
+        {
+            rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
+        }
+        for (auto i = 0; i < 16; ++i)
+        {
+            rootptr->attributes.emplace_back(disFloat(gen));
+        }
+        for (auto i = 0; i < 8; ++i)
+        {
+            rootptr->equips.emplace_back(r1.getStorage());
+            auto &equip = rootptr->equips.back();
+            equip.id = disInt32(gen);
+            equip.uuid = disInt64(gen);
+            equip.number = disInt32(gen);
+            equip.timestamp = disInt64(gen);
+            equip.level = disInt32(gen);
+            auto attributesPtr = r1.getOffsetPtr<XOffsetDatastructure::XVector<float>>(equip.attributes);
+            *attributesPtr = {disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen), disFloat(gen)};
+        }
+        for (auto i = 0; i < 4; ++i)
+        {
+            rootptr->skills.emplace_back(disInt32(gen), disInt32(gen));
+        }
     }
     auto x = disInt32(gen);
     if (x != 1837058832)
-         throw std::logic_error("Random number sequence is inconsistent.");
+        throw std::logic_error("Random number sequence is inconsistent.");
 
     auto finish1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
@@ -1853,7 +1886,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 1; // 100000;
+    auto iterNum = 0; // 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
     std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
@@ -1881,7 +1914,12 @@ int main()
         auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
         results["offsetdatastructure"].push_back(result);
     }
-
+    for (auto i = 0; i < 1; ++i)
+    {
+        std::cout << "iteration: " << i << std::endl;
+        auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true);
+        results["offsetdatastructure"].push_back(result);
+    }
     // for (auto i = 0; i < 10000; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
