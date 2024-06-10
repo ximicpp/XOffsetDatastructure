@@ -359,6 +359,20 @@ XOffsetDatastructure is also a collection of high-performance data structures de
 | XOffsetDatastructure(60) | XOffsetDatastructure::*  | 182                                  |
 | XOffsetDatastructure(30) | XOffsetDatastructure::*  | 160                                  |
 
+auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure); # 162m
+auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true); # 299m
+auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack); # 439m
+
+with 10/100 modifications
+135m 135m MessagePack
+295m 160m XOffsetDatastructure(10)
+439m 144m XOffsetDatastructure(10) with prealloc
+
+with 0 modifications
+135m 135m MessagePack
+275m 140m XOffsetDatastructure(10)
+402m 127m XOffsetDatastructure(10) with prealloc
+
 #### 7.2.2 Growth Factor
 XOffsetDatastructure(10)
 111111111111111111111111111111111111100111111110000111111111
@@ -414,7 +428,7 @@ inter chunk fragments: 0
 offsetdatastructure:
  offsetdatastructure      1.0.0       4504       3037          0ms    16.2511ms          0ms          0ms 
  offsetdatastructure      1.0.0       3864       2915          0ms    14.9141ms          0ms          0ms 
- 
+
 
 ### 7.3 Compaction
 
