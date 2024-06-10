@@ -1691,7 +1691,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     rootptr->pos = {disFloat(gen), disFloat(gen), disFloat(gen)};
     if (ContianerPreAllocation)
     {
-        rootptr->items.reserve(66);
+        // rootptr->items.reserve(66);
         for (auto i = 0; i < 64; ++i)
         {
             rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(disInt64(gen)), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
