@@ -392,6 +392,12 @@ inter chunk fragments: 0.371622
 
 #### 7.2.3 Pre-allocation
 
+| Algorithms                                  | Wire Format Size |
+| ------------------------------------------- | ---------------- |
+| XOffsetDatastructure With Pre-Allocation    | 4504/3037        |
+| XOffsetDatastructure Without Pre-Allocation | 3864/2915        |
+
+
 iterations 0
 1111111111111111111111111111111111111111111111111111111111
 inter chunk fragments: 0
@@ -440,6 +446,12 @@ growth factor 0.1
 offsetdatastructure      1.0.0       3864       2915 
 growth factor 0.1 items pre alloc
 offsetdatastructure      1.0.0       3800       2893 
+
+
+ offsetdatastructure      1.0.0       4504       3037     0.0001ms     0.0093ms          0ms          0ms
+ offsetdatastructure      1.0.0       3864       2915
+
+
 
 ### 7.3 Compaction
 
