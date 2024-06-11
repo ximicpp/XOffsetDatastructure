@@ -19,6 +19,7 @@
 #include <fstream>
 #include "character_generated.h"
 #include <ctime>
+#include <any>
 
 constexpr bool WriteToFile = false;
 
@@ -510,7 +511,7 @@ namespace benchmark3_cistaoffset
 }
 
 benchmark3::Result
-zppbits_serialization_test3(size_t iterations)
+zppbits_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     using namespace benchmark3_zppbits;
     std::random_device rd;
@@ -666,7 +667,7 @@ zppbits_serialization_test3(size_t iterations)
 }
 
 benchmark3::Result
-flatbuffers_serialization_test3(size_t iterations)
+flatbuffers_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     uint64_t duration, duration1, duration2;
     std::size_t originalSize, compressedSize;
@@ -955,7 +956,7 @@ flatbuffers_serialization_test3(size_t iterations)
 }
 
 benchmark3::Result
-capnproto_serialization_test3(size_t iterations)
+capnproto_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     std::random_device rd;
     std::mt19937_64 gen(0);
@@ -1226,7 +1227,7 @@ capnproto_serialization_test3(size_t iterations)
 }
 
 benchmark3::Result
-msgpack_serialization_test3(size_t iterations, std::vector<benchmark3_msgpack::Character> &unitVector)
+msgpack_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     using namespace benchmark3_msgpack;
     std::random_device rd;
@@ -1369,7 +1370,7 @@ msgpack_serialization_test3(size_t iterations, std::vector<benchmark3_msgpack::C
     return benchmark3::Result("msgpack", msgpack_version(), serialized.size(), compressedSize, duration, duration1, duration2);
 }
 
-benchmark3::Result cistaraw_serialization_test3(size_t iterations)
+benchmark3::Result cistaraw_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     using namespace benchmark3_cistaraw;
     std::random_device rd;
@@ -1523,7 +1524,7 @@ benchmark3::Result cistaraw_serialization_test3(size_t iterations)
     return benchmark3::Result(libName, "1.0.0", buf.size(), compressedSize, duration, duration1, duration2);
 }
 
-benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
+benchmark3::Result cistaoffset_serialization_test3(size_t iterations, std::vector<std::any> &unitVector)
 {
     using namespace benchmark3_cistaoffset;
     std::random_device rd;
@@ -1661,7 +1662,7 @@ benchmark3::Result cistaoffset_serialization_test3(size_t iterations)
     return benchmark3::Result(libName, "1.0.0", buf.size(), compressedSize, duration, duration1, duration2);
 }
 
-benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> &unitVector, bool ContianerPreAllocation = false)
+benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, std::vector<std::any> &unitVector, bool ContianerPreAllocation = false)
 {
     using namespace benchmark3_offsetdatastructure;
     benchmark3::Result ret("offsetdatastructure", "1.0.0", 0, 0, 0, 0, 0);
@@ -1893,46 +1894,45 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 10; // 100000;
+    auto iterNum = 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
-    std::vector<XOffsetDatastructure::XTypeHolder<benchmark3_offsetdatastructure::Character>> unitVectorXoffsetDatastructure;
-    std::vector<benchmark3_msgpack::Character> unitVectorMsgpack;
-    // for (auto i = 0; i < 1000; ++i)
+    std::vector<std::any> unitVector;
+    for (auto i = 0; i < 10; ++i)
+    {
+        std::cout << "iteration: " << i << std::endl;
+        // auto result = cistaraw_serialization_test3(iterNum, unitVector);
+        // results["cistaraw"].push_back(result);
+        // result = cistaoffset_serialization_test3(iterNum, unitVector);
+        // results["cistaoffse"].push_back(result);
+        auto result = capnproto_serialization_test3(iterNum, unitVector);
+        results["capnproto"].push_back(result);
+        result = flatbuffers_serialization_test3(iterNum, unitVector);
+        results["flatbuffers"].push_back(result);
+        result = offsetdatastructure_serialization_test3(iterNum, unitVector, true);
+        results["offsetdatastructure"].push_back(result);
+        result = msgpack_serialization_test3(iterNum, unitVector);
+        results["msgpack"].push_back(result);
+        result = zppbits_serialization_test3(iterNum, unitVector);
+        results["zppbits"].push_back(result);
+    }
+    // for (auto i = 0; i < 1; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     // auto result = cistaraw_serialization_test3(iterNum);
-    //     // results["cistaraw"].push_back(result);
-    //     // result = cistaoffset_serialization_test3(iterNum);
-    //     // results["cistaoffse"].push_back(result);
-    //     // result = capnproto_serialization_test3(iterNum);
-    //     // results["capnproto"].push_back(result);
-    //     // result = flatbuffers_serialization_test3(iterNum);
-    //     // results["flatbuffers"].push_back(result);
+    //     auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
+    //     results["msgpack"].push_back(result);
+    // }
+    // for (auto i = 0; i < 1; ++i)
+    // {
+    //     std::cout << "iteration: " << i << std::endl;
     //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
     //     results["offsetdatastructure"].push_back(result);
-    //     // result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
-    //     // results["msgpack"].push_back(result);
-    //     // result = zppbits_serialization_test3(iterNum);
-    //     // results["zppbits"].push_back(result);
     // }
-    for (auto i = 0; i < 1; ++i)
-    {
-        std::cout << "iteration: " << i << std::endl;
-        auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
-        results["msgpack"].push_back(result);
-    }
-    for (auto i = 0; i < 1; ++i)
-    {
-        std::cout << "iteration: " << i << std::endl;
-        auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
-        results["offsetdatastructure"].push_back(result);
-    }
-    for (auto i = 0; i < 1; ++i)
-    {
-        std::cout << "iteration: " << i << std::endl;
-        auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true);
-        results["offsetdatastructure"].push_back(result);
-    }
+    // for (auto i = 0; i < 1; ++i)
+    // {
+    //     std::cout << "iteration: " << i << std::endl;
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true);
+    //     results["offsetdatastructure"].push_back(result);
+    // }
 
     for (const auto &result : results)
     {
