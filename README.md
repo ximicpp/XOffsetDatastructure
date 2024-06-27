@@ -1,4 +1,4 @@
-# Using Modern C++ to Build XOffsetDatastructure: A Zero-Encoding and Zero-Decoding High-Performance Serialization Library in the Game Industry
+# CppCon 2024: Using Modern C++ to Build XOffsetDatastructure: A Zero-Encoding and Zero-Decoding High-Performance Serialization Library in the Game Industry
 
 ## 0. Abstract
 
