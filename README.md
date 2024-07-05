@@ -1,8 +1,8 @@
-# CppCon 2024: Using Modern C++ to Build XOffsetDatastructure: A Zero-Encoding and Zero-Decoding High-Performance Serialization Library in the Game Industry
+# CppCon 2024: Using Modern C++ to Build XOffsetDatastructure: A Zero-Encoding and Zero-Decoding High-Performance Serialization Library
 
 ## 0. Abstract
 
-XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization in the game industry by utilizing zero-encoding and zero-decoding. It is also a collection of high-performance data structures designed for efficient read and in-place/non-in-place write, with performance comparable to STL.  
+XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization by utilizing zero-encoding and zero-decoding. It is also a collection of high-performance data structures designed for efficient read and in-place/non-in-place write, with performance comparable to STL.  
 
 Custom allocators are used to keep fields in contiguous memory, enabling them to be sent directly. Offset pointers are used to maintain pointer validity after buffer resizing and memory movement caused by modifications to variable-size fields. Some other techniques, such as containers that support offset pointers and auto-resizing mechanisms, are involved.
 
@@ -18,7 +18,7 @@ We aim to reduce or even eliminate the performance consumption of serialization 
 
 According to a study by Kanev et al.[\[1\]](https://doi.org/10.1145/2749469.2750392), serialization and RPCs are responsible for 12% of all fleet cycles across all applications at Google. According to another study by Palkar et al.[\[2\]](https://doi.org/10.14778/3236187.3236207), modern big data applications can spend 80–90% of CPU time parsing data.    
 
-In the game industry, serialization/deserialization performance consumption has always been a factor that affects user experience and game performance. In one of our typical commercial games, over 20% of CPU time is spent on serialization and deserialization. In the game domain, various game data needs to be transferred and modified between different servers, as well as between servers and clients.    
+In the game industry, serialization/deserialization performance consumption has always been a factor that affects user experience and game performance. In a typical commercial games, over 20% of CPU time is spent on serialization and deserialization. In the game domain, various game data needs to be transferred and modified between different servers, as well as between servers and clients.    
 
 This is the original intention behind proposing this solution: to solve the performance problem of game data transfer.  
 
@@ -314,6 +314,6 @@ Efficiently processing compatibility is an issue that needs to be continued.
 
 ## 6. Summary
 
-XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization in the game industry by utilizing zero-encoding and zero-decoding.  
+XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization by utilizing zero-encoding and zero-decoding.  
 
 XOffsetDatastructure is also a collection of high-performance data structures designed for efficient read and in-place/non-in-place write, with performance comparable to STL.   
