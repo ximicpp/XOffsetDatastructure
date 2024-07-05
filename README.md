@@ -125,18 +125,6 @@ XOffsetDatastructure can be used directly as base data structures in memory.
 | boost::*                 | 56.273                             |
 | XOffsetDatastructure::*  | 49.8465                            |
 
-### 2.5 Pointer Validity
-
-Provides pointers that remain valid even after buffer resizing and memory movement caused by modifications to variable-size fields.  
-
-```cpp
-XTypeHolder<Character> character;
-// ...
-auto attributes = character.getOffsetPtr<XVector<float>>(character.attributes);
-// ...
-attributes->push_back(2.718);
-```
-
 ## 3. Performance Statistics
 
 The performance statistics of XOffsetDatastructure are presented in this chapter.  
