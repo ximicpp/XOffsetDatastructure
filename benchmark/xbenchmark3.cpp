@@ -1894,7 +1894,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 100000;
+    auto iterNum = 1000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<std::any> unitVector;
     for (auto i = 0; i < 10; ++i)
