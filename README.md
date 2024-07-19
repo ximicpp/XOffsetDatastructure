@@ -163,7 +163,7 @@ Note: For solutions that lack support for in-place and non-in-place modification
 
 ### 3.3 Message Size
 
-The message size comparison is shown in the table below. The difference between the compressed message sizes is not significant, and XOffsetDatastructure is slightly superior compared to the other solutions.    
+The message size comparison is shown in the table below. The difference between the compressed message sizes is not significant.    
 Note: The compressed message size is crucial because network messages are typically transmitted in compressed form.
 
 | Algorithms           | Wire Format Size (zlib/normal, bytes) |
@@ -173,7 +173,7 @@ Note: The compressed message size is crucial because network messages are typica
 | Cista++(raw)         | 3294/5392                             |
 | FlatBuffers          | 3247/3672                             |
 | MessagePack          | 3064/3222                             |
-| XOffsetDatastructure | 2749/5656                             |
+| XOffsetDatastructure | 3075/4184                             |
 | zpp::bits            | 2769/2916                             |
 | Protocol Buffers     | 3759/4100                             |
 
