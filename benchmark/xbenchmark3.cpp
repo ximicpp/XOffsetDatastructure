@@ -1331,7 +1331,7 @@ msgpack_serialization_test3(size_t iterations, std::vector<std::any> &unitVector
     auto finish2 = std::chrono::high_resolution_clock::now();
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
 
-    unitVector.push_back(r1);
+    // unitVector.push_back(r1);
 
     Character r2;
     msgpack::sbuffer sbuf;
@@ -1815,7 +1815,7 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
     auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
 
     r1.trim();
-    unitVector.push_back(r1);
+    // unitVector.push_back(r1);
 
     auto bufSize = r1.getBuffer().size();
     std::vector<std::byte> data2(r1.getBuffer().size());
@@ -1894,10 +1894,10 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
 int main()
 {
-    auto iterNum = 1000;
+    auto iterNum = 100000;
     std::map<std::string, std::vector<benchmark3::Result>> results;
     std::vector<std::any> unitVector;
-    for (auto i = 0; i < 10; ++i)
+    for (auto i = 0; i < 3; ++i)
     {
         std::cout << "iteration: " << i << std::endl;
         // auto result = cistaraw_serialization_test3(iterNum, unitVector);
