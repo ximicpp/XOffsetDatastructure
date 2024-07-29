@@ -587,21 +587,18 @@ namespace XOffsetDatastructure
 #if OFFSET_DATA_STRUCTURE_RETRY_ATUO == 0
 #define RETRY_IF_BAD_ALLOC(func, holder) func;
 #else
-#define RETRY_IF_BAD_ALLOC(func, holder) XOffsetDatastructure::XRetryIfBadAlloc([&]() { func; }, [&](std::size_t st) { holder.expand(((st + XOffsetDatastructure::EXPANDMASK) >> XOffsetDatastructure::EXPANDSIZE) << XOffsetDatastructure::EXPANDSIZE); })
+// #define RETRY_IF_BAD_ALLOC(func, holder) XOffsetDatastructure::XRetryIfBadAlloc([&]() { func; }, [&](std::size_t st) { holder.expand(((st + XOffsetDatastructure::EXPANDMASK) >> XOffsetDatastructure::EXPANDSIZE) << XOffsetDatastructure::EXPANDSIZE); })
 
 // inline and almost zero-overhead
-// #define RETRY_IF_BAD_ALLOC(func, holder) \
-//     do { \
-//         bool success = false; \
-//         while (!success) { \
-//             try { \
-//                 func; \
-//                 success = true; \
-//             } catch (const XOffsetDatastructure::XBadAllocException& exception) { \
-//                 holder.expand(((exception.size() + XOffsetDatastructure::EXPANDMASK) >> XOffsetDatastructure::EXPANDSIZE) << XOffsetDatastructure::EXPANDSIZE); \
-//             } \
-//         } \
-//     } while (0)
+#define RETRY_IF_BAD_ALLOC(func, holder) \
+    while (true) { \
+        try { \
+            func; \
+            break; \
+        } catch (const XOffsetDatastructure::XBadAllocException& exception) { \
+            holder.expand(((exception.size() + XOffsetDatastructure::EXPANDMASK) >> XOffsetDatastructure::EXPANDSIZE) << XOffsetDatastructure::EXPANDSIZE); \
+        } \
+    }
 
 #endif
 }
