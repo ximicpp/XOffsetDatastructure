@@ -1922,19 +1922,19 @@ int main()
     // for (auto i = 0; i < 1; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = msgpack_serialization_test3(iterNum, unitVectorMsgpack);
+    //     auto result = msgpack_serialization_test3(iterNum, unitVector);
     //     results["msgpack"].push_back(result);
     // }
     // for (auto i = 0; i < 1; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure);
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector);
     //     results["offsetdatastructure"].push_back(result);
     // }
     // for (auto i = 0; i < 1; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVectorXoffsetDatastructure, true);
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector, true);
     //     results["offsetdatastructure"].push_back(result);
     // }
 
