@@ -1781,8 +1781,8 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
         for (auto i = 0; i < 4; ++i)
         {
             rootptr->equips.pop_back();
-            rootptr->equips.emplace_back(r1.getStorage());
-            // RETRY_IF_BAD_ALLOC(rootptr->equips.emplace_back(r1.getStorage()), r1);
+            // rootptr->equips.emplace_back(r1.getStorage());
+            RETRY_IF_BAD_ALLOC(rootptr->equips.emplace_back(r1.getStorage()), r1);
             auto &equip = rootptr->equips.back();
             equip.id = disInt32(gen);
             equip.uuid = disInt64(gen);
@@ -1795,14 +1795,14 @@ benchmark3::Result offsetdatastructure_serialization_test3(size_t iterations, st
 
         for (auto i = 0; i < 8; ++i)
         {
-            rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
-            // RETRY_IF_BAD_ALLOC(rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen)), r1);
+            // rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen));
+            RETRY_IF_BAD_ALLOC(rootptr->path.emplace_back(disFloat(gen), disFloat(gen), disFloat(gen)), r1);
         }
-        rootptr->attributes.emplace_back(disFloat(gen));
-        // RETRY_IF_BAD_ALLOC(rootptr->attributes.emplace_back(disFloat(gen)), r1);
+        // rootptr->attributes.emplace_back(disFloat(gen));
+        RETRY_IF_BAD_ALLOC(rootptr->attributes.emplace_back(disFloat(gen)), r1);
         auto itemUuid0 = disInt64(gen);
-        rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid0), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
-        // RETRY_IF_BAD_ALLOC(rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid0), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen))), r1);
+        // rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid0), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen)));
+        RETRY_IF_BAD_ALLOC(rootptr->items.emplace(std::piecewise_construct, std::forward_as_tuple(itemUuid0), std::forward_as_tuple(disInt32(gen), disInt64(gen), disInt32(gen), disInt64(gen))), r1);
         rootptr->items.erase(itemUuid0);
         for (auto i = 0; i < 8; ++i)
         {
