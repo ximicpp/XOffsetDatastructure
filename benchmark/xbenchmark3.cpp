@@ -1919,22 +1919,25 @@ int main()
         result = zppbits_serialization_test3(iterNum, unitVector);
         results["zppbits"].push_back(result);
     }
-    // for (auto i = 0; i < 1; ++i)
+    // std::vector<std::any> unitVector1;
+    // for (auto i = 0; i < 10000; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = msgpack_serialization_test3(iterNum, unitVector);
+    //     auto result = msgpack_serialization_test3(iterNum, unitVector1);
     //     results["msgpack"].push_back(result);
     // }
-    // for (auto i = 0; i < 1; ++i)
+    // std::vector<std::any> unitVector2;
+    // for (auto i = 0; i < 10000; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector);
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector2);
     //     results["offsetdatastructure"].push_back(result);
     // }
-    // for (auto i = 0; i < 1; ++i)
+    // std::vector<std::any> unitVector3;
+    // for (auto i = 0; i < 10000; ++i)
     // {
     //     std::cout << "iteration: " << i << std::endl;
-    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector, true);
+    //     auto result = offsetdatastructure_serialization_test3(iterNum, unitVector3, true);
     //     results["offsetdatastructure"].push_back(result);
     // }
 
