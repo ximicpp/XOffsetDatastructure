@@ -196,7 +196,7 @@ std::size_t readData(const std::string &datafile, boost::container::vector<doubl
 
 int main()
 {
-	bool forceRemove = true;
+	bool forceRemove = false;
 	const std::string datafile("data.bin");
 	const int numRuns = 0;
 	std::size_t storageSize = 0;
