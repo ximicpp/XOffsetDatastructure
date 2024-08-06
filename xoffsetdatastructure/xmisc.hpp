@@ -23,39 +23,41 @@ typedef uint64_t CHUNK, *PCHUNK;
 
 #ifdef _WIN64
 #include <intrin.h>
-#endif
-
-#ifdef __APPLE__
+#elif __APPLE__
 #define __forceinline inline
-inline bool _BitScanForward64(ULONG* Index, ULONG Mask) {
-    if (Mask == 0) {
+inline bool _BitScanForward64(ULONG *Index, ULONG Mask)
+{
+    if (Mask == 0)
+    {
         return false;
     }
     *Index = __builtin_ctzll(Mask);
     return true;
 }
-inline bool _BitScanReverse64(ULONG* Index, ULONG Mask) {
-    if (Mask == 0) {
+inline bool _BitScanReverse64(ULONG *Index, ULONG Mask)
+{
+    if (Mask == 0)
+    {
         return false;
     }
     *Index = 63 - __builtin_clzll(Mask);
     return true;
 }
-#endif
-
-#ifdef __linux__
+#elif __linux__
 #define __forceinline inline
-
-inline bool _BitScanForward64(ULONG* Index, ULONG Mask) {
-    if (Mask == 0) {
+inline bool _BitScanForward64(ULONG *Index, ULONG Mask)
+{
+    if (Mask == 0)
+    {
         return false;
     }
     *Index = (ULONG)__builtin_ffsll(Mask) - 1;
     return true;
 }
-
-inline bool _BitScanReverse64(ULONG* Index, ULONG Mask) {
-    if (Mask == 0) {
+inline bool _BitScanReverse64(ULONG *Index, ULONG Mask)
+{
+    if (Mask == 0)
+    {
         return false;
     }
     *Index = 63 - __builtin_clzll(Mask);
