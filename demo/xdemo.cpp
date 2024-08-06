@@ -194,10 +194,17 @@ std::size_t readData(const std::string &datafile, boost::container::vector<doubl
 	return storageSize;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
 	bool forceRemove = false;
-	const std::string datafile("data.bin");
+	std::string datafile;
+	if (argc > 1) {
+		datafile = argv[1];
+	}
+	else {
+		datafile = "data.bin";
+	}
+	std::cout << "datafile: " << datafile << std::endl;
 	const int numRuns = 0;
 	std::size_t storageSize = 0;
 	boost::container::vector<double> writeTimes(numRuns);
