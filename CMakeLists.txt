@@ -10,6 +10,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Add Boost as a subproject
 add_subdirectory(external/boost EXCLUDE_FROM_ALL)
 
-# Add demo subdirectories
-add_subdirectory(demo)
-add_subdirectory(demov2)
+# Add examples subdirectory
+add_subdirectory(examples)

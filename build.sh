@@ -1,29 +1,31 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
 # Create and enter build directory
+echo "Creating build directory..."
 mkdir -p build
 cd build
 
 # Configure with CMake
+echo "Configuring CMake..."
 cmake -DCMAKE_BUILD_TYPE=Release ..
-if [ $? -ne 0 ]; then
-    echo "CMake configuration failed"
-    exit 1
-fi
 
 # Build the project
+echo "Building project..."
 cmake --build .
-if [ $? -ne 0 ]; then
-    echo "Build failed"
-    exit 1
-fi
 
 # Run the demos
 echo
-echo "Running demo..."
-./bin/xdemo
+echo "Running demo v1..."
+./bin/xdemo_v1
 echo
-echo "Running demov2..."
-./bin/xdemov2
+echo "Running demo v2..."
+./bin/xdemo_v2
 
+# Return to original directory
 cd ..
+
+echo
+echo "Build and run completed successfully!"
