@@ -1,9 +1,0 @@
-libdir=F:/workspace/cpp-serializers/build/external/flatbuffers/lib
-includedir=F:/workspace/cpp-serializers/build/external/flatbuffers/include
-
-Name: FlatBuffers
-Description: Memory Efficient Serialization Library
-Version: 24.3.7
-
-Libs: -L${libdir} -lflatbuffers
-Cflags: -I${includedir}
