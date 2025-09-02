@@ -7,7 +7,7 @@ add_executable(xtypesignature_demo xtypesignature_demo.cpp)
 foreach(target xoffsetdatastructure_demo xoffsetdatastructure2_demo xtypesignature_demo)
     target_include_directories(${target} PRIVATE 
         ${CMAKE_SOURCE_DIR}
-        ${BOOST_INCLUDE_DIR}
+        ${BOOST_INCLUDE_DIRS}
     )
 endforeach()
 
