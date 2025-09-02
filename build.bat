@@ -24,10 +24,10 @@ if errorlevel 1 (
 :: Run the demos
 echo.
 echo Running demo v1...
-bin\Release\xdemo_v1.exe
+bin\Release\xoffsetdatastructure_demo.exe
 echo.
 echo Running demo v2...
-bin\Release\xdemo_v2.exe
+bin\Release\xoffsetdatastructure2_demo.exe
 
 :: Return to original directory
 cd ..

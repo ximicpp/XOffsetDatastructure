@@ -19,10 +19,10 @@ cmake --build .
 # Run the demos
 echo
 echo "Running demo v1..."
-./bin/xdemo_v1
+./bin/xoffsetdatastructure_demo
 echo
 echo "Running demo v2..."
-./bin/xdemo_v2
+./bin/xoffsetdatastructure2_demo
 
 # Return to original directory
 cd ..
