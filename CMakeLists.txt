@@ -1,14 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-
-# Set project name
 project(XOffsetDatastructure)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard to C++20
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add Boost as a subproject
-add_subdirectory(external/boost EXCLUDE_FROM_ALL)
+# Set Boost include directory
+set(BOOST_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external/boost_1_81_0)
 
 # Add examples subdirectory
 add_subdirectory(examples)

@@ -1,21 +1,23 @@
 # Add executables
 add_executable(xoffsetdatastructure_demo xoffsetdatastructure_demo.cpp)
 add_executable(xoffsetdatastructure2_demo xoffsetdatastructure2_demo.cpp)
+add_executable(xtypesignature_demo xtypesignature_demo.cpp)
 
-# Add include directories for v1
-target_include_directories(xoffsetdatastructure_demo PRIVATE ${CMAKE_SOURCE_DIR})
+# Add include directories for all targets
+foreach(target xoffsetdatastructure_demo xoffsetdatastructure2_demo xtypesignature_demo)
+    target_include_directories(${target} PRIVATE 
+        ${CMAKE_SOURCE_DIR}
+        ${BOOST_INCLUDE_DIR}
+    )
+endforeach()
+
+# Add specific include directories
 target_include_directories(xoffsetdatastructure_demo PRIVATE ${CMAKE_SOURCE_DIR}/xoffsetdatastructure)
-
-# Add include directories for v2
-target_include_directories(xoffsetdatastructure2_demo PRIVATE ${CMAKE_SOURCE_DIR})
 target_include_directories(xoffsetdatastructure2_demo PRIVATE ${CMAKE_SOURCE_DIR}/xoffsetdatastructure2)
+target_include_directories(xtypesignature_demo PRIVATE ${CMAKE_SOURCE_DIR}/xtypesignature)
 
-# Link against Boost
-target_link_libraries(xoffsetdatastructure_demo PRIVATE Boost::headers Boost::interprocess)
-target_link_libraries(xoffsetdatastructure2_demo PRIVATE Boost::headers Boost::interprocess)
-
-# Set output directory for both executables
-set_target_properties(xoffsetdatastructure_demo xoffsetdatastructure2_demo
+# Set output directory for all executables
+set_target_properties(xoffsetdatastructure_demo xoffsetdatastructure2_demo xtypesignature_demo
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
