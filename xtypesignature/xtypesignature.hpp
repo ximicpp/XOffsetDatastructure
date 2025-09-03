@@ -130,6 +130,18 @@ namespace XTypeSignature {
             return CompileString<new_size>(result);
         }
 
+        template <size_t M>
+        constexpr bool operator==(const CompileString<M>& other) const noexcept {
+            size_t i = 0;
+            while (i < N && i < M && value[i] != '\0' && other.value[i] != '\0') {
+                if (value[i] != other.value[i]) {
+                    return false;
+                }
+                ++i;
+            }
+            return value[i] == other.value[i];
+        }
+
         constexpr bool operator==(const char* other) const noexcept {
             size_t i = 0;
             while (i < N && value[i] != '\0' && other[i] != '\0') {
