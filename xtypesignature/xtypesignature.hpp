@@ -1,6 +1,7 @@
 #pragma once
 #include <boost/container/vector.hpp>
 #include <boost/container/flat_map.hpp>
+#include <boost/container/flat_set.hpp>
 #include <boost/container/string.hpp>
 #include <boost/any/basic_any.hpp>
 #include <boost/pfr.hpp>
@@ -31,6 +32,8 @@ namespace XTypeSignature {
     using XVector = boost::container::vector<T>;
     template <typename K, typename V>
     using XMap = boost::container::flat_map<K, V>;
+	template <typename T>
+	using XSet = boost::container::flat_set<T>;
 
     // Basic any type
     struct alignas(BASIC_ALIGNMENT) any_equivalent {
@@ -357,6 +360,19 @@ namespace XTypeSignature {
                 static_assert(always_false<T>::value, "Unsupported type");
                 return CompileString{""};
             }
+        }
+    };
+
+    template <typename T>
+    struct TypeSignature<XSet<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"set[s:"} +
+                   CompileString<32>::from_number(sizeof(XSet<T>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(XSet<T>)) +
+                   CompileString{"]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
         }
     };
 
