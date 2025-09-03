@@ -1,14 +1,8 @@
 #pragma once
-#include <boost/container/vector.hpp>
-#include <boost/container/flat_map.hpp>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/string.hpp>
-#include <boost/any/basic_any.hpp>
 #include <boost/pfr.hpp>
 #include <string_view>
 #include <type_traits>
 #include <iostream>
-#include "xtypes.hpp"
 
 // Platform detection
 #if defined(_MSC_VER)
@@ -26,30 +20,6 @@
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
-
-    // Type aliases for the library
-    using XString = boost::container::basic_string<char>;
-    template <typename T>
-    using XVector = boost::container::vector<T>;
-    template <typename K, typename V>
-    using XMap = boost::container::flat_map<K, V>;
-	template <typename T>
-	using XSet = boost::container::flat_set<T>;
-
-    // Basic any type
-    struct alignas(BASIC_ALIGNMENT) any_equivalent {
-        void* man;
-        char buf[ANY_SIZE];
-    };
-
-    using XAny = any_equivalent;
-    using DynamicStruct = XMap<XString, XAny>;
-
-    // Verify boost::any compatibility
-    static_assert(sizeof(any_equivalent) == sizeof(boost::anys::basic_any<ANY_SIZE, BASIC_ALIGNMENT>), 
-                 "Size mismatch with boost::any");
-    static_assert(alignof(any_equivalent) == alignof(boost::anys::basic_any<ANY_SIZE, BASIC_ALIGNMENT>), 
-                 "Alignment mismatch with boost::any");
 
     // Verify fundamental type sizes
     static_assert(sizeof(char) == 1, "char must be 1 byte");
@@ -160,7 +130,6 @@ namespace XTypeSignature {
             return CompileString<new_size>(result);
         }
 
-        // 新添加的编译期比较操作符
         constexpr bool operator==(const char* other) const noexcept {
             size_t i = 0;
             while (i < N && value[i] != '\0' && other[i] != '\0') {
@@ -226,7 +195,7 @@ namespace XTypeSignature {
         }
     }
 
-    // 基本类型的特化必须在通用模板之前声明
+    // 基本类型的特化
     template <>
     struct TypeSignature<int32_t> {
         static constexpr auto calculate() noexcept {
@@ -307,92 +276,10 @@ namespace XTypeSignature {
                 return TypeSignature<std::remove_extent_t<T>[]>::calculate();
             }
             else {
-                // 添加类型名到错误消息中
                 static_assert(always_false<T>::value, 
                     "Type is not supported for automatic reflection. Type name: " __FUNCSIG__);
                 return CompileString{""};
             }
-        }
-    };
-
-    template <>
-    struct TypeSignature<any_equivalent> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"struct[s:"} +
-                   CompileString<32>::from_number(sizeof(any_equivalent)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(any_equivalent)) +
-                   CompileString{"]{"} +
-                   CompileString{"@0:"} +
-                   TypeSignature<void*>::calculate() +
-                   CompileString{",@8:"} +
-                   TypeSignature<char[ANY_SIZE]>::calculate() +
-                   CompileString{"}"};
-        }
-    };
-
-    // 为 XOffsetDatastructure 中的容器添加类型签名特化
-    template <typename T>
-    struct TypeSignature<XOffsetDatastructure::XVector<T>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"vector[s:"} +
-                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XVector<T>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XVector<T>)) +
-                   CompileString{"]<"} +
-                   TypeSignature<T>::calculate() +
-                   CompileString{">"};
-        }
-    };
-
-    template <>
-    struct TypeSignature<XOffsetDatastructure::XString> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"string[s:"} +
-                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XString)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XString)) +
-                   CompileString{"]"};
-        }
-    };
-
-    template <typename K, typename V>
-    struct TypeSignature<XOffsetDatastructure::XMap<K, V>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"map[s:"} +
-                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XMap<K, V>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XMap<K, V>)) +
-                   CompileString{"]<"} +
-                   TypeSignature<K>::calculate() +
-                   CompileString{","} +
-                   TypeSignature<V>::calculate() +
-                   CompileString{">"};
-        }
-    };
-
-    template <typename T>
-    struct TypeSignature<XOffsetDatastructure::XSet<T>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"set[s:"} +
-                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XSet<T>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XSet<T>)) +
-                   CompileString{"]<"} +
-                   TypeSignature<T>::calculate() +
-                   CompileString{">"};
-        }
-    };
-
-    // 为 boost::container::basic_string 添加特化
-    template <>
-    struct TypeSignature<boost::container::basic_string<char>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"string[s:"} +
-                   CompileString<32>::from_number(sizeof(boost::container::basic_string<char>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(boost::container::basic_string<char>)) +
-                   CompileString{"]"};
         }
     };
 

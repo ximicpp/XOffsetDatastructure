@@ -14,10 +14,7 @@ endforeach()
 # Add specific include directories
 target_include_directories(xoffsetdatastructure_demo PRIVATE ${CMAKE_SOURCE_DIR}/xoffsetdatastructure)
 target_include_directories(xoffsetdatastructure2_demo PRIVATE ${CMAKE_SOURCE_DIR}/xoffsetdatastructure2)
-target_include_directories(xtypesignature_demo PRIVATE
-    ${CMAKE_SOURCE_DIR}/xtypesignature
-    ${CMAKE_SOURCE_DIR}/xoffsetdatastructure
-)
+target_include_directories(xtypesignature_demo PRIVATE ${CMAKE_SOURCE_DIR})
 
 # Set output directory for all executables
 set_target_properties(xoffsetdatastructure_demo xoffsetdatastructure2_demo xtypesignature_demo
