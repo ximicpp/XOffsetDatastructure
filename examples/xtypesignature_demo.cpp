@@ -7,10 +7,10 @@ namespace test {
     using XTypeSignature::BASIC_ALIGNMENT;
     using XTypeSignature::get_XTypeSignature;
     using XTypeSignature::TypeSignature;
-    using XTypeSignature::XString;
-    using XTypeSignature::XVector;
-    using XTypeSignature::XMap;
-    using XTypeSignature::XSet;
+    using XOffsetDatastructure::XString;
+    using XOffsetDatastructure::XVector;
+    using XOffsetDatastructure::XMap;
+    using XOffsetDatastructure::XSet;
 
     // 基本测试结构
     struct Point {
@@ -58,36 +58,36 @@ namespace test {
                  "struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]}");
     
     static_assert(get_XTypeSignature<Rectangle>() == 
-                 "struct[s:40,a:8]{@0:struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]},"
+                 "struct[s:48,a:8]{@0:struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]},"
                  "@8:struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]},"
-                 "@16:string[s:24,a:8]}");
+                 "@16:string[s:32,a:8]}");
 
     static_assert(get_XTypeSignature<TestTypeInner>() == 
-        "struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}");
+                 "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}");
     
     static_assert(get_XTypeSignature<TestType>() == 
-        "struct[s:208,a:8]{"
-        "@0:i32[s:4,a:4],"
-        "@4:f32[s:4,a:4],"
-        "@8:vector[s:24,a:8]<i32[s:4,a:4]>,"
-        "@32:vector[s:24,a:8]<string[s:24,a:8]>,"
-        "@56:vector[s:24,a:8]<struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}>,"
-        "@80:map[s:24,a:8]<string[s:24,a:8],struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}>,"
-        "@104:set[s:24,a:8]<string[s:24,a:8]>,"
-        "@128:set[s:24,a:8]<i32[s:4,a:4]>,"
-        "@152:string[s:24,a:8],"
-        "@176:struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}"
-        "}");
+                 "struct[s:272,a:8]{"
+                 "@0:i32[s:4,a:4],"
+                 "@4:f32[s:4,a:4],"
+                 "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
+                 "@40:vector[s:32,a:8]<string[s:32,a:8]>,"
+                 "@72:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+                 "@104:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+                 "@136:set[s:32,a:8]<string[s:32,a:8]>,"
+                 "@168:set[s:32,a:8]<i32[s:4,a:4]>,"
+                 "@200:string[s:32,a:8],"
+                 "@232:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}"
+                 "}");
     
     static_assert(get_XTypeSignature<TestType2>() == 
-                 "struct[s:56,a:8]{@0:i32[s:4,a:4],@8:string[s:24,a:8],"
-                 "@32:vector[s:24,a:8]<i32[s:4,a:4]>}");
+                 "struct[s:72,a:8]{@0:i32[s:4,a:4],@8:string[s:32,a:8],"
+                 "@40:vector[s:32,a:8]<i32[s:4,a:4]>}");
     
     static_assert(get_XTypeSignature<XVector<int32_t>>() == 
-                 "vector[s:24,a:8]<i32[s:4,a:4]>");
+                 "vector[s:32,a:8]<i32[s:4,a:4]>");
     
     static_assert(get_XTypeSignature<XMap<XString, int32_t>>() == 
-                 "map[s:24,a:8]<string[s:24,a:8],i32[s:4,a:4]>");
+                 "map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>");
     
     static_assert(get_XTypeSignature<char[ANY_SIZE]>() == 
                  "bytes[s:64,a:1]");
@@ -117,8 +117,8 @@ int main()
     print_XTypeSignature<test::TestTypeInner>("TestTypeInner");
     print_XTypeSignature<test::TestType>("TestType");  // 这里会打印出实际的类型签名
     print_XTypeSignature<test::TestType2>("TestType2");
-    print_XTypeSignature<XTypeSignature::XVector<int32_t>>("Vector<int32_t>");
-    print_XTypeSignature<XTypeSignature::XMap<XTypeSignature::XString, int32_t>>("Map<XString, int32_t>");
+    print_XTypeSignature<XOffsetDatastructure::XVector<int32_t>>("Vector<int32_t>");
+    print_XTypeSignature<XOffsetDatastructure::XMap<XOffsetDatastructure::XString, int32_t>>("Map<XString, int32_t>");
     print_XTypeSignature<char[XTypeSignature::ANY_SIZE]>("char[ANY_SIZE]");
     print_XTypeSignature<void*>("void*");
 

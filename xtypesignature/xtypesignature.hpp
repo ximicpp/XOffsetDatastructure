@@ -8,6 +8,7 @@
 #include <string_view>
 #include <type_traits>
 #include <iostream>
+#include "xtypes.hpp"
 
 // Platform detection
 #if defined(_MSC_VER)
@@ -178,111 +179,139 @@ namespace XTypeSignature {
         }
     };
 
+    // 前向声明 TypeSignature
     template <typename T>
     struct TypeSignature;
 
+    // 计算字段偏移量的辅助函数
+    template<typename T, size_t Index>
+    constexpr size_t get_field_offset() noexcept {
+        if constexpr (Index == 0) {
+            return 0;
+        } else {
+            using PrevType = std::tuple_element_t<Index - 1, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            using CurrType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            
+            constexpr size_t prev_offset = get_field_offset<T, Index - 1>();
+            constexpr size_t prev_size = sizeof(PrevType);
+            constexpr size_t curr_align = alignof(CurrType);
+            
+            return (prev_offset + prev_size + (curr_align - 1)) & ~(curr_align - 1);
+        }
+    }
+
+    // 通用的 get_fields_signature 函数
+    template <typename T, size_t Index = 0>
+    constexpr auto get_fields_signature() noexcept {
+        if constexpr (Index >= boost::pfr::tuple_size_v<T>) {
+            return CompileString{""};
+        }
+        else {
+            using FieldType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            
+            if constexpr (Index == 0) {
+                return CompileString{"@"} +
+                       CompileString<32>::from_number(get_field_offset<T, Index>()) +
+                       CompileString{":"} +
+                       TypeSignature<FieldType>::calculate() +
+                       get_fields_signature<T, Index + 1>();
+            }
+            else {
+                return CompileString{",@"} +
+                       CompileString<32>::from_number(get_field_offset<T, Index>()) +
+                       CompileString{":"} +
+                       TypeSignature<FieldType>::calculate() +
+                       get_fields_signature<T, Index + 1>();
+            }
+        }
+    }
+
+    // 基本类型的特化必须在通用模板之前声明
     template <>
     struct TypeSignature<int32_t> {
         static constexpr auto calculate() noexcept {
-            return CompileString{"i32[s:"} +
-                   CompileString<32>::from_number(sizeof(int32_t)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(int32_t)) +
-                   CompileString{"]"};
-        }
-    };
-
-    template <>
-    struct TypeSignature<uint32_t> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"u32[s:"} +
-                   CompileString<32>::from_number(sizeof(uint32_t)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(uint32_t)) +
-                   CompileString{"]"};
+            return CompileString{"i32[s:4,a:4]"};
         }
     };
 
     template <>
     struct TypeSignature<float> {
         static constexpr auto calculate() noexcept {
-            return CompileString{"f32[s:"} +
-                   CompileString<32>::from_number(sizeof(float)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(float)) +
-                   CompileString{"]"};
+            return CompileString{"f32[s:4,a:4]"};
         }
     };
 
-    template <>
-    struct TypeSignature<double> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"f64[s:"} +
-                   CompileString<32>::from_number(sizeof(double)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(double)) +
-                   CompileString{"]"};
-        }
-    };
-
-    template <size_t N>
-    struct TypeSignature<char[N]> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"bytes[s:"} +
-                   CompileString<32>::from_number(N) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(char[N])) +
-                   CompileString{"]"};
-        }
-    };
-
+    // 为指针类型添加特化
     template <typename T>
     struct TypeSignature<T*> {
         static constexpr auto calculate() noexcept {
-            return CompileString{"ptr[s:"} +
-                   CompileString<32>::from_number(sizeof(T*)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(T*)) +
-                   CompileString{"]"};
+            return CompileString{"ptr[s:8,a:8]"};
         }
     };
 
+    // 为数组类型添加特化
+    template <typename T, size_t N>
+    struct TypeSignature<T[N]> {
+        static constexpr auto calculate() noexcept {
+            if constexpr (std::is_same_v<T, char>) {
+                return CompileString{"bytes[s:"} +
+                       CompileString<32>::from_number(N) +
+                       CompileString{",a:1]"};
+            } else {
+                return CompileString{"array[s:"} +
+                       CompileString<32>::from_number(sizeof(T[N])) +
+                       CompileString{",a:"} +
+                       CompileString<32>::from_number(alignof(T[N])) +
+                       CompileString{"]<"} +
+                       TypeSignature<T>::calculate() +
+                       CompileString{","} +
+                       CompileString<32>::from_number(N) +
+                       CompileString{">"};
+            }
+        }
+    };
+
+    // 为 void* 添加特化
     template <>
-    struct TypeSignature<XString> {
+    struct TypeSignature<void*> {
         static constexpr auto calculate() noexcept {
-            return CompileString{"string[s:"} +
-                   CompileString<32>::from_number(sizeof(XString)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XString)) +
-                   CompileString{"]"};
+            return CompileString{"ptr[s:8,a:8]"};
         }
     };
 
+    // 为 char[ANY_SIZE] 添加特化
+    template <>
+    struct TypeSignature<char[ANY_SIZE]> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"bytes[s:64,a:1]"};
+        }
+    };
+
+    // 通用的 TypeSignature 实现
     template <typename T>
-    struct TypeSignature<XVector<T>> {
+    struct TypeSignature {
         static constexpr auto calculate() noexcept {
-            return CompileString{"vector[s:"} +
-                   CompileString<32>::from_number(sizeof(XVector<T>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XVector<T>)) +
-                   CompileString{"]<"} +
-                   TypeSignature<T>::calculate() +
-                   CompileString{">"};
-        }
-    };
-
-    template <typename K, typename V>
-    struct TypeSignature<XMap<K, V>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"map[s:"} +
-                   CompileString<32>::from_number(sizeof(XMap<K, V>)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XMap<K, V>)) +
-                   CompileString{"]<"} +
-                   TypeSignature<K>::calculate() +
-                   CompileString{","} +
-                   TypeSignature<V>::calculate() +
-                   CompileString{">"};
+            if constexpr (std::is_aggregate_v<T> && !std::is_array_v<T>) {
+                return CompileString{"struct[s:"} +
+                       CompileString<32>::from_number(sizeof(T)) +
+                       CompileString{",a:"} +
+                       CompileString<32>::from_number(alignof(T)) +
+                       CompileString{"]{"} +
+                       get_fields_signature<T>() +
+                       CompileString{"}"};
+            }
+            else if constexpr (std::is_pointer_v<T>) {
+                return TypeSignature<void*>::calculate();
+            }
+            else if constexpr (std::is_array_v<T>) {
+                return TypeSignature<std::remove_extent_t<T>[]>::calculate();
+            }
+            else {
+                // 添加类型名到错误消息中
+                static_assert(always_false<T>::value, 
+                    "Type is not supported for automatic reflection. Type name: " __FUNCSIG__);
+                return CompileString{""};
+            }
         }
     };
 
@@ -302,77 +331,68 @@ namespace XTypeSignature {
         }
     };
 
-    template <typename T, size_t I>
-    struct FieldOffsetHelper {
-        static constexpr size_t calculate() noexcept {
-            if constexpr (I == 0) {
-                return 0;
-            }
-            else {
-                using PrevType = std::tuple_element_t<I - 1, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-                using CurrType = std::tuple_element_t<I, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-
-                constexpr size_t prev_offset = FieldOffsetHelper<T, I - 1>::calculate();
-                constexpr size_t prev_size = sizeof(PrevType);
-                constexpr size_t curr_align = alignof(CurrType);
-
-                return (prev_offset + prev_size + (curr_align - 1)) & ~(curr_align - 1);
-            }
-        }
-    };
-
-    template <typename Struct, size_t Index = 0>
-    constexpr auto get_fields_signature() noexcept {
-        if constexpr (Index >= boost::pfr::tuple_size_v<Struct>) {
-            return CompileString{""};
-        }
-        else {
-            using FieldType = std::remove_cvref_t<decltype(boost::pfr::get<Index>(std::declval<Struct>()))>;
-            constexpr size_t offset = FieldOffsetHelper<Struct, Index>::calculate();
-
-            auto field_sig = CompileString{"@"} +
-                            CompileString<32>::from_number(offset) +
-                            CompileString{":"} +
-                            TypeSignature<FieldType>::calculate();
-
-            if constexpr (Index == 0) {
-                return field_sig + get_fields_signature<Struct, Index + 1>();
-            }
-            else {
-                return CompileString{","} + field_sig + get_fields_signature<Struct, Index + 1>();
-            }
-        }
-    }
-
+    // 为 XOffsetDatastructure 中的容器添加类型签名特化
     template <typename T>
-    struct TypeSignature {
+    struct TypeSignature<XOffsetDatastructure::XVector<T>> {
         static constexpr auto calculate() noexcept {
-            if constexpr (std::is_class_v<T>) {
-                return CompileString{"struct[s:"} +
-                       CompileString<32>::from_number(sizeof(T)) +
-                       CompileString{",a:"} +
-                       CompileString<32>::from_number(alignof(T)) +
-                       CompileString{"]{"} +
-                       get_fields_signature<T>() +
-                       CompileString{"}"};
-            }
-            else {
-                static_assert(always_false<T>::value, "Unsupported type");
-                return CompileString{""};
-            }
-        }
-    };
-
-    template <typename T>
-    struct TypeSignature<XSet<T>> {
-        static constexpr auto calculate() noexcept {
-            return CompileString{"set[s:"} +
-                   CompileString<32>::from_number(sizeof(XSet<T>)) +
+            return CompileString{"vector[s:"} +
+                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XVector<T>)) +
                    CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(XSet<T>)) +
+                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XVector<T>)) +
                    CompileString{"]<"} +
                    TypeSignature<T>::calculate() +
                    CompileString{">"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<XOffsetDatastructure::XString> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"string[s:"} +
+                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XString)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XString)) +
+                   CompileString{"]"};
+        }
+    };
+
+    template <typename K, typename V>
+    struct TypeSignature<XOffsetDatastructure::XMap<K, V>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"map[s:"} +
+                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XMap<K, V>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XMap<K, V>)) +
+                   CompileString{"]<"} +
+                   TypeSignature<K>::calculate() +
+                   CompileString{","} +
+                   TypeSignature<V>::calculate() +
+                   CompileString{">"};
+        }
+    };
+
+    template <typename T>
+    struct TypeSignature<XOffsetDatastructure::XSet<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"set[s:"} +
+                   CompileString<32>::from_number(sizeof(XOffsetDatastructure::XSet<T>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(XOffsetDatastructure::XSet<T>)) +
+                   CompileString{"]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
+        }
+    };
+
+    // 为 boost::container::basic_string 添加特化
+    template <>
+    struct TypeSignature<boost::container::basic_string<char>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"string[s:"} +
+                   CompileString<32>::from_number(sizeof(boost::container::basic_string<char>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(boost::container::basic_string<char>)) +
+                   CompileString{"]"};
         }
     };
 
