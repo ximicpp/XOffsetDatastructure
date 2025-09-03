@@ -58,7 +58,7 @@ namespace test {
         XVector2 mVector;
     };
 
-    struct alignas(BASIC_ALIGNMENT) ComplexTestType2 {
+    struct alignas(BASIC_ALIGNMENT) TestType2 {
         int32_t mInt{ 0 };
         float mFloat{ 0.f };
         XVector2 mVector;
@@ -99,7 +99,7 @@ namespace test {
                  "@232:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}"
                  "}");
 
-    // static_assert(get_XTypeSignature<ComplexTestType2>() == 
+    // static_assert(get_XTypeSignature<TestType2>() == 
     //              "struct[s:272,a:8]{"
     //              "@0:i32[s:4,a:4],"
     //              "@4:f32[s:4,a:4],"
@@ -137,7 +137,7 @@ namespace test {
     static_assert(get_XTypeSignature<XMap<XString, int32_t>>() == get_XTypeSignature<XMap2>());
     static_assert(get_XTypeSignature<XSet<int32_t>>() == get_XTypeSignature<XSet2>());
     static_assert(get_XTypeSignature<TestTypeInner>() == get_XTypeSignature<TestTypeInner2>());
-    // static_assert(get_XTypeSignature<TestType>() == get_XTypeSignature<ComplexTestType2>());
+    // static_assert(get_XTypeSignature<TestType>() == get_XTypeSignature<TestType2>());
     
     static_assert(get_XTypeSignature<char[ANY_SIZE]>() == "bytes[s:64,a:1]");
     
@@ -165,7 +165,7 @@ int main()
     print_XTypeSignature<test::TestTypeInner>("TestTypeInner");
     print_XTypeSignature<test::TestTypeInner2>("TestTypeInner2");
     print_XTypeSignature<test::TestType>("TestType");
-    // print_XTypeSignature<test::ComplexTestType2>("ComplexTestType2");
+    // print_XTypeSignature<test::TestType2>("TestType2");
     print_XTypeSignature<XOffsetDatastructure::XVector<int32_t>>("Vector<int32_t>");
     print_XTypeSignature<XOffsetDatastructure::XMap<XOffsetDatastructure::XString, int32_t>>("Map<XString, int32_t>");
     print_XTypeSignature<XOffsetDatastructure2::XVector<int32_t>>("Vector2<int32_t>");

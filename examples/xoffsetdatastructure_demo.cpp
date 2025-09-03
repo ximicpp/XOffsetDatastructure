@@ -6,14 +6,14 @@
 #include <algorithm>
 #include <chrono>
 #include <numeric>
-#include "xtypes.hpp"
-#include "xtypeholder.hpp"
+#include "xoffsetdatastructure/xtypes.hpp"
+#include "xoffsetdatastructure/xtypeholder.hpp"
+#include "xoffsetdatastructure/xtypesignature.hpp"
 
 using namespace XOffsetDatastructure;
 
-class TestType
+struct TestType
 {
-public:
 	template <typename Allocator>
 	TestType(Allocator allocator) : mVector(allocator), mStringVector(allocator), mComplexMap(allocator), mStringSet(allocator), mSet(allocator), mString(allocator), TestTypeInnerObj(allocator), mXXTypeVector(allocator) {}
     // TestType(const TestType&) = delete;
@@ -22,9 +22,8 @@ public:
 	float mFloat{0.f};
 	XVector<int> mVector;
 	XVector<XString> mStringVector;
-	class TestTypeInner
+	struct TestTypeInner
 	{
-	public:
 		template <typename Allocator>
 		TestTypeInner(Allocator allocator) : mVector(allocator) {}
 		// TestTypeInner(const TestTypeInner&) = delete;
@@ -38,6 +37,41 @@ public:
 	XSet<int> mSet;
 	XString mString;
 };
+
+// XOffsetDatastructure 测试类型
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerStruct {
+    int32_t mInt;
+    XVector<int32_t> mVector;
+};
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeStruct {
+    int32_t mInt;
+    float mFloat;
+    XVector<int32_t> mVector;
+    XVector<XString> mStringVector;
+    XVector<TestTypeInnerStruct> mTypeVector;
+    XMap<XString, TestTypeInnerStruct> mComplexMap;
+    XSet<XString> mStringSet;
+    XSet<int32_t> mSet;
+    XString mString;
+    TestTypeInnerStruct innerObj;
+};
+
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerStruct>() == 
+             "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}");
+
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeStruct>() == 
+             "struct[s:272,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:f32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@40:vector[s:32,a:8]<string[s:32,a:8]>,"
+             "@72:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@104:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@136:set[s:32,a:8]<string[s:32,a:8]>,"
+             "@168:set[s:32,a:8]<i32[s:4,a:4]>,"
+             "@200:string[s:32,a:8],"
+             "@232:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}"
+             "}");
 
 std::size_t writeData(const std::string &datafile, boost::container::vector<double> &writeTimes, bool writeFile = true)
 {
