@@ -12,6 +12,15 @@
 
 using namespace XOffsetDatastructure;
 
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInner {
+		template <typename Allocator>
+		TestTypeInner(Allocator allocator) : mVector(allocator) {}
+		// TestTypeInner(const TestTypeInner&) = delete;
+    	// TestTypeInner& operator=(const TestTypeInner&) = delete;
+		int mInt{0};
+		XVector<int> mVector;
+};
+
 struct TestType
 {
 	template <typename Allocator>
@@ -22,15 +31,7 @@ struct TestType
 	float mFloat{0.f};
 	XVector<int> mVector;
 	XVector<XString> mStringVector;
-	struct TestTypeInner
-	{
-		template <typename Allocator>
-		TestTypeInner(Allocator allocator) : mVector(allocator) {}
-		// TestTypeInner(const TestTypeInner&) = delete;
-    	// TestTypeInner& operator=(const TestTypeInner&) = delete;
-		int mInt{0};
-		XVector<int> mVector;
-	} TestTypeInnerObj;
+	TestTypeInner TestTypeInnerObj;
 	XVector<TestTypeInner> mXXTypeVector;
 	XMap<XString, TestTypeInner> mComplexMap;
 	XSet<XString> mStringSet;
@@ -38,28 +39,30 @@ struct TestType
 	XString mString;
 };
 
-// XOffsetDatastructure 测试类型
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerStruct {
+// 用于反射的内部类型（聚合类型）
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerReflectable {
     int32_t mInt;
     XVector<int32_t> mVector;
 };
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeStruct {
+
+// 用于反射的外部类型（聚合类型）
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectable {
     int32_t mInt;
     float mFloat;
     XVector<int32_t> mVector;
     XVector<XString> mStringVector;
-    XVector<TestTypeInnerStruct> mTypeVector;
-    XMap<XString, TestTypeInnerStruct> mComplexMap;
+    XVector<TestTypeInnerReflectable> mTypeVector;
+    XMap<XString, TestTypeInnerReflectable> mComplexMap;
     XSet<XString> mStringSet;
     XSet<int32_t> mSet;
     XString mString;
-    TestTypeInnerStruct innerObj;
+    TestTypeInnerReflectable innerObj;
 };
 
-static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerStruct>() == 
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectable>() == 
              "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}");
 
-static_assert(XTypeSignature::get_XTypeSignature<TestTypeStruct>() == 
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectable>() == 
              "struct[s:272,a:8]{"
              "@0:i32[s:4,a:4],"
              "@4:f32[s:4,a:4],"
