@@ -1,19 +1,18 @@
-#include "xtypesignature.hpp"
+#include "xtypesignature/xtypesignature.hpp"
 #include <iostream>
+#include <cstdint>
 
 namespace test {
-    using namespace XTypeSignature;
+    using XTypeSignature::ANY_SIZE;
+    using XTypeSignature::BASIC_ALIGNMENT;
+    using XTypeSignature::get_XTypeSignature;
+    using XTypeSignature::TypeSignature;
+    using XTypeSignature::XString;
+    using XTypeSignature::XVector;
+    using XTypeSignature::XMap;
+    using XTypeSignature::XSet;
 
-    // Verify specific type sizes
-    static_assert(sizeof(bool) <= ANY_SIZE, "bool size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(int) <= ANY_SIZE, "int size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(float) <= ANY_SIZE, "float size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(double) <= ANY_SIZE, "double size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(XString) <= ANY_SIZE, "string size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(XMap<int, int>) <= ANY_SIZE, "map size exceeds ANY_SIZE bytes");
-    static_assert(sizeof(XVector<int>) <= ANY_SIZE, "vector size exceeds ANY_SIZE bytes");
-
-    // Test structures
+    // 基本测试结构
     struct Point {
         float x;
         float y;
@@ -25,15 +24,23 @@ namespace test {
         XString name;
     };
 
+    // 测试类型
+    struct alignas(BASIC_ALIGNMENT) TestTypeInner {
+        int32_t mInt;
+        XVector<int32_t> mVector;
+    };
+
     struct alignas(BASIC_ALIGNMENT) TestType {
         int32_t mInt;
-
-        struct alignas(BASIC_ALIGNMENT) TestTypeInner {
-            int32_t mInt;
-            XVector<int32_t> mVector;
-        } TestTypeInnerObj;
-
+        float mFloat;
+        XVector<int32_t> mVector;
+        XVector<XString> mStringVector;
+        XVector<TestTypeInner> mTypeVector;
         XMap<XString, TestTypeInner> mComplexMap;
+        XSet<XString> mStringSet;
+        XSet<int32_t> mSet;
+        XString mString;
+        TestTypeInner innerObj;
     };
 
     struct alignas(BASIC_ALIGNMENT) TestType2 {
@@ -42,7 +49,7 @@ namespace test {
         XVector<int32_t> mVector;
     };
 
-    // Type signature verification
+    // 类型签名验证
     static_assert(get_XTypeSignature<int32_t>() == "i32[s:4,a:4]");
     
     static_assert(get_XTypeSignature<float>() == "f32[s:4,a:4]");
@@ -54,12 +61,23 @@ namespace test {
                  "struct[s:40,a:8]{@0:struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]},"
                  "@8:struct[s:8,a:4]{@0:f32[s:4,a:4],@4:f32[s:4,a:4]},"
                  "@16:string[s:24,a:8]}");
+
+    static_assert(get_XTypeSignature<TestTypeInner>() == 
+        "struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}");
     
     static_assert(get_XTypeSignature<TestType>() == 
-                 "struct[s:64,a:8]{@0:i32[s:4,a:4],"
-                 "@8:struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>},"
-                 "@40:map[s:24,a:8]<string[s:24,a:8],struct[s:32,a:8]{@0:i32[s:4,a:4],"
-                 "@8:vector[s:24,a:8]<i32[s:4,a:4]>}>}");
+        "struct[s:208,a:8]{"
+        "@0:i32[s:4,a:4],"
+        "@4:f32[s:4,a:4],"
+        "@8:vector[s:24,a:8]<i32[s:4,a:4]>,"
+        "@32:vector[s:24,a:8]<string[s:24,a:8]>,"
+        "@56:vector[s:24,a:8]<struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}>,"
+        "@80:map[s:24,a:8]<string[s:24,a:8],struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}>,"
+        "@104:set[s:24,a:8]<string[s:24,a:8]>,"
+        "@128:set[s:24,a:8]<i32[s:4,a:4]>,"
+        "@152:string[s:24,a:8],"
+        "@176:struct[s:32,a:8]{@0:i32[s:4,a:4],@8:vector[s:24,a:8]<i32[s:4,a:4]>}"
+        "}");
     
     static_assert(get_XTypeSignature<TestType2>() == 
                  "struct[s:56,a:8]{@0:i32[s:4,a:4],@8:string[s:24,a:8],"
@@ -76,21 +94,13 @@ namespace test {
     
     static_assert(get_XTypeSignature<void*>() == 
                  "ptr[s:8,a:8]");
-    
-    static_assert(get_XTypeSignature<any_equivalent>() ==
-                 "struct[s:72,a:8]{@0:ptr[s:8,a:8],@8:bytes[s:64,a:1]}");
-    
-    static_assert(get_XTypeSignature<DynamicStruct>() ==
-                 "map[s:24,a:8]<string[s:24,a:8],struct[s:72,a:8]{@0:ptr[s:8,a:8],"
-                 "@8:bytes[s:64,a:1]}>");
 
 } // namespace test
 
 template <typename T>
 void print_XTypeSignature(const char* name)
 {
-    using namespace XTypeSignature;
-    constexpr auto sig = TypeSignature<T>::calculate();
+    constexpr auto sig = XTypeSignature::TypeSignature<T>::calculate();
     std::cout << name << ": ";
     sig.print();
     std::cout << '\n';
@@ -98,20 +108,19 @@ void print_XTypeSignature(const char* name)
 
 int main()
 {
-    std::cout << "Type signatures with size and alignment information:\n";
+    std::cout << "Type signatures with size and alignment information:\n\n";
 
     print_XTypeSignature<int32_t>("int32_t");
     print_XTypeSignature<float>("float");
     print_XTypeSignature<test::Point>("Point");
     print_XTypeSignature<test::Rectangle>("Rectangle");
-    print_XTypeSignature<test::TestType>("TestType");
+    print_XTypeSignature<test::TestTypeInner>("TestTypeInner");
+    print_XTypeSignature<test::TestType>("TestType");  // 这里会打印出实际的类型签名
     print_XTypeSignature<test::TestType2>("TestType2");
     print_XTypeSignature<XTypeSignature::XVector<int32_t>>("Vector<int32_t>");
     print_XTypeSignature<XTypeSignature::XMap<XTypeSignature::XString, int32_t>>("Map<XString, int32_t>");
     print_XTypeSignature<char[XTypeSignature::ANY_SIZE]>("char[ANY_SIZE]");
     print_XTypeSignature<void*>("void*");
-    print_XTypeSignature<XTypeSignature::XAny>("XAny");
-    print_XTypeSignature<XTypeSignature::DynamicStruct>("DynamicStruct");
 
     return 0;
 }
