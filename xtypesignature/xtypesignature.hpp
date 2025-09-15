@@ -8,13 +8,25 @@
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
     #define IS_LITTLE_ENDIAN 1
-#else
+    #define FUNCTION_SIGNATURE __FUNCSIG__
+#elif defined(__clang__)
     #define TYPESIG_PLATFORM_WINDOWS 0
+    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
     #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         #define IS_LITTLE_ENDIAN 1
     #else
         #define IS_LITTLE_ENDIAN 0
     #endif
+#elif defined(__GNUC__)
+    #define TYPESIG_PLATFORM_WINDOWS 0
+    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
+    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        #define IS_LITTLE_ENDIAN 1
+    #else
+        #define IS_LITTLE_ENDIAN 0
+    #endif
+#else
+    #error "Unsupported compiler"
 #endif
 
 namespace XTypeSignature {
@@ -289,7 +301,7 @@ namespace XTypeSignature {
             }
             else {
                 static_assert(always_false<T>::value, 
-                    "Type is not supported for automatic reflection. Type name: " __FUNCSIG__);
+                    "Type is not supported for automatic reflection");
                 return CompileString{""};
             }
         }
