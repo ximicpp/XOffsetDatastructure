@@ -261,10 +261,10 @@ int main(int argc, char* argv[])
 		datafile = "data.bin";
 	}
 	std::cout << "datafile: " << datafile << std::endl;
-	const int numRuns = 0;
+	const int numRuns = 1;  // At least 1 run for meaningful averages
 	std::size_t storageSize = 0;
-	boost::container::vector<double> writeTimes(numRuns);
-	boost::container::vector<double> readTimes(numRuns);
+	boost::container::vector<double> writeTimes;
+	boost::container::vector<double> readTimes;
 	if (forceRemove)
 	{
 		std::filesystem::remove(datafile);
@@ -279,8 +279,11 @@ int main(int argc, char* argv[])
 		storageSize = writeData(datafile, writeTimes, false);
 		readData(datafile, readTimes);
 	}
-	double writeTimeAvg = std::accumulate(writeTimes.begin(), writeTimes.end(), 0.0) / numRuns;
-	double readTimeAvg = std::accumulate(readTimes.begin(), readTimes.end(), 0.0) / numRuns;
+	
+	// Avoid division by zero
+	double writeTimeAvg = writeTimes.empty() ? 0.0 : std::accumulate(writeTimes.begin(), writeTimes.end(), 0.0) / writeTimes.size();
+	double readTimeAvg = readTimes.empty() ? 0.0 : std::accumulate(readTimes.begin(), readTimes.end(), 0.0) / readTimes.size();
+	
 	std::cout << std::left << std::setw(25) << "Average writeData time:" << std::right << std::setw(10) << std::fixed << std::setprecision(3) << writeTimeAvg * 1000 << " ms" << std::endl;
 	std::cout << std::left << std::setw(25) << "Average readData time:" << std::right << std::setw(10) << std::fixed << std::setprecision(3) << readTimeAvg * 1000 << " ms" << std::endl;
 	std::cout << "storageSize: " << storageSize << std::endl;
