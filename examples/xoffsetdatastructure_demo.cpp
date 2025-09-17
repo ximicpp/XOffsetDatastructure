@@ -21,7 +21,7 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInner {
 		XVector<int> mVector;
 };
 
-struct TestType
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestType
 {
 	template <typename Allocator>
 	TestType(Allocator allocator) : mVector(allocator), mStringVector(allocator), mComplexMap(allocator), mStringSet(allocator), mSet(allocator), mString(allocator), TestTypeInnerObj(allocator), mXXTypeVector(allocator) {}
