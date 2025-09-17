@@ -63,12 +63,12 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectionHint {
     float mFloat;
     XVector<int32_t> mVector;
     XVector<XString> mStringVector;
-    XVector<TestTypeInnerReflectionHint> mTypeVector;    // Uses hint type, not TestTypeInner
+    TestTypeInnerReflectionHint TestTypeInnerObj;       // Uses hint type, not TestTypeInner
+    XVector<TestTypeInnerReflectionHint> mXXTypeVector; // Uses hint type, not TestTypeInner
     XMap<XString, TestTypeInnerReflectionHint> mComplexMap;  // Uses hint type, not TestTypeInner
     XSet<XString> mStringSet;
     XSet<int32_t> mSet;
     XString mString;
-    TestTypeInnerReflectionHint innerObj;               // Uses hint type, not TestTypeInner
 };
 
 // Type signature validation
@@ -81,12 +81,12 @@ static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
              "@4:f32[s:4,a:4],"
              "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
              "@40:vector[s:32,a:8]<string[s:32,a:8]>,"
-             "@72:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
-             "@104:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
-             "@136:set[s:32,a:8]<string[s:32,a:8]>,"
-             "@168:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@200:string[s:32,a:8],"
-             "@232:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}"
+             "@72:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@112:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@144:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@176:set[s:32,a:8]<string[s:32,a:8]>,"
+             "@208:set[s:32,a:8]<i32[s:4,a:4]>,"
+             "@240:string[s:32,a:8]"
              "}");
 
 // Layout validation
