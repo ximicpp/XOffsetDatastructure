@@ -39,30 +39,43 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestType
 	XString mString;
 };
 
-// 用于反射的内部类型（聚合类型）
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerReflectable {
+// Reflection hint types - Workaround for boost::pfr limitations
+// 
+// Problem: boost::pfr (our current reflection library) only works with aggregate types,
+// but our actual types have custom constructors for allocator initialization.
+// Solution: Create identical aggregate versions purely for compile-time type analysis.
+// Must have identical layout to actual types - fields must match exactly.
+
+// TestTypeInnerReflectionHint: Aggregate version of TestTypeInner
+// - Removes constructor to satisfy boost::pfr aggregate type requirement
+// - Keeps identical field layout for type signature generation
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerReflectionHint {
     int32_t mInt;
     XVector<int32_t> mVector;
 };
 
-// 用于反射的外部类型（聚合类型）
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectable {
+// TestTypeReflectionHint: Aggregate version of TestType  
+// - Removes constructor to satisfy boost::pfr aggregate type requirement
+// - Uses ReflectionHint types for nested custom types
+// - Field order must exactly match TestType for correct memory layout
+struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectionHint {
     int32_t mInt;
     float mFloat;
     XVector<int32_t> mVector;
     XVector<XString> mStringVector;
-    XVector<TestTypeInnerReflectable> mTypeVector;
-    XMap<XString, TestTypeInnerReflectable> mComplexMap;
+    XVector<TestTypeInnerReflectionHint> mTypeVector;    // Uses hint type, not TestTypeInner
+    XMap<XString, TestTypeInnerReflectionHint> mComplexMap;  // Uses hint type, not TestTypeInner
     XSet<XString> mStringSet;
     XSet<int32_t> mSet;
     XString mString;
-    TestTypeInnerReflectable innerObj;
+    TestTypeInnerReflectionHint innerObj;               // Uses hint type, not TestTypeInner
 };
 
-static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectable>() == 
+// Type signature validation
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == 
              "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}");
 
-static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectable>() == 
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() == 
              "struct[s:272,a:8]{"
              "@0:i32[s:4,a:4],"
              "@4:f32[s:4,a:4],"
@@ -75,6 +88,12 @@ static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectable>() ==
              "@200:string[s:32,a:8],"
              "@232:struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}"
              "}");
+
+// Layout validation
+static_assert(sizeof(TestTypeInner) == sizeof(TestTypeInnerReflectionHint));
+static_assert(alignof(TestTypeInner) == alignof(TestTypeInnerReflectionHint));
+static_assert(sizeof(TestType) == sizeof(TestTypeReflectionHint));
+static_assert(alignof(TestType) == alignof(TestTypeReflectionHint));
 
 std::size_t writeData(const std::string &datafile, boost::container::vector<double> &writeTimes, bool writeFile = true)
 {
