@@ -289,24 +289,37 @@ namespace XOffsetDatastructure2
 	// Memory Compaction
 	// ========================================================================
 
+	// SFINAE helper to detect if a type has a static migrate method
+	template<typename T, typename = void>
+	struct has_migrate : std::false_type {};
+
+	template<typename T>
+	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBuffer&>(), std::declval<XBuffer&>()))>> : std::true_type {};
+
 	class XBufferCompactor {
 	public:
-		// Manual compaction: User migrates objects via callback
-		static XBuffer compact_manual(
-			XBuffer& old_xbuf, 
-			std::function<void(XBuffer&, XBuffer&)> migrate_callback)
-		{
-			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-			std::size_t new_size = stats.used_size + (stats.used_size / 10);
-			if (new_size < 4096) new_size = 4096;
-			
-			XBuffer new_xbuf(new_size);
-			migrate_callback(old_xbuf, new_xbuf);
-			
-			// Shrink to fit: Remove unused memory
-			new_xbuf.shrink_to_fit();
-			
-			return new_xbuf;
+		// Manual compaction: Type-based with automatic migrate detection
+		// Uses C++17 if constexpr to detect if type T has migrate method
+		// Returns original buffer if type doesn't have migrate method
+		template<typename T>
+		static XBuffer compact_manual(XBuffer& old_xbuf) {
+			if constexpr (has_migrate<T>::value) {
+				// Type has migrate method, perform compaction
+				auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+				std::size_t new_size = stats.used_size + (stats.used_size / 10);
+				if (new_size < 4096) new_size = 4096;
+				
+				XBuffer new_xbuf(new_size);
+				T::migrate(old_xbuf, new_xbuf);
+				
+				// Shrink to fit: Remove unused memory
+				new_xbuf.shrink_to_fit();
+				
+				return new_xbuf;
+			} else {
+				// Type doesn't have migrate method, return original buffer (move semantics)
+				return std::move(old_xbuf);
+			}
 		}
 		
 		// Automatic compaction: Requires reflection (not implemented)
