@@ -302,6 +302,10 @@ namespace XOffsetDatastructure2
 			
 			XBuffer new_xbuf(new_size);
 			migrate_callback(old_xbuf, new_xbuf);
+			
+			// Shrink to fit: Remove unused memory
+			new_xbuf.shrink_to_fit();
+			
 			return new_xbuf;
 		}
 		
