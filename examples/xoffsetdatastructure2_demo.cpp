@@ -126,6 +126,19 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
         std::cout << "\n[Memory Visualization] Final state after all data added\n";
         XBufferVisualizer::print_stats(xbuf);
     }
+    
+    // ========================================================================
+    // Memory Compaction: Automatic compaction (not implemented)
+    // ========================================================================
+    /*
+    bool success = XBufferCompactor::compact_automatic(xbuf);
+    if (success) {
+        std::cout << "Automatic compaction succeeded\n";
+        XBufferVisualizer::print_stats(xbuf);
+    } else {
+        std::cout << "Automatic compaction not implemented (requires reflection)\n";
+    }
+    */
 
     if (writeFile)
     {
@@ -257,5 +270,6 @@ int main(int argc, char* argv[])
     }
     
     std::cout << "storageSize: " << storageSize << std::endl;
+    
     return 0;
 }
