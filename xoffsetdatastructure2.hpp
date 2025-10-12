@@ -338,7 +338,7 @@ namespace XOffsetDatastructure2
 			(void)old_xbuf;
 			static_assert(sizeof(T) == 0, 
 				"compact_automatic requires C++26 reflection (not yet available). "
-				"Please use compact_manual<T> or compact_auto<T> instead.");
+				"Please use compact_manual<T> instead.");
 			return XBuffer();
 		}
 	};
