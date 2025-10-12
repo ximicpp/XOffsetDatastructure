@@ -1,10 +1,3 @@
-#include <boost/container/vector.hpp>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/set.hpp>
-#include <boost/container/flat_map.hpp>
-#include <boost/container/map.hpp>
-#include <boost/container/string.hpp>
-#include <boost/interprocess/managed_external_buffer.hpp>
 #include <cstddef>
 #include <cstring>
 #include <memory>
@@ -15,7 +8,7 @@
 #include <algorithm>
 #include <numeric>
 #include <iomanip>
-#include "xoffsetdatastructure2/xtypes2.hpp"
+#include "xoffsetdatastructure2.hpp"
 
 using namespace XOffsetDatastructure2;
 
