@@ -43,7 +43,7 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
     
     if (showVisualization) {
         std::cout << "\n[Memory Visualization] Initial XBuffer (4KB)\n";
-        XBufferVisualizer::print_memory_bar(xbuf, 60);
+        XBufferVisualizer::print_stats(xbuf);
     }
     
     TestType* mytest = xbuf.construct<TestType>("MyTest")(xbuf.get_segment_manager());
@@ -83,11 +83,7 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
 
     if (showVisualization) {
         std::cout << "\n[Memory Visualization] After adding basic data\n";
-        XBufferVisualizer::print_memory_bar(xbuf, 60);
-        auto stats = XBufferVisualizer::get_memory_stats(xbuf);
-        std::cout << "  Used: " << stats.used_size << " bytes | Free: " << stats.free_size 
-                  << " bytes | Usage: " << std::fixed << std::setprecision(1) 
-                  << stats.usage_percent() << "%\n";
+        XBufferVisualizer::print_stats(xbuf);
     }
 
     xbuf.grow(1024 * 32);
@@ -95,7 +91,7 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
 
     if (showVisualization) {
         std::cout << "\n[Memory Visualization] After growing buffer to 36KB\n";
-        XBufferVisualizer::print_memory_bar(xbuf, 60);
+        XBufferVisualizer::print_stats(xbuf);
     }
 
     for (auto i = 0; i < 7; ++i)
@@ -128,15 +124,7 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
 
     if (showVisualization) {
         std::cout << "\n[Memory Visualization] Final state after all data added\n";
-        XBufferVisualizer::print_memory_bar(xbuf, 60);
-        auto stats = XBufferVisualizer::get_memory_stats(xbuf);
-        std::cout << "  Total: " << stats.total_size << " bytes | Used: " << stats.used_size 
-                  << " bytes (" << std::fixed << std::setprecision(1) << stats.usage_percent() << "%)\n";
-        std::cout << "  Fragmentation: " << std::fixed << std::setprecision(1) 
-                  << stats.fragmentation_percent() << "%\n";
-        
-        std::cout << "\n[Named Objects]\n";
-        print_xbuffer_objects(xbuf);
+        XBufferVisualizer::print_stats(xbuf);
     }
 
     if (writeFile)
@@ -224,21 +212,24 @@ std::size_t readData(const std::string& datafile, boost::container::vector<doubl
 
 int main(int argc, char* argv[])
 {
-    std::string datafile = (argc > 1) ? argv[1] : "data2.bin";
+    std::string datafile = "data2.bin";
     bool showVisualization = false;
     
-    // Check for --visualize or -v flag
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--visualize" || arg == "-v") {
             showVisualization = true;
+        } else {
+            // Assume it's a datafile path
+            datafile = arg;
         }
     }
     
     std::cout << "datafile: " << datafile << std::endl;
     if (showVisualization) {
         std::cout << "Memory visualization: ENABLED\n";
-        std::cout << "======================================================================\n";
+        std::cout << "======================================================================\n\n";
     }
 
     const int numRuns = 1;
