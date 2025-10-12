@@ -181,29 +181,30 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
     }
     
     // ========================================================================
-    // Memory Compaction: Manual compaction using TestType::migrate
-    // NOTE: If compact_automatic were available, you could simply use:
-    //       XBuffer compact_buf = XBufferCompactor::compact_automatic(xbuf);
-    //       This would eliminate the need for TestType::migrate callback.
+    // Memory Compaction
     // ========================================================================
     XBuffer* buffer_to_write = &xbuf;
     XBuffer compact_buf;
     
     if (enableCompaction) {
         if (showVisualization) {
-            std::cout << "\n[Memory Compaction] Manual compaction using TestType::migrate\n";
             std::cout << "Before compaction: ";
             XBufferVisualizer::print_stats(xbuf);
         }
         
-        // Perform manual compaction using TestType's migrate callback
-        // (Required because C++ lacks automatic reflection/serialization)
-        compact_buf = XBufferCompactor::compact_manual(xbuf, TestType::migrate);
-        buffer_to_write = &compact_buf;
+        compact_buf = XBufferCompactor::compact_manual<TestType>(xbuf);
         
-        if (showVisualization) {
-            std::cout << "After compaction:  ";
-            XBufferVisualizer::print_stats(compact_buf);
+        if (compact_buf.get_size() > 0) {
+            buffer_to_write = &compact_buf;
+            
+            if (showVisualization) {
+                std::cout << "After compaction:  ";
+                XBufferVisualizer::print_stats(compact_buf);
+            }
+        } else {
+            if (showVisualization) {
+                std::cout << "Compaction skipped: Type doesn't have migrate method\n";
+            }
         }
     }
 
