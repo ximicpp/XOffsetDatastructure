@@ -155,5 +155,4 @@ private:
 } // namespace interprocess
 } // namespace boost
 
-#include <boost/interprocess/detail/config_end.hpp>
 #endif

@@ -10,7 +10,6 @@
 #include <boost/container/detail/next_capacity.hpp>
 #include "xmanagedmemory.hpp"
 #include "xallocationalgorithm.hpp"
-#include "xconfig2.hpp"
 
 namespace XOffsetDatastructure2
 {
