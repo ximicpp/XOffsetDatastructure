@@ -1,14 +1,9 @@
-cmake_minimum_required(VERSION 3.10)
-
 # Set C++ standard to C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Enable testing
 enable_testing()
-
-# Get Boost include directories from parent
-set(BOOST_INCLUDE_DIRS ${BOOST_INCLUDE_DIRS} PARENT_SCOPE)
 
 # Test executables
 add_executable(test_basic_types test_basic_types.cpp)
