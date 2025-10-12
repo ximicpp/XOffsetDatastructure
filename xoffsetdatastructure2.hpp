@@ -322,10 +322,24 @@ namespace XOffsetDatastructure2
 			}
 		}
 		
-		// Automatic compaction: Requires reflection (not implemented)
-		static bool compact_automatic(XBuffer& xbuf, void* options = nullptr) {
-			(void)xbuf; (void)options;
-			return false;
+		// Automatic compaction (C++26): Fully automatic via reflection
+		// 
+		// Key difference from compact_manual:
+		// - compact_manual: Requires user-defined T::migrate() method
+		// - compact_automatic: Uses C++26 reflection to auto-generate migration
+		//
+		// Core idea: Use std::meta::members_of(^T) to iterate all fields,
+		// automatically handle POD types, containers, and nested objects.
+		// No manual T::migrate() needed!
+		//
+		// Status: NOT IMPLEMENTED (C++26 reflection not yet available)
+		template<typename T>
+		static XBuffer compact_automatic(XBuffer& old_xbuf) {
+			(void)old_xbuf;
+			static_assert(sizeof(T) == 0, 
+				"compact_automatic requires C++26 reflection (not yet available). "
+				"Please use compact_manual<T> or compact_auto<T> instead.");
+			return XBuffer();
 		}
 	};
 }
