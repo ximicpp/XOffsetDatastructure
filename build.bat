@@ -23,14 +23,8 @@ if errorlevel 1 (
 
 :: Run the demos
 echo.
-echo Running XOffsetDatastructure demo v1...
-bin\Release\xoffsetdatastructure_demo.exe
-echo.
 echo Running XOffsetDatastructure demo v2...
 bin\Release\xoffsetdatastructure2_demo.exe
-echo.
-echo Running XTypeSignature demo...
-bin\Release\xtypesignature_demo.exe
 
 :: Return to original directory
 cd ..
