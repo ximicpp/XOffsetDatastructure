@@ -21,13 +21,80 @@ if errorlevel 1 (
     exit /b 1
 )
 
-:: Run the demos
+:: Run tests first
 echo.
-echo Running XOffsetDatastructure demo v2 (with all features)...
+echo ======================================================================
+echo Running Tests
+echo ======================================================================
+
+set TEST_FAILED=0
+
+if exist "bin\Release\test_basic_types.exe" (
+    echo.
+    echo [1/5] Running Basic Types Test...
+    bin\Release\test_basic_types.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [1/5] test_basic_types.exe not found (skipped)
+)
+
+if exist "bin\Release\test_vector.exe" (
+    echo.
+    echo [2/5] Running Vector Test...
+    bin\Release\test_vector.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [2/5] test_vector.exe not found (skipped)
+)
+
+if exist "bin\Release\test_map_set.exe" (
+    echo.
+    echo [3/5] Running Map/Set Test...
+    bin\Release\test_map_set.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [3/5] test_map_set.exe not found (skipped)
+)
+
+if exist "bin\Release\test_nested.exe" (
+    echo.
+    echo [4/5] Running Nested Structures Test...
+    bin\Release\test_nested.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [4/5] test_nested.exe not found (skipped)
+)
+
+if exist "bin\Release\test_compaction.exe" (
+    echo.
+    echo [5/5] Running Memory Compaction Test...
+    bin\Release\test_compaction.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [5/5] test_compaction.exe not found (skipped)
+)
+
+:: Run the demo after tests
+echo.
+echo ======================================================================
+echo Running XOffsetDatastructure Demo v2
+echo ======================================================================
 bin\Release\xoffsetdatastructure2_demo.exe --visualize --compact
 
 :: Return to original directory
 cd ..
 
+:: Final summary
 echo.
-echo Build and run completed successfully!
+echo ======================================================================
+if %TEST_FAILED%==0 (
+    echo Build, demo, and tests completed successfully!
+    echo Result: ALL TESTS PASSED
+) else (
+    echo Build and demo completed, but some tests FAILED
+    echo Result: TESTS FAILED
+)
+echo ======================================================================
+echo.
+
+exit /b %TEST_FAILED%

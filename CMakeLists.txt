@@ -28,3 +28,44 @@ set(BOOST_INCLUDE_DIRS
 
 # Add examples subdirectory
 add_subdirectory(examples)
+
+# Enable testing
+enable_testing()
+
+# Test executables
+add_executable(test_basic_types tests/test_basic_types.cpp)
+target_include_directories(test_basic_types PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_basic_types PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+
+add_executable(test_vector tests/test_vector.cpp)
+target_include_directories(test_vector PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_vector PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+
+add_executable(test_map_set tests/test_map_set.cpp)
+target_include_directories(test_map_set PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_map_set PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+
+add_executable(test_nested tests/test_nested.cpp)
+target_include_directories(test_nested PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_nested PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+
+add_executable(test_compaction tests/test_compaction.cpp)
+target_include_directories(test_compaction PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_compaction PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+
+# Add CTest tests
+add_test(NAME BasicTypes COMMAND test_basic_types)
+add_test(NAME VectorOps COMMAND test_vector)
+add_test(NAME MapSetOps COMMAND test_map_set)
+add_test(NAME NestedStructures COMMAND test_nested)
+add_test(NAME MemoryCompaction COMMAND test_compaction)
