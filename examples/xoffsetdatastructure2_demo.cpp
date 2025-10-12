@@ -181,7 +181,7 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
     }
     
     // ========================================================================
-    // Memory Compaction
+    // Memory Compaction: Three approaches available
     // ========================================================================
     XBuffer* buffer_to_write = &xbuf;
     XBuffer compact_buf;
@@ -192,7 +192,15 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
             XBufferVisualizer::print_stats(xbuf);
         }
         
+        // Approach 1: compact_manual (C++17 if constexpr)
+        // - Requires: User must define T::migrate() method manually
         compact_buf = XBufferCompactor::compact_manual<TestType>(xbuf);
+        
+        // Approach 2: compact_automatic (C++26 reflection - NOT YET AVAILABLE)
+        // - Requires: Nothing! Uses std::meta::members_of(^T) to auto-generate migration
+        // - Benefit: No need to write T::migrate() - fully automatic
+        // - Status: Waiting for C++26 reflection support
+        // compact_buf = XBufferCompactor::compact_automatic<TestType>(xbuf);
         
         if (compact_buf.get_size() > 0) {
             buffer_to_write = &compact_buf;
