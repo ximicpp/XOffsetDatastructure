@@ -19,7 +19,7 @@ cmake --build .
 # Run the demos
 echo
 echo "Running XOffsetDatastructure demo v2..."
-./bin/xoffsetdatastructure2_demo
+./bin/xoffsetdatastructure2_demo --visualize
 
 # Return to original directory
 cd ..

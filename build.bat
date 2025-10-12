@@ -24,7 +24,7 @@ if errorlevel 1 (
 :: Run the demos
 echo.
 echo Running XOffsetDatastructure demo v2...
-bin\Release\xoffsetdatastructure2_demo.exe
+bin\Release\xoffsetdatastructure2_demo.exe --visualize
 
 :: Return to original directory
 cd ..

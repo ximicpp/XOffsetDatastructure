@@ -36,10 +36,16 @@ public:
     XString mString;
 };
 
-std::size_t writeData(const std::string& datafile, boost::container::vector<double>& writeTimes, bool writeFile = true)
+std::size_t writeData(const std::string& datafile, boost::container::vector<double>& writeTimes, bool writeFile = true, bool showVisualization = false)
 {
     auto start = std::chrono::high_resolution_clock::now();
     XBuffer xbuf(4096);
+    
+    if (showVisualization) {
+        std::cout << "\n[Memory Visualization] Initial XBuffer (4KB)\n";
+        XBufferVisualizer::print_memory_bar(xbuf, 60);
+    }
+    
     TestType* mytest = xbuf.construct<TestType>("MyTest")(xbuf.get_segment_manager());
     mytest->mInt = 123;
     mytest->mFloat = 3.14f;
@@ -75,8 +81,22 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
         mytest->mSet.insert(i);
     }
 
+    if (showVisualization) {
+        std::cout << "\n[Memory Visualization] After adding basic data\n";
+        XBufferVisualizer::print_memory_bar(xbuf, 60);
+        auto stats = XBufferVisualizer::get_memory_stats(xbuf);
+        std::cout << "  Used: " << stats.used_size << " bytes | Free: " << stats.free_size 
+                  << " bytes | Usage: " << std::fixed << std::setprecision(1) 
+                  << stats.usage_percent() << "%\n";
+    }
+
     xbuf.grow(1024 * 32);
     mytest = xbuf.find_or_construct<TestType>("MyTest")(xbuf.get_segment_manager());
+
+    if (showVisualization) {
+        std::cout << "\n[Memory Visualization] After growing buffer to 36KB\n";
+        XBufferVisualizer::print_memory_bar(xbuf, 60);
+    }
 
     for (auto i = 0; i < 7; ++i)
     {
@@ -105,6 +125,19 @@ std::size_t writeData(const std::string& datafile, boost::container::vector<doub
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     writeTimes.push_back(elapsed_seconds.count());
+
+    if (showVisualization) {
+        std::cout << "\n[Memory Visualization] Final state after all data added\n";
+        XBufferVisualizer::print_memory_bar(xbuf, 60);
+        auto stats = XBufferVisualizer::get_memory_stats(xbuf);
+        std::cout << "  Total: " << stats.total_size << " bytes | Used: " << stats.used_size 
+                  << " bytes (" << std::fixed << std::setprecision(1) << stats.usage_percent() << "%)\n";
+        std::cout << "  Fragmentation: " << std::fixed << std::setprecision(1) 
+                  << stats.fragmentation_percent() << "%\n";
+        
+        std::cout << "\n[Named Objects]\n";
+        print_xbuffer_objects(xbuf);
+    }
 
     if (writeFile)
     {
@@ -192,7 +225,21 @@ std::size_t readData(const std::string& datafile, boost::container::vector<doubl
 int main(int argc, char* argv[])
 {
     std::string datafile = (argc > 1) ? argv[1] : "data2.bin";
+    bool showVisualization = false;
+    
+    // Check for --visualize or -v flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--visualize" || arg == "-v") {
+            showVisualization = true;
+        }
+    }
+    
     std::cout << "datafile: " << datafile << std::endl;
+    if (showVisualization) {
+        std::cout << "Memory visualization: ENABLED\n";
+        std::cout << "======================================================================\n";
+    }
 
     const int numRuns = 1;
     std::size_t storageSize = 0;
@@ -200,7 +247,7 @@ int main(int argc, char* argv[])
     boost::container::vector<double> readTimes(numRuns);
 
     // Initial write and read
-    storageSize = writeData(datafile, writeTimes);
+    storageSize = writeData(datafile, writeTimes, true, showVisualization);
     readData(datafile, readTimes);
 
     // Additional runs if numRuns > 1
