@@ -250,175 +250,66 @@ namespace XOffsetDatastructure2
 	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
 	// ========================================================================
-	// XBuffer Memory Visualization Utilities
+	// XBuffer Memory Visualization
 	// ========================================================================
 
 	class XBufferVisualizer {
 	public:
-		// 获取内存使用统计信息
 		struct MemoryStats {
 			std::size_t total_size;
 			std::size_t free_size;
 			std::size_t used_size;
-			std::size_t num_free_blocks;
-			std::size_t num_allocated_blocks;
-			std::size_t largest_free_block;
 			
 			double usage_percent() const {
 				return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0;
 			}
 			
-			double fragmentation_percent() const {
-				return free_size > 0 ? ((free_size - largest_free_block) * 100.0 / free_size) : 0.0;
+			double free_percent() const {
+				return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0;
 			}
 		};
 
-		// Get XBuffer memory statistics
 		static MemoryStats get_memory_stats(XBuffer& xbuf) {
 			MemoryStats stats = {};
 			stats.total_size = xbuf.get_size();
 			stats.free_size = xbuf.get_free_memory();
 			stats.used_size = stats.total_size - stats.free_size;
-			
-			// Estimate number of free blocks (not directly available in API)
-			stats.num_free_blocks = 0;  // Not available in current API
-			stats.num_allocated_blocks = 0;  // Not available in current API
-			
-			// Try to estimate largest free block using binary search
-			try {
-				void* ptr = xbuf.allocate(stats.free_size);
-				stats.largest_free_block = stats.free_size;
-				xbuf.deallocate(ptr);
-			} catch(...) {
-				// Binary search for largest allocatable block
-				std::size_t low = 0, high = stats.free_size;
-				stats.largest_free_block = 0;
-				while (low <= high && high > 0) {
-					std::size_t mid = low + (high - low) / 2;
-					try {
-						void* ptr = xbuf.allocate(mid);
-						xbuf.deallocate(ptr);
-						stats.largest_free_block = mid;
-						low = mid + 1;
-					} catch(...) {
-						if (mid == 0) break;
-						high = mid - 1;
-					}
-				}
-			}
-			
 			return stats;
 		}
 
-		// 打印内存统计信息
-		static void print_memory_stats(XBuffer& xbuf, const char* title = "XBuffer Memory Statistics") {
+		static void print_stats(XBuffer& xbuf) {
 			MemoryStats stats = get_memory_stats(xbuf);
-			
-			std::cout << "\n" << std::string(70, '=') << std::endl;
-			std::cout << title << std::endl;
-			std::cout << std::string(70, '=') << std::endl;
-			
-			std::cout << "Total Size:           " << format_size(stats.total_size) << std::endl;
-			std::cout << "Used Size:            " << format_size(stats.used_size) 
-			          << " (" << std::fixed << std::setprecision(2) << stats.usage_percent() << "%)" << std::endl;
-			std::cout << "Free Size:            " << format_size(stats.free_size) 
-			          << " (" << std::fixed << std::setprecision(2) << (100.0 - stats.usage_percent()) << "%)" << std::endl;
-			std::cout << "Largest Free Block:   " << format_size(stats.largest_free_block) << std::endl;
-			std::cout << "Free Blocks:          " << stats.num_free_blocks << std::endl;
-			std::cout << "Fragmentation:        " << std::fixed << std::setprecision(2) 
-			          << stats.fragmentation_percent() << "%" << std::endl;
-			
-			std::cout << std::string(70, '-') << std::endl;
-		}
-
-		// Print memory usage bar chart
-		static void print_memory_bar(XBuffer& xbuf, int bar_width = 50) {
-			MemoryStats stats = get_memory_stats(xbuf);
-			
-			int used_blocks = static_cast<int>(stats.usage_percent() * bar_width / 100.0);
-			int free_blocks = bar_width - used_blocks;
-			
-			std::cout << "Memory Usage: [";
-			for (int i = 0; i < used_blocks; ++i) std::cout << "#";
-			for (int i = 0; i < free_blocks; ++i) std::cout << ".";
-			std::cout << "] " << std::fixed << std::setprecision(1) 
-			          << stats.usage_percent() << "%" << std::endl;
-		}
-
-		// Print all named objects
-		static void print_named_objects(XBuffer& xbuf) {
-			std::cout << "\n" << std::string(70, '=') << std::endl;
-			std::cout << "Named Objects in XBuffer" << std::endl;
-			std::cout << std::string(70, '=') << std::endl;
-			
-			auto* segment_mgr = xbuf.get_segment_manager();
-			auto named_it = segment_mgr->named_begin();
-			auto named_end = segment_mgr->named_end();
-			
-			if (named_it == named_end) {
-				std::cout << "(No named objects)" << std::endl;
-			} else {
-				int index = 0;
-				for (; named_it != named_end; ++named_it, ++index) {
-					const auto& obj = *named_it;
-					std::cout << std::setw(3) << index << ". " 
-					          << std::setw(30) << std::left << obj.name() 
-					          << " | Offset: 0x" << std::hex << std::setw(8) << std::setfill('0') 
-					          << get_offset(xbuf, obj.value()) << std::dec << std::setfill(' ')
-					          << std::endl;
-				}
-			}
-			std::cout << std::string(70, '-') << std::endl;
-		}
-
-		// 打印完整的可视化报告
-		static void print_full_report(XBuffer& xbuf, const char* title = "XBuffer Visualization Report") {
-			std::cout << "\n" << std::string(70, '=') << std::endl;
-			std::cout << title << std::endl;
-			std::cout << std::string(70, '=') << std::endl;
-			std::cout << std::endl;
-			
-			print_memory_bar(xbuf, 60);
-			print_memory_stats(xbuf, "Memory Statistics");
-			print_named_objects(xbuf);
-			
-			std::cout << std::string(70, '=') << std::endl;
-			std::cout << std::endl;
-		}
-
-	private:
-		// 格式化大小显示（B, KB, MB）
-		static std::string format_size(std::size_t bytes) {
-			std::ostringstream oss;
-			if (bytes < 1024) {
-				oss << bytes << " B";
-			} else if (bytes < 1024 * 1024) {
-				oss << std::fixed << std::setprecision(2) << (bytes / 1024.0) << " KB";
-			} else {
-				oss << std::fixed << std::setprecision(2) << (bytes / (1024.0 * 1024.0)) << " MB";
-			}
-			return oss.str();
-		}
-
-		// 获取对象相对于buffer起始位置的偏移
-		static std::size_t get_offset(XBuffer& xbuf, const void* ptr) {
-			const char* base = static_cast<const char*>(xbuf.get_address());
-			const char* target = static_cast<const char*>(ptr);
-			return target - base;
+			std::cout << "XBuffer: " << stats.used_size << "/" << stats.total_size 
+			          << " bytes (" << std::fixed << std::setprecision(1) 
+			          << stats.usage_percent() << "% used)" << std::endl;
 		}
 	};
 
-	// 便捷函数
-	inline void visualize_xbuffer(XBuffer& xbuf, const char* title = nullptr) {
-		XBufferVisualizer::print_full_report(xbuf, title ? title : "XBuffer Visualization Report");
-	}
+	// ========================================================================
+	// Memory Compaction
+	// ========================================================================
 
-	inline void print_xbuffer_stats(XBuffer& xbuf) {
-		XBufferVisualizer::print_memory_stats(xbuf);
-	}
-
-	inline void print_xbuffer_objects(XBuffer& xbuf) {
-		XBufferVisualizer::print_named_objects(xbuf);
-	}
+	class XBufferCompactor {
+	public:
+		// Manual compaction: User migrates objects via callback
+		static XBuffer compact_manual(
+			XBuffer& old_xbuf, 
+			std::function<void(XBuffer&, XBuffer&)> migrate_callback)
+		{
+			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+			std::size_t new_size = stats.used_size + (stats.used_size / 10);
+			if (new_size < 4096) new_size = 4096;
+			
+			XBuffer new_xbuf(new_size);
+			migrate_callback(old_xbuf, new_xbuf);
+			return new_xbuf;
+		}
+		
+		// Automatic compaction: Requires reflection (not implemented)
+		static bool compact_automatic(XBuffer& xbuf, void* options = nullptr) {
+			(void)xbuf; (void)options;
+			return false;
+		}
+	};
 }
 #endif
