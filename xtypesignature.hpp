@@ -172,11 +172,11 @@ namespace XTypeSignature {
         }
     };
 
-    // 前向声明 TypeSignature
+    // Forward declaration of TypeSignature
     template <typename T>
     struct TypeSignature;
 
-    // 计算字段偏移量的辅助函数
+    // Helper function to calculate field offsets
     template<typename T, size_t Index>
     constexpr size_t get_field_offset() noexcept {
         if constexpr (Index == 0) {
@@ -193,7 +193,7 @@ namespace XTypeSignature {
         }
     }
 
-    // 通用的 get_fields_signature 函数
+    // Generic get_fields_signature function
     template <typename T, size_t Index = 0>
     constexpr auto get_fields_signature() noexcept {
         if constexpr (Index >= boost::pfr::tuple_size_v<T>) {
@@ -219,7 +219,7 @@ namespace XTypeSignature {
         }
     }
 
-    // 基本类型的特化
+    // Specializations for basic types
     template <>
     struct TypeSignature<int32_t> {
         static constexpr auto calculate() noexcept {
@@ -286,7 +286,7 @@ namespace XTypeSignature {
     };
     #endif
 
-    // 为指针类型添加特化
+    // Specialization for pointer types
     template <typename T>
     struct TypeSignature<T*> {
         static constexpr auto calculate() noexcept {
@@ -294,7 +294,7 @@ namespace XTypeSignature {
         }
     };
 
-    // 为数组类型添加特化
+    // Specialization for array types
     template <typename T, size_t N>
     struct TypeSignature<T[N]> {
         static constexpr auto calculate() noexcept {
@@ -316,7 +316,7 @@ namespace XTypeSignature {
         }
     };
 
-    // 为 void* 添加特化
+    // Specialization for void*
     template <>
     struct TypeSignature<void*> {
         static constexpr auto calculate() noexcept {
@@ -324,7 +324,7 @@ namespace XTypeSignature {
         }
     };
 
-    // 为 char[ANY_SIZE] 添加特化
+    // Specialization for char[ANY_SIZE]
     template <>
     struct TypeSignature<char[ANY_SIZE]> {
         static constexpr auto calculate() noexcept {
@@ -332,7 +332,7 @@ namespace XTypeSignature {
         }
     };
 
-    // 通用的 TypeSignature 实现
+    // Generic TypeSignature implementation
     template <typename T>
     struct TypeSignature {
         static constexpr auto calculate() noexcept {
