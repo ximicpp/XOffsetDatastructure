@@ -6,21 +6,9 @@
 #include <iostream>
 #include <cassert>
 #include "../xoffsetdatastructure2.hpp"
+#include "basic_types.hpp"
 
 using namespace XOffsetDatastructure2;
-
-// Test structure
-struct alignas(BASIC_ALIGNMENT) BasicTypes {
-    template <typename Allocator>
-    BasicTypes(Allocator allocator) {}
-    
-    int mInt;
-    float mFloat;
-    double mDouble;
-    char mChar;
-    bool mBool;
-    long long mLongLong;
-};
 
 bool test_basic_types() {
     std::cout << "\n[TEST] Basic Types\n";

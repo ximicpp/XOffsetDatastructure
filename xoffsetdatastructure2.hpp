@@ -23,14 +23,8 @@
 #include <sstream>
 #include <string>
 #include <fstream>
-#include "XTypeSignature.hpp"
+#include "xtypesignature.hpp"
 
-// ============================================================================
-// Configuration: Basic Alignment (64-bit = 8 bytes)
-// ============================================================================
-// BASIC_ALIGNMENT is now defined in XTypeSignature.hpp as a constexpr
-// Usage: struct alignas(XTypeSignature::BASIC_ALIGNMENT) MyStruct { ... };
-//    Or: struct alignas(BASIC_ALIGNMENT) MyStruct { ... }; (with using directive)
 using XTypeSignature::BASIC_ALIGNMENT;
 
 namespace boost {

@@ -1,0 +1,23 @@
+schema_version: "1.0"
+
+types:
+  - name: ModifyTestData
+    type: struct
+    fields:
+      - name: counter
+        type: int
+        default: 0
+      - name: ratio
+        type: float
+        default: 0.0
+      - name: active
+        type: bool
+        default: false
+      - name: numbers
+        type: XVector<int>
+      - name: names
+        type: XVector<XString>
+      - name: scores
+        type: XMap<XString, int>
+      - name: tags
+        type: XSet<int>

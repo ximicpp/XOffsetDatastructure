@@ -1,0 +1,24 @@
+schema_version: "1.0"
+
+types:
+  - name: BasicTypes
+    type: struct
+    fields:
+      - name: mInt
+        type: int
+        default: 0
+      - name: mFloat
+        type: float
+        default: 0.0
+      - name: mDouble
+        type: double
+        default: 0.0
+      - name: mChar
+        type: char
+        default: '\0'
+      - name: mBool
+        type: bool
+        default: false
+      - name: mLongLong
+        type: long long
+        default: 0

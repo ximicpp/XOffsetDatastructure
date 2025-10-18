@@ -27,7 +27,7 @@ class StructDef:
 class TypeAnalyzer:
     """Analyze types and generate proper C++ representations"""
     
-    BASIC_TYPES = {'int', 'float', 'double', 'bool', 'char', 'int32_t', 'int64_t', 'uint32_t', 'uint64_t'}
+    BASIC_TYPES = {'int', 'float', 'double', 'bool', 'char', 'long long', 'int32_t', 'int64_t', 'uint32_t', 'uint64_t'}
     XOFFSET_TYPES = {'XString', 'XVector', 'XSet', 'XMap'}
     
     @staticmethod

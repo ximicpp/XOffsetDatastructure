@@ -22,11 +22,18 @@ endfunction()
 
 # Test executables
 add_executable(test_basic_types test_basic_types.cpp)
-target_include_directories(test_basic_types PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(test_basic_types PRIVATE 
+    ${BOOST_INCLUDE_DIRS} 
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/generated
+)
 set_target_properties(test_basic_types PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
 )
 configure_macos_target(test_basic_types)
+if(Python3_FOUND)
+    add_dependencies(test_basic_types generate_schemas)
+endif()
 
 add_executable(test_vector test_vector.cpp)
 target_include_directories(test_vector PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})

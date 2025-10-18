@@ -1,0 +1,26 @@
+schema_version: "1.0"
+
+types:
+  - name: SimpleData
+    type: struct
+    fields:
+      - name: id
+        type: int
+        default: 0
+      - name: value
+        type: float
+        default: 0.0
+      - name: name
+        type: XString
+
+  - name: ComplexData
+    type: struct
+    fields:
+      - name: title
+        type: XString
+      - name: items
+        type: XVector<int>
+      - name: tags
+        type: XSet<int>
+      - name: metadata
+        type: XMap<XString, int>
