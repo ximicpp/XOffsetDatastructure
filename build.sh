@@ -64,10 +64,18 @@ fi
 
 if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_compaction" ]; then
     echo
-    echo "[5/5] Running Memory Compaction Test..."
+    echo "[5/6] Running Memory Compaction Test..."
     ./$TEST_DIR/test_compaction || TEST_FAILED=1
 else
-    echo "[5/5] test_compaction not found (skipped)"
+    echo "[5/6] test_compaction not found (skipped)"
+fi
+
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_modify" ]; then
+    echo
+    echo "[6/6] Running Data Modification Test..."
+    ./$TEST_DIR/test_modify || TEST_FAILED=1
+else
+    echo "[6/6] test_modify not found (skipped)"
 fi
 
 # Run the demo after tests
