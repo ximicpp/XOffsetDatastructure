@@ -7,40 +7,9 @@
 #include <fstream>
 #include <vector>
 #include "xoffsetdatastructure2.hpp"
+#include "game_data.hpp"
 
 using namespace XOffsetDatastructure2;
-
-// ============================================================================
-// Data Structures
-// ============================================================================
-
-struct alignas(BASIC_ALIGNMENT) Item {
-    template <typename Allocator>
-    Item(Allocator allocator) 
-        : item_id(0), item_type(0), quantity(0), name(allocator) {}
-    
-    int item_id;
-    int item_type;    // 0=weapon, 1=armor, 2=potion, 3=material
-    int quantity;
-    XString name;
-};
-
-struct alignas(BASIC_ALIGNMENT) GameData {
-    template <typename Allocator>
-    GameData(Allocator allocator)
-        : player_name(allocator),
-          items(allocator),
-          achievements(allocator),
-          quest_progress(allocator) {}
-    
-    int player_id;
-    int level;
-    float health;
-    XString player_name;
-    XVector<Item> items;               // Inventory items with type info
-    XSet<int> achievements;            // Achievement IDs
-    XMap<XString, int> quest_progress; // Quest name -> progress %
-};
 
 // ============================================================================
 // Example: Game Data with Nested Structures

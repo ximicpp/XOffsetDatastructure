@@ -3,22 +3,30 @@ add_executable(helloworld helloworld.cpp)
 target_include_directories(helloworld PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
+    ${CMAKE_BINARY_DIR}/generated
 )
 set_target_properties(helloworld
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+if(Python3_FOUND)
+    add_dependencies(helloworld generate_schemas)
+endif()
 
 # Full Demo
 add_executable(demo demo.cpp)
 target_include_directories(demo PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
+    ${CMAKE_BINARY_DIR}/generated
 )
 set_target_properties(demo
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+if(Python3_FOUND)
+    add_dependencies(demo generate_schemas)
+endif()
 
 # macOS specific: disable RPATH and use system libraries
 if(APPLE)

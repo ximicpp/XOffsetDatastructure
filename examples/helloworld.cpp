@@ -5,19 +5,9 @@
 
 #include <iostream>
 #include "../xoffsetdatastructure2.hpp"
+#include "player.hpp"
 
 using namespace XOffsetDatastructure2;
-
-// Simple data structure with 64-bit alignment
-struct alignas(BASIC_ALIGNMENT) Player {
-    template <typename Allocator>
-    Player(Allocator allocator) : name(allocator), items(allocator) {}
-    
-    int id;
-    int level;
-    XString name;
-    XVector<int> items;
-};
 
 int main() {
     std::cout << "\n=== XOffsetDatastructure2 Hello World ===\n\n";
