@@ -21,42 +21,51 @@ echo "======================================================================"
 
 TEST_FAILED=0
 
-if [ -f "bin/test_basic_types" ]; then
+# Determine test binary directory (macOS/Linux uses Release, Windows uses Release)
+if [ -d "bin/Release" ]; then
+    TEST_DIR="bin/Release"
+elif [ -d "bin" ]; then
+    TEST_DIR="bin"
+else
+    TEST_DIR=""
+fi
+
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_basic_types" ]; then
     echo
     echo "[1/5] Running Basic Types Test..."
-    ./bin/test_basic_types || TEST_FAILED=1
+    ./$TEST_DIR/test_basic_types || TEST_FAILED=1
 else
     echo "[1/5] test_basic_types not found (skipped)"
 fi
 
-if [ -f "bin/test_vector" ]; then
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_vector" ]; then
     echo
     echo "[2/5] Running Vector Test..."
-    ./bin/test_vector || TEST_FAILED=1
+    ./$TEST_DIR/test_vector || TEST_FAILED=1
 else
     echo "[2/5] test_vector not found (skipped)"
 fi
 
-if [ -f "bin/test_map_set" ]; then
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_map_set" ]; then
     echo
     echo "[3/5] Running Map/Set Test..."
-    ./bin/test_map_set || TEST_FAILED=1
+    ./$TEST_DIR/test_map_set || TEST_FAILED=1
 else
     echo "[3/5] test_map_set not found (skipped)"
 fi
 
-if [ -f "bin/test_nested" ]; then
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_nested" ]; then
     echo
     echo "[4/5] Running Nested Structures Test..."
-    ./bin/test_nested || TEST_FAILED=1
+    ./$TEST_DIR/test_nested || TEST_FAILED=1
 else
     echo "[4/5] test_nested not found (skipped)"
 fi
 
-if [ -f "bin/test_compaction" ]; then
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_compaction" ]; then
     echo
     echo "[5/5] Running Memory Compaction Test..."
-    ./bin/test_compaction || TEST_FAILED=1
+    ./$TEST_DIR/test_compaction || TEST_FAILED=1
 else
     echo "[5/5] test_compaction not found (skipped)"
 fi
