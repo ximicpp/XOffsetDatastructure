@@ -70,6 +70,13 @@ set_target_properties(test_comprehensive PROPERTIES
 )
 configure_macos_target(test_comprehensive)
 
+add_executable(test_serialization test_serialization.cpp)
+target_include_directories(test_serialization PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_serialization PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+configure_macos_target(test_serialization)
+
 # Add CTest tests
 add_test(NAME BasicTypes COMMAND test_basic_types)
 add_test(NAME VectorOps COMMAND test_vector)
@@ -78,3 +85,4 @@ add_test(NAME NestedStructures COMMAND test_nested)
 add_test(NAME MemoryStats COMMAND test_compaction)
 add_test(NAME DataModification COMMAND test_modify)
 add_test(NAME Comprehensive COMMAND test_comprehensive)
+add_test(NAME Serialization COMMAND test_serialization)
