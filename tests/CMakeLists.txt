@@ -28,7 +28,7 @@ target_include_directories(test_basic_types PRIVATE
     ${CMAKE_BINARY_DIR}/generated
 )
 set_target_properties(test_basic_types PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_basic_types)
 if(Python3_FOUND)
@@ -38,58 +38,66 @@ endif()
 add_executable(test_vector test_vector.cpp)
 target_include_directories(test_vector PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_vector PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_vector)
 
 add_executable(test_map_set test_map_set.cpp)
 target_include_directories(test_map_set PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_map_set PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_map_set)
 
 add_executable(test_nested test_nested.cpp)
 target_include_directories(test_nested PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_nested PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_nested)
 
 add_executable(test_compaction test_compaction.cpp)
 target_include_directories(test_compaction PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_compaction PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_compaction)
 
 add_executable(test_modify test_modify.cpp)
 target_include_directories(test_modify PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_modify PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_modify)
 
 add_executable(test_comprehensive test_comprehensive.cpp)
 target_include_directories(test_comprehensive PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_comprehensive PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_comprehensive)
 
 add_executable(test_serialization test_serialization.cpp)
 target_include_directories(test_serialization PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_serialization PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_serialization)
 
 add_executable(test_alignment test_alignment.cpp)
 target_include_directories(test_alignment PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
 set_target_properties(test_alignment PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_alignment)
+
+# Type signature verification test
+add_executable(test_type_signature test_type_signature.cpp)
+target_include_directories(test_type_signature PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_type_signature PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+configure_macos_target(test_type_signature)
 
 # Generated types test
 if(Python3_FOUND)
@@ -100,7 +108,7 @@ if(Python3_FOUND)
         ${CMAKE_BINARY_DIR}/generated
     )
     set_target_properties(test_generated_types PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     )
     configure_macos_target(test_generated_types)
     add_dependencies(test_generated_types generate_schemas)
@@ -116,6 +124,7 @@ add_test(NAME DataModification COMMAND test_modify)
 add_test(NAME Comprehensive COMMAND test_comprehensive)
 add_test(NAME Serialization COMMAND test_serialization)
 add_test(NAME Alignment COMMAND test_alignment)
+add_test(NAME TypeSignature COMMAND test_type_signature)
 
 if(Python3_FOUND)
     add_test(NAME GeneratedTypes COMMAND test_generated_types)

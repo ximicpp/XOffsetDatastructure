@@ -444,4 +444,52 @@ namespace XOffsetDatastructure2
 		}
 	};
 }
+
+// ============================================================================
+// Type Signature Support for XOffsetDatastructure2 Containers
+// ============================================================================
+
+namespace XTypeSignature {
+    
+    // XString signature
+    template <>
+    struct TypeSignature<XOffsetDatastructure2::XString> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"string[s:32,a:8]"};
+        }
+    };
+    
+    // XVector<T> signature
+    template <typename T>
+    struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"vector[s:32,a:8]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
+        }
+    };
+    
+    // XSet<T> signature
+    template <typename T>
+    struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"set[s:32,a:8]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
+        }
+    };
+    
+    // XMap<K,V> signature
+    template <typename K, typename V>
+    struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"map[s:32,a:8]<"} +
+                   TypeSignature<K>::calculate() +
+                   CompileString{","} +
+                   TypeSignature<V>::calculate() +
+                   CompileString{">"};
+        }
+    };
+
+} // namespace XTypeSignature
 #endif
