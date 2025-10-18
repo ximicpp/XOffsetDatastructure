@@ -43,10 +43,10 @@ struct GameData {
 };
 
 // ============================================================================
-// Example 1: Game Data with Nested Structures
+// Example: Game Data with Nested Structures
 // ============================================================================
 void example_game_data() {
-    std::cout << "\n========== Example 1: Game Data with User-Friendly API ==========\n\n";
+    std::cout << "\n========== Example: Game Data with User-Friendly API ==========\n\n";
     
     // Create buffer with extended API
     std::cout << "1. Creating buffer...\n";
@@ -156,8 +156,44 @@ void example_game_data() {
     std::cout << "   Memory after shrink: " << stats6.used_size << " / " << stats6.total_size 
               << " bytes (" << stats6.usage_percent() << "%)\n";
     
-    // Verify data integrity
-    std::cout << "\n7. Verifying data integrity...\n";
+    // Serialization and Deserialization
+    std::cout << "\n7. Serialization and Deserialization...\n";
+    
+    // Serialize to string
+    std::cout << "   Serializing to string...\n";
+    auto serialized_data = xbuf.save_to_string();
+    std::cout << "   Serialized size: " << serialized_data.size() << " bytes\n";
+    
+    // Deserialize from string
+    std::cout << "   Deserializing from string...\n";
+    XBufferExt loaded_xbuf = XBufferExt::load_from_string(serialized_data);
+    std::cout << "   [OK] Loaded successfully!\n";
+    
+    auto [loaded_game, loaded_found] = loaded_xbuf.find_ex<GameData>("Player1");
+    if (loaded_found) {
+        std::cout << "   Loaded player: " << loaded_game->player_name 
+                  << " (Level " << loaded_game->level << ")\n";
+        std::cout << "   Loaded items count: " << loaded_game->items.size() << "\n";
+        std::cout << "   Loaded first item: " << loaded_game->items[0].name << "\n";
+        std::cout << "   Loaded last item: " << loaded_game->items.back().name << "\n";
+        
+        // Verify data integrity
+        bool data_matches = (loaded_game->player_id == game->player_id) &&
+                           (loaded_game->level == game->level) &&
+                           (loaded_game->items.size() == game->items.size()) &&
+                           (loaded_game->achievements.size() == game->achievements.size());
+        
+        if (data_matches) {
+            std::cout << "   [OK] Serialized and deserialized data match!\n";
+        } else {
+            std::cout << "   [ERROR] Data mismatch after deserialization!\n";
+        }
+    } else {
+        std::cout << "   [ERROR] Player data not found after deserialization!\n";
+    }
+    
+    // Verify original data integrity
+    std::cout << "\n8. Verifying original data integrity...\n";
     auto [verify_game, found] = xbuf.find_ex<GameData>("Player1");
     std::cout << "   Found: " << (found ? "YES" : "NO") << "\n";
     std::cout << "   Player: " << verify_game->player_name << "\n";
@@ -179,17 +215,12 @@ int main(int argc, char* argv[]) {
     std::cout << "  XOffsetDatastructure2 Demo - Usage Example\n";
     std::cout << "======================================================================\n";
     
-    try {
-        // Run example
-        example_game_data();
-        
-        std::cout << "\n======================================================================\n";
-        std::cout << "  Example completed successfully!\n";
-        std::cout << "======================================================================\n\n";
-        
-        return 0;
-    } catch (const std::exception& e) {
-        std::cerr << "\n[ERROR] Exception: " << e.what() << "\n";
-        return 1;
-    }
+    // Run example
+    example_game_data();
+    
+    std::cout << "\n======================================================================\n";
+    std::cout << "  Example completed successfully!\n";
+    std::cout << "======================================================================\n\n";
+    
+    return 0;
 }

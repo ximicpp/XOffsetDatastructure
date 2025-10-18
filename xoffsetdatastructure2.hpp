@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <fstream>
 
 
 namespace boost {
@@ -375,6 +376,23 @@ namespace XOffsetDatastructure2
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
+		}
+		
+		// ====================================================================
+		// Serialization and Deserialization
+		// ====================================================================
+		
+		// Save to string (binary data in string)
+		std::string save_to_string() {
+			auto* buffer = this->get_buffer();
+			return std::string(buffer->begin(), buffer->end());
+		}
+		
+		// Load from string (static factory method)
+		static XBufferExt load_from_string(const std::string& data) {
+			std::vector<char> buffer(data.begin(), data.end());
+			XBufferExt xbuf(buffer);
+			return xbuf;
 		}
 		
 		// ====================================================================
