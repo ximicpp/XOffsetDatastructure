@@ -69,12 +69,8 @@ static_assert(sizeof(TestTypeInner) == sizeof(TestTypeInnerReflectionHint),
 static_assert(alignof(TestTypeInner) == alignof(TestTypeInnerReflectionHint),
               "Alignment mismatch: TestTypeInner runtime and reflection types must have identical alignment");
 
-// Expected type signature for TestTypeInnerReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for TestTypeInnerReflectionHint");
 
 // Type signature validation for TestType
 // This ensures binary compatibility across compilations
@@ -84,11 +80,21 @@ static_assert(sizeof(TestType) == sizeof(TestTypeReflectionHint),
 static_assert(alignof(TestType) == alignof(TestTypeReflectionHint),
               "Alignment mismatch: TestType runtime and reflection types must have identical alignment");
 
-// Expected type signature for TestTypeReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
+             "struct[s:272,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:f32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@40:vector[s:32,a:8]<string[s:32,a:8]>,"
+             "@72:struct[s:40,a:8]{@0:i32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@112:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@144:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
+             "@176:set[s:32,a:8]<string[s:32,a:8]>,"
+             "@208:set[s:32,a:8]<i32[s:4,a:4]>,"
+             "@240:string[s:32,a:8]}",
+              "Type signature mismatch for TestTypeReflectionHint");
 
 #endif // GENERATED_TEST_TYPES_HPP_

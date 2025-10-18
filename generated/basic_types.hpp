@@ -49,11 +49,14 @@ static_assert(sizeof(BasicTypes) == sizeof(BasicTypesReflectionHint),
 static_assert(alignof(BasicTypes) == alignof(BasicTypesReflectionHint),
               "Alignment mismatch: BasicTypes runtime and reflection types must have identical alignment");
 
-// Expected type signature for BasicTypesReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<BasicTypesReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<BasicTypesReflectionHint>() ==
+             "struct[s:32,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:f32[s:4,a:4],"
+             "@8:f64[s:8,a:8],"
+             "@16:char[s:1,a:1],"
+             "@17:bool[s:1,a:1],"
+             "@24:i64[s:8,a:8]}",
+              "Type signature mismatch for BasicTypesReflectionHint");
 
 #endif // GENERATED_BASIC_TYPES_HPP_

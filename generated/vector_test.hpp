@@ -43,11 +43,11 @@ static_assert(sizeof(VectorTest) == sizeof(VectorTestReflectionHint),
 static_assert(alignof(VectorTest) == alignof(VectorTestReflectionHint),
               "Alignment mismatch: VectorTest runtime and reflection types must have identical alignment");
 
-// Expected type signature for VectorTestReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<VectorTestReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<VectorTestReflectionHint>() ==
+             "struct[s:96,a:8]{"
+             "@0:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@32:vector[s:32,a:8]<f32[s:4,a:4]>,"
+             "@64:vector[s:32,a:8]<string[s:32,a:8]>}",
+              "Type signature mismatch for VectorTestReflectionHint");
 
 #endif // GENERATED_VECTOR_TEST_HPP_

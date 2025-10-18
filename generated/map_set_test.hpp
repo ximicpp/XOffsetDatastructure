@@ -45,11 +45,12 @@ static_assert(sizeof(MapSetTest) == sizeof(MapSetTestReflectionHint),
 static_assert(alignof(MapSetTest) == alignof(MapSetTestReflectionHint),
               "Alignment mismatch: MapSetTest runtime and reflection types must have identical alignment");
 
-// Expected type signature for MapSetTestReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<MapSetTestReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<MapSetTestReflectionHint>() ==
+             "struct[s:128,a:8]{"
+             "@0:set[s:32,a:8]<i32[s:4,a:4]>,"
+             "@32:set[s:32,a:8]<string[s:32,a:8]>,"
+             "@64:map[s:32,a:8]<i32[s:4,a:4],string[s:32,a:8]>,"
+             "@96:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
+              "Type signature mismatch for MapSetTestReflectionHint");
 
 #endif // GENERATED_MAP_SET_TEST_HPP_

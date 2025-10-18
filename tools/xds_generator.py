@@ -120,6 +120,151 @@ class TypeAnalyzer:
         
         return args
 
+class TypeSignatureCalculator:
+    """Calculate expected type signature strings"""
+    
+    # Type sizes and alignments (64-bit platform)
+    TYPE_INFO = {
+        'int': (4, 4, 'i32'),
+        'int32_t': (4, 4, 'i32'),
+        'int64_t': (8, 8, 'i64'),
+        'uint32_t': (4, 4, 'u32'),
+        'uint64_t': (8, 8, 'u64'),
+        'float': (4, 4, 'f32'),
+        'double': (8, 8, 'f64'),
+        'bool': (1, 1, 'bool'),
+        'char': (1, 1, 'char'),
+        'long long': (8, 8, 'i64'),
+        'XString': (32, 8, 'string'),
+    }
+    
+    @staticmethod
+    def get_type_signature(type_str: str, struct_map: Dict[str, 'StructDef']) -> str:
+        """Generate type signature for a type"""
+        # Strip ReflectionHint suffix to get original type name
+        original_type = type_str
+        if type_str.endswith('ReflectionHint'):
+            original_type = type_str[:-14]  # Remove 'ReflectionHint'
+        
+        # Handle basic types
+        if type_str in TypeSignatureCalculator.TYPE_INFO:
+            size, align, sig = TypeSignatureCalculator.TYPE_INFO[type_str]
+            return f"{sig}[s:{size},a:{align}]"
+        
+        # Handle XVector<T>
+        if type_str.startswith('XVector<'):
+            inner = type_str[8:-1]
+            inner_sig = TypeSignatureCalculator.get_type_signature(inner, struct_map)
+            return f"vector[s:32,a:8]<{inner_sig}>"
+        
+        # Handle XSet<T>
+        if type_str.startswith('XSet<'):
+            inner = type_str[5:-1]
+            inner_sig = TypeSignatureCalculator.get_type_signature(inner, struct_map)
+            return f"set[s:32,a:8]<{inner_sig}>"
+        
+        # Handle XMap<K,V>
+        if type_str.startswith('XMap<'):
+            inner = type_str[5:-1]
+            parts = TypeAnalyzer.split_template_args(inner)
+            if len(parts) == 2:
+                key_sig = TypeSignatureCalculator.get_type_signature(parts[0], struct_map)
+                val_sig = TypeSignatureCalculator.get_type_signature(parts[1], struct_map)
+                return f"map[s:32,a:8]<{key_sig},{val_sig}>"
+        
+        # Handle custom struct types (check original name without ReflectionHint)
+        if original_type in struct_map:
+            return TypeSignatureCalculator.get_struct_signature(struct_map[original_type], struct_map)
+        
+        return f"unknown[{type_str}]"
+    
+    @staticmethod
+    def calculate_field_offset(fields: List[Field], index: int, struct_map: Dict[str, 'StructDef']) -> int:
+        """Calculate field offset with proper alignment"""
+        if index == 0:
+            return 0
+        
+        offset = 0
+        for i in range(index):
+            field = fields[i]
+            field_size = TypeSignatureCalculator.get_type_size(field.type, struct_map)
+            field_align = TypeSignatureCalculator.get_type_align(field.type, struct_map)
+            
+            # Align current offset
+            offset = (offset + field_align - 1) & ~(field_align - 1)
+            offset += field_size
+        
+        # Align for current field
+        current_align = TypeSignatureCalculator.get_type_align(fields[index].type, struct_map)
+        offset = (offset + current_align - 1) & ~(current_align - 1)
+        
+        return offset
+    
+    @staticmethod
+    def get_type_size(type_str: str, struct_map: Dict[str, 'StructDef']) -> int:
+        """Get size of a type"""
+        if type_str in TypeSignatureCalculator.TYPE_INFO:
+            return TypeSignatureCalculator.TYPE_INFO[type_str][0]
+        if type_str.startswith(('XVector<', 'XSet<', 'XMap<')):
+            return 32
+        if type_str == 'XString':
+            return 32
+        if type_str in struct_map:
+            return TypeSignatureCalculator.calculate_struct_size(struct_map[type_str], struct_map)
+        return 8  # Default pointer size
+    
+    @staticmethod
+    def get_type_align(type_str: str, struct_map: Dict[str, 'StructDef']) -> int:
+        """Get alignment of a type"""
+        if type_str in TypeSignatureCalculator.TYPE_INFO:
+            return TypeSignatureCalculator.TYPE_INFO[type_str][1]
+        if type_str.startswith(('XVector<', 'XSet<', 'XMap<')):
+            return 8
+        if type_str == 'XString':
+            return 8
+        if type_str in struct_map:
+            return 8  # BASIC_ALIGNMENT
+        return 8
+    
+    @staticmethod
+    def calculate_struct_size(struct: 'StructDef', struct_map: Dict[str, 'StructDef']) -> int:
+        """Calculate total struct size with alignment"""
+        if not struct.fields:
+            return 8  # Minimum size for alignment
+        
+        size = 0
+        max_align = 8  # BASIC_ALIGNMENT
+        
+        for field in struct.fields:
+            field_size = TypeSignatureCalculator.get_type_size(field.type, struct_map)
+            field_align = TypeSignatureCalculator.get_type_align(field.type, struct_map)
+            max_align = max(max_align, field_align)
+            
+            # Align current position
+            size = (size + field_align - 1) & ~(field_align - 1)
+            size += field_size
+        
+        # Final padding to struct alignment
+        size = (size + max_align - 1) & ~(max_align - 1)
+        return size
+    
+    @staticmethod
+    def get_struct_signature(struct: 'StructDef', struct_map: Dict[str, 'StructDef']) -> str:
+        """Generate complete struct signature"""
+        size = TypeSignatureCalculator.calculate_struct_size(struct, struct_map)
+        align = 8  # BASIC_ALIGNMENT
+        
+        field_sigs = []
+        for i, field in enumerate(struct.fields):
+            offset = TypeSignatureCalculator.calculate_field_offset(struct.fields, i, struct_map)
+            # Use reflection types for signature
+            field_type = TypeAnalyzer.get_reflection_type(field.type, {s.name for s in struct_map.values()})
+            field_sig = TypeSignatureCalculator.get_type_signature(field_type, struct_map)
+            field_sigs.append(f"@{offset}:{field_sig}")
+        
+        fields_str = ",".join(field_sigs)
+        return f"struct[s:{size},a:{align}]{{{fields_str}}}"
+
 class CodeGenerator:
     """Generate C++ code from schema"""
     
@@ -127,6 +272,7 @@ class CodeGenerator:
         self.structs = structs
         self.config = config
         self.struct_names = {s.name for s in structs}
+        self.struct_map = {s.name: s for s in structs}
     
     def generate_runtime_type(self, struct: StructDef) -> str:
         """Generate runtime type with allocator constructor"""
@@ -211,8 +357,63 @@ class CodeGenerator:
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
         
-        # Add type signature comment
-        lines.append(self.generate_type_signature_comment(struct))
+        # Calculate expected type signature
+        expected_sig = TypeSignatureCalculator.get_struct_signature(struct, self.struct_map)
+        
+        # Split long signatures for readability (>100 chars)
+        if len(expected_sig) > 100:
+            # Format multi-line signature
+            lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() ==")
+            
+            # Split at field boundaries
+            import re
+            # Find all field patterns @offset:type
+            parts = re.split(r'(,@\d+:)', expected_sig)
+            
+            # Reconstruct with proper formatting
+            result_lines = []
+            current_line = ""
+            for part in parts:
+                if part.startswith(',@'):
+                    if current_line:
+                        result_lines.append(current_line)
+                    current_line = part[1:]  # Remove leading comma
+                else:
+                    current_line += part
+            if current_line:
+                result_lines.append(current_line)
+            
+            # Handle struct header separately
+            if result_lines and result_lines[0].startswith('struct'):
+                header_end = result_lines[0].find('{')
+                if header_end > 0:
+                    header = result_lines[0][:header_end+1]
+                    first_field = result_lines[0][header_end+1:]
+                    lines.append(f'             "{header}"')
+                    if first_field:
+                        lines.append(f'             "{first_field},"')
+                    
+                    for field_line in result_lines[1:-1]:
+                        lines.append(f'             "{field_line},"')
+                    
+                    if len(result_lines) > 1:
+                        last = result_lines[-1]
+                        if last.endswith('}'):
+                            lines.append(f'             "{last}",')
+                        else:
+                            lines.append(f'             "{last}"')
+                else:
+                    lines.append(f'             "{expected_sig}",')
+            else:
+                lines.append(f'             "{expected_sig}",')
+            
+            lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
+        else:
+            # Single line signature
+            lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() == \"{expected_sig}\",")
+            lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
+        
+        lines.append("")
         
         return "\n".join(lines)
     
