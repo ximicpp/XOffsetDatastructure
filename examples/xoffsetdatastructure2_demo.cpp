@@ -16,11 +16,8 @@ using namespace XOffsetDatastructure2;
 
 struct Item {
     template <typename Allocator>
-    Item(Allocator allocator) : name(allocator) {}
-    
-    Item(int id, const char* name_str, int type, int quantity, void* allocator)
-        : item_id(id), item_type(type), quantity(quantity), 
-          name(name_str, static_cast<XString::allocator_type*>(allocator)) {}
+    Item(Allocator allocator) 
+        : item_id(0), item_type(0), quantity(0), name(allocator) {}
     
     int item_id;
     int item_type;    // 0=weapon, 1=armor, 2=potion, 3=material
