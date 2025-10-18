@@ -5,6 +5,22 @@ project(XOffsetDatastructure)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# macOS specific settings
+if(APPLE)
+    # Use the system C++ library
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    
+    # Set RPATH settings globally
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+    set(CMAKE_INSTALL_RPATH "@executable_path;@loader_path")
+    
+    # Ensure we use the correct deployment target
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version" FORCE)
+    endif()
+endif()
+
 # Set Boost include directories
 set(BOOST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/boost
