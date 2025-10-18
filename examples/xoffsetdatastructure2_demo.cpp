@@ -14,12 +14,25 @@ using namespace XOffsetDatastructure2;
 // Data Structures
 // ============================================================================
 
-// Example 1: Game Data
+struct Item {
+    template <typename Allocator>
+    Item(Allocator allocator) : name(allocator) {}
+    
+    Item(int id, const char* name_str, int type, int quantity, void* allocator)
+        : item_id(id), item_type(type), quantity(quantity), 
+          name(name_str, static_cast<XString::allocator_type*>(allocator)) {}
+    
+    int item_id;
+    int item_type;    // 0=weapon, 1=armor, 2=potion, 3=material
+    int quantity;
+    XString name;
+};
+
 struct GameData {
     template <typename Allocator>
     GameData(Allocator allocator)
         : player_name(allocator),
-          inventory(allocator),
+          items(allocator),
           achievements(allocator),
           quest_progress(allocator) {}
     
@@ -27,16 +40,9 @@ struct GameData {
     int level;
     float health;
     XString player_name;
-    XVector<int> inventory;           // Item IDs
+    XVector<Item> items;               // Inventory items with type info
     XSet<int> achievements;            // Achievement IDs
     XMap<XString, int> quest_progress; // Quest name -> progress %
-};
-
-// Example 2: Data Container
-struct DataContainer {
-    template <typename Allocator>
-    DataContainer(Allocator allocator) : items(allocator) {}
-    XVector<int> items;
 };
 
 // ============================================================================
@@ -57,8 +63,24 @@ void example_game_data() {
     game->health = 87.5f;
     game->player_name = XString("DragonSlayer", xbuf.get_segment_manager());
     
-    // Add inventory items
-    game->inventory = {101, 102, 103, 201, 202, 305};
+    // Add items with type information
+    game->items.emplace_back(xbuf.get_segment_manager());
+    game->items.back().item_id = 101;
+    game->items.back().item_type = 0; // weapon
+    game->items.back().quantity = 1;
+    game->items.back().name = XString("Steel Sword", xbuf.get_segment_manager());
+    
+    game->items.emplace_back(xbuf.get_segment_manager());
+    game->items.back().item_id = 201;
+    game->items.back().item_type = 1; // armor
+    game->items.back().quantity = 1;
+    game->items.back().name = XString("Iron Shield", xbuf.get_segment_manager());
+    
+    game->items.emplace_back(xbuf.get_segment_manager());
+    game->items.back().item_id = 301;
+    game->items.back().item_type = 2; // potion
+    game->items.back().quantity = 5;
+    game->items.back().name = XString("Health Potion", xbuf.get_segment_manager());
     
     // Add achievements
     game->achievements.insert(1);  // First Blood
@@ -73,13 +95,22 @@ void example_game_data() {
     game->quest_progress.emplace(
         XString("SideQuest2", xbuf.get_segment_manager()), 50);
     
-    // Step 3: Display summary
+    // Step 3: Display summary and check memory
     std::cout << "3. Game data summary:\n";
     std::cout << "   Player: " << game->player_name << " (ID: " << game->player_id << ")\n";
     std::cout << "   Level: " << game->level << ", Health: " << game->health << "%\n";
-    std::cout << "   Inventory: " << game->inventory.size() << " items\n";
+    std::cout << "   Items:\n";
+    for (const auto& item : game->items) {
+        const char* type_name[] = {"Weapon", "Armor", "Potion", "Material"};
+        std::cout << "     - " << item.name << " (x" << item.quantity << ", " 
+                  << type_name[item.item_type] << ")\n";
+    }
     std::cout << "   Achievements: " << game->achievements.size() << " unlocked\n";
     std::cout << "   Quests: " << game->quest_progress.size() << " in progress\n";
+    
+    auto stats3 = XBufferVisualizer::get_memory_stats(xbuf);
+    std::cout << "   Memory used: " << stats3.used_size << " / " << stats3.total_size 
+              << " bytes (" << stats3.usage_percent() << "%)\n";
     
     // Step 4: Show quest details
     std::cout << "\n4. Quest progress:\n";
@@ -87,80 +118,62 @@ void example_game_data() {
         std::cout << "   " << quest_name << ": " << progress << "%\n";
     }
     
-    // Step 5: Modify data
-    std::cout << "\n5. Updating data (level up, add item)...\n";
+    // Step 5: Grow buffer and add more items
+    std::cout << "\n5. Growing buffer and adding more items...\n";
+    xbuf.grow(8192);
+    game = xbuf.find_or_construct<GameData>("Player1")(xbuf.get_segment_manager());
+    
+    // Add materials
+    for (int i = 0; i < 10; ++i) {
+        game->items.emplace_back(xbuf.get_segment_manager());
+        game->items.back().item_id = 400 + i;
+        game->items.back().item_type = 3; // material
+        game->items.back().quantity = 10 + i;
+        game->items.back().name = XString(("Material_" + std::to_string(i)).c_str(), 
+                                          xbuf.get_segment_manager());
+    }
+    
+    auto stats5 = XBufferVisualizer::get_memory_stats(xbuf);
+    std::cout << "   Total items: " << game->items.size() << "\n";
+    std::cout << "   Memory used: " << stats5.used_size << " / " << stats5.total_size 
+              << " bytes (" << stats5.usage_percent() << "%)\n";
+    
+    // Step 6: Modify data and shrink
+    std::cout << "\n6. Updating data and shrinking buffer...\n";
     game->level++;
-    game->inventory.push_back(999); // Legendary sword!
+    
+    // Add legendary sword
+    game->items.emplace_back(xbuf.get_segment_manager());
+    game->items.back().item_id = 999;
+    game->items.back().item_type = 0; // weapon
+    game->items.back().quantity = 1;
+    game->items.back().name = XString("Legendary Sword", xbuf.get_segment_manager());
+    
     game->quest_progress[XString("MainQuest", xbuf.get_segment_manager())] = 90;
     
+    xbuf.shrink_to_fit();
+    auto stats6 = XBufferVisualizer::get_memory_stats(xbuf);
     std::cout << "   New level: " << game->level << "\n";
-    std::cout << "   Inventory size: " << game->inventory.size() << "\n";
+    std::cout << "   Total items: " << game->items.size() << "\n";
+    std::cout << "   Last item added: " << game->items.back().name 
+              << " (ID: " << game->items.back().item_id << ")\n";
     std::cout << "   MainQuest progress: " 
               << game->quest_progress[XString("MainQuest", xbuf.get_segment_manager())] << "%\n";
+    std::cout << "   Memory after shrink: " << stats6.used_size << " / " << stats6.total_size 
+              << " bytes (" << stats6.usage_percent() << "%)\n";
     
-    std::cout << "\n[OK] Example 1 completed successfully!\n";
-}
-
-// ============================================================================
-// Example 2: Memory Operations
-// ============================================================================
-void example_memory_operations() {
-    std::cout << "\n========== Example 2: Memory Operations ==========\n\n";
+    // Step 7: Verify data integrity
+    std::cout << "\n7. Verifying data integrity...\n";
+    auto [verify_game, found] = xbuf.find<GameData>("Player1");
+    std::cout << "   Found: " << (found ? "YES" : "NO") << "\n";
+    std::cout << "   Player: " << verify_game->player_name << "\n";
+    std::cout << "   Total items: " << verify_game->items.size() << "\n";
+    std::cout << "   First item: " << verify_game->items[0].name 
+              << " (ID: " << verify_game->items[0].item_id << ")\n";
+    std::cout << "   Last item: " << verify_game->items.back().name 
+              << " (ID: " << verify_game->items.back().item_id << ")\n";
     
-    // Step 1: Create small buffer
-    std::cout << "1. Creating 1KB buffer...\n";
-    XBuffer xbuf(1024);
-    auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "   Total: " << stats1.total_size << " bytes\n";
-    std::cout << "   Used: " << stats1.used_size << " bytes (" 
-              << stats1.usage_percent() << "%)\n";
-    
-    // Step 2: Add data
-    std::cout << "\n2. Adding data...\n";
-    auto* data = xbuf.construct<DataContainer>("Data")(xbuf.get_segment_manager());
-    for (int i = 0; i < 50; ++i) {
-        data->items.push_back(i);
-    }
-    auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "   Used: " << stats2.used_size << " bytes (" 
-              << stats2.usage_percent() << "%)\n";
-    
-    // Step 3: Grow buffer
-    std::cout << "\n3. Growing buffer by 2KB...\n";
-    xbuf.grow(2048);
-    auto stats3 = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "   Total: " << stats3.total_size << " bytes\n";
-    std::cout << "   Used: " << stats3.used_size << " bytes (" 
-              << stats3.usage_percent() << "%)\n";
-    
-    // Step 4: Add more data
-    std::cout << "\n4. Adding more data...\n";
-    data = xbuf.find_or_construct<DataContainer>("Data")(xbuf.get_segment_manager());
-    for (int i = 50; i < 200; ++i) {
-        data->items.push_back(i);
-    }
-    auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "   Items: " << data->items.size() << "\n";
-    std::cout << "   Used: " << stats4.used_size << " bytes (" 
-              << stats4.usage_percent() << "%)\n";
-    
-    // Step 5: Shrink to fit
-    std::cout << "\n5. Shrinking to fit...\n";
-    xbuf.shrink_to_fit();
-    auto stats5 = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "   Total: " << stats5.total_size << " bytes (reduced from " 
-              << stats4.total_size << ")\n";
-    std::cout << "   Used: " << stats5.used_size << " bytes (" 
-              << stats5.usage_percent() << "%)\n";
-    
-    // Step 6: Verify data integrity
-    auto [verify_data, found] = xbuf.find<DataContainer>("Data");
-    std::cout << "\n6. Verifying data integrity...\n";
-    std::cout << "   Items count: " << verify_data->items.size() << "\n";
-    std::cout << "   First item: " << verify_data->items[0] << "\n";
-    std::cout << "   Last item: " << verify_data->items.back() << "\n";
-    
-    std::cout << "\n[OK] Example 2 completed successfully!\n";
+    std::cout << "\n[OK] Example completed successfully!\n";
 }
 
 // ============================================================================
@@ -169,16 +182,15 @@ void example_memory_operations() {
 int main(int argc, char* argv[]) {
     std::cout << "\n";
     std::cout << "======================================================================\n";
-    std::cout << "  XOffsetDatastructure2 Demo - Usage Examples\n";
+    std::cout << "  XOffsetDatastructure2 Demo - Usage Example\n";
     std::cout << "======================================================================\n";
     
     try {
-        // Run examples
+        // Run example
         example_game_data();
-        example_memory_operations();
         
         std::cout << "\n======================================================================\n";
-        std::cout << "  All examples completed successfully!\n";
+        std::cout << "  Example completed successfully!\n";
         std::cout << "======================================================================\n\n";
         
         return 0;
