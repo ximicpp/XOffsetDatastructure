@@ -25,7 +25,7 @@ add_executable(test_basic_types test_basic_types.cpp)
 target_include_directories(test_basic_types PRIVATE 
     ${BOOST_INCLUDE_DIRS} 
     ${CMAKE_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/generated
+    ${CMAKE_SOURCE_DIR}/generated
 )
 set_target_properties(test_basic_types PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
@@ -105,7 +105,7 @@ if(Python3_FOUND)
     target_include_directories(test_generated_types PRIVATE 
         ${BOOST_INCLUDE_DIRS} 
         ${CMAKE_SOURCE_DIR}
-        ${CMAKE_BINARY_DIR}/generated
+        ${CMAKE_SOURCE_DIR}/generated
     )
     set_target_properties(test_generated_types PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
