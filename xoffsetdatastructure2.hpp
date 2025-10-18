@@ -286,6 +286,111 @@ namespace XOffsetDatastructure2
 	};
 
 	// ========================================================================
+	// XBufferExt: Extended XBuffer with Unified make() API
+	// ========================================================================
+	
+	// Helper trait to detect XString type
+	template<typename T>
+	struct is_xstring : std::false_type {};
+	
+	template<>
+	struct is_xstring<XString> : std::true_type {};
+	
+	// Helper trait to detect allocator
+	template<typename T>
+	struct is_allocator : std::false_type {};
+	
+	template<typename T, typename M>
+	struct is_allocator<boost::interprocess::allocator<T, M>> : std::true_type {};
+	
+	class XBufferExt : public XBuffer {
+	public:
+		// Inherit constructors
+		using XBuffer::XBuffer;
+		
+		// ====================================================================
+		// Unified make<T>() API
+		// ====================================================================
+		
+		// 1. make<GameData>("Player1") - Named object
+		template<typename T>
+		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
+		make(const char* name) {
+			return this->construct<T>(name)(this->get_segment_manager());
+		}
+		
+		// 2. make<GameData>() - Anonymous object
+		template<typename T>
+		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
+		make() {
+			return this->construct<T>(boost::interprocess::anonymous_instance)(this->get_segment_manager());
+		}
+		
+		// 3. make<int>("array", 10) - Array
+		template<typename T>
+		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
+		make(const char* name, std::size_t count) {
+			return this->construct<T>(name)[count](this->get_segment_manager());
+		}
+		
+		// 4. make<XString>("Hello") - String from const char*
+		template<typename T>
+		std::enable_if_t<is_xstring<T>::value, XString>
+		make(const char* str) {
+			return XString(str, this->get_segment_manager());
+		}
+		
+		// 5. make<XString>(std::string) - String from std::string
+		template<typename T>
+		std::enable_if_t<is_xstring<T>::value, XString>
+		make(const std::string& str) {
+			return XString(str.c_str(), this->get_segment_manager());
+		}
+		
+		// 6. make<XString>() - Empty string
+		template<typename T>
+		std::enable_if_t<is_xstring<T>::value, XString>
+		make() {
+			return XString(this->get_segment_manager());
+		}
+		
+		// 7. Allocator helper (non-template based, use dedicated method)
+		template<typename T>
+		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
+			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
+		}
+		
+		// ====================================================================
+		// Find and utility methods
+		// ====================================================================
+		
+		// Find object
+		template<typename T>
+		std::pair<T*, bool> find_ex(const char* name) {
+			auto result = this->find<T>(name);
+			return {result.first, result.second};
+		}
+		
+		// Find or make object
+		template<typename T>
+		T* find_or_make(const char* name) {
+			return this->find_or_construct<T>(name)(this->get_segment_manager());
+		}
+		
+		// ====================================================================
+		// Memory statistics
+		// ====================================================================
+		
+		void print_stats() {
+			XBufferVisualizer::print_stats(*this);
+		}
+		
+		XBufferVisualizer::MemoryStats stats() {
+			return XBufferVisualizer::get_memory_stats(*this);
+		}
+	};
+
+	// ========================================================================
 	// Memory Compaction
 	// ========================================================================
 
