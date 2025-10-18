@@ -64,7 +64,7 @@ fi
 
 if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_compaction" ]; then
     echo
-    echo "[5/6] Running Memory Compaction Test..."
+    echo "[5/6] Running Memory Statistics Test..."
     ./$TEST_DIR/test_compaction || TEST_FAILED=1
 else
     echo "[5/6] test_compaction not found (skipped)"
@@ -72,10 +72,18 @@ fi
 
 if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_modify" ]; then
     echo
-    echo "[6/6] Running Data Modification Test..."
+    echo "[6/7] Running Data Modification Test..."
     ./$TEST_DIR/test_modify || TEST_FAILED=1
 else
-    echo "[6/6] test_modify not found (skipped)"
+    echo "[6/7] test_modify not found (skipped)"
+fi
+
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_comprehensive" ]; then
+    echo
+    echo "[7/7] Running Comprehensive Integration Test..."
+    ./$TEST_DIR/test_comprehensive || TEST_FAILED=1
+else
+    echo "[7/7] test_comprehensive not found (skipped)"
 fi
 
 # Run the demo after tests
@@ -83,7 +91,13 @@ echo
 echo "======================================================================"
 echo "Running XOffsetDatastructure Demo v2"
 echo "======================================================================"
-./bin/xoffsetdatastructure2_demo --visualize --compact
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/../xoffsetdatastructure2_demo" ]; then
+    $TEST_DIR/../xoffsetdatastructure2_demo
+elif [ -f "bin/xoffsetdatastructure2_demo" ]; then
+    ./bin/xoffsetdatastructure2_demo
+else
+    echo "Demo not found (skipped)"
+fi
 
 # Return to original directory
 cd ..

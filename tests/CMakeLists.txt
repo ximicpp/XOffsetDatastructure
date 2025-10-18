@@ -63,10 +63,18 @@ set_target_properties(test_modify PROPERTIES
 )
 configure_macos_target(test_modify)
 
+add_executable(test_comprehensive test_comprehensive.cpp)
+target_include_directories(test_comprehensive PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_comprehensive PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+configure_macos_target(test_comprehensive)
+
 # Add CTest tests
 add_test(NAME BasicTypes COMMAND test_basic_types)
 add_test(NAME VectorOps COMMAND test_vector)
 add_test(NAME MapSetOps COMMAND test_map_set)
 add_test(NAME NestedStructures COMMAND test_nested)
-add_test(NAME MemoryCompaction COMMAND test_compaction)
+add_test(NAME MemoryStats COMMAND test_compaction)
 add_test(NAME DataModification COMMAND test_modify)
+add_test(NAME Comprehensive COMMAND test_comprehensive)

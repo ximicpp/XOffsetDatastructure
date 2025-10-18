@@ -1,6 +1,6 @@
 // ============================================================================
-// Test: Memory Compaction
-// Purpose: Test memory compaction functionality
+// Test: Memory Statistics
+// Purpose: Test memory visualization and statistics
 // ============================================================================
 
 #include <iostream>
@@ -9,108 +9,110 @@
 
 using namespace XOffsetDatastructure2;
 
-struct CompactTestType {
+struct MemoryTestType {
     template <typename Allocator>
-    CompactTestType(Allocator allocator) 
+    MemoryTestType(Allocator allocator) 
         : data(allocator), strings(allocator) {}
     
     int value;
     XVector<int> data;
     XVector<XString> strings;
-    
-    // Migration function for compaction
-    static void migrate(XBuffer& old_buf, XBuffer& new_buf) {
-        auto* old_obj = old_buf.find<CompactTestType>("CompactTest").first;
-        if (!old_obj) return;
-        
-        auto* new_obj = new_buf.construct<CompactTestType>("CompactTest")(new_buf.get_segment_manager());
-        new_obj->value = old_obj->value;
-        new_obj->data = old_obj->data;
-        
-        for (const auto& str : old_obj->strings) {
-            new_obj->strings.emplace_back(str.c_str(), new_buf.get_segment_manager());
-        }
-    }
 };
 
-bool test_memory_compaction() {
-    std::cout << "\n[TEST] Memory Compaction\n";
+bool test_memory_stats() {
+    std::cout << "\n[TEST] Memory Statistics\n";
     std::cout << std::string(50, '-') << "\n";
     
-    // Create initial buffer with extra space
-    XBuffer xbuf(16384);
-    auto* obj = xbuf.construct<CompactTestType>("CompactTest")(xbuf.get_segment_manager());
+    // Test 1: Initial buffer stats
+    std::cout << "Test 1: Initial buffer stats... ";
+    XBuffer xbuf(4096);
+    auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats1.total_size == 4096);
+    assert(stats1.free_size > 0);
+    assert(stats1.used_size > 0);  // Has management overhead
+    assert(stats1.usage_percent() < 10.0);  // Very low usage
+    std::cout << "[OK]\n";
+    std::cout << "  Total: " << stats1.total_size << " bytes\n";
+    std::cout << "  Used:  " << stats1.used_size << " bytes (" 
+              << stats1.usage_percent() << "%)\n";
     
-    // Test 1: Fill with data
-    std::cout << "Test 1: Fill buffer with data... ";
-    obj->value = 999;
+    // Test 2: After object creation
+    std::cout << "Test 2: After object creation... ";
+    auto* obj = xbuf.construct<MemoryTestType>("MemTest")(xbuf.get_segment_manager());
+    obj->value = 42;
+    auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats2.used_size > stats1.used_size);
+    assert(stats2.free_size < stats1.free_size);
+    std::cout << "[OK]\n";
+    std::cout << "  Used:  " << stats2.used_size << " bytes (" 
+              << stats2.usage_percent() << "%)\n";
+    
+    // Test 3: After adding data
+    std::cout << "Test 3: After adding data... ";
     for (int i = 0; i < 100; ++i) {
         obj->data.push_back(i);
     }
+    auto stats3 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats3.used_size > stats2.used_size);
+    std::cout << "[OK]\n";
+    std::cout << "  Used:  " << stats3.used_size << " bytes (" 
+              << stats3.usage_percent() << "%)\n";
+    
+    // Test 4: After adding strings
+    std::cout << "Test 4: After adding strings... ";
     for (int i = 0; i < 20; ++i) {
         std::string str = "TestString_" + std::to_string(i);
         obj->strings.emplace_back(str.c_str(), xbuf.get_segment_manager());
     }
+    auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats4.used_size > stats3.used_size);
+    std::cout << "[OK]\n";
+    std::cout << "  Used:  " << stats4.used_size << " bytes (" 
+              << stats4.usage_percent() << "%)\n";
+    
+    // Test 5: Buffer growth
+    std::cout << "Test 5: Buffer growth... ";
+    std::size_t old_size = xbuf.get_size();
+    xbuf.grow(4096);
+    assert(xbuf.get_size() == old_size + 4096);
+    auto stats5 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats5.total_size == old_size + 4096);
+    assert(stats5.free_size > stats4.free_size);
+    assert(stats5.usage_percent() < stats4.usage_percent());
+    std::cout << "[OK]\n";
+    std::cout << "  Total: " << stats5.total_size << " bytes\n";
+    std::cout << "  Used:  " << stats5.used_size << " bytes (" 
+              << stats5.usage_percent() << "%)\n";
+    
+    // Test 6: Shrink to fit
+    std::cout << "Test 6: Shrink to fit... ";
+    xbuf.shrink_to_fit();
+    auto stats6 = XBufferVisualizer::get_memory_stats(xbuf);
+    assert(stats6.total_size < stats5.total_size);
+    assert(stats6.usage_percent() > stats5.usage_percent());
+    std::cout << "[OK]\n";
+    std::cout << "  Total: " << stats6.total_size << " bytes\n";
+    std::cout << "  Used:  " << stats6.used_size << " bytes (" 
+              << stats6.usage_percent() << "%)\n";
+    
+    // Test 7: Verify data integrity after shrink
+    std::cout << "Test 7: Verify data after shrink... ";
+    auto [found_obj, found] = xbuf.find<MemoryTestType>("MemTest");
+    assert(found);
+    assert(found_obj->value == 42);
+    assert(found_obj->data.size() == 100);
+    assert(found_obj->strings.size() == 20);
+    assert(found_obj->data[50] == 50);
+    assert(found_obj->strings[10] == "TestString_10");
     std::cout << "[OK]\n";
     
-    // Test 2: Check memory stats before compaction
-    std::cout << "Test 2: Memory stats before compaction... ";
-    auto stats_before = XBufferVisualizer::get_memory_stats(xbuf);
-    std::cout << "\n  Total size: " << stats_before.total_size << " bytes\n";
-    std::cout << "  Used:       " << stats_before.used_size << " bytes\n";
-    std::cout << "  Free:       " << stats_before.free_size << " bytes\n";
-    std::cout << "  Efficiency: " << stats_before.usage_percent() << "%\n";
-    std::cout << "[OK]\n";
-    
-    // Test 3: Perform compaction
-    std::cout << "Test 3: Compact memory... ";
-    XBuffer compact_buf = XBufferCompactor::compact_manual<CompactTestType>(xbuf);
-    assert(compact_buf.get_size() > 0);
-    std::cout << "[OK]\n";
-    
-    // Test 4: Check memory stats after compaction
-    std::cout << "Test 4: Memory stats after compaction... ";
-    auto stats_after = XBufferVisualizer::get_memory_stats(compact_buf);
-    std::cout << "\n  Total size: " << stats_after.total_size << " bytes\n";
-    std::cout << "  Used:       " << stats_after.used_size << " bytes\n";
-    std::cout << "  Free:       " << stats_after.free_size << " bytes\n";
-    std::cout << "  Efficiency: " << stats_after.usage_percent() << "%\n";
-    
-    // Verify size reduction
-    assert(stats_after.total_size < stats_before.total_size);
-    double reduction = (1.0 - (double)stats_after.total_size / stats_before.total_size) * 100.0;
-    std::cout << "  Reduction:  " << reduction << "%\n";
-    std::cout << "[OK]\n";
-    
-    // Test 5: Verify data integrity after compaction
-    std::cout << "Test 5: Verify data integrity... ";
-    auto* compact_obj = compact_buf.find<CompactTestType>("CompactTest").first;
-    assert(compact_obj != nullptr);
-    assert(compact_obj->value == 999);
-    assert(compact_obj->data.size() == 100);
-    assert(compact_obj->strings.size() == 20);
-    assert(compact_obj->data[50] == 50);
-    assert(compact_obj->strings[10] == "TestString_10");
-    std::cout << "[OK]\n";
-    
-    // Test 6: Verify all data elements
-    std::cout << "Test 6: Verify all elements... ";
-    for (int i = 0; i < 100; ++i) {
-        assert(compact_obj->data[i] == i);
-    }
-    for (int i = 0; i < 20; ++i) {
-        std::string expected = "TestString_" + std::to_string(i);
-        assert(compact_obj->strings[i] == expected.c_str());
-    }
-    std::cout << "[OK]\n";
-    
-    std::cout << "[PASS] All compaction tests passed!\n";
+    std::cout << "[PASS] All memory statistics tests passed!\n";
     return true;
 }
 
 int main() {
     try {
-        return test_memory_compaction() ? 0 : 1;
+        return test_memory_stats() ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << "[FAIL] Exception: " << e.what() << "\n";
         return 1;
