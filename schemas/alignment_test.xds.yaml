@@ -1,0 +1,17 @@
+schema_version: "1.0"
+
+types:
+  - name: AlignedStruct
+    type: struct
+    fields:
+      - name: a
+        type: char
+        default: '\0'
+      - name: b
+        type: int
+        default: 0
+      - name: c
+        type: double
+        default: 0.0
+      - name: name
+        type: XString

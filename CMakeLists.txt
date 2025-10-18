@@ -52,6 +52,16 @@ set(BOOST_INCLUDE_DIRS
 if(Python3_FOUND)
     set(SCHEMA_FILES
         ${CMAKE_SOURCE_DIR}/schemas/test_types.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/basic_types.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/vector_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/map_set_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/nested_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/modify_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/compaction_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/serialization_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/alignment_test.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/player.xds.yaml
+        ${CMAKE_SOURCE_DIR}/schemas/game_data.xds.yaml
     )
     
     set(GENERATED_HEADERS "")
