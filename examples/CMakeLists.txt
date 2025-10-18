@@ -7,7 +7,7 @@ target_include_directories(helloworld PRIVATE
 )
 set_target_properties(helloworld
     PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 if(Python3_FOUND)
     add_dependencies(helloworld generate_schemas)
@@ -22,7 +22,7 @@ target_include_directories(demo PRIVATE
 )
 set_target_properties(demo
     PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 if(Python3_FOUND)
     add_dependencies(demo generate_schemas)

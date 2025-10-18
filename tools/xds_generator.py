@@ -183,6 +183,23 @@ class CodeGenerator:
         
         return "\n".join(lines)
     
+    def generate_validation(self, struct: StructDef) -> str:
+        """Generate compile-time validation code"""
+        lines = []
+        
+        # Add comment explaining the validation
+        lines.append(f"// Type signature validation for {struct.name}")
+        lines.append(f"// This ensures binary compatibility across compilations")
+        
+        # Size and alignment validation
+        lines.append(f"static_assert(sizeof({struct.name}) == sizeof({struct.name}ReflectionHint),")
+        lines.append(f'              "Size mismatch: {struct.name} runtime and reflection types must have identical size");')
+        lines.append(f"static_assert(alignof({struct.name}) == alignof({struct.name}ReflectionHint),")
+        lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
+        lines.append("")
+        
+        return "\n".join(lines)
+    
     def generate_header(self, output_name: str) -> str:
         """Generate complete C++ header file"""
         lines = []
@@ -199,13 +216,38 @@ class CodeGenerator:
         lines.append("using namespace XOffsetDatastructure2;")
         lines.append("")
         
+        # Add comment about reflection hint types
+        lines.append("// ============================================================================")
+        lines.append("// Runtime Types - Used for actual data storage")
+        lines.append("// ============================================================================")
+        lines.append("")
+        
         # Generate runtime types
         for struct in self.structs:
             lines.append(self.generate_runtime_type(struct))
         
+        # Add comment
+        lines.append("// ============================================================================")
+        lines.append("// Reflection Hint Types - Used for compile-time type analysis")
+        lines.append("// ============================================================================")
+        lines.append("// These are aggregate versions of runtime types that satisfy boost::pfr")
+        lines.append("// requirements for reflection. They must have identical memory layout")
+        lines.append("// to their runtime counterparts.")
+        lines.append("// ============================================================================")
+        lines.append("")
+        
         # Generate reflection hint types
         for struct in self.structs:
             lines.append(self.generate_reflection_hint_type(struct))
+        
+        # Add validation section
+        lines.append("// ============================================================================")
+        lines.append("// Compile-Time Validation")
+        lines.append("// ============================================================================")
+        lines.append("")
+        
+        for struct in self.structs:
+            lines.append(self.generate_validation(struct))
         
         # Close header guard
         lines.append(f"#endif // {guard_name}")
