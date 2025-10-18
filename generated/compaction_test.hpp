@@ -43,11 +43,11 @@ static_assert(sizeof(MemoryTestType) == sizeof(MemoryTestTypeReflectionHint),
 static_assert(alignof(MemoryTestType) == alignof(MemoryTestTypeReflectionHint),
               "Alignment mismatch: MemoryTestType runtime and reflection types must have identical alignment");
 
-// Expected type signature for MemoryTestTypeReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<MemoryTestTypeReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<MemoryTestTypeReflectionHint>() ==
+             "struct[s:72,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@40:vector[s:32,a:8]<string[s:32,a:8]>}",
+              "Type signature mismatch for MemoryTestTypeReflectionHint");
 
 #endif // GENERATED_COMPACTION_TEST_HPP_

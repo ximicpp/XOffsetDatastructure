@@ -71,12 +71,8 @@ static_assert(sizeof(InnerObject) == sizeof(InnerObjectReflectionHint),
 static_assert(alignof(InnerObject) == alignof(InnerObjectReflectionHint),
               "Alignment mismatch: InnerObject runtime and reflection types must have identical alignment");
 
-// Expected type signature for InnerObjectReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>() == "struct[s:72,a:8]{@0:i32[s:4,a:4],@8:string[s:32,a:8],@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for InnerObjectReflectionHint");
 
 // Type signature validation for MiddleObject
 // This ensures binary compatibility across compilations
@@ -86,12 +82,14 @@ static_assert(sizeof(MiddleObject) == sizeof(MiddleObjectReflectionHint),
 static_assert(alignof(MiddleObject) == alignof(MiddleObjectReflectionHint),
               "Alignment mismatch: MiddleObject runtime and reflection types must have identical alignment");
 
-// Expected type signature for MiddleObjectReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>() ==
+             "struct[s:136,a:8]{"
+             "@0:string[s:32,a:8],"
+             "@32:struct[s:72,a:8]{@0:i32[s:4,a:4],"
+             "@8:string[s:32,a:8],"
+             "@40:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@104:vector[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for MiddleObjectReflectionHint");
 
 // Type signature validation for OuterObject
 // This ensures binary compatibility across compilations
@@ -101,11 +99,17 @@ static_assert(sizeof(OuterObject) == sizeof(OuterObjectReflectionHint),
 static_assert(alignof(OuterObject) == alignof(OuterObjectReflectionHint),
               "Alignment mismatch: OuterObject runtime and reflection types must have identical alignment");
 
-// Expected type signature for OuterObjectReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<OuterObjectReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<OuterObjectReflectionHint>() ==
+             "struct[s:200,a:8]{"
+             "@0:string[s:32,a:8],"
+             "@32:struct[s:136,a:8]{@0:string[s:32,a:8],"
+             "@32:struct[s:72,a:8]{@0:i32[s:4,a:4],"
+             "@8:string[s:32,a:8],"
+             "@40:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@104:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@168:vector[s:32,a:8]<struct[s:72,a:8]{@0:i32[s:4,a:4],"
+             "@8:string[s:32,a:8],"
+             "@40:vector[s:32,a:8]<i32[s:4,a:4]>}>}",
+              "Type signature mismatch for OuterObjectReflectionHint");
 
 #endif // GENERATED_NESTED_TEST_HPP_

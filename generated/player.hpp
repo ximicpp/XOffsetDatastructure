@@ -45,11 +45,12 @@ static_assert(sizeof(Player) == sizeof(PlayerReflectionHint),
 static_assert(alignof(Player) == alignof(PlayerReflectionHint),
               "Alignment mismatch: Player runtime and reflection types must have identical alignment");
 
-// Expected type signature for PlayerReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<PlayerReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<PlayerReflectionHint>() ==
+             "struct[s:72,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:i32[s:4,a:4],"
+             "@8:string[s:32,a:8],"
+             "@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for PlayerReflectionHint");
 
 #endif // GENERATED_PLAYER_HPP_

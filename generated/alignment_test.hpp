@@ -45,11 +45,7 @@ static_assert(sizeof(AlignedStruct) == sizeof(AlignedStructReflectionHint),
 static_assert(alignof(AlignedStruct) == alignof(AlignedStructReflectionHint),
               "Alignment mismatch: AlignedStruct runtime and reflection types must have identical alignment");
 
-// Expected type signature for AlignedStructReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<AlignedStructReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<AlignedStructReflectionHint>() == "struct[s:48,a:8]{@0:char[s:1,a:1],@4:i32[s:4,a:4],@8:f64[s:8,a:8],@16:string[s:32,a:8]}",
+              "Type signature mismatch for AlignedStructReflectionHint");
 
 #endif // GENERATED_ALIGNMENT_TEST_HPP_

@@ -234,6 +234,58 @@ namespace XTypeSignature {
         }
     };
 
+    template <>
+    struct TypeSignature<double> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"f64[s:8,a:8]"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<int64_t> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"i64[s:8,a:8]"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<uint32_t> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"u32[s:4,a:4]"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<uint64_t> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"u64[s:8,a:8]"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<bool> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"bool[s:1,a:1]"};
+        }
+    };
+
+    template <>
+    struct TypeSignature<char> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"char[s:1,a:1]"};
+        }
+    };
+
+    // Only add long long if it's different from int64_t
+    #if !defined(__APPLE__) || !defined(__LP64__)
+    template <>
+    struct TypeSignature<long long> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"i64[s:8,a:8]"};
+        }
+    };
+    #endif
+
     // 为指针类型添加特化
     template <typename T>
     struct TypeSignature<T*> {

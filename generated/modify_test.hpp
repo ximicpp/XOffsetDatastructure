@@ -51,11 +51,15 @@ static_assert(sizeof(ModifyTestData) == sizeof(ModifyTestDataReflectionHint),
 static_assert(alignof(ModifyTestData) == alignof(ModifyTestDataReflectionHint),
               "Alignment mismatch: ModifyTestData runtime and reflection types must have identical alignment");
 
-// Expected type signature for ModifyTestDataReflectionHint:
-// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>
-// Format: struct[s:<size>,a:<align>]{@<offset>:<field_type>,...}
-//
-// You can verify the actual signature by uncommenting this line:
-// #pragma message(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>().value)
+static_assert(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>() ==
+             "struct[s:144,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:f32[s:4,a:4],"
+             "@8:bool[s:1,a:1],"
+             "@16:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@48:vector[s:32,a:8]<string[s:32,a:8]>,"
+             "@80:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>,"
+             "@112:set[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for ModifyTestDataReflectionHint");
 
 #endif // GENERATED_MODIFY_TEST_HPP_
