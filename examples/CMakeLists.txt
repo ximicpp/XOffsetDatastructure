@@ -3,7 +3,7 @@ add_executable(helloworld helloworld.cpp)
 target_include_directories(helloworld PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
-    ${CMAKE_BINARY_DIR}/generated
+    ${CMAKE_SOURCE_DIR}/generated
 )
 set_target_properties(helloworld
     PROPERTIES
@@ -18,7 +18,7 @@ add_executable(demo demo.cpp)
 target_include_directories(demo PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
-    ${CMAKE_BINARY_DIR}/generated
+    ${CMAKE_SOURCE_DIR}/generated
 )
 set_target_properties(demo
     PROPERTIES
@@ -26,6 +26,21 @@ set_target_properties(demo
 )
 if(Python3_FOUND)
     add_dependencies(demo generate_schemas)
+endif()
+
+# Signature Demo
+add_executable(signature_demo signature_demo.cpp)
+target_include_directories(signature_demo PRIVATE 
+    ${CMAKE_SOURCE_DIR}
+    ${BOOST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/generated
+)
+set_target_properties(signature_demo
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+if(Python3_FOUND)
+    add_dependencies(signature_demo generate_schemas)
 endif()
 
 # macOS specific: disable RPATH and use system libraries
@@ -45,6 +60,15 @@ if(APPLE)
         -Wl,-rpath,/usr/local/lib
     )
     target_link_options(demo PRIVATE
+        -Wl,-rpath,/usr/lib
+        -Wl,-rpath,/usr/local/lib
+    )
+    set_target_properties(signature_demo PROPERTIES
+        SKIP_BUILD_RPATH TRUE
+        BUILD_WITH_INSTALL_RPATH FALSE
+        INSTALL_RPATH ""
+    )
+    target_link_options(signature_demo PRIVATE
         -Wl,-rpath,/usr/lib
         -Wl,-rpath,/usr/local/lib
     )

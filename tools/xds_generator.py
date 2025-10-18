@@ -183,6 +183,18 @@ class CodeGenerator:
         
         return "\n".join(lines)
     
+    def generate_type_signature_comment(self, struct: StructDef) -> str:
+        """Generate expected type signature as a comment for reference"""
+        lines = []
+        lines.append(f"// Expected type signature for {struct.name}ReflectionHint:")
+        lines.append(f"// This signature is computed at compile-time by XTypeSignature::get_XTypeSignature<>")
+        lines.append(f"// Format: struct[s:<size>,a:<align>]{{@<offset>:<field_type>,...}}")
+        lines.append(f"//")
+        lines.append(f"// You can verify the actual signature by uncommenting this line:")
+        lines.append(f"// #pragma message(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>().value)")
+        lines.append("")
+        return "\n".join(lines)
+    
     def generate_validation(self, struct: StructDef) -> str:
         """Generate compile-time validation code"""
         lines = []
@@ -190,6 +202,7 @@ class CodeGenerator:
         # Add comment explaining the validation
         lines.append(f"// Type signature validation for {struct.name}")
         lines.append(f"// This ensures binary compatibility across compilations")
+        lines.append("")
         
         # Size and alignment validation
         lines.append(f"static_assert(sizeof({struct.name}) == sizeof({struct.name}ReflectionHint),")
@@ -197,6 +210,9 @@ class CodeGenerator:
         lines.append(f"static_assert(alignof({struct.name}) == alignof({struct.name}ReflectionHint),")
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
+        
+        # Add type signature comment
+        lines.append(self.generate_type_signature_comment(struct))
         
         return "\n".join(lines)
     

@@ -64,24 +64,25 @@ if(Python3_FOUND)
         ${CMAKE_SOURCE_DIR}/schemas/game_data.xds.yaml
     )
     
+    # Generate code from schemas
     set(GENERATED_HEADERS "")
     foreach(SCHEMA_FILE ${SCHEMA_FILES})
         get_filename_component(SCHEMA_NAME ${SCHEMA_FILE} NAME_WE)
-        set(GENERATED_HEADER ${CMAKE_BINARY_DIR}/generated/${SCHEMA_NAME}.hpp)
+        string(REPLACE ".xds" "" SCHEMA_NAME ${SCHEMA_NAME})
+        set(OUTPUT_FILE "${CMAKE_SOURCE_DIR}/generated/${SCHEMA_NAME}.hpp")
+        list(APPEND GENERATED_HEADERS ${OUTPUT_FILE})
         
         add_custom_command(
-            OUTPUT ${GENERATED_HEADER}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/generated
+            OUTPUT ${OUTPUT_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/generated
             COMMAND ${Python3_EXECUTABLE} 
                     ${CMAKE_SOURCE_DIR}/tools/xds_generator.py 
                     ${SCHEMA_FILE}
-                    -o ${CMAKE_BINARY_DIR}/generated/
+                    -o ${CMAKE_SOURCE_DIR}/generated/
             DEPENDS ${SCHEMA_FILE} ${CMAKE_SOURCE_DIR}/tools/xds_generator.py
             COMMENT "Generating ${SCHEMA_NAME}.hpp from schema"
             VERBATIM
         )
-        
-        list(APPEND GENERATED_HEADERS ${GENERATED_HEADER})
     endforeach()
     
     add_custom_target(generate_schemas ALL DEPENDS ${GENERATED_HEADERS})
@@ -98,4 +99,3 @@ add_subdirectory(examples)
 
 # Add tests subdirectory
 add_subdirectory(tests)
-
