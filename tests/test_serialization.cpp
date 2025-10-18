@@ -11,7 +11,7 @@
 using namespace XOffsetDatastructure2;
 
 // Test structures
-struct SimpleData {
+struct alignas(BASIC_ALIGNMENT) SimpleData {
     template <typename Allocator>
     SimpleData(Allocator allocator) : name(allocator) {}
     
@@ -20,7 +20,7 @@ struct SimpleData {
     XString name;
 };
 
-struct ComplexData {
+struct alignas(BASIC_ALIGNMENT) ComplexData {
     template <typename Allocator>
     ComplexData(Allocator allocator)
         : title(allocator), items(allocator), tags(allocator), metadata(allocator) {}

@@ -11,7 +11,7 @@
 using namespace XOffsetDatastructure2;
 
 // Comprehensive test data structure
-struct ComprehensiveTestType {
+struct alignas(BASIC_ALIGNMENT) ComprehensiveTestType {
     template <typename Allocator>
     ComprehensiveTestType(Allocator allocator) 
         : mVector(allocator), 

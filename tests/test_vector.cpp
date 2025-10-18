@@ -9,7 +9,7 @@
 
 using namespace XOffsetDatastructure2;
 
-struct VectorTest {
+struct alignas(BASIC_ALIGNMENT) VectorTest {
     template <typename Allocator>
     VectorTest(Allocator allocator) 
         : intVector(allocator), 

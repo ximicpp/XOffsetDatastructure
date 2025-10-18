@@ -10,7 +10,7 @@
 using namespace XOffsetDatastructure2;
 
 // Test data structure
-struct ModifyTestData {
+struct alignas(BASIC_ALIGNMENT) ModifyTestData {
     template <typename Allocator>
     ModifyTestData(Allocator allocator) 
         : numbers(allocator), names(allocator), scores(allocator), tags(allocator) {}

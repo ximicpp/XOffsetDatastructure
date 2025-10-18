@@ -9,7 +9,8 @@
 
 using namespace XOffsetDatastructure2;
 
-struct BasicTypes {
+// Test structure
+struct alignas(BASIC_ALIGNMENT) BasicTypes {
     template <typename Allocator>
     BasicTypes(Allocator allocator) {}
     

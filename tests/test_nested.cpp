@@ -9,24 +9,26 @@
 
 using namespace XOffsetDatastructure2;
 
-struct InnerObject {
+struct alignas(BASIC_ALIGNMENT) InnerObject {
     template <typename Allocator>
-    InnerObject(Allocator allocator) : data(allocator) {}
+    InnerObject(Allocator allocator) : name(allocator), data(allocator) {}
     
     int id;
+    XString name;
     XVector<int> data;
 };
 
-struct MiddleObject {
+struct alignas(BASIC_ALIGNMENT) MiddleObject {
     template <typename Allocator>
     MiddleObject(Allocator allocator) 
-        : name(allocator), inner(allocator) {}
+        : name(allocator), inner(allocator), values(allocator) {}
     
     XString name;
     InnerObject inner;
+    XVector<int> values;
 };
 
-struct OuterObject {
+struct alignas(BASIC_ALIGNMENT) OuterObject {
     template <typename Allocator>
     OuterObject(Allocator allocator) 
         : title(allocator), middle(allocator), innerList(allocator) {}

@@ -9,7 +9,7 @@
 
 using namespace XOffsetDatastructure2;
 
-struct MemoryTestType {
+struct alignas(BASIC_ALIGNMENT) MemoryTestType {
     template <typename Allocator>
     MemoryTestType(Allocator allocator) 
         : data(allocator), strings(allocator) {}

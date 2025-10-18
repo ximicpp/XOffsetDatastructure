@@ -9,7 +9,7 @@
 
 using namespace XOffsetDatastructure2;
 
-struct MapSetTest {
+struct alignas(BASIC_ALIGNMENT) MapSetTest {
     template <typename Allocator>
     MapSetTest(Allocator allocator) 
         : intSet(allocator),
