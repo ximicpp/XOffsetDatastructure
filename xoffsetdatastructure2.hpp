@@ -24,6 +24,15 @@
 #include <string>
 #include <fstream>
 
+// ============================================================================
+// Configuration: Basic Alignment (64-bit = 8 bytes)
+// ============================================================================
+#ifndef BASIC_ALIGNMENT
+#define BASIC_ALIGNMENT 8
+#endif
+
+// Macro for declaring aligned structures
+// Usage: struct alignas(BASIC_ALIGNMENT) MyStruct { ... };
 
 namespace boost {
 namespace interprocess {

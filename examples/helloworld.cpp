@@ -8,8 +8,8 @@
 
 using namespace XOffsetDatastructure2;
 
-// Simple data structure
-struct Player {
+// Simple data structure with 64-bit alignment
+struct alignas(BASIC_ALIGNMENT) Player {
     template <typename Allocator>
     Player(Allocator allocator) : name(allocator), items(allocator) {}
     

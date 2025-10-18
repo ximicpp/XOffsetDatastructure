@@ -77,6 +77,13 @@ set_target_properties(test_serialization PROPERTIES
 )
 configure_macos_target(test_serialization)
 
+add_executable(test_alignment test_alignment.cpp)
+target_include_directories(test_alignment PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_alignment PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+)
+configure_macos_target(test_alignment)
+
 # Add CTest tests
 add_test(NAME BasicTypes COMMAND test_basic_types)
 add_test(NAME VectorOps COMMAND test_vector)
@@ -86,3 +93,4 @@ add_test(NAME MemoryStats COMMAND test_compaction)
 add_test(NAME DataModification COMMAND test_modify)
 add_test(NAME Comprehensive COMMAND test_comprehensive)
 add_test(NAME Serialization COMMAND test_serialization)
+add_test(NAME Alignment COMMAND test_alignment)

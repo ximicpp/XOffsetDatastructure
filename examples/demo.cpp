@@ -14,7 +14,7 @@ using namespace XOffsetDatastructure2;
 // Data Structures
 // ============================================================================
 
-struct Item {
+struct alignas(BASIC_ALIGNMENT) Item {
     template <typename Allocator>
     Item(Allocator allocator) 
         : item_id(0), item_type(0), quantity(0), name(allocator) {}
@@ -25,7 +25,7 @@ struct Item {
     XString name;
 };
 
-struct GameData {
+struct alignas(BASIC_ALIGNMENT) GameData {
     template <typename Allocator>
     GameData(Allocator allocator)
         : player_name(allocator),
