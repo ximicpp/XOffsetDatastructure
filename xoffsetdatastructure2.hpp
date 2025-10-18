@@ -318,5 +318,264 @@ namespace XOffsetDatastructure2
 			return XBuffer();
 		}
 	};
+
+	// ============================================================================
+	// XBufferPlanner: Capacity Planning and Reservation
+	// ============================================================================
+	// Purpose: Pre-allocate buffer space to avoid out-of-memory errors during operations
+	// Philosophy: "Plan first, execute safely"
+	// ============================================================================
+	
+	class XBufferPlanner {
+	private:
+		// ==================== Internal Constants ====================
+		
+		// Segment manager overhead per allocation
+		static constexpr std::size_t SEGMENT_MANAGER_OVERHEAD = 32;
+		
+		// Memory alignment padding (typically 8 or 16 bytes)
+		static constexpr std::size_t ALIGNMENT_PADDING = 16;
+		
+		// Container control structure overhead
+		static constexpr std::size_t CONTAINER_CONTROL_OVERHEAD = 64;
+		
+		// Extra reserve factor for container growth
+		static constexpr double DEFAULT_RESERVE_FACTOR = 0.1;  // 10%
+		
+	public:
+		// ==================== Basic Size Estimation ====================
+		
+		/// Estimate size for a single object (including overhead)
+		template<typename T>
+		static std::size_t estimate_object_size() {
+			// Object size + segment manager overhead + alignment padding
+			std::size_t obj_size = sizeof(T);
+			std::size_t total = obj_size + SEGMENT_MANAGER_OVERHEAD;
+			
+			// Round up to alignment boundary
+			total = ((total + ALIGNMENT_PADDING - 1) / ALIGNMENT_PADDING) * ALIGNMENT_PADDING;
+			
+			return total;
+		}
+		
+		/// Estimate size for XVector with element count
+		template<typename T>
+		static std::size_t estimate_vector_size(std::size_t count) {
+			if (count == 0) return CONTAINER_CONTROL_OVERHEAD;
+			
+			// Vector control structure
+			std::size_t vector_struct_size = sizeof(XVector<T>);
+			
+			// Element storage (with reserve factor)
+			std::size_t element_size = sizeof(T);
+			std::size_t reserve_count = static_cast<std::size_t>(count * DEFAULT_RESERVE_FACTOR);
+			std::size_t elements_size = (count + reserve_count) * element_size;
+			
+			// Total: control structure + elements + segment overhead + alignment
+			std::size_t total = vector_struct_size + elements_size + SEGMENT_MANAGER_OVERHEAD;
+			total = ((total + ALIGNMENT_PADDING - 1) / ALIGNMENT_PADDING) * ALIGNMENT_PADDING;
+			
+			return total;
+		}
+		
+		/// Estimate size for XMap with entry count
+		template<typename K, typename V>
+		static std::size_t estimate_map_size(std::size_t count) {
+			if (count == 0) return CONTAINER_CONTROL_OVERHEAD;
+			
+			// flat_map uses vector<pair<K,V>> internally
+			std::size_t map_struct_size = sizeof(XMap<K, V>);
+			
+			// Entry storage (pair<K,V> with reserve)
+			std::size_t entry_size = sizeof(std::pair<K, V>);
+			std::size_t reserve_count = static_cast<std::size_t>(count * 0.2);  // 20% for maps
+			std::size_t entries_size = (count + reserve_count) * entry_size;
+			
+			// Total
+			std::size_t total = map_struct_size + entries_size + SEGMENT_MANAGER_OVERHEAD;
+			total = ((total + ALIGNMENT_PADDING - 1) / ALIGNMENT_PADDING) * ALIGNMENT_PADDING;
+			
+			return total;
+		}
+		
+		/// Estimate size for XSet with entry count
+		template<typename T>
+		static std::size_t estimate_set_size(std::size_t count) {
+			if (count == 0) return CONTAINER_CONTROL_OVERHEAD;
+			
+			// flat_set uses vector<T> internally
+			std::size_t set_struct_size = sizeof(XSet<T>);
+			
+			// Element storage (with reserve)
+			std::size_t element_size = sizeof(T);
+			std::size_t reserve_count = static_cast<std::size_t>(count * 0.2);  // 20% for sets
+			std::size_t elements_size = (count + reserve_count) * element_size;
+			
+			// Total
+			std::size_t total = set_struct_size + elements_size + SEGMENT_MANAGER_OVERHEAD;
+			total = ((total + ALIGNMENT_PADDING - 1) / ALIGNMENT_PADDING) * ALIGNMENT_PADDING;
+			
+			return total;
+		}
+		
+		/// Estimate size for XString with max length
+		static std::size_t estimate_string_size(std::size_t max_length) {
+			// XString structure size
+			std::size_t string_struct_size = sizeof(XString);
+			
+			// Character data (length + null terminator)
+			std::size_t data_size = max_length + 1;
+			
+			// Total
+			std::size_t total = string_struct_size + data_size + SEGMENT_MANAGER_OVERHEAD;
+			total = ((total + ALIGNMENT_PADDING - 1) / ALIGNMENT_PADDING) * ALIGNMENT_PADDING;
+			
+			return total;
+		}
+		
+		/// Get base overhead (segment manager initialization)
+		static std::size_t get_base_overhead() {
+			// Empirical value: segment manager initialization overhead
+			return 1024;
+		}
+		
+		// ==================== Estimator (Fluent API) ====================
+		
+		/// Fluent API for chaining capacity estimations
+		class Estimator {
+		private:
+			std::size_t total_bytes_;
+			
+		public:
+			/// Constructor with base overhead
+			Estimator() : total_bytes_(1024) {}  // Base segment manager overhead
+			
+			/// Add capacity for N objects of type T
+			template<typename T>
+			Estimator& add_objects(std::size_t count) {
+				total_bytes_ += estimate_object_size<T>() * count;
+				return *this;
+			}
+			
+			/// Add capacity for XVector<T> with element_count elements
+			template<typename T>
+			Estimator& add_vector(std::size_t element_count) {
+				total_bytes_ += estimate_vector_size<T>(element_count);
+				return *this;
+			}
+			
+			/// Add capacity for XMap<K,V> with entry_count entries
+			template<typename K, typename V>
+			Estimator& add_map(std::size_t entry_count) {
+				total_bytes_ += estimate_map_size<K, V>(entry_count);
+				return *this;
+			}
+			
+			/// Add capacity for XSet<T> with entry_count entries
+			template<typename T>
+			Estimator& add_set(std::size_t entry_count) {
+				total_bytes_ += estimate_set_size<T>(entry_count);
+				return *this;
+			}
+			
+			/// Add capacity for count strings with avg_length characters
+			Estimator& add_strings(std::size_t count, std::size_t avg_length) {
+				total_bytes_ += count * estimate_string_size(avg_length);
+				return *this;
+			}
+			
+			/// Add raw bytes
+			Estimator& add_bytes(std::size_t bytes) {
+				total_bytes_ += bytes;
+				return *this;
+			}
+			
+			/// Add safety margin (default 20%)
+			/// percent: 0.0 to 1.0 (e.g., 0.2 = 20%)
+			Estimator& add_margin(double percent = 0.2) {
+				if (percent < 0.0 || percent > 1.0) {
+					throw std::invalid_argument("Margin percent must be between 0.0 and 1.0");
+				}
+				total_bytes_ = static_cast<std::size_t>(total_bytes_ * (1.0 + percent));
+				return *this;
+			}
+			
+			/// Get total estimated bytes
+			std::size_t total() const {
+				return total_bytes_;
+			}
+			
+			/// Implicit conversion to size_t for convenience
+			operator std::size_t() const {
+				return total_bytes_;
+			}
+		};
+	};
+	
+	// ============================================================================
+	// XBufferWithPlanner: XBuffer with Built-in Planning Support
+	// ============================================================================
+	
+	/// Extended XBuffer with capacity planning methods
+	class XBufferWithPlanner : public XBuffer {
+	public:
+		// Inherit constructors
+		using XBuffer::XBuffer;
+		
+		// Expose base class methods
+		using XBuffer::get_size;
+		using XBuffer::get_free_memory;
+		using XBuffer::grow;
+		using XBuffer::construct;
+		using XBuffer::find;
+		using XBuffer::find_or_construct;
+		using XBuffer::get_segment_manager;
+		
+		/// Reserve at least 'bytes' of free space
+		/// Grows the buffer if necessary
+		void reserve(std::size_t bytes) {
+			std::size_t available = available_space();
+			if (available < bytes) {
+				std::size_t growth = bytes - available;
+				this->grow(growth);
+			}
+		}
+		
+		/// Get buffer size
+		std::size_t size() const {
+			return this->get_size();
+		}
+		
+		/// Reserve space based on estimator
+		void reserve(const XBufferPlanner::Estimator& estimator) {
+			reserve(estimator.total());
+		}
+		
+		/// Check if buffer has at least 'bytes' of free space
+		bool has_capacity(std::size_t bytes) const {
+			return available_space() >= bytes;
+		}
+		
+		/// Get available free space
+		std::size_t available_space() const {
+			return this->get_free_memory();
+		}
+		
+		/// Get memory statistics
+		XBufferVisualizer::MemoryStats stats() const {
+			// Create non-const reference for stats query
+			XBuffer& non_const_buffer = const_cast<XBuffer&>(static_cast<const XBuffer&>(*this));
+			return XBufferVisualizer::get_memory_stats(non_const_buffer);
+		}
+		
+		/// Print memory statistics
+		void print_stats() const {
+			auto s = stats();
+			std::cout << "XBuffer: " << s.used_size << "/" << s.total_size 
+			          << " bytes (" << std::fixed << std::setprecision(1) 
+			          << s.usage_percent() << "% used, " 
+			          << s.free_size << " bytes free)" << std::endl;
+		}
+	};
 }
 #endif
