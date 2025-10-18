@@ -21,6 +21,12 @@ if(APPLE)
     endif()
 endif()
 
+# Enable testing
+enable_testing()
+
+# Find Python for code generation
+find_package(Python3 COMPONENTS Interpreter)
+
 # Set Boost include directories
 set(BOOST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/boost
@@ -41,6 +47,41 @@ set(BOOST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/boost/libs/intrusive/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/predef/include
 )
+
+# Schema code generation
+if(Python3_FOUND)
+    set(SCHEMA_FILES
+        ${CMAKE_SOURCE_DIR}/schemas/test_types.xds.yaml
+    )
+    
+    set(GENERATED_HEADERS "")
+    foreach(SCHEMA_FILE ${SCHEMA_FILES})
+        get_filename_component(SCHEMA_NAME ${SCHEMA_FILE} NAME_WE)
+        set(GENERATED_HEADER ${CMAKE_BINARY_DIR}/generated/${SCHEMA_NAME}.hpp)
+        
+        add_custom_command(
+            OUTPUT ${GENERATED_HEADER}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/generated
+            COMMAND ${Python3_EXECUTABLE} 
+                    ${CMAKE_SOURCE_DIR}/tools/xds_generator.py 
+                    ${SCHEMA_FILE}
+                    -o ${CMAKE_BINARY_DIR}/generated/
+            DEPENDS ${SCHEMA_FILE} ${CMAKE_SOURCE_DIR}/tools/xds_generator.py
+            COMMENT "Generating ${SCHEMA_NAME}.hpp from schema"
+            VERBATIM
+        )
+        
+        list(APPEND GENERATED_HEADERS ${GENERATED_HEADER})
+    endforeach()
+    
+    add_custom_target(generate_schemas ALL DEPENDS ${GENERATED_HEADERS})
+    
+    message(STATUS "Schema code generation enabled")
+    message(STATUS "  Python: ${Python3_EXECUTABLE}")
+    message(STATUS "  Schemas: ${SCHEMA_FILES}")
+else()
+    message(WARNING "Python3 not found - schema code generation disabled")
+endif()
 
 # Add examples subdirectory
 add_subdirectory(examples)
