@@ -17,7 +17,7 @@ void test_basic_creation() {
     inner->mInt = 42;
     assert(inner->mInt == 42);
     
-    std::cout << "  ✓ TestTypeInner created and modified" << std::endl;
+    std::cout << "  [OK] TestTypeInner created and modified" << std::endl;
 }
 
 void test_vector_operations() {
@@ -35,7 +35,7 @@ void test_vector_operations() {
     assert(inner->mVector[1] == 2);
     assert(inner->mVector[2] == 3);
     
-    std::cout << "  ✓ XVector operations work correctly" << std::endl;
+    std::cout << "  [OK] XVector operations work correctly" << std::endl;
 }
 
 void test_complex_type() {
@@ -56,7 +56,7 @@ void test_complex_type() {
     test->TestTypeInnerObj.mInt = 999;
     assert(test->TestTypeInnerObj.mInt == 999);
     
-    std::cout << "  ✓ TestType with nested TestTypeInner works" << std::endl;
+    std::cout << "  [OK] TestType with nested TestTypeInner works" << std::endl;
 }
 
 void test_string_operations() {
@@ -72,7 +72,7 @@ void test_string_operations() {
     assert(test->mString.size() == strlen(hello));
     assert(strcmp(test->mString.c_str(), hello) == 0);
     
-    std::cout << "  ✓ XString operations work correctly" << std::endl;
+    std::cout << "  [OK] XString operations work correctly" << std::endl;
 }
 
 void test_string_vector() {
@@ -107,10 +107,10 @@ void test_set_operations() {
     assert(test->mSet.count(20) == 1);
     assert(test->mSet.count(99) == 0);
     
-    std::cout << "  ✓ XSet<int> operations work correctly" << std::endl;
+    std::cout << "  [OK] XSet<int> operations work correctly" << std::endl;
     std::cout << "  (XSet<XString> requires special handling - skipping)" << std::endl;
     
-    std::cout << "  ✓ XSet operations work correctly" << std::endl;
+    std::cout << "  [OK] XSet operations work correctly" << std::endl;
 }
 
 void test_default_values() {
@@ -125,7 +125,7 @@ void test_default_values() {
     assert(test->mInt == 0);
     assert(test->mFloat == 0.0f);
     
-    std::cout << "  ✓ Default values initialized correctly" << std::endl;
+    std::cout << "  [OK] Default values initialized correctly" << std::endl;
 }
 
 void test_type_sizes() {
@@ -146,7 +146,7 @@ void test_type_sizes() {
     assert(alignof(TestTypeInnerReflectionHint) == 8);
     assert(alignof(TestTypeReflectionHint) == 8);
     
-    std::cout << "  ✓ All types properly aligned" << std::endl;
+    std::cout << "  [OK] All types properly aligned" << std::endl;
 }
 
 int main() {
