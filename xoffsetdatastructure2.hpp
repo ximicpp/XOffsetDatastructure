@@ -1,5 +1,21 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
+
+// ============================================================================
+// Configuration Macros
+// ============================================================================
+
+// Container growth factor configuration
+// 0: Use default Boost container growth factor (typically 2x)
+// 1: Use custom growth factor (defined below as growth_factor_custom)
+#ifndef OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR
+#define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
+#endif
+
+// ============================================================================
+// Boost Headers
+// ============================================================================
+
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
