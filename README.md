@@ -1,20 +1,6 @@
 ### Introduction
 XOffsetDatastructure is a serialization library designed to reduce or even eliminate the performance consumption of serialization and deserialization by utilizing zero-encoding and zero-decoding. It is also a collection of high-performance data structures designed for efficient read and in-place/non-in-place write, with performance comparable to STL.
 
-### Quick Start
-```cpp
-#include "xoffsetdatastructure2.hpp"  // Single header file
-
-using namespace XOffsetDatastructure2;
-
-// Create buffer and data
-XBuffer xbuf(4096);
-auto* data = xbuf.construct<YourType>("name")(xbuf.get_segment_manager());
-
-// Use offset-based containers: XVector, XMap, XSet, XString
-// Compile-time type signature verification included
-```
-
 ### CppCon 2024
 [CppCon 2024: Using Modern C++ to Build XOffsetDatastructure: A Zero-Encoding and Zero-Decoding High-Performance Serialization Library](https://github.com/CppCon/CppCon2024/blob/main/Presentations/Using_Modern_Cpp_to_Build_XOffsetDatastructure.pdf)
 

@@ -5,7 +5,7 @@
 
 #include <iostream>
 #include "../xoffsetdatastructure2.hpp"
-#include "player.hpp"
+#include "../generated/player.hpp"
 
 using namespace XOffsetDatastructure2;
 
