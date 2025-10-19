@@ -548,7 +548,7 @@ def main():
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(code)
     
-    print(f"✓ Successfully generated {output_path}")
+    print(f"[OK] Successfully generated {output_path}")
     print(f"  Runtime types: {', '.join(s.name for s in structs)}")
     print(f"  Reflection types: {', '.join(s.name + 'ReflectionHint' for s in structs)}")
 
