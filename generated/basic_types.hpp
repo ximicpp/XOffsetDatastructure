@@ -10,8 +10,21 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypes {
+	// Default constructor
 	template <typename Allocator>
 	BasicTypes(Allocator allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	BasicTypes(Allocator allocator, int mInt_val, float mFloat_val, double mDouble_val, char mChar_val, bool mBool_val, long long mLongLong_val)
+		: mInt(mInt_val)
+		, mFloat(mFloat_val)
+		, mDouble(mDouble_val)
+		, mChar(mChar_val)
+		, mBool(mBool_val)
+		, mLongLong(mLongLong_val)
+	{}
+
 	int mInt{0};
 	float mFloat{0.0f};
 	double mDouble{0.0};

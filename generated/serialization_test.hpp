@@ -10,16 +10,28 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) SimpleData {
+	// Default constructor
 	template <typename Allocator>
 	SimpleData(Allocator allocator) : name(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	SimpleData(Allocator allocator, int id_val, float value_val, const char* name_val)
+		: id(id_val)
+		, value(value_val)
+		, name(name_val, allocator)
+	{}
+
 	int id{0};
 	float value{0.0f};
 	XString name;
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) ComplexData {
+	// Default constructor
 	template <typename Allocator>
 	ComplexData(Allocator allocator) : title(allocator), items(allocator), tags(allocator), metadata(allocator) {}
+
 	XString title;
 	XVector<int> items;
 	XSet<int> tags;

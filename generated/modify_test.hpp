@@ -10,8 +10,22 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) ModifyTestData {
+	// Default constructor
 	template <typename Allocator>
 	ModifyTestData(Allocator allocator) : numbers(allocator), names(allocator), scores(allocator), tags(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	ModifyTestData(Allocator allocator, int counter_val, float ratio_val, bool active_val)
+		: counter(counter_val)
+		, ratio(ratio_val)
+		, active(active_val)
+		, numbers(allocator)
+		, names(allocator)
+		, scores(allocator)
+		, tags(allocator)
+	{}
+
 	int counter{0};
 	float ratio{0.0f};
 	bool active{false};

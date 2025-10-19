@@ -10,8 +10,19 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) Item {
+	// Default constructor
 	template <typename Allocator>
 	Item(Allocator allocator) : name(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	Item(Allocator allocator, int item_id_val, int item_type_val, int quantity_val, const char* name_val)
+		: item_id(item_id_val)
+		, item_type(item_type_val)
+		, quantity(quantity_val)
+		, name(name_val, allocator)
+	{}
+
 	int item_id{0};
 	int item_type{0};
 	int quantity{0};
@@ -19,8 +30,22 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) Item {
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameData {
+	// Default constructor
 	template <typename Allocator>
 	GameData(Allocator allocator) : player_name(allocator), items(allocator), achievements(allocator), quest_progress(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	GameData(Allocator allocator, int player_id_val, int level_val, float health_val, const char* player_name_val)
+		: player_id(player_id_val)
+		, level(level_val)
+		, health(health_val)
+		, player_name(player_name_val, allocator)
+		, items(allocator)
+		, achievements(allocator)
+		, quest_progress(allocator)
+	{}
+
 	int player_id{0};
 	int level{0};
 	float health{0.0f};

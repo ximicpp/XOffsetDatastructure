@@ -10,8 +10,10 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) MapSetTest {
+	// Default constructor
 	template <typename Allocator>
 	MapSetTest(Allocator allocator) : intSet(allocator), stringSet(allocator), intMap(allocator), stringMap(allocator) {}
+
 	XSet<int> intSet;
 	XSet<XString> stringSet;
 	XMap<int, XString> intMap;

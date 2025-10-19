@@ -70,13 +70,14 @@ void demo_basic_usage() {
     // Add items
     print_subsection("Adding Items to Inventory");
     for (int i = 0; i < 5; i++) {
-        Item item(xbuf.allocator<Item>());
-        item.item_id = i + 1;
-        item.item_type = (i % 3);  // 0=Potion, 1=Weapon, 2=Armor
         std::string item_name = "Potion " + std::to_string(i+1);
-        item.name = XString(item_name.c_str(), xbuf.allocator<XString>());
-        item.quantity = (i + 1) * 10;
-        game->items.push_back(item);
+        game->items.emplace_back(
+            xbuf.allocator<Item>(),
+            i + 1,              // item_id
+            i % 3,              // item_type (0=Potion, 1=Weapon, 2=Armor)
+            item_name.c_str(),  // name
+            (i + 1) * 10        // quantity
+        );
     }
     print_check("Added " + std::to_string(game->items.size()) + " items");
     
@@ -246,16 +247,17 @@ void demo_performance() {
     
     auto start = std::chrono::high_resolution_clock::now();
     
-    // Insert 1000 items
+    // Insert 1000 items using emplace_back for better performance
     auto* game = xbuf.make<GameData>("perf_test");
     for (int i = 0; i < 1000; i++) {
-        Item item(xbuf.allocator<Item>());
-        item.item_id = i;
-        item.item_type = i % 3;
         std::string item_name = "Item_" + std::to_string(i);
-        item.name = XString(item_name.c_str(), xbuf.allocator<XString>());
-        item.quantity = i;
-        game->items.push_back(item);
+        game->items.emplace_back(
+            xbuf.allocator<Item>(),
+            i,                  // item_id
+            i % 3,              // item_type
+            item_name.c_str(),  // name
+            i                   // quantity
+        );
     }
     
     auto end = std::chrono::high_resolution_clock::now();
