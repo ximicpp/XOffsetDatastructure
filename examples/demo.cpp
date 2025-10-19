@@ -75,8 +75,8 @@ void demo_basic_usage() {
             xbuf.allocator<Item>(),
             i + 1,              // item_id
             i % 3,              // item_type (0=Potion, 1=Weapon, 2=Armor)
-            item_name.c_str(),  // name
-            (i + 1) * 10        // quantity
+            (i + 1) * 10,       // quantity
+            item_name.c_str()   // name
         );
     }
     print_check("Added " + std::to_string(game->items.size()) + " items");
@@ -255,8 +255,8 @@ void demo_performance() {
             xbuf.allocator<Item>(),
             i,                  // item_id
             i % 3,              // item_type
-            item_name.c_str(),  // name
-            i                   // quantity
+            i,                  // quantity
+            item_name.c_str()   // name
         );
     }
     
