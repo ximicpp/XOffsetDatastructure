@@ -10,8 +10,18 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) MemoryTestType {
+	// Default constructor
 	template <typename Allocator>
 	MemoryTestType(Allocator allocator) : data(allocator), strings(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	MemoryTestType(Allocator allocator, int value_val)
+		: value(value_val)
+		, data(allocator)
+		, strings(allocator)
+	{}
+
 	int value{0};
 	XVector<int> data;
 	XVector<XString> strings;

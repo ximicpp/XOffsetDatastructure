@@ -10,24 +10,38 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) InnerObject {
+	// Default constructor
 	template <typename Allocator>
 	InnerObject(Allocator allocator) : name(allocator), data(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	InnerObject(Allocator allocator, int id_val, const char* name_val)
+		: id(id_val)
+		, name(name_val, allocator)
+		, data(allocator)
+	{}
+
 	int id{0};
 	XString name;
 	XVector<int> data;
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) MiddleObject {
+	// Default constructor
 	template <typename Allocator>
 	MiddleObject(Allocator allocator) : name(allocator), inner(allocator), values(allocator) {}
+
 	XString name;
 	InnerObject inner;
 	XVector<int> values;
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) OuterObject {
+	// Default constructor
 	template <typename Allocator>
 	OuterObject(Allocator allocator) : title(allocator), middle(allocator), innerList(allocator) {}
+
 	XString title;
 	MiddleObject middle;
 	XVector<InnerObject> innerList;

@@ -281,9 +281,12 @@ class CodeGenerator:
         # Generate struct header with alignment
         lines.append(f"struct alignas(XTypeSignature::BASIC_ALIGNMENT) {struct.name} {{")
         
-        # Generate allocator constructor
+        # ====================================================================
+        # Constructor 1: Default constructor (allocator only)
+        # ====================================================================
         allocator_fields = [f.name for f in struct.fields if TypeAnalyzer.needs_allocator(f.type, self.struct_names)]
         
+        lines.append("\t// Default constructor")
         if allocator_fields:
             lines.append("\ttemplate <typename Allocator>")
             ctor_init = ", ".join([f"{name}(allocator)" for name in allocator_fields])
@@ -292,6 +295,58 @@ class CodeGenerator:
             lines.append("\ttemplate <typename Allocator>")
             lines.append(f"\t{struct.name}(Allocator allocator) {{}}")
         
+        lines.append("")
+        
+        # ====================================================================
+        # Constructor 2: Full constructor for emplace_back (if there are fields)
+        # ====================================================================
+        # Check if we have any non-container fields
+        non_container_fields = [
+            f for f in struct.fields 
+            if not TypeAnalyzer.is_xoffset_container(f.type) and f.type not in self.struct_names
+        ]
+        
+        if non_container_fields:
+            lines.append("\t// Full constructor for emplace_back")
+            lines.append("\ttemplate <typename Allocator>")
+            
+            # Build parameter list
+            params = ["Allocator allocator"]
+            for field in struct.fields:
+                if field.type == 'XString':
+                    params.append(f"const char* {field.name}_val")
+                elif TypeAnalyzer.is_xoffset_container(field.type):
+                    # Skip containers in full constructor (too complex)
+                    continue
+                elif field.type in self.struct_names:
+                    # Skip nested structs (too complex)
+                    continue
+                else:
+                    params.append(f"{field.type} {field.name}_val")
+            
+            # Constructor signature
+            lines.append(f"\t{struct.name}({', '.join(params)})")
+            
+            # Build initializer list
+            init_list = []
+            for field in struct.fields:
+                if field.type == 'XString':
+                    init_list.append(f"{field.name}({field.name}_val, allocator)")
+                elif TypeAnalyzer.is_xoffset_container(field.type):
+                    # Initialize container with allocator
+                    init_list.append(f"{field.name}(allocator)")
+                elif field.type in self.struct_names:
+                    # Initialize nested struct with allocator
+                    init_list.append(f"{field.name}(allocator)")
+                else:
+                    init_list.append(f"{field.name}({field.name}_val)")
+            
+            if init_list:
+                lines.append(f"\t\t: {init_list[0]}")
+                for init in init_list[1:]:
+                    lines.append(f"\t\t, {init}")
+            lines.append("\t{}")
+            lines.append("")
         
         # Generate fields
         for field in struct.fields:

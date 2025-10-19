@@ -10,8 +10,19 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) AlignedStruct {
+	// Default constructor
 	template <typename Allocator>
 	AlignedStruct(Allocator allocator) : name(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	AlignedStruct(Allocator allocator, char a_val, int b_val, double c_val, const char* name_val)
+		: a(a_val)
+		, b(b_val)
+		, c(c_val)
+		, name(name_val, allocator)
+	{}
+
 	char a{'\0'};
 	int b{0};
 	double c{0.0};

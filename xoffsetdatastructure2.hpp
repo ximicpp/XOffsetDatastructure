@@ -258,16 +258,10 @@ namespace XTypeSignature {
     template <> struct TypeSignature<double>   { static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
     template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
-    // On most Unix-like systems (but not Windows), long long may be a distinct type from int64_t
-    // On Windows/MSVC, long long is the same as int64_t, so we don't define it to avoid duplicate specialization
-    #if defined(__APPLE__) && defined(__LP64__)
-    // On macOS 64-bit, long is int64_t, so long long might be different
-    template <> struct TypeSignature<long long> { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
-    #elif defined(__linux__) && !defined(_MSC_VER)
-    // On Linux with GCC/Clang, long long might be different from int64_t
-    template <> struct TypeSignature<long long> { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
-    #endif
-    // Note: On Windows (MSVC), long long is the same type as int64_t, so no separate specialization is needed
+    
+    // Note: long long is typically the same as int64_t on modern systems
+    // If you encounter compilation errors about duplicate specialization, 
+    // it means your system has long long == int64_t (which is common)
 
     // Pointer types
     template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };

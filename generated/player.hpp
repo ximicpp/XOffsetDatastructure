@@ -10,8 +10,19 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) Player {
+	// Default constructor
 	template <typename Allocator>
 	Player(Allocator allocator) : name(allocator), items(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	Player(Allocator allocator, int id_val, int level_val, const char* name_val)
+		: id(id_val)
+		, level(level_val)
+		, name(name_val, allocator)
+		, items(allocator)
+	{}
+
 	int id{0};
 	int level{0};
 	XString name;

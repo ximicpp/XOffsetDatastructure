@@ -10,8 +10,10 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) VectorTest {
+	// Default constructor
 	template <typename Allocator>
 	VectorTest(Allocator allocator) : intVector(allocator), floatVector(allocator), stringVector(allocator) {}
+
 	XVector<int> intVector;
 	XVector<float> floatVector;
 	XVector<XString> stringVector;

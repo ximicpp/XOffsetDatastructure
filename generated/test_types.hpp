@@ -10,15 +10,41 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInner {
+	// Default constructor
 	template <typename Allocator>
 	TestTypeInner(Allocator allocator) : mVector(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	TestTypeInner(Allocator allocator, int mInt_val)
+		: mInt(mInt_val)
+		, mVector(allocator)
+	{}
+
 	int mInt{0};
 	XVector<int> mVector;
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestType {
+	// Default constructor
 	template <typename Allocator>
 	TestType(Allocator allocator) : mVector(allocator), mStringVector(allocator), TestTypeInnerObj(allocator), mXXTypeVector(allocator), mComplexMap(allocator), mStringSet(allocator), mSet(allocator), mString(allocator) {}
+
+	// Full constructor for emplace_back
+	template <typename Allocator>
+	TestType(Allocator allocator, int mInt_val, float mFloat_val, const char* mString_val)
+		: mInt(mInt_val)
+		, mFloat(mFloat_val)
+		, mVector(allocator)
+		, mStringVector(allocator)
+		, TestTypeInnerObj(allocator)
+		, mXXTypeVector(allocator)
+		, mComplexMap(allocator)
+		, mStringSet(allocator)
+		, mSet(allocator)
+		, mString(mString_val, allocator)
+	{}
+
 	int mInt{0};
 	float mFloat{0.0f};
 	XVector<int> mVector;
