@@ -15,7 +15,7 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypes {
 	int mInt{0};
 	float mFloat{0.0f};
 	double mDouble{0.0};
-	char mChar;
+	char mChar{'\0'};
 	bool mBool{false};
 	long long mLongLong{0};
 };
