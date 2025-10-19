@@ -3,7 +3,6 @@
 
 // =============================================================================
 // XOffsetDatastructure2 - Single Header Library
-// Offset-based data structures with compile-time type signature verification
 // =============================================================================
 
 // Platform Detection & Configuration
@@ -49,7 +48,6 @@
 // ========================================================================
 // Standard Library Headers
 // ========================================================================
-
 #include <string_view>
 #include <type_traits>
 #include <vector>
@@ -62,7 +60,6 @@
 // ========================================================================
 // Boost Headers
 // ========================================================================
-
 #include <boost/pfr.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
@@ -85,7 +82,6 @@
 // ========================================================================
 // XTypeSignature - Compile-Time Type Signature System
 // ========================================================================
-
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
@@ -126,7 +122,6 @@ namespace XTypeSignature {
     struct CompileString {
         char value[N];
         static constexpr size_t size = N - 1;
-
         constexpr CompileString(const char (&str)[N]) {
             for (size_t i = 0; i < N; ++i) {
                 value[i] = str[i];
@@ -137,39 +132,31 @@ namespace XTypeSignature {
         static constexpr CompileString<32> from_number(T num) noexcept {
             char result[32] = {};
             int idx = 0;
-
             if (num == 0) {
                 result[0] = '0';
                 idx = 1;
-            }
-            else {
+            } else {
                 bool negative = std::is_signed_v<T> && num < 0;
                 using UnsignedT = std::make_unsigned_t<T>;
                 UnsignedT abs_num;
-
                 if (negative) {
                     abs_num = UnsignedT(-(std::make_signed_t<T>(num)));
-                }
-                else {
+                } else {
                     abs_num = UnsignedT(num);
                 }
-
                 while (abs_num > 0) {
                     result[idx++] = '0' + char(abs_num % 10);
                     abs_num /= 10;
                 }
-
                 if (negative) {
                     result[idx++] = '-';
                 }
-
                 for (int i = 0; i < idx / 2; ++i) {
                     char temp = result[i];
                     result[i] = result[idx - 1 - i];
                     result[idx - 1 - i] = temp;
                 }
             }
-
             result[idx] = '\0';
             return CompileString<32>(result);
         }
@@ -178,18 +165,15 @@ namespace XTypeSignature {
         constexpr auto operator+(const CompileString<M>& other) const noexcept {
             constexpr size_t new_size = N + M - 1;
             char result[new_size] = {};
-
             size_t pos = 0;
             while (pos < N - 1 && value[pos] != '\0') {
                 result[pos] = value[pos];
                 ++pos;
             }
-
             size_t j = 0;
             while (j < M) {
                 result[pos++] = other.value[j++];
             }
-
             return CompileString<new_size>(result);
         }
 
@@ -235,11 +219,9 @@ namespace XTypeSignature {
         } else {
             using PrevType = std::tuple_element_t<Index - 1, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
             using CurrType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            
             constexpr size_t prev_offset = get_field_offset<T, Index - 1>();
             constexpr size_t prev_size = sizeof(PrevType);
             constexpr size_t curr_align = alignof(CurrType);
-            
             return (prev_offset + prev_size + (curr_align - 1)) & ~(curr_align - 1);
         }
     }
@@ -249,18 +231,15 @@ namespace XTypeSignature {
     constexpr auto get_fields_signature() noexcept {
         if constexpr (Index >= boost::pfr::tuple_size_v<T>) {
             return CompileString{""};
-        }
-        else {
+        } else {
             using FieldType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            
             if constexpr (Index == 0) {
                 return CompileString{"@"} +
                        CompileString<32>::from_number(get_field_offset<T, Index>()) +
                        CompileString{":"} +
                        TypeSignature<FieldType>::calculate() +
                        get_fields_signature<T, Index + 1>();
-            }
-            else {
+            } else {
                 return CompileString{",@"} +
                        CompileString<32>::from_number(get_field_offset<T, Index>()) +
                        CompileString{":"} +
@@ -353,162 +332,118 @@ using XTypeSignature::BASIC_ALIGNMENT;
 // ========================================================================
 // Boost Interprocess Extensions
 // ========================================================================
-
 namespace boost {
 namespace interprocess {
 
 template <class MutexFamily, class VoidPointer = offset_ptr<void>, std::size_t MemAlignment = 0>
-class x_best_fit : public rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment>
-{
+class x_best_fit : public rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment> {
     typedef rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment> supertype;
-
 public:
     typedef typename supertype::size_type size_type;
-
     x_best_fit(typename supertype::size_type size, typename supertype::size_type extra_hdr_bytes)
-        : supertype(size, extra_hdr_bytes)
-    {
-    }
+        : supertype(size, extra_hdr_bytes) {}
 };
 
 template <class MutexFamily, class VoidPointer = offset_ptr<void>>
-class x_seq_fit : public simple_seq_fit<MutexFamily, VoidPointer>
-{
+class x_seq_fit : public simple_seq_fit<MutexFamily, VoidPointer> {
     typedef simple_seq_fit<MutexFamily, VoidPointer> supertype;
-
 public:
     typedef typename supertype::size_type size_type;
-
     x_seq_fit(typename supertype::size_type segment_size, typename supertype::size_type extra_hdr_bytes)
-        : supertype(segment_size, extra_hdr_bytes)
-    {
-    }
+        : supertype(segment_size, extra_hdr_bytes) {}
 };
 
-template <
-    class CharType,
-    class AllocationAlgorithm,
-    template <class IndexConfig> class IndexType>
-class XManagedMemory
-    : public ipcdetail::basic_managed_memory_impl<CharType, AllocationAlgorithm, IndexType>
-{
+template <class CharType, class AllocationAlgorithm, template <class IndexConfig> class IndexType>
+class XManagedMemory : public ipcdetail::basic_managed_memory_impl<CharType, AllocationAlgorithm, IndexType> {
 private:
     typedef ipcdetail::basic_managed_memory_impl<CharType, AllocationAlgorithm, IndexType> base_t;
     BOOST_MOVABLE_BUT_NOT_COPYABLE(XManagedMemory)
-
 public:
     typedef typename base_t::size_type size_type;
-
-    XManagedMemory() noexcept
-    {
-    }
-
-    ~XManagedMemory()
-    {
+    XManagedMemory() noexcept {}
+    ~XManagedMemory() {
         this->priv_close();
     }
 
-    XManagedMemory(size_type size)
-        : m_buffer(size, char(0))
-    {
+    XManagedMemory(size_type size) : m_buffer(size, char(0)) {
         void *addr = m_buffer.data();
-        if (!base_t::create_impl(addr, size))
-        {
+        if (!base_t::create_impl(addr, size)) {
             this->priv_close();
             throw interprocess_exception("Could not initialize heap in XManagedMemory constructor");
         }
     }
 
-    XManagedMemory(const char* data, size_type size)
-        : m_buffer(data, data + size)
-    {
+    XManagedMemory(const char* data, size_type size) : m_buffer(data, data + size) {
         void *addr = m_buffer.data();
         BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
-        if (!base_t::open_impl(addr, size))
-        {
+        if (!base_t::open_impl(addr, size)) {
             throw interprocess_exception("Could not initialize m_buffer in constructor");
         }
     }
 
-    XManagedMemory(std::vector<char> &externalBuffer) 
-        : m_buffer(std::move(externalBuffer))
-    {
+    XManagedMemory(std::vector<char> &externalBuffer) : m_buffer(std::move(externalBuffer)) {
         void *addr = m_buffer.data();
         size_type size = m_buffer.size();
         BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
-        if (!base_t::open_impl(addr, size))
-        {
+        if (!base_t::open_impl(addr, size)) {
             throw interprocess_exception("Could not initialize m_buffer in constructor");
         }
     }
 
-    XManagedMemory(BOOST_RV_REF(XManagedMemory) moved) noexcept
-    {
+    XManagedMemory(BOOST_RV_REF(XManagedMemory) moved) noexcept {
         this->swap(moved);
     }
 
-    XManagedMemory &operator=(BOOST_RV_REF(XManagedMemory) moved) noexcept
-    {
+    XManagedMemory &operator=(BOOST_RV_REF(XManagedMemory) moved) noexcept {
         XManagedMemory tmp(boost::move(moved));
         this->swap(tmp);
         return *this;
     }
 
-    bool grow(size_type extra_bytes)
-    {
-        try
-        {
+    bool grow(size_type extra_bytes) {
+        try {
             m_buffer.resize(m_buffer.size() + extra_bytes);
             base_t::close_impl();
             base_t::open_impl(&m_buffer[0], m_buffer.size());
             base_t::grow(extra_bytes);
             return true;
-        }
-        catch(...)
-        {
+        } catch(...) {
             return false;
         }
     }
 
-    void swap(XManagedMemory &other) noexcept
-    {
+    void swap(XManagedMemory &other) noexcept {
         base_t::swap(other);
         m_buffer.swap(other.m_buffer);
     }
 
-    void update_after_shrink()
-    {
+    void update_after_shrink() {
         auto *pBuf = get_buffer();
         std::vector<char> new_buf(pBuf->data(), pBuf->data() + pBuf->size());
         XManagedMemory new_mem(new_buf);
         this->swap(new_mem);
     }
 
-    void shrink_to_fit()
-    {
+    void shrink_to_fit() {
         base_t::shrink_to_fit();
         m_buffer.resize(base_t::get_size());
         update_after_shrink();
     }
 
-    std::vector<char> *get_buffer()
-    {
+    std::vector<char> *get_buffer() {
         return &m_buffer;
     }
 
-    const void* get_address() const
-    {
+    const void* get_address() const {
         return m_buffer.data();
     }
 
-    size_type get_size() const
-    {
+    size_type get_size() const {
         return m_buffer.size();
     }
 
 private:
-    void priv_close()
-    {
+    void priv_close() {
         base_t::destroy_impl();
         std::vector<char>().swap(m_buffer);
     }
@@ -519,12 +454,8 @@ private:
 } // namespace interprocess
 } // namespace boost
 
-
-namespace XOffsetDatastructure2
-{
+namespace XOffsetDatastructure2 {
 	using namespace boost::interprocess;
-
-	// typedef XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index> XBuffer;
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
 	// Container growth factor: 1.1x (10% incremental growth)
@@ -571,18 +502,15 @@ namespace XOffsetDatastructure2
 	// ========================================================================
 	// XBuffer Memory Visualization
 	// ========================================================================
-
 	class XBufferVisualizer {
 	public:
 		struct MemoryStats {
 			std::size_t total_size;
 			std::size_t free_size;
 			std::size_t used_size;
-			
 			double usage_percent() const {
 				return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0;
 			}
-			
 			double free_percent() const {
 				return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0;
 			}
@@ -607,120 +535,95 @@ namespace XOffsetDatastructure2
 	// ========================================================================
 	// XBufferExt: Extended XBuffer with Unified make() API
 	// ========================================================================
-	
 	// Helper trait to detect XString type
 	template<typename T>
 	struct is_xstring : std::false_type {};
-	
 	template<>
 	struct is_xstring<XString> : std::true_type {};
-	
+
 	// Helper trait to detect allocator
 	template<typename T>
 	struct is_allocator : std::false_type {};
-	
 	template<typename T, typename M>
 	struct is_allocator<boost::interprocess::allocator<T, M>> : std::true_type {};
-	
+
 	class XBufferExt : public XBuffer {
 	public:
-		// Inherit constructors
 		using XBuffer::XBuffer;
-		
-		// ====================================================================
+
 		// Unified make<T>() API
-		// ====================================================================
-		
 		// 1. make<GameData>("Player1") - Named object
 		template<typename T>
 		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
 		make(const char* name) {
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
-		
 		// 2. make<GameData>() - Anonymous object
 		template<typename T>
 		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
 		make() {
 			return this->construct<T>(boost::interprocess::anonymous_instance)(this->get_segment_manager());
 		}
-		
 		// 3. make<int>("array", 10) - Array
 		template<typename T>
 		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
 		make(const char* name, std::size_t count) {
 			return this->construct<T>(name)[count](this->get_segment_manager());
 		}
-		
 		// 4. make<XString>("Hello") - String from const char*
 		template<typename T>
 		std::enable_if_t<is_xstring<T>::value, XString>
 		make(const char* str) {
 			return XString(str, this->get_segment_manager());
 		}
-		
 		// 5. make<XString>(std::string) - String from std::string
 		template<typename T>
 		std::enable_if_t<is_xstring<T>::value, XString>
 		make(const std::string& str) {
 			return XString(str.c_str(), this->get_segment_manager());
 		}
-		
 		// 6. make<XString>() - Empty string
 		template<typename T>
 		std::enable_if_t<is_xstring<T>::value, XString>
 		make() {
 			return XString(this->get_segment_manager());
 		}
-		
-		// 7. Allocator helper (non-template based, use dedicated method)
+		// 7. Allocator helper
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
-		
-		// ====================================================================
+
 		// Find and utility methods
-		// ====================================================================
-		
 		// Find object
 		template<typename T>
 		std::pair<T*, bool> find_ex(const char* name) {
 			auto result = this->find<T>(name);
 			return {result.first, result.second};
 		}
-		
 		// Find or make object
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
 		}
-		
-		// ====================================================================
+
 		// Serialization and Deserialization
-		// ====================================================================
-		
-		// Save to string (binary data in string)
+		// Save to string
 		std::string save_to_string() {
 			auto* buffer = this->get_buffer();
 			return std::string(buffer->begin(), buffer->end());
 		}
-		
-		// Load from string (static factory method)
+		// Load from string
 		static XBufferExt load_from_string(const std::string& data) {
 			std::vector<char> buffer(data.begin(), data.end());
 			XBufferExt xbuf(buffer);
 			return xbuf;
 		}
-		
-		// ====================================================================
+
 		// Memory statistics
-		// ====================================================================
-		
 		void print_stats() {
 			XBufferVisualizer::print_stats(*this);
 		}
-		
 		XBufferVisualizer::MemoryStats stats() {
 			return XBufferVisualizer::get_memory_stats(*this);
 		}
@@ -729,28 +632,16 @@ namespace XOffsetDatastructure2
 	// ========================================================================
 	// Memory Compaction
 	// ========================================================================
-
-	// SFINAE helper to detect if a type has a static migrate method
+	// SFINAE helper to detect migrate method
 	template<typename T, typename = void>
 	struct has_migrate : std::false_type {};
-
 	template<typename T>
 	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBuffer&>(), std::declval<XBuffer&>()))>> : std::true_type {};
 
-	// ============================================================================
 	// XBufferCompactor: Memory Compaction Interface
-	// ============================================================================
-	// NOTE: Memory compaction features are not available in the current version.
-	//       This functionality requires either:
-	//       1. Manual implementation with user-defined migrate() methods
-	//       2. C++26 reflection support (not yet available in standard compilers)
-	//
-	//       This class is reserved for future implementation.
-	// ============================================================================
+	// NOTE: Not available in current version. Requires C++26 reflection or manual migrate() methods.
 	class XBufferCompactor {
 	public:
-		// Placeholder: Memory compaction interface
-		// To be implemented when C++26 reflection becomes available
 		template<typename T>
 		static XBuffer compact(XBuffer& old_xbuf) {
 			static_assert(sizeof(T) == 0, 
@@ -764,9 +655,7 @@ namespace XOffsetDatastructure2
 // ============================================================================
 // Type Signature Support for XOffsetDatastructure2 Containers
 // ============================================================================
-
 namespace XTypeSignature {
-    
     // XString signature
     template <>
     struct TypeSignature<XOffsetDatastructure2::XString> {
@@ -774,7 +663,6 @@ namespace XTypeSignature {
             return CompileString{"string[s:32,a:8]"};
         }
     };
-    
     // XVector<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
@@ -784,7 +672,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    
     // XSet<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
@@ -794,7 +681,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    
     // XMap<K,V> signature
     template <typename K, typename V>
     struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
@@ -806,6 +692,5 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-
 } // namespace XTypeSignature
 #endif
