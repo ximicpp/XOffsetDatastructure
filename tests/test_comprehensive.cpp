@@ -93,9 +93,9 @@ void fillLargeNestedData(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     for (auto i = 0; i < 7; ++i) {
         std::string key = "stringinset" + std::to_string(i);
         XString xkey = xbuf.make<XString>(key);
-        // Use try_emplace to construct in-place
-        auto [it, inserted] = obj->mComplexMap.try_emplace(xkey, xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
-        auto& vec = it->second.mVector;
+        ComprehensiveTestType::TestTypeInner xvalue(xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
+        obj->mComplexMap.emplace(xkey, xvalue);
+        auto& vec = obj->mComplexMap.find(xkey)->second.mVector;
         for (int j = 0; j < 100; ++j) {
             vec.insert(vec.end(), {7, 8, 9, 10, 11, 12});
         }
