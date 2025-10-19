@@ -25,7 +25,7 @@ bool test_memory_stats() {
     
     // Test 1: Initial buffer stats
     std::cout << "Test 1: Initial buffer stats... ";
-    XBuffer xbuf(4096);
+    XBufferExt xbuf(4096);
     auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats1.total_size == 4096);
     assert(stats1.free_size > 0);
@@ -38,7 +38,7 @@ bool test_memory_stats() {
     
     // Test 2: After object creation
     std::cout << "Test 2: After object creation... ";
-    auto* obj = xbuf.construct<MemoryTestType>("MemTest")(xbuf.get_segment_manager());
+    auto* obj = xbuf.make<MemoryTestType>("MemTest");
     obj->value = 42;
     auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats2.used_size > stats1.used_size);
@@ -62,7 +62,7 @@ bool test_memory_stats() {
     std::cout << "Test 4: After adding strings... ";
     for (int i = 0; i < 20; ++i) {
         std::string str = "TestString_" + std::to_string(i);
-        obj->strings.emplace_back(str.c_str(), xbuf.get_segment_manager());
+        obj->strings.emplace_back(xbuf.make<XString>(str));
     }
     auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats4.used_size > stats3.used_size);

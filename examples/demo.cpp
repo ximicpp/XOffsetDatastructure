@@ -47,16 +47,16 @@ void demo_basic_usage() {
     print_section("1. Basic Usage - Creating and Accessing Data");
     
     // Create buffer
-    print_subsection("Creating XBuffer with 4KB");
-    XBuffer xbuf(4096);
+    print_subsection("Creating XBufferExt with 4KB");
+    XBufferExt xbuf(4096);
     print_check("Buffer created");
     
     // Create game data
     print_subsection("Creating Game Data");
-    auto* game = xbuf.construct<GameData>("player_save")(xbuf.get_segment_manager());
+    auto* game = xbuf.make<GameData>("player_save");
     
     // Set player data
-    game->player_name = XString("Hero", xbuf.get_segment_manager());
+    game->player_name = xbuf.make<XString>("Hero");
     game->player_id = 12345;
     game->level = 42;
     game->health = 100.0f;
@@ -69,11 +69,11 @@ void demo_basic_usage() {
     // Add items
     print_subsection("Adding Items to Inventory");
     for (int i = 0; i < 5; i++) {
-        Item item(xbuf.get_segment_manager());
+        Item item(xbuf.allocator<Item>());
         item.item_id = i + 1;
         item.item_type = (i % 3);  // 0=Potion, 1=Weapon, 2=Armor
         std::string item_name = "Potion " + std::to_string(i+1);
-        item.name = XString(item_name.c_str(), xbuf.get_segment_manager());
+        item.name = xbuf.make<XString>(item_name);
         item.quantity = (i + 1) * 10;
         game->items.push_back(item);
     }
@@ -89,9 +89,9 @@ void demo_basic_usage() {
     
     // Add quest progress
     print_subsection("Quest Progress");
-    game->quest_progress[XString("Main Quest", xbuf.get_segment_manager())] = 75;
-    game->quest_progress[XString("Side Quest A", xbuf.get_segment_manager())] = 100;
-    game->quest_progress[XString("Side Quest B", xbuf.get_segment_manager())] = 50;
+    game->quest_progress[xbuf.make<XString>("Main Quest")] = 75;
+    game->quest_progress[xbuf.make<XString>("Side Quest A")] = 100;
+    game->quest_progress[xbuf.make<XString>("Side Quest B")] = 50;
     print_check("Tracking " + std::to_string(game->quest_progress.size()) + " quests");
     
     // Display inventory
@@ -114,33 +114,33 @@ void demo_memory_management() {
     print_section("2. Memory Management - Buffer Operations");
     
     print_subsection("Initial Buffer");
-    XBuffer xbuf(1024);
-    auto stats = XBufferVisualizer::get_memory_stats(xbuf);
+    XBufferExt xbuf(1024);
+    auto stats = xbuf.stats();
     print_info("Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Free Size", std::to_string(stats.free_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     
     print_subsection("Adding Data");
-    auto* game = xbuf.construct<GameData>("game")(xbuf.get_segment_manager());
-    game->player_name = XString("TestPlayer", xbuf.get_segment_manager());
+    auto* game = xbuf.make<GameData>("game");
+    game->player_name = xbuf.make<XString>("TestPlayer");
     for (int i = 0; i < 100; i++) {
         game->achievements.insert(i);  // Add achievement IDs
     }
     
-    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    stats = xbuf.stats();
     print_info("After Adding Data", std::to_string(stats.used_size) + " bytes used");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     
     print_subsection("Growing Buffer");
     xbuf.grow(4096);
-    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    stats = xbuf.stats();
     print_info("New Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     print_check("Buffer grown successfully");
     
     print_subsection("Shrinking to Fit");
     xbuf.shrink_to_fit();
-    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    stats = xbuf.stats();
     print_info("After Shrink", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     print_check("Memory optimized");
@@ -154,9 +154,9 @@ void demo_serialization() {
     print_section("3. Serialization - Save and Load");
     
     print_subsection("Creating Source Data");
-    XBuffer src_buf(2048);
-    auto* src_game = src_buf.construct<GameData>("save")(src_buf.get_segment_manager());
-    src_game->player_name = XString("SavedHero", src_buf.get_segment_manager());
+    XBufferExt src_buf(2048);
+    auto* src_game = src_buf.make<GameData>("save");
+    src_game->player_name = src_buf.make<XString>("SavedHero");
     src_game->player_id = 99999;
     src_game->level = 99;
     src_game->health = 100.0f;
@@ -167,12 +167,11 @@ void demo_serialization() {
     print_info("Level", std::to_string(src_game->level));
     
     print_subsection("Serializing to Binary");
-    auto* buffer = src_buf.get_buffer();
-    std::vector<char> binary_data(buffer->begin(), buffer->end());
+    std::string binary_data = src_buf.save_to_string();
     print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
     
     print_subsection("Deserializing from Binary");
-    XBuffer dst_buf(binary_data);
+    XBufferExt dst_buf = XBufferExt::load_from_string(binary_data);
     auto* dst_game = dst_buf.find<GameData>("save").first;
     
     if (dst_game) {
@@ -242,18 +241,18 @@ void demo_performance() {
     print_info("Compatibility", "x86-64, ARM64");
     
     print_subsection("Benchmarking Example");
-    XBuffer xbuf(65536);  // 64KB buffer for 1000 items
+    XBufferExt xbuf(65536);  // 64KB buffer for 1000 items
     
     auto start = std::chrono::high_resolution_clock::now();
     
     // Insert 1000 items
-    auto* game = xbuf.construct<GameData>("perf_test")(xbuf.get_segment_manager());
+    auto* game = xbuf.make<GameData>("perf_test");
     for (int i = 0; i < 1000; i++) {
-        Item item(xbuf.get_segment_manager());
+        Item item(xbuf.allocator<Item>());
         item.item_id = i;
         item.item_type = i % 3;
         std::string item_name = "Item_" + std::to_string(i);
-        item.name = XString(item_name.c_str(), xbuf.get_segment_manager());
+        item.name = xbuf.make<XString>(item_name);
         item.quantity = i;
         game->items.push_back(item);
     }

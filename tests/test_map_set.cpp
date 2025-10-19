@@ -27,8 +27,8 @@ bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<MapSetTest>("MapSetTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<MapSetTest>("MapSetTest");
     
     // Test 1: Set insertion
     std::cout << "Test 1: Set insertion... ";
@@ -52,7 +52,7 @@ bool test_map_set_operations() {
     std::cout << "Test 3: String set operations... ";
     for (int i = 0; i < 10; ++i) {
         std::string str = "Item_" + std::to_string(i);
-        obj->stringSet.emplace(str.c_str(), xbuf.get_segment_manager());
+        obj->stringSet.emplace(xbuf.make<XString>(str));
     }
     assert(obj->stringSet.size() == 10);
     std::cout << "[OK]\n";
@@ -61,7 +61,7 @@ bool test_map_set_operations() {
     std::cout << "Test 4: Map insertion... ";
     for (int i = 0; i < 20; ++i) {
         std::string value = "Value_" + std::to_string(i);
-        XString xvalue(value.c_str(), xbuf.get_segment_manager());
+        XString xvalue = xbuf.make<XString>(value);
         obj->intMap.emplace(i, xvalue);
     }
     assert(obj->intMap.size() == 20);
@@ -78,12 +78,12 @@ bool test_map_set_operations() {
     std::cout << "Test 6: String key map... ";
     for (int i = 0; i < 15; ++i) {
         std::string key = "Key_" + std::to_string(i);
-        XString xkey(key.c_str(), xbuf.get_segment_manager());
+        XString xkey = xbuf.make<XString>(key);
         obj->stringMap.emplace(xkey, i * 10);
     }
     assert(obj->stringMap.size() == 15);
     
-    XString search_key("Key_5", xbuf.get_segment_manager());
+    XString search_key = xbuf.make<XString>("Key_5");
     auto it2 = obj->stringMap.find(search_key);
     assert(it2 != obj->stringMap.end());
     assert(it2->second == 50);
@@ -101,7 +101,7 @@ bool test_map_set_operations() {
     // Test 8: Persistence
     std::cout << "Test 8: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
-    XBuffer loaded_buf(buffer->data(), buffer->size());
+    XBufferExt loaded_buf(buffer->data(), buffer->size());
     auto* loaded_obj = loaded_buf.find<MapSetTest>("MapSetTest").first;
     assert(loaded_obj->intSet.size() == 50);
     assert(loaded_obj->intMap.size() == 20);

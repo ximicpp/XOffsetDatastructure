@@ -46,10 +46,10 @@ struct alignas(BASIC_ALIGNMENT) ComprehensiveTestType {
 // ============================================================================
 // Stage 1: Fill Basic Fields
 // ============================================================================
-void fillBasicFields(ComprehensiveTestType* obj, XBuffer& xbuf) {
+void fillBasicFields(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     obj->mInt = 123;
     obj->mFloat = 3.14f;
-    obj->mString = XString("abcdefghijklmnopqrstuvwxyz", xbuf.get_segment_manager());
+    obj->mString = xbuf.make<XString>("abcdefghijklmnopqrstuvwxyz");
     
     obj->mVector.push_back(1);
     obj->mVector.push_back(3);
@@ -64,7 +64,7 @@ void fillBasicFields(ComprehensiveTestType* obj, XBuffer& xbuf) {
 // ============================================================================
 // Stage 2: Fill Small Containers
 // ============================================================================
-void fillSmallContainers(ComprehensiveTestType* obj, XBuffer& xbuf) {
+void fillSmallContainers(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     for (auto i = 0; i < 1; ++i) {
         obj->mVector.push_back(i);
         obj->TestTypeInnerObj.mVector.push_back(64 + i);
@@ -76,11 +76,11 @@ void fillSmallContainers(ComprehensiveTestType* obj, XBuffer& xbuf) {
     }
 
     for (auto i = 0; i < 10; ++i) {
-        obj->mStringVector.emplace_back("abcdefghijklmnopqrstuvwxyz", xbuf.get_segment_manager());
+        obj->mStringVector.emplace_back(xbuf.make<XString>("abcdefghijklmnopqrstuvwxyz"));
     }
 
     for (auto i = 0; i < 13; ++i) {
-        obj->mStringSet.emplace("stringinset", xbuf.get_segment_manager());
+        obj->mStringSet.emplace(xbuf.make<XString>("stringinset"));
         obj->mSet.insert(i);
     }
 }
@@ -88,12 +88,12 @@ void fillSmallContainers(ComprehensiveTestType* obj, XBuffer& xbuf) {
 // ============================================================================
 // Stage 3: Fill Large Nested Data
 // ============================================================================
-void fillLargeNestedData(ComprehensiveTestType* obj, XBuffer& xbuf) {
+void fillLargeNestedData(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     // Complex map with nested vectors
     for (auto i = 0; i < 7; ++i) {
         std::string key = "stringinset" + std::to_string(i);
-        XString xkey(key.c_str(), xbuf.get_segment_manager());
-        ComprehensiveTestType::TestTypeInner xvalue(xbuf.get_segment_manager());
+        XString xkey = xbuf.make<XString>(key);
+        ComprehensiveTestType::TestTypeInner xvalue(xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
         obj->mComplexMap.emplace(xkey, xvalue);
         auto& vec = obj->mComplexMap.find(xkey)->second.mVector;
         for (int j = 0; j < 100; ++j) {
@@ -103,7 +103,7 @@ void fillLargeNestedData(ComprehensiveTestType* obj, XBuffer& xbuf) {
 
     // Vector of objects
     for (auto i = 0; i < 6; ++i) {
-        obj->mXXTypeVector.emplace_back(xbuf.get_segment_manager());
+        obj->mXXTypeVector.emplace_back(xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
         obj->mXXTypeVector.back().mInt = i;
         auto& vec = obj->mXXTypeVector.back().mVector;
         vec = {1, 2, 3, 4, 5, 6};
@@ -203,8 +203,8 @@ bool test_comprehensive_creation() {
     
     // Test 1: Create buffer and object
     std::cout << "Test 1: Create initial buffer... ";
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     assert(obj != nullptr);
     std::cout << "[OK]\n";
     
@@ -222,7 +222,7 @@ bool test_comprehensive_creation() {
     // Test 4: Grow buffer
     std::cout << "Test 4: Grow buffer for large data... ";
     xbuf.grow(1024 * 32);
-    obj = xbuf.find_or_construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
     assert(obj != nullptr);
     std::cout << "[OK]\n";
     
@@ -253,12 +253,12 @@ bool test_comprehensive_serialization() {
     
     // Test 1: Create and fill data
     std::cout << "Test 1: Create comprehensive data... ";
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     xbuf.grow(1024 * 32);
-    obj = xbuf.find_or_construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
     fillLargeNestedData(obj, xbuf);
     std::cout << "[OK]\n";
     
@@ -270,7 +270,7 @@ bool test_comprehensive_serialization() {
     
     // Test 3: Deserialize from memory
     std::cout << "Test 3: Deserialize from memory... ";
-    XBuffer new_xbuf(buffer);
+    XBufferExt new_xbuf(buffer);
     auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj != nullptr);
@@ -301,8 +301,8 @@ bool test_comprehensive_modification() {
     
     // Test 1: Create initial data
     std::cout << "Test 1: Create initial data... ";
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     std::cout << "[OK]\n";
@@ -332,7 +332,7 @@ bool test_comprehensive_modification() {
     // Test 5: Serialize and verify modifications
     std::cout << "Test 5: Serialize and verify... ";
     std::vector<char> buffer(*xbuf.get_buffer());
-    XBuffer new_xbuf(buffer);
+    XBufferExt new_xbuf(buffer);
     auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj->mInt == 999);
@@ -350,13 +350,13 @@ bool test_comprehensive_memory_operations() {
     
     // Test 1: Initial buffer
     std::cout << "Test 1: Create initial buffer... ";
-    XBuffer xbuf(4096);
+    XBufferExt xbuf(4096);
     auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
     std::cout << "[OK]\n  Initial: " << stats1.total_size << " bytes\n";
     
     // Test 2: Add data
     std::cout << "Test 2: Add comprehensive data... ";
-    auto* obj = xbuf.construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
@@ -375,7 +375,7 @@ bool test_comprehensive_memory_operations() {
     
     // Test 4: Add more data
     std::cout << "Test 4: Add large nested data... ";
-    obj = xbuf.find_or_construct<ComprehensiveTestType>("CompTest")(xbuf.get_segment_manager());
+    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
     fillLargeNestedData(obj, xbuf);
     auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
     std::cout << "[OK]\n  Final used: " << stats4.used_size << " bytes (" 
