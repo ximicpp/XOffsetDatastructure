@@ -41,24 +41,28 @@ bool test_simple_serialization() {
     auto* data = xbuf.make<SimpleData>("TestData");
     data->id = 42;
     data->value = 3.14f;
-    data->name = xbuf.make<XString>("Hello");
+    std::cout << "[OK]\n";
+    
+    // Set string field
+    std::cout << "Test 2: Set string field... ";
+    data->name = XString("Hello", xbuf.allocator<XString>());
     std::cout << "[OK]\n";
     
     // Serialize
-    std::cout << "Test 2: Serialize to string... ";
+    std::cout << "Test 3: Serialize to string... ";
     std::string serialized = xbuf.save_to_string();
     assert(serialized.size() > 0);
     std::cout << "[OK] (Size: " << serialized.size() << " bytes)\n";
     
     // Deserialize
-    std::cout << "Test 3: Deserialize from string... ";
+    std::cout << "Test 4: Deserialize from string... ";
     XBufferExt loaded = XBufferExt::load_from_string(serialized);
     auto [loaded_data, found] = loaded.find_ex<SimpleData>("TestData");
     assert(found);
     std::cout << "[OK]\n";
     
     // Verify data
-    std::cout << "Test 4: Verify data integrity... ";
+    std::cout << "Test 5: Verify data integrity... ";
     assert(loaded_data->id == 42);
     assert(loaded_data->value == 3.14f);
     assert(loaded_data->name == "Hello");
@@ -76,7 +80,7 @@ bool test_complex_serialization() {
     std::cout << "Test 1: Create complex structure... ";
     XBufferExt xbuf(8192);
     auto* data = xbuf.make<ComplexData>("Complex");
-    data->title = xbuf.make<XString>("Test Title");
+    data->title = XString("Test Title", xbuf.allocator<XString>());
     
     for (int i = 0; i < 10; ++i) {
         data->items.push_back(i * 10);
@@ -86,8 +90,8 @@ bool test_complex_serialization() {
     data->tags.insert(5);
     data->tags.insert(10);
     
-    data->metadata.emplace(xbuf.make<XString>("version"), 1);
-    data->metadata.emplace(xbuf.make<XString>("count"), 100);
+    data->metadata.emplace(XString("version", xbuf.allocator<XString>()), 1);
+    data->metadata.emplace(XString("count", xbuf.allocator<XString>()), 100);
     std::cout << "[OK]\n";
     
     // Serialize
@@ -111,7 +115,7 @@ bool test_complex_serialization() {
     assert(loaded_data->tags.size() == 3);
     assert(loaded_data->tags.count(5) == 1);
     assert(loaded_data->metadata.size() == 2);
-    assert(loaded_data->metadata[xbuf.make<XString>("version")] == 1);
+    assert(loaded_data->metadata[XString("version", xbuf.allocator<XString>())] == 1);
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] Complex serialization tests passed!\n";
@@ -129,17 +133,17 @@ bool test_multiple_objects() {
     auto* obj1 = xbuf.make<SimpleData>("Object1");
     obj1->id = 1;
     obj1->value = 1.1f;
-    obj1->name = xbuf.make<XString>("First");
+    obj1->name = XString("First", xbuf.allocator<XString>());
     
     auto* obj2 = xbuf.make<SimpleData>("Object2");
     obj2->id = 2;
     obj2->value = 2.2f;
-    obj2->name = xbuf.make<XString>("Second");
+    obj2->name = XString("Second", xbuf.allocator<XString>());
     
     auto* obj3 = xbuf.make<SimpleData>("Object3");
     obj3->id = 3;
     obj3->value = 3.3f;
-    obj3->name = xbuf.make<XString>("Third");
+    obj3->name = XString("Third", xbuf.allocator<XString>());
     std::cout << "[OK]\n";
     
     // Serialize
@@ -204,7 +208,7 @@ bool test_roundtrip() {
     auto* data = xbuf1.make<SimpleData>("Roundtrip");
     data->id = 999;
     data->value = 9.99f;
-    data->name = xbuf1.make<XString>("Original");
+    data->name = XString("Original", xbuf1.allocator<XString>());
     std::cout << "[OK]\n";
     
     // First roundtrip

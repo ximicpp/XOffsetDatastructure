@@ -57,7 +57,7 @@ void demo_basic_usage() {
     auto* game = xbuf.make<GameData>("player_save");
     
     // Set player data
-    game->player_name = xbuf.make<XString>("Hero");
+    game->player_name = XString("Hero", xbuf.allocator<XString>());
     game->player_id = 12345;
     game->level = 42;
     game->health = 100.0f;
@@ -74,7 +74,7 @@ void demo_basic_usage() {
         item.item_id = i + 1;
         item.item_type = (i % 3);  // 0=Potion, 1=Weapon, 2=Armor
         std::string item_name = "Potion " + std::to_string(i+1);
-        item.name = xbuf.make<XString>(item_name);
+        item.name = XString(item_name.c_str(), xbuf.allocator<XString>());
         item.quantity = (i + 1) * 10;
         game->items.push_back(item);
     }
@@ -90,9 +90,9 @@ void demo_basic_usage() {
     
     // Add quest progress
     print_subsection("Quest Progress");
-    game->quest_progress[xbuf.make<XString>("Main Quest")] = 75;
-    game->quest_progress[xbuf.make<XString>("Side Quest A")] = 100;
-    game->quest_progress[xbuf.make<XString>("Side Quest B")] = 50;
+    game->quest_progress[XString("Main Quest", xbuf.allocator<XString>())] = 75;
+    game->quest_progress[XString("Side Quest A", xbuf.allocator<XString>())] = 100;
+    game->quest_progress[XString("Side Quest B", xbuf.allocator<XString>())] = 50;
     print_check("Tracking " + std::to_string(game->quest_progress.size()) + " quests");
     
     // Display inventory
@@ -123,7 +123,7 @@ void demo_memory_management() {
     
     print_subsection("Adding Data");
     auto* game = xbuf.make<GameData>("game");
-    game->player_name = xbuf.make<XString>("TestPlayer");
+    game->player_name = XString("TestPlayer", xbuf.allocator<XString>());
     for (int i = 0; i < 100; i++) {
         game->achievements.insert(i);  // Add achievement IDs
     }
@@ -157,7 +157,7 @@ void demo_serialization() {
     print_subsection("Creating Source Data");
     XBufferExt src_buf(2048);
     auto* src_game = src_buf.make<GameData>("save");
-    src_game->player_name = src_buf.make<XString>("SavedHero");
+    src_game->player_name = XString("SavedHero", src_buf.allocator<XString>());
     src_game->player_id = 99999;
     src_game->level = 99;
     src_game->health = 100.0f;
@@ -253,7 +253,7 @@ void demo_performance() {
         item.item_id = i;
         item.item_type = i % 3;
         std::string item_name = "Item_" + std::to_string(i);
-        item.name = xbuf.make<XString>(item_name);
+        item.name = XString(item_name.c_str(), xbuf.allocator<XString>());
         item.quantity = i;
         game->items.push_back(item);
     }

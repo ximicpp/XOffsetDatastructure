@@ -21,7 +21,7 @@ int main() {
     auto* player = xbuf.make<Player>("Hero");
     player->id = 1;
     player->level = 10;
-    player->name = xbuf.make<XString>("Alice");
+    player->name = XString("Alice", xbuf.allocator<XString>());
     
     // 3. Add some data
     std::cout << "3. Adding items...\n";

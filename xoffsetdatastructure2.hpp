@@ -558,50 +558,28 @@ namespace XOffsetDatastructure2 {
 	public:
 		using XBuffer::XBuffer;
 
-		// Unified make<T>() API
-		// 1. make<GameData>("Player1") - Named object
+		// ============================================================================
+		// Object Creation API
+		// ============================================================================
+		
+		// Create a named object that can be found later
+		// Usage: auto* game = xbuf.make<GameData>("save");
 		template<typename T>
-		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
-		make(const char* name) {
+		T* make(const char* name) {
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
-		// 2. make<GameData>() - Anonymous object
-		template<typename T>
-		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
-		make() {
-			return this->construct<T>(boost::interprocess::anonymous_instance)(this->get_segment_manager());
-		}
-		// 3. make<int>("array", 10) - Array
-		template<typename T>
-		std::enable_if_t<!is_xstring<T>::value && !is_allocator<T>::value, T*>
-		make(const char* name, std::size_t count) {
-			return this->construct<T>(name)[count](this->get_segment_manager());
-		}
-		// 4. make<XString>("Hello") - String from const char*
-		template<typename T>
-		std::enable_if_t<is_xstring<T>::value, XString>
-		make(const char* str) {
-			return XString(str, this->get_segment_manager());
-		}
-		// 5. make<XString>(std::string) - String from std::string
-		template<typename T>
-		std::enable_if_t<is_xstring<T>::value, XString>
-		make(const std::string& str) {
-			return XString(str.c_str(), this->get_segment_manager());
-		}
-		// 6. make<XString>() - Empty string
-		template<typename T>
-		std::enable_if_t<is_xstring<T>::value, XString>
-		make() {
-			return XString(this->get_segment_manager());
-		}
-		// 7. Allocator helper
+		
+		// Get allocator for constructing allocator-aware types
+		// Usage: XString str("text", xbuf.allocator<XString>());
+		//        vec.emplace_back(xbuf.allocator<Item>());
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
 
-		// Find and utility methods
+		// ============================================================================
+		// Find and Utility Methods
+		// ============================================================================
 		// Find object
 		template<typename T>
 		std::pair<T*, bool> find_ex(const char* name) {
