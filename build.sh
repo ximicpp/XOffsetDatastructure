@@ -89,12 +89,12 @@ fi
 # Run the demo after tests
 echo
 echo "======================================================================"
-echo "Running XOffsetDatastructure Demo v2"
+echo "Running XOffsetDatastructure Demo"
 echo "======================================================================"
-if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/../xoffsetdatastructure2_demo" ]; then
-    $TEST_DIR/../xoffsetdatastructure2_demo
-elif [ -f "bin/xoffsetdatastructure2_demo" ]; then
-    ./bin/xoffsetdatastructure2_demo
+if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/../demo" ]; then
+    $TEST_DIR/../demo
+elif [ -f "bin/demo" ]; then
+    ./bin/demo
 else
     echo "Demo not found (skipped)"
 fi

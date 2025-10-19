@@ -298,8 +298,19 @@ class CodeGenerator:
             default_val = ""
             if field.default is not None:
                 if isinstance(field.default, bool):
+                    # Handle bool: true/false
                     default_val = "{true}" if field.default else "{false}"
+                elif isinstance(field.default, str):
+                    # Handle char: '\0', 'A', etc.
+                    if field.type == 'char' and len(field.default) <= 3:  # Single char like '\0' or 'A'
+                        # Need to wrap in quotes: '\0' → {'\0'}
+                        if not field.default.startswith("'"):
+                            default_val = f"{{'{field.default}'}}"
+                        else:
+                            default_val = f"{{{field.default}}}"
+                    # Could extend for string defaults in the future
                 elif isinstance(field.default, (int, float)):
+                    # Handle numeric types
                     if field.type == 'float':
                         default_val = f"{{{field.default}f}}"
                     else:

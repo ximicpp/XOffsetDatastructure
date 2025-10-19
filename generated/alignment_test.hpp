@@ -12,7 +12,7 @@ using namespace XOffsetDatastructure2;
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) AlignedStruct {
 	template <typename Allocator>
 	AlignedStruct(Allocator allocator) : name(allocator) {}
-	char a;
+	char a{'\0'};
 	int b{0};
 	double c{0.0};
 	XString name;

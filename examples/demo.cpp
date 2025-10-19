@@ -1,195 +1,348 @@
 // ============================================================================
-// XOffsetDatastructure2 Demo
-// Purpose: Demonstrate basic usage and API
+// XOffsetDatastructure2 - Comprehensive Demo
+// Purpose: Showcase the main features and capabilities
 // ============================================================================
 
 #include <iostream>
-#include <fstream>
+#include <iomanip>
+#include <string>
 #include <vector>
-#include "xoffsetdatastructure2.hpp"
-#include "game_data.hpp"
+#include "../xoffsetdatastructure2.hpp"
+#include "../generated/game_data.hpp"
 
 using namespace XOffsetDatastructure2;
 
 // ============================================================================
-// Example: Game Data with Nested Structures
+// Demo Utilities
 // ============================================================================
-void example_game_data() {
-    std::cout << "\n========== Example: Game Data with User-Friendly API ==========\n\n";
-    
-    // Create buffer with extended API
-    std::cout << "1. Creating buffer...\n";
-    XBufferExt xbuf(8192);
-    std::cout << "   Buffer size: " << xbuf.get_size() << " bytes\n";
-    
-    // Create and fill game data using unified make<T>() API
-    std::cout << "\n2. Creating game data with unified make<T>() API...\n";
-    auto* game = xbuf.make<GameData>("Player1");
-    game->player_id = 99;
-    game->level = 42;
-    game->health = 87.5f;
-    game->player_name = xbuf.make<XString>("DragonSlayer");
-    
-    // Add items using unified API
-    game->items.emplace_back(xbuf.allocator<Item>());
-    game->items.back().item_id = 101;
-    game->items.back().item_type = 0;
-    game->items.back().quantity = 1;
-    game->items.back().name = xbuf.make<XString>("Steel Sword");
-    
-    game->items.emplace_back(xbuf.allocator<Item>());
-    game->items.back().item_id = 201;
-    game->items.back().item_type = 1;
-    game->items.back().quantity = 1;
-    game->items.back().name = xbuf.make<XString>("Iron Shield");
-    
-    game->items.emplace_back(xbuf.allocator<Item>());
-    game->items.back().item_id = 301;
-    game->items.back().item_type = 2;
-    game->items.back().quantity = 5;
-    game->items.back().name = xbuf.make<XString>("Health Potion");
-    
-    // Add achievements
-    game->achievements.insert(1);
-    game->achievements.insert(5);
-    game->achievements.insert(10);
-    
-    // Add quest progress
-    game->quest_progress.emplace(xbuf.make<XString>("MainQuest"), 75);
-    game->quest_progress.emplace(xbuf.make<XString>("SideQuest1"), 100);
-    game->quest_progress.emplace(xbuf.make<XString>("SideQuest2"), 50);
-    
-    // Display summary
-    std::cout << "3. Game data summary:\n";
-    std::cout << "   Player: " << game->player_name << " (ID: " << game->player_id << ")\n";
-    std::cout << "   Level: " << game->level << ", Health: " << game->health << "%\n";
-    std::cout << "   Items:\n";
-    for (const auto& item : game->items) {
-        const char* type_name[] = {"Weapon", "Armor", "Potion", "Material"};
-        std::cout << "     - " << item.name << " (x" << item.quantity << ", " 
-                  << type_name[item.item_type] << ")\n";
-    }
-    std::cout << "   Achievements: " << game->achievements.size() << " unlocked\n";
-    std::cout << "   Quests: " << game->quest_progress.size() << " in progress\n";
-    
-    auto stats3 = xbuf.stats();
-    std::cout << "   Memory used: " << stats3.used_size << " / " << stats3.total_size 
-              << " bytes (" << stats3.usage_percent() << "%)\n";
-    
-    // Show quest details
-    std::cout << "\n4. Quest progress:\n";
-    for (const auto& [quest_name, progress] : game->quest_progress) {
-        std::cout << "   " << quest_name << ": " << progress << "%\n";
-    }
-    
-    // Grow buffer and add more items
-    std::cout << "\n5. Growing buffer and adding more items...\n";
-    xbuf.grow(8192);
-    game = xbuf.find_or_make<GameData>("Player1");
-    
-    // Add materials using unified API
-    for (int i = 0; i < 10; ++i) {
-        game->items.emplace_back(xbuf.allocator<Item>());
-        game->items.back().item_id = 400 + i;
-        game->items.back().item_type = 3;
-        game->items.back().quantity = 10 + i;
-        game->items.back().name = xbuf.make<XString>("Material_" + std::to_string(i));
-    }
-    
-    auto stats5 = xbuf.stats();
-    std::cout << "   Total items: " << game->items.size() << "\n";
-    std::cout << "   Memory used: " << stats5.used_size << " / " << stats5.total_size 
-              << " bytes (" << stats5.usage_percent() << "%)\n";
-    
-    // Modify data and shrink
-    std::cout << "\n6. Updating data and shrinking buffer...\n";
-    game->level++;
-    
-    // Add legendary sword using unified API
-    game->items.emplace_back(xbuf.allocator<Item>());
-    game->items.back().item_id = 999;
-    game->items.back().item_type = 0;
-    game->items.back().quantity = 1;
-    game->items.back().name = xbuf.make<XString>("Legendary Sword");
-    
-    game->quest_progress[xbuf.make<XString>("MainQuest")] = 90;
-    
-    xbuf.shrink_to_fit();
-    auto stats6 = xbuf.stats();
-    std::cout << "   New level: " << game->level << "\n";
-    std::cout << "   Total items: " << game->items.size() << "\n";
-    std::cout << "   Last item added: " << game->items.back().name 
-              << " (ID: " << game->items.back().item_id << ")\n";
-    std::cout << "   MainQuest progress: " 
-              << game->quest_progress[xbuf.make<XString>("MainQuest")] << "%\n";
-    std::cout << "   Memory after shrink: " << stats6.used_size << " / " << stats6.total_size 
-              << " bytes (" << stats6.usage_percent() << "%)\n";
-    
-    // Serialization and Deserialization
-    std::cout << "\n7. Serialization and Deserialization...\n";
-    
-    // Serialize to string
-    std::cout << "   Serializing to string...\n";
-    auto serialized_data = xbuf.save_to_string();
-    std::cout << "   Serialized size: " << serialized_data.size() << " bytes\n";
-    
-    // Deserialize from string
-    std::cout << "   Deserializing from string...\n";
-    XBufferExt loaded_xbuf = XBufferExt::load_from_string(serialized_data);
-    std::cout << "   [OK] Loaded successfully!\n";
-    
-    auto [loaded_game, loaded_found] = loaded_xbuf.find_ex<GameData>("Player1");
-    if (loaded_found) {
-        std::cout << "   Loaded player: " << loaded_game->player_name 
-                  << " (Level " << loaded_game->level << ")\n";
-        std::cout << "   Loaded items count: " << loaded_game->items.size() << "\n";
-        std::cout << "   Loaded first item: " << loaded_game->items[0].name << "\n";
-        std::cout << "   Loaded last item: " << loaded_game->items.back().name << "\n";
-        
-        // Verify data integrity
-        bool data_matches = (loaded_game->player_id == game->player_id) &&
-                           (loaded_game->level == game->level) &&
-                           (loaded_game->items.size() == game->items.size()) &&
-                           (loaded_game->achievements.size() == game->achievements.size());
-        
-        if (data_matches) {
-            std::cout << "   [OK] Serialized and deserialized data match!\n";
-        } else {
-            std::cout << "   [ERROR] Data mismatch after deserialization!\n";
-        }
-    } else {
-        std::cout << "   [ERROR] Player data not found after deserialization!\n";
-    }
-    
-    // Verify original data integrity
-    std::cout << "\n8. Verifying original data integrity...\n";
-    auto [verify_game, found] = xbuf.find_ex<GameData>("Player1");
-    std::cout << "   Found: " << (found ? "YES" : "NO") << "\n";
-    std::cout << "   Player: " << verify_game->player_name << "\n";
-    std::cout << "   Total items: " << verify_game->items.size() << "\n";
-    std::cout << "   First item: " << verify_game->items[0].name 
-              << " (ID: " << verify_game->items[0].item_id << ")\n";
-    std::cout << "   Last item: " << verify_game->items.back().name 
-              << " (ID: " << verify_game->items.back().item_id << ")\n";
-    
-    std::cout << "\n[OK] Example completed successfully!\n";
+
+void print_section(const std::string& title) {
+    std::cout << "\n";
+    std::cout << "+"; 
+    for (int i = 0; i < 68; i++) std::cout << "=";
+    std::cout << "+\n";
+    std::cout << "| " << std::left << std::setw(66) << title << " |\n";
+    std::cout << "+";
+    for (int i = 0; i < 68; i++) std::cout << "=";
+    std::cout << "+\n";
+}
+
+void print_subsection(const std::string& title) {
+    std::cout << "\n+- " << title << "\n";
+}
+
+void print_check(const std::string& msg) {
+    std::cout << "  ✓ " << msg << "\n";
+}
+
+void print_info(const std::string& key, const std::string& value) {
+    std::cout << "  • " << std::left << std::setw(20) << key << ": " << value << "\n";
 }
 
 // ============================================================================
-// Main
+// Demo 1: Basic Usage
 // ============================================================================
-int main(int argc, char* argv[]) {
+
+void demo_basic_usage() {
+    print_section("1. Basic Usage - Creating and Accessing Data");
+    
+    // Create buffer
+    print_subsection("Creating XBuffer with 4KB");
+    XBuffer xbuf(4096);
+    print_check("Buffer created");
+    
+    // Create game data
+    print_subsection("Creating Game Data");
+    auto* game = xbuf.construct<GameData>("player_save")(xbuf.get_segment_manager());
+    
+    // Set player data
+    game->player_name = XString("Hero", xbuf.get_segment_manager());
+    game->player_id = 12345;
+    game->level = 42;
+    game->health = 100.0f;
+    
+    print_check("Player created: " + std::string(game->player_name.c_str()));
+    print_info("Player ID", std::to_string(game->player_id));
+    print_info("Level", std::to_string(game->level));
+    print_info("Health", std::to_string(game->health));
+    
+    // Add items
+    print_subsection("Adding Items to Inventory");
+    for (int i = 0; i < 5; i++) {
+        Item item(xbuf.get_segment_manager());
+        item.item_id = i + 1;
+        item.item_type = (i % 3);  // 0=Potion, 1=Weapon, 2=Armor
+        std::string item_name = "Potion " + std::to_string(i+1);
+        item.name = XString(item_name.c_str(), xbuf.get_segment_manager());
+        item.quantity = (i + 1) * 10;
+        game->items.push_back(item);
+    }
+    print_check("Added " + std::to_string(game->items.size()) + " items");
+    
+    // Add achievements (using integers)
+    print_subsection("Unlocking Achievements");
+    std::vector<int> achievements = {1, 5, 10, 25, 50, 100};  // Achievement IDs
+    for (int ach_id : achievements) {
+        game->achievements.insert(ach_id);
+    }
+    print_check("Unlocked " + std::to_string(game->achievements.size()) + " achievements");
+    
+    // Add quest progress
+    print_subsection("Quest Progress");
+    game->quest_progress[XString("Main Quest", xbuf.get_segment_manager())] = 75;
+    game->quest_progress[XString("Side Quest A", xbuf.get_segment_manager())] = 100;
+    game->quest_progress[XString("Side Quest B", xbuf.get_segment_manager())] = 50;
+    print_check("Tracking " + std::to_string(game->quest_progress.size()) + " quests");
+    
+    // Display inventory
+    print_subsection("Inventory Details");
+    const char* item_types[] = {"Potion", "Weapon", "Armor"};
+    for (size_t i = 0; i < game->items.size(); i++) {
+        const auto& item = game->items[i];
+        std::cout << "  [" << item.item_id << "] " 
+                  << std::left << std::setw(15) << item.name.c_str()
+                  << " x" << std::setw(3) << item.quantity
+                  << " (Type: " << item_types[item.item_type] << ")\n";
+    }
+}
+
+// ============================================================================
+// Demo 2: Memory Management
+// ============================================================================
+
+void demo_memory_management() {
+    print_section("2. Memory Management - Buffer Operations");
+    
+    print_subsection("Initial Buffer");
+    XBuffer xbuf(1024);
+    auto stats = XBufferVisualizer::get_memory_stats(xbuf);
+    print_info("Total Size", std::to_string(stats.total_size) + " bytes");
+    print_info("Free Size", std::to_string(stats.free_size) + " bytes");
+    print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
+    
+    print_subsection("Adding Data");
+    auto* game = xbuf.construct<GameData>("game")(xbuf.get_segment_manager());
+    game->player_name = XString("TestPlayer", xbuf.get_segment_manager());
+    for (int i = 0; i < 100; i++) {
+        game->achievements.insert(i);  // Add achievement IDs
+    }
+    
+    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    print_info("After Adding Data", std::to_string(stats.used_size) + " bytes used");
+    print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
+    
+    print_subsection("Growing Buffer");
+    xbuf.grow(4096);
+    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    print_info("New Total Size", std::to_string(stats.total_size) + " bytes");
+    print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
+    print_check("Buffer grown successfully");
+    
+    print_subsection("Shrinking to Fit");
+    xbuf.shrink_to_fit();
+    stats = XBufferVisualizer::get_memory_stats(xbuf);
+    print_info("After Shrink", std::to_string(stats.total_size) + " bytes");
+    print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
+    print_check("Memory optimized");
+}
+
+// ============================================================================
+// Demo 3: Serialization
+// ============================================================================
+
+void demo_serialization() {
+    print_section("3. Serialization - Save and Load");
+    
+    print_subsection("Creating Source Data");
+    XBuffer src_buf(2048);
+    auto* src_game = src_buf.construct<GameData>("save")(src_buf.get_segment_manager());
+    src_game->player_name = XString("SavedHero", src_buf.get_segment_manager());
+    src_game->player_id = 99999;
+    src_game->level = 99;
+    src_game->health = 100.0f;
+    
+    print_check("Created game state");
+    print_info("Player", std::string(src_game->player_name.c_str()));
+    print_info("Player ID", std::to_string(src_game->player_id));
+    print_info("Level", std::to_string(src_game->level));
+    
+    print_subsection("Serializing to Binary");
+    auto* buffer = src_buf.get_buffer();
+    std::vector<char> binary_data(buffer->begin(), buffer->end());
+    print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
+    
+    print_subsection("Deserializing from Binary");
+    XBuffer dst_buf(binary_data);
+    auto* dst_game = dst_buf.find<GameData>("save").first;
+    
+    if (dst_game) {
+        print_check("Deserialization successful!");
+        print_info("Player", std::string(dst_game->player_name.c_str()));
+        print_info("Player ID", std::to_string(dst_game->player_id));
+        print_info("Level", std::to_string(dst_game->level));
+        
+        // Verify integrity
+        bool integrity_ok = (
+            std::string(dst_game->player_name.c_str()) == "SavedHero" &&
+            dst_game->player_id == 99999 &&
+            dst_game->level == 99
+        );
+        
+        if (integrity_ok) {
+            print_check("Data integrity verified ✓");
+        }
+    } else {
+        std::cout << "  ✗ Deserialization failed\n";
+    }
+}
+
+// ============================================================================
+// Demo 4: Type Signature Verification
+// ============================================================================
+
+void demo_type_signatures() {
+    print_section("4. Type Signature System - Compile-Time Safety");
+    
+    print_subsection("Type Signature Information");
+    
+    constexpr auto item_sig = XTypeSignature::get_XTypeSignature<ItemReflectionHint>();
+    constexpr auto game_sig = XTypeSignature::get_XTypeSignature<GameDataReflectionHint>();
+    
+    print_info("Item Signature", std::string(item_sig.value));
     std::cout << "\n";
-    std::cout << "======================================================================\n";
-    std::cout << "  XOffsetDatastructure2 Demo - Usage Example\n";
-    std::cout << "======================================================================\n";
+    print_info("GameData Signature", std::string(game_sig.value));
     
-    // Run example
-    example_game_data();
+    print_subsection("Benefits");
+    print_check("Binary compatibility across compilations");
+    print_check("Automatic verification at compile-time");
+    print_check("Prevents data corruption from layout changes");
+    print_check("Type-safe offset calculations");
+}
+
+// ============================================================================
+// Demo 5: Performance Insights
+// ============================================================================
+
+void demo_performance() {
+    print_section("5. Performance Characteristics");
     
-    std::cout << "\n======================================================================\n";
-    std::cout << "  Example completed successfully!\n";
-    std::cout << "======================================================================\n\n";
+    print_subsection("Container Growth Strategy");
+    print_info("Growth Factor", "1.1x (10% incremental)");
+    print_info("Benefit", "Reduced memory overhead");
+    print_info("Trade-off", "More frequent reallocations");
     
-    return 0;
+    print_subsection("Memory Layout");
+    print_info("Allocator", "Sequential-fit (fast)");
+    print_info("Alignment", "8-byte (BASIC_ALIGNMENT)");
+    print_info("Pointers", "Offset-based (relocatable)");
+    
+    print_subsection("Platform Requirements");
+    print_info("Architecture", "64-bit only");
+    print_info("Byte Order", "Little-endian");
+    print_info("Compatibility", "x86-64, ARM64");
+    
+    print_subsection("Benchmarking Example");
+    XBuffer xbuf(65536);  // 64KB buffer for 1000 items
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    // Insert 1000 items
+    auto* game = xbuf.construct<GameData>("perf_test")(xbuf.get_segment_manager());
+    for (int i = 0; i < 1000; i++) {
+        Item item(xbuf.get_segment_manager());
+        item.item_id = i;
+        item.item_type = i % 3;
+        std::string item_name = "Item_" + std::to_string(i);
+        item.name = XString(item_name.c_str(), xbuf.get_segment_manager());
+        item.quantity = i;
+        game->items.push_back(item);
+    }
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    
+    print_info("Operations", "1000 item insertions");
+    print_info("Time", std::to_string(duration.count()) + " μs");
+    print_info("Avg per Item", std::to_string(duration.count() / 1000.0) + " μs");
+}
+
+// ============================================================================
+// Demo 6: Advanced Features
+// ============================================================================
+
+void demo_advanced_features() {
+    print_section("6. Advanced Features");
+    
+    print_subsection("Container Types");
+    print_check("XVector<T> - Dynamic array (like std::vector)");
+    print_check("XSet<T> - Unique elements (flat_set implementation)");
+    print_check("XMap<K,V> - Key-value pairs (flat_map implementation)");
+    print_check("XString - Offset-aware string container");
+    
+    print_subsection("Type System");
+    print_check("Compile-time type signature calculation");
+    print_check("Automatic size and offset computation");
+    print_check("Cross-compilation compatibility checks");
+    print_check("Boost.PFR reflection support");
+    
+    print_subsection("Memory Features");
+    print_check("Dynamic buffer growth");
+    print_check("Shrink-to-fit optimization");
+    print_check("Memory usage statistics");
+    print_check("Zero-copy deserialization");
+    
+    print_subsection("Future Enhancements (Planned)");
+    std::cout << "  ○ C++26 reflection-based compaction\n";
+    std::cout << "  ○ Schema versioning and migration\n";
+    std::cout << "  ○ JSON export/import\n";
+    std::cout << "  ○ Performance benchmarking suite\n";
+}
+
+// ============================================================================
+// Main Demo Entry Point
+// ============================================================================
+
+int main() {
+    std::cout << R"(
++======================================================================+
+|                                                                      |
+|           XOffsetDatastructure2 - Comprehensive Demo                |
+|                                                                      |
+|     Offset-Based Data Structures with Type Signature System         |
+|                                                                      |
++======================================================================+
+)";
+
+    try {
+        // Run all demos
+        demo_basic_usage();
+        demo_memory_management();
+        demo_serialization();
+        demo_type_signatures();
+        demo_performance();
+        demo_advanced_features();
+        
+        // Summary
+        print_section("Demo Complete");
+        std::cout << "\n";
+        std::cout << "  * All demonstrations completed successfully!\n";
+        std::cout << "\n";
+        std::cout << "  For more information:\n";
+        std::cout << "     - Documentation: docs/\n";
+        std::cout << "     - Examples: examples/\n";
+        std::cout << "     - Tests: tests/\n";
+        std::cout << "\n";
+        std::cout << "  Key Takeaways:\n";
+        std::cout << "     - Type-safe offset-based containers\n";
+        std::cout << "     - Binary serialization with zero-copy\n";
+        std::cout << "     - Compile-time type signature verification\n";
+        std::cout << "     - Memory-efficient growth strategy\n";
+        std::cout << "\n";
+        
+        return 0;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "\n[ERROR] " << e.what() << "\n";
+        return 1;
+    }
 }

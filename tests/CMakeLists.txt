@@ -99,6 +99,14 @@ set_target_properties(test_type_signature PROPERTIES
 )
 configure_macos_target(test_type_signature)
 
+# Platform requirements test (64-bit, little-endian)
+add_executable(test_platform test_platform.cpp)
+target_include_directories(test_platform PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_platform PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+configure_macos_target(test_platform)
+
 # Generated types test
 if(Python3_FOUND)
     add_executable(test_generated_types test_generated_types.cpp)
@@ -125,6 +133,7 @@ add_test(NAME Comprehensive COMMAND test_comprehensive)
 add_test(NAME Serialization COMMAND test_serialization)
 add_test(NAME Alignment COMMAND test_alignment)
 add_test(NAME TypeSignature COMMAND test_type_signature)
+add_test(NAME Platform COMMAND test_platform)
 
 if(Python3_FOUND)
     add_test(NAME GeneratedTypes COMMAND test_generated_types)

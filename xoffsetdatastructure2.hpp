@@ -2,6 +2,58 @@
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
 
 // ============================================================================
+// Platform Requirements Check
+// ============================================================================
+
+// XOffsetDatastructure2 is designed specifically for:
+// - 64-bit architectures (sizeof(void*) == 8)
+// - Little-endian byte order
+//
+// These requirements ensure:
+// - Consistent memory layout across platforms
+// - Binary data portability between compatible systems
+// - Predictable type signatures and offsets
+
+// Check for 64-bit architecture
+#if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
+    #define XOFFSET_ARCH_64BIT 1
+#else
+    #define XOFFSET_ARCH_64BIT 0
+#endif
+
+// Check for little-endian (most common: x86, x86-64, ARM in little-endian mode)
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
+    #define XOFFSET_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#elif defined(_WIN32) || defined(_WIN64)
+    #define XOFFSET_LITTLE_ENDIAN 1  // Windows is always little-endian
+#elif defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) || defined(__THUMBEL__) || \
+      defined(__AARCH64EL__) || defined(_MIPSEL) || defined(__MIPSEL)
+    #define XOFFSET_LITTLE_ENDIAN 1
+#elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
+      defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB)
+    #define XOFFSET_LITTLE_ENDIAN 0
+#else
+    // Default assumption for x86/x86-64
+    #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+        #define XOFFSET_LITTLE_ENDIAN 1
+    #else
+        #warning "Unable to detect endianness, assuming little-endian"
+        #define XOFFSET_LITTLE_ENDIAN 1
+    #endif
+#endif
+
+// Compile-time checks (can be disabled with XOFFSET_DISABLE_PLATFORM_CHECKS)
+#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
+    #if !XOFFSET_ARCH_64BIT
+        #error "XOffsetDatastructure2 requires 64-bit architecture. Define XOFFSET_DISABLE_PLATFORM_CHECKS to override (not recommended)."
+    #endif
+    
+    #if !XOFFSET_LITTLE_ENDIAN
+        #error "XOffsetDatastructure2 requires little-endian architecture. Define XOFFSET_DISABLE_PLATFORM_CHECKS to override (not recommended)."
+    #endif
+#endif
+
+// ============================================================================
 // Configuration Macros
 // ============================================================================
 
