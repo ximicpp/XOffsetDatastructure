@@ -6,63 +6,33 @@
 // Offset-based data structures with compile-time type signature verification
 // =============================================================================
 
-// =============================================================================
-// Platform Detection & Requirements
-// =============================================================================
-
-// Compiler detection
+// Platform Detection & Configuration
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
     #define IS_LITTLE_ENDIAN 1
     #define FUNCTION_SIGNATURE __FUNCSIG__
-#elif defined(__clang__)
+#elif defined(__clang__) || defined(__GNUC__)
     #define TYPESIG_PLATFORM_WINDOWS 0
     #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
-    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        #define IS_LITTLE_ENDIAN 1
-    #else
-        #define IS_LITTLE_ENDIAN 0
-    #endif
-#elif defined(__GNUC__)
-    #define TYPESIG_PLATFORM_WINDOWS 0
-    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
-    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        #define IS_LITTLE_ENDIAN 1
-    #else
-        #define IS_LITTLE_ENDIAN 0
-    #endif
+    #define IS_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 #else
     #error "Unsupported compiler"
 #endif
 
-// Architecture detection (64-bit required)
 #if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
     #define XOFFSET_ARCH_64BIT 1
 #else
     #define XOFFSET_ARCH_64BIT 0
 #endif
 
-// Endianness detection (little-endian required)
 #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
     #define XOFFSET_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#elif defined(_WIN32) || defined(_WIN64)
+#elif defined(_WIN32) || defined(_WIN64) || defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
     #define XOFFSET_LITTLE_ENDIAN 1
-#elif defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) || defined(__THUMBEL__) || \
-      defined(__AARCH64EL__) || defined(_MIPSEL) || defined(__MIPSEL)
-    #define XOFFSET_LITTLE_ENDIAN 1
-#elif defined(__BIG_ENDIAN__) || defined(__ARMEB__) || defined(__THUMBEB__) || \
-      defined(__AARCH64EB__) || defined(_MIPSEB) || defined(__MIPSEB)
-    #define XOFFSET_LITTLE_ENDIAN 0
 #else
-    #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
-        #define XOFFSET_LITTLE_ENDIAN 1
-    #else
-        #warning "Unable to detect endianness, assuming little-endian"
-        #define XOFFSET_LITTLE_ENDIAN 1
-    #endif
+    #define XOFFSET_LITTLE_ENDIAN 0
 #endif
 
-// Compile-time checks
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
     #if !XOFFSET_ARCH_64BIT
         #error "XOffsetDatastructure2 requires 64-bit architecture"
@@ -72,8 +42,6 @@
     #endif
 #endif
 
-// Configuration: container growth factor
-// 0 = default (2x), 1 = custom (1.1x)
 #ifndef OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR
 #define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
 #endif
@@ -302,46 +270,22 @@ namespace XTypeSignature {
         }
     }
 
-    // Type signature specializations for basic types
-    template <> struct TypeSignature<int32_t> {
-        static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; }
-    };
-    template <> struct TypeSignature<float> {
-        static constexpr auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; }
-    };
-    template <> struct TypeSignature<double> {
-        static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; }
-    };
-    template <> struct TypeSignature<int64_t> {
-        static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; }
-    };
-    template <> struct TypeSignature<uint32_t> {
-        static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; }
-    };
-    template <> struct TypeSignature<uint64_t> {
-        static constexpr auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; }
-    };
-    template <> struct TypeSignature<bool> {
-        static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; }
-    };
-    template <> struct TypeSignature<char> {
-        static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; }
-    };
-
+    // Basic type signatures
+    template <> struct TypeSignature<int32_t>  { static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<uint32_t> { static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<int64_t>  { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<uint64_t> { static constexpr auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<float>    { static constexpr auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<double>   { static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
+    template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     #if !defined(__APPLE__) || !defined(__LP64__)
-    template <> struct TypeSignature<long long> {
-        static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; }
-    };
+    template <> struct TypeSignature<long long> { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
     #endif
 
     // Pointer types
-    template <typename T>
-    struct TypeSignature<T*> {
-        static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; }
-    };
-    template <> struct TypeSignature<void*> {
-        static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; }
-    };
+    template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
+    template <>           struct TypeSignature<void*>{ static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
     // Array types
     template <typename T, size_t N>
@@ -583,19 +527,8 @@ namespace XOffsetDatastructure2
 	// typedef XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index> XBuffer;
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
-	struct growth_factor_custom
-		// : boost::container::dtl::grow_factor_ratio<0, 15, 10> // growth_factor_50
-		// : boost::container::dtl::grow_factor_ratio<0, 16, 10> // growth_factor_60
-		// : boost::container::dtl::grow_factor_ratio<0, 14, 10>	// 40
-		// : boost::container::dtl::grow_factor_ratio<0, 13, 10>	// 30
-		// : boost::container::dtl::grow_factor_ratio<0, 12, 10>	// 20
-		: boost::container::dtl::grow_factor_ratio<0, 11, 10> // 10
-	// : boost::container::dtl::grow_factor_ratio<0, 17, 10> // growth_factor_70
-	// : boost::container::dtl::grow_factor_ratio<0, 18, 10> // growth_factor_80
-	// : boost::container::dtl::grow_factor_ratio<0, 19, 10> // growth_factor_90
-	// : boost::container::dtl::grow_factor_ratio<0, 2, 1>	// 100
-	{
-	};
+	// Container growth factor: 1.1x (10% incremental growth)
+	struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
     template <typename T>
     using XOffsetPtr = boost::interprocess::offset_ptr<T>;
