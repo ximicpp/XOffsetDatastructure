@@ -52,7 +52,7 @@ bool test_map_set_operations() {
     std::cout << "Test 3: String set operations... ";
     for (int i = 0; i < 10; ++i) {
         std::string str = "Item_" + std::to_string(i);
-        obj->stringSet.emplace(xbuf.make<XString>(str));
+        obj->stringSet.emplace(XString(str.c_str(), xbuf.allocator<XString>()));
     }
     assert(obj->stringSet.size() == 10);
     std::cout << "[OK]\n";
@@ -61,7 +61,7 @@ bool test_map_set_operations() {
     std::cout << "Test 4: Map insertion... ";
     for (int i = 0; i < 20; ++i) {
         std::string value = "Value_" + std::to_string(i);
-        XString xvalue = xbuf.make<XString>(value);
+        XString xvalue = XString(value.c_str(), xbuf.allocator<XString>());
         obj->intMap.emplace(i, xvalue);
     }
     assert(obj->intMap.size() == 20);
@@ -78,12 +78,12 @@ bool test_map_set_operations() {
     std::cout << "Test 6: String key map... ";
     for (int i = 0; i < 15; ++i) {
         std::string key = "Key_" + std::to_string(i);
-        XString xkey = xbuf.make<XString>(key);
+        XString xkey = XString(key.c_str(), xbuf.allocator<XString>());
         obj->stringMap.emplace(xkey, i * 10);
     }
     assert(obj->stringMap.size() == 15);
     
-    XString search_key = xbuf.make<XString>("Key_5");
+    XString search_key = XString("Key_5", xbuf.allocator<XString>());
     auto it2 = obj->stringMap.find(search_key);
     assert(it2 != obj->stringMap.end());
     assert(it2->second == 50);

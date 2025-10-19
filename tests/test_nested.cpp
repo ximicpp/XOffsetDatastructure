@@ -47,8 +47,8 @@ bool test_nested_structures() {
     
     // Test 1: Initialize nested structure
     std::cout << "Test 1: Initialize nested objects... ";
-    obj->title = xbuf.make<XString>("OuterTitle");
-    obj->middle.name = xbuf.make<XString>("MiddleName");
+    obj->title = XString("OuterTitle", xbuf.allocator<XString>());
+    obj->middle.name = XString("MiddleName", xbuf.allocator<XString>());
     obj->middle.inner.id = 42;
     for (int i = 0; i < 10; ++i) {
         obj->middle.inner.data.push_back(i * 2);

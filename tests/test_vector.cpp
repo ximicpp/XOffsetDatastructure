@@ -48,9 +48,9 @@ bool test_vector_operations() {
     
     // Test 3: String vector
     std::cout << "Test 3: String vector operations... ";
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 20; ++i) {
         std::string str = "String_" + std::to_string(i);
-        obj->stringVector.emplace_back(xbuf.make<XString>(str));
+        obj->stringVector.emplace_back(XString(str.c_str(), xbuf.allocator<XString>()));
     }
     assert(obj->stringVector.size() == 10);
     assert(obj->stringVector[0] == "String_0");

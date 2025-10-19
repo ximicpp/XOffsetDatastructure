@@ -153,24 +153,24 @@ bool test_modify_vector_string() {
     
     // Test 1: Add string elements
     std::cout << "Test 1: Add string elements... ";
-    data->names.emplace_back(xbuf.make<XString>("Alice"));
-    data->names.emplace_back(xbuf.make<XString>("Bob"));
-    data->names.emplace_back(xbuf.make<XString>("Carol"));
+    data->names.emplace_back("Alice", xbuf.allocator<XString>());
+    data->names.emplace_back("Bob", xbuf.allocator<XString>());
+    data->names.emplace_back("Carol", xbuf.allocator<XString>());
     assert(data->names.size() == 3);
     assert(data->names[0] == "Alice");
     std::cout << "[OK]\n";
     
     // Test 2: Modify string element
     std::cout << "Test 2: Modify string element... ";
-    data->names[1] = xbuf.make<XString>("Bobby");
+    data->names[1] = XString("Bobby", xbuf.allocator<XString>());
     assert(data->names[1] == "Bobby");
     std::cout << "[OK]\n";
     
     // Test 3: Modify via iterator
     std::cout << "Test 3: Append to strings via iterator... ";
     for (auto& name : data->names) {
-        XString suffix = xbuf.make<XString>("_Modified");
-        name = xbuf.make<XString>(std::string(name.c_str()) + std::string(suffix.c_str()));
+        XString suffix = XString("_Modified", xbuf.allocator<XString>());
+        name = XString((std::string(name.c_str()) + std::string(suffix.c_str())).c_str(), xbuf.allocator<XString>());
     }
     assert(data->names[0] == "Alice_Modified");
     assert(data->names[1] == "Bobby_Modified");
@@ -180,7 +180,7 @@ bool test_modify_vector_string() {
     // Test 4: Insert new element
     std::cout << "Test 4: Insert new element... ";
     auto it = data->names.begin() + 1;
-    data->names.insert(it, xbuf.make<XString>("David"));
+    data->names.insert(it, XString("David", xbuf.allocator<XString>()));
     assert(data->names.size() == 4);
     assert(data->names[1] == "David");
     assert(data->names[2] == "Bobby_Modified");
@@ -206,31 +206,31 @@ bool test_modify_map() {
     
     // Test 1: Add key-value pairs
     std::cout << "Test 1: Add key-value pairs... ";
-    data->scores.emplace(xbuf.make<XString>("Alice"), 85);
-    data->scores.emplace(xbuf.make<XString>("Bob"), 90);
-    data->scores.emplace(xbuf.make<XString>("Carol"), 78);
+    data->scores.emplace(XString("Alice", xbuf.allocator<XString>()), 85);
+    data->scores.emplace(XString("Bob", xbuf.allocator<XString>()), 90);
+    data->scores.emplace(XString("Carol", xbuf.allocator<XString>()), 78);
     assert(data->scores.size() == 3);
     std::cout << "[OK]\n";
     
     // Test 2: Modify existing value by key
     std::cout << "Test 2: Modify value by key... ";
-    auto it = data->scores.find(xbuf.make<XString>("Alice"));
+    auto it = data->scores.find(XString("Alice", xbuf.allocator<XString>()));
     assert(it != data->scores.end());
     it->second = 95;
-    assert(data->scores.find(xbuf.make<XString>("Alice"))->second == 95);
+    assert(data->scores.find(XString("Alice", xbuf.allocator<XString>()))->second == 95);
     std::cout << "[OK]\n";
     
     // Test 3: Modify via operator[]
     std::cout << "Test 3: Modify via operator[]... ";
-    data->scores[xbuf.make<XString>("Bob")] = 92;
-    assert(data->scores[xbuf.make<XString>("Bob")] == 92);
+    data->scores[XString("Bob", xbuf.allocator<XString>())] = 92;
+    assert(data->scores[XString("Bob", xbuf.allocator<XString>())] == 92);
     std::cout << "[OK]\n";
     
     // Test 4: Add new entry via operator[]
     std::cout << "Test 4: Add via operator[]... ";
-    data->scores[xbuf.make<XString>("David")] = 88;
+    data->scores[XString("David", xbuf.allocator<XString>())] = 88;
     assert(data->scores.size() == 4);
-    assert(data->scores[xbuf.make<XString>("David")] == 88);
+    assert(data->scores[XString("David", xbuf.allocator<XString>())] == 88);
     std::cout << "[OK]\n";
     
     // Test 5: Modify all values via iterator
@@ -238,17 +238,17 @@ bool test_modify_map() {
     for (auto& pair : data->scores) {
         pair.second += 5;
     }
-    assert(data->scores[xbuf.make<XString>("Alice")] == 100);
-    assert(data->scores[xbuf.make<XString>("Bob")] == 97);
-    assert(data->scores[xbuf.make<XString>("Carol")] == 83);
-    assert(data->scores[xbuf.make<XString>("David")] == 93);
+    assert(data->scores[XString("Alice", xbuf.allocator<XString>())] == 100);
+    assert(data->scores[XString("Bob", xbuf.allocator<XString>())] == 97);
+    assert(data->scores[XString("Carol", xbuf.allocator<XString>())] == 83);
+    assert(data->scores[XString("David", xbuf.allocator<XString>())] == 93);
     std::cout << "[OK]\n";
     
     // Test 6: Erase entry
     std::cout << "Test 6: Erase entry... ";
-    data->scores.erase(xbuf.make<XString>("Carol"));
+    data->scores.erase(XString("Carol", xbuf.allocator<XString>()));
     assert(data->scores.size() == 3);
-    assert(data->scores.find(xbuf.make<XString>("Carol")) == data->scores.end());
+    assert(data->scores.find(XString("Carol", xbuf.allocator<XString>())) == data->scores.end());
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All map modification tests passed!\n";
@@ -323,11 +323,11 @@ bool test_modify_mixed_operations() {
         data->numbers.push_back(i);
     }
     
-    data->names.emplace_back(xbuf.make<XString>("Alice"));
-    data->names.emplace_back(xbuf.make<XString>("Bob"));
+    data->names.emplace_back("Alice", xbuf.allocator<XString>());
+    data->names.emplace_back("Bob", xbuf.allocator<XString>());
     
-    data->scores.emplace(xbuf.make<XString>("Alice"), 80);
-    data->scores.emplace(xbuf.make<XString>("Bob"), 85);
+    data->scores.emplace(XString("Alice", xbuf.allocator<XString>()), 80);
+    data->scores.emplace(XString("Bob", xbuf.allocator<XString>()), 85);
     
     data->tags.insert(1);
     data->tags.insert(2);
@@ -340,14 +340,14 @@ bool test_modify_mixed_operations() {
     data->active = false;
     
     data->numbers[0] = 999;
-    data->names[0] = xbuf.make<XString>("Alicia");
-    data->scores[xbuf.make<XString>("Alice")] = 95;
+    data->names[0] = XString("Alicia", xbuf.allocator<XString>());
+    data->scores[XString("Alice", xbuf.allocator<XString>())] = 95;
     data->tags.insert(3);
     
     assert(data->counter == 100);
     assert(data->numbers[0] == 999);
     assert(data->names[0] == "Alicia");
-    assert(data->scores[xbuf.make<XString>("Alice")] == 95);
+    assert(data->scores[XString("Alice", xbuf.allocator<XString>())] == 95);
     assert(data->tags.find(3) != data->tags.end());
     std::cout << "[OK]\n";
     
@@ -378,7 +378,7 @@ bool test_modify_mixed_operations() {
     }
     
     assert(data->numbers[0] == 1998);
-    assert(data->scores[xbuf.make<XString>("Alice")] == 85);
+    assert(data->scores[XString("Alice", xbuf.allocator<XString>())] == 85);
     assert(data->tags.size() == 8);  // 1,2,3,10,11,12,13,14
     std::cout << "[OK]\n";
     
@@ -392,7 +392,7 @@ bool test_modify_mixed_operations() {
     assert(new_data->counter == 100);
     assert(new_data->numbers[0] == 1998);
     assert(new_data->names[0] == "Alicia");
-    assert(new_data->scores[xbuf.make<XString>("Alice")] == 85);
+    assert(new_data->scores[XString("Alice", xbuf.allocator<XString>())] == 85);
     assert(new_data->tags.size() == 8);
     std::cout << "[OK]\n";
     

@@ -49,7 +49,7 @@ struct alignas(BASIC_ALIGNMENT) ComprehensiveTestType {
 void fillBasicFields(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     obj->mInt = 123;
     obj->mFloat = 3.14f;
-    obj->mString = xbuf.make<XString>("abcdefghijklmnopqrstuvwxyz");
+    obj->mString = XString("abcdefghijklmnopqrstuvwxyz", xbuf.allocator<XString>());
     
     obj->mVector.push_back(1);
     obj->mVector.push_back(3);
@@ -76,11 +76,11 @@ void fillSmallContainers(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     }
 
     for (auto i = 0; i < 10; ++i) {
-        obj->mStringVector.emplace_back(xbuf.make<XString>("abcdefghijklmnopqrstuvwxyz"));
+        obj->mStringVector.emplace_back(XString("abcdefghijklmnopqrstuvwxyz", xbuf.allocator<XString>()));
     }
 
     for (auto i = 0; i < 13; ++i) {
-        obj->mStringSet.emplace(xbuf.make<XString>("stringinset"));
+        obj->mStringSet.emplace(XString("stringinset", xbuf.allocator<XString>()));
         obj->mSet.insert(i);
     }
 }
@@ -92,10 +92,9 @@ void fillLargeNestedData(ComprehensiveTestType* obj, XBufferExt& xbuf) {
     // Complex map with nested vectors
     for (auto i = 0; i < 7; ++i) {
         std::string key = "stringinset" + std::to_string(i);
-        XString xkey = xbuf.make<XString>(key);
-        ComprehensiveTestType::TestTypeInner xvalue(xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
-        obj->mComplexMap.emplace(xkey, xvalue);
-        auto& vec = obj->mComplexMap.find(xkey)->second.mVector;
+        XString xkey = XString(key.c_str(), xbuf.allocator<XString>());
+        auto [it, inserted] = obj->mComplexMap.try_emplace(xkey, xbuf.allocator<ComprehensiveTestType::TestTypeInner>());
+        auto& vec = it->second.mVector;
         for (int j = 0; j < 100; ++j) {
             vec.insert(vec.end(), {7, 8, 9, 10, 11, 12});
         }

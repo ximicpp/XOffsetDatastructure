@@ -61,8 +61,8 @@ bool test_memory_stats() {
     // Test 4: After adding strings
     std::cout << "Test 4: After adding strings... ";
     for (int i = 0; i < 20; ++i) {
-        std::string str = "TestString_" + std::to_string(i);
-        obj->strings.emplace_back(xbuf.make<XString>(str));
+        std::string str = "String_" + std::to_string(i);
+        obj->strings.emplace_back(XString(str.c_str(), xbuf.allocator<XString>()));
     }
     auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats4.used_size > stats3.used_size);
