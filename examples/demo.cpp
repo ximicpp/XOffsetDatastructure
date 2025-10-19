@@ -32,11 +32,11 @@ void print_subsection(const std::string& title) {
 }
 
 void print_check(const std::string& msg) {
-    std::cout << "  ✓ " << msg << "\n";
+    std::cout << "  [OK] " << msg << "\n";
 }
 
 void print_info(const std::string& key, const std::string& value) {
-    std::cout << "  • " << std::left << std::setw(20) << key << ": " << value << "\n";
+    std::cout << "  " << std::left << std::setw(20) << key << ": " << value << "\n";
 }
 
 // ============================================================================
@@ -189,10 +189,10 @@ void demo_serialization() {
         );
         
         if (integrity_ok) {
-            print_check("Data integrity verified ✓");
+            print_check("Data integrity verified");
         }
     } else {
-        std::cout << "  ✗ Deserialization failed\n";
+        std::cout << "  [FAIL] Deserialization failed\n";
     }
 }
 
@@ -262,8 +262,8 @@ void demo_performance() {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     
     print_info("Operations", "1000 item insertions");
-    print_info("Time", std::to_string(duration.count()) + " μs");
-    print_info("Avg per Item", std::to_string(duration.count() / 1000.0) + " μs");
+    print_info("Time", std::to_string(duration.count()) + " us");
+    print_info("Avg per Item", std::to_string(duration.count() / 1000.0) + " us");
 }
 
 // ============================================================================
@@ -292,10 +292,10 @@ void demo_advanced_features() {
     print_check("Zero-copy deserialization");
     
     print_subsection("Future Enhancements (Planned)");
-    std::cout << "  ○ C++26 reflection-based compaction\n";
-    std::cout << "  ○ Schema versioning and migration\n";
-    std::cout << "  ○ JSON export/import\n";
-    std::cout << "  ○ Performance benchmarking suite\n";
+    std::cout << "  - C++26 reflection-based compaction\n";
+    std::cout << "  - Schema versioning and migration\n";
+    std::cout << "  - JSON export/import\n";
+    std::cout << "  - Performance benchmarking suite\n";
 }
 
 // ============================================================================
