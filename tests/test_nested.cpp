@@ -42,13 +42,13 @@ bool test_nested_structures() {
     std::cout << "\n[TEST] Nested Structures\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* obj = xbuf.construct<OuterObject>("Nested")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* obj = xbuf.make<OuterObject>("Nested");
     
     // Test 1: Initialize nested structure
     std::cout << "Test 1: Initialize nested objects... ";
-    obj->title = XString("OuterTitle", xbuf.get_segment_manager());
-    obj->middle.name = XString("MiddleName", xbuf.get_segment_manager());
+    obj->title = xbuf.make<XString>("OuterTitle");
+    obj->middle.name = xbuf.make<XString>("MiddleName");
     obj->middle.inner.id = 42;
     for (int i = 0; i < 10; ++i) {
         obj->middle.inner.data.push_back(i * 2);
@@ -67,7 +67,7 @@ bool test_nested_structures() {
     // Test 3: Vector of nested objects
     std::cout << "Test 3: Vector of nested objects... ";
     for (int i = 0; i < 5; ++i) {
-        obj->innerList.emplace_back(xbuf.get_segment_manager());
+        obj->innerList.emplace_back(xbuf.allocator<InnerObject>());
         obj->innerList.back().id = i * 100;
         for (int j = 0; j < i + 1; ++j) {
             obj->innerList.back().data.push_back(j);
@@ -91,7 +91,7 @@ bool test_nested_structures() {
     // Test 5: Persistence
     std::cout << "Test 5: Persistence of nested structures... ";
     auto* buffer = xbuf.get_buffer();
-    XBuffer loaded_buf(buffer->data(), buffer->size());
+    XBufferExt loaded_buf(buffer->data(), buffer->size());
     auto* loaded = loaded_buf.find<OuterObject>("Nested").first;
     
     assert(loaded->title == "OuterTitle");

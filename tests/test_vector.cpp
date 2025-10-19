@@ -25,8 +25,8 @@ bool test_vector_operations() {
     std::cout << "\n[TEST] Vector Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<VectorTest>("VectorTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<VectorTest>("VectorTest");
     
     // Test 1: push_back
     std::cout << "Test 1: push_back operations... ";
@@ -50,7 +50,7 @@ bool test_vector_operations() {
     std::cout << "Test 3: String vector operations... ";
     for (int i = 0; i < 10; ++i) {
         std::string str = "String_" + std::to_string(i);
-        obj->stringVector.emplace_back(str.c_str(), xbuf.get_segment_manager());
+        obj->stringVector.emplace_back(xbuf.make<XString>(str));
     }
     assert(obj->stringVector.size() == 10);
     assert(obj->stringVector[0] == "String_0");
@@ -76,7 +76,7 @@ bool test_vector_operations() {
     // Test 6: Persistence
     std::cout << "Test 6: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
-    XBuffer loaded_buf(buffer->data(), buffer->size());
+    XBufferExt loaded_buf(buffer->data(), buffer->size());
     auto* loaded_obj = loaded_buf.find<VectorTest>("VectorTest").first;
     assert(loaded_obj->floatVector.size() == 100);
     assert(loaded_obj->stringVector.size() == 10);

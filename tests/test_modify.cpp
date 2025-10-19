@@ -31,8 +31,8 @@ bool test_modify_basic_types() {
     std::cout << "\n[TEST] Modify Basic Types\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Initialize values
     std::cout << "Test 1: Initialize basic values... ";
@@ -87,8 +87,8 @@ bool test_modify_vector() {
     std::cout << "\n[TEST] Modify Vector Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Add elements
     std::cout << "Test 1: Add elements to vector... ";
@@ -148,30 +148,29 @@ bool test_modify_vector_string() {
     std::cout << "\n[TEST] Modify Vector of Strings\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Add string elements
     std::cout << "Test 1: Add string elements... ";
-    data->names.emplace_back("Alice", xbuf.get_segment_manager());
-    data->names.emplace_back("Bob", xbuf.get_segment_manager());
-    data->names.emplace_back("Carol", xbuf.get_segment_manager());
+    data->names.emplace_back(xbuf.make<XString>("Alice"));
+    data->names.emplace_back(xbuf.make<XString>("Bob"));
+    data->names.emplace_back(xbuf.make<XString>("Carol"));
     assert(data->names.size() == 3);
     assert(data->names[0] == "Alice");
     std::cout << "[OK]\n";
     
     // Test 2: Modify string element
     std::cout << "Test 2: Modify string element... ";
-    data->names[1] = XString("Bobby", xbuf.get_segment_manager());
+    data->names[1] = xbuf.make<XString>("Bobby");
     assert(data->names[1] == "Bobby");
     std::cout << "[OK]\n";
     
     // Test 3: Modify via iterator
     std::cout << "Test 3: Append to strings via iterator... ";
     for (auto& name : data->names) {
-        XString suffix("_Modified", xbuf.get_segment_manager());
-        name = XString((std::string(name.c_str()) + std::string(suffix.c_str())).c_str(), 
-                       xbuf.get_segment_manager());
+        XString suffix = xbuf.make<XString>("_Modified");
+        name = xbuf.make<XString>(std::string(name.c_str()) + std::string(suffix.c_str()));
     }
     assert(data->names[0] == "Alice_Modified");
     assert(data->names[1] == "Bobby_Modified");
@@ -181,7 +180,7 @@ bool test_modify_vector_string() {
     // Test 4: Insert new element
     std::cout << "Test 4: Insert new element... ";
     auto it = data->names.begin() + 1;
-    data->names.insert(it, XString("David", xbuf.get_segment_manager()));
+    data->names.insert(it, xbuf.make<XString>("David"));
     assert(data->names.size() == 4);
     assert(data->names[1] == "David");
     assert(data->names[2] == "Bobby_Modified");
@@ -202,36 +201,36 @@ bool test_modify_map() {
     std::cout << "\n[TEST] Modify Map Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Add key-value pairs
     std::cout << "Test 1: Add key-value pairs... ";
-    data->scores.emplace(XString("Alice", xbuf.get_segment_manager()), 85);
-    data->scores.emplace(XString("Bob", xbuf.get_segment_manager()), 90);
-    data->scores.emplace(XString("Carol", xbuf.get_segment_manager()), 78);
+    data->scores.emplace(xbuf.make<XString>("Alice"), 85);
+    data->scores.emplace(xbuf.make<XString>("Bob"), 90);
+    data->scores.emplace(xbuf.make<XString>("Carol"), 78);
     assert(data->scores.size() == 3);
     std::cout << "[OK]\n";
     
     // Test 2: Modify existing value by key
     std::cout << "Test 2: Modify value by key... ";
-    auto it = data->scores.find(XString("Alice", xbuf.get_segment_manager()));
+    auto it = data->scores.find(xbuf.make<XString>("Alice"));
     assert(it != data->scores.end());
     it->second = 95;
-    assert(data->scores.find(XString("Alice", xbuf.get_segment_manager()))->second == 95);
+    assert(data->scores.find(xbuf.make<XString>("Alice"))->second == 95);
     std::cout << "[OK]\n";
     
     // Test 3: Modify via operator[]
     std::cout << "Test 3: Modify via operator[]... ";
-    data->scores[XString("Bob", xbuf.get_segment_manager())] = 92;
-    assert(data->scores[XString("Bob", xbuf.get_segment_manager())] == 92);
+    data->scores[xbuf.make<XString>("Bob")] = 92;
+    assert(data->scores[xbuf.make<XString>("Bob")] == 92);
     std::cout << "[OK]\n";
     
     // Test 4: Add new entry via operator[]
     std::cout << "Test 4: Add via operator[]... ";
-    data->scores[XString("David", xbuf.get_segment_manager())] = 88;
+    data->scores[xbuf.make<XString>("David")] = 88;
     assert(data->scores.size() == 4);
-    assert(data->scores[XString("David", xbuf.get_segment_manager())] == 88);
+    assert(data->scores[xbuf.make<XString>("David")] == 88);
     std::cout << "[OK]\n";
     
     // Test 5: Modify all values via iterator
@@ -239,17 +238,17 @@ bool test_modify_map() {
     for (auto& pair : data->scores) {
         pair.second += 5;
     }
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 100);
-    assert(data->scores[XString("Bob", xbuf.get_segment_manager())] == 97);
-    assert(data->scores[XString("Carol", xbuf.get_segment_manager())] == 83);
-    assert(data->scores[XString("David", xbuf.get_segment_manager())] == 93);
+    assert(data->scores[xbuf.make<XString>("Alice")] == 100);
+    assert(data->scores[xbuf.make<XString>("Bob")] == 97);
+    assert(data->scores[xbuf.make<XString>("Carol")] == 83);
+    assert(data->scores[xbuf.make<XString>("David")] == 93);
     std::cout << "[OK]\n";
     
     // Test 6: Erase entry
     std::cout << "Test 6: Erase entry... ";
-    data->scores.erase(XString("Carol", xbuf.get_segment_manager()));
+    data->scores.erase(xbuf.make<XString>("Carol"));
     assert(data->scores.size() == 3);
-    assert(data->scores.find(XString("Carol", xbuf.get_segment_manager())) == data->scores.end());
+    assert(data->scores.find(xbuf.make<XString>("Carol")) == data->scores.end());
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All map modification tests passed!\n";
@@ -260,8 +259,8 @@ bool test_modify_set() {
     std::cout << "\n[TEST] Modify Set Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Add elements
     std::cout << "Test 1: Add elements to set... ";
@@ -311,8 +310,8 @@ bool test_modify_mixed_operations() {
     std::cout << "\n[TEST] Mixed Modification Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(16384);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(16384);
+    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Test 1: Initialize all fields
     std::cout << "Test 1: Initialize all fields... ";
@@ -324,11 +323,11 @@ bool test_modify_mixed_operations() {
         data->numbers.push_back(i);
     }
     
-    data->names.emplace_back("Alice", xbuf.get_segment_manager());
-    data->names.emplace_back("Bob", xbuf.get_segment_manager());
+    data->names.emplace_back(xbuf.make<XString>("Alice"));
+    data->names.emplace_back(xbuf.make<XString>("Bob"));
     
-    data->scores.emplace(XString("Alice", xbuf.get_segment_manager()), 80);
-    data->scores.emplace(XString("Bob", xbuf.get_segment_manager()), 85);
+    data->scores.emplace(xbuf.make<XString>("Alice"), 80);
+    data->scores.emplace(xbuf.make<XString>("Bob"), 85);
     
     data->tags.insert(1);
     data->tags.insert(2);
@@ -341,14 +340,14 @@ bool test_modify_mixed_operations() {
     data->active = false;
     
     data->numbers[0] = 999;
-    data->names[0] = XString("Alicia", xbuf.get_segment_manager());
-    data->scores[XString("Alice", xbuf.get_segment_manager())] = 95;
+    data->names[0] = xbuf.make<XString>("Alicia");
+    data->scores[xbuf.make<XString>("Alice")] = 95;
     data->tags.insert(3);
     
     assert(data->counter == 100);
     assert(data->numbers[0] == 999);
     assert(data->names[0] == "Alicia");
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 95);
+    assert(data->scores[xbuf.make<XString>("Alice")] == 95);
     assert(data->tags.find(3) != data->tags.end());
     std::cout << "[OK]\n";
     
@@ -379,7 +378,7 @@ bool test_modify_mixed_operations() {
     }
     
     assert(data->numbers[0] == 1998);
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 85);
+    assert(data->scores[xbuf.make<XString>("Alice")] == 85);
     assert(data->tags.size() == 8);  // 1,2,3,10,11,12,13,14
     std::cout << "[OK]\n";
     
@@ -387,13 +386,13 @@ bool test_modify_mixed_operations() {
     std::cout << "Test 5: Serialize to memory... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     
-    XBuffer new_xbuf(buffer);
+    XBufferExt new_xbuf(buffer);
     auto [new_data, new_found] = new_xbuf.find<ModifyTestData>("ModifyTest");
     assert(new_found);
     assert(new_data->counter == 100);
     assert(new_data->numbers[0] == 1998);
     assert(new_data->names[0] == "Alicia");
-    assert(new_data->scores[XString("Alice", xbuf.get_segment_manager())] == 85);
+    assert(new_data->scores[xbuf.make<XString>("Alice")] == 85);
     assert(new_data->tags.size() == 8);
     std::cout << "[OK]\n";
     
