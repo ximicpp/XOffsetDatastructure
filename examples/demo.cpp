@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <chrono>
 #include "../xoffsetdatastructure2.hpp"
 #include "../generated/game_data.hpp"
 
