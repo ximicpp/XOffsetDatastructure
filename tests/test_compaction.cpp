@@ -103,7 +103,7 @@ bool test_memory_stats() {
     assert(found_obj->data.size() == 100);
     assert(found_obj->strings.size() == 20);
     assert(found_obj->data[50] == 50);
-    assert(found_obj->strings[10] == "TestString_10");
+    assert(found_obj->strings[10] == "String_10");
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All memory statistics tests passed!\n";
