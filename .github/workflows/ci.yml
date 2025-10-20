@@ -299,7 +299,12 @@ jobs:
           pip3 install pyyaml
       
       - name: Select Xcode version
-        run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+        run: |
+          # List available Xcode versions
+          ls /Applications/ | grep Xcode || true
+          # Use the default Xcode (usually latest)
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
       
       - name: Configure CMake for iOS
         run: |
