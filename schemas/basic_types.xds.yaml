@@ -19,6 +19,6 @@ types:
       - name: mBool
         type: bool
         default: false
-      - name: mLongLong
-        type: long long
+      - name: mInt64
+        type: int64_t
         default: 0

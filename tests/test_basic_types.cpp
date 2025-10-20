@@ -24,7 +24,7 @@ bool test_basic_types() {
     obj->mDouble = 2.71828;
     obj->mChar = 'A';
     obj->mBool = true;
-    obj->mLongLong = 9223372036854775807LL;
+    obj->mInt64 = 9223372036854775807LL;
     
     // Verify
     assert(obj->mInt == 42);
@@ -32,7 +32,7 @@ bool test_basic_types() {
     assert(obj->mDouble == 2.71828);
     assert(obj->mChar == 'A');
     assert(obj->mBool == true);
-    assert(obj->mLongLong == 9223372036854775807LL);
+    assert(obj->mInt64 == 9223372036854775807LL);
     
     // Test persistence
     auto* buffer = xbuf.get_buffer();
@@ -44,7 +44,7 @@ bool test_basic_types() {
     assert(loaded_obj->mDouble == 2.71828);
     assert(loaded_obj->mChar == 'A');
     assert(loaded_obj->mBool == true);
-    assert(loaded_obj->mLongLong == 9223372036854775807LL);
+    assert(loaded_obj->mInt64 == 9223372036854775807LL);
     
     std::cout << "[PASS] All basic type tests passed!\n";
     return true;
