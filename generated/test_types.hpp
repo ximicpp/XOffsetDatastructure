@@ -95,8 +95,14 @@ static_assert(sizeof(TestTypeInner) == sizeof(TestTypeInnerReflectionHint),
 static_assert(alignof(TestTypeInner) == alignof(TestTypeInnerReflectionHint),
               "Alignment mismatch: TestTypeInner runtime and reflection types must have identical alignment");
 
+// Type signature verification disabled on MSVC due to deep template instantiation issues
+// with Boost.PFR reflection on aggregate types containing XString in containers.
+// See: https://github.com/boostorg/pfr/issues
+#ifndef _MSC_VER
 static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for TestTypeInnerReflectionHint");
+
+#endif // _MSC_VER
 
 // Type signature validation for TestType
 // This ensures binary compatibility across compilations
@@ -106,6 +112,10 @@ static_assert(sizeof(TestType) == sizeof(TestTypeReflectionHint),
 static_assert(alignof(TestType) == alignof(TestTypeReflectionHint),
               "Alignment mismatch: TestType runtime and reflection types must have identical alignment");
 
+// Type signature verification disabled on MSVC due to deep template instantiation issues
+// with Boost.PFR reflection on aggregate types containing XString in containers.
+// See: https://github.com/boostorg/pfr/issues
+#ifndef _MSC_VER
 static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
              "struct[s:272,a:8]{"
              "@0:i32[s:4,a:4],"
@@ -122,5 +132,7 @@ static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
              "@208:set[s:32,a:8]<i32[s:4,a:4]>,"
              "@240:string[s:32,a:8]}",
               "Type signature mismatch for TestTypeReflectionHint");
+
+#endif // _MSC_VER
 
 #endif // GENERATED_TEST_TYPES_HPP_

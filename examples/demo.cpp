@@ -206,16 +206,23 @@ void demo_type_signatures() {
     
     print_subsection("Type Signature Information");
     
+#ifndef _MSC_VER
+    // Type signature display (works on Clang/GCC, disabled on MSVC)
     constexpr auto item_sig = XTypeSignature::get_XTypeSignature<ItemReflectionHint>();
     constexpr auto game_sig = XTypeSignature::get_XTypeSignature<GameDataReflectionHint>();
     
     print_info("Item Signature", std::string(item_sig.value));
     std::cout << "\n";
     print_info("GameData Signature", std::string(game_sig.value));
+#else
+    std::cout << "  Type signature display is disabled on MSVC due to compiler limitations.\n";
+    std::cout << "  However, size/alignment validation is still enforced at compile-time.\n";
+#endif
+    std::cout << "\n";
     
     print_subsection("Benefits");
     print_check("Binary compatibility across compilations");
-    print_check("Automatic verification at compile-time");
+    print_check("Automatic verification at compile-time (size/alignment)");
     print_check("Prevents data corruption from layout changes");
     print_check("Type-safe offset calculations");
 }
