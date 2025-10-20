@@ -51,7 +51,19 @@ endfunction()
 enable_testing()
 
 # Find Python for code generation
-find_package(Python3 COMPONENTS Interpreter)
+# On Windows, prefer the Python from environment if set
+if(WIN32 AND DEFINED ENV{Python3_EXECUTABLE})
+    set(Python3_EXECUTABLE $ENV{Python3_EXECUTABLE} CACHE FILEPATH "Path to Python3 executable")
+    message(STATUS "Using Python from environment: ${Python3_EXECUTABLE}")
+elseif(WIN32 AND DEFINED ENV{pythonLocation})
+    # GitHub Actions sets pythonLocation
+    set(Python3_EXECUTABLE "$ENV{pythonLocation}/python.exe" CACHE FILEPATH "Path to Python3 executable")
+    message(STATUS "Using Python from GitHub Actions: ${Python3_EXECUTABLE}")
+endif()
+
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+message(STATUS "Python3 executable: ${Python3_EXECUTABLE}")
+message(STATUS "Python3 version: ${Python3_VERSION}")
 
 # Set Boost include directories
 set(BOOST_INCLUDE_DIRS
