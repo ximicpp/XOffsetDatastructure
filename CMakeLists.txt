@@ -5,7 +5,7 @@ project(XOffsetDatastructure)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# macOS specific settings
+# macOS and iOS specific settings
 if(APPLE)
     # Use the system C++ library
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
@@ -15,11 +15,37 @@ if(APPLE)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
     set(CMAKE_INSTALL_RPATH "@executable_path;@loader_path")
     
-    # Ensure we use the correct deployment target
-    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version" FORCE)
+    # iOS specific settings
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # Set code signing identity (use automatic for CI)
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO")
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO")
+        
+        # Set development team (empty for unsigned builds)
+        set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "")
+        
+        message(STATUS "Configuring for iOS platform")
+    else()
+        # Ensure we use the correct deployment target for macOS
+        if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version" FORCE)
+        endif()
     endif()
 endif()
+
+# Helper function to set iOS bundle identifier
+function(set_ios_bundle_id target)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set_target_properties(${target} PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME ${target}
+            MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.xoffsetdatastructure.${target}"
+        )
+    endif()
+endfunction()
 
 # Enable testing
 enable_testing()

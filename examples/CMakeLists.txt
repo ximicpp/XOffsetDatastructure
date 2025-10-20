@@ -12,6 +12,7 @@ set_target_properties(helloworld
 if(Python3_FOUND)
     add_dependencies(helloworld generate_schemas)
 endif()
+set_ios_bundle_id(helloworld)
 
 # Comprehensive Demo
 add_executable(demo demo.cpp)
@@ -27,6 +28,7 @@ set_target_properties(demo
 if(Python3_FOUND)
     add_dependencies(demo generate_schemas)
 endif()
+set_ios_bundle_id(demo)
 
 # macOS specific: disable RPATH and use system libraries
 if(APPLE)
