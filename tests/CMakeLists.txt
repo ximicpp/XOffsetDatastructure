@@ -18,6 +18,8 @@ function(configure_macos_target target_name)
             -Wl,-rpath,/usr/local/lib
         )
     endif()
+    # Set iOS bundle identifier if building for iOS
+    set_ios_bundle_id(${target_name})
 endfunction()
 
 # Test executables
