@@ -52,9 +52,9 @@ bool test_vector_operations() {
         std::string str = "String_" + std::to_string(i);
         obj->stringVector.emplace_back(XString(str.c_str(), xbuf.allocator<XString>()));
     }
-    assert(obj->stringVector.size() == 10);
+    assert(obj->stringVector.size() == 20);
     assert(obj->stringVector[0] == "String_0");
-    assert(obj->stringVector[9] == "String_9");
+    assert(obj->stringVector[19] == "String_19");
     std::cout << "[OK]\n";
     
     // Test 4: Iteration
@@ -79,8 +79,9 @@ bool test_vector_operations() {
     XBufferExt loaded_buf(buffer->data(), buffer->size());
     auto* loaded_obj = loaded_buf.find<VectorTest>("VectorTest").first;
     assert(loaded_obj->floatVector.size() == 100);
-    assert(loaded_obj->stringVector.size() == 10);
+    assert(loaded_obj->stringVector.size() == 20);
     assert(loaded_obj->stringVector[5] == "String_5");
+    assert(loaded_obj->stringVector[19] == "String_19");
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All vector tests passed!\n";
