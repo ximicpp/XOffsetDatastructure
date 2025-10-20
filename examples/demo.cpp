@@ -7,7 +7,13 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+// Conditional chrono include to avoid Clang-14 + libstdc++-14 conflicts
+#if !defined(__clang__) || __clang_major__ >= 15
 #include <chrono>
+#define HAS_CHRONO 1
+#else
+#define HAS_CHRONO 0
+#endif
 #include "../xoffsetdatastructure2.hpp"
 #include "../generated/game_data.hpp"
 
@@ -252,7 +258,9 @@ void demo_performance() {
     print_subsection("Benchmarking Example");
     XBufferExt xbuf(65536);  // 64KB buffer for 1000 items
     
+#if HAS_CHRONO
     auto start = std::chrono::high_resolution_clock::now();
+#endif
     
     // Insert 1000 items using emplace_back for better performance
     auto* game = xbuf.make<GameData>("perf_test");
@@ -267,12 +275,17 @@ void demo_performance() {
         );
     }
     
+#if HAS_CHRONO
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     
     print_info("Operations", "1000 item insertions");
     print_info("Time", std::to_string(duration.count()) + " us");
     print_info("Avg per Item", std::to_string(duration.count() / 1000.0) + " us");
+#else
+    print_info("Operations", "1000 item insertions");
+    print_info("Note", "Timing skipped (chrono unavailable on this compiler)");
+#endif
 }
 
 // ============================================================================
