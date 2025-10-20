@@ -86,20 +86,12 @@ namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
 
-    // Type size validations
-    static_assert(sizeof(char) == 1, "char must be 1 byte");
-    static_assert(sizeof(bool) == 1, "bool must be 1 byte");
-    static_assert(sizeof(short) == 2, "short must be 2 bytes");
-    static_assert(sizeof(int) == 4, "int must be 4 bytes");
-    #ifdef _MSC_VER
-    static_assert(sizeof(long) == 4, "long must be 4 bytes on Windows");
-    #else
-    static_assert(sizeof(long) == 8, "long must be 8 bytes on Unix-like systems");
-    #endif
-    static_assert(sizeof(long long) == 8, "long long must be 8 bytes");
-    static_assert(sizeof(float) == 4, "float must be 4 bytes");
-    static_assert(sizeof(double) == 8, "double must be 8 bytes");
-    static_assert(sizeof(long double) >= 8, "long double must be at least 8 bytes");
+    // ========================================================================
+    // Type Size Validations
+    // ========================================================================
+    // Only validate types we actually use. See docs/CROSS_PLATFORM_TYPES.md
+    
+    // Fixed-size integer types (safe and recommended)
     static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
     static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
     static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
@@ -108,10 +100,19 @@ namespace XTypeSignature {
     static_assert(sizeof(uint32_t) == 4, "uint32_t must be 4 bytes");
     static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
     static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
-    static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes");
+    
+    // Floating point types
+    static_assert(sizeof(float) == 4, "float must be 4 bytes");
+    static_assert(sizeof(double) == 8, "double must be 8 bytes");
+    
+    // Character and boolean types
+    static_assert(sizeof(char) == 1, "char must be 1 byte");
+    static_assert(sizeof(bool) == 1, "bool must be 1 byte");
+    
+    // Platform requirements
+    static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
     static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
-    static_assert(alignof(max_align_t) >= 8, "Maximum alignment must be at least 8 bytes");
-    static_assert(sizeof(size_t) == 8, "64-bit architecture required");
+    static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
     static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
 
     template <typename T>
