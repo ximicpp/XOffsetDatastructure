@@ -56,7 +56,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-macos-${{ matrix.build_type }}
           path: build/Testing/
@@ -121,7 +121,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-linux-${{ matrix.compiler }}-${{ matrix.build_type }}
           path: build/Testing/
@@ -187,7 +187,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-windows-msvc-${{ matrix.build_type }}
           path: build/Testing/
@@ -260,7 +260,7 @@ jobs:
             adb shell "cd /data/local/tmp && ./demo"
       
       - name: Upload Android binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-binaries-${{ matrix.abi }}
           path: build-android-${{ matrix.abi }}/bin/
@@ -339,7 +339,7 @@ jobs:
           done
       
       - name: Upload iOS binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ios-binaries-${{ matrix.platform }}
           path: build-${{ matrix.platform }}/bin/
@@ -354,7 +354,7 @@ jobs:
     
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       
       - name: Check binary compatibility
         run: |
