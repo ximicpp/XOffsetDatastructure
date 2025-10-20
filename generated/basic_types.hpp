@@ -16,13 +16,13 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypes {
 
 	// Full constructor for emplace_back
 	template <typename Allocator>
-	BasicTypes(Allocator allocator, int mInt_val, float mFloat_val, double mDouble_val, char mChar_val, bool mBool_val, long long mLongLong_val)
+	BasicTypes(Allocator allocator, int mInt_val, float mFloat_val, double mDouble_val, char mChar_val, bool mBool_val, int64_t mInt64_val)
 		: mInt(mInt_val)
 		, mFloat(mFloat_val)
 		, mDouble(mDouble_val)
 		, mChar(mChar_val)
 		, mBool(mBool_val)
-		, mLongLong(mLongLong_val)
+		, mInt64(mInt64_val)
 	{}
 
 	int mInt{0};
@@ -30,7 +30,7 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypes {
 	double mDouble{0.0};
 	char mChar{'\0'};
 	bool mBool{false};
-	long long mLongLong{0};
+	int64_t mInt64{0};
 };
 
 // ============================================================================
@@ -47,7 +47,7 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypesReflectionHint {
 	double mDouble;
 	char mChar;
 	bool mBool;
-	long long mLongLong;
+	int64_t mInt64;
 };
 
 // ============================================================================
