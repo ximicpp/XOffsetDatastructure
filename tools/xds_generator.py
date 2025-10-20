@@ -416,12 +416,18 @@ class CodeGenerator:
         lines.append(f"// This ensures binary compatibility across compilations")
         lines.append("")
         
-        # Size and alignment validation
+        # Size and alignment validation (always enabled)
         lines.append(f"static_assert(sizeof({struct.name}) == sizeof({struct.name}ReflectionHint),")
         lines.append(f'              "Size mismatch: {struct.name} runtime and reflection types must have identical size");')
         lines.append(f"static_assert(alignof({struct.name}) == alignof({struct.name}ReflectionHint),")
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
+        
+        # Type signature validation (disabled on MSVC due to template instantiation issues)
+        lines.append("// Type signature verification disabled on MSVC due to deep template instantiation issues")
+        lines.append("// with Boost.PFR reflection on aggregate types containing XString in containers.")
+        lines.append("// See: https://github.com/boostorg/pfr/issues")
+        lines.append("#ifndef _MSC_VER")
         
         # Calculate expected type signature
         expected_sig = TypeSignatureCalculator.get_struct_signature(struct, self.struct_map)
@@ -479,6 +485,8 @@ class CodeGenerator:
             lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() == \"{expected_sig}\",")
             lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
         
+        lines.append("")
+        lines.append("#endif // _MSC_VER")
         lines.append("")
         
         return "\n".join(lines)

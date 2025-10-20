@@ -74,12 +74,27 @@ if exist "bin\Release\test_compaction.exe" (
     echo [5/5] test_compaction.exe not found (skipped)
 )
 
+:: Run MSVC compatibility test
+if exist "bin\Release\test_msvc_compat.exe" (
+    echo.
+    echo [Bonus] Running MSVC Compatibility Test...
+    bin\Release\test_msvc_compat.exe
+    if errorlevel 1 set TEST_FAILED=1
+) else (
+    echo [Bonus] test_msvc_compat.exe not found (skipped)
+)
+
 :: Run the demo after tests
 echo.
 echo ======================================================================
-echo Running XOffsetDatastructure Demo v2
+echo Running XOffsetDatastructure Demo
 echo ======================================================================
-bin\Release\xoffsetdatastructure2_demo.exe --visualize --compact
+if exist "bin\Release\demo.exe" (
+    bin\Release\demo.exe
+) else (
+    echo demo.exe not found!
+    set TEST_FAILED=1
+)
 
 :: Return to original directory
 cd ..
