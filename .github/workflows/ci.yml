@@ -2,9 +2,9 @@ name: Cross-Platform CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, next_practical ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, next_practical ]
   workflow_dispatch:
 
 jobs:
