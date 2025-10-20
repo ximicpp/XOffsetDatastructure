@@ -107,67 +107,19 @@ set_target_properties(test_platform PROPERTIES
 )
 configure_macos_target(test_platform)
 
-# MSVC compatibility test
+# MSVC compatibility test (comprehensive test suite for MSVC-specific issues)
 add_executable(test_msvc_compat test_msvc_compat.cpp)
-target_include_directories(test_msvc_compat PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+target_include_directories(test_msvc_compat PRIVATE 
+    ${BOOST_INCLUDE_DIRS} 
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/generated
+)
 set_target_properties(test_msvc_compat PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 configure_macos_target(test_msvc_compat)
-
-# Minimal allocator test
-add_executable(test_minimal_alloc test_minimal_alloc.cpp)
-target_include_directories(test_minimal_alloc PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_minimal_alloc PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_minimal_alloc)
-
-# Nested struct allocator test
-add_executable(test_nested_alloc test_nested_alloc.cpp)
-target_include_directories(test_nested_alloc PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_nested_alloc PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_nested_alloc)
-
-# Init order test
-add_executable(test_init_order test_init_order.cpp)
-target_include_directories(test_init_order PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_init_order PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_init_order)
-
-# Manual GameData test
-add_executable(test_manual_gamedata test_manual_gamedata.cpp)
-target_include_directories(test_manual_gamedata PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_manual_gamedata PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_manual_gamedata)
-
-# Static assert test
-add_executable(test_static_assert test_static_assert.cpp)
-target_include_directories(test_static_assert PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_static_assert PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_static_assert)
-
-# Demo reproduction test
 if(Python3_FOUND)
-    add_executable(test_demo_repro test_demo_repro.cpp)
-    target_include_directories(test_demo_repro PRIVATE 
-        ${BOOST_INCLUDE_DIRS} 
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/generated
-    )
-    set_target_properties(test_demo_repro PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    )
-    configure_macos_target(test_demo_repro)
-    add_dependencies(test_demo_repro generate_schemas)
+    add_dependencies(test_msvc_compat generate_schemas)
 endif()
 
 # Generated types test
