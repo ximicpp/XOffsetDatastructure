@@ -85,7 +85,7 @@ bool test_aligned_allocation() {
     assert(aligned->a == 1);
     assert(aligned->b == 2);
     assert(aligned->c == 3.14);
-    assert(aligned->name == std::string("AlignedData"));
+    assert(aligned->name == "AlignedData");
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] Aligned allocation tests passed!\n";
@@ -114,7 +114,7 @@ bool test_serialization_with_alignment() {
     assert(loaded_data->a == 1);
     assert(loaded_data->b == 2);
     assert(loaded_data->c == 2.718);
-    assert(loaded_data->name == std::string("TestData"));
+    assert(loaded_data->name == "TestData");
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] Serialization with alignment tests passed!\n";
@@ -155,8 +155,8 @@ bool test_mixed_alignment() {
     auto [u, fu] = loaded.find_ex<UnalignedStruct>("Unaligned");
     
     assert(fa && fu);
-    assert(a->name == std::string("Aligned"));
-    assert(u->name == std::string("Unaligned"));
+    assert(a->name == "Aligned");
+    assert(u->name == "Unaligned");
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] Mixed alignment tests passed!\n";
