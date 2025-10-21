@@ -422,12 +422,13 @@ jobs:
           done
           echo ""
           
-          # Search for executables
+          # Search for executables (both standalone and inside .app bundles)
           echo "Step 4: Looking for test_msvc_compat and demo..."
           TEST_EXEC=""
           DEMO_EXEC=""
           
           for path in "${POSSIBLE_PATHS[@]}"; do
+            # Check for standalone executables first
             if [ -f "$path/test_msvc_compat" ]; then
               TEST_EXEC="$path/test_msvc_compat"
               echo "  ✓ Found test_msvc_compat: $TEST_EXEC"
@@ -436,13 +437,23 @@ jobs:
               DEMO_EXEC="$path/demo"
               echo "  ✓ Found demo: $DEMO_EXEC"
             fi
+            
+            # Check inside .app bundles (iOS typical structure)
+            if [ -z "$TEST_EXEC" ] && [ -f "$path/test_msvc_compat.app/test_msvc_compat" ]; then
+              TEST_EXEC="$path/test_msvc_compat.app/test_msvc_compat"
+              echo "  ✓ Found test_msvc_compat in .app bundle: $TEST_EXEC"
+            fi
+            if [ -z "$DEMO_EXEC" ] && [ -f "$path/demo.app/demo" ]; then
+              DEMO_EXEC="$path/demo.app/demo"
+              echo "  ✓ Found demo in .app bundle: $DEMO_EXEC"
+            fi
           done
           
           if [ -z "$TEST_EXEC" ] && [ -z "$DEMO_EXEC" ]; then
-            echo "  ⚠ No executables found in standard locations"
+            echo "  ⚠ No executables found in standard locations or .app bundles"
             echo ""
-            echo "Performing deep search (this may take a moment)..."
-            find "build-${{ matrix.platform }}" -type f \( -name "test_msvc_compat" -o -name "demo" \) 2>/dev/null | while read -r file; do
+            echo "Performing deep search..."
+            find "build-${{ matrix.platform }}" -type f \( -name "test_msvc_compat" -o -name "demo" \) 2>/dev/null | head -5 | while read -r file; do
               echo "  Found: $file"
             done || echo "  No executables found"
           fi
