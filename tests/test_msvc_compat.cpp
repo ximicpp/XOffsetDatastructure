@@ -401,9 +401,9 @@ int main() {
         std::cout << "\n";
         std::cout << "+======================================================+\n";
         if (all_passed) {
-            std::cout << "|              ALL TESTS PASSED ✓                      |\n";
+            std::cout << "|              ALL TESTS PASSED [OK]                   |\n";
         } else {
-            std::cout << "|              SOME TESTS FAILED ✗                     |\n";
+            std::cout << "|              SOME TESTS FAILED [FAIL]                |\n";
         }
         std::cout << "+======================================================+\n";
         std::cout << "\n";
