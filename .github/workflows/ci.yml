@@ -371,17 +371,41 @@ jobs:
       - name: Run tests on iOS Simulator
         if: matrix.platform == 'iOS-simulator'
         run: |
-          # Start simulator
-          xcrun simctl boot "iPhone 15 Pro" || true
+          # List available simulators
+          echo "Available simulators:"
+          xcrun simctl list devices available
           
-          # Find and run test executables
-          cd build-${{ matrix.platform }}/bin/Release
-          for test in test_msvc_compat demo; do
-            if [ -f "$test" ]; then
-              echo "Running $test on simulator..."
-              xcrun simctl spawn booted ./$test || echo "Warning: $test failed or not executable on simulator"
-            fi
-          done
+          # Find an available iPhone simulator
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | grep -v "unavailable" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+          
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "No iPhone simulator found, trying to create one..."
+            xcrun simctl create "iPhone-Test" com.apple.CoreSimulator.SimDeviceType.iPhone-15 com.apple.CoreSimulator.SimRuntime.iOS-17-0 || true
+            SIMULATOR_ID=$(xcrun simctl list devices | grep "iPhone-Test" | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+          fi
+          
+          if [ -n "$SIMULATOR_ID" ]; then
+            echo "Using simulator: $SIMULATOR_ID"
+            # Boot simulator
+            xcrun simctl boot "$SIMULATOR_ID" || echo "Simulator already booted or boot failed"
+            
+            # Wait for boot
+            sleep 5
+            
+            # Find and run test executables
+            cd build-${{ matrix.platform }}/bin/Release
+            for test in test_msvc_compat demo; do
+              if [ -f "$test" ]; then
+                echo "Running $test on simulator..."
+                xcrun simctl spawn "$SIMULATOR_ID" ./$test || echo "Warning: $test failed or not executable on simulator"
+              fi
+            done
+            
+            # Shutdown simulator
+            xcrun simctl shutdown "$SIMULATOR_ID" || true
+          else
+            echo "Warning: Could not find or create iOS simulator, skipping simulator tests"
+          fi
       
       - name: Upload iOS binaries
         uses: actions/upload-artifact@v4
