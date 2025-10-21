@@ -40,43 +40,43 @@ bool verify_type_sizes() {
     
     // Basic types
     if (sizeof(char) != 1) {
-        std::cout << "    ❌ sizeof(char) = " << sizeof(char) << ", expected 1\n";
+        std::cout << "    [FAIL] sizeof(char) = " << sizeof(char) << ", expected 1\n";
         all_correct = false;
     }
     
     if (sizeof(int) != 4) {
-        std::cout << "    ❌ sizeof(int) = " << sizeof(int) << ", expected 4\n";
+        std::cout << "    [FAIL] sizeof(int) = " << sizeof(int) << ", expected 4\n";
         all_correct = false;
     }
     
     if (sizeof(float) != 4) {
-        std::cout << "    ❌ sizeof(float) = " << sizeof(float) << ", expected 4\n";
+        std::cout << "    [FAIL] sizeof(float) = " << sizeof(float) << ", expected 4\n";
         all_correct = false;
     }
     
     if (sizeof(double) != 8) {
-        std::cout << "    ❌ sizeof(double) = " << sizeof(double) << ", expected 8\n";
+        std::cout << "    [FAIL] sizeof(double) = " << sizeof(double) << ", expected 8\n";
         all_correct = false;
     }
     
     if (sizeof(long long) != 8) {
-        std::cout << "    ❌ sizeof(long long) = " << sizeof(long long) << ", expected 8\n";
+        std::cout << "    [FAIL] sizeof(long long) = " << sizeof(long long) << ", expected 8\n";
         all_correct = false;
     }
     
     if (sizeof(void*) != 8) {
-        std::cout << "    ❌ sizeof(void*) = " << sizeof(void*) << ", expected 8\n";
+        std::cout << "    [FAIL] sizeof(void*) = " << sizeof(void*) << ", expected 8\n";
         all_correct = false;
     }
     
     // Container types
     if (sizeof(XString) != 32) {
-        std::cout << "    ❌ sizeof(XString) = " << sizeof(XString) << ", expected 32\n";
+        std::cout << "    [FAIL] sizeof(XString) = " << sizeof(XString) << ", expected 32\n";
         all_correct = false;
     }
     
     if (all_correct) {
-        std::cout << "    ✓ All type sizes correct\n";
+        std::cout << "    [OK] All type sizes correct\n";
     }
     
     return all_correct;
@@ -95,7 +95,7 @@ bool verify_endianness() {
     
     if (bytes_u32[0] != 0x78 || bytes_u32[1] != 0x56 || 
         bytes_u32[2] != 0x34 || bytes_u32[3] != 0x12) {
-        std::cout << "    ❌ uint32_t byte order incorrect\n";
+        std::cout << "    [FAIL] uint32_t byte order incorrect\n";
         std::cout << "       Expected: 78 56 34 12\n";
         std::cout << "       Got:      " << std::hex 
                   << (int)bytes_u32[0] << " " << (int)bytes_u32[1] << " "
@@ -108,11 +108,11 @@ bool verify_endianness() {
     uint8_t* bytes_double = reinterpret_cast<uint8_t*>(&test_double);
     // IEEE 754 double 1.0 in little-endian: 00 00 00 00 00 00 F0 3F
     if (bytes_double[7] != 0x3F || bytes_double[6] != 0xF0) {
-        std::cout << "    ❌ double byte order incorrect\n";
+        std::cout << "    [FAIL] double byte order incorrect\n";
         return false;
     }
     
-    std::cout << "    ✓ Endianness is little-endian\n";
+    std::cout << "    [OK] Endianness is little-endian\n";
     return true;
 }
 
@@ -131,21 +131,21 @@ bool verify_alignment() {
     
     // Check natural alignment
     if (alignof(int) != 4) {
-        std::cout << "    ❌ alignof(int) = " << alignof(int) << ", expected 4\n";
+        std::cout << "    [FAIL] alignof(int) = " << alignof(int) << ", expected 4\n";
         return false;
     }
     
     if (alignof(double) != 8) {
-        std::cout << "    ❌ alignof(double) = " << alignof(double) << ", expected 8\n";
+        std::cout << "    [FAIL] alignof(double) = " << alignof(double) << ", expected 8\n";
         return false;
     }
     
     if (alignof(void*) != 8) {
-        std::cout << "    ❌ alignof(void*) = " << alignof(void*) << ", expected 8\n";
+        std::cout << "    [FAIL] alignof(void*) = " << alignof(void*) << ", expected 8\n";
         return false;
     }
     
-    std::cout << "    ✓ Alignment requirements met\n";
+    std::cout << "    [OK] Alignment requirements met\n";
     return true;
 }
 
@@ -197,7 +197,7 @@ bool test_binary_compatibility() {
             }
             
             if (!all_match) {
-                std::cout << "    ❌ Binary data layout incorrect\n";
+                std::cout << "    [FAIL] Binary data layout incorrect\n";
                 return false;
             }
             break;
@@ -205,11 +205,11 @@ bool test_binary_compatibility() {
     }
     
     if (!found) {
-        std::cout << "    ❌ Could not find test data in buffer\n";
+        std::cout << "    [FAIL] Could not find test data in buffer\n";
         return false;
     }
     
-    std::cout << "    ✓ Binary compatibility verified\n";
+    std::cout << "    [OK] Binary compatibility verified\n";
     return true;
 }
 
@@ -237,21 +237,21 @@ bool test_cross_buffer_compatibility() {
     auto* dst_vec = dst_buf.find<IntVector>("numbers").first;
     
     if (!dst_vec) {
-        std::cout << "    ❌ Failed to find data in destination buffer\n";
+        std::cout << "    [FAIL] Failed to find data in destination buffer\n";
         return false;
     }
     
     // Verify data integrity
     for (size_t i = 0; i < dst_vec->size(); i++) {
         if ((*dst_vec)[i] != static_cast<int>(i * 1000 + i)) {
-            std::cout << "    ❌ Data mismatch at index " << i 
+            std::cout << "    [FAIL] Data mismatch at index " << i 
                       << ": expected " << (i * 1000 + i)
                       << ", got " << (*dst_vec)[i] << "\n";
             return false;
         }
     }
     
-    std::cout << "    ✓ Cross-buffer compatibility verified\n";
+    std::cout << "    [OK] Cross-buffer compatibility verified\n";
     return true;
 }
 
@@ -276,20 +276,20 @@ bool test_platform_requirements() {
     bool is_64bit = is_64bit_platform();
     bool is_le = is_little_endian();
     
-    std::cout << "  64-bit architecture: " << (is_64bit ? "✓ YES" : "✗ NO") << "\n";
-    std::cout << "  Little-endian:       " << (is_le ? "✓ YES" : "✗ NO") << "\n";
+    std::cout << "  64-bit architecture: " << (is_64bit ? "[OK] YES" : "[FAIL] NO") << "\n";
+    std::cout << "  Little-endian:       " << (is_le ? "[OK] YES" : "[FAIL] NO") << "\n";
     std::cout << "\n";
     
     // If requirements not met, fail with clear message
     if (!is_64bit) {
-        std::cout << "[FAIL] ❌ XOffsetDatastructure2 requires 64-bit architecture\n";
+        std::cout << "[FAIL] XOffsetDatastructure2 requires 64-bit architecture\n";
         std::cout << "       Current platform is " << (sizeof(void*) * 8) << "-bit\n";
         std::cout << "       This library is designed for 64-bit systems only.\n";
         return false;
     }
     
     if (!is_le) {
-        std::cout << "[FAIL] ❌ XOffsetDatastructure2 requires little-endian architecture\n";
+        std::cout << "[FAIL] XOffsetDatastructure2 requires little-endian architecture\n";
         std::cout << "       Current platform is big-endian\n";
         std::cout << "       This library stores data in little-endian format.\n";
         std::cout << "       Using it on big-endian systems will cause data corruption.\n";
@@ -325,7 +325,7 @@ bool test_platform_requirements() {
     }
     
     std::cout << "\n";
-    std::cout << "[PASS] ✓ Platform meets all requirements!\n";
+    std::cout << "[PASS] Platform meets all requirements!\n";
     std::cout << "       Your system is compatible with XOffsetDatastructure2.\n";
     std::cout << "       - 64-bit architecture\n";
     std::cout << "       - Little-endian byte order\n";
