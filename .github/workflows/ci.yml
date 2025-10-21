@@ -369,73 +369,124 @@ jobs:
       
       - name: Run tests on iOS Simulator
         if: matrix.platform == 'iOS-simulator'
-        continue-on-error: true  # Don't fail the job if simulator tests fail
+        continue-on-error: true
         run: |
-          set -x  # Enable debug output
-          
           echo "=== iOS Simulator Test Execution ==="
-          echo "Current directory: $(pwd)"
-          echo ""
           
-          # Find an available iPhone simulator
-          echo "Looking for available iPhone simulator..."
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | grep -v "unavailable" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+          # Find simulator
+          echo "Step 1: Finding iPhone simulator..."
+          SIMULATOR_ID=$(xcrun simctl list devices available 2>&1 | grep "iPhone" | grep -v "unavailable" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
           
           if [ -z "$SIMULATOR_ID" ]; then
-            echo "No iPhone simulator found!"
+            echo "❌ No iPhone simulator found"
             exit 0
           fi
           
-          echo "Using simulator: $SIMULATOR_ID"
-          xcrun simctl list devices | grep "$SIMULATOR_ID"
+          SIMULATOR_NAME=$(xcrun simctl list devices 2>&1 | grep "$SIMULATOR_ID" | sed -E 's/^[[:space:]]+//' | sed -E 's/ \([A-F0-9-]+\).*//')
+          echo "✓ Found simulator: $SIMULATOR_NAME ($SIMULATOR_ID)"
           echo ""
           
-          # Boot simulator
-          echo "Booting simulator..."
-          xcrun simctl boot "$SIMULATOR_ID" || echo "Simulator already booted or boot failed"
-          sleep 5
+          # Boot simulator with timeout
+          echo "Step 2: Booting simulator..."
+          if xcrun simctl boot "$SIMULATOR_ID" 2>&1; then
+            echo "✓ Simulator booted successfully"
+          else
+            echo "⚠ Simulator already booted or boot failed (continuing anyway)"
+          fi
+          
+          echo "Waiting 3 seconds for simulator to be ready..."
+          sleep 3
           echo ""
           
-          # Find test executables
-          echo "Searching for test executables in build directory..."
-          echo "Build directory structure:"
-          ls -R build-${{ matrix.platform }} | head -50
+          # Find executables using targeted search
+          echo "Step 3: Searching for test executables..."
+          
+          # Xcode builds with specific configuration paths
+          POSSIBLE_PATHS=(
+            "build-${{ matrix.platform }}/Release-iphonesimulator"
+            "build-${{ matrix.platform }}/tests/Release-iphonesimulator"
+            "build-${{ matrix.platform }}/examples/Release-iphonesimulator"
+            "build-${{ matrix.platform }}/bin/Release"
+            "build-${{ matrix.platform }}/bin"
+          )
+          
+          echo "Checking build output locations..."
+          for path in "${POSSIBLE_PATHS[@]}"; do
+            if [ -d "$path" ]; then
+              echo "  Found directory: $path"
+              ls "$path" 2>/dev/null | head -10 || true
+            fi
+          done
           echo ""
           
-          # iOS builds create .app bundles, not standalone executables
-          # Tests may be inside .app bundles or in specific directories
-          echo "Looking for executables..."
-          find build-${{ matrix.platform }} -type f \( -name "test_msvc_compat" -o -name "demo" \) -exec ls -lh {} \; || true
-          echo ""
+          # Search for executables
+          echo "Step 4: Looking for test_msvc_compat and demo..."
+          TEST_EXEC=""
+          DEMO_EXEC=""
           
-          # Try to find and run executables
-          FOUND=0
-          for dir in "build-${{ matrix.platform }}/bin/Release" "build-${{ matrix.platform }}/Release" "build-${{ matrix.platform }}/bin"; do
-            if [ -d "$dir" ]; then
-              echo "Checking directory: $dir"
-              ls -la "$dir" || true
-              
-              for test in test_msvc_compat demo; do
-                if [ -f "$dir/$test" ]; then
-                  echo "Found $test in $dir"
-                  echo "Running $test on iOS Simulator..."
-                  xcrun simctl spawn "$SIMULATOR_ID" "$dir/$test" && echo "✓ $test completed" || echo "✗ $test failed"
-                  FOUND=1
-                fi
-              done
+          for path in "${POSSIBLE_PATHS[@]}"; do
+            if [ -f "$path/test_msvc_compat" ]; then
+              TEST_EXEC="$path/test_msvc_compat"
+              echo "  ✓ Found test_msvc_compat: $TEST_EXEC"
+            fi
+            if [ -f "$path/demo" ]; then
+              DEMO_EXEC="$path/demo"
+              echo "  ✓ Found demo: $DEMO_EXEC"
             fi
           done
           
-          if [ $FOUND -eq 0 ]; then
-            echo "⚠️  No standalone test executables found"
-            echo "Note: iOS builds typically create .app bundles, not standalone executables"
-            echo "Simulator tests may need different configuration"
+          if [ -z "$TEST_EXEC" ] && [ -z "$DEMO_EXEC" ]; then
+            echo "  ⚠ No executables found in standard locations"
+            echo ""
+            echo "Performing deep search (this may take a moment)..."
+            find "build-${{ matrix.platform }}" -type f \( -name "test_msvc_compat" -o -name "demo" \) 2>/dev/null | while read -r file; do
+              echo "  Found: $file"
+            done || echo "  No executables found"
+          fi
+          echo ""
+          
+          # Run tests
+          echo "Step 5: Running tests on simulator..."
+          TESTS_RUN=0
+          
+          if [ -n "$TEST_EXEC" ] && [ -f "$TEST_EXEC" ]; then
+            echo "Running test_msvc_compat..."
+            if xcrun simctl spawn "$SIMULATOR_ID" "$TEST_EXEC" 2>&1; then
+              echo "  ✓ test_msvc_compat completed successfully"
+              TESTS_RUN=$((TESTS_RUN + 1))
+            else
+              echo "  ✗ test_msvc_compat failed"
+            fi
+            echo ""
           fi
           
-          # Shutdown simulator
+          if [ -n "$DEMO_EXEC" ] && [ -f "$DEMO_EXEC" ]; then
+            echo "Running demo..."
+            if xcrun simctl spawn "$SIMULATOR_ID" "$DEMO_EXEC" 2>&1; then
+              echo "  ✓ demo completed successfully"
+              TESTS_RUN=$((TESTS_RUN + 1))
+            else
+              echo "  ✗ demo failed"
+            fi
+            echo ""
+          fi
+          
+          # Summary
+          echo "Step 6: Cleanup..."
+          xcrun simctl shutdown "$SIMULATOR_ID" 2>&1 || true
           echo ""
-          xcrun simctl shutdown "$SIMULATOR_ID" || true
-          echo "Simulator test execution completed"
+          
+          echo "=== Summary ==="
+          echo "Simulator: $SIMULATOR_NAME"
+          echo "Tests run: $TESTS_RUN"
+          if [ $TESTS_RUN -gt 0 ]; then
+            echo "✅ iOS Simulator tests completed"
+          else
+            echo "⚠️  No tests were executed (executables not found or not configured for iOS)"
+            echo ""
+            echo "Note: iOS builds may require additional configuration to create"
+            echo "standalone executables instead of .app bundles."
+          fi
       
       - name: Upload iOS binaries
         uses: actions/upload-artifact@v4
