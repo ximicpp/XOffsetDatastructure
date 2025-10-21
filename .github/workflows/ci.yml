@@ -229,7 +229,7 @@ jobs:
     strategy:
       fail-fast: false  # Don't cancel other jobs if one fails
       matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86_64]
+        abi: [arm64-v8a, x86_64]  # Only 64-bit architectures (library requirement)
         api_level: [30]
     
     steps:
@@ -256,7 +256,6 @@ jobs:
           add-to-path: true
       
       - name: Configure CMake for Android
-        continue-on-error: ${{ matrix.abi == 'armeabi-v7a' }}  # Expected to fail on 32-bit
         run: |
           mkdir build-android-${{ matrix.abi }}
           cd build-android-${{ matrix.abi }}
@@ -269,7 +268,6 @@ jobs:
             ..
       
       - name: Build for Android
-        continue-on-error: ${{ matrix.abi == 'armeabi-v7a' }}  # Expected to fail on 32-bit
         run: cmake --build build-android-${{ matrix.abi }} --config Release -j$(nproc)
       
       - name: List built binaries
