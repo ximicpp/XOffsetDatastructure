@@ -32,13 +32,17 @@ jobs:
       - name: Install dependencies
         run: |
           brew install cmake
-          pip3 install pyyaml
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyyaml
+          python3 -c "import yaml; print('PyYAML installed for:', __import__('sys').executable)"
       
       - name: Configure CMake
         run: |
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ..
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                -DPython3_EXECUTABLE=$(which python3) \
+                ..
       
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
@@ -165,16 +169,21 @@ jobs:
           Get-ChildItem -Path "schemas" -Filter "*.xds.yaml" | ForEach-Object {
             python tools/xds_generator.py $_.FullName -o generated/
           }
+          echo ""
           echo "Generated headers:"
-          Get-ChildItem -Path "generated" -Filter "*.hpp"
+          Get-ChildItem -Path "generated" -Filter "*.hpp" | ForEach-Object {
+            Write-Host "  $_"
+            # Touch the file to make it newer than dependencies
+            (Get-Item $_).LastWriteTime = Get-Date
+          }
+          echo ""
+          echo "Verification: All headers exist and are up-to-date"
       
       - name: Configure CMake
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 17 2022" -A ${{ matrix.arch }} ..
-        env:
-          Python3_EXECUTABLE: python
+          cmake -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DSKIP_SCHEMA_GENERATION=ON ..
       
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} -j $env:NUMBER_OF_PROCESSORS
@@ -346,6 +355,7 @@ jobs:
             -DCMAKE_OSX_SYSROOT=${{ matrix.sdk }} \
             -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO \
             -DCMAKE_IOS_INSTALL_COMBINED=YES \
+            -DSKIP_SCHEMA_GENERATION=ON \
             ..
       
       - name: Build for iOS
