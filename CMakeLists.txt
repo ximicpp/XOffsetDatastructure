@@ -90,7 +90,43 @@ set(BOOST_INCLUDE_DIRS
 # Option to skip schema generation if headers are pre-generated
 option(SKIP_SCHEMA_GENERATION "Skip schema code generation (use pre-generated headers)" OFF)
 
-if(Python3_FOUND AND NOT SKIP_SCHEMA_GENERATION)
+if(SKIP_SCHEMA_GENERATION)
+    # Create an empty target for dependencies, assuming headers are pre-generated
+    add_custom_target(generate_schemas)
+    message(STATUS "Schema code generation SKIPPED - using pre-generated headers")
+    message(STATUS "  Generated headers should exist in: ${CMAKE_SOURCE_DIR}/generated/")
+    
+    # Verify that generated headers exist
+    set(EXPECTED_HEADERS
+        alignment_test.hpp
+        basic_types.hpp
+        compaction_test.hpp
+        game_data.hpp
+        map_set_test.hpp
+        modify_test.hpp
+        nested_test.hpp
+        player.hpp
+        serialization_test.hpp
+        test_types.hpp
+        vector_test.hpp
+    )
+    
+    set(MISSING_HEADERS "")
+    foreach(HEADER ${EXPECTED_HEADERS})
+        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/generated/${HEADER}")
+            list(APPEND MISSING_HEADERS ${HEADER})
+        endif()
+    endforeach()
+    
+    if(MISSING_HEADERS)
+        message(WARNING "Some generated headers are missing:")
+        foreach(HEADER ${MISSING_HEADERS})
+            message(WARNING "  - ${HEADER}")
+        endforeach()
+        message(WARNING "Please run schema generation manually before building.")
+    endif()
+    
+elseif(Python3_FOUND)
     # Check if PyYAML is available (only once, not per schema)
     execute_process(
         COMMAND ${Python3_EXECUTABLE} -c "import yaml"
@@ -147,7 +183,10 @@ if(Python3_FOUND AND NOT SKIP_SCHEMA_GENERATION)
     message(STATUS "  Python: ${Python3_EXECUTABLE}")
     message(STATUS "  Schemas: ${SCHEMA_FILES}")
 else()
+    # Create empty target even if Python not found
+    add_custom_target(generate_schemas)
     message(WARNING "Python3 not found - schema code generation disabled")
+    message(WARNING "Please ensure generated headers exist in ${CMAKE_SOURCE_DIR}/generated/")
 endif()
 
 # Add examples subdirectory
