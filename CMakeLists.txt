@@ -87,7 +87,25 @@ set(BOOST_INCLUDE_DIRS
 )
 
 # Schema code generation
-if(Python3_FOUND)
+# Option to skip schema generation if headers are pre-generated
+option(SKIP_SCHEMA_GENERATION "Skip schema code generation (use pre-generated headers)" OFF)
+
+if(Python3_FOUND AND NOT SKIP_SCHEMA_GENERATION)
+    # Check if PyYAML is available (only once, not per schema)
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c "import yaml"
+        RESULT_VARIABLE PYYAML_CHECK
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    
+    if(NOT PYYAML_CHECK EQUAL 0)
+        message(WARNING "PyYAML not found for Python ${Python3_EXECUTABLE}.")
+        message(WARNING "  Schema code generation will fail unless headers are pre-generated.")
+        message(WARNING "  Please run: pip3 install pyyaml")
+        message(WARNING "  Or use -DSKIP_SCHEMA_GENERATION=ON and pre-generate headers.")
+    endif()
+    
     set(SCHEMA_FILES
         ${CMAKE_SOURCE_DIR}/schemas/test_types.xds.yaml
         ${CMAKE_SOURCE_DIR}/schemas/basic_types.xds.yaml
@@ -109,18 +127,6 @@ if(Python3_FOUND)
         string(REPLACE ".xds" "" SCHEMA_NAME ${SCHEMA_NAME})
         set(OUTPUT_FILE "${CMAKE_SOURCE_DIR}/generated/${SCHEMA_NAME}.hpp")
         list(APPEND GENERATED_HEADERS ${OUTPUT_FILE})
-        
-        # Check if PyYAML is available by testing import
-        execute_process(
-            COMMAND ${Python3_EXECUTABLE} -c "import yaml"
-            RESULT_VARIABLE PYYAML_CHECK
-            OUTPUT_QUIET
-            ERROR_QUIET
-        )
-        
-        if(NOT PYYAML_CHECK EQUAL 0)
-            message(WARNING "PyYAML not found for Python ${Python3_EXECUTABLE}. Code generation may fail.")
-        endif()
         
         add_custom_command(
             OUTPUT ${OUTPUT_FILE}
