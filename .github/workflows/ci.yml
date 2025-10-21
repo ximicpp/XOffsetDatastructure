@@ -156,6 +156,18 @@ jobs:
           python -m pip install pyyaml
           python -c "import yaml; print('PyYAML version:', yaml.__version__)"
       
+      - name: Pre-generate schema headers
+        run: |
+          echo "Pre-generating schema headers before CMake build..."
+          if (-not (Test-Path "generated")) {
+            New-Item -ItemType Directory -Path "generated"
+          }
+          Get-ChildItem -Path "schemas" -Filter "*.xds.yaml" | ForEach-Object {
+            python tools/xds_generator.py $_.FullName -o generated/
+          }
+          echo "Generated headers:"
+          Get-ChildItem -Path "generated" -Filter "*.hpp"
+      
       - name: Configure CMake
         run: |
           mkdir build
@@ -304,6 +316,16 @@ jobs:
         run: |
           brew install cmake
           pip3 install pyyaml
+      
+      - name: Pre-generate schema headers
+        run: |
+          echo "Pre-generating schema headers before Xcode build..."
+          mkdir -p generated
+          for schema in schemas/*.xds.yaml; do
+            python3 tools/xds_generator.py "$schema" -o generated/
+          done
+          echo "Generated headers:"
+          ls -la generated/
       
       - name: Select Xcode version
         run: |

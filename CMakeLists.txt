@@ -110,6 +110,18 @@ if(Python3_FOUND)
         set(OUTPUT_FILE "${CMAKE_SOURCE_DIR}/generated/${SCHEMA_NAME}.hpp")
         list(APPEND GENERATED_HEADERS ${OUTPUT_FILE})
         
+        # Check if PyYAML is available by testing import
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} -c "import yaml"
+            RESULT_VARIABLE PYYAML_CHECK
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        
+        if(NOT PYYAML_CHECK EQUAL 0)
+            message(WARNING "PyYAML not found for Python ${Python3_EXECUTABLE}. Code generation may fail.")
+        endif()
+        
         add_custom_command(
             OUTPUT ${OUTPUT_FILE}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/generated
