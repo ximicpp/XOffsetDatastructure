@@ -1,6 +1,6 @@
 // ============================================================================
-// XOffsetDatastructure2 - Comprehensive Demo
-// Purpose: Showcase the main features and capabilities
+// XOffsetDatastructure2 - Comprehensive Demo (C++26 Reflection Version)
+// Purpose: Showcase the main features and C++26 reflection capabilities
 // ============================================================================
 
 #include <iostream>
@@ -15,7 +15,7 @@
 #define HAS_CHRONO 0
 #endif
 #include "../xoffsetdatastructure2.hpp"
-#include "../generated/game_data.hpp"
+#include "game_data.hpp"
 
 using namespace XOffsetDatastructure2;
 
@@ -204,31 +204,59 @@ void demo_serialization() {
 }
 
 // ============================================================================
-// Demo 4: Type Signature Verification
+// Demo 4: C++26 Reflection Type Signatures
 // ============================================================================
 
 void demo_type_signatures() {
-    print_section("4. Type Signature System - Compile-Time Safety");
+    print_section("4. C++26 Reflection - Type Signature System");
     
-    print_subsection("Type Signature Information");
+    print_subsection("Reflection Capability");
     
-#ifndef _MSC_VER
-    // Type signature display (works on Clang/GCC, disabled on MSVC)
-    constexpr auto item_sig = XTypeSignature::get_XTypeSignature<ItemReflectionHint>();
-    constexpr auto game_sig = XTypeSignature::get_XTypeSignature<GameDataReflectionHint>();
+#if __cpp_reflection >= 202306L
+    std::cout << "  Status: [OK] C++26 Reflection ENABLED\n\n";
     
-    print_info("Item Signature", std::string(item_sig.value));
+    print_info("Feature Macro", "__cpp_reflection >= 202306L");
+    print_info("Implementation", "std::meta namespace");
+    print_info("Key Operations", "members_of, offset_of, type_of");
+    
+    print_subsection("Type Signature Display");
+    
+    // Display Item signature
+    constexpr auto item_sig = XTypeSignature::get_XTypeSignature<Item>();
+    std::cout << "  Item:\n    ";
+    item_sig.print();
+    std::cout << "\n\n";
+    
+    // Display GameData signature
+    constexpr auto game_sig = XTypeSignature::get_XTypeSignature<GameData>();
+    std::cout << "  GameData:\n    ";
+    game_sig.print();
     std::cout << "\n";
-    print_info("GameData Signature", std::string(game_sig.value));
+    
+    print_subsection("Key Advantages over Boost.PFR (next_practical)");
+    print_check("No code generation required");
+    print_check("No separate ReflectionHint types");
+    print_check("Direct type introspection with constructors");
+    print_check("Compiler-provided offset accuracy");
+    print_check("std::meta::members_of - iterate fields at compile-time");
+    print_check("std::meta::offset_of - direct offset access");
+    print_check("template for - compile-time member iteration");
+    
 #else
-    std::cout << "  Type signature display is disabled on MSVC due to compiler limitations.\n";
-    std::cout << "  However, size/alignment validation is still enforced at compile-time.\n";
-#endif
-    std::cout << "\n";
+    std::cout << "  Status: [X] C++26 Reflection NOT AVAILABLE\n\n";
     
-    print_subsection("Benefits");
+    print_info("Current Mode", "Basic size/alignment validation");
+    print_info("To Enable", "Compile with -std=c++26 -freflection");
+    print_info("Fallback", "Size/alignment static_assert only");
+    
+    std::cout << "\n";
+    std::cout << "  Note: Type signature verification is disabled.\n";
+    std::cout << "        Using basic compile-time checks instead.\n";
+#endif
+    
+    print_subsection("Compile-Time Safety");
     print_check("Binary compatibility across compilations");
-    print_check("Automatic verification at compile-time (size/alignment)");
+    print_check("Automatic verification (no manual checks)");
     print_check("Prevents data corruption from layout changes");
     print_check("Type-safe offset calculations");
 }
@@ -293,7 +321,7 @@ void demo_performance() {
 // ============================================================================
 
 void demo_advanced_features() {
-    print_section("6. Advanced Features");
+    print_section("6. Advanced Features & Comparisons");
     
     print_subsection("Container Types");
     print_check("XVector<T> - Dynamic array (like std::vector)");
@@ -301,11 +329,19 @@ void demo_advanced_features() {
     print_check("XMap<K,V> - Key-value pairs (flat_map implementation)");
     print_check("XString - Offset-aware string container");
     
-    print_subsection("Type System");
-    print_check("Compile-time type signature calculation");
-    print_check("Automatic size and offset computation");
-    print_check("Cross-compilation compatibility checks");
-    print_check("Boost.PFR reflection support");
+    print_subsection("next_cpp26 vs next_practical");
+    std::cout << "\n";
+    std::cout << "  +---------------------+-------------------+---------------------+\n";
+    std::cout << "  | Feature             | next_practical    | next_cpp26          |\n";
+    std::cout << "  +---------------------+-------------------+---------------------+\n";
+    std::cout << "  | Reflection          | Boost.PFR         | C++26 std::meta     |\n";
+    std::cout << "  | Code Generation     | Required (Python) | Not needed          |\n";
+    std::cout << "  | ReflectionHint      | Required          | Not needed          |\n";
+    std::cout << "  | Field Offset        | Manual calculation| std::meta::offset_of|\n";
+    std::cout << "  | Member Iteration    | Template recursion| template for        |\n";
+    std::cout << "  | External Deps       | Boost.PFR         | None (stdlib)       |\n";
+    std::cout << "  | Compiler Support    | GCC/Clang/MSVC    | C++26 required      |\n";
+    std::cout << "  +---------------------+-------------------+---------------------+\n";
     
     print_subsection("Memory Features");
     print_check("Dynamic buffer growth");
@@ -313,11 +349,22 @@ void demo_advanced_features() {
     print_check("Memory usage statistics");
     print_check("Zero-copy deserialization");
     
-    print_subsection("Future Enhancements (Planned)");
-    std::cout << "  - C++26 reflection-based compaction\n";
-    std::cout << "  - Schema versioning and migration\n";
-    std::cout << "  - JSON export/import\n";
-    std::cout << "  - Performance benchmarking suite\n";
+#if __cpp_reflection >= 202306L
+    print_subsection("C++26 Reflection Features (Active)");
+    print_check("std::meta::members_of - Get all struct members");
+    print_check("std::meta::offset_of - Direct field offset");
+    print_check("std::meta::type_of - Get member type");
+    print_check("std::meta::name_of - Get member name (debugging)");
+    print_check("template for - Compile-time iteration");
+    print_check("Direct struct introspection (no aggregates needed)");
+#else
+    print_subsection("Future: C++26 Reflection (Inactive)");
+    std::cout << "  When enabled with C++26 compiler:\n";
+    std::cout << "    - std::meta::members_of(^T) to get all members\n";
+    std::cout << "    - std::meta::offset_of for direct offset access\n";
+    std::cout << "    - template for to iterate members at compile-time\n";
+    std::cout << "    - No code generation or ReflectionHint types needed\n";
+#endif
 }
 
 // ============================================================================
@@ -328,12 +375,19 @@ int main() {
     std::cout << R"(
 +======================================================================+
 |                                                                      |
-|           XOffsetDatastructure2 - Comprehensive Demo                |
+|     XOffsetDatastructure2 - Comprehensive Demo (C++26 Edition)      |
 |                                                                      |
-|     Offset-Based Data Structures with Type Signature System         |
+|     Offset-Based Data Structures with C++26 Reflection              |
 |                                                                      |
 +======================================================================+
 )";
+
+#if __cpp_reflection >= 202306L
+    std::cout << "  [OK] C++26 Reflection: ENABLED\n";
+#else
+    std::cout << "  [X] C++26 Reflection: NOT AVAILABLE (using fallback)\n";
+#endif
+    std::cout << "\n";
 
     try {
         // Run all demos
@@ -354,10 +408,11 @@ int main() {
         std::cout << "     - Examples: examples/\n";
         std::cout << "     - Tests: tests/\n";
         std::cout << "\n";
-        std::cout << "  Key Takeaways:\n";
-        std::cout << "     - Type-safe offset-based containers\n";
+        std::cout << "  Key Takeaways (next_cpp26):\n";
+        std::cout << "     - C++26 reflection-based type signatures\n";
+        std::cout << "     - No code generation required\n";
+        std::cout << "     - Direct type introspection\n";
         std::cout << "     - Binary serialization with zero-copy\n";
-        std::cout << "     - Compile-time type signature verification\n";
         std::cout << "     - Memory-efficient growth strategy\n";
         std::cout << "\n";
         
