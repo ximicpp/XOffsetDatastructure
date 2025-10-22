@@ -1,5 +1,366 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
+
+// =============================================================================
+// XOffsetDatastructure2 - Single Header Library (C++26 Reflection Version)
+// =============================================================================
+
+// ============================================================================
+// Platform Detection & Configuration
+// ============================================================================
+#if defined(_MSC_VER)
+    #define TYPESIG_PLATFORM_WINDOWS 1
+    #define IS_LITTLE_ENDIAN 1
+    #define FUNCTION_SIGNATURE __FUNCSIG__
+#elif defined(__clang__) || defined(__GNUC__)
+    #define TYPESIG_PLATFORM_WINDOWS 0
+    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
+    #define IS_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#else
+    #error "Unsupported compiler"
+#endif
+
+#if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
+    #define XOFFSET_ARCH_64BIT 1
+#else
+    #define XOFFSET_ARCH_64BIT 0
+#endif
+
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
+    #define XOFFSET_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#elif defined(_WIN32) || defined(_WIN64) || defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+    #define XOFFSET_LITTLE_ENDIAN 1
+#else
+    #define XOFFSET_LITTLE_ENDIAN 0
+#endif
+
+#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
+    #if !XOFFSET_ARCH_64BIT
+        #error "XOffsetDatastructure2 requires 64-bit architecture"
+    #endif
+    #if !XOFFSET_LITTLE_ENDIAN
+        #error "XOffsetDatastructure2 requires little-endian architecture"
+    #endif
+#endif
+
+#ifndef OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR
+#define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
+#endif
+
+// ============================================================================
+// Standard Library Headers
+// ============================================================================
+#include <string_view>
+#include <type_traits>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <fstream>
+
+// ========================================================================
+// XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
+// ========================================================================
+namespace XTypeSignature {
+    inline constexpr int BASIC_ALIGNMENT = 8;
+    inline constexpr int ANY_SIZE = 64;
+
+    // ========================================================================
+    // Type Size Validations
+    // ========================================================================
+    // Only validate types we actually use. See docs/CROSS_PLATFORM_TYPES.md
+    
+    // Fixed-size integer types (safe and recommended)
+    static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
+    static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
+    static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
+    static_assert(sizeof(uint16_t) == 2, "uint16_t must be 2 bytes");
+    static_assert(sizeof(int32_t) == 4, "int32_t must be 4 bytes");
+    static_assert(sizeof(uint32_t) == 4, "uint32_t must be 4 bytes");
+    static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
+    static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
+    
+    // Floating point types
+    static_assert(sizeof(float) == 4, "float must be 4 bytes");
+    static_assert(sizeof(double) == 8, "double must be 8 bytes");
+    
+    // Character and boolean types
+    static_assert(sizeof(char) == 1, "char must be 1 byte");
+    static_assert(sizeof(bool) == 1, "bool must be 1 byte");
+    
+    // Platform requirements
+    static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
+    static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
+    static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
+    static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
+
+    template <typename T>
+    struct always_false : std::false_type {};
+
+    // ========================================================================
+    // Compile-Time String for Type Signatures
+    // ========================================================================
+    template <size_t N>
+    struct CompileString {
+        char value[N];
+        static constexpr size_t size = N - 1;
+        
+        constexpr CompileString(const char (&str)[N]) {
+            for (size_t i = 0; i < N; ++i) {
+                value[i] = str[i];
+            }
+        }
+
+        template <typename T>
+        static constexpr CompileString<32> from_number(T num) noexcept {
+            char result[32] = {};
+            int idx = 0;
+            if (num == 0) {
+                result[0] = '0';
+                idx = 1;
+            } else {
+                bool negative = std::is_signed_v<T> && num < 0;
+                using UnsignedT = std::make_unsigned_t<T>;
+                UnsignedT abs_num;
+                if (negative) {
+                    abs_num = UnsignedT(-(std::make_signed_t<T>(num)));
+                } else {
+                    abs_num = UnsignedT(num);
+                }
+                while (abs_num > 0) {
+                    result[idx++] = '0' + char(abs_num % 10);
+                    abs_num /= 10;
+                }
+                if (negative) {
+                    result[idx++] = '-';
+                }
+                for (int i = 0; i < idx / 2; ++i) {
+                    char temp = result[i];
+                    result[i] = result[idx - 1 - i];
+                    result[idx - 1 - i] = temp;
+                }
+            }
+            result[idx] = '\0';
+            return CompileString<32>(result);
+        }
+
+        template <size_t M>
+        constexpr auto operator+(const CompileString<M>& other) const noexcept {
+            constexpr size_t new_size = N + M - 1;
+            char result[new_size] = {};
+            size_t pos = 0;
+            while (pos < N - 1 && value[pos] != '\0') {
+                result[pos] = value[pos];
+                ++pos;
+            }
+            size_t j = 0;
+            while (j < M) {
+                result[pos++] = other.value[j++];
+            }
+            return CompileString<new_size>(result);
+        }
+
+        template <size_t M>
+        constexpr bool operator==(const CompileString<M>& other) const noexcept {
+            size_t i = 0;
+            while (i < N && i < M && value[i] != '\0' && other.value[i] != '\0') {
+                if (value[i] != other.value[i]) {
+                    return false;
+                }
+                ++i;
+            }
+            return value[i] == other.value[i];
+        }
+
+        constexpr bool operator==(const char* other) const noexcept {
+            size_t i = 0;
+            while (i < N && value[i] != '\0' && other[i] != '\0') {
+                if (value[i] != other[i]) {
+                    return false;
+                }
+                ++i;
+            }
+            return value[i] == other[i];
+        }
+
+        void print() const {
+            for (size_t i = 0; i < N && value[i] != '\0'; ++i) {
+                std::cout << value[i];
+            }
+        }
+    };
+
+    // Forward declarations
+    template <typename T>
+    struct TypeSignature;
+
+    // ========================================================================
+    // Field Offset Calculation (C++26 Reflection)
+    // ========================================================================
+#if __cpp_reflection >= 202306L
+    template<typename T, size_t Index>
+    constexpr size_t get_field_offset() noexcept {
+        constexpr auto members = std::meta::members_of(^T);
+        
+        if constexpr (Index == 0) {
+            return 0;
+        } else {
+            // Use reflection to get member offset directly
+            constexpr auto member = members[Index];
+            return std::meta::offset_of(member);
+        }
+    }
+#else
+    // Fallback: Manual calculation (less accurate, for compatibility)
+    template<typename T, size_t Index>
+    constexpr size_t get_field_offset() noexcept {
+        static_assert(sizeof(T) == 0, 
+            "C++26 reflection required for accurate field offset calculation. "
+            "Please compile with -std=c++26 or use next_practical branch.");
+        return 0;
+    }
+#endif
+
+    // ========================================================================
+    // Generate Signature for All Fields (C++26 Reflection)
+    // ========================================================================
+#if __cpp_reflection >= 202306L
+    template <typename T>
+    constexpr auto get_fields_signature() noexcept {
+        constexpr auto members = std::meta::members_of(^T);
+        
+        CompileString result{""};
+        bool first = true;
+        size_t index = 0;
+        
+        // Use template for to iterate members at compile-time
+        template for (constexpr auto member : members) {
+            if constexpr (std::meta::is_nonstatic_data_member(member)) {
+                using FieldType = typename std::meta::type_of(member);
+                constexpr size_t offset = std::meta::offset_of(member);
+                
+                if (first) {
+                    result = CompileString{"@"} +
+                            CompileString<32>::from_number(offset) +
+                            CompileString{":"} +
+                            TypeSignature<FieldType>::calculate();
+                    first = false;
+                } else {
+                    result = result + CompileString{",@"} +
+                            CompileString<32>::from_number(offset) +
+                            CompileString{":"} +
+                            TypeSignature<FieldType>::calculate();
+                }
+                ++index;
+            }
+        }
+        
+        return result;
+    }
+#else
+    // Fallback: Empty implementation
+    template <typename T>
+    constexpr auto get_fields_signature() noexcept {
+        return CompileString{""};
+    }
+#endif
+
+    // ========================================================================
+    // Basic Type Signatures
+    // ========================================================================
+    template <> struct TypeSignature<int32_t>  { static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<uint32_t> { static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<int64_t>  { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<uint64_t> { static constexpr auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<float>    { static constexpr auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<double>   { static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
+    template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
+    
+    // Pointer types
+    template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
+    template <>           struct TypeSignature<void*>{ static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
+
+    // ========================================================================
+    // Array Types
+    // ========================================================================
+    template <typename T, size_t N>
+    struct TypeSignature<T[N]> {
+        static constexpr auto calculate() noexcept {
+            if constexpr (std::is_same_v<T, char>) {
+                return CompileString{"bytes[s:"} +
+                       CompileString<32>::from_number(N) +
+                       CompileString{",a:1]"};
+            } else {
+                return CompileString{"array[s:"} +
+                       CompileString<32>::from_number(sizeof(T[N])) +
+                       CompileString{",a:"} +
+                       CompileString<32>::from_number(alignof(T[N])) +
+                       CompileString{"]<"} +
+                       TypeSignature<T>::calculate() +
+                       CompileString{","} +
+                       CompileString<32>::from_number(N) +
+                       CompileString{">"};
+            }
+        }
+    };
+
+    template <> struct TypeSignature<char[ANY_SIZE]> {
+        static constexpr auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
+    };
+
+    // ========================================================================
+    // Generic Type Signature (C++26 Reflection)
+    // ========================================================================
+    template <typename T>
+    struct TypeSignature {
+        static constexpr auto calculate() noexcept {
+#if __cpp_reflection >= 202306L
+            if constexpr (std::is_aggregate_v<T> && !std::is_array_v<T>) {
+                return CompileString{"struct[s:"} +
+                       CompileString<32>::from_number(sizeof(T)) +
+                       CompileString{",a:"} +
+                       CompileString<32>::from_number(alignof(T)) +
+                       CompileString{"]{"} +
+                       get_fields_signature<T>() +
+                       CompileString{"}"};
+            }
+            else if constexpr (std::is_pointer_v<T>) {
+                return TypeSignature<void*>::calculate();
+            }
+            else if constexpr (std::is_array_v<T>) {
+                return TypeSignature<std::remove_extent_t<T>[]>::calculate();
+            }
+            else {
+                static_assert(always_false<T>::value, 
+                    "Type is not supported for automatic reflection");
+                return CompileString{""};
+            }
+#else
+            static_assert(sizeof(T) == 0, 
+                "C++26 reflection required for type signature generation. "
+                "Please compile with -std=c++26 or use next_practical branch with Boost.PFR.");
+            return CompileString{""};
+#endif
+        }
+    };
+
+    // ========================================================================
+    // Public API
+    // ========================================================================
+    template <typename T>
+    [[nodiscard]] constexpr auto get_XTypeSignature() noexcept {
+        return TypeSignature<T>::calculate();
+    }
+
+} // namespace XTypeSignature
+
+using XTypeSignature::BASIC_ALIGNMENT;
+
+// ============================================================================
+// Boost Interprocess Extensions
+// ============================================================================
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
@@ -337,8 +698,12 @@ namespace XOffsetDatastructure2
 		// - std::meta::members_of(^T) to get all member reflections
 		// - std::meta::name_of(), type_of() for member introspection
 		// - Compile-time type detection and recursive migration
+		// 
+		// @param old_xbuf The buffer to compact
+		// @param object_name Name of the object to migrate (default: "MyTest")
+		// @return New compacted buffer
 		template<typename T>
-		static XBuffer compact_automatic(XBuffer& old_xbuf) {
+		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
 #if __cpp_reflection >= 202306L  // Check for C++26 reflection support
 			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
@@ -347,14 +712,14 @@ namespace XOffsetDatastructure2
 			
 			XBuffer new_xbuf(new_size);
 			
-			// Find old object in fragmented buffer
-			auto* old_obj = old_xbuf.find<T>("MyTest").first;
+			// Find old object in fragmented buffer (using provided name)
+			auto* old_obj = old_xbuf.find<T>(object_name).first;
 			if (!old_obj) {
 				return new_xbuf;
 			}
 			
-			// Create new object in compact buffer
-			auto* new_obj = new_xbuf.construct<T>("MyTest")(new_xbuf.get_segment_manager());
+			// Create new object in compact buffer (using same name)
+			auto* new_obj = new_xbuf.construct<T>(object_name)(new_xbuf.get_segment_manager());
 			
 			// Migrate all members automatically using reflection
 			migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
@@ -365,9 +730,64 @@ namespace XOffsetDatastructure2
 			return new_xbuf;
 #else
 			(void)old_xbuf;
+			(void)object_name;
 			static_assert(sizeof(T) == 0, 
 				"compact_automatic requires C++26 reflection (P2996R5 or later). "
 				"Your compiler does not support __cpp_reflection >= 202306L. "
+				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
+			return XBuffer();
+#endif
+		}
+		
+		// Compact all objects of type T in the buffer
+		// Automatically finds and migrates all instances of type T
+		// 
+		// @param old_xbuf The buffer to compact
+		// @return New compacted buffer with all T objects migrated
+		template<typename T>
+		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
+#if __cpp_reflection >= 202306L
+			// Calculate new buffer size
+			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+			std::size_t new_size = stats.used_size + (stats.used_size / 10);
+			if (new_size < 4096) new_size = 4096;
+			
+			XBuffer new_xbuf(new_size);
+			
+			// Get segment manager for iteration
+			auto* segment = old_xbuf.get_segment_manager();
+			
+			// Iterate through all named objects
+			typedef typename XBuffer::segment_manager::const_named_iterator const_named_it;
+			const_named_it named_beg = segment->named_begin();
+			const_named_it named_end = segment->named_end();
+			
+			std::size_t migrated_count = 0;
+			
+			for(const_named_it it = named_beg; it != named_end; ++it) {
+				const char* name = it->name();
+				
+				// Try to find object of type T with this name
+				auto* old_obj = old_xbuf.find<T>(name).first;
+				
+				if (old_obj) {
+					// Found an object of type T, migrate it
+					auto* new_obj = new_xbuf.construct<T>(name)(new_xbuf.get_segment_manager());
+					migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
+					++migrated_count;
+				}
+			}
+			
+			// Shrink to fit if we migrated anything
+			if (migrated_count > 0) {
+				new_xbuf.shrink_to_fit();
+			}
+			
+			return new_xbuf;
+#else
+			(void)old_xbuf;
+			static_assert(sizeof(T) == 0, 
+				"compact_automatic_all requires C++26 reflection. "
 				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
 			return XBuffer();
 #endif
@@ -582,5 +1002,125 @@ namespace XOffsetDatastructure2
 		}
 #endif
 	};
+
+	// ========================================================================
+	// XBufferExt: Extended XBuffer with Unified make() API
+	// ========================================================================
+	// Helper trait to detect XString type
+	template<typename T>
+	struct is_xstring : std::false_type {};
+	template<>
+	struct is_xstring<XString> : std::true_type {};
+
+	// Helper trait to detect allocator
+	template<typename T>
+	struct is_allocator : std::false_type {};
+	template<typename T, typename M>
+	struct is_allocator<boost::interprocess::allocator<T, M>> : std::true_type {};
+
+	class XBufferExt : public XBuffer {
+	public:
+		using XBuffer::XBuffer;
+
+		// ============================================================================
+		// Object Creation API
+		// ============================================================================
+		
+		// Create a named object that can be found later
+		// Usage: auto* game = xbuf.make<GameData>("save");
+		template<typename T>
+		T* make(const char* name) {
+			return this->construct<T>(name)(this->get_segment_manager());
+		}
+		
+		// Get allocator for constructing allocator-aware types
+		// Usage: XString str("text", xbuf.allocator<XString>());
+		//        vec.emplace_back(xbuf.allocator<Item>());
+		template<typename T>
+		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
+			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
+		}
+
+		// ============================================================================
+		// Find and Utility Methods
+		// ============================================================================
+		// Find object
+		template<typename T>
+		std::pair<T*, bool> find_ex(const char* name) {
+			auto result = this->find<T>(name);
+			return {result.first, result.second};
+		}
+		// Find or make object
+		template<typename T>
+		T* find_or_make(const char* name) {
+			return this->find_or_construct<T>(name)(this->get_segment_manager());
+		}
+
+		// Serialization and Deserialization
+		// Save to string
+		std::string save_to_string() {
+			auto* buffer = this->get_buffer();
+			return std::string(buffer->begin(), buffer->end());
+		}
+		// Load from string
+		static XBufferExt load_from_string(const std::string& data) {
+			std::vector<char> buffer(data.begin(), data.end());
+			XBufferExt xbuf(buffer);
+			return xbuf;
+		}
+
+		// Memory statistics
+		void print_stats() {
+			XBufferVisualizer::print_stats(*this);
+		}
+		XBufferVisualizer::MemoryStats stats() {
+			return XBufferVisualizer::get_memory_stats(*this);
+		}
+	};
 }
+
+// ============================================================================
+// Type Signature Support for XOffsetDatastructure2 Containers
+// ============================================================================
+namespace XTypeSignature {
+    // XString signature
+    template <>
+    struct TypeSignature<XOffsetDatastructure2::XString> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"string[s:32,a:8]"};
+        }
+    };
+    
+    // XVector<T> signature
+    template <typename T>
+    struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"vector[s:32,a:8]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
+        }
+    };
+    
+    // XSet<T> signature
+    template <typename T>
+    struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"set[s:32,a:8]<"} +
+                   TypeSignature<T>::calculate() +
+                   CompileString{">"};
+        }
+    };
+    
+    // XMap<K,V> signature
+    template <typename K, typename V>
+    struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
+        static constexpr auto calculate() noexcept {
+            return CompileString{"map[s:32,a:8]<"} +
+                   TypeSignature<K>::calculate() +
+                   CompileString{","} +
+                   TypeSignature<V>::calculate() +
+                   CompileString{">"};
+        }
+    };
+} // namespace XTypeSignature
 #endif
