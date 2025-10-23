@@ -59,8 +59,9 @@ static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
 static_assert(sizeof(Player) == 72, "Player size must be 72 bytes");
 static_assert(alignof(Player) == 8, "Player alignment must be 8 bytes");
 
-#warning "C++26 reflection not available. Using basic size/alignment validation only."
-#warning "For full type signature validation, compile with -std=c++26 -freflection"
+// Note: C++26 reflection not available. Using basic size/alignment validation only.
+// For full type signature validation, compile with C++26 reflection support.
+#pragma message("Warning: C++26 reflection not available. Using basic size/alignment validation only.")
 #endif
 
 #endif // PLAYER_HPP_

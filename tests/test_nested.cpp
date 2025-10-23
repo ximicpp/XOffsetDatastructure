@@ -79,7 +79,7 @@ bool test_nested_structures() {
     
     // Test 4: Deep access
     std::cout << "Test 4: Deep access patterns... ";
-    int total_elements = 0;
+    size_t total_elements = 0;
     for (const auto& inner : obj->innerList) {
         total_elements += inner.data.size();
     }
