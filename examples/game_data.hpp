@@ -115,8 +115,9 @@ static_assert(alignof(Item) == 8, "Item alignment must be 8 bytes");
 static_assert(sizeof(GameData) == 144, "GameData size must be 144 bytes");
 static_assert(alignof(GameData) == 8, "GameData alignment must be 8 bytes");
 
-#warning "C++26 reflection not available. Using basic size/alignment validation only."
-#warning "For full type signature validation, compile with -std=c++26 -freflection"
+// Note: C++26 reflection not available. Using basic size/alignment validation only.
+// For full type signature validation, compile with C++26 reflection support.
+#pragma message("Warning: C++26 reflection not available. Using basic size/alignment validation only.")
 #endif
 
 #endif // GAME_DATA_HPP_
