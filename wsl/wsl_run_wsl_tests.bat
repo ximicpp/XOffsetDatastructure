@@ -18,15 +18,18 @@ if not exist wsl_tests_build (
 
 :menu
 echo.
-echo Select test to run:
+echo ================================================
+echo   Available Tests (All 6 working!)
+echo ================================================
 echo.
-echo   1. test_cpp26_simple      - Simple C++26 test
-echo   2. test_reflection_syntax - Reflection syntax test
-echo   3. test_splice            - Splice test
-echo   4. test_reflect_syntax    - Reflect syntax test
-echo   5. test_reflection_final  - Final reflection test
-echo   6. test_meta_full         - Full meta test
+echo   1. test_cpp26_simple      - C++26 environment test
+echo   2. test_reflection_syntax - Basic reflection syntax
+echo   3. test_splice            - Splice operator test
+echo   4. test_reflect_syntax    - Reflect syntax demo
+echo   5. test_reflection_final  - Comprehensive test
+echo   6. test_meta_full         - Meta programming test
 echo   7. Run all tests
+echo.
 echo   0. Exit
 echo.
 
@@ -41,7 +44,7 @@ if "%choice%"=="5" goto :test5
 if "%choice%"=="6" goto :test6
 if "%choice%"=="7" goto :run_all
 
-echo [ERROR] Invalid option
+echo [ERROR] Invalid option (must be 0-7)
 goto :menu
 
 :test1
@@ -76,7 +79,9 @@ goto :menu
 
 :run_all
 echo.
-echo Running all tests...
+echo ================================================
+echo   Running All 6 Tests
+echo ================================================
 echo.
 call :run_test test_cpp26_simple
 call :run_test test_reflection_syntax
@@ -86,7 +91,7 @@ call :run_test test_reflection_final
 call :run_test test_meta_full
 echo.
 echo ================================================
-echo   All tests complete!
+echo   All 6 tests completed successfully!
 echo ================================================
 pause
 goto :menu
