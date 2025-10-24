@@ -34,8 +34,20 @@ echo [5/6] Building test_reflection_final...
 %SystemRoot%\System32\wsl.exe bash -c "cd /mnt/g/workspace/XOffsetDatastructure/wsl && ~/clang-p2996-install/bin/clang++ -std=c++26 -freflection -stdlib=libc++ test_reflection_final.cpp -o wsl_tests_build/test_reflection_final -L~/clang-p2996-install/lib -Wl,-rpath,~/clang-p2996-install/lib"
 
 echo.
-echo [6/6] Building test_meta_full...
+echo [6/8] Building test_meta_full...
 %SystemRoot%\System32\wsl.exe bash -c "cd /mnt/g/workspace/XOffsetDatastructure/wsl && ~/clang-p2996-install/bin/clang++ -std=c++26 -freflection -stdlib=libc++ test_meta_full.cpp -o wsl_tests_build/test_meta_full -L~/clang-p2996-install/lib -Wl,-rpath,~/clang-p2996-install/lib"
+
+echo.
+echo [7/8] Building test_p2996_comprehensive...
+%SystemRoot%\System32\wsl.exe bash -c "cd /mnt/g/workspace/XOffsetDatastructure/wsl && ~/clang-p2996-install/bin/clang++ -std=c++26 -freflection -stdlib=libc++ test_p2996_comprehensive.cpp -o wsl_tests_build/test_p2996_comprehensive -L~/clang-p2996-install/lib -Wl,-rpath,~/clang-p2996-install/lib"
+
+echo.
+echo [8/9] Building test_meta_functions...
+%SystemRoot%\System32\wsl.exe bash -c "cd /mnt/g/workspace/XOffsetDatastructure/wsl && ~/clang-p2996-install/bin/clang++ -std=c++26 -freflection -stdlib=libc++ test_meta_functions.cpp -o wsl_tests_build/test_meta_functions -L~/clang-p2996-install/lib -Wl,-rpath,~/clang-p2996-install/lib"
+
+echo.
+echo [9/9] Building test_advanced_meta...
+%SystemRoot%\System32\wsl.exe bash -c "cd /mnt/g/workspace/XOffsetDatastructure/wsl && ~/clang-p2996-install/bin/clang++ -std=c++26 -freflection -stdlib=libc++ test_advanced_meta.cpp -o wsl_tests_build/test_advanced_meta -L~/clang-p2996-install/lib -Wl,-rpath,~/clang-p2996-install/lib"
 
 cd ..
 

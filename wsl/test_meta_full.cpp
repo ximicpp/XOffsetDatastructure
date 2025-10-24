@@ -23,9 +23,9 @@ int main() {
     constexpr auto point_type = ^^Point;
     constexpr auto vector_type = ^^Vector3D;
     constexpr auto color_type = ^^Color;
-    std::cout << "   ✅ Point reflected\n";
-    std::cout << "   ✅ Vector3D reflected\n";
-    std::cout << "   ✅ Color reflected\n";
+    std::cout << "   [PASS] Point reflected\n";
+    std::cout << "   [PASS] Vector3D reflected\n";
+    std::cout << "   [PASS] Color reflected\n";
     
     // Test 2: Member access for Point
     std::cout << "\n2. Point Member Access:\n";
@@ -54,10 +54,10 @@ int main() {
               << ", b=" << (int)(c.*b_ptr) << ", a=" << (int)(c.*a_ptr) << "\n";
     
     std::cout << "\n=== All Meta Tests Passed! ===\n";
-    std::cout << "✅ Multiple types reflected\n";
-    std::cout << "✅ Different member types (int, double, float, unsigned char)\n";
-    std::cout << "✅ All splice operations work\n";
-    std::cout << "\n🎉 P2996 Meta Programming functional!\n";
+    std::cout << "[PASS] Multiple types reflected\n";
+    std::cout << "[PASS] Different member types (int, double, float, unsigned char)\n";
+    std::cout << "[PASS] All splice operations work\n";
+    std::cout << "\n[PASS][PASS] P2996 Meta Programming functional!\n";
     
     return 0;
 }

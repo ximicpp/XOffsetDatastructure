@@ -11,7 +11,7 @@ int main() {
     
     // Test reflecting a type
     constexpr auto type_s = ^^S;
-    std::cout << "✅ Type S reflected\n";
+    std::cout << "[PASS] Type S reflected\n";
     
     // Test reflecting members using splice
     S obj{42, 100};
@@ -22,7 +22,7 @@ int main() {
     std::cout << "  S.x = " << obj.*x_ptr << "\n";
     std::cout << "  S.y = " << obj.*y_ptr << "\n";
     
-    std::cout << "\n✅ Reflect syntax test passed!\n";
+    std::cout << "\n[PASS] Reflect syntax test passed!\n";
     
     return 0;
 }
