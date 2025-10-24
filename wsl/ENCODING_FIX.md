@@ -7,22 +7,22 @@ The following files have been fixed to remove Chinese characters and avoid encod
 ### 1. wsl/wsl.bat
 - **Original**: Had Chinese text in menu and messages
 - **Fixed**: All text converted to English
-- **Status**: ✅ No encoding issues
+- **Status**: [OK]No encoding issues
 
 ### 2. wsl/wsl_run_demo.bat  
 - **Original**: Chinese comments and messages
 - **Fixed**: All text converted to English
-- **Status**: ✅ No encoding issues
+- **Status**: [OK]No encoding issues
 
 ### 3. wsl/wsl_run_tests.bat
 - **Original**: Chinese menu and messages
 - **Fixed**: All text converted to English  
-- **Status**: ✅ No encoding issues
+- **Status**: [OK]No encoding issues
 
 ### 4. wsl/wsl_rebuild_with_reflection.bat
 - **Original**: Chinese comments and messages
 - **Fixed**: All text converted to English
-- **Status**: ✅ No encoding issues
+- **Status**: [OK]No encoding issues
 
 ## File Organization
 
@@ -74,10 +74,10 @@ wsl_run_tests.bat
 ## Verification
 
 All `.bat` files now use:
-- ✅ English text only
-- ✅ ASCII characters
-- ✅ No special encoding required
-- ✅ Works on all Windows systems
+- [OK]English text only
+- [OK]ASCII characters
+- [OK]No special encoding required
+- [OK]Works on all Windows systems
 
 ## Next Steps
 
