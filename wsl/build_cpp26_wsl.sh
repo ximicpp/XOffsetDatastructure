@@ -29,7 +29,7 @@ if [ ! -f "$CLANG_P2996" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}✅ 找到 Clang P2996${NC}"
+echo -e "${GREEN}[OK]找到 Clang P2996${NC}"
 echo "   $CLANG_P2996"
 "$CLANG_P2996" --version | head -1
 echo
@@ -42,7 +42,7 @@ if [ ! -d "$PROJECT_DIR" ]; then
 fi
 
 cd "$PROJECT_DIR"
-echo -e "${GREEN}✅ 项目目录: $PROJECT_DIR${NC}"
+echo -e "${GREEN}[OK]项目目录: $PROJECT_DIR${NC}"
 echo
 
 # 清理旧构建
@@ -72,7 +72,7 @@ cmake \
     ..
 
 echo
-echo -e "${GREEN}✅ CMake 配置完成${NC}"
+echo -e "${GREEN}[OK]CMake 配置完成${NC}"
 echo
 
 echo -e "${BLUE}================================================${NC}"
@@ -87,7 +87,7 @@ echo
 cmake --build . -j$CPU_CORES
 
 echo
-echo -e "${GREEN}✅ 编译完成${NC}"
+echo -e "${GREEN}[OK]编译完成${NC}"
 echo
 
 echo -e "${BLUE}================================================${NC}"
@@ -119,7 +119,7 @@ echo -e "${BLUE}  构建和测试总结${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo
 
-echo -e "${GREEN}✅ 编译成功！${NC}"
+echo -e "${GREEN}[OK]编译成功！${NC}"
 echo
 echo "可执行文件位置:"
 ls -lh bin/ 2>/dev/null || true
@@ -146,7 +146,7 @@ int main() {
     
     TestStruct obj{42, 3.14};
     
-    std::cout << "✅ C++26 Reflection: ENABLED\n";
+    std::cout << "[OK]C++26 Reflection: ENABLED\n";
     std::cout << "   Splice syntax works!\n";
     std::cout << "   Test value: " << obj.*ptr << "\n";
     
@@ -157,7 +157,7 @@ EOFCPP
 echo "测试反射功能..."
 if "$CLANG_P2996" -std=c++26 -freflection -stdlib=libc++ /tmp/quick_reflection_test.cpp -o /tmp/quick_test -L"$LIBCXX_LIB" -Wl,-rpath,"$LIBCXX_LIB" 2>/dev/null && LD_LIBRARY_PATH="$LIBCXX_LIB" /tmp/quick_test; then
     echo
-    echo -e "${GREEN}🎉 C++26 反射功能已启用！${NC}"
+    echo -e "${GREEN}C++26 反射功能已启用！${NC}"
 else
     echo
     echo -e "${YELLOW}⚠️  反射功能检测失败${NC}"

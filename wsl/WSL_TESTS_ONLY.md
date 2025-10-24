@@ -1,6 +1,6 @@
 # WSL Tests Only - Build Summary
 
-## ✅ Success!
+## [OK]Success!
 
 You can now build and run **only** the WSL reflection tests without building the main project!
 
@@ -12,10 +12,10 @@ You can now build and run **only** the WSL reflection tests without building the
 
 | Test | Status | File |
 |------|--------|------|
-| `test_cpp26_simple` | ✅ Built | Simple C++26 test |
-| `test_reflection_syntax` | ✅ Built | Reflection syntax |
-| `test_splice` | ✅ Built | Splice operations |
-| `test_reflection_final` | ✅ Built | Final reflection test |
+| `test_cpp26_simple` | [OK]Built | Simple C++26 test |
+| `test_reflection_syntax` | [OK]Built | Reflection syntax |
+| `test_splice` | [OK]Built | Splice operations |
+| `test_reflection_final` | [OK]Built | Final reflection test |
 
 ### Build Errors (2/6):
 
@@ -145,7 +145,7 @@ wsl_build_tests_only.bat
 | Files Built | 6 test files | All examples + tests |
 | Dependencies | None | xoffsetdatastructure2.hpp |
 | Errors | 2/6 (fixable) | Many (complex) |
-| **Status** | ✅ **Works!** | ❌ Has errors |
+| **Status** | [OK]**Works!** | ❌ Has errors |
 
 ---
 
@@ -170,7 +170,7 @@ struct S {
 
 ## 💡 Next Steps
 
-1. ✅ Run the 4 working tests
+1. [OK]Run the 4 working tests
 2. Fix the 2 failing tests (optional)
 3. Add more reflection tests
 4. Experiment with C++26 features
