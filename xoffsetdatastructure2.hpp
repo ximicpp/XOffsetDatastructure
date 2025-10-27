@@ -63,9 +63,7 @@
 
 // ========================================================================
 // XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
-// (COMMENTED OUT - Focus on compact first)
 // ========================================================================
-#if 0
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
@@ -204,14 +202,15 @@ namespace XTypeSignature {
     // ========================================================================
     template<typename T, size_t Index>
     consteval size_t get_field_offset() noexcept {
-        auto members = std::meta::members_of(^T);
+        using namespace std::meta;
+        auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
         
         if constexpr (Index == 0) {
             return 0;
         } else {
             // Use reflection to get member offset directly
             auto member = members[Index];
-            return std::meta::offset_of(member);
+            return offset_of(member).bytes;
         }
     }
 
@@ -224,28 +223,158 @@ namespace XTypeSignature {
     // Instead, we use the size of the members vector directly
     template <typename T>
     consteval std::size_t get_member_count() noexcept {
-        auto all_members = std::meta::members_of(^T);
+        using namespace std::meta;
+        auto all_members = nonstatic_data_members_of(^^T, access_context::unchecked());
         return all_members.size();
     }
     
-    // Main function: Generate signature for all fields
-    // NOTE: Due to P2996 limitations, we can't dynamically build type signatures
-    // template for cannot accumulate results to external variables
-    // Splice [:type_of(member):] requires member to be constexpr (template for provides this)
-    // But we can't store intermediate CompileString results in a loop
-    //
-    // Current implementation: Return only field count
-    // For full signatures, use manual TypeSignature specializations (see examples/)
+    // ========================================================================
+    // Generate Signature for Single Field
+    // ========================================================================
+    template<typename T, std::size_t Index>
+    static consteval auto get_field_signature() noexcept {
+        using namespace std::meta;
+        constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
+        
+        // Get field type using splice
+        using FieldType = [:type_of(member):];
+        
+        // Get field offset
+        constexpr std::size_t offset = offset_of(member).bytes;
+        
+        // Generate format: @offset:type
+        return CompileString{"@"} +
+               CompileString<32>::from_number(offset) +
+               CompileString{":"} +
+               TypeSignature<FieldType>::calculate();
+    }
+
+    // ========================================================================
+    // Preprocessor Macros for Field Signature Accumulation
+    // ========================================================================
+    
+    // Macro: Generate single field signature call
+    #define XTYPE_FIELD_SIG(T, n) \
+        get_field_signature<T, n>()
+    
+    // Macro: Comma separator
+    #define XTYPE_COMMA() + CompileString{","} +
+    
+    // Macros for different field counts (0-20 fields)
+    #define XTYPE_SIG_BUILD_0(T) CompileString{""}
+    
+    #define XTYPE_SIG_BUILD_1(T) \
+        XTYPE_FIELD_SIG(T, 0)
+    
+    #define XTYPE_SIG_BUILD_2(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1)
+    
+    #define XTYPE_SIG_BUILD_3(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2)
+    
+    #define XTYPE_SIG_BUILD_4(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3)
+    
+    #define XTYPE_SIG_BUILD_5(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4)
+    
+    #define XTYPE_SIG_BUILD_6(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 5)
+    
+    #define XTYPE_SIG_BUILD_7(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 6)
+    
+    #define XTYPE_SIG_BUILD_8(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 7)
+    
+    #define XTYPE_SIG_BUILD_9(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 7) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 8)
+    
+    #define XTYPE_SIG_BUILD_10(T) \
+        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 7) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 8) XTYPE_COMMA() \
+        XTYPE_FIELD_SIG(T, 9)
+
+    // ========================================================================
+    // Main Function: Generate Signature for All Fields
+    // ========================================================================
+    // Uses preprocessor macros to accumulate field signatures at compile time
+    // See docs/PREPROCESSOR_MACRO_TEST_REPORT.md for detailed explanation
     template <typename T>
     consteval auto get_fields_signature() noexcept {
         constexpr std::size_t count = get_member_count<T>();
         
-        // Return simplified signature with field count only
-        if constexpr (count > 0) {
-            return CompileString{"fields:"} +
-                   CompileString<32>::from_number(count);
+        // Use if constexpr to select appropriate macro based on field count
+        if constexpr (count == 0) {
+            return XTYPE_SIG_BUILD_0(T);
+        } else if constexpr (count == 1) {
+            return XTYPE_SIG_BUILD_1(T);
+        } else if constexpr (count == 2) {
+            return XTYPE_SIG_BUILD_2(T);
+        } else if constexpr (count == 3) {
+            return XTYPE_SIG_BUILD_3(T);
+        } else if constexpr (count == 4) {
+            return XTYPE_SIG_BUILD_4(T);
+        } else if constexpr (count == 5) {
+            return XTYPE_SIG_BUILD_5(T);
+        } else if constexpr (count == 6) {
+            return XTYPE_SIG_BUILD_6(T);
+        } else if constexpr (count == 7) {
+            return XTYPE_SIG_BUILD_7(T);
+        } else if constexpr (count == 8) {
+            return XTYPE_SIG_BUILD_8(T);
+        } else if constexpr (count == 9) {
+            return XTYPE_SIG_BUILD_9(T);
+        } else if constexpr (count == 10) {
+            return XTYPE_SIG_BUILD_10(T);
         } else {
-            return CompileString{""};
+            // More than 10 fields - need to extend macros
+            return CompileString{"TOO_MANY_FIELDS[count:"} +
+                   CompileString<32>::from_number(count) +
+                   CompileString{"]"};
         }
     }
 
@@ -332,7 +461,6 @@ namespace XTypeSignature {
     }
 
 } // namespace XTypeSignature
-#endif // Type Signature (commented out)
 
 // using XTypeSignature::BASIC_ALIGNMENT;
 
@@ -1076,9 +1204,7 @@ namespace XOffsetDatastructure2
 
 // ============================================================================
 // Type Signature Support for XOffsetDatastructure2 Containers
-// (COMMENTED OUT - Focus on compact first)
 // ============================================================================
-#if 0
 namespace XTypeSignature {
     // XString signature
     template <>
@@ -1120,5 +1246,4 @@ namespace XTypeSignature {
         }
     };
 } // namespace XTypeSignature
-#endif // Type Signature for containers (commented out)
 #endif // X_OFFSET_DATA_STRUCTURE_2_HPP
