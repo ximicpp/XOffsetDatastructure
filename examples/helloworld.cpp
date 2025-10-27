@@ -109,12 +109,20 @@ int main() {
         std::cout << "\n";
     }
     
-    // Show type signature (compile-time calculated)
-    // COMMENTED OUT - Focus on compact first
-    // std::cout << "\n   Type Signature:\n   ";
-    // constexpr auto sig = XTypeSignature::get_XTypeSignature<Player>();
-    // sig.print();
-    // std::cout << "\n";
+    // 9. Show type signature (compile-time calculated)
+    std::cout << "\n9. Type Signature (compile-time, zero runtime cost):\n";
+    std::cout << "   Player type signature:\n   ";
+    constexpr auto sig = XTypeSignature::get_XTypeSignature<Player>();
+    for (size_t i = 0; i < sig.size && sig.value[i] != '\0'; ++i) {
+        std::cout << sig.value[i];
+    }
+    std::cout << "\n\n   Explanation:\n";
+    std::cout << "   - struct[s:72,a:8]: Size 72 bytes, aligned to 8 bytes\n";
+    std::cout << "   - @0:i32:  Field 'id' at offset 0\n";
+    std::cout << "   - @4:i32:  Field 'level' at offset 4\n";
+    std::cout << "   - @8:...:  Field 'name' (XString) at offset 8\n";
+    std::cout << "   - @40:...: Field 'items' (XVector) at offset 40\n";
+    std::cout << "\n   [OK] Type signature matches memory layout!\n";
     
     std::cout << "\n=== Done! ===\n\n";
     return 0;

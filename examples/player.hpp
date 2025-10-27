@@ -35,7 +35,6 @@ struct alignas(8) Player {
 
 // ============================================================================
 // Compile-Time Type Signature Validation (C++26 Reflection)
-// (COMMENTED OUT - Focus on compact first)
 // ============================================================================
 // Using C++26 reflection, we can directly validate the Player type
 // without needing a separate ReflectionHint aggregate type.
@@ -47,13 +46,13 @@ struct alignas(8) Player {
 // ============================================================================
 
 // Full type signature validation using C++26 reflection
-// static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
-//              "struct[s:72,a:8]{"
-//              "@0:i32[s:4,a:4],"
-//              "@4:i32[s:4,a:4],"
-//              "@8:string[s:32,a:8],"
-//              "@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
-//               "Type signature mismatch for Player - "
-//               "Binary layout changed! This breaks serialization compatibility.");
+static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
+             "struct[s:72,a:8]{"
+             "@0:i32[s:4,a:4],"
+             "@4:i32[s:4,a:4],"
+             "@8:string[s:32,a:8],"
+             "@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
+              "Type signature mismatch for Player - "
+              "Binary layout changed! This breaks serialization compatibility.");
 
 #endif // PLAYER_HPP_

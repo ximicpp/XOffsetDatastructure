@@ -286,6 +286,36 @@ else
     echo -e "${YELLOW}Demo executable not found (skipped)${NC}"
 fi
 
+echo ""
+
+# Run HelloWorld Example
+echo -e "${CYAN}======================================================================${NC}"
+echo -e "${CYAN}Running HelloWorld Example (with Type Signature Validation)${NC}"
+echo -e "${CYAN}======================================================================${NC}"
+echo ""
+
+# Try both possible paths
+HELLOWORLD_PATH="bin/helloworld"
+if [ ! -f "$HELLOWORLD_PATH" ]; then
+    HELLOWORLD_PATH="bin/$BUILD_TYPE/helloworld"
+fi
+
+if [ -f "$HELLOWORLD_PATH" ]; then
+    ./$HELLOWORLD_PATH
+    
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo -e "${GREEN}✓ HelloWorld example completed successfully!${NC}"
+    else
+        echo ""
+        echo -e "${RED}✗ HelloWorld example failed!${NC}"
+        TEST_FAILED=1
+    fi
+else
+    echo -e "${YELLOW}HelloWorld executable not found (skipped)${NC}"
+    echo -e "${YELLOW}Checked paths: bin/helloworld and bin/$BUILD_TYPE/helloworld${NC}"
+fi
+
 # Return to original directory
 cd ..
 
