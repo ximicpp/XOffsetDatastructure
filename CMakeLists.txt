@@ -1,9 +1,28 @@
 cmake_minimum_required(VERSION 3.10)
 project(XOffsetDatastructure)
 
-# Set C++ standard to C++20
-set(CMAKE_CXX_STANDARD 20)
+# Set C++ standard (default to C++20, can be overridden)
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Option to enable C++26 reflection tests
+option(ENABLE_REFLECTION_TESTS "Enable C++26 reflection tests (requires Clang with P2996 support)" OFF)
+
+# If reflection tests are enabled, use C++26
+if(ENABLE_REFLECTION_TESTS)
+    set(CMAKE_CXX_STANDARD 26)
+    message(STATUS "Reflection tests enabled - using C++26")
+    
+    # Add reflection flag for Clang
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-freflection)
+        message(STATUS "Added -freflection flag for Clang")
+    else()
+        message(WARNING "Reflection tests require Clang with P2996 support")
+    endif()
+endif()
 
 # macOS specific settings
 if(APPLE)

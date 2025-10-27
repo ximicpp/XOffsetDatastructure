@@ -1,6 +1,6 @@
-# Set C++ standard to C++20
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# C++ standard is inherited from parent CMakeLists.txt
+# (C++20 by default, C++26 if ENABLE_REFLECTION_TESTS is ON)
+# Don't override it here
 
 # Enable testing
 enable_testing()
@@ -70,3 +70,69 @@ add_test(NAME MapSetOps COMMAND test_map_set)
 add_test(NAME NestedStructures COMMAND test_nested)
 add_test(NAME MemoryCompaction COMMAND test_compaction)
 add_test(NAME DataModification COMMAND test_modify)
+
+# ============================================================================
+# C++26 Reflection Tests (Optional)
+# ============================================================================
+# These tests will always be built, but will skip at runtime if reflection
+# is not available. This ensures the project builds in all environments.
+# ============================================================================
+
+message(STATUS "Adding C++26 reflection tests...")
+
+# List of reflection test files
+set(REFLECTION_TESTS
+    test_reflection_operators
+    test_member_iteration
+    test_reflection_type_signature
+    test_splice_operations
+    test_type_introspection
+    test_reflection_compaction
+    test_reflection_serialization
+    test_reflection_comparison
+)
+
+# Add each reflection test
+foreach(test_name ${REFLECTION_TESTS})
+    add_executable(${test_name} ${test_name}.cpp)
+    target_include_directories(${test_name} PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+    set_target_properties(${test_name} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+    )
+    configure_macos_target(${test_name})
+    
+    # Add to CTest
+    add_test(NAME ${test_name} COMMAND ${test_name})
+    
+    # Set test to pass even if skipped (when reflection not available)
+    set_tests_properties(${test_name} PROPERTIES
+        SKIP_RETURN_CODE 0
+    )
+endforeach()
+
+message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR} reflection tests")
+
+# Display configuration summary
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "  XOffsetDatastructure2 Test Summary")
+message(STATUS "========================================")
+message(STATUS "C++ Standard: C++${CMAKE_CXX_STANDARD}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Basic Tests: 6 tests")
+message(STATUS "Reflection Tests: 8 tests")
+message(STATUS "Total Tests: 14 tests")
+
+if(ENABLE_REFLECTION_TESTS)
+    message(STATUS "Reflection: ENABLED")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(STATUS "Reflection Flag: -freflection")
+    else()
+        message(STATUS "Warning: Non-Clang compiler may not support reflection")
+    endif()
+else()
+    message(STATUS "Reflection: OPTIONAL (tests will skip if not available)")
+    message(STATUS "To enable: cmake -DENABLE_REFLECTION_TESTS=ON")
+endif()
+message(STATUS "========================================")
+message(STATUS "")
