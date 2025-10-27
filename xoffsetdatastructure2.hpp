@@ -198,7 +198,6 @@ namespace XTypeSignature {
     // ========================================================================
     // Field Offset Calculation (C++26 Reflection)
     // ========================================================================
-#if __cpp_reflection >= 202306L
     template<typename T, size_t Index>
     constexpr size_t get_field_offset() noexcept {
         constexpr auto members = std::meta::members_of(^T);
@@ -211,21 +210,10 @@ namespace XTypeSignature {
             return std::meta::offset_of(member);
         }
     }
-#else
-    // Fallback: Manual calculation (less accurate, for compatibility)
-    template<typename T, size_t Index>
-    constexpr size_t get_field_offset() noexcept {
-        static_assert(sizeof(T) == 0, 
-            "C++26 reflection required for accurate field offset calculation. "
-            "Please compile with -std=c++26 or use next_practical branch.");
-        return 0;
-    }
-#endif
 
     // ========================================================================
     // Generate Signature for All Fields (C++26 Reflection)
     // ========================================================================
-#if __cpp_reflection >= 202306L
     template <typename T>
     constexpr auto get_fields_signature() noexcept {
         constexpr auto members = std::meta::members_of(^T);
@@ -258,13 +246,6 @@ namespace XTypeSignature {
         
         return result;
     }
-#else
-    // Fallback: Empty implementation
-    template <typename T>
-    constexpr auto get_fields_signature() noexcept {
-        return CompileString{""};
-    }
-#endif
 
     // ========================================================================
     // Basic Type Signatures
@@ -316,7 +297,6 @@ namespace XTypeSignature {
     template <typename T>
     struct TypeSignature {
         static constexpr auto calculate() noexcept {
-#if __cpp_reflection >= 202306L
             if constexpr (std::is_aggregate_v<T> && !std::is_array_v<T>) {
                 return CompileString{"struct[s:"} +
                        CompileString<32>::from_number(sizeof(T)) +
@@ -337,12 +317,6 @@ namespace XTypeSignature {
                     "Type is not supported for automatic reflection");
                 return CompileString{""};
             }
-#else
-            static_assert(sizeof(T) == 0, 
-                "C++26 reflection required for type signature generation. "
-                "Please compile with -std=c++26 or use next_practical branch with Boost.PFR.");
-            return CompileString{""};
-#endif
         }
     };
 
@@ -704,7 +678,6 @@ namespace XOffsetDatastructure2
 		// @return New compacted buffer
 		template<typename T>
 		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
-#if __cpp_reflection >= 202306L  // Check for C++26 reflection support
 			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
@@ -728,15 +701,6 @@ namespace XOffsetDatastructure2
 			new_xbuf.shrink_to_fit();
 			
 			return new_xbuf;
-#else
-			(void)old_xbuf;
-			(void)object_name;
-			static_assert(sizeof(T) == 0, 
-				"compact_automatic requires C++26 reflection (P2996R5 or later). "
-				"Your compiler does not support __cpp_reflection >= 202306L. "
-				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
-			return XBuffer();
-#endif
 		}
 		
 		// Compact all objects of type T in the buffer
@@ -746,7 +710,6 @@ namespace XOffsetDatastructure2
 		// @return New compacted buffer with all T objects migrated
 		template<typename T>
 		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
-#if __cpp_reflection >= 202306L
 			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
@@ -784,17 +747,9 @@ namespace XOffsetDatastructure2
 			}
 			
 			return new_xbuf;
-#else
-			(void)old_xbuf;
-			static_assert(sizeof(T) == 0, 
-				"compact_automatic_all requires C++26 reflection. "
-				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
-			return XBuffer();
-#endif
 		}
 
 	private:
-#if __cpp_reflection >= 202306L
 		// ====================================================================
 		// Type trait helpers for reflection-based migration
 		// ====================================================================
@@ -1000,7 +955,6 @@ namespace XOffsetDatastructure2
 				}
 			}
 		}
-#endif
 	};
 
 	// ========================================================================
