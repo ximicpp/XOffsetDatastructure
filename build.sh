@@ -278,12 +278,26 @@ echo -e "${CYAN}Running XOffsetDatastructure Demo v2${NC}"
 echo -e "${CYAN}======================================================================${NC}"
 echo ""
 
-DEMO_PATH="bin/$BUILD_TYPE/xoffsetdatastructure2_demo"
+# Try both possible paths
+DEMO_PATH="bin/xoffsetdatastructure2_demo"
+if [ ! -f "$DEMO_PATH" ]; then
+    DEMO_PATH="bin/$BUILD_TYPE/xoffsetdatastructure2_demo"
+fi
 
 if [ -f "$DEMO_PATH" ]; then
-    ./$DEMO_PATH --visualize --compact
+    ./$DEMO_PATH
+    
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo -e "${GREEN}✓ Demo completed successfully!${NC}"
+    else
+        echo ""
+        echo -e "${RED}✗ Demo failed!${NC}"
+        TEST_FAILED=1
+    fi
 else
     echo -e "${YELLOW}Demo executable not found (skipped)${NC}"
+    echo -e "${YELLOW}Checked paths: bin/xoffsetdatastructure2_demo and bin/$BUILD_TYPE/xoffsetdatastructure2_demo${NC}"
 fi
 
 echo ""
