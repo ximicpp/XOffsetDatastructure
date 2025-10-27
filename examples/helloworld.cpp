@@ -66,8 +66,6 @@ int main() {
     
     // 8. Memory Compaction Demo (C++26 only)
     std::cout << "\n8. Memory Compaction:\n";
-    
-#if __cpp_reflection >= 202306L
     std::cout << "   [OK] C++26 reflection: ENABLED\n";
     std::cout << "   [OK] Automatic memory compaction available\n\n";
     
@@ -112,17 +110,11 @@ int main() {
     }
     
     // Show type signature (compile-time calculated)
-    std::cout << "\n   Type Signature:\n   ";
-    constexpr auto sig = XTypeSignature::get_XTypeSignature<Player>();
-    sig.print();
-    std::cout << "\n";
-    
-#else
-    std::cout << "   [X] C++26 reflection: NOT AVAILABLE\n";
-    std::cout << "   [i] Memory compaction requires C++26 reflection\n";
-    std::cout << "   [i] Using basic size/alignment validation\n";
-    std::cout << "   [i] Compile with -std=c++26 -freflection for compaction features\n";
-#endif
+    // COMMENTED OUT - Focus on compact first
+    // std::cout << "\n   Type Signature:\n   ";
+    // constexpr auto sig = XTypeSignature::get_XTypeSignature<Player>();
+    // sig.print();
+    // std::cout << "\n";
     
     std::cout << "\n=== Done! ===\n\n";
     return 0;

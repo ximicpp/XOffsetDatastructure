@@ -212,7 +212,6 @@ void demo_type_signatures() {
     
     print_subsection("Reflection Capability");
     
-#if __cpp_reflection >= 202306L
     std::cout << "  Status: [OK] C++26 Reflection ENABLED\n\n";
     
     print_info("Feature Macro", "__cpp_reflection >= 202306L");
@@ -241,18 +240,6 @@ void demo_type_signatures() {
     print_check("std::meta::members_of - iterate fields at compile-time");
     print_check("std::meta::offset_of - direct offset access");
     print_check("template for - compile-time member iteration");
-    
-#else
-    std::cout << "  Status: [X] C++26 Reflection NOT AVAILABLE\n\n";
-    
-    print_info("Current Mode", "Basic size/alignment validation");
-    print_info("To Enable", "Compile with -std=c++26 -freflection");
-    print_info("Fallback", "Size/alignment static_assert only");
-    
-    std::cout << "\n";
-    std::cout << "  Note: Type signature verification is disabled.\n";
-    std::cout << "        Using basic compile-time checks instead.\n";
-#endif
     
     print_subsection("Compile-Time Safety");
     print_check("Binary compatibility across compilations");
@@ -349,7 +336,6 @@ void demo_advanced_features() {
     print_check("Memory usage statistics");
     print_check("Zero-copy deserialization");
     
-#if __cpp_reflection >= 202306L
     print_subsection("C++26 Reflection Features (Active)");
     print_check("std::meta::members_of - Get all struct members");
     print_check("std::meta::offset_of - Direct field offset");
@@ -357,14 +343,6 @@ void demo_advanced_features() {
     print_check("std::meta::name_of - Get member name (debugging)");
     print_check("template for - Compile-time iteration");
     print_check("Direct struct introspection (no aggregates needed)");
-#else
-    print_subsection("Future: C++26 Reflection (Inactive)");
-    std::cout << "  When enabled with C++26 compiler:\n";
-    std::cout << "    - std::meta::members_of(^T) to get all members\n";
-    std::cout << "    - std::meta::offset_of for direct offset access\n";
-    std::cout << "    - template for to iterate members at compile-time\n";
-    std::cout << "    - No code generation or ReflectionHint types needed\n";
-#endif
 }
 
 // ============================================================================
@@ -382,11 +360,7 @@ int main() {
 +======================================================================+
 )";
 
-#if __cpp_reflection >= 202306L
     std::cout << "  [OK] C++26 Reflection: ENABLED\n";
-#else
-    std::cout << "  [X] C++26 Reflection: NOT AVAILABLE (using fallback)\n";
-#endif
     std::cout << "\n";
 
     try {

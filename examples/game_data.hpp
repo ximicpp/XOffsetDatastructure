@@ -78,8 +78,6 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameData {
 //   - Cleaner type definitions
 // ============================================================================
 
-#if __cpp_reflection >= 202306L
-
 // Item type signature validation
 static_assert(XTypeSignature::get_XTypeSignature<Item>() == 
              "struct[s:48,a:8]{"
@@ -106,18 +104,5 @@ static_assert(XTypeSignature::get_XTypeSignature<GameData>() ==
              "@112:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
               "Type signature mismatch for GameData - "
               "Binary layout changed! This breaks serialization compatibility.");
-
-#else
-// Fallback: Basic size/alignment validation
-static_assert(sizeof(Item) == 48, "Item size must be 48 bytes");
-static_assert(alignof(Item) == 8, "Item alignment must be 8 bytes");
-
-static_assert(sizeof(GameData) == 144, "GameData size must be 144 bytes");
-static_assert(alignof(GameData) == 8, "GameData alignment must be 8 bytes");
-
-// Note: C++26 reflection not available. Using basic size/alignment validation only.
-// For full type signature validation, compile with C++26 reflection support.
-#pragma message("Warning: C++26 reflection not available. Using basic size/alignment validation only.")
-#endif
 
 #endif // GAME_DATA_HPP_
