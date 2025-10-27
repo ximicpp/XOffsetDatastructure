@@ -50,6 +50,8 @@
 // ============================================================================
 // Standard Library Headers
 // ============================================================================
+#include <experimental/meta>
+#include <array>
 #include <string_view>
 #include <type_traits>
 #include <iostream>
@@ -61,7 +63,9 @@
 
 // ========================================================================
 // XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
+// (COMMENTED OUT - Focus on compact first)
 // ========================================================================
+#if 0
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
@@ -198,96 +202,75 @@ namespace XTypeSignature {
     // ========================================================================
     // Field Offset Calculation (C++26 Reflection)
     // ========================================================================
-#if __cpp_reflection >= 202306L
     template<typename T, size_t Index>
-    constexpr size_t get_field_offset() noexcept {
-        constexpr auto members = std::meta::members_of(^T);
+    consteval size_t get_field_offset() noexcept {
+        auto members = std::meta::members_of(^T);
         
         if constexpr (Index == 0) {
             return 0;
         } else {
             // Use reflection to get member offset directly
-            constexpr auto member = members[Index];
+            auto member = members[Index];
             return std::meta::offset_of(member);
         }
     }
-#else
-    // Fallback: Manual calculation (less accurate, for compatibility)
-    template<typename T, size_t Index>
-    constexpr size_t get_field_offset() noexcept {
-        static_assert(sizeof(T) == 0, 
-            "C++26 reflection required for accurate field offset calculation. "
-            "Please compile with -std=c++26 or use next_practical branch.");
-        return 0;
-    }
-#endif
 
     // ========================================================================
     // Generate Signature for All Fields (C++26 Reflection)
     // ========================================================================
-#if __cpp_reflection >= 202306L
+    
+    // Helper: Count total number of data members
+    // Due to P2996 limitations, we cannot use template for to accumulate count
+    // Instead, we use the size of the members vector directly
     template <typename T>
-    constexpr auto get_fields_signature() noexcept {
-        constexpr auto members = std::meta::members_of(^T);
+    consteval std::size_t get_member_count() noexcept {
+        auto all_members = std::meta::members_of(^T);
+        return all_members.size();
+    }
+    
+    // Main function: Generate signature for all fields
+    // NOTE: Due to P2996 limitations, we can't dynamically build type signatures
+    // template for cannot accumulate results to external variables
+    // Splice [:type_of(member):] requires member to be constexpr (template for provides this)
+    // But we can't store intermediate CompileString results in a loop
+    //
+    // Current implementation: Return only field count
+    // For full signatures, use manual TypeSignature specializations (see examples/)
+    template <typename T>
+    consteval auto get_fields_signature() noexcept {
+        constexpr std::size_t count = get_member_count<T>();
         
-        CompileString result{""};
-        bool first = true;
-        size_t index = 0;
-        
-        // Use template for to iterate members at compile-time
-        template for (constexpr auto member : members) {
-            if constexpr (std::meta::is_nonstatic_data_member(member)) {
-                using FieldType = typename std::meta::type_of(member);
-                constexpr size_t offset = std::meta::offset_of(member);
-                
-                if (first) {
-                    result = CompileString{"@"} +
-                            CompileString<32>::from_number(offset) +
-                            CompileString{":"} +
-                            TypeSignature<FieldType>::calculate();
-                    first = false;
-                } else {
-                    result = result + CompileString{",@"} +
-                            CompileString<32>::from_number(offset) +
-                            CompileString{":"} +
-                            TypeSignature<FieldType>::calculate();
-                }
-                ++index;
-            }
+        // Return simplified signature with field count only
+        if constexpr (count > 0) {
+            return CompileString{"fields:"} +
+                   CompileString<32>::from_number(count);
+        } else {
+            return CompileString{""};
         }
-        
-        return result;
     }
-#else
-    // Fallback: Empty implementation
-    template <typename T>
-    constexpr auto get_fields_signature() noexcept {
-        return CompileString{""};
-    }
-#endif
 
     // ========================================================================
     // Basic Type Signatures
     // ========================================================================
-    template <> struct TypeSignature<int32_t>  { static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<uint32_t> { static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<int64_t>  { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<uint64_t> { static constexpr auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<float>    { static constexpr auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<double>   { static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
-    template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
+    template <> struct TypeSignature<int32_t>  { static consteval auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<uint32_t> { static consteval auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<int64_t>  { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<uint64_t> { static consteval auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<float>    { static consteval auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
+    template <> struct TypeSignature<double>   { static consteval auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
+    template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
+    template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     
     // Pointer types
-    template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
-    template <>           struct TypeSignature<void*>{ static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
+    template <typename T> struct TypeSignature<T*>   { static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
+    template <>           struct TypeSignature<void*>{ static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
     // ========================================================================
     // Array Types
     // ========================================================================
     template <typename T, size_t N>
     struct TypeSignature<T[N]> {
-        static constexpr auto calculate() noexcept {
+        static consteval auto calculate() noexcept {
             if constexpr (std::is_same_v<T, char>) {
                 return CompileString{"bytes[s:"} +
                        CompileString<32>::from_number(N) +
@@ -307,7 +290,7 @@ namespace XTypeSignature {
     };
 
     template <> struct TypeSignature<char[ANY_SIZE]> {
-        static constexpr auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
+        static consteval auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
     };
 
     // ========================================================================
@@ -315,9 +298,9 @@ namespace XTypeSignature {
     // ========================================================================
     template <typename T>
     struct TypeSignature {
-        static constexpr auto calculate() noexcept {
-#if __cpp_reflection >= 202306L
-            if constexpr (std::is_aggregate_v<T> && !std::is_array_v<T>) {
+        static consteval auto calculate() noexcept {
+            // In C++26, we can use reflection on any class type (not just aggregates)
+            if constexpr (std::is_class_v<T> && !std::is_array_v<T>) {
                 return CompileString{"struct[s:"} +
                        CompileString<32>::from_number(sizeof(T)) +
                        CompileString{",a:"} +
@@ -337,12 +320,6 @@ namespace XTypeSignature {
                     "Type is not supported for automatic reflection");
                 return CompileString{""};
             }
-#else
-            static_assert(sizeof(T) == 0, 
-                "C++26 reflection required for type signature generation. "
-                "Please compile with -std=c++26 or use next_practical branch with Boost.PFR.");
-            return CompileString{""};
-#endif
         }
     };
 
@@ -350,13 +327,14 @@ namespace XTypeSignature {
     // Public API
     // ========================================================================
     template <typename T>
-    [[nodiscard]] constexpr auto get_XTypeSignature() noexcept {
+    [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
         return TypeSignature<T>::calculate();
     }
 
 } // namespace XTypeSignature
+#endif // Type Signature (commented out)
 
-using XTypeSignature::BASIC_ALIGNMENT;
+// using XTypeSignature::BASIC_ALIGNMENT;
 
 // ============================================================================
 // Boost Interprocess Extensions
@@ -558,6 +536,61 @@ namespace XOffsetDatastructure2
 	// typedef XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index> XBuffer;
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
+	// ====================================================================
+	// C++20 Concepts for container classification (Namespace scope)
+	// ====================================================================
+	
+	// Concept: Has iterator support (begin/end)
+	template<typename T>
+	concept HasIterator = requires(T t) {
+		{ t.begin() } -> std::input_or_output_iterator;
+		{ t.end() } -> std::input_or_output_iterator;
+	};
+	
+	// Concept: Has value_type
+	template<typename T>
+	concept HasValueType = requires {
+		typename T::value_type;
+	};
+	
+	// Concept: Has mapped_type (for maps)
+	template<typename T>
+	concept HasMappedType = requires {
+		typename T::mapped_type;
+	};
+	
+	// Concept: Has key_type (for maps and sets)
+	template<typename T>
+	concept HasKeyType = requires {
+		typename T::key_type;
+	};
+	
+	// Concept: Sequential container (has push_back or emplace_back)
+	template<typename T>
+	concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
+		requires(T t, typename T::value_type v) {
+			{ t.emplace_back(std::move(v)) };
+		};
+	
+	// Concept: Set-like container (has key_type but not mapped_type, has emplace)
+	template<typename T>
+	concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
+		!HasMappedType<T> &&
+		requires(T t, typename T::value_type v) {
+			{ t.emplace(std::move(v)) };
+		};
+	
+	// Concept: Map-like container (has both key_type and mapped_type)
+	template<typename T>
+	concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
+		requires(T t, typename T::key_type k, typename T::mapped_type v) {
+			{ t.emplace(std::move(k), std::move(v)) };
+		};
+	
+	// Concept: Any supported container
+	template<typename T>
+	concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
+
 	struct growth_factor_custom
 		// : boost::container::dtl::grow_factor_ratio<0, 15, 10> // growth_factor_50
 		// : boost::container::dtl::grow_factor_ratio<0, 16, 10> // growth_factor_60
@@ -704,7 +737,6 @@ namespace XOffsetDatastructure2
 		// @return New compacted buffer
 		template<typename T>
 		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
-#if __cpp_reflection >= 202306L  // Check for C++26 reflection support
 			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
@@ -728,15 +760,6 @@ namespace XOffsetDatastructure2
 			new_xbuf.shrink_to_fit();
 			
 			return new_xbuf;
-#else
-			(void)old_xbuf;
-			(void)object_name;
-			static_assert(sizeof(T) == 0, 
-				"compact_automatic requires C++26 reflection (P2996R5 or later). "
-				"Your compiler does not support __cpp_reflection >= 202306L. "
-				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
-			return XBuffer();
-#endif
 		}
 		
 		// Compact all objects of type T in the buffer
@@ -746,7 +769,6 @@ namespace XOffsetDatastructure2
 		// @return New compacted buffer with all T objects migrated
 		template<typename T>
 		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
-#if __cpp_reflection >= 202306L
 			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
@@ -784,17 +806,9 @@ namespace XOffsetDatastructure2
 			}
 			
 			return new_xbuf;
-#else
-			(void)old_xbuf;
-			static_assert(sizeof(T) == 0, 
-				"compact_automatic_all requires C++26 reflection. "
-				"Please use compact_manual<T> instead or upgrade to a C++26-compliant compiler.");
-			return XBuffer();
-#endif
 		}
 
 	private:
-#if __cpp_reflection >= 202306L
 		// ====================================================================
 		// Type trait helpers for reflection-based migration
 		// ====================================================================
@@ -818,66 +832,12 @@ namespace XOffsetDatastructure2
 		template<typename T>
 		using container_value_type_t = typename container_value_type<T>::type;
 		
-		// ====================================================================
-		// C++20 Concepts for container classification
-		// ====================================================================
-		
-		// Concept: Has iterator support (begin/end)
-		template<typename T>
-		concept HasIterator = requires(T t) {
-			{ t.begin() } -> std::input_or_output_iterator;
-			{ t.end() } -> std::input_or_output_iterator;
-		};
-		
-		// Concept: Has value_type
-		template<typename T>
-		concept HasValueType = requires {
-			typename T::value_type;
-		};
-		
-		// Concept: Has mapped_type (for maps)
-		template<typename T>
-		concept HasMappedType = requires {
-			typename T::mapped_type;
-		};
-		
-		// Concept: Has key_type (for maps and sets)
-		template<typename T>
-		concept HasKeyType = requires {
-			typename T::key_type;
-		};
-		
-		// Concept: Sequential container (has push_back or emplace_back)
-		template<typename T>
-		concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
-			requires(T t, typename T::value_type v) {
-				{ t.emplace_back(std::move(v)) };
-			};
-		
-		// Concept: Set-like container (has key_type but not mapped_type, has emplace)
-		template<typename T>
-		concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
-			!HasMappedType<T> &&
-			requires(T t, typename T::value_type v) {
-				{ t.emplace(std::move(v)) };
-			};
-		
-		// Concept: Map-like container (has both key_type and mapped_type)
-		template<typename T>
-		concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
-			requires(T t, typename T::key_type k, typename T::mapped_type v) {
-				{ t.emplace(std::move(k), std::move(v)) };
-			};
-		
-		// Concept: Any supported container
-		template<typename T>
-		concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
-		
 		// Check if type is a simple POD (int, float, etc.)
+		// Note: Concepts defined at namespace scope above
 		template<typename T>
-		constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
-		                                  !SupportedContainer<T> && 
-		                                  !is_xstring<T>::value;
+		static constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
+		                                         !SupportedContainer<T> && 
+		                                         !is_xstring<T>::value;
 		
 		// ====================================================================
 		// Reflection-based member migration
@@ -976,31 +936,66 @@ namespace XOffsetDatastructure2
 			}
 		}
 		
-		// Migrate all members of a struct using C++26 reflection
+		// ====================================================================
+		// Reflection-based member migration using index sequence
+		// ====================================================================
+		
+		// Helper: Get member count
+		template<typename T>
+		static consteval std::size_t get_member_count_impl() {
+			using namespace std::meta;
+			return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+		}
+		
+		// Helper: Get member info at specific index (compile-time)
+		template<typename T, std::size_t Index>
+		static consteval auto get_member_at() {
+			using namespace std::meta;
+			auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+			return members[Index];
+		}
+		
+		// Helper: Migrate a single member at Index using splice
+		template<typename T, std::size_t Index>
+		static void migrate_member_at(const T& old_obj, T& new_obj,
+		                              XBuffer& old_xbuf, XBuffer& new_xbuf) {
+			using namespace std::meta;
+			
+			// Get member info at compile-time (constexpr context)
+			constexpr auto member = get_member_at<T, Index>();
+			
+			// Get member type using splice (this works because member is constexpr!)
+			using MemberType = [:type_of(member):];
+			
+			// Access members using splice (pattern from test_splice_operations.cpp)
+			// Since member is constexpr, we can use obj.[:member:] syntax!
+			const auto& old_member = old_obj.[:member:];
+			auto& new_member = new_obj.[:member:];
+			
+			// Migrate this member based on its type
+			migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
+		}
+		
+		// Helper: Migrate all members using fold expression
+		template<typename T, std::size_t... Is>
+		static void migrate_members_impl(const T& old_obj, T& new_obj,
+		                                 XBuffer& old_xbuf, XBuffer& new_xbuf,
+		                                 std::index_sequence<Is...>) {
+			// Fold expression: expand migrate_member_at<T, 0>(), migrate_member_at<T, 1>(), ...
+			(migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+		}
+		
+		// Main: Migrate all members of a struct using C++26 reflection
 		template<typename T>
 		static void migrate_members(const T& old_obj, T& new_obj, 
 		                           XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			// Get all non-static data members via reflection
-			constexpr auto members = std::meta::members_of(^T);
+			// Get member count at compile-time
+			constexpr std::size_t member_count = get_member_count_impl<T>();
 			
-			// Iterate through each member at compile-time
-			template for (constexpr auto member : members) {
-				// Skip static members and member functions
-				if constexpr (std::meta::is_nonstatic_data_member(member)) {
-					// Get member pointer and type
-					constexpr auto member_ptr = std::meta::pointer_to_member(member);
-					using MemberType = typename std::meta::type_of(member);
-					
-					// Access old and new member via pointer-to-member
-					const auto& old_member = old_obj.*member_ptr;
-					auto& new_member = new_obj.*member_ptr;
-					
-					// Migrate this member based on its type
-					migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
-				}
-			}
+			// Use index sequence + fold expression to migrate all members
+			migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
+			                    std::make_index_sequence<member_count>{});
 		}
-#endif
 	};
 
 	// ========================================================================
@@ -1081,12 +1076,14 @@ namespace XOffsetDatastructure2
 
 // ============================================================================
 // Type Signature Support for XOffsetDatastructure2 Containers
+// (COMMENTED OUT - Focus on compact first)
 // ============================================================================
+#if 0
 namespace XTypeSignature {
     // XString signature
     template <>
     struct TypeSignature<XOffsetDatastructure2::XString> {
-        static constexpr auto calculate() noexcept {
+        static consteval auto calculate() noexcept {
             return CompileString{"string[s:32,a:8]"};
         }
     };
@@ -1094,7 +1091,7 @@ namespace XTypeSignature {
     // XVector<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
-        static constexpr auto calculate() noexcept {
+        static consteval auto calculate() noexcept {
             return CompileString{"vector[s:32,a:8]<"} +
                    TypeSignature<T>::calculate() +
                    CompileString{">"};
@@ -1104,7 +1101,7 @@ namespace XTypeSignature {
     // XSet<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
-        static constexpr auto calculate() noexcept {
+        static consteval auto calculate() noexcept {
             return CompileString{"set[s:32,a:8]<"} +
                    TypeSignature<T>::calculate() +
                    CompileString{">"};
@@ -1114,7 +1111,7 @@ namespace XTypeSignature {
     // XMap<K,V> signature
     template <typename K, typename V>
     struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
-        static constexpr auto calculate() noexcept {
+        static consteval auto calculate() noexcept {
             return CompileString{"map[s:32,a:8]<"} +
                    TypeSignature<K>::calculate() +
                    CompileString{","} +
@@ -1123,4 +1120,5 @@ namespace XTypeSignature {
         }
     };
 } // namespace XTypeSignature
-#endif
+#endif // Type Signature for containers (commented out)
+#endif // X_OFFSET_DATA_STRUCTURE_2_HPP

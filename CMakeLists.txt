@@ -12,7 +12,7 @@ if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Add reflection flag and standard library
-add_compile_options(-freflection -stdlib=libc++)
+add_compile_options(-freflection -fexpansion-statements -stdlib=libc++)
 add_link_options(-stdlib=libc++)
 
 # Get the clang install directory
