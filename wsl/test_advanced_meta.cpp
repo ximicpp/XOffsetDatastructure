@@ -1,6 +1,7 @@
 #include <iostream>
 #include <experimental/meta>
 #include <string_view>
+#include <utility>
 
 // Test structures
 struct Person {
@@ -43,6 +44,69 @@ template<typename T>
 consteval auto get_member_count() {
     using namespace std::meta;
     return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+}
+
+// Helper: Print all member info in consteval context
+template<typename T>
+consteval void print_members_consteval() {
+    using namespace std::meta;
+    
+    // Get all members - this works in consteval context
+    auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+    
+    // Can iterate in consteval context
+    // But we can't do I/O here, so we'll use a different approach
+}
+
+// Helper: Generate member info array at compile time
+template<typename T>
+consteval auto get_member_info_count() {
+    using namespace std::meta;
+    auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+    return members.size();
+}
+
+// Structure to hold member info (can cross compile-time boundary)
+struct MemberInfo {
+    const char* name;
+    const char* type;
+    bool is_public;
+    bool is_static;
+};
+
+// Helper: Create compile-time member info for a specific index
+template<typename T, size_t Index>
+consteval auto get_member_info_at() -> MemberInfo {
+    using namespace std::meta;
+    auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+    
+    if (Index < members.size()) {
+        auto member = members[Index];
+        return MemberInfo{
+            display_string_of(member).data(),
+            display_string_of(type_of(member)).data(),
+            is_public(member),
+            is_static_member(member)
+        };
+    }
+    return MemberInfo{"", "", false, false};
+}
+
+// Macro-like template to iterate members at compile time
+template<typename T, size_t... Is>
+constexpr void print_all_members_impl(std::index_sequence<Is...>) {
+    std::cout << "Iterating members via consteval:\n";
+    ((std::cout << "  [" << Is << "] " 
+                << get_member_info_at<T, Is>().name << " : "
+                << get_member_info_at<T, Is>().type << "\n"
+                << "      public=" << get_member_info_at<T, Is>().is_public
+                << ", static=" << get_member_info_at<T, Is>().is_static << "\n"), ...);
+}
+
+template<typename T>
+void print_all_members_via_consteval() {
+    constexpr auto count = get_member_info_count<T>();
+    print_all_members_impl<T>(std::make_index_sequence<count>{});
 }
 
 int main() {
@@ -246,9 +310,30 @@ int main() {
     std::cout << "[PASS] Test 9 PASSED\n\n";
 
     // ========================================================================
-    // Test 10: Combined Reflection Operations
+    // Test 10: Using nonstatic_data_members_of with Iteration
     // ========================================================================
-    std::cout << "[Test 10] Combined Operations\n";
+    std::cout << "[Test 10] nonstatic_data_members_of Iteration\n";
+    std::cout << "-----------------------------------\n";
+    {
+        std::cout << "Demonstrating member iteration via consteval:\n\n";
+        
+        std::cout << "Person members:\n";
+        print_all_members_via_consteval<Person>();
+        
+        std::cout << "\nPoint3D members:\n";
+        print_all_members_via_consteval<Point3D>();
+        
+        std::cout << "\nComplex members:\n";
+        print_all_members_via_consteval<Complex>();
+        
+        std::cout << "\n[PASS] nonstatic_data_members_of iteration\n";
+    }
+    std::cout << "[PASS] Test 10 PASSED\n\n";
+
+    // ========================================================================
+    // Test 11: Combined Reflection Operations
+    // ========================================================================
+    std::cout << "[Test 11] Combined Operations\n";
     std::cout << "-----------------------------------\n";
     {
         Point3D pt{1.0f, 2.0f, 3.0f};
@@ -301,7 +386,8 @@ int main() {
     std::cout << "[PASS] Test 7:  Manual serialization\n";
     std::cout << "[PASS] Test 8:  Type display names\n";
     std::cout << "[PASS] Test 9:  Member filtering\n";
-    std::cout << "[PASS] Test 10: Combined operations\n";
+    std::cout << "[PASS] Test 10: nonstatic_data_members_of iteration\n";
+    std::cout << "[PASS] Test 11: Combined operations\n";
     std::cout << "\n[SUCCESS] All P2996 R10 features working!\n";
     std::cout << "========================================\n";
     std::cout << "\n[NOTE] P2996 R10 Constraints:\n";
