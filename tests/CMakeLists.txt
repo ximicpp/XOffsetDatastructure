@@ -1,6 +1,4 @@
-# C++ standard is inherited from parent CMakeLists.txt
-# (C++20 by default, C++26 if ENABLE_REFLECTION_TESTS is ON)
-# Don't override it here
+# C++ standard is inherited from parent CMakeLists.txt (C++26)
 
 # Enable testing
 enable_testing()
@@ -72,10 +70,7 @@ add_test(NAME MemoryCompaction COMMAND test_compaction)
 add_test(NAME DataModification COMMAND test_modify)
 
 # ============================================================================
-# C++26 Reflection Tests (Optional)
-# ============================================================================
-# These tests will always be built, but will skip at runtime if reflection
-# is not available. This ensures the project builds in all environments.
+# C++26 Reflection Tests
 # ============================================================================
 
 message(STATUS "Adding C++26 reflection tests...")
@@ -103,11 +98,6 @@ foreach(test_name ${REFLECTION_TESTS})
     
     # Add to CTest
     add_test(NAME ${test_name} COMMAND ${test_name})
-    
-    # Set test to pass even if skipped (when reflection not available)
-    set_tests_properties(${test_name} PROPERTIES
-        SKIP_RETURN_CODE 0
-    )
 endforeach()
 
 message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR} reflection tests")
@@ -122,17 +112,6 @@ message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}
 message(STATUS "Basic Tests: 6 tests")
 message(STATUS "Reflection Tests: 8 tests")
 message(STATUS "Total Tests: 14 tests")
-
-if(ENABLE_REFLECTION_TESTS)
-    message(STATUS "Reflection: ENABLED")
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        message(STATUS "Reflection Flag: -freflection")
-    else()
-        message(STATUS "Warning: Non-Clang compiler may not support reflection")
-    endif()
-else()
-    message(STATUS "Reflection: OPTIONAL (tests will skip if not available)")
-    message(STATUS "To enable: cmake -DENABLE_REFLECTION_TESTS=ON")
-endif()
+message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")

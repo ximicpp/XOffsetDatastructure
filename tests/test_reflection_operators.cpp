@@ -5,10 +5,7 @@
 
 #include "../xoffsetdatastructure2.hpp"
 #include <iostream>
-
-#if __has_include(<experimental/meta>)
 #include <experimental/meta>
-#define HAS_REFLECTION 1
 
 using namespace XOffsetDatastructure2;
 
@@ -136,14 +133,11 @@ void test_reflection_with_instances() {
     std::cout << "[PASS] Reflection with instances\n\n";
 }
 
-#endif // __cpp_reflection
-
 int main() {
     std::cout << "========================================\n";
     std::cout << "  Reflection Operators Test\n";
     std::cout << "========================================\n\n";
 
-#if HAS_REFLECTION
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
     std::cout << "[INFO] Using Clang P2996 experimental reflection\n\n";
     
@@ -164,9 +158,4 @@ int main() {
     std::cout << "\n[SUCCESS] All reflection operator tests passed!\n";
     
     return 0;
-#else
-    std::cout << "[SKIP] C++26 Reflection not available\n";
-    std::cout << "[INFO] Compile with -std=c++26 -freflection to enable\n";
-    return 0;
-#endif
 }

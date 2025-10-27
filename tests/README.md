@@ -175,6 +175,123 @@ If tests don't compile:
 - Check Boost library paths
 - Verify C++17 or later compiler support
 
+---
+
+## 🆕 C++26 Reflection Tests (NEW!)
+
+### Purpose
+Test C++26 reflection features (P2996) with XOffsetDatastructure2.
+
+### Quick Start
+
+**Run all reflection tests (Linux/macOS):**
+```bash
+cd tests
+chmod +x run_reflection_tests.sh
+./run_reflection_tests.sh
+```
+
+**Run all reflection tests (Windows):**
+```cmd
+cd tests
+run_reflection_tests.bat
+```
+
+### Reflection Test Files
+
+#### 🔴 High Priority (Core Features)
+
+**7. test_reflection_operators.cpp** (5 tests)
+- Test `^^` reflection operator
+- Test `[::]` splice operator
+- Type and member reflection
+- Built-in and container types
+
+**8. test_member_iteration.cpp** (6 tests)
+- `nonstatic_data_members_of()` function
+- Member filtering and iteration
+- Member properties (`is_public()`, `is_static_member()`)
+
+**9. test_reflection_type_signature.cpp** (6 tests)
+- Integration with `XTypeSignature`
+- Compile-time type validation
+- Serialization with reflection
+
+#### 🟡 Medium Priority (Utility Features)
+
+**10. test_splice_operations.cpp** (6 tests)
+- Direct member splice
+- Member pointer splice
+- Type splice and expressions
+
+**11. test_type_introspection.cpp** (7 tests)
+- Type name queries (`display_string_of()`)
+- Member type analysis (`type_of()`)
+- Type comparison and validation
+
+**12. test_reflection_compaction.cpp** (5 tests)
+- Reflection-assisted memory analysis
+- Structure analysis with reflection
+- Data integrity validation
+
+#### 🟢 Low Priority (Advanced Applications)
+
+**13. test_reflection_serialization.cpp** (6 tests)
+- Auto-generated structure documentation
+- Member listing and analysis
+- Version compatibility checks
+
+**14. test_reflection_comparison.cpp** (7 tests)
+- Compile-time member counting
+- Structure equality checking
+- Version compatibility validation
+
+### Reflection Test Statistics
+
+- **Total Test Files**: 8
+- **Total Individual Tests**: 48
+- **P2996 Features Covered**: All core APIs
+
+### Running Individual Reflection Tests
+
+```bash
+# Linux/macOS
+./build/tests/test_reflection_operators
+./build/tests/test_member_iteration
+# ... etc
+
+# Windows
+.\build\tests\Release\test_reflection_operators.exe
+.\build\tests\Release\test_member_iteration.exe
+REM ... etc
+```
+
+### Reflection Test Requirements
+
+**Compiler**: Clang with P2996 support  
+**Standard**: `-std=c++26`  
+**Flags**: `-freflection`  
+**Header**: `<experimental/meta>`
+
+### Test Behavior
+
+**If reflection is supported:**
+- Tests run and show detailed output
+- All tests should pass
+
+**If reflection is NOT supported:**
+- Tests automatically skip with `[SKIP]` message
+- Build still succeeds (optional feature)
+
+### Reflection Documentation
+
+See these files for more information:
+- **REFLECTION_QUICKSTART.md** - Quick start guide
+- **REFLECTION_TESTS_SUMMARY.md** - Detailed test summary
+- **REFLECTION_TEST_RECOMMENDATIONS.md** - Full recommendations
+
+---
+
 ## Contributing
 
 To add new tests:

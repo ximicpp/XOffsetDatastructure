@@ -6,9 +6,8 @@
 #include "../xoffsetdatastructure2.hpp"
 #include <iostream>
 
-#if __has_include(<experimental/meta>)
 #include <experimental/meta>
-#define HAS_REFLECTION 1
+#include <experimental/meta>
 
 using namespace XOffsetDatastructure2;
 
@@ -214,14 +213,13 @@ void test_serialization_with_reflection() {
     std::cout << "[PASS] Serialization with reflection\n\n";
 }
 
-#endif // __cpp_reflection
 
 int main() {
     std::cout << "========================================\n";
     std::cout << "  Reflection Type Signature Test\n";
     std::cout << "========================================\n\n";
 
-#if __has_include(<experimental/meta>)
+#include <experimental/meta>
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
     std::cout << "[INFO] Testing XTypeSignature integration\n\n";
     
@@ -244,9 +242,4 @@ int main() {
     std::cout << "\n[SUCCESS] All type signature tests passed!\n";
     
     return 0;
-#else
-    std::cout << "[SKIP] C++26 Reflection not available\n";
-    std::cout << "[INFO] Compile with -std=c++26 -freflection to enable\n";
-    return 0;
-#endif
 }

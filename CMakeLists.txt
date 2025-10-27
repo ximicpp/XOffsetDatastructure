@@ -1,28 +1,28 @@
 cmake_minimum_required(VERSION 3.10)
 project(XOffsetDatastructure)
 
-# Set C++ standard (default to C++20, can be overridden)
-if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 20)
-endif()
+# This project requires C++26 with reflection support
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+message(STATUS "Using C++26 with reflection")
 
-# Option to enable C++26 reflection tests
-option(ENABLE_REFLECTION_TESTS "Enable C++26 reflection tests (requires Clang with P2996 support)" OFF)
-
-# If reflection tests are enabled, use C++26
-if(ENABLE_REFLECTION_TESTS)
-    set(CMAKE_CXX_STANDARD 26)
-    message(STATUS "Reflection tests enabled - using C++26")
-    
-    # Add reflection flag for Clang
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        add_compile_options(-freflection)
-        message(STATUS "Added -freflection flag for Clang")
-    else()
-        message(WARNING "Reflection tests require Clang with P2996 support")
-    endif()
+# Verify we're using Clang with P2996 support
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "This project requires Clang with P2996 reflection support")
 endif()
+
+# Add reflection flag and standard library
+add_compile_options(-freflection -stdlib=libc++)
+add_link_options(-stdlib=libc++)
+
+# Get the clang install directory
+get_filename_component(CLANG_BIN_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
+get_filename_component(CLANG_INSTALL_DIR ${CLANG_BIN_DIR} DIRECTORY)
+include_directories(SYSTEM ${CLANG_INSTALL_DIR}/include/c++/v1)
+link_directories(${CLANG_INSTALL_DIR}/lib)
+
+message(STATUS "Added -freflection flag")
+message(STATUS "Clang install: ${CLANG_INSTALL_DIR}")
 
 # macOS specific settings
 if(APPLE)
