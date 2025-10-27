@@ -5,10 +5,7 @@
 
 #include "../xoffsetdatastructure2.hpp"
 #include <iostream>
-
-#if __has_include(<experimental/meta>)
 #include <experimental/meta>
-#define HAS_REFLECTION 1
 #include <utility>
 
 using namespace XOffsetDatastructure2;
@@ -230,14 +227,11 @@ void test_simple_struct_iteration() {
     std::cout << "[PASS] Simple struct iteration\n\n";
 }
 
-#endif // __cpp_reflection
-
 int main() {
     std::cout << "========================================\n";
     std::cout << "  Member Iteration Test\n";
     std::cout << "========================================\n\n";
 
-#if __has_include(<experimental/meta>)
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
     std::cout << "[INFO] Testing nonstatic_data_members_of\n\n";
     
@@ -260,9 +254,4 @@ int main() {
     std::cout << "\n[SUCCESS] All member iteration tests passed!\n";
     
     return 0;
-#else
-    std::cout << "[SKIP] C++26 Reflection not available\n";
-    std::cout << "[INFO] Compile with -std=c++26 -freflection to enable\n";
-    return 0;
-#endif
 }
