@@ -85,6 +85,8 @@ set(REFLECTION_TESTS
     test_reflection_compaction
     test_reflection_serialization
     test_reflection_comparison
+    test_compact_automatic
+    test_compiletime_type_signature
 )
 
 # Add each reflection test
@@ -110,8 +112,8 @@ message(STATUS "========================================")
 message(STATUS "C++ Standard: C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Basic Tests: 6 tests")
-message(STATUS "Reflection Tests: 8 tests")
-message(STATUS "Total Tests: 14 tests")
+message(STATUS "Reflection Tests: 10 tests")
+message(STATUS "Total Tests: 16 tests")
 message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")
