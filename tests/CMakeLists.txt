@@ -85,6 +85,7 @@ set(REFLECTION_TESTS
     test_reflection_compaction
     test_reflection_serialization
     test_reflection_comparison
+    test_field_limit_fix
 )
 
 # Add each reflection test
