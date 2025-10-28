@@ -17,20 +17,6 @@ struct CompactTestType {
     int value;
     XVector<int> data;
     XVector<XString> strings;
-    
-    // Migration function for compaction
-    static void migrate(XBuffer& old_buf, XBuffer& new_buf) {
-        auto* old_obj = old_buf.find<CompactTestType>("CompactTest").first;
-        if (!old_obj) return;
-        
-        auto* new_obj = new_buf.construct<CompactTestType>("CompactTest")(new_buf.get_segment_manager());
-        new_obj->value = old_obj->value;
-        new_obj->data = old_obj->data;
-        
-        for (const auto& str : old_obj->strings) {
-            new_obj->strings.emplace_back(str.c_str(), new_buf.get_segment_manager());
-        }
-    }
 };
 
 bool test_memory_compaction() {
@@ -62,9 +48,9 @@ bool test_memory_compaction() {
     std::cout << "  Efficiency: " << stats_before.usage_percent() << "%\n";
     std::cout << "[OK]\n";
     
-    // Test 3: Perform compaction
-    std::cout << "Test 3: Compact memory... ";
-    XBuffer compact_buf = XBufferCompactor::compact_manual<CompactTestType>(xbuf);
+    // Test 3: Perform automatic compaction (C++26 reflection-based)
+    std::cout << "Test 3: Compact memory (automatic)... ";
+    XBuffer compact_buf = XBufferCompactor::compact_automatic<CompactTestType>(xbuf, "CompactTest");
     assert(compact_buf.get_size() > 0);
     std::cout << "[OK]\n";
     

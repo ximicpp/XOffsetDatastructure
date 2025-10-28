@@ -625,33 +625,10 @@ namespace XOffsetDatastructure2
 		}
 	};
 
-	// Memory Compaction
-
-	template<typename T, typename = void>
-	struct has_migrate : std::false_type {};
-
-	template<typename T>
-	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBuffer&>(), std::declval<XBuffer&>()))>> : std::true_type {};
+	// Automatic Memory Compaction (C++26 Reflection-Based)
 
 	class XBufferCompactor {
 	public:
-		// Manual compaction (requires T::migrate() method)
-		template<typename T>
-		static XBuffer compact_manual(XBuffer& old_xbuf) {
-			if constexpr (has_migrate<T>::value) {
-				auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-				std::size_t new_size = stats.used_size + (stats.used_size / 10);
-				if (new_size < 4096) new_size = 4096;
-				
-				XBuffer new_xbuf(new_size);
-				T::migrate(old_xbuf, new_xbuf);
-				new_xbuf.shrink_to_fit();
-				return new_xbuf;
-			} else {
-				return std::move(old_xbuf);
-			}
-		}
-		
 		// Automatic compaction (C++26 reflection-based)
 		template<typename T>
 		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
