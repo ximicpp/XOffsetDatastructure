@@ -13,7 +13,8 @@ using namespace XOffsetDatastructure2;
 // ============================================================================
 
 // struct alignas(XTypeSignature::BASIC_ALIGNMENT) Player {
-struct alignas(8) Player {
+class alignas(8) Player {
+public:
 	// Default constructor
 	template <typename Allocator>
 	Player(Allocator allocator) : name(allocator), items(allocator) {}
