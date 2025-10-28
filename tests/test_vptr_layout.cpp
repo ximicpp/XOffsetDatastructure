@@ -50,7 +50,7 @@ int main() {
     std::cout << "Non-polymorphic:\n";
     std::cout << "  - Size: " << sizeof(NonPolymorphic) << " bytes (just int32_t)\n";
     std::cout << "  - Expected signature: struct[s:4,a:4]{@0:i32[s:4,a:4]}\n";
-    std::cout << "  - data at offset 0 ✓\n\n";
+    std::cout << "  - data at offset 0 [OK]\n\n";
     
     std::cout << "Polymorphic:\n";
     std::cout << "  - Size: " << sizeof(Polymorphic) << " bytes (int32_t + vptr)\n";
@@ -59,23 +59,23 @@ int main() {
     std::cout << "      [8-11]: data  (4 bytes, int32_t)\n";
     std::cout << "      [12-15]: padding (4 bytes)\n\n";
     
-    std::cout << "❌ Problem:\n";
+    std::cout << "[Problem]:\n";
     std::cout << "  - Reflection only sees explicit data members (not vptr)\n";
     std::cout << "  - Signature shows: struct[s:16,a:8]{@8:i32[s:4,a:4]}\n";
     std::cout << "  - Missing info: vptr at @0 (8 bytes)\n";
     std::cout << "  - This is MISLEADING - offsets are correct but incomplete!\n\n";
     
-    std::cout << "⚠️  Impact:\n";
+    std::cout << "[Impact]:\n";
     std::cout << "  1. Type signature is INCOMPLETE for polymorphic classes\n";
     std::cout << "  2. Missing vptr could break cross-platform checks\n";
     std::cout << "  3. Size/alignment correct, but field list incomplete\n\n";
     
-    std::cout << "✅ Recommendation:\n";
+    std::cout << "[Recommendation]:\n";
     std::cout << "  - Document: \"Polymorphic classes include compiler vptr\"\n";
     std::cout << "  - Add metadata: is_polymorphic<T> check\n";
     std::cout << "  - Warning: Don't use polymorphic types in XBuffer!\n\n";
     
-    std::cout << "📌 Note:\n";
+    std::cout << "[Note]:\n";
     std::cout << "  Virtual functions are NOT recommended for serialization.\n";
     std::cout << "  vtable pointers are compiler/platform specific.\n";
     std::cout << "  Use plain POD types for cross-platform compatibility.\n";

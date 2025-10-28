@@ -7,7 +7,7 @@ using namespace XOffsetDatastructure2;
 
 struct BadType {
     int id;
-    virtual void process() {}  // ❌ Virtual function makes this polymorphic
+    virtual void process() {}  // [BAD] Virtual function makes this polymorphic
 };
 
 int main() {
@@ -25,8 +25,8 @@ int main() {
     //
     // Solution: Use plain POD types or non-polymorphic classes.
     // Example:
-    //   ❌ BAD:  struct Data { virtual void f() {} };
-    //   ✅ GOOD: struct Data { void f() {} };  // No 'virtual' keyword
+    //   [BAD]:  struct Data { virtual void f() {} };
+    //   [GOOD]: struct Data { void f() {} };  // No 'virtual' keyword
     
     return 0;
 }

@@ -6,7 +6,7 @@
 
 using namespace XOffsetDatastructure2;
 
-// ✅ GOOD: Non-polymorphic type (no virtual functions)
+// [GOOD]: Non-polymorphic type (no virtual functions)
 struct SafeData {
     int32_t id;
     float value;
@@ -19,7 +19,7 @@ struct SafeData {
     }
 };
 
-// ❌ BAD: Polymorphic type (has virtual function)
+// [BAD]: Polymorphic type (has virtual function)
 struct UnsafeData {
     int32_t id;
     
@@ -28,7 +28,7 @@ struct UnsafeData {
     virtual void process() {}  // Virtual function = polymorphic
 };
 
-// ❌ BAD: Has virtual destructor
+// [BAD]: Has virtual destructor
 struct UnsafeWithVirtualDestructor {
     int32_t id;
     
@@ -45,7 +45,7 @@ int main() {
     // Test 1: Safe type should compile
     std::cout << "Test 1: Safe (non-polymorphic) type\n";
     std::cout << "  is_xbuffer_safe<SafeData>: " 
-              << (is_xbuffer_safe<SafeData>::value ? "✅ SAFE" : "❌ UNSAFE") << "\n";
+              << (is_xbuffer_safe<SafeData>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
     std::cout << "  is_polymorphic: " << std::is_polymorphic_v<SafeData> << "\n";
     std::cout << "  sizeof: " << sizeof(SafeData) << " bytes\n\n";
     
@@ -60,17 +60,17 @@ int main() {
     // Test 2: Unsafe type detection
     std::cout << "Test 2: Unsafe (polymorphic) type\n";
     std::cout << "  is_xbuffer_safe<UnsafeData>: " 
-              << (is_xbuffer_safe<UnsafeData>::value ? "✅ SAFE" : "❌ UNSAFE") << "\n";
+              << (is_xbuffer_safe<UnsafeData>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
     std::cout << "  is_polymorphic: " << std::is_polymorphic_v<UnsafeData> << "\n";
     std::cout << "  sizeof: " << sizeof(UnsafeData) << " bytes (includes vptr!)\n\n";
     
     // Test 3: Virtual destructor detection
     std::cout << "Test 3: Type with virtual destructor\n";
     std::cout << "  is_xbuffer_safe<UnsafeWithVirtualDestructor>: " 
-              << (is_xbuffer_safe<UnsafeWithVirtualDestructor>::value ? "✅ SAFE" : "❌ UNSAFE") << "\n";
+              << (is_xbuffer_safe<UnsafeWithVirtualDestructor>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
     std::cout << "  has_virtual_destructor: " << std::has_virtual_destructor_v<UnsafeWithVirtualDestructor> << "\n\n";
     
-    // ❌ THESE SHOULD FAIL AT COMPILE-TIME (uncomment to test):
+    // [BAD] THESE SHOULD FAIL AT COMPILE-TIME (uncomment to test):
     
     // auto* unsafe1 = xbuf.make<UnsafeData>("unsafe");
     // Error: static assertion failed: Cannot use polymorphic types in XBuffer!
@@ -81,9 +81,9 @@ int main() {
     std::cout << "========================================\n";
     std::cout << "Summary\n";
     std::cout << "========================================\n";
-    std::cout << "✅ SafeData (non-polymorphic): ALLOWED\n";
-    std::cout << "❌ UnsafeData (virtual function): BLOCKED\n";
-    std::cout << "❌ UnsafeWithVirtualDestructor: BLOCKED\n\n";
+    std::cout << "[OK] SafeData (non-polymorphic): ALLOWED\n";
+    std::cout << "[BLOCKED] UnsafeData (virtual function): BLOCKED\n";
+    std::cout << "[BLOCKED] UnsafeWithVirtualDestructor: BLOCKED\n\n";
     
     std::cout << "Type safety is enforced at COMPILE-TIME!\n";
     std::cout << "Unsafe types will cause compilation errors.\n";

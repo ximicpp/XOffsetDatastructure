@@ -82,7 +82,7 @@ void test_type_signature_generation() {
     // Verify it's not the error message
     constexpr bool has_error15 = sig15 == "TOO_MANY_FIELDS";
     static_assert(!has_error15, "LargeStruct should not produce error signature");
-    std::cout << "    ✓ No 'TOO_MANY_FIELDS' error\n";
+    std::cout << "    [OK] No 'TOO_MANY_FIELDS' error\n";
     
     // Test 10-field struct (boundary)
     std::cout << "\n  BoundaryStruct (10 fields):\n";
@@ -90,7 +90,7 @@ void test_type_signature_generation() {
     std::cout << "    Signature: ";
     sig10.print();
     std::cout << "\n";
-    std::cout << "    ✓ Boundary case works\n";
+    std::cout << "    [OK] Boundary case works\n";
     
     // Test 20-field struct
     std::cout << "\n  VeryLargeStruct (20 fields):\n";
@@ -101,7 +101,7 @@ void test_type_signature_generation() {
     
     constexpr bool has_error20 = sig20 == "TOO_MANY_FIELDS";
     static_assert(!has_error20, "VeryLargeStruct should not produce error signature");
-    std::cout << "    ✓ 20 fields work!\n";
+    std::cout << "    [OK] 20 fields work!\n";
     
     std::cout << "\n[PASS] Type signature generation\n\n";
 }
@@ -178,10 +178,10 @@ void test_performance_comparison() {
     std::cout << "    - Manual maintenance required\n";
     
     std::cout << "\n  New approach: Index sequence + fold expressions\n";
-    std::cout << "    - ✓ No field limit\n";
-    std::cout << "    - ✓ ~20 lines of clean code\n";
-    std::cout << "    - ✓ Automatic scaling\n";
-    std::cout << "    - ✓ Better compile-time performance\n";
+    std::cout << "    - [OK] No field limit\n";
+    std::cout << "    - [OK] ~20 lines of clean code\n";
+    std::cout << "    - [OK] Automatic scaling\n";
+    std::cout << "    - [OK] Better compile-time performance\n";
     
     std::cout << "\n[PASS] Approach validated\n\n";
 }
@@ -209,7 +209,7 @@ int main() {
         std::cout << "[PASS] Test 3: Field count detection\n";
         std::cout << "[PASS] Test 4: Performance comparison\n";
         std::cout << "\n[SUCCESS] All field limit tests passed!\n";
-        std::cout << "\n✅ Fix validated: Structures with unlimited fields now supported!\n";
+        std::cout << "\n[SUCCESS] Fix validated: Structures with unlimited fields now supported!\n";
         
         return 0;
     }

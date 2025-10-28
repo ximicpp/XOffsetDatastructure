@@ -194,15 +194,15 @@ void test_type_signature(const char* name, bool should_succeed = true) {
         std::cout << "\n";
         
         if (should_succeed) {
-            std::cout << "  ✅ SUCCESS - Type signature generated\n";
+            std::cout << "  [OK] SUCCESS - Type signature generated\n";
         } else {
-            std::cout << "  ⚠️  UNEXPECTED - Expected to fail but succeeded\n";
+            std::cout << "  [WARN] UNEXPECTED - Expected to fail but succeeded\n";
         }
     } catch (...) {
         if (should_succeed) {
-            std::cout << "  ❌ FAILED - Could not generate signature\n";
+            std::cout << "  [FAIL] FAILED - Could not generate signature\n";
         } else {
-            std::cout << "  ✅ EXPECTED - Type signature not supported\n";
+            std::cout << "  [OK] EXPECTED - Type signature not supported\n";
         }
     }
 }
@@ -293,7 +293,7 @@ int main() {
     std::cout << "  Summary\n";
     std::cout << "========================================================================\n";
     
-    std::cout << "\n✅ SUPPORTED:\n";
+    std::cout << "\n[SUPPORTED]:\n";
     std::cout << "  - Simple struct/class\n";
     std::cout << "  - Class with alignas (8, 16, 32, etc.)\n";
     std::cout << "  - Class with private/protected/public members\n";
@@ -309,7 +309,7 @@ int main() {
     std::cout << "  - Class with array members\n";
     std::cout << "  - Packed class\n";
     
-    std::cout << "\n📝 NOTES:\n";
+    std::cout << "\n[NOTES]:\n";
     std::cout << "  - Type signatures reflect actual memory layout\n";
     std::cout << "  - Methods and static members are not included\n";
     std::cout << "  - Private members are included via access_context::unchecked()\n";
