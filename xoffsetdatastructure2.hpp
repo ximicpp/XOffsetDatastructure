@@ -2,7 +2,6 @@
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
 
 // XOffsetDatastructure2 - C++26 Reflection-Based Offset Container Library
-// Platform Detection & Configuration
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
     #define IS_LITTLE_ENDIAN 1
@@ -42,9 +41,6 @@
 #define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
 #endif
 
-// ============================================================================
-// Standard Library Headers
-// ============================================================================
 #include <experimental/meta>
 #include <array>
 #include <string_view>
@@ -56,14 +52,11 @@
 #include <vector>
 #include <fstream>
 
-// ========================================================================
 // XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
-// ========================================================================
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
 
-    // Type Size Validations
     static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
     static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
     static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
@@ -87,7 +80,6 @@ namespace XTypeSignature {
     template <typename T>
     struct always_false : std::false_type {};
 
-    // Compile-Time String
     template <size_t N>
     struct CompileString {
         char value[N];
@@ -181,7 +173,6 @@ namespace XTypeSignature {
     template <typename T>
     struct TypeSignature;
 
-    // Field Offset Calculation (C++26 Reflection)
     template<typename T, size_t Index>
     consteval size_t get_field_offset() noexcept {
         using namespace std::meta;
@@ -194,7 +185,6 @@ namespace XTypeSignature {
         }
     }
 
-    // Generate Signature for All Fields
     template <typename T>
     consteval std::size_t get_member_count() noexcept {
         using namespace std::meta;
@@ -215,7 +205,6 @@ namespace XTypeSignature {
                TypeSignature<FieldType>::calculate();
     }
 
-    // Index Sequence-Based Field Signature Accumulation
     template<typename T, std::size_t Index, bool IsFirst>
     consteval auto build_field_with_comma() noexcept {
         if constexpr (IsFirst) {
@@ -238,7 +227,6 @@ namespace XTypeSignature {
         }
     }
 
-    // Basic Type Signatures
     template <> struct TypeSignature<int32_t>  { static consteval auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
     template <> struct TypeSignature<uint32_t> { static consteval auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
     template <> struct TypeSignature<int64_t>  { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
@@ -248,7 +236,6 @@ namespace XTypeSignature {
     template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     
-    // Const qualified types (strip const)
     template <typename T>
     struct TypeSignature<const T> {
         static consteval auto calculate() noexcept {
@@ -259,7 +246,6 @@ namespace XTypeSignature {
     template <typename T> struct TypeSignature<T*>   { static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
     template <>           struct TypeSignature<void*>{ static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
-    // Array Types
     template <typename T, size_t N>
     struct TypeSignature<T[N]> {
         static consteval auto calculate() noexcept {
@@ -285,18 +271,27 @@ namespace XTypeSignature {
         static consteval auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
     };
 
-    // Generic Type Signature (C++26 Reflection)
     template <typename T>
     struct TypeSignature {
         static consteval auto calculate() noexcept {
             if constexpr (std::is_class_v<T> && !std::is_array_v<T>) {
-                return CompileString{"struct[s:"} +
-                       CompileString<32>::from_number(sizeof(T)) +
-                       CompileString{",a:"} +
-                       CompileString<32>::from_number(alignof(T)) +
-                       CompileString{"]{"} +
-                       get_fields_signature<T>() +
-                       CompileString{"}"};
+                if constexpr (std::is_polymorphic_v<T>) {
+                    return CompileString{"struct[s:"} +
+                           CompileString<32>::from_number(sizeof(T)) +
+                           CompileString{",a:"} +
+                           CompileString<32>::from_number(alignof(T)) +
+                           CompileString{",polymorphic]{"} +
+                           get_fields_signature<T>() +
+                           CompileString{"}"};
+                } else {
+                    return CompileString{"struct[s:"} +
+                           CompileString<32>::from_number(sizeof(T)) +
+                           CompileString{",a:"} +
+                           CompileString<32>::from_number(alignof(T)) +
+                           CompileString{"]{"} +
+                           get_fields_signature<T>() +
+                           CompileString{"}"};
+                }
             }
             else if constexpr (std::is_pointer_v<T>) {
                 return TypeSignature<void*>::calculate();
@@ -312,7 +307,6 @@ namespace XTypeSignature {
         }
     };
 
-    // Public API
     template <typename T>
     [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
         return TypeSignature<T>::calculate();
@@ -320,7 +314,6 @@ namespace XTypeSignature {
 
 } // namespace XTypeSignature
 
-// Boost Interprocess Extensions
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
@@ -517,7 +510,6 @@ namespace XOffsetDatastructure2
 
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
-	// C++20 Concepts for Container Classification
 	template<typename T>
 	concept HasIterator = requires(T t) {
 		{ t.begin() } -> std::input_or_output_iterator;
@@ -599,8 +591,6 @@ namespace XOffsetDatastructure2
 
 	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
-	// XBuffer Memory Visualization
-
 	class XBufferVisualizer {
 	public:
 		struct MemoryStats {
@@ -633,11 +623,8 @@ namespace XOffsetDatastructure2
 		}
 	};
 
-	// Automatic Memory Compaction (C++26 Reflection-Based)
-
 	class XBufferCompactor {
 	public:
-		// Automatic compaction (C++26 reflection-based)
 		template<typename T>
 		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
@@ -656,7 +643,6 @@ namespace XOffsetDatastructure2
 			return new_xbuf;
 		}
 		
-		// Compact all objects of type T
 		template<typename T>
 		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
@@ -688,7 +674,6 @@ namespace XOffsetDatastructure2
 		}
 
 	private:
-		// Type trait helpers
 		template<typename T>
 		struct is_xstring : std::false_type {};
 		
@@ -709,7 +694,6 @@ namespace XOffsetDatastructure2
 		                                         !SupportedContainer<T> && 
 		                                         !is_xstring<T>::value;
 		
-		// Reflection-based member migration
 		template<typename ElementType>
 		static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
 			if constexpr (is_simple_pod_v<ElementType>) {
@@ -725,7 +709,6 @@ namespace XOffsetDatastructure2
 			}
 		}
 		
-		// Unified Container Migration (C++20 Concepts)
 		template<typename ContainerType>
 		static void migrate_container(const ContainerType& old_container, 
 		                              ContainerType& new_container,
@@ -808,23 +791,64 @@ namespace XOffsetDatastructure2
 		}
 	};
 
-	// XBufferExt: Extended XBuffer
+	template<typename T>
+	struct is_xbuffer_safe {
+		static constexpr bool value = 
+			!std::is_polymorphic_v<T> &&
+			!std::is_abstract_v<T> &&
+			!std::has_virtual_destructor_v<T>;
+		
+		static constexpr const char* reason() {
+			if constexpr (std::is_polymorphic_v<T>) {
+				return "Polymorphic types (with virtual functions) cannot be safely serialized in XBuffer.\n"
+				       "Virtual function table pointers (vptr) are process-specific and cannot be persisted.\n"
+				       "Use plain POD types or structs without virtual functions instead.";
+			}
+			else if constexpr (std::is_abstract_v<T>) {
+				return "Abstract types (with pure virtual functions) cannot be instantiated in XBuffer.";
+			}
+			else if constexpr (std::has_virtual_destructor_v<T>) {
+				return "Types with virtual destructors are polymorphic and cannot be serialized in XBuffer.";
+			}
+			return "";
+		}
+	};
+	
+	template<typename T>
+	constexpr void validate_xbuffer_type() {
+		static_assert(is_xbuffer_safe<T>::value, 
+			"Type is not safe for XBuffer serialization. See error message for details.");
+	}
+
 	class XBufferExt : public XBuffer {
 	public:
 		using XBuffer::XBuffer;
 
-		// Object Creation API
 		template<typename T>
 		T* make(const char* name) {
+			static_assert(is_xbuffer_safe<T>::value, 
+				"Cannot use polymorphic types in XBuffer!\n\n"
+				"Polymorphic types contain virtual function table pointers (vptr) that:\n"
+				"  - Are process-specific memory addresses\n"
+				"  - Cannot be serialized or deserialized\n"
+				"  - Will cause crashes when loaded in different processes\n\n"
+				"Solution: Use plain POD types or non-polymorphic classes.\n"
+				"Example:\n"
+				"  [BAD]:  struct Data { virtual void f() {} };\n"
+				"  [GOOD]: struct Data { void f() {} };  // No 'virtual' keyword\n");
+			
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
 		
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
+			static_assert(is_xbuffer_safe<T>::value,
+				"Cannot create allocator for polymorphic types in XBuffer. "
+				"Use non-polymorphic types instead.");
+			
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
 
-		// Find and Utility Methods
 		template<typename T>
 		std::pair<T*, bool> find_ex(const char* name) {
 			auto result = this->find<T>(name);
@@ -833,10 +857,12 @@ namespace XOffsetDatastructure2
 		
 		template<typename T>
 		T* find_or_make(const char* name) {
+			static_assert(is_xbuffer_safe<T>::value,
+				"Cannot use polymorphic types in XBuffer. Use plain POD types instead.");
+			
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
 		}
 
-		// Serialization
 		std::string save_to_string() {
 			auto* buffer = this->get_buffer();
 			return std::string(buffer->begin(), buffer->end());
