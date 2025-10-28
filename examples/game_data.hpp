@@ -9,7 +9,8 @@ using namespace XOffsetDatastructure2;
 // Item - Direct Type Definition (C++26 Reflection)
 // ============================================================================
 
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) Item {
+class alignas(XTypeSignature::BASIC_ALIGNMENT) Item {
+public:
 	// Default constructor
 	template <typename Allocator>
 	Item(Allocator allocator) : name(allocator) {}
