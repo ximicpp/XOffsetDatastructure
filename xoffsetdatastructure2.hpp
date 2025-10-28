@@ -824,15 +824,6 @@ namespace XOffsetDatastructure2
 	};
 
 	// XBufferExt: Extended XBuffer
-	template<typename T>
-	struct is_xstring : std::false_type {};
-	template<>
-	struct is_xstring<XString> : std::true_type {};
-	template<typename T>
-	struct is_allocator : std::false_type {};
-	template<typename T, typename M>
-	struct is_allocator<boost::interprocess::allocator<T, M>> : std::true_type {};
-
 	class XBufferExt : public XBuffer {
 	public:
 		using XBuffer::XBuffer;
@@ -854,6 +845,7 @@ namespace XOffsetDatastructure2
 			auto result = this->find<T>(name);
 			return {result.first, result.second};
 		}
+		
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
@@ -870,9 +862,6 @@ namespace XOffsetDatastructure2
 			return xbuf;
 		}
 
-		void print_stats() {
-			XBufferVisualizer::print_stats(*this);
-		}
 		XBufferVisualizer::MemoryStats stats() {
 			return XBufferVisualizer::get_memory_stats(*this);
 		}
