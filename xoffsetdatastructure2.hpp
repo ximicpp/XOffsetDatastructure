@@ -250,131 +250,55 @@ namespace XTypeSignature {
     }
 
     // ========================================================================
-    // Preprocessor Macros for Field Signature Accumulation
+    // Index Sequence-Based Field Signature Accumulation (No Field Limit!)
+    // ========================================================================
+    // This approach replaces preprocessor macros with modern C++ techniques:
+    // - Uses std::index_sequence to generate compile-time indices
+    // - Uses fold expressions to accumulate signatures
+    // - No hard-coded field limit (works with any number of fields)
     // ========================================================================
     
-    // Macro: Generate single field signature call
-    #define XTYPE_FIELD_SIG(T, n) \
-        get_field_signature<T, n>()
+    // Helper: Build a single field signature with comma prefix (except for first field)
+    template<typename T, std::size_t Index, bool IsFirst>
+    consteval auto build_field_with_comma() noexcept {
+        if constexpr (IsFirst) {
+            // First field: no comma prefix
+            return get_field_signature<T, Index>();
+        } else {
+            // Subsequent fields: add comma prefix
+            return CompileString{","} + get_field_signature<T, Index>();
+        }
+    }
     
-    // Macro: Comma separator
-    #define XTYPE_COMMA() + CompileString{","} +
+    // Helper: Concatenate field signatures using fold expression
+    template<typename T, std::size_t... Indices>
+    consteval auto concatenate_field_signatures(std::index_sequence<Indices...>) noexcept {
+        // Use fold expression to concatenate all fields
+        // Pattern: (sig0 + sig1 + sig2 + ...)
+        // First field has no comma, rest have comma prefix
+        return (build_field_with_comma<T, Indices, (Indices == 0)>() + ...);
+    }
     
-    // Macros for different field counts (0-20 fields)
-    #define XTYPE_SIG_BUILD_0(T) CompileString{""}
-    
-    #define XTYPE_SIG_BUILD_1(T) \
-        XTYPE_FIELD_SIG(T, 0)
-    
-    #define XTYPE_SIG_BUILD_2(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1)
-    
-    #define XTYPE_SIG_BUILD_3(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2)
-    
-    #define XTYPE_SIG_BUILD_4(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3)
-    
-    #define XTYPE_SIG_BUILD_5(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4)
-    
-    #define XTYPE_SIG_BUILD_6(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 5)
-    
-    #define XTYPE_SIG_BUILD_7(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 6)
-    
-    #define XTYPE_SIG_BUILD_8(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 7)
-    
-    #define XTYPE_SIG_BUILD_9(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 7) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 8)
-    
-    #define XTYPE_SIG_BUILD_10(T) \
-        XTYPE_FIELD_SIG(T, 0) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 1) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 2) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 3) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 4) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 5) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 6) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 7) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 8) XTYPE_COMMA() \
-        XTYPE_FIELD_SIG(T, 9)
-
+    // Main Function: Generate Signature for All Fields (No Limit!)
     // ========================================================================
-    // Main Function: Generate Signature for All Fields
+    // Uses index_sequence + fold expressions instead of macros
+    // Advantages:
+    // - No field count limit (was 10, now unlimited)
+    // - Cleaner code (no macro soup)
+    // - Better compile-time performance
+    // - More maintainable
     // ========================================================================
-    // Uses preprocessor macros to accumulate field signatures at compile time
-    // See docs/PREPROCESSOR_MACRO_TEST_REPORT.md for detailed explanation
     template <typename T>
     consteval auto get_fields_signature() noexcept {
         constexpr std::size_t count = get_member_count<T>();
         
-        // Use if constexpr to select appropriate macro based on field count
         if constexpr (count == 0) {
-            return XTYPE_SIG_BUILD_0(T);
-        } else if constexpr (count == 1) {
-            return XTYPE_SIG_BUILD_1(T);
-        } else if constexpr (count == 2) {
-            return XTYPE_SIG_BUILD_2(T);
-        } else if constexpr (count == 3) {
-            return XTYPE_SIG_BUILD_3(T);
-        } else if constexpr (count == 4) {
-            return XTYPE_SIG_BUILD_4(T);
-        } else if constexpr (count == 5) {
-            return XTYPE_SIG_BUILD_5(T);
-        } else if constexpr (count == 6) {
-            return XTYPE_SIG_BUILD_6(T);
-        } else if constexpr (count == 7) {
-            return XTYPE_SIG_BUILD_7(T);
-        } else if constexpr (count == 8) {
-            return XTYPE_SIG_BUILD_8(T);
-        } else if constexpr (count == 9) {
-            return XTYPE_SIG_BUILD_9(T);
-        } else if constexpr (count == 10) {
-            return XTYPE_SIG_BUILD_10(T);
+            // No fields: return empty string
+            return CompileString{""};
         } else {
-            // More than 10 fields - need to extend macros
-            return CompileString{"TOO_MANY_FIELDS[count:"} +
-                   CompileString<32>::from_number(count) +
-                   CompileString{"]"};
+            // Generate index sequence [0, 1, 2, ..., count-1]
+            // and concatenate all field signatures
+            return concatenate_field_signatures<T>(std::make_index_sequence<count>{});
         }
     }
 
