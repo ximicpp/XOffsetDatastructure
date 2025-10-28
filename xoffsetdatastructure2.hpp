@@ -248,6 +248,14 @@ namespace XTypeSignature {
     template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     
+    // Const qualified types (strip const)
+    template <typename T>
+    struct TypeSignature<const T> {
+        static consteval auto calculate() noexcept {
+            return TypeSignature<T>::calculate();
+        }
+    };
+    
     template <typename T> struct TypeSignature<T*>   { static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
     template <>           struct TypeSignature<void*>{ static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
