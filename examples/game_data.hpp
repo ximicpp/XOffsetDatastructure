@@ -34,7 +34,8 @@ public:
 // GameData - Direct Type Definition (C++26 Reflection)
 // ============================================================================
 
-struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameData {
+class alignas(XTypeSignature::BASIC_ALIGNMENT) GameData {
+public:
 	// Default constructor
 	template <typename Allocator>
 	GameData(Allocator allocator) 
