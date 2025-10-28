@@ -249,11 +249,101 @@ void demo_type_signatures() {
 }
 
 // ============================================================================
-// Demo 5: Performance Insights
+// Demo 5: Automatic Memory Compaction (C++26 Reflection)
+// ============================================================================
+
+void demo_automatic_compaction() {
+    print_section("5. Automatic Memory Compaction (C++26 Reflection)");
+    
+    print_subsection("Creating Fragmented Buffer");
+    XBufferExt xbuf(8192);  // 8KB buffer
+    
+    // Create game data with items
+    auto* game = xbuf.make<GameData>("save_game");
+    game->player_name = XString("FragmentedHero", xbuf.allocator<XString>());
+    game->player_id = 77777;
+    game->level = 50;
+    game->health = 85.5f;
+    
+    // Add items
+    for (int i = 0; i < 20; i++) {
+        std::string item_name = "Item_" + std::to_string(i);
+        game->items.emplace_back(
+            xbuf.allocator<Item>(),
+            i, i % 3, i * 5, item_name.c_str()
+        );
+    }
+    
+    // Add achievements
+    for (int i = 0; i < 50; i++) {
+        game->achievements.insert(i);
+    }
+    
+    auto stats_before = xbuf.stats();
+    print_info("Total Size", std::to_string(stats_before.total_size) + " bytes");
+    print_info("Used Size", std::to_string(stats_before.used_size) + " bytes");
+    print_info("Free Size", std::to_string(stats_before.free_size) + " bytes");
+    print_info("Usage", std::to_string(static_cast<int>(stats_before.usage_percent())) + "%");
+    
+    print_subsection("Creating Fragmentation");
+    // Remove some items to create holes
+    game->items.pop_back();
+    game->items.pop_back();
+    game->items.pop_back();
+    
+    auto stats_frag = xbuf.stats();
+    print_info("After Deletions", std::to_string(stats_frag.used_size) + " bytes used");
+    print_info("Fragmented Space", std::to_string(stats_frag.free_size) + " bytes free");
+    print_check("Buffer is now fragmented");
+    
+    print_subsection("Automatic Compaction (C++26 Reflection)");
+    std::cout << "  Using XBufferCompactor::compact_automatic<GameData>()\n\n";
+    
+    // Compact using C++26 reflection
+    XBuffer compacted = XBufferCompactor::compact_automatic<GameData>(xbuf, "save_game");
+    
+    auto stats_after = XBufferVisualizer::get_memory_stats(compacted);
+    print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");
+    print_info("Used Size", std::to_string(stats_after.used_size) + " bytes");
+    print_info("Efficiency", std::to_string(static_cast<int>(stats_after.usage_percent())) + "%");
+    print_info("Saved Memory", std::to_string(stats_before.total_size - stats_after.total_size) + " bytes");
+    print_check("Memory compacted successfully!");
+    
+    print_subsection("Data Integrity Verification");
+    auto [compacted_game, found] = compacted.find<GameData>("save_game");
+    if (found) {
+        bool integrity_ok = (
+            std::string(compacted_game->player_name.c_str()) == "FragmentedHero" &&
+            compacted_game->player_id == 77777 &&
+            compacted_game->level == 50 &&
+            compacted_game->items.size() == 17 &&  // 20 - 3 removed
+            compacted_game->achievements.size() == 50
+        );
+        
+        if (integrity_ok) {
+            print_check("All data verified after compaction");
+            print_info("Player Name", std::string(compacted_game->player_name.c_str()));
+            print_info("Items Count", std::to_string(compacted_game->items.size()));
+            print_info("Achievements", std::to_string(compacted_game->achievements.size()));
+        } else {
+            std::cout << "  [FAIL] Data integrity check failed\n";
+        }
+    }
+    
+    print_subsection("How It Works (C++26 Reflection)");
+    print_check("std::meta::members_of - Iterate all fields at compile-time");
+    print_check("std::meta::type_of - Detect field types (POD, containers, nested)");
+    print_check("Automatic recursive migration - No manual migrate() needed");
+    print_check("Type-safe - Compiler ensures correctness");
+    print_check("Zero runtime discovery - All done at compile-time");
+}
+
+// ============================================================================
+// Demo 6: Performance Insights
 // ============================================================================
 
 void demo_performance() {
-    print_section("5. Performance Characteristics");
+    print_section("6. Performance Characteristics");
     
     print_subsection("Container Growth Strategy");
     print_info("Growth Factor", "1.1x (10% incremental)");
@@ -304,11 +394,11 @@ void demo_performance() {
 }
 
 // ============================================================================
-// Demo 6: Advanced Features
+// Demo 7: Advanced Features
 // ============================================================================
 
 void demo_advanced_features() {
-    print_section("6. Advanced Features & Comparisons");
+    print_section("7. Advanced Features & Comparisons");
     
     print_subsection("Container Types");
     print_check("XVector<T> - Dynamic array (like std::vector)");
@@ -369,6 +459,7 @@ int main() {
         demo_memory_management();
         demo_serialization();
         demo_type_signatures();
+        demo_automatic_compaction();
         demo_performance();
         demo_advanced_features();
         
