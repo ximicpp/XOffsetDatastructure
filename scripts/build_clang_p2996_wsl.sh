@@ -171,10 +171,20 @@ echo "Testing C++26 reflection..."
 cat > /tmp/test_reflection.cpp << 'EOFCPP'
 #include <iostream>
 
+struct TestStruct {
+    int x;
+    double y;
+};
+
 int main() {
 #if __cpp_reflection >= 202306L
     std::cout << "[OK] C++26 Reflection: ENABLED\n";
     std::cout << "   __cpp_reflection = " << __cpp_reflection << "\n";
+    
+    // Test P2996R5 reflection syntax
+    constexpr auto refl = ^TestStruct;
+    std::cout << "   Reflection syntax test passed!\n";
+    
     return 0;
 #else
     std::cout << "[ERROR] C++26 Reflection: NOT ENABLED\n";
@@ -184,11 +194,30 @@ int main() {
 EOFCPP
 
 REFLECTION_OK=false
-echo "Compiling test program..."
-if "$CLANG_BIN" -std=c++2c -freflection-latest /tmp/test_reflection.cpp -o /tmp/test_reflection 2>&1; then
+LIBCXX_INCLUDE="$INSTALL_DIR/include/c++/v1"
+LIBCXX_LIB="$INSTALL_DIR/lib"
+
+echo "Compiling test program (P2996R5 syntax)..."
+# Try new syntax first: -std=c++26 -freflection
+if "$CLANG_BIN" -std=c++26 -freflection -stdlib=libc++ \
+    -I"$LIBCXX_INCLUDE" -L"$LIBCXX_LIB" -Wl,-rpath,"$LIBCXX_LIB" \
+    /tmp/test_reflection.cpp -o /tmp/test_reflection 2>/dev/null; then
     echo "Running test..."
-    if /tmp/test_reflection; then
+    if LD_LIBRARY_PATH="$LIBCXX_LIB" /tmp/test_reflection 2>/dev/null; then
         REFLECTION_OK=true
+        echo -e "${GREEN}[OK] Using modern syntax: -std=c++26 -freflection${NC}"
+    fi
+else
+    # Fallback to old syntax if new syntax fails
+    echo -e "${YELLOW}Modern syntax failed, trying legacy syntax...${NC}"
+    if "$CLANG_BIN" -std=c++2c -freflection-latest -stdlib=libc++ \
+        -I"$LIBCXX_INCLUDE" -L"$LIBCXX_LIB" -Wl,-rpath,"$LIBCXX_LIB" \
+        /tmp/test_reflection.cpp -o /tmp/test_reflection 2>/dev/null; then
+        echo "Running test..."
+        if LD_LIBRARY_PATH="$LIBCXX_LIB" /tmp/test_reflection 2>/dev/null; then
+            REFLECTION_OK=true
+            echo -e "${YELLOW}[OK] Using legacy syntax: -std=c++2c -freflection-latest${NC}"
+        fi
     fi
 fi
 
@@ -219,7 +248,11 @@ echo
 echo "1. Add to PATH (in ~/.bashrc):"
 echo "   export PATH=\"$INSTALL_DIR/bin:\$PATH\""
 echo
-echo "2. Compile C++26 code:"
+echo "2. Compile C++26 code (P2996R5 syntax):"
+echo "   # Modern syntax (recommended):"
+echo "   clang++ -std=c++26 -freflection -stdlib=libc++ your_file.cpp"
+echo
+echo "   # Legacy syntax (if modern fails):"
 echo "   clang++ -std=c++2c -freflection-latest your_file.cpp"
 echo
 echo "3. Build XOffsetDatastructure2:"
