@@ -243,7 +243,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=14
+    TOTAL_TESTS=18
 fi
 
 # Basic tests (6 tests)
@@ -257,7 +257,7 @@ run_test "test_nested" 4 $TOTAL_TESTS
 run_test "test_compaction" 5 $TOTAL_TESTS
 run_test "test_modify" 6 $TOTAL_TESTS
 
-# Reflection tests (8 tests) - only if enabled
+# Reflection tests (12 tests) - only if enabled
 if [ $ENABLE_REFLECTION -eq 1 ]; then
     echo -e "${YELLOW}=== Reflection Tests ===${NC}"
     echo ""
@@ -270,6 +270,10 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_reflection_compaction" 12 $TOTAL_TESTS
     run_test "test_reflection_serialization" 13 $TOTAL_TESTS
     run_test "test_reflection_comparison" 14 $TOTAL_TESTS
+    run_test "test_field_limit_fix" 15 $TOTAL_TESTS
+    run_test "test_class_type_signatures" 16 $TOTAL_TESTS
+    run_test "test_type_safety" 17 $TOTAL_TESTS
+    run_test "test_vptr_layout" 18 $TOTAL_TESTS
 fi
 
 # Run demo
