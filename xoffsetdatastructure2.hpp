@@ -1,13 +1,8 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
 
-// =============================================================================
-// XOffsetDatastructure2 - Single Header Library (C++26 Reflection Version)
-// =============================================================================
-
-// ============================================================================
+// XOffsetDatastructure2 - C++26 Reflection-Based Offset Container Library
 // Platform Detection & Configuration
-// ============================================================================
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
     #define IS_LITTLE_ENDIAN 1
@@ -68,12 +63,7 @@ namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
 
-    // ========================================================================
     // Type Size Validations
-    // ========================================================================
-    // Only validate types we actually use. See docs/CROSS_PLATFORM_TYPES.md
-    
-    // Fixed-size integer types (safe and recommended)
     static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
     static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
     static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
@@ -83,15 +73,12 @@ namespace XTypeSignature {
     static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
     static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
     
-    // Floating point types
     static_assert(sizeof(float) == 4, "float must be 4 bytes");
     static_assert(sizeof(double) == 8, "double must be 8 bytes");
     
-    // Character and boolean types
     static_assert(sizeof(char) == 1, "char must be 1 byte");
     static_assert(sizeof(bool) == 1, "bool must be 1 byte");
     
-    // Platform requirements
     static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
     static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
     static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
@@ -100,9 +87,7 @@ namespace XTypeSignature {
     template <typename T>
     struct always_false : std::false_type {};
 
-    // ========================================================================
-    // Compile-Time String for Type Signatures
-    // ========================================================================
+    // Compile-Time String
     template <size_t N>
     struct CompileString {
         char value[N];
@@ -193,13 +178,10 @@ namespace XTypeSignature {
         }
     };
 
-    // Forward declarations
     template <typename T>
     struct TypeSignature;
 
-    // ========================================================================
     // Field Offset Calculation (C++26 Reflection)
-    // ========================================================================
     template<typename T, size_t Index>
     consteval size_t get_field_offset() noexcept {
         using namespace std::meta;
@@ -208,19 +190,11 @@ namespace XTypeSignature {
         if constexpr (Index == 0) {
             return 0;
         } else {
-            // Use reflection to get member offset directly
-            auto member = members[Index];
-            return offset_of(member).bytes;
+            return offset_of(members[Index]).bytes;
         }
     }
 
-    // ========================================================================
-    // Generate Signature for All Fields (C++26 Reflection)
-    // ========================================================================
-    
-    // Helper: Count total number of data members
-    // Due to P2996 limitations, we cannot use template for to accumulate count
-    // Instead, we use the size of the members vector directly
+    // Generate Signature for All Fields
     template <typename T>
     consteval std::size_t get_member_count() noexcept {
         using namespace std::meta;
@@ -228,83 +202,43 @@ namespace XTypeSignature {
         return all_members.size();
     }
     
-    // ========================================================================
-    // Generate Signature for Single Field
-    // ========================================================================
     template<typename T, std::size_t Index>
     static consteval auto get_field_signature() noexcept {
         using namespace std::meta;
         constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
         
-        // Get field type using splice
         using FieldType = [:type_of(member):];
-        
-        // Get field offset
         constexpr std::size_t offset = offset_of(member).bytes;
-        
-        // Generate format: @offset:type
         return CompileString{"@"} +
                CompileString<32>::from_number(offset) +
                CompileString{":"} +
                TypeSignature<FieldType>::calculate();
     }
 
-    // ========================================================================
-    // Index Sequence-Based Field Signature Accumulation (No Field Limit!)
-    // ========================================================================
-    // This approach replaces preprocessor macros with modern C++ techniques:
-    // - Uses std::index_sequence to generate compile-time indices
-    // - Uses fold expressions to accumulate signatures
-    // - No hard-coded field limit (works with any number of fields)
-    // ========================================================================
-    
-    // Helper: Build a single field signature with comma prefix (except for first field)
+    // Index Sequence-Based Field Signature Accumulation
     template<typename T, std::size_t Index, bool IsFirst>
     consteval auto build_field_with_comma() noexcept {
         if constexpr (IsFirst) {
-            // First field: no comma prefix
             return get_field_signature<T, Index>();
         } else {
-            // Subsequent fields: add comma prefix
             return CompileString{","} + get_field_signature<T, Index>();
         }
     }
-    
-    // Helper: Concatenate field signatures using fold expression
     template<typename T, std::size_t... Indices>
     consteval auto concatenate_field_signatures(std::index_sequence<Indices...>) noexcept {
-        // Use fold expression to concatenate all fields
-        // Pattern: (sig0 + sig1 + sig2 + ...)
-        // First field has no comma, rest have comma prefix
         return (build_field_with_comma<T, Indices, (Indices == 0)>() + ...);
     }
-    
-    // Main Function: Generate Signature for All Fields (No Limit!)
-    // ========================================================================
-    // Uses index_sequence + fold expressions instead of macros
-    // Advantages:
-    // - No field count limit (was 10, now unlimited)
-    // - Cleaner code (no macro soup)
-    // - Better compile-time performance
-    // - More maintainable
-    // ========================================================================
     template <typename T>
     consteval auto get_fields_signature() noexcept {
         constexpr std::size_t count = get_member_count<T>();
-        
         if constexpr (count == 0) {
-            // No fields: return empty string
             return CompileString{""};
         } else {
-            // Generate index sequence [0, 1, 2, ..., count-1]
-            // and concatenate all field signatures
             return concatenate_field_signatures<T>(std::make_index_sequence<count>{});
         }
     }
 
-    // ========================================================================
     // Basic Type Signatures
-    // ========================================================================
     template <> struct TypeSignature<int32_t>  { static consteval auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
     template <> struct TypeSignature<uint32_t> { static consteval auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
     template <> struct TypeSignature<int64_t>  { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
@@ -314,13 +248,10 @@ namespace XTypeSignature {
     template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     
-    // Pointer types
     template <typename T> struct TypeSignature<T*>   { static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
     template <>           struct TypeSignature<void*>{ static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
-    // ========================================================================
     // Array Types
-    // ========================================================================
     template <typename T, size_t N>
     struct TypeSignature<T[N]> {
         static consteval auto calculate() noexcept {
@@ -346,13 +277,10 @@ namespace XTypeSignature {
         static consteval auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
     };
 
-    // ========================================================================
     // Generic Type Signature (C++26 Reflection)
-    // ========================================================================
     template <typename T>
     struct TypeSignature {
         static consteval auto calculate() noexcept {
-            // In C++26, we can use reflection on any class type (not just aggregates)
             if constexpr (std::is_class_v<T> && !std::is_array_v<T>) {
                 return CompileString{"struct[s:"} +
                        CompileString<32>::from_number(sizeof(T)) +
@@ -376,9 +304,7 @@ namespace XTypeSignature {
         }
     };
 
-    // ========================================================================
     // Public API
-    // ========================================================================
     template <typename T>
     [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
         return TypeSignature<T>::calculate();
@@ -386,11 +312,7 @@ namespace XTypeSignature {
 
 } // namespace XTypeSignature
 
-// using XTypeSignature::BASIC_ALIGNMENT;
-
-// ============================================================================
 // Boost Interprocess Extensions
-// ============================================================================
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
@@ -585,46 +507,36 @@ namespace XOffsetDatastructure2
 {
 	using namespace boost::interprocess;
 
-	// typedef XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index> XBuffer;
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
-	// ====================================================================
-	// C++20 Concepts for container classification (Namespace scope)
-	// ====================================================================
-	
-	// Concept: Has iterator support (begin/end)
+	// C++20 Concepts for Container Classification
 	template<typename T>
 	concept HasIterator = requires(T t) {
 		{ t.begin() } -> std::input_or_output_iterator;
 		{ t.end() } -> std::input_or_output_iterator;
 	};
 	
-	// Concept: Has value_type
 	template<typename T>
 	concept HasValueType = requires {
 		typename T::value_type;
 	};
 	
-	// Concept: Has mapped_type (for maps)
 	template<typename T>
 	concept HasMappedType = requires {
 		typename T::mapped_type;
 	};
 	
-	// Concept: Has key_type (for maps and sets)
 	template<typename T>
 	concept HasKeyType = requires {
 		typename T::key_type;
 	};
 	
-	// Concept: Sequential container (has push_back or emplace_back)
 	template<typename T>
 	concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
 		requires(T t, typename T::value_type v) {
 			{ t.emplace_back(std::move(v)) };
 		};
 	
-	// Concept: Set-like container (has key_type but not mapped_type, has emplace)
 	template<typename T>
 	concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
 		!HasMappedType<T> &&
@@ -632,30 +544,16 @@ namespace XOffsetDatastructure2
 			{ t.emplace(std::move(v)) };
 		};
 	
-	// Concept: Map-like container (has both key_type and mapped_type)
 	template<typename T>
 	concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
 		requires(T t, typename T::key_type k, typename T::mapped_type v) {
 			{ t.emplace(std::move(k), std::move(v)) };
 		};
 	
-	// Concept: Any supported container
 	template<typename T>
 	concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
 
-	struct growth_factor_custom
-		// : boost::container::dtl::grow_factor_ratio<0, 15, 10> // growth_factor_50
-		// : boost::container::dtl::grow_factor_ratio<0, 16, 10> // growth_factor_60
-		// : boost::container::dtl::grow_factor_ratio<0, 14, 10>	// 40
-		// : boost::container::dtl::grow_factor_ratio<0, 13, 10>	// 30
-		// : boost::container::dtl::grow_factor_ratio<0, 12, 10>	// 20
-		: boost::container::dtl::grow_factor_ratio<0, 11, 10> // 10
-	// : boost::container::dtl::grow_factor_ratio<0, 17, 10> // growth_factor_70
-	// : boost::container::dtl::grow_factor_ratio<0, 18, 10> // growth_factor_80
-	// : boost::container::dtl::grow_factor_ratio<0, 19, 10> // growth_factor_90
-	// : boost::container::dtl::grow_factor_ratio<0, 2, 1>	// 100
-	{
-	};
+	struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
     template <typename T>
     using XOffsetPtr = boost::interprocess::offset_ptr<T>;
@@ -672,7 +570,6 @@ namespace XOffsetDatastructure2
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename T>
 	using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
-	// using XSet = boost::container::set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename T>
@@ -684,7 +581,6 @@ namespace XOffsetDatastructure2
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename K, typename V>
 	using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBuffer::segment_manager>>;
-	// using XMap = boost::container::map<K, V, std::less<K>, allocator<std::pair<const K, V>, XBuffer::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename K, typename V>
@@ -695,9 +591,7 @@ namespace XOffsetDatastructure2
 
 	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
-	// ========================================================================
 	// XBuffer Memory Visualization
-	// ========================================================================
 
 	class XBufferVisualizer {
 	public:
@@ -731,11 +625,8 @@ namespace XOffsetDatastructure2
 		}
 	};
 
-	// ========================================================================
 	// Memory Compaction
-	// ========================================================================
 
-	// SFINAE helper to detect if a type has a static migrate method
 	template<typename T, typename = void>
 	struct has_migrate : std::false_type {};
 
@@ -744,94 +635,51 @@ namespace XOffsetDatastructure2
 
 	class XBufferCompactor {
 	public:
-		// Manual compaction: Type-based with automatic migrate detection
-		// Uses C++17 if constexpr to detect if type T has migrate method
-		// Returns original buffer if type doesn't have migrate method
+		// Manual compaction (requires T::migrate() method)
 		template<typename T>
 		static XBuffer compact_manual(XBuffer& old_xbuf) {
 			if constexpr (has_migrate<T>::value) {
-				// Type has migrate method, perform compaction
 				auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 				std::size_t new_size = stats.used_size + (stats.used_size / 10);
 				if (new_size < 4096) new_size = 4096;
 				
 				XBuffer new_xbuf(new_size);
 				T::migrate(old_xbuf, new_xbuf);
-				
-				// Shrink to fit: Remove unused memory
 				new_xbuf.shrink_to_fit();
-				
 				return new_xbuf;
 			} else {
-				// Type doesn't have migrate method, return original buffer (move semantics)
 				return std::move(old_xbuf);
 			}
 		}
 		
-		// Automatic compaction (C++26): Fully automatic via reflection
-		// 
-		// Key difference from compact_manual:
-		// - compact_manual: Requires user-defined T::migrate() method
-		// - compact_automatic: Uses C++26 reflection to auto-generate migration
-		//
-		// Core idea: Use std::meta::members_of(^T) to iterate all fields,
-		// automatically handle POD types, containers, and nested objects.
-		// No manual T::migrate() needed!
-		//
-		// Implementation based on C++26 reflection proposal (P2996R5):
-		// - Uses ^T syntax for type reflection
-		// - std::meta::members_of(^T) to get all member reflections
-		// - std::meta::name_of(), type_of() for member introspection
-		// - Compile-time type detection and recursive migration
-		// 
-		// @param old_xbuf The buffer to compact
-		// @param object_name Name of the object to migrate (default: "MyTest")
-		// @return New compacted buffer
+		// Automatic compaction (C++26 reflection-based)
 		template<typename T>
 		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
-			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
 			if (new_size < 4096) new_size = 4096;
 			
 			XBuffer new_xbuf(new_size);
-			
-			// Find old object in fragmented buffer (using provided name)
 			auto* old_obj = old_xbuf.find<T>(object_name).first;
 			if (!old_obj) {
 				return new_xbuf;
 			}
 			
-			// Create new object in compact buffer (using same name)
 			auto* new_obj = new_xbuf.construct<T>(object_name)(new_xbuf.get_segment_manager());
-			
-			// Migrate all members automatically using reflection
 			migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-			
-			// Shrink to fit: Remove unused memory
 			new_xbuf.shrink_to_fit();
-			
 			return new_xbuf;
 		}
 		
-		// Compact all objects of type T in the buffer
-		// Automatically finds and migrates all instances of type T
-		// 
-		// @param old_xbuf The buffer to compact
-		// @return New compacted buffer with all T objects migrated
+		// Compact all objects of type T
 		template<typename T>
 		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
-			// Calculate new buffer size
 			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
 			std::size_t new_size = stats.used_size + (stats.used_size / 10);
 			if (new_size < 4096) new_size = 4096;
 			
 			XBuffer new_xbuf(new_size);
-			
-			// Get segment manager for iteration
 			auto* segment = old_xbuf.get_segment_manager();
-			
-			// Iterate through all named objects
 			typedef typename XBuffer::segment_manager::const_named_iterator const_named_it;
 			const_named_it named_beg = segment->named_begin();
 			const_named_it named_end = segment->named_end();
@@ -840,19 +688,13 @@ namespace XOffsetDatastructure2
 			
 			for(const_named_it it = named_beg; it != named_end; ++it) {
 				const char* name = it->name();
-				
-				// Try to find object of type T with this name
 				auto* old_obj = old_xbuf.find<T>(name).first;
-				
 				if (old_obj) {
-					// Found an object of type T, migrate it
 					auto* new_obj = new_xbuf.construct<T>(name)(new_xbuf.get_segment_manager());
 					migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
 					++migrated_count;
 				}
 			}
-			
-			// Shrink to fit if we migrated anything
 			if (migrated_count > 0) {
 				new_xbuf.shrink_to_fit();
 			}
@@ -861,18 +703,12 @@ namespace XOffsetDatastructure2
 		}
 
 	private:
-		// ====================================================================
-		// Type trait helpers for reflection-based migration
-		// ====================================================================
-		
-		// Check if type is XString
+		// Type trait helpers
 		template<typename T>
 		struct is_xstring : std::false_type {};
 		
 		template<>
 		struct is_xstring<XString> : std::true_type {};
-		
-		// Helper to extract value_type from containers
 		template<typename T, typename = void>
 		struct container_value_type {};
 		
@@ -883,196 +719,115 @@ namespace XOffsetDatastructure2
 		
 		template<typename T>
 		using container_value_type_t = typename container_value_type<T>::type;
-		
-		// Check if type is a simple POD (int, float, etc.)
-		// Note: Concepts defined at namespace scope above
 		template<typename T>
 		static constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
 		                                         !SupportedContainer<T> && 
 		                                         !is_xstring<T>::value;
 		
-		// ====================================================================
 		// Reflection-based member migration
-		// ====================================================================
-		
-		// Helper: Migrate a single element (POD, XString, or nested object)
 		template<typename ElementType>
 		static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
 			if constexpr (is_simple_pod_v<ElementType>) {
-				// POD types: direct copy
 				return old_elem;
 			}
 			else if constexpr (is_xstring<ElementType>::value) {
-				// XString: reconstruct with new allocator
 				return XString(old_elem.c_str(), new_xbuf.get_segment_manager());
 			}
 			else {
-				// Nested objects: construct and recursively migrate
 				ElementType new_elem(new_xbuf.get_segment_manager());
 				migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
 				return new_elem;
 			}
 		}
 		
-		// ====================================================================
-		// Unified Container Migration (Optimized with Concepts)
-		// ====================================================================
-		// Combines migrate_container_sequential() and migrate_map() into a 
-		// single generic function using C++20 Concepts for type classification.
-		//
-		// Benefits:
-		// - Reduces code duplication (41% fewer lines)
-		// - Single interface for all container types
-		// - Automatic type detection via Concepts
-		// - Easier to maintain and extend
-		//
-		// Supported containers:
-		// - XVector<T> (SequentialContainer)
-		// - XSet<T>    (SetLikeContainer)
-		// - XMap<K,V>  (MapLikeContainer)
-		// ====================================================================
+		// Unified Container Migration (C++20 Concepts)
 		template<typename ContainerType>
 		static void migrate_container(const ContainerType& old_container, 
 		                              ContainerType& new_container,
 		                              XBuffer& old_xbuf, XBuffer& new_xbuf) {
 			using ElementType = container_value_type_t<ContainerType>;
 			
-			// Optimization: POD fast path with early return
 			if constexpr (is_simple_pod_v<ElementType>) {
-				// POD elements: direct copy (allocator-aware assignment)
 				new_container = old_container;
-				return;  // Early exit - avoids unnecessary branching
+				return;
 			}
 			
-			// Non-POD elements: Use Concepts to classify container type
 			if constexpr (MapLikeContainer<ContainerType>) {
-				// --------------------------------------------------------
-				// Map-like containers (XMap<K,V>)
-				// --------------------------------------------------------
-				// Iterate through key-value pairs and migrate each
 				for (const auto& [key, value] : old_container) {
 					auto new_key = migrate_element(key, old_xbuf, new_xbuf);
 					auto new_value = migrate_element(value, old_xbuf, new_xbuf);
-					
-					// Map insertion: emplace(key, value)
 					new_container.emplace(std::move(new_key), std::move(new_value));
 				}
 			}
 			else {
-				// --------------------------------------------------------
-				// Sequential/Set-like containers (XVector<T>, XSet<T>)
-				// --------------------------------------------------------
-				// Iterate through elements and migrate each
 				for (const auto& elem : old_container) {
 					auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
-					
-					// Use Concept to choose correct insertion method
 					if constexpr (SetLikeContainer<ContainerType>) {
-						// Set-like: emplace(elem) - automatic deduplication
 						new_container.emplace(std::move(migrated_elem));
 					} else {
-						// Sequential: emplace_back(elem) - append to end
 						new_container.emplace_back(std::move(migrated_elem));
 					}
 				}
 			}
 		}
 		
-		// Main: Migrate a single member based on its type (using concepts)
 		template<typename MemberType>
 		static void migrate_member(const MemberType& old_member, MemberType& new_member, 
 		                          XBuffer& old_xbuf, XBuffer& new_xbuf) {
 			if constexpr (is_simple_pod_v<MemberType>) {
-				// Simple POD types: direct copy
 				new_member = old_member;
 			}
 			else if constexpr (is_xstring<MemberType>::value) {
-				// XString: reconstruct with new allocator
 				new_member = XString(old_member.c_str(), new_xbuf.get_segment_manager());
 			}
 			else if constexpr (SupportedContainer<MemberType>) {
-				// All supported containers (XVector, XSet, XMap)
-				// Unified interface - single function handles all cases!
 				migrate_container(old_member, new_member, old_xbuf, new_xbuf);
 			}
 			else {
-				// Nested user-defined struct: recursive migration
 				migrate_members(old_member, new_member, old_xbuf, new_xbuf);
 			}
 		}
-		
-		// ====================================================================
-		// Reflection-based member migration using index sequence
-		// ====================================================================
-		
-		// Helper: Get member count
 		template<typename T>
 		static consteval std::size_t get_member_count_impl() {
 			using namespace std::meta;
 			return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
 		}
-		
-		// Helper: Get member info at specific index (compile-time)
 		template<typename T, std::size_t Index>
 		static consteval auto get_member_at() {
 			using namespace std::meta;
 			auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
 			return members[Index];
 		}
-		
-		// Helper: Migrate a single member at Index using splice
 		template<typename T, std::size_t Index>
 		static void migrate_member_at(const T& old_obj, T& new_obj,
 		                              XBuffer& old_xbuf, XBuffer& new_xbuf) {
 			using namespace std::meta;
-			
-			// Get member info at compile-time (constexpr context)
 			constexpr auto member = get_member_at<T, Index>();
-			
-			// Get member type using splice (this works because member is constexpr!)
 			using MemberType = [:type_of(member):];
-			
-			// Access members using splice (pattern from test_splice_operations.cpp)
-			// Since member is constexpr, we can use obj.[:member:] syntax!
 			const auto& old_member = old_obj.[:member:];
 			auto& new_member = new_obj.[:member:];
-			
-			// Migrate this member based on its type
 			migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
 		}
-		
-		// Helper: Migrate all members using fold expression
 		template<typename T, std::size_t... Is>
 		static void migrate_members_impl(const T& old_obj, T& new_obj,
 		                                 XBuffer& old_xbuf, XBuffer& new_xbuf,
 		                                 std::index_sequence<Is...>) {
-			// Fold expression: expand migrate_member_at<T, 0>(), migrate_member_at<T, 1>(), ...
 			(migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
 		}
-		
-		// Main: Migrate all members of a struct using C++26 reflection
 		template<typename T>
 		static void migrate_members(const T& old_obj, T& new_obj, 
 		                           XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			// Get member count at compile-time
 			constexpr std::size_t member_count = get_member_count_impl<T>();
-			
-			// Use index sequence + fold expression to migrate all members
 			migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
 			                    std::make_index_sequence<member_count>{});
 		}
 	};
 
-	// ========================================================================
-	// XBufferExt: Extended XBuffer with Unified make() API
-	// ========================================================================
-	// Helper trait to detect XString type
+	// XBufferExt: Extended XBuffer
 	template<typename T>
 	struct is_xstring : std::false_type {};
 	template<>
 	struct is_xstring<XString> : std::true_type {};
-
-	// Helper trait to detect allocator
 	template<typename T>
 	struct is_allocator : std::false_type {};
 	template<typename T, typename M>
@@ -1082,54 +837,39 @@ namespace XOffsetDatastructure2
 	public:
 		using XBuffer::XBuffer;
 
-		// ============================================================================
 		// Object Creation API
-		// ============================================================================
-		
-		// Create a named object that can be found later
-		// Usage: auto* game = xbuf.make<GameData>("save");
 		template<typename T>
 		T* make(const char* name) {
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
 		
-		// Get allocator for constructing allocator-aware types
-		// Usage: XString str("text", xbuf.allocator<XString>());
-		//        vec.emplace_back(xbuf.allocator<Item>());
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
 
-		// ============================================================================
 		// Find and Utility Methods
-		// ============================================================================
-		// Find object
 		template<typename T>
 		std::pair<T*, bool> find_ex(const char* name) {
 			auto result = this->find<T>(name);
 			return {result.first, result.second};
 		}
-		// Find or make object
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
 		}
 
-		// Serialization and Deserialization
-		// Save to string
+		// Serialization
 		std::string save_to_string() {
 			auto* buffer = this->get_buffer();
 			return std::string(buffer->begin(), buffer->end());
 		}
-		// Load from string
 		static XBufferExt load_from_string(const std::string& data) {
 			std::vector<char> buffer(data.begin(), data.end());
 			XBufferExt xbuf(buffer);
 			return xbuf;
 		}
 
-		// Memory statistics
 		void print_stats() {
 			XBufferVisualizer::print_stats(*this);
 		}
@@ -1139,19 +879,14 @@ namespace XOffsetDatastructure2
 	};
 }
 
-// ============================================================================
 // Type Signature Support for XOffsetDatastructure2 Containers
-// ============================================================================
 namespace XTypeSignature {
-    // XString signature
     template <>
     struct TypeSignature<XOffsetDatastructure2::XString> {
         static consteval auto calculate() noexcept {
             return CompileString{"string[s:32,a:8]"};
         }
     };
-    
-    // XVector<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
         static consteval auto calculate() noexcept {
@@ -1160,8 +895,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    
-    // XSet<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
         static consteval auto calculate() noexcept {
@@ -1170,8 +903,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    
-    // XMap<K,V> signature
     template <typename K, typename V>
     struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
         static consteval auto calculate() noexcept {
