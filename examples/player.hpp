@@ -46,6 +46,10 @@ public:
 //   - Direct field introspection using template for
 // ============================================================================
 
+// Type safety validation
+static_assert(is_xbuffer_safe<Player>::value, 
+              "Player must be safe for XBuffer");
+
 // Full type signature validation using C++26 reflection
 static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
              "struct[s:72,a:8]{"

@@ -18,6 +18,10 @@ struct TestStruct {
     TestStruct(Allocator allocator) : x(0), y(0.0), name(allocator) {}
 };
 
+// Type safety validation
+static_assert(is_xbuffer_safe<TestStruct>::value, 
+              "TestStruct must be safe for XBuffer");
+
 void test_type_reflection() {
     using namespace std::meta;
     
