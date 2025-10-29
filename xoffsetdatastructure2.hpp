@@ -50,6 +50,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <map>
+#include <set>
 #include <fstream>
 
 // XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
@@ -791,33 +793,262 @@ namespace XOffsetDatastructure2
 		}
 	};
 
+	// ============================================================================
+	// Type Safety: Whitelist-Based Validation
+	// Only explicitly allowed types can be used in XBuffer
+	// ============================================================================
+	
+	namespace detail {
+		// Step 1: Check if type is a basic primitive type
+		template<typename T>
+		consteval bool is_basic_type() {
+			using CleanT = std::remove_cv_t<T>;
+			return std::is_same_v<CleanT, int8_t> ||
+			       std::is_same_v<CleanT, int16_t> ||
+			       std::is_same_v<CleanT, int32_t> ||
+			       std::is_same_v<CleanT, int64_t> ||
+			       std::is_same_v<CleanT, uint8_t> ||
+			       std::is_same_v<CleanT, uint16_t> ||
+			       std::is_same_v<CleanT, uint32_t> ||
+			       std::is_same_v<CleanT, uint64_t> ||
+			       std::is_same_v<CleanT, float> ||
+			       std::is_same_v<CleanT, double> ||
+			       std::is_same_v<CleanT, bool> ||
+			       std::is_same_v<CleanT, char>;
+		}
+		
+		// Step 2: Check if type is XString
+		template<typename T>
+		consteval bool is_xstring() {
+			return std::is_same_v<std::remove_cv_t<T>, XString>;
+		}
+		
+		// Forward declaration for recursive checking
+		template<typename T>
+		consteval bool is_safe_type();
+		
+		// Step 3: Check if X container element types are safe (recursive)
+		template<typename T>
+		consteval bool is_safe_xvector() {
+			using CleanT = std::remove_cv_t<T>;
+			// Check if it's XVector<U> and U is safe
+			if constexpr (requires { typename CleanT::value_type; }) {
+				// Simple heuristic: check if size/alignment matches XVector
+				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+					return is_safe_type<typename CleanT::value_type>();
+				}
+			}
+			return false;
+		}
+		
+		template<typename T>
+		consteval bool is_safe_xset() {
+			using CleanT = std::remove_cv_t<T>;
+			if constexpr (requires { typename CleanT::key_type; }) {
+				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+					return is_safe_type<typename CleanT::key_type>();
+				}
+			}
+			return false;
+		}
+		
+		template<typename T>
+		consteval bool is_safe_xmap() {
+			using CleanT = std::remove_cv_t<T>;
+			if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
+				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+					return is_safe_type<typename CleanT::key_type>() &&
+					       is_safe_type<typename CleanT::mapped_type>();
+				}
+			}
+			return false;
+		}
+		
+		// Get member count for constexpr use
+		template<typename T>
+		consteval std::size_t get_safe_member_count() {
+			using namespace std::meta;
+			return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+		}
+		
+		// Helper: Check single member at index
+		template<typename T, std::size_t Index>
+		consteval bool is_member_safe_at() {
+			using namespace std::meta;
+			
+			// Get member directly by index (avoid storing vector)
+			constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
+			using MemberType = [:type_of(member):];
+			
+			// Check if member type is safe
+			if (!is_safe_type<MemberType>()) {
+				return false;
+			}
+			
+			// Additional critical checks
+			if constexpr (std::is_reference_v<MemberType>) {
+				return false;  // References cannot be serialized
+			}
+			if constexpr (std::is_pointer_v<MemberType>) {
+				return false;  // Raw pointers forbidden (use XOffsetPtr instead)
+			}
+			
+			return true;
+		}
+		
+		// Check all members using fold expression (compile-time)
+		template<typename T, std::size_t... Indices>
+		consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
+			return (is_member_safe_at<T, Indices>() && ...);
+		}
+		
+		// Step 4: Check if user-defined type's members are all safe (recursive)
+		template<typename T>
+		consteval bool are_all_members_safe() {
+			using namespace std::meta;
+			
+			// Must be class/struct
+			if constexpr (!std::is_class_v<T>) {
+				return false;
+			}
+			
+			// Must NOT be polymorphic (no virtual functions)
+			if constexpr (std::is_polymorphic_v<T>) {
+				return false;
+			}
+			
+			// Must NOT be union
+			if constexpr (std::is_union_v<T>) {
+				return false;
+			}
+			
+			// Check all non-static members recursively using fold expression
+			constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+			if constexpr (member_count == 0) {
+				return true;  // Empty struct is safe
+			} else {
+				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
+			}
+		}
+		
+		// Main safety checker: Whitelist-based validation (recursive)
+		template<typename T>
+		consteval bool is_safe_type() {
+			using CleanT = std::remove_cv_t<T>;
+			
+			// Whitelist check order:
+			
+			// 1. Basic primitive types (int32_t, float, etc.)
+			if constexpr (is_basic_type<CleanT>()) {
+				return true;
+			}
+			
+			// 2. XString
+			if constexpr (is_xstring<CleanT>()) {
+				return true;
+			}
+			
+			// 3. X containers (with recursive element type checking)
+			// Note: We use structural checks (size/alignment) since we can't
+			// directly compare template types at this point
+			if constexpr (std::is_class_v<CleanT>) {
+				// Try XVector
+				if constexpr (is_safe_xvector<CleanT>()) {
+					return true;
+				}
+				// Try XSet
+				if constexpr (is_safe_xset<CleanT>()) {
+					return true;
+				}
+				// Try XMap
+				if constexpr (is_safe_xmap<CleanT>()) {
+					return true;
+				}
+			}
+			
+			// 4. User-defined class/struct (recursive member checking)
+			if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
+				return are_all_members_safe<CleanT>();
+			}
+			
+			// Everything else: FORBIDDEN (not in whitelist)
+			return false;
+		}
+		
+		// Generate simplified error message
+		template<typename T>
+		consteval const char* get_safety_error_message() {
+			using CleanT = std::remove_cv_t<T>;
+			
+			if constexpr (is_safe_type<CleanT>()) {
+				return "Type is SAFE for XBuffer";
+			}
+			else if constexpr (std::is_polymorphic_v<CleanT>) {
+				return "UNSAFE: Type has virtual functions (polymorphic)";
+			}
+			else if constexpr (std::is_union_v<CleanT>) {
+				return "UNSAFE: Union type not allowed";
+			}
+			else if constexpr (std::is_pointer_v<CleanT>) {
+				return "UNSAFE: Raw pointer (use XOffsetPtr<T> instead)";
+			}
+			else if constexpr (std::is_reference_v<CleanT>) {
+				return "UNSAFE: Reference type not allowed";
+			}
+			else if constexpr (std::is_same_v<CleanT, std::string>) {
+				return "UNSAFE: std::string (use XString instead)";
+			}
+			else if constexpr (requires { typename CleanT::allocator_type; }) {
+				return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
+			}
+			else if constexpr (std::is_class_v<CleanT>) {
+				return "UNSAFE: Struct/class contains unsafe members";
+			}
+			else {
+				return "UNSAFE: Type not allowed in XBuffer";
+			}
+		}
+	} // namespace detail
+	
+	// Public interface: Type safety checker
 	template<typename T>
 	struct is_xbuffer_safe {
-		static constexpr bool value = 
-			!std::is_polymorphic_v<T> &&
-			!std::is_abstract_v<T> &&
-			!std::has_virtual_destructor_v<T>;
+		static constexpr bool value = detail::is_safe_type<T>();
 		
 		static constexpr const char* reason() {
-			if constexpr (std::is_polymorphic_v<T>) {
-				return "Polymorphic types (with virtual functions) cannot be safely serialized in XBuffer.\n"
-				       "Virtual function table pointers (vptr) are process-specific and cannot be persisted.\n"
-				       "Use plain POD types or structs without virtual functions instead.";
-			}
-			else if constexpr (std::is_abstract_v<T>) {
-				return "Abstract types (with pure virtual functions) cannot be instantiated in XBuffer.";
-			}
-			else if constexpr (std::has_virtual_destructor_v<T>) {
-				return "Types with virtual destructors are polymorphic and cannot be serialized in XBuffer.";
-			}
-			return "";
+			return detail::get_safety_error_message<T>();
 		}
 	};
 	
+	// Simplified type validation with clear error message
 	template<typename T>
 	constexpr void validate_xbuffer_type() {
 		static_assert(is_xbuffer_safe<T>::value, 
-			"Type is not safe for XBuffer serialization. See error message for details.");
+			"\n\n"
+			"========================================\n"
+			"  XBuffer Type Safety Error\n"
+			"========================================\n"
+			"The type you are trying to use is NOT SAFE for XBuffer.\n\n"
+			"ALLOWED TYPES:\n"
+			"  Basic Types:\n"
+			"    int8_t, int16_t, int32_t, int64_t\n"
+			"    uint8_t, uint16_t, uint32_t, uint64_t\n"
+			"    float, double, bool, char\n\n"
+			"  XBuffer Containers:\n"
+			"    XString, XVector<T>, XMap<K,V>, XSet<T>\n\n"
+			"  User-Defined Types:\n"
+			"    struct/class containing only safe types\n"
+			"    (no virtual functions, no raw pointers)\n\n"
+			"NOT ALLOWED:\n"
+			"  ✗ Virtual functions (polymorphic types)\n"
+			"  ✗ Raw pointers (use XOffsetPtr<T>)\n"
+			"  ✗ References\n"
+			"  ✗ std::string (use XString)\n"
+			"  ✗ std::vector (use XVector<T>)\n"
+			"  ✗ std::map (use XMap<K,V>)\n"
+			"  ✗ std::set (use XSet<T>)\n"
+			"  ✗ Union types\n"
+			"========================================\n");
 	}
 
 	class XBufferExt : public XBuffer {
@@ -826,26 +1057,13 @@ namespace XOffsetDatastructure2
 
 		template<typename T>
 		T* make(const char* name) {
-			static_assert(is_xbuffer_safe<T>::value, 
-				"Cannot use polymorphic types in XBuffer!\n\n"
-				"Polymorphic types contain virtual function table pointers (vptr) that:\n"
-				"  - Are process-specific memory addresses\n"
-				"  - Cannot be serialized or deserialized\n"
-				"  - Will cause crashes when loaded in different processes\n\n"
-				"Solution: Use plain POD types or non-polymorphic classes.\n"
-				"Example:\n"
-				"  [BAD]:  struct Data { virtual void f() {} };\n"
-				"  [GOOD]: struct Data { void f() {} };  // No 'virtual' keyword\n");
-			
+			validate_xbuffer_type<T>();
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
 		
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
-			static_assert(is_xbuffer_safe<T>::value,
-				"Cannot create allocator for polymorphic types in XBuffer. "
-				"Use non-polymorphic types instead.");
-			
+			validate_xbuffer_type<T>();
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
 
@@ -857,9 +1075,7 @@ namespace XOffsetDatastructure2
 		
 		template<typename T>
 		T* find_or_make(const char* name) {
-			static_assert(is_xbuffer_safe<T>::value,
-				"Cannot use polymorphic types in XBuffer. Use plain POD types instead.");
-			
+			validate_xbuffer_type<T>();
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
 		}
 

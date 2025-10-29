@@ -88,6 +88,7 @@ set(REFLECTION_TESTS
     test_field_limit_fix
     test_class_type_signatures
     test_type_safety
+    test_type_safety_comprehensive
     test_vptr_layout
 )
 
