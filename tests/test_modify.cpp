@@ -27,6 +27,10 @@ struct ModifyTestData {
     XSet<int> tags;
 };
 
+// Type safety validation
+static_assert(is_xbuffer_safe<ModifyTestData>::value, 
+              "ModifyTestData must be safe for XBuffer");
+
 bool test_modify_basic_types() {
     std::cout << "\n[TEST] Modify Basic Types\n";
     std::cout << std::string(50, '-') << "\n";
