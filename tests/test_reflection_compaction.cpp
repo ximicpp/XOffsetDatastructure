@@ -21,6 +21,10 @@ struct CompactData {
         : id(0), name(allocator), values(allocator) {}
 };
 
+// Type safety validation
+static_assert(is_xbuffer_safe<CompactData>::value,
+              "CompactData must be safe for XBuffer");
+
 // Helper functions
 template<typename T>
 consteval size_t get_member_count_ce() {

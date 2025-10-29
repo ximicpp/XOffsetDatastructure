@@ -16,6 +16,10 @@ struct Point {
     int y;
 };
 
+// Type safety validation
+static_assert(is_xbuffer_safe<Point>::value,
+              "Point must be safe for XBuffer");
+
 struct DataStruct {
     uint32_t id;
     double value;
@@ -24,6 +28,10 @@ struct DataStruct {
     template <typename Allocator>
     DataStruct(Allocator allocator) : id(0), value(0.0), name(allocator) {}
 };
+
+// Type safety validation
+static_assert(is_xbuffer_safe<DataStruct>::value,
+              "DataStruct must be safe for XBuffer");
 
 void test_direct_member_splice() {
     std::cout << "[Test 1] Direct Member Splice\n";
