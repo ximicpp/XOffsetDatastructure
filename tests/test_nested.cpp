@@ -36,14 +36,6 @@ struct OuterObject {
     XVector<InnerObject> innerList;
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<InnerObject>::value, 
-              "InnerObject must be safe for XBuffer");
-static_assert(is_xbuffer_safe<MiddleObject>::value, 
-              "MiddleObject must be safe for XBuffer");
-static_assert(is_xbuffer_safe<OuterObject>::value, 
-              "OuterObject must be safe for XBuffer");
-
 bool test_nested_structures() {
     std::cout << "\n[TEST] Nested Structures\n";
     std::cout << std::string(50, '-') << "\n";

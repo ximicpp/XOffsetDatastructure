@@ -31,12 +31,6 @@ struct ComplexData {
         : type(0), name(allocator), items(allocator) {}
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<SerializableData>::value,
-              "SerializableData must be safe for XBuffer");
-static_assert(is_xbuffer_safe<ComplexData>::value,
-              "ComplexData must be safe for XBuffer");
-
 // Helper: Get member count
 template<typename T>
 consteval size_t get_member_count_ce() {

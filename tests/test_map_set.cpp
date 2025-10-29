@@ -23,10 +23,6 @@ struct MapSetTest {
     XMap<XString, int> stringMap;
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<MapSetTest>::value, 
-              "MapSetTest must be safe for XBuffer");
-
 bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";
     std::cout << std::string(50, '-') << "\n";

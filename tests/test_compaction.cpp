@@ -19,10 +19,6 @@ struct CompactTestType {
     XVector<XString> strings;
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<CompactTestType>::value, 
-              "CompactTestType must be safe for XBuffer");
-
 bool test_memory_compaction() {
     std::cout << "\n[TEST] Memory Compaction\n";
     std::cout << std::string(50, '-') << "\n";

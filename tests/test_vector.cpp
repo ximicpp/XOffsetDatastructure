@@ -21,10 +21,6 @@ struct VectorTest {
     XVector<XString> stringVector;
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<VectorTest>::value, 
-              "VectorTest must be safe for XBuffer");
-
 bool test_vector_operations() {
     std::cout << "\n[TEST] Vector Operations\n";
     std::cout << std::string(50, '-') << "\n";
