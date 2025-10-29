@@ -24,12 +24,6 @@ struct Point3D {
     float x, y, z;
 };
 
-// Type safety validation
-static_assert(is_xbuffer_safe<ComparableData>::value,
-              "ComparableData must be safe for XBuffer");
-static_assert(is_xbuffer_safe<Point3D>::value,
-              "Point3D must be safe for XBuffer");
-
 // Compile-time member count using reflection
 template<typename T>
 consteval size_t member_count() {

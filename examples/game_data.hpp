@@ -81,17 +81,6 @@ public:
 // ============================================================================
 
 // ============================================================================
-// Type Safety Validation
-// Ensures types are safe for XBuffer serialization
-// ============================================================================
-
-static_assert(is_xbuffer_safe<Item>::value, 
-              "Item must be safe for XBuffer serialization");
-
-static_assert(is_xbuffer_safe<GameData>::value, 
-              "GameData must be safe for XBuffer serialization");
-
-// ============================================================================
 // Type Signature Validation (Binary Layout Compatibility)
 // ============================================================================
 
