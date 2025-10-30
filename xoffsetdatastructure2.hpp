@@ -41,18 +41,16 @@
 #define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
 #endif
 
-#include <experimental/meta>
-#include <array>
-#include <string_view>
-#include <type_traits>
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <map>
-#include <set>
-#include <fstream>
+// ============================================================================
+// Standard Library Headers
+// ============================================================================
+#include <experimental/meta>     // C++26 Reflection
+#include <type_traits>           // Type traits
+#include <iostream>              // I/O streams
+#include <iomanip>               // I/O manipulators (std::fixed, std::setprecision)
+#include <sstream>               // String streams
+#include <string>                // std::string
+#include <vector>                // std::vector (for internal buffer)
 
 // XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
 namespace XTypeSignature {
@@ -316,6 +314,9 @@ namespace XTypeSignature {
 
 } // namespace XTypeSignature
 
+// ============================================================================
+// Boost.Interprocess Headers (Memory Management)
+// ============================================================================
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
@@ -324,20 +325,21 @@ namespace XTypeSignature {
 #include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
 #include <boost/interprocess/mem_algo/rbtree_best_fit.hpp>
 #include <boost/interprocess/sync/mutex_family.hpp>
+
+// ============================================================================
+// Boost.Container Headers (Offset-based Containers)
+// ============================================================================
 #include <boost/container/vector.hpp>
 #include <boost/container/flat_set.hpp>
-#include <boost/container/set.hpp>
 #include <boost/container/flat_map.hpp>
-#include <boost/container/map.hpp>
 #include <boost/container/string.hpp>
 #include <boost/container/detail/next_capacity.hpp>
+
+// ============================================================================
+// Boost Utility Headers
+// ============================================================================
 #include <boost/move/utility_core.hpp>
 #include <boost/assert.hpp>
-#include <vector>
-#include <iostream>
-#include <iomanip>
-#include <sstream>
-#include <string>
 
 
 namespace boost {
