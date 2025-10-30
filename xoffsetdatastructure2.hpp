@@ -506,594 +506,601 @@ private:
 } // namespace boost
 
 
-namespace XOffsetDatastructure2
-{
-	using namespace boost::interprocess;
+namespace XOffsetDatastructure2 {
+    using namespace boost::interprocess;
 
-	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
+    using XBuffer = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
 
-	template<typename T>
-	concept HasIterator = requires(T t) {
-		{ t.begin() } -> std::input_or_output_iterator;
-		{ t.end() } -> std::input_or_output_iterator;
-	};
-	
-	template<typename T>
-	concept HasValueType = requires {
-		typename T::value_type;
-	};
-	
-	template<typename T>
-	concept HasMappedType = requires {
-		typename T::mapped_type;
-	};
-	
-	template<typename T>
-	concept HasKeyType = requires {
-		typename T::key_type;
-	};
-	
-	template<typename T>
-	concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
-		requires(T t, typename T::value_type v) {
-			{ t.emplace_back(std::move(v)) };
-		};
-	
-	template<typename T>
-	concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
-		!HasMappedType<T> &&
-		requires(T t, typename T::value_type v) {
-			{ t.emplace(std::move(v)) };
-		};
-	
-	template<typename T>
-	concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
-		requires(T t, typename T::key_type k, typename T::mapped_type v) {
-			{ t.emplace(std::move(k), std::move(v)) };
-		};
-	
-	template<typename T>
-	concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
+    template<typename T>
+    concept HasIterator = requires(T t) {
+        { t.begin() } -> std::input_or_output_iterator;
+        { t.end() } -> std::input_or_output_iterator;
+    };
+    
+    template<typename T>
+    concept HasValueType = requires {
+        typename T::value_type;
+    };
+    
+    template<typename T>
+    concept HasMappedType = requires {
+        typename T::mapped_type;
+    };
+    
+    template<typename T>
+    concept HasKeyType = requires {
+        typename T::key_type;
+    };
+    
+    template<typename T>
+    concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
+        requires(T t, typename T::value_type v) {
+            { t.emplace_back(std::move(v)) };
+        };
+    
+    template<typename T>
+    concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
+        !HasMappedType<T> &&
+        requires(T t, typename T::value_type v) {
+            { t.emplace(std::move(v)) };
+        };
+    
+    template<typename T>
+    concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
+        requires(T t, typename T::key_type k, typename T::mapped_type v) {
+            { t.emplace(std::move(k), std::move(v)) };
+        };
+    
+    template<typename T>
+    concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
 
-	struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
+    struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
     template <typename T>
     using XOffsetPtr = boost::interprocess::offset_ptr<T>;
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-	template <typename T>
-	using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>>;
+    template <typename T>
+    using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-	template <typename T>
-	using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option>;
+    using vector_option = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
+    template <typename T>
+    using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option>;
 #endif
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-	template <typename T>
-	using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
+    template <typename T>
+    using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-	template <typename T>
-	using XVector_flatset = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option_flatset>;
-	template <typename T>
-	using XSet = boost::container::flat_set<T, std::less<T>, XVector_flatset<T>>;
+    using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
+    template <typename T>
+    using XVector_flatset = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option_flatset>;
+    template <typename T>
+    using XSet = boost::container::flat_set<T, std::less<T>, XVector_flatset<T>>;
 #endif
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-	template <typename K, typename V>
-	using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBuffer::segment_manager>>;
+    template <typename K, typename V>
+    using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBuffer::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-	using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-	template <typename K, typename V>
-	using XVector_flatmap = boost::container::vector<std::pair<K, V>, allocator<std::pair<K, V>, XBuffer::segment_manager>, vector_option_flatmap>;
-	template <typename K, typename V>
-	using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V>>;
+    using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
+    template <typename K, typename V>
+    using XVector_flatmap = boost::container::vector<std::pair<K, V>, allocator<std::pair<K, V>, XBuffer::segment_manager>, vector_option_flatmap>;
+    template <typename K, typename V>
+    using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V>>;
 #endif
 
-	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
+    using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
-	class XBufferVisualizer {
-	public:
-		struct MemoryStats {
-			std::size_t total_size;
-			std::size_t free_size;
-			std::size_t used_size;
-			
-			double usage_percent() const {
-				return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0;
-			}
-			
-			double free_percent() const {
-				return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0;
-			}
-		};
+    class XBufferVisualizer {
+    public:
+        struct MemoryStats {
+            std::size_t total_size;
+            std::size_t free_size;
+            std::size_t used_size;
+            
+            double usage_percent() const {
+                return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0;
+            }
+            
+            double free_percent() const {
+                return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0;
+            }
+        };
 
-		static MemoryStats get_memory_stats(XBuffer& xbuf) {
-			MemoryStats stats = {};
-			stats.total_size = xbuf.get_size();
-			stats.free_size = xbuf.get_free_memory();
-			stats.used_size = stats.total_size - stats.free_size;
-			return stats;
-		}
+        static MemoryStats get_memory_stats(XBuffer& xbuf) {
+            MemoryStats stats = {};
+            stats.total_size = xbuf.get_size();
+            stats.free_size = xbuf.get_free_memory();
+            stats.used_size = stats.total_size - stats.free_size;
+            return stats;
+        }
 
-		static void print_stats(XBuffer& xbuf) {
-			MemoryStats stats = get_memory_stats(xbuf);
-			std::cout << "XBuffer: " << stats.used_size << "/" << stats.total_size 
-			          << " bytes (" << std::fixed << std::setprecision(1) 
-			          << stats.usage_percent() << "% used)" << std::endl;
-		}
-	};
+        static void print_stats(XBuffer& xbuf) {
+            MemoryStats stats = get_memory_stats(xbuf);
+            std::cout << "XBuffer: " << stats.used_size << "/" << stats.total_size 
+                      << " bytes (" << std::fixed << std::setprecision(1) 
+                      << stats.usage_percent() << "% used)" << std::endl;
+        }
+    };
 
-	class XBufferCompactor {
-	public:
-		template<typename T>
-		static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
-			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-			std::size_t new_size = stats.used_size + (stats.used_size / 10);
-			if (new_size < 4096) new_size = 4096;
-			
-			XBuffer new_xbuf(new_size);
-			auto* old_obj = old_xbuf.find<T>(object_name).first;
-			if (!old_obj) {
-				return new_xbuf;
-			}
-			
-			auto* new_obj = new_xbuf.construct<T>(object_name)(new_xbuf.get_segment_manager());
-			migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-			new_xbuf.shrink_to_fit();
-			return new_xbuf;
-		}
-		
-		template<typename T>
-		static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
-			auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-			std::size_t new_size = stats.used_size + (stats.used_size / 10);
-			if (new_size < 4096) new_size = 4096;
-			
-			XBuffer new_xbuf(new_size);
-			auto* segment = old_xbuf.get_segment_manager();
-			typedef typename XBuffer::segment_manager::const_named_iterator const_named_it;
-			const_named_it named_beg = segment->named_begin();
-			const_named_it named_end = segment->named_end();
-			
-			std::size_t migrated_count = 0;
-			
-			for(const_named_it it = named_beg; it != named_end; ++it) {
-				const char* name = it->name();
-				auto* old_obj = old_xbuf.find<T>(name).first;
-				if (old_obj) {
-					auto* new_obj = new_xbuf.construct<T>(name)(new_xbuf.get_segment_manager());
-					migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-					++migrated_count;
-				}
-			}
-			if (migrated_count > 0) {
-				new_xbuf.shrink_to_fit();
-			}
-			
-			return new_xbuf;
-		}
+    class XBufferCompactor {
+    public:
+        template<typename T>
+        static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
+            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+            std::size_t new_size = stats.used_size + (stats.used_size / 10);
+            if (new_size < 4096) new_size = 4096;
+            
+            XBuffer new_xbuf(new_size);
+            auto* old_obj = old_xbuf.find<T>(object_name).first;
+            if (!old_obj) {
+                return new_xbuf;
+            }
+            
+            auto* new_obj = new_xbuf.construct<T>(object_name)(new_xbuf.get_segment_manager());
+            migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
+            new_xbuf.shrink_to_fit();
+            return new_xbuf;
+        }
+        
+        template<typename T>
+        static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
+            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+            std::size_t new_size = stats.used_size + (stats.used_size / 10);
+            if (new_size < 4096) new_size = 4096;
+            
+            XBuffer new_xbuf(new_size);
+            auto* segment = old_xbuf.get_segment_manager();
+            using const_named_it = typename XBuffer::segment_manager::const_named_iterator;
+            const_named_it named_beg = segment->named_begin();
+            const_named_it named_end = segment->named_end();
+            
+            std::size_t migrated_count = 0;
+            
+            for(const_named_it it = named_beg; it != named_end; ++it) {
+                const char* name = it->name();
+                auto* old_obj = old_xbuf.find<T>(name).first;
+                if (old_obj) {
+                    auto* new_obj = new_xbuf.construct<T>(name)(new_xbuf.get_segment_manager());
+                    migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
+                    ++migrated_count;
+                }
+            }
+            if (migrated_count > 0) {
+                new_xbuf.shrink_to_fit();
+            }
+            
+            return new_xbuf;
+        }
 
-	private:
-		template<typename T>
-		struct is_xstring : std::false_type {};
-		
-		template<>
-		struct is_xstring<XString> : std::true_type {};
-		template<typename T, typename = void>
-		struct container_value_type {};
-		
-		template<typename T>
-		struct container_value_type<T, std::void_t<typename T::value_type>> {
-			using type = typename T::value_type;
-		};
-		
-		template<typename T>
-		using container_value_type_t = typename container_value_type<T>::type;
-		template<typename T>
-		static constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
-		                                         !SupportedContainer<T> && 
-		                                         !is_xstring<T>::value;
-		
-		template<typename ElementType>
-		static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			if constexpr (is_simple_pod_v<ElementType>) {
-				return old_elem;
-			}
-			else if constexpr (is_xstring<ElementType>::value) {
-				return XString(old_elem.c_str(), new_xbuf.get_segment_manager());
-			}
-			else {
-				ElementType new_elem(new_xbuf.get_segment_manager());
-				migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
-				return new_elem;
-			}
-		}
-		
-		template<typename ContainerType>
-		static void migrate_container(const ContainerType& old_container, 
-		                              ContainerType& new_container,
-		                              XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			using ElementType = container_value_type_t<ContainerType>;
-			
-			if constexpr (is_simple_pod_v<ElementType>) {
-				new_container = old_container;
-				return;
-			}
-			
-			if constexpr (MapLikeContainer<ContainerType>) {
-				for (const auto& [key, value] : old_container) {
-					auto new_key = migrate_element(key, old_xbuf, new_xbuf);
-					auto new_value = migrate_element(value, old_xbuf, new_xbuf);
-					new_container.emplace(std::move(new_key), std::move(new_value));
-				}
-			}
-			else {
-				for (const auto& elem : old_container) {
-					auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
-					if constexpr (SetLikeContainer<ContainerType>) {
-						new_container.emplace(std::move(migrated_elem));
-					} else {
-						new_container.emplace_back(std::move(migrated_elem));
-					}
-				}
-			}
-		}
-		
-		template<typename MemberType>
-		static void migrate_member(const MemberType& old_member, MemberType& new_member, 
-		                          XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			if constexpr (is_simple_pod_v<MemberType>) {
-				new_member = old_member;
-			}
-			else if constexpr (is_xstring<MemberType>::value) {
-				new_member = XString(old_member.c_str(), new_xbuf.get_segment_manager());
-			}
-			else if constexpr (SupportedContainer<MemberType>) {
-				migrate_container(old_member, new_member, old_xbuf, new_xbuf);
-			}
-			else {
-				migrate_members(old_member, new_member, old_xbuf, new_xbuf);
-			}
-		}
-		template<typename T>
-		static consteval std::size_t get_member_count_impl() {
-			using namespace std::meta;
-			return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-		}
-		template<typename T, std::size_t Index>
-		static consteval auto get_member_at() {
-			using namespace std::meta;
-			auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
-			return members[Index];
-		}
-		template<typename T, std::size_t Index>
-		static void migrate_member_at(const T& old_obj, T& new_obj,
-		                              XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			using namespace std::meta;
-			constexpr auto member = get_member_at<T, Index>();
-			using MemberType = [:type_of(member):];
-			const auto& old_member = old_obj.[:member:];
-			auto& new_member = new_obj.[:member:];
-			migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
-		}
-		template<typename T, std::size_t... Is>
-		static void migrate_members_impl(const T& old_obj, T& new_obj,
-		                                 XBuffer& old_xbuf, XBuffer& new_xbuf,
-		                                 std::index_sequence<Is...>) {
-			(migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
-		}
-		template<typename T>
-		static void migrate_members(const T& old_obj, T& new_obj, 
-		                           XBuffer& old_xbuf, XBuffer& new_xbuf) {
-			constexpr std::size_t member_count = get_member_count_impl<T>();
-			migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
-			                    std::make_index_sequence<member_count>{});
-		}
-	};
+    private:
+        template<typename T>
+        struct is_xstring : std::false_type {};
+        
+        template<>
+        struct is_xstring<XString> : std::true_type {};
+        
+        template<typename T, typename = void>
+        struct container_value_type {};
+        
+        template<typename T>
+        struct container_value_type<T, std::void_t<typename T::value_type>> {
+            using type = typename T::value_type;
+        };
+        
+        template<typename T>
+        using container_value_type_t = typename container_value_type<T>::type;
+        
+        template<typename T>
+        static constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
+                                                 !SupportedContainer<T> && 
+                                                 !is_xstring<T>::value;
+        
+        template<typename ElementType>
+        static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            if constexpr (is_simple_pod_v<ElementType>) {
+                return old_elem;
+            }
+            else if constexpr (is_xstring<ElementType>::value) {
+                return XString(old_elem.c_str(), new_xbuf.get_segment_manager());
+            }
+            else {
+                ElementType new_elem(new_xbuf.get_segment_manager());
+                migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
+                return new_elem;
+            }
+        }
+        
+        template<typename ContainerType>
+        static void migrate_container(const ContainerType& old_container, 
+                                      ContainerType& new_container,
+                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            using ElementType = container_value_type_t<ContainerType>;
+            
+            if constexpr (is_simple_pod_v<ElementType>) {
+                new_container = old_container;
+                return;
+            }
+            
+            if constexpr (MapLikeContainer<ContainerType>) {
+                for (const auto& [key, value] : old_container) {
+                    auto new_key = migrate_element(key, old_xbuf, new_xbuf);
+                    auto new_value = migrate_element(value, old_xbuf, new_xbuf);
+                    new_container.emplace(std::move(new_key), std::move(new_value));
+                }
+            }
+            else {
+                for (const auto& elem : old_container) {
+                    auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
+                    if constexpr (SetLikeContainer<ContainerType>) {
+                        new_container.emplace(std::move(migrated_elem));
+                    } else {
+                        new_container.emplace_back(std::move(migrated_elem));
+                    }
+                }
+            }
+        }
+        
+        template<typename MemberType>
+        static void migrate_member(const MemberType& old_member, MemberType& new_member, 
+                                  XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            if constexpr (is_simple_pod_v<MemberType>) {
+                new_member = old_member;
+            }
+            else if constexpr (is_xstring<MemberType>::value) {
+                new_member = XString(old_member.c_str(), new_xbuf.get_segment_manager());
+            }
+            else if constexpr (SupportedContainer<MemberType>) {
+                migrate_container(old_member, new_member, old_xbuf, new_xbuf);
+            }
+            else {
+                migrate_members(old_member, new_member, old_xbuf, new_xbuf);
+            }
+        }
+        
+        template<typename T>
+        static consteval std::size_t get_member_count_impl() {
+            using namespace std::meta;
+            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+        }
+        
+        template<typename T, std::size_t Index>
+        static consteval auto get_member_at() {
+            using namespace std::meta;
+            auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+            return members[Index];
+        }
+        
+        template<typename T, std::size_t Index>
+        static void migrate_member_at(const T& old_obj, T& new_obj,
+                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            using namespace std::meta;
+            constexpr auto member = get_member_at<T, Index>();
+            using MemberType = [:type_of(member):];
+            const auto& old_member = old_obj.[:member:];
+            auto& new_member = new_obj.[:member:];
+            migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
+        }
+        
+        template<typename T, std::size_t... Is>
+        static void migrate_members_impl(const T& old_obj, T& new_obj,
+                                         XBuffer& old_xbuf, XBuffer& new_xbuf,
+                                         std::index_sequence<Is...>) {
+            (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+        }
+        
+        template<typename T>
+        static void migrate_members(const T& old_obj, T& new_obj, 
+                                   XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            constexpr std::size_t member_count = get_member_count_impl<T>();
+            migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
+                                std::make_index_sequence<member_count>{});
+        }
+    };
 
-	// ============================================================================
-	// Type Safety: Whitelist-Based Validation
-	// Only explicitly allowed types can be used in XBuffer
-	// ============================================================================
-	
-	namespace detail {
-		// Step 1: Check if type is a basic primitive type
-		template<typename T>
-		consteval bool is_basic_type() {
-			using CleanT = std::remove_cv_t<T>;
-			return std::is_same_v<CleanT, int8_t> ||
-			       std::is_same_v<CleanT, int16_t> ||
-			       std::is_same_v<CleanT, int32_t> ||
-			       std::is_same_v<CleanT, int64_t> ||
-			       std::is_same_v<CleanT, uint8_t> ||
-			       std::is_same_v<CleanT, uint16_t> ||
-			       std::is_same_v<CleanT, uint32_t> ||
-			       std::is_same_v<CleanT, uint64_t> ||
-			       std::is_same_v<CleanT, float> ||
-			       std::is_same_v<CleanT, double> ||
-			       std::is_same_v<CleanT, bool> ||
-			       std::is_same_v<CleanT, char>;
-		}
+    // ============================================================================
+    // Type Safety: Whitelist-Based Validation
+    // Only explicitly allowed types can be used in XBuffer
+    // ============================================================================
+    
+    namespace detail {
+        // Step 1: Check if type is a basic primitive type
+        template<typename T>
+        consteval bool is_basic_type() {
+            using CleanT = std::remove_cv_t<T>;
+            return std::is_same_v<CleanT, int8_t> ||
+                   std::is_same_v<CleanT, int16_t> ||
+                   std::is_same_v<CleanT, int32_t> ||
+                   std::is_same_v<CleanT, int64_t> ||
+                   std::is_same_v<CleanT, uint8_t> ||
+                   std::is_same_v<CleanT, uint16_t> ||
+                   std::is_same_v<CleanT, uint32_t> ||
+                   std::is_same_v<CleanT, uint64_t> ||
+                   std::is_same_v<CleanT, float> ||
+                   std::is_same_v<CleanT, double> ||
+                   std::is_same_v<CleanT, bool> ||
+                   std::is_same_v<CleanT, char>;
+        }
+        
+        // Step 2: Check if type is XString
+        template<typename T>
+        consteval bool is_xstring() {
+            return std::is_same_v<std::remove_cv_t<T>, XString>;
+        }
+        
+        // Forward declaration for recursive checking
+        template<typename T>
+        consteval bool is_safe_type();
+        
+        // Step 3: Check if X container element types are safe (recursive)
+        template<typename T>
+        consteval bool is_safe_xvector() {
+            using CleanT = std::remove_cv_t<T>;
+            // Check if it's XVector<U> and U is safe
+            if constexpr (requires { typename CleanT::value_type; }) {
+                // Simple heuristic: check if size/alignment matches XVector
+                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+                    return is_safe_type<typename CleanT::value_type>();
+                }
+            }
+            return false;
+        }
+        
+        template<typename T>
+        consteval bool is_safe_xset() {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (requires { typename CleanT::key_type; }) {
+                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+                    return is_safe_type<typename CleanT::key_type>();
+                }
+            }
+            return false;
+        }
+        
+        template<typename T>
+        consteval bool is_safe_xmap() {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
+                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
+                    return is_safe_type<typename CleanT::key_type>() &&
+                           is_safe_type<typename CleanT::mapped_type>();
+                }
+            }
+            return false;
+        }
 		
-		// Step 2: Check if type is XString
-		template<typename T>
-		consteval bool is_xstring() {
-			return std::is_same_v<std::remove_cv_t<T>, XString>;
-		}
-		
-		// Forward declaration for recursive checking
-		template<typename T>
-		consteval bool is_safe_type();
-		
-		// Step 3: Check if X container element types are safe (recursive)
-		template<typename T>
-		consteval bool is_safe_xvector() {
-			using CleanT = std::remove_cv_t<T>;
-			// Check if it's XVector<U> and U is safe
-			if constexpr (requires { typename CleanT::value_type; }) {
-				// Simple heuristic: check if size/alignment matches XVector
-				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-					return is_safe_type<typename CleanT::value_type>();
-				}
-			}
-			return false;
-		}
-		
-		template<typename T>
-		consteval bool is_safe_xset() {
-			using CleanT = std::remove_cv_t<T>;
-			if constexpr (requires { typename CleanT::key_type; }) {
-				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-					return is_safe_type<typename CleanT::key_type>();
-				}
-			}
-			return false;
-		}
-		
-		template<typename T>
-		consteval bool is_safe_xmap() {
-			using CleanT = std::remove_cv_t<T>;
-			if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
-				if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-					return is_safe_type<typename CleanT::key_type>() &&
-					       is_safe_type<typename CleanT::mapped_type>();
-				}
-			}
-			return false;
-		}
-		
-		// Get member count for constexpr use
-		template<typename T>
-		consteval std::size_t get_safe_member_count() {
-			using namespace std::meta;
-			return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-		}
-		
-		// Helper: Check single member at index
-		template<typename T, std::size_t Index>
-		consteval bool is_member_safe_at() {
-			using namespace std::meta;
-			
-			// Get member directly by index (avoid storing vector)
-			constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
-			using MemberType = [:type_of(member):];
-			
-			// Check if member type is safe
-			if (!is_safe_type<MemberType>()) {
-				return false;
-			}
-			
-			// Additional critical checks
-			if constexpr (std::is_reference_v<MemberType>) {
-				return false;  // References cannot be serialized
-			}
-			if constexpr (std::is_pointer_v<MemberType>) {
-				return false;  // Raw pointers forbidden (use XOffsetPtr instead)
-			}
-			
-			return true;
-		}
-		
-		// Check all members using fold expression (compile-time)
-		template<typename T, std::size_t... Indices>
-		consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
-			return (is_member_safe_at<T, Indices>() && ...);
-		}
-		
-		// Step 4: Check if user-defined type's members are all safe (recursive)
-		template<typename T>
-		consteval bool are_all_members_safe() {
-			using namespace std::meta;
-			
-			// Must be class/struct
-			if constexpr (!std::is_class_v<T>) {
-				return false;
-			}
-			
-			// Must NOT be polymorphic (no virtual functions)
-			if constexpr (std::is_polymorphic_v<T>) {
-				return false;
-			}
-			
-			// Must NOT be union
-			if constexpr (std::is_union_v<T>) {
-				return false;
-			}
-			
-			// Check all non-static members recursively using fold expression
-			constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-			if constexpr (member_count == 0) {
-				return true;  // Empty struct is safe
-			} else {
-				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
-			}
-		}
-		
-		// Main safety checker: Whitelist-based validation (recursive)
-		template<typename T>
-		consteval bool is_safe_type() {
-			using CleanT = std::remove_cv_t<T>;
-			
-			// Whitelist check order:
-			
-			// 1. Basic primitive types (int32_t, float, etc.)
-			if constexpr (is_basic_type<CleanT>()) {
-				return true;
-			}
-			
-			// 2. XString
-			if constexpr (is_xstring<CleanT>()) {
-				return true;
-			}
-			
-			// 3. X containers (with recursive element type checking)
-			// Note: We use structural checks (size/alignment) since we can't
-			// directly compare template types at this point
-			if constexpr (std::is_class_v<CleanT>) {
-				// Try XVector
-				if constexpr (is_safe_xvector<CleanT>()) {
-					return true;
-				}
-				// Try XSet
-				if constexpr (is_safe_xset<CleanT>()) {
-					return true;
-				}
-				// Try XMap
-				if constexpr (is_safe_xmap<CleanT>()) {
-					return true;
-				}
-			}
-			
-			// 4. User-defined class/struct (recursive member checking)
-			if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
-				return are_all_members_safe<CleanT>();
-			}
-			
-			// Everything else: FORBIDDEN (not in whitelist)
-			return false;
-		}
-		
-		// Generate simplified error message
-		template<typename T>
-		consteval const char* get_safety_error_message() {
-			using CleanT = std::remove_cv_t<T>;
-			
-			if constexpr (is_safe_type<CleanT>()) {
-				return "Type is SAFE for XBuffer";
-			}
-			else if constexpr (std::is_polymorphic_v<CleanT>) {
-				return "UNSAFE: Type has virtual functions (polymorphic)";
-			}
-			else if constexpr (std::is_union_v<CleanT>) {
-				return "UNSAFE: Union type not allowed";
-			}
-			else if constexpr (std::is_pointer_v<CleanT>) {
-				return "UNSAFE: Raw pointer (use XOffsetPtr<T> instead)";
-			}
-			else if constexpr (std::is_reference_v<CleanT>) {
-				return "UNSAFE: Reference type not allowed";
-			}
-			else if constexpr (std::is_same_v<CleanT, std::string>) {
-				return "UNSAFE: std::string (use XString instead)";
-			}
-			else if constexpr (requires { typename CleanT::allocator_type; }) {
-				return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
-			}
-			else if constexpr (std::is_class_v<CleanT>) {
-				return "UNSAFE: Struct/class contains unsafe members";
-			}
-			else {
-				return "UNSAFE: Type not allowed in XBuffer";
-			}
-		}
-	} // namespace detail
-	
-	// Public interface: Type safety checker
-	template<typename T>
-	struct is_xbuffer_safe {
-		static constexpr bool value = detail::is_safe_type<T>();
-		
-		static constexpr const char* reason() {
-			return detail::get_safety_error_message<T>();
-		}
-	};
-	
-	// Simplified type validation with clear error message
-	template<typename T>
-	constexpr void validate_xbuffer_type() {
-		static_assert(is_xbuffer_safe<T>::value, 
-			"\n\n"
-			"========================================\n"
-			"  XBuffer Type Safety Error\n"
-			"========================================\n"
-			"The type you are trying to use is NOT SAFE for XBuffer.\n\n"
-			"ALLOWED TYPES:\n"
-			"  Basic Types:\n"
-			"    int8_t, int16_t, int32_t, int64_t\n"
-			"    uint8_t, uint16_t, uint32_t, uint64_t\n"
-			"    float, double, bool, char\n\n"
-			"  XBuffer Containers:\n"
-			"    XString, XVector<T>, XMap<K,V>, XSet<T>\n\n"
-			"  User-Defined Types:\n"
-			"    struct/class containing only safe types\n"
-			"    (no virtual functions, no raw pointers)\n\n"
-			"NOT ALLOWED:\n"
-			"  ✗ Virtual functions (polymorphic types)\n"
-			"  ✗ Raw pointers (use XOffsetPtr<T>)\n"
-			"  ✗ References\n"
-			"  ✗ std::string (use XString)\n"
-			"  ✗ std::vector (use XVector<T>)\n"
-			"  ✗ std::map (use XMap<K,V>)\n"
-			"  ✗ std::set (use XSet<T>)\n"
-			"  ✗ Union types\n"
-			"========================================\n");
-	}
+        // Get member count for constexpr use
+        template<typename T>
+        consteval std::size_t get_safe_member_count() {
+            using namespace std::meta;
+            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+        }
+        
+        // Helper: Check single member at index
+        template<typename T, std::size_t Index>
+        consteval bool is_member_safe_at() {
+            using namespace std::meta;
+            
+            // Get member directly by index (avoid storing vector)
+            constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
+            using MemberType = [:type_of(member):];
+            
+            // Check if member type is safe
+            if (!is_safe_type<MemberType>()) {
+                return false;
+            }
+            
+            // Additional critical checks
+            if constexpr (std::is_reference_v<MemberType>) {
+                return false;  // References cannot be serialized
+            }
+            if constexpr (std::is_pointer_v<MemberType>) {
+                return false;  // Raw pointers forbidden (use XOffsetPtr instead)
+            }
+            
+            return true;
+        }
+        
+        // Check all members using fold expression (compile-time)
+        template<typename T, std::size_t... Indices>
+        consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
+            return (is_member_safe_at<T, Indices>() && ...);
+        }
+        
+        // Step 4: Check if user-defined type's members are all safe (recursive)
+        template<typename T>
+        consteval bool are_all_members_safe() {
+            using namespace std::meta;
+            
+            // Must be class/struct
+            if constexpr (!std::is_class_v<T>) {
+                return false;
+            }
+            
+            // Must NOT be polymorphic (no virtual functions)
+            if constexpr (std::is_polymorphic_v<T>) {
+                return false;
+            }
+            
+            // Must NOT be union
+            if constexpr (std::is_union_v<T>) {
+                return false;
+            }
+            
+            // Check all non-static members recursively using fold expression
+            constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+            if constexpr (member_count == 0) {
+                return true;  // Empty struct is safe
+            } else {
+                return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
+            }
+        }
+        
+        // Main safety checker: Whitelist-based validation (recursive)
+        template<typename T>
+        consteval bool is_safe_type() {
+            using CleanT = std::remove_cv_t<T>;
+            
+            // Whitelist check order:
+            
+            // 1. Basic primitive types (int32_t, float, etc.)
+            if constexpr (is_basic_type<CleanT>()) {
+                return true;
+            }
+            
+            // 2. XString
+            if constexpr (is_xstring<CleanT>()) {
+                return true;
+            }
+            
+            // 3. X containers (with recursive element type checking)
+            // Note: We use structural checks (size/alignment) since we can't
+            // directly compare template types at this point
+            if constexpr (std::is_class_v<CleanT>) {
+                // Try XVector
+                if constexpr (is_safe_xvector<CleanT>()) {
+                    return true;
+                }
+                // Try XSet
+                if constexpr (is_safe_xset<CleanT>()) {
+                    return true;
+                }
+                // Try XMap
+                if constexpr (is_safe_xmap<CleanT>()) {
+                    return true;
+                }
+            }
+            
+            // 4. User-defined class/struct (recursive member checking)
+            if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
+                return are_all_members_safe<CleanT>();
+            }
+            
+            // Everything else: FORBIDDEN (not in whitelist)
+            return false;
+        }
+        
+        // Generate simplified error message
+        template<typename T>
+        consteval const char* get_safety_error_message() {
+            using CleanT = std::remove_cv_t<T>;
+            
+            if constexpr (is_safe_type<CleanT>()) {
+                return "Type is SAFE for XBuffer";
+            }
+            else if constexpr (std::is_polymorphic_v<CleanT>) {
+                return "UNSAFE: Type has virtual functions (polymorphic)";
+            }
+            else if constexpr (std::is_union_v<CleanT>) {
+                return "UNSAFE: Union type not allowed";
+            }
+            else if constexpr (std::is_pointer_v<CleanT>) {
+                return "UNSAFE: Raw pointer (use XOffsetPtr<T> instead)";
+            }
+            else if constexpr (std::is_reference_v<CleanT>) {
+                return "UNSAFE: Reference type not allowed";
+            }
+            else if constexpr (std::is_same_v<CleanT, std::string>) {
+                return "UNSAFE: std::string (use XString instead)";
+            }
+            else if constexpr (requires { typename CleanT::allocator_type; }) {
+                return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
+            }
+            else if constexpr (std::is_class_v<CleanT>) {
+                return "UNSAFE: Struct/class contains unsafe members";
+            }
+            else {
+                return "UNSAFE: Type not allowed in XBuffer";
+            }
+        }
+    } // namespace detail
+    
+    // Public interface: Type safety checker
+    template<typename T>
+    struct is_xbuffer_safe {
+        static constexpr bool value = detail::is_safe_type<T>();
+        
+        static constexpr const char* reason() {
+            return detail::get_safety_error_message<T>();
+        }
+    };
+    
+    // Simplified type validation with clear error message
+    template<typename T>
+    constexpr void validate_xbuffer_type() {
+        static_assert(is_xbuffer_safe<T>::value, 
+            "\n\n"
+            "========================================\n"
+            "  XBuffer Type Safety Error\n"
+            "========================================\n"
+            "The type you are trying to use is NOT SAFE for XBuffer.\n\n"
+            "ALLOWED TYPES:\n"
+            "  Basic Types:\n"
+            "    int8_t, int16_t, int32_t, int64_t\n"
+            "    uint8_t, uint16_t, uint32_t, uint64_t\n"
+            "    float, double, bool, char\n\n"
+            "  XBuffer Containers:\n"
+            "    XString, XVector<T>, XMap<K,V>, XSet<T>\n\n"
+            "  User-Defined Types:\n"
+            "    struct/class containing only safe types\n"
+            "    (no virtual functions, no raw pointers)\n\n"
+            "NOT ALLOWED:\n"
+            "  ✗ Virtual functions (polymorphic types)\n"
+            "  ✗ Raw pointers (use XOffsetPtr<T>)\n"
+            "  ✗ References\n"
+            "  ✗ std::string (use XString)\n"
+            "  ✗ std::vector (use XVector<T>)\n"
+            "  ✗ std::map (use XMap<K,V>)\n"
+            "  ✗ std::set (use XSet<T>)\n"
+            "  ✗ Union types\n"
+            "========================================\n");
+    }
 
-	class XBufferExt : public XBuffer {
-	public:
-		using XBuffer::XBuffer;
+    class XBufferExt : public XBuffer {
+    public:
+        using XBuffer::XBuffer;
 
-		template<typename T>
-		T* make(const char* name) {
-			validate_xbuffer_type<T>();
-			return this->construct<T>(name)(this->get_segment_manager());
-		}
-		
-		template<typename T>
-		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
-			validate_xbuffer_type<T>();
-			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
-		}
+        template<typename T>
+        T* make(const char* name) {
+            validate_xbuffer_type<T>();
+            return this->construct<T>(name)(this->get_segment_manager());
+        }
+        
+        template<typename T>
+        boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
+            validate_xbuffer_type<T>();
+            return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
+        }
 
-		template<typename T>
-		std::pair<T*, bool> find_ex(const char* name) {
-			auto result = this->find<T>(name);
-			return {result.first, result.second};
-		}
-		
-		template<typename T>
-		T* find_or_make(const char* name) {
-			validate_xbuffer_type<T>();
-			return this->find_or_construct<T>(name)(this->get_segment_manager());
-		}
+        template<typename T>
+        std::pair<T*, bool> find_ex(const char* name) {
+            auto result = this->find<T>(name);
+            return {result.first, result.second};
+        }
+        
+        template<typename T>
+        T* find_or_make(const char* name) {
+            validate_xbuffer_type<T>();
+            return this->find_or_construct<T>(name)(this->get_segment_manager());
+        }
 
-		std::string save_to_string() {
-			auto* buffer = this->get_buffer();
-			return std::string(buffer->begin(), buffer->end());
-		}
-		static XBufferExt load_from_string(const std::string& data) {
-			std::vector<char> buffer(data.begin(), data.end());
-			XBufferExt xbuf(buffer);
-			return xbuf;
-		}
+        std::string save_to_string() {
+            auto* buffer = this->get_buffer();
+            return std::string(buffer->begin(), buffer->end());
+        }
+        
+        static XBufferExt load_from_string(const std::string& data) {
+            std::vector<char> buffer(data.begin(), data.end());
+            XBufferExt xbuf(buffer);
+            return xbuf;
+        }
 
-		XBufferVisualizer::MemoryStats stats() {
-			return XBufferVisualizer::get_memory_stats(*this);
-		}
-	};
-}
+        XBufferVisualizer::MemoryStats stats() {
+            return XBufferVisualizer::get_memory_stats(*this);
+        }
+    };
+} // namespace XOffsetDatastructure2
 
 // Type Signature Support for XOffsetDatastructure2 Containers
 namespace XTypeSignature {
