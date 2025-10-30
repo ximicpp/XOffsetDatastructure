@@ -1,7 +1,6 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
 
-// XOffsetDatastructure2 - C++26 Reflection-Based Offset Container Library
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
     #define IS_LITTLE_ENDIAN 1
@@ -41,18 +40,14 @@
 #define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
 #endif
 
-// ============================================================================
-// Standard Library Headers
-// ============================================================================
-#include <experimental/meta>     // C++26 Reflection
-#include <type_traits>           // Type traits
-#include <iostream>              // I/O streams
-#include <iomanip>               // I/O manipulators (std::fixed, std::setprecision)
-#include <sstream>               // String streams
-#include <string>                // std::string
-#include <vector>                // std::vector (for internal buffer)
+#include <experimental/meta>
+#include <type_traits>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <vector>
 
-// XTypeSignature - Compile-Time Type Signature System (C++26 Reflection)
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
@@ -314,9 +309,6 @@ namespace XTypeSignature {
 
 } // namespace XTypeSignature
 
-// ============================================================================
-// Boost.Interprocess Headers (Memory Management)
-// ============================================================================
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
@@ -325,19 +317,11 @@ namespace XTypeSignature {
 #include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
 #include <boost/interprocess/mem_algo/rbtree_best_fit.hpp>
 #include <boost/interprocess/sync/mutex_family.hpp>
-
-// ============================================================================
-// Boost.Container Headers (Offset-based Containers)
-// ============================================================================
 #include <boost/container/vector.hpp>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/container/string.hpp>
 #include <boost/container/detail/next_capacity.hpp>
-
-// ============================================================================
-// Boost Utility Headers
-// ============================================================================
 #include <boost/move/utility_core.hpp>
 #include <boost/assert.hpp>
 
@@ -801,13 +785,7 @@ namespace XOffsetDatastructure2 {
         }
     };
 
-    // ============================================================================
-    // Type Safety: Whitelist-Based Validation
-    // Only explicitly allowed types can be used in XBuffer
-    // ============================================================================
-    
     namespace detail {
-        // Step 1: Check if type is a basic primitive type
         template<typename T>
         consteval bool is_basic_type() {
             using CleanT = std::remove_cv_t<T>;
@@ -825,23 +803,18 @@ namespace XOffsetDatastructure2 {
                    std::is_same_v<CleanT, char>;
         }
         
-        // Step 2: Check if type is XString
         template<typename T>
         consteval bool is_xstring() {
             return std::is_same_v<std::remove_cv_t<T>, XString>;
         }
         
-        // Forward declaration for recursive checking
         template<typename T>
         consteval bool is_safe_type();
         
-        // Step 3: Check if X container element types are safe (recursive)
         template<typename T>
         consteval bool is_safe_xvector() {
             using CleanT = std::remove_cv_t<T>;
-            // Check if it's XVector<U> and U is safe
             if constexpr (requires { typename CleanT::value_type; }) {
-                // Simple heuristic: check if size/alignment matches XVector
                 if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
                     return is_safe_type<typename CleanT::value_type>();
                 }
@@ -872,118 +845,93 @@ namespace XOffsetDatastructure2 {
             return false;
         }
 		
-        // Get member count for constexpr use
         template<typename T>
         consteval std::size_t get_safe_member_count() {
             using namespace std::meta;
             return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
         }
         
-        // Helper: Check single member at index
         template<typename T, std::size_t Index>
         consteval bool is_member_safe_at() {
             using namespace std::meta;
             
-            // Get member directly by index (avoid storing vector)
             constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
             using MemberType = [:type_of(member):];
             
-            // Check if member type is safe
             if (!is_safe_type<MemberType>()) {
                 return false;
             }
             
-            // Additional critical checks
             if constexpr (std::is_reference_v<MemberType>) {
-                return false;  // References cannot be serialized
+                return false;
             }
             if constexpr (std::is_pointer_v<MemberType>) {
-                return false;  // Raw pointers forbidden (use XOffsetPtr instead)
+                return false;
             }
             
             return true;
         }
         
-        // Check all members using fold expression (compile-time)
         template<typename T, std::size_t... Indices>
         consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
             return (is_member_safe_at<T, Indices>() && ...);
         }
         
-        // Step 4: Check if user-defined type's members are all safe (recursive)
         template<typename T>
         consteval bool are_all_members_safe() {
             using namespace std::meta;
             
-            // Must be class/struct
             if constexpr (!std::is_class_v<T>) {
                 return false;
             }
             
-            // Must NOT be polymorphic (no virtual functions)
             if constexpr (std::is_polymorphic_v<T>) {
                 return false;
             }
             
-            // Must NOT be union
             if constexpr (std::is_union_v<T>) {
                 return false;
             }
             
-            // Check all non-static members recursively using fold expression
             constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
             if constexpr (member_count == 0) {
-                return true;  // Empty struct is safe
+                return true;
             } else {
                 return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
             }
         }
         
-        // Main safety checker: Whitelist-based validation (recursive)
         template<typename T>
         consteval bool is_safe_type() {
             using CleanT = std::remove_cv_t<T>;
             
-            // Whitelist check order:
-            
-            // 1. Basic primitive types (int32_t, float, etc.)
             if constexpr (is_basic_type<CleanT>()) {
                 return true;
             }
             
-            // 2. XString
             if constexpr (is_xstring<CleanT>()) {
                 return true;
             }
             
-            // 3. X containers (with recursive element type checking)
-            // Note: We use structural checks (size/alignment) since we can't
-            // directly compare template types at this point
             if constexpr (std::is_class_v<CleanT>) {
-                // Try XVector
                 if constexpr (is_safe_xvector<CleanT>()) {
                     return true;
                 }
-                // Try XSet
                 if constexpr (is_safe_xset<CleanT>()) {
                     return true;
                 }
-                // Try XMap
                 if constexpr (is_safe_xmap<CleanT>()) {
                     return true;
                 }
             }
             
-            // 4. User-defined class/struct (recursive member checking)
             if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
                 return are_all_members_safe<CleanT>();
             }
             
-            // Everything else: FORBIDDEN (not in whitelist)
             return false;
         }
         
-        // Generate simplified error message
         template<typename T>
         consteval const char* get_safety_error_message() {
             using CleanT = std::remove_cv_t<T>;
@@ -1016,9 +964,8 @@ namespace XOffsetDatastructure2 {
                 return "UNSAFE: Type not allowed in XBuffer";
             }
         }
-    } // namespace detail
+    }
     
-    // Public interface: Type safety checker
     template<typename T>
     struct is_xbuffer_safe {
         static constexpr bool value = detail::is_safe_type<T>();
@@ -1028,7 +975,6 @@ namespace XOffsetDatastructure2 {
         }
     };
     
-    // Simplified type validation with clear error message
     template<typename T>
     constexpr void validate_xbuffer_type() {
         static_assert(is_xbuffer_safe<T>::value, 
@@ -1102,9 +1048,8 @@ namespace XOffsetDatastructure2 {
             return XBufferVisualizer::get_memory_stats(*this);
         }
     };
-} // namespace XOffsetDatastructure2
+}
 
-// Type Signature Support for XOffsetDatastructure2 Containers
 namespace XTypeSignature {
     template <>
     struct TypeSignature<XOffsetDatastructure2::XString> {
@@ -1138,5 +1083,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-} // namespace XTypeSignature
-#endif // X_OFFSET_DATA_STRUCTURE_2_HPP
+}
+
+#endif
