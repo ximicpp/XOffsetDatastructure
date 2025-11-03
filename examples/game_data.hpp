@@ -66,24 +66,6 @@ public:
 	XMap<XString, int32_t> quest_progress;
 };
 
-// ============================================================================
-// Compile-Time Type Signature Validation (C++26 Reflection)
-// ============================================================================
-// Key Difference from next_practical:
-//   - next_practical: Requires separate ReflectionHint types (aggregates for Boost.PFR)
-//   - next_cpp26: Direct type validation using C++26 reflection
-//
-// Advantages:
-//   - No code duplication (no ReflectionHint types needed)
-//   - Works with types that have constructors
-//   - More accurate (direct field inspection via std::meta)
-//   - Cleaner type definitions
-// ============================================================================
-
-// ============================================================================
-// Type Signature Validation (Binary Layout Compatibility)
-// ============================================================================
-
 // Item type signature validation
 static_assert(XTypeSignature::get_XTypeSignature<Item>() == 
              "struct[s:48,a:8]{"

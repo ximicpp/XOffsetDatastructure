@@ -5,13 +5,6 @@
 
 using namespace XOffsetDatastructure2;
 
-// ============================================================================
-// Player - Direct Type Definition (C++26 Reflection)
-// ============================================================================
-// Note: In next_cpp26, we don't need separate ReflectionHint types!
-// C++26 reflection can directly analyze types with constructors.
-// ============================================================================
-
 // struct alignas(XTypeSignature::BASIC_ALIGNMENT) Player {
 class alignas(8) Player {
 public:
@@ -33,18 +26,6 @@ public:
 	XString name;
 	XVector<int32_t> items;
 };
-
-// ============================================================================
-// Compile-Time Type Signature Validation (C++26 Reflection)
-// ============================================================================
-// Using C++26 reflection, we can directly validate the Player type
-// without needing a separate ReflectionHint aggregate type.
-//
-// When __cpp_reflection >= 202306L:
-//   - std::meta::members_of(^Player) works even with constructors
-//   - No need for separate aggregate types
-//   - Direct field introspection using template for
-// ============================================================================
 
 // Full type signature validation using C++26 reflection
 static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
