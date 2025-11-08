@@ -1,6 +1,6 @@
 // ============================================================================
 // XOffsetDatastructure2 - Hello World
-// Purpose: Introduction to basic usage with visual enhancements
+// Purpose: Simple introduction to basic usage with Player
 // ============================================================================
 
 #include <iostream>
@@ -19,74 +19,82 @@ int main() {
     // 1. Create buffer
     std::cout << "\n[1] Creating XBufferExt (4KB)\n";
     XBufferExt xbuf(4096);
-    
-    // Check buffer creation
-    if (xbuf.empty()) {
-        std::cerr << "    ✗ Buffer creation failed\n";
-        return 1;
-    }
-    
     std::cout << "    ✓ Buffer initialized\n";
     
     // Get buffer statistics
-    BufferStats stats = xbuf.get_stats();
+    auto stats = xbuf.stats();
     std::cout << "    Total: " << stats.total_size << " bytes\n";
     std::cout << "    Free:  " << stats.free_size << " bytes\n";
     
-    // 2. Create an object
-    std::cout << "\n[2] Creating game data\n";
-    auto game = xbuf.make<GameData>("Game1");
+    // 2. Create a player
+    std::cout << "\n[2] Creating player\n";
+    auto* player = xbuf.make<Player>("Hero");
     
     // Check object creation
-    if (!game) {
-        std::cerr << "    ✗ GameData creation failed\n";
+    if (!player) {
+        std::cerr << "    ✗ Player creation failed\n";
         return 1;
     }
     
-    std::cout << "    ✓ GameData created\n";
+    std::cout << "    ✓ Player created\n";
     
     // 3. Set player information
     std::cout << "\n[3] Setting player info\n";
-    game->player_name = XString("Alice", xbuf.allocator<XString>());
-    game->player_id = 1;
-    game->level = 10;
-    game->health = 100;
+    player->name = XString("Alice", xbuf.allocator<XString>());
+    player->id = 1;
+    player->level = 10;
     
-    std::cout << "    Name:   " << game->player_name.c_str() << "\n";
-    std::cout << "    ID:     " << game->player_id << "\n";
-    std::cout << "    Level:  " << game->level << "\n";
-    std::cout << "    Health: " << game->health << "\n";
+    std::cout << "    Name:   " << player->name.c_str() << "\n";
+    std::cout << "    ID:     " << player->id << "\n";
+    std::cout << "    Level:  " << player->level << "\n";
     
-    // 4. Add items to inventory
+    // 4. Add items (item IDs)
     std::cout << "\n[4] Adding items\n";
-    game->items.push_back(Item{"Sword", 1, 10});
-    game->items.push_back(Item{"Shield", 1, 20});
-    game->items.push_back(Item{"Potion", 2, 30});
+    player->items.push_back(101);
+    player->items.push_back(102);
+    player->items.push_back(103);
     
-    std::cout << "    ✓ Added " << game->items.size() << " items\n";
+    std::cout << "    ✓ Added " << player->items.size() << " items\n";
     
-    // 5. Display inventory
-    std::cout << "\n[5] Inventory\n";
-    for (size_t i = 0; i < game->items.size(); i++) {
-        std::cout << "    [" << i+1 << "] " 
-                  << game->items[i].name.c_str()
-                  << " x" << game->items[i].quantity << "\n";
+    // 5. Display items
+    std::cout << "\n[5] Item IDs\n";
+    for (size_t i = 0; i < player->items.size(); i++) {
+        std::cout << "    [" << i+1 << "] Item ID: " 
+                  << player->items[i] << "\n";
     }
     
-    // 6. Show memory usage
-    std::cout << "\n[6] Memory usage\n";
-    stats = xbuf.get_stats();
+    // 6. Serialize to string
+    std::cout << "\n[6] Serialization\n";
+    auto data = xbuf.save_to_string();
+    std::cout << "    Serialized size: " << data.size() << " bytes\n";
+    
+    // 7. Deserialize from string
+    std::cout << "\n[7] Deserialization\n";
+    XBufferExt loaded = XBufferExt::load_from_string(data);
+    auto [loaded_player, found] = loaded.find_ex<Player>("Hero");
+    
+    if (found) {
+        std::cout << "    ✓ Loaded player: " << loaded_player->name.c_str()
+                  << " (Level " << loaded_player->level << ")\n";
+        std::cout << "    ✓ Items count: " << loaded_player->items.size() << "\n";
+    } else {
+        std::cerr << "    ✗ Failed to find player\n";
+    }
+    
+    // 8. Show memory usage
+    std::cout << "\n[8] Memory usage\n";
+    stats = xbuf.stats();
     std::cout << "    Used:  " << stats.used_size << " bytes\n";
     std::cout << "    Free:  " << stats.free_size << " bytes\n";
     std::cout << "    Total: " << stats.total_size << " bytes\n";
     std::cout << "    Usage: " << static_cast<int>(stats.usage_percent()) << "%\n";
     
-    // 7. Show type signature
-    std::cout << "\n[7] Type signature\n";
+    // 9. Show type signature
+    std::cout << "\n[9] Type signature\n";
     std::cout << "    ✓ Computed at compile-time\n";
     std::cout << "    ✓ Ensures binary compatibility\n";
-    std::cout << "    GameData: struct[s:" << sizeof(GameDataReflectionHint)
-              << ",a:" << alignof(GameDataReflectionHint) << "]\n";
+    std::cout << "    Player: struct[s:" << sizeof(PlayerReflectionHint)
+              << ",a:" << alignof(PlayerReflectionHint) << "]\n";
     
     // Final summary
     std::cout << "\n+==================================================================+\n";
@@ -95,7 +103,7 @@ int main() {
     std::cout << "\nKey Takeaways:\n";
     std::cout << "  • XBufferExt manages offset-based memory\n";
     std::cout << "  • make<T>() creates named objects\n";
-    std::cout << "  • Containers work seamlessly with allocators\n";
+    std::cout << "  • Containers (XVector, XString) work seamlessly\n";
     std::cout << "  • Type signatures ensure compile-time safety\n";
     std::cout << "  • Zero-copy serialization is supported\n\n";
     
