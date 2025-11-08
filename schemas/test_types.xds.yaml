@@ -1,0 +1,40 @@
+schema_version: "1.0"
+
+types:
+  - name: TestTypeInner
+    type: struct
+    fields:
+      - name: mInt
+        type: int
+        default: 0
+      - name: mVector
+        type: XVector<int>
+
+  - name: TestType
+    type: struct
+    fields:
+      - name: mInt
+        type: int
+        default: 0
+      - name: mFloat
+        type: float
+        default: 0.0
+      - name: mVector
+        type: XVector<int>
+      - name: mStringVector
+        type: XVector<XString>
+      - name: TestTypeInnerObj
+        type: TestTypeInner
+      - name: mXXTypeVector
+        type: XVector<TestTypeInner>
+      - name: mComplexMap
+        type: XMap<XString, TestTypeInner>
+      - name: mStringSet
+        type: XSet<XString>
+      - name: mSet
+        type: XSet<int>
+      - name: mString
+        type: XString
+
+codegen:
+  output_dir: "generated"

@@ -1,0 +1,33 @@
+schema_version: "1.0"
+
+types:
+  - name: InnerObject
+    type: struct
+    fields:
+      - name: id
+        type: int
+        default: 0
+      - name: name
+        type: XString
+      - name: data
+        type: XVector<int>
+
+  - name: MiddleObject
+    type: struct
+    fields:
+      - name: name
+        type: XString
+      - name: inner
+        type: InnerObject
+      - name: values
+        type: XVector<int>
+
+  - name: OuterObject
+    type: struct
+    fields:
+      - name: title
+        type: XString
+      - name: middle
+        type: MiddleObject
+      - name: innerList
+        type: XVector<InnerObject>
