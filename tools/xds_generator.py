@@ -412,11 +412,17 @@ class CodeGenerator:
         lines = []
         
         # Add comment explaining the validation
-        lines.append(f"// Type signature validation for {struct.name}")
-        lines.append(f"// This ensures binary compatibility across compilations")
+        lines.append(f"// Compile-time validation for {struct.name}")
+        lines.append("")
+        
+        # Type safety validation (NEW)
+        lines.append("// 1. Type Safety Check")
+        lines.append(f"static_assert(XOffsetDatastructure2::is_xbuffer_safe<{struct.name}ReflectionHint>::value,")
+        lines.append(f'              "Type safety error for {struct.name}ReflectionHint");')
         lines.append("")
         
         # Size and alignment validation (always enabled)
+        lines.append("// 2. Size and Alignment Check")
         lines.append(f"static_assert(sizeof({struct.name}) == sizeof({struct.name}ReflectionHint),")
         lines.append(f'              "Size mismatch: {struct.name} runtime and reflection types must have identical size");')
         lines.append(f"static_assert(alignof({struct.name}) == alignof({struct.name}ReflectionHint),")
@@ -424,6 +430,7 @@ class CodeGenerator:
         lines.append("")
         
         # Type signature validation (disabled on MSVC due to template instantiation issues)
+        lines.append("// 3. Type Signature Check (disabled on MSVC)")
         lines.append("// Type signature verification disabled on MSVC due to deep template instantiation issues")
         lines.append("// with Boost.PFR reflection on aggregate types containing XString in containers.")
         lines.append("// See: https://github.com/boostorg/pfr/issues")

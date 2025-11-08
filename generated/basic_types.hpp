@@ -54,14 +54,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypesReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for BasicTypes
-// This ensures binary compatibility across compilations
+// Compile-time validation for BasicTypes
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<BasicTypesReflectionHint>::value,
+              "Type safety error for BasicTypesReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(BasicTypes) == sizeof(BasicTypesReflectionHint),
               "Size mismatch: BasicTypes runtime and reflection types must have identical size");
 static_assert(alignof(BasicTypes) == alignof(BasicTypesReflectionHint),
               "Alignment mismatch: BasicTypes runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

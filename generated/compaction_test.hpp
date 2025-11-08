@@ -45,14 +45,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) MemoryTestTypeReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for MemoryTestType
-// This ensures binary compatibility across compilations
+// Compile-time validation for MemoryTestType
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<MemoryTestTypeReflectionHint>::value,
+              "Type safety error for MemoryTestTypeReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(MemoryTestType) == sizeof(MemoryTestTypeReflectionHint),
               "Size mismatch: MemoryTestType runtime and reflection types must have identical size");
 static_assert(alignof(MemoryTestType) == alignof(MemoryTestTypeReflectionHint),
               "Alignment mismatch: MemoryTestType runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

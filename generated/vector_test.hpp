@@ -37,14 +37,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) VectorTestReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for VectorTest
-// This ensures binary compatibility across compilations
+// Compile-time validation for VectorTest
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<VectorTestReflectionHint>::value,
+              "Type safety error for VectorTestReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(VectorTest) == sizeof(VectorTestReflectionHint),
               "Size mismatch: VectorTest runtime and reflection types must have identical size");
 static_assert(alignof(VectorTest) == alignof(VectorTestReflectionHint),
               "Alignment mismatch: VectorTest runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

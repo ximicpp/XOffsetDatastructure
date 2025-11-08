@@ -77,14 +77,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) OuterObjectReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for InnerObject
-// This ensures binary compatibility across compilations
+// Compile-time validation for InnerObject
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<InnerObjectReflectionHint>::value,
+              "Type safety error for InnerObjectReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(InnerObject) == sizeof(InnerObjectReflectionHint),
               "Size mismatch: InnerObject runtime and reflection types must have identical size");
 static_assert(alignof(InnerObject) == alignof(InnerObjectReflectionHint),
               "Alignment mismatch: InnerObject runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
@@ -94,14 +99,19 @@ static_assert(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>() ==
 
 #endif // _MSC_VER
 
-// Type signature validation for MiddleObject
-// This ensures binary compatibility across compilations
+// Compile-time validation for MiddleObject
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<MiddleObjectReflectionHint>::value,
+              "Type safety error for MiddleObjectReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(MiddleObject) == sizeof(MiddleObjectReflectionHint),
               "Size mismatch: MiddleObject runtime and reflection types must have identical size");
 static_assert(alignof(MiddleObject) == alignof(MiddleObjectReflectionHint),
               "Alignment mismatch: MiddleObject runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
@@ -117,14 +127,19 @@ static_assert(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>() =
 
 #endif // _MSC_VER
 
-// Type signature validation for OuterObject
-// This ensures binary compatibility across compilations
+// Compile-time validation for OuterObject
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<OuterObjectReflectionHint>::value,
+              "Type safety error for OuterObjectReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(OuterObject) == sizeof(OuterObjectReflectionHint),
               "Size mismatch: OuterObject runtime and reflection types must have identical size");
 static_assert(alignof(OuterObject) == alignof(OuterObjectReflectionHint),
               "Alignment mismatch: OuterObject runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
