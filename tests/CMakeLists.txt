@@ -156,3 +156,12 @@ add_test(NAME MSVCCompat COMMAND test_msvc_compat)
 if(Python3_FOUND)
     add_test(NAME GeneratedTypes COMMAND test_generated_types)
 endif()
+
+# const T support test
+add_executable(test_const_support test_const_support.cpp)
+target_include_directories(test_const_support PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+set_target_properties(test_const_support PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+configure_macos_target(test_const_support)
+add_test(NAME ConstSupport COMMAND test_const_support)
