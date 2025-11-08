@@ -1,0 +1,1 @@
+/usr/bin/c++  -stdlib=libc++ -O3 -DNDEBUG -arch arm64 -mmacosx-version-min=10.15 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -Wl,-rpath,/usr/lib -Wl,-rpath,/usr/local/lib CMakeFiles/helloworld.dir/helloworld.cpp.o -o ../bin/helloworld

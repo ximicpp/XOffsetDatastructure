@@ -1,0 +1,12 @@
+schema_version: "1.0"
+
+types:
+  - name: VectorTest
+    type: struct
+    fields:
+      - name: intVector
+        type: XVector<int>
+      - name: floatVector
+        type: XVector<float>
+      - name: stringVector
+        type: XVector<XString>

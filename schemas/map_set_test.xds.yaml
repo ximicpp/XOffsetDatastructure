@@ -1,0 +1,14 @@
+schema_version: "1.0"
+
+types:
+  - name: MapSetTest
+    type: struct
+    fields:
+      - name: intSet
+        type: XSet<int>
+      - name: stringSet
+        type: XSet<XString>
+      - name: intMap
+        type: XMap<int, XString>
+      - name: stringMap
+        type: XMap<XString, int>

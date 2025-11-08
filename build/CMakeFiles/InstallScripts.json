@@ -1,0 +1,9 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/fanchensu/XOffsetDatastructure/build/cmake_install.cmake",
+		"/Users/fanchensu/XOffsetDatastructure/build/examples/cmake_install.cmake",
+		"/Users/fanchensu/XOffsetDatastructure/build/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

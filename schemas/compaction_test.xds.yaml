@@ -1,0 +1,13 @@
+schema_version: "1.0"
+
+types:
+  - name: MemoryTestType
+    type: struct
+    fields:
+      - name: value
+        type: int
+        default: 0
+      - name: data
+        type: XVector<int>
+      - name: strings
+        type: XVector<XString>
