@@ -214,7 +214,7 @@ namespace XTypeSignature {
 
     // Calculate field offset at compile-time
     template<typename T, size_t Index>
-    constexpr size_t get_field_offset() noexcept {
+    consteval size_t get_field_offset() noexcept {
         if constexpr (Index == 0) {
             return 0;
         } else {
@@ -227,26 +227,48 @@ namespace XTypeSignature {
         }
     }
 
-    // Generate signature for all fields
-    template <typename T, size_t Index = 0>
-    constexpr auto get_fields_signature() noexcept {
-        if constexpr (Index >= boost::pfr::tuple_size_v<T>) {
+    // ========================================================================
+    // Optimized Field Signature Generation (Fold Expression)
+    // Replaces recursive template instantiation with fold expression
+    // ========================================================================
+    
+    // Helper: Build signature for a single field
+    template<typename T, size_t Index>
+    consteval auto build_single_field_signature() noexcept {
+        using FieldType = std::tuple_element_t<Index, 
+            decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+        
+        return CompileString{"@"} +
+               CompileString<32>::from_number(get_field_offset<T, Index>()) +
+               CompileString{":"} +
+               TypeSignature<FieldType>::calculate();
+    }
+
+    // Helper: Add comma prefix (except for the first field)
+    template<typename T, size_t Index, bool IsFirst>
+    consteval auto build_field_with_comma() noexcept {
+        if constexpr (IsFirst) {
+            return build_single_field_signature<T, Index>();
+        } else {
+            return CompileString{","} + build_single_field_signature<T, Index>();
+        }
+    }
+
+    // Helper: Concatenate all field signatures using fold expression
+    template<typename T, size_t... Indices>
+    consteval auto concatenate_field_signatures(std::index_sequence<Indices...>) noexcept {
+        return (build_field_with_comma<T, Indices, (Indices == 0)>() + ...);
+    }
+
+    // Main entry point: Generate signature for all fields
+    // Optimized version using fold expression instead of recursion
+    template <typename T>
+    consteval auto get_fields_signature() noexcept {
+        constexpr size_t count = boost::pfr::tuple_size_v<T>;
+        if constexpr (count == 0) {
             return CompileString{""};
         } else {
-            using FieldType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            if constexpr (Index == 0) {
-                return CompileString{"@"} +
-                       CompileString<32>::from_number(get_field_offset<T, Index>()) +
-                       CompileString{":"} +
-                       TypeSignature<FieldType>::calculate() +
-                       get_fields_signature<T, Index + 1>();
-            } else {
-                return CompileString{",@"} +
-                       CompileString<32>::from_number(get_field_offset<T, Index>()) +
-                       CompileString{":"} +
-                       TypeSignature<FieldType>::calculate() +
-                       get_fields_signature<T, Index + 1>();
-            }
+            return concatenate_field_signatures<T>(std::make_index_sequence<count>{});
         }
     }
 
@@ -294,6 +316,14 @@ namespace XTypeSignature {
         static constexpr auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
     };
 
+    // const T support: strip const and delegate to non-const version
+    template <typename T>
+    struct TypeSignature<const T> {
+        static consteval auto calculate() noexcept {
+            return TypeSignature<T>::calculate();
+        }
+    };
+
     // Generic type signature
     template <typename T>
     struct TypeSignature {
@@ -323,7 +353,7 @@ namespace XTypeSignature {
 
     // Public API
     template <typename T>
-    [[nodiscard]] constexpr auto get_XTypeSignature() noexcept {
+    [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
         return TypeSignature<T>::calculate();
     }
 
