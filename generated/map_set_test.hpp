@@ -39,14 +39,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) MapSetTestReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for MapSetTest
-// This ensures binary compatibility across compilations
+// Compile-time validation for MapSetTest
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<MapSetTestReflectionHint>::value,
+              "Type safety error for MapSetTestReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(MapSetTest) == sizeof(MapSetTestReflectionHint),
               "Size mismatch: MapSetTest runtime and reflection types must have identical size");
 static_assert(alignof(MapSetTest) == alignof(MapSetTestReflectionHint),
               "Alignment mismatch: MapSetTest runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

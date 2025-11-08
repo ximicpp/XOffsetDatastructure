@@ -48,14 +48,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) AlignedStructReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for AlignedStruct
-// This ensures binary compatibility across compilations
+// Compile-time validation for AlignedStruct
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<AlignedStructReflectionHint>::value,
+              "Type safety error for AlignedStructReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(AlignedStruct) == sizeof(AlignedStructReflectionHint),
               "Size mismatch: AlignedStruct runtime and reflection types must have identical size");
 static_assert(alignof(AlignedStruct) == alignof(AlignedStructReflectionHint),
               "Alignment mismatch: AlignedStruct runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

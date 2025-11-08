@@ -57,14 +57,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ModifyTestDataReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for ModifyTestData
-// This ensures binary compatibility across compilations
+// Compile-time validation for ModifyTestData
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<ModifyTestDataReflectionHint>::value,
+              "Type safety error for ModifyTestDataReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(ModifyTestData) == sizeof(ModifyTestDataReflectionHint),
               "Size mismatch: ModifyTestData runtime and reflection types must have identical size");
 static_assert(alignof(ModifyTestData) == alignof(ModifyTestDataReflectionHint),
               "Alignment mismatch: ModifyTestData runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

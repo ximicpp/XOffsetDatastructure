@@ -84,14 +84,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameDataReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for Item
-// This ensures binary compatibility across compilations
+// Compile-time validation for Item
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<ItemReflectionHint>::value,
+              "Type safety error for ItemReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(Item) == sizeof(ItemReflectionHint),
               "Size mismatch: Item runtime and reflection types must have identical size");
 static_assert(alignof(Item) == alignof(ItemReflectionHint),
               "Alignment mismatch: Item runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
@@ -101,14 +106,19 @@ static_assert(XTypeSignature::get_XTypeSignature<ItemReflectionHint>() == "struc
 
 #endif // _MSC_VER
 
-// Type signature validation for GameData
-// This ensures binary compatibility across compilations
+// Compile-time validation for GameData
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<GameDataReflectionHint>::value,
+              "Type safety error for GameDataReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(GameData) == sizeof(GameDataReflectionHint),
               "Size mismatch: GameData runtime and reflection types must have identical size");
 static_assert(alignof(GameData) == alignof(GameDataReflectionHint),
               "Alignment mismatch: GameData runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues

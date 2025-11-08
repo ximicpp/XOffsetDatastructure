@@ -63,14 +63,19 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ComplexDataReflectionHint {
 // Compile-Time Validation
 // ============================================================================
 
-// Type signature validation for SimpleData
-// This ensures binary compatibility across compilations
+// Compile-time validation for SimpleData
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<SimpleDataReflectionHint>::value,
+              "Type safety error for SimpleDataReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(SimpleData) == sizeof(SimpleDataReflectionHint),
               "Size mismatch: SimpleData runtime and reflection types must have identical size");
 static_assert(alignof(SimpleData) == alignof(SimpleDataReflectionHint),
               "Alignment mismatch: SimpleData runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
@@ -80,14 +85,19 @@ static_assert(XTypeSignature::get_XTypeSignature<SimpleDataReflectionHint>() == 
 
 #endif // _MSC_VER
 
-// Type signature validation for ComplexData
-// This ensures binary compatibility across compilations
+// Compile-time validation for ComplexData
 
+// 1. Type Safety Check
+static_assert(XOffsetDatastructure2::is_xbuffer_safe<ComplexDataReflectionHint>::value,
+              "Type safety error for ComplexDataReflectionHint");
+
+// 2. Size and Alignment Check
 static_assert(sizeof(ComplexData) == sizeof(ComplexDataReflectionHint),
               "Size mismatch: ComplexData runtime and reflection types must have identical size");
 static_assert(alignof(ComplexData) == alignof(ComplexDataReflectionHint),
               "Alignment mismatch: ComplexData runtime and reflection types must have identical alignment");
 
+// 3. Type Signature Check (disabled on MSVC)
 // Type signature verification disabled on MSVC due to deep template instantiation issues
 // with Boost.PFR reflection on aggregate types containing XString in containers.
 // See: https://github.com/boostorg/pfr/issues
