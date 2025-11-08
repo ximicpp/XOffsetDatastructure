@@ -284,12 +284,6 @@ void demo_advanced_features() {
     print_check("Dynamic growth/shrinking");
     print_check("Memory usage tracking");
     print_check("Zero-copy serialization");
-    
-    print_subsection("Roadmap");
-    std::cout << "  - C++26 reflection support\n";
-    std::cout << "  - Schema versioning\n";
-    std::cout << "  - JSON serialization\n";
-    std::cout << "  - Benchmark suite\n";
 }
 
 // Main Entry Point
@@ -311,12 +305,8 @@ int main() {
         demo_advanced_features();
         
         print_section("Summary");
-        std::cout << "\n  ✓ All demonstrations completed successfully!\n\n";
-        std::cout << "  Resources:\n";
-        std::cout << "    - Documentation: docs/\n";
-        std::cout << "    - Examples: examples/\n";
-        std::cout << "    - Tests: tests/\n\n";
-        std::cout << "  Key Features:\n";
+        std::cout << "\n  ✓ All demonstrations completed successfully!\n";
+        std::cout << "\n  Key Features:\n";
         std::cout << "    • Type-safe offset-based containers\n";
         std::cout << "    • Zero-copy binary serialization\n";
         std::cout << "    • Compile-time type verification\n";
