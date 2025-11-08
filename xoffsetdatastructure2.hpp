@@ -1,10 +1,7 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
 #define X_OFFSET_DATA_STRUCTURE_2_HPP
 
-// =============================================================================
-// XOffsetDatastructure2 - Single Header Library
-// =============================================================================
-
+// XOffsetDatastructure2 - Single Header Library for Offset-Based Data Structures
 // Platform Detection & Configuration
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
@@ -45,9 +42,7 @@
 #define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
 #endif
 
-// ========================================================================
 // Standard Library Headers
-// ========================================================================
 #include <string_view>
 #include <type_traits>
 #include <vector>
@@ -57,9 +52,7 @@
 #include <string>
 #include <fstream>
 
-// ========================================================================
 // Boost Headers
-// ========================================================================
 #include <boost/pfr.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
@@ -79,19 +72,12 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/assert.hpp>
 
-// ========================================================================
 // XTypeSignature - Compile-Time Type Signature System
-// ========================================================================
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
 
-    // ========================================================================
     // Type Size Validations
-    // ========================================================================
-    // Only validate types we actually use. See docs/CROSS_PLATFORM_TYPES.md
-    
-    // Fixed-size integer types (safe and recommended)
     static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
     static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
     static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
@@ -101,15 +87,12 @@ namespace XTypeSignature {
     static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
     static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
     
-    // Floating point types
     static_assert(sizeof(float) == 4, "float must be 4 bytes");
     static_assert(sizeof(double) == 8, "double must be 8 bytes");
     
-    // Character and boolean types
     static_assert(sizeof(char) == 1, "char must be 1 byte");
     static_assert(sizeof(bool) == 1, "bool must be 1 byte");
     
-    // Platform requirements
     static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
     static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
     static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
@@ -118,7 +101,6 @@ namespace XTypeSignature {
     template <typename T>
     struct always_false : std::false_type {};
 
-    // Compile-time string for type signatures
     template <size_t N>
     struct CompileString {
         char value[N];
@@ -208,11 +190,9 @@ namespace XTypeSignature {
         }
     };
 
-    // Forward declarations
     template <typename T>
     struct TypeSignature;
 
-    // Calculate field offset at compile-time
     template<typename T, size_t Index>
     consteval size_t get_field_offset() noexcept {
         if constexpr (Index == 0) {
@@ -227,12 +207,7 @@ namespace XTypeSignature {
         }
     }
 
-    // ========================================================================
-    // Optimized Field Signature Generation (Fold Expression)
-    // Replaces recursive template instantiation with fold expression
-    // ========================================================================
-    
-    // Helper: Build signature for a single field
+    // Field Signature Generation (Fold Expression)
     template<typename T, size_t Index>
     consteval auto build_single_field_signature() noexcept {
         using FieldType = std::tuple_element_t<Index, 
@@ -244,7 +219,6 @@ namespace XTypeSignature {
                TypeSignature<FieldType>::calculate();
     }
 
-    // Helper: Add comma prefix (except for the first field)
     template<typename T, size_t Index, bool IsFirst>
     consteval auto build_field_with_comma() noexcept {
         if constexpr (IsFirst) {
@@ -254,14 +228,11 @@ namespace XTypeSignature {
         }
     }
 
-    // Helper: Concatenate all field signatures using fold expression
     template<typename T, size_t... Indices>
     consteval auto concatenate_field_signatures(std::index_sequence<Indices...>) noexcept {
         return (build_field_with_comma<T, Indices, (Indices == 0)>() + ...);
     }
 
-    // Main entry point: Generate signature for all fields
-    // Optimized version using fold expression instead of recursion
     template <typename T>
     consteval auto get_fields_signature() noexcept {
         constexpr size_t count = boost::pfr::tuple_size_v<T>;
@@ -272,7 +243,6 @@ namespace XTypeSignature {
         }
     }
 
-    // Basic type signatures
     template <> struct TypeSignature<int32_t>  { static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
     template <> struct TypeSignature<uint32_t> { static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
     template <> struct TypeSignature<int64_t>  { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
@@ -282,15 +252,9 @@ namespace XTypeSignature {
     template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     
-    // Note: long long is typically the same as int64_t on modern systems
-    // If you encounter compilation errors about duplicate specialization, 
-    // it means your system has long long == int64_t (which is common)
-
-    // Pointer types
     template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
     template <>           struct TypeSignature<void*>{ static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
 
-    // Array types
     template <typename T, size_t N>
     struct TypeSignature<T[N]> {
         static constexpr auto calculate() noexcept {
@@ -316,7 +280,6 @@ namespace XTypeSignature {
         static constexpr auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
     };
 
-    // const T support: strip const and delegate to non-const version
     template <typename T>
     struct TypeSignature<const T> {
         static consteval auto calculate() noexcept {
@@ -324,7 +287,6 @@ namespace XTypeSignature {
         }
     };
 
-    // Generic type signature
     template <typename T>
     struct TypeSignature {
         static constexpr auto calculate() noexcept {
@@ -351,7 +313,6 @@ namespace XTypeSignature {
         }
     };
 
-    // Public API
     template <typename T>
     [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
         return TypeSignature<T>::calculate();
@@ -361,9 +322,7 @@ namespace XTypeSignature {
 
 using XTypeSignature::BASIC_ALIGNMENT;
 
-// ========================================================================
 // Boost Interprocess Extensions
-// ========================================================================
 namespace boost {
 namespace interprocess {
 
@@ -490,7 +449,6 @@ namespace XOffsetDatastructure2 {
 	using namespace boost::interprocess;
 	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
 
-	// Container growth factor: 1.1x (10% incremental growth)
 	struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
     template <typename T>
@@ -531,9 +489,7 @@ namespace XOffsetDatastructure2 {
 
 	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
-	// ========================================================================
 	// XBuffer Memory Visualization
-	// ========================================================================
 	class XBufferVisualizer {
 	public:
 		struct MemoryStats {
@@ -564,73 +520,49 @@ namespace XOffsetDatastructure2 {
 		}
 	};
 
-	// ========================================================================
-	// XBufferExt: Extended XBuffer with Unified make() API
-	// ========================================================================
-	// Helper trait to detect XString type
+	// XBufferExt: Extended XBuffer
 	template<typename T>
 	struct is_xstring : std::false_type {};
 	template<>
 	struct is_xstring<XString> : std::true_type {};
 
-	// Helper trait to detect allocator
-	template<typename T>
-	struct is_allocator : std::false_type {};
-	template<typename T, typename M>
-	struct is_allocator<boost::interprocess::allocator<T, M>> : std::true_type {};
-
 	class XBufferExt : public XBuffer {
 	public:
 		using XBuffer::XBuffer;
 
-		// ============================================================================
 		// Object Creation API
-		// ============================================================================
-		
-		// Create a named object that can be found later
-		// Usage: auto* game = xbuf.make<GameData>("save");
 		template<typename T>
 		T* make(const char* name) {
 			return this->construct<T>(name)(this->get_segment_manager());
 		}
 		
-		// Get allocator for constructing allocator-aware types
-		// Usage: XString str("text", xbuf.allocator<XString>());
-		//        vec.emplace_back(xbuf.allocator<Item>());
 		template<typename T>
 		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
 			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
 		}
 
-		// ============================================================================
 		// Find and Utility Methods
-		// ============================================================================
-		// Find object
 		template<typename T>
 		std::pair<T*, bool> find_ex(const char* name) {
 			auto result = this->find<T>(name);
 			return {result.first, result.second};
 		}
-		// Find or make object
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
 		}
 
-		// Serialization and Deserialization
-		// Save to string
+		// Serialization
 		std::string save_to_string() {
 			auto* buffer = this->get_buffer();
 			return std::string(buffer->begin(), buffer->end());
 		}
-		// Load from string
 		static XBufferExt load_from_string(const std::string& data) {
 			std::vector<char> buffer(data.begin(), data.end());
 			XBufferExt xbuf(buffer);
 			return xbuf;
 		}
 
-		// Memory statistics
 		void print_stats() {
 			XBufferVisualizer::print_stats(*this);
 		}
@@ -639,17 +571,12 @@ namespace XOffsetDatastructure2 {
 		}
 	};
 
-	// ========================================================================
-	// Memory Compaction
-	// ========================================================================
-	// SFINAE helper to detect migrate method
+	// Memory Compaction (Experimental)
 	template<typename T, typename = void>
 	struct has_migrate : std::false_type {};
 	template<typename T>
 	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBuffer&>(), std::declval<XBuffer&>()))>> : std::true_type {};
 
-	// XBufferCompactor: Memory Compaction Interface
-	// NOTE: Not available in current version. Requires C++26 reflection or manual migrate() methods.
 	class XBufferCompactor {
 	public:
 		template<typename T>
@@ -662,18 +589,14 @@ namespace XOffsetDatastructure2 {
 	};
 }
 
-// ============================================================================
 // Type Signature Support for XOffsetDatastructure2 Containers
-// ============================================================================
 namespace XTypeSignature {
-    // XString signature
     template <>
     struct TypeSignature<XOffsetDatastructure2::XString> {
         static constexpr auto calculate() noexcept {
             return CompileString{"string[s:32,a:8]"};
         }
     };
-    // XVector<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
         static constexpr auto calculate() noexcept {
@@ -682,7 +605,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    // XSet<T> signature
     template <typename T>
     struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
         static constexpr auto calculate() noexcept {
@@ -691,7 +613,6 @@ namespace XTypeSignature {
                    CompileString{">"};
         }
     };
-    // XMap<K,V> signature
     template <typename K, typename V>
     struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
         static constexpr auto calculate() noexcept {
