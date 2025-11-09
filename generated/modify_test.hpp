@@ -69,11 +69,9 @@ static_assert(sizeof(ModifyTestData) == sizeof(ModifyTestDataReflectionHint),
 static_assert(alignof(ModifyTestData) == alignof(ModifyTestDataReflectionHint),
               "Alignment mismatch: ModifyTestData runtime and reflection types must have identical alignment");
 
-// 3. Type Signature Check (disabled on MSVC)
-// Type signature verification disabled on MSVC due to deep template instantiation issues
-// with Boost.PFR reflection on aggregate types containing XString in containers.
-// See: https://github.com/boostorg/pfr/issues
-#ifndef _MSC_VER
+// 3. Type Signature Check
+// Type signature verification using boost::pfr::tuple_element (lightweight API)
+// Compatible with MSVC, GCC, and Clang
 static_assert(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>() ==
              "struct[s:144,a:8]{"
              "@0:i32[s:4,a:4],"
@@ -84,7 +82,5 @@ static_assert(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>()
              "@80:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>,"
              "@112:set[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for ModifyTestDataReflectionHint");
-
-#endif // _MSC_VER
 
 #endif // GENERATED_MODIFY_TEST_HPP_

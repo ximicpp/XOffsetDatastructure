@@ -89,15 +89,11 @@ static_assert(sizeof(InnerObject) == sizeof(InnerObjectReflectionHint),
 static_assert(alignof(InnerObject) == alignof(InnerObjectReflectionHint),
               "Alignment mismatch: InnerObject runtime and reflection types must have identical alignment");
 
-// 3. Type Signature Check (disabled on MSVC)
-// Type signature verification disabled on MSVC due to deep template instantiation issues
-// with Boost.PFR reflection on aggregate types containing XString in containers.
-// See: https://github.com/boostorg/pfr/issues
-#ifndef _MSC_VER
+// 3. Type Signature Check
+// Type signature verification using boost::pfr::tuple_element (lightweight API)
+// Compatible with MSVC, GCC, and Clang
 static_assert(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>() == "struct[s:72,a:8]{@0:i32[s:4,a:4],@8:string[s:32,a:8],@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for InnerObjectReflectionHint");
-
-#endif // _MSC_VER
 
 // Compile-time validation for MiddleObject
 
@@ -111,11 +107,9 @@ static_assert(sizeof(MiddleObject) == sizeof(MiddleObjectReflectionHint),
 static_assert(alignof(MiddleObject) == alignof(MiddleObjectReflectionHint),
               "Alignment mismatch: MiddleObject runtime and reflection types must have identical alignment");
 
-// 3. Type Signature Check (disabled on MSVC)
-// Type signature verification disabled on MSVC due to deep template instantiation issues
-// with Boost.PFR reflection on aggregate types containing XString in containers.
-// See: https://github.com/boostorg/pfr/issues
-#ifndef _MSC_VER
+// 3. Type Signature Check
+// Type signature verification using boost::pfr::tuple_element (lightweight API)
+// Compatible with MSVC, GCC, and Clang
 static_assert(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>() ==
              "struct[s:136,a:8]{"
              "@0:string[s:32,a:8],"
@@ -124,8 +118,6 @@ static_assert(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>() =
              "@40:vector[s:32,a:8]<i32[s:4,a:4]>},"
              "@104:vector[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for MiddleObjectReflectionHint");
-
-#endif // _MSC_VER
 
 // Compile-time validation for OuterObject
 
@@ -139,11 +131,9 @@ static_assert(sizeof(OuterObject) == sizeof(OuterObjectReflectionHint),
 static_assert(alignof(OuterObject) == alignof(OuterObjectReflectionHint),
               "Alignment mismatch: OuterObject runtime and reflection types must have identical alignment");
 
-// 3. Type Signature Check (disabled on MSVC)
-// Type signature verification disabled on MSVC due to deep template instantiation issues
-// with Boost.PFR reflection on aggregate types containing XString in containers.
-// See: https://github.com/boostorg/pfr/issues
-#ifndef _MSC_VER
+// 3. Type Signature Check
+// Type signature verification using boost::pfr::tuple_element (lightweight API)
+// Compatible with MSVC, GCC, and Clang
 static_assert(XTypeSignature::get_XTypeSignature<OuterObjectReflectionHint>() ==
              "struct[s:200,a:8]{"
              "@0:string[s:32,a:8],"
@@ -156,7 +146,5 @@ static_assert(XTypeSignature::get_XTypeSignature<OuterObjectReflectionHint>() ==
              "@8:string[s:32,a:8],"
              "@40:vector[s:32,a:8]<i32[s:4,a:4]>}>}",
               "Type signature mismatch for OuterObjectReflectionHint");
-
-#endif // _MSC_VER
 
 #endif // GENERATED_NESTED_TEST_HPP_

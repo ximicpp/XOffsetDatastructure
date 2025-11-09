@@ -429,12 +429,10 @@ class CodeGenerator:
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
         
-        # Type signature validation (disabled on MSVC due to template instantiation issues)
-        lines.append("// 3. Type Signature Check (disabled on MSVC)")
-        lines.append("// Type signature verification disabled on MSVC due to deep template instantiation issues")
-        lines.append("// with Boost.PFR reflection on aggregate types containing XString in containers.")
-        lines.append("// See: https://github.com/boostorg/pfr/issues")
-        lines.append("#ifndef _MSC_VER")
+        # Type signature validation (now enabled on MSVC with optimized PFR usage)
+        lines.append("// 3. Type Signature Check")
+        lines.append("// Type signature verification using boost::pfr::tuple_element (lightweight API)")
+        lines.append("// Compatible with MSVC, GCC, and Clang")
         
         # Calculate expected type signature
         expected_sig = TypeSignatureCalculator.get_struct_signature(struct, self.struct_map)
@@ -492,8 +490,6 @@ class CodeGenerator:
             lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() == \"{expected_sig}\",")
             lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
         
-        lines.append("")
-        lines.append("#endif // _MSC_VER")
         lines.append("")
         
         return "\n".join(lines)

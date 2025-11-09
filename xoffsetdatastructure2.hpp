@@ -193,13 +193,22 @@ namespace XTypeSignature {
     template <typename T>
     struct TypeSignature;
 
+    // Helper: Get field type using PFR's tuple_element (lighter than structure_to_tuple)
+    template<typename T, size_t Index>
+    struct field_type {
+        using type = typename boost::pfr::tuple_element<Index, T>::type;
+    };
+    
+    template<typename T, size_t Index>
+    using field_type_t = typename field_type<T, Index>::type;
+
     template<typename T, size_t Index>
     consteval size_t get_field_offset() noexcept {
         if constexpr (Index == 0) {
             return 0;
         } else {
-            using PrevType = std::tuple_element_t<Index - 1, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-            using CurrType = std::tuple_element_t<Index, decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+            using PrevType = field_type_t<T, Index - 1>;
+            using CurrType = field_type_t<T, Index>;
             constexpr size_t prev_offset = get_field_offset<T, Index - 1>();
             constexpr size_t prev_size = sizeof(PrevType);
             constexpr size_t curr_align = alignof(CurrType);
@@ -210,8 +219,7 @@ namespace XTypeSignature {
     // Field Signature Generation (Fold Expression)
     template<typename T, size_t Index>
     consteval auto build_single_field_signature() noexcept {
-        using FieldType = std::tuple_element_t<Index, 
-            decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+        using FieldType = field_type_t<T, Index>;
         
         return CompileString{"@"} +
                CompileString<32>::from_number(get_field_offset<T, Index>()) +
