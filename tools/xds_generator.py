@@ -123,6 +123,9 @@ class TypeAnalyzer:
 class TypeSignatureCalculator:
     """Calculate expected type signature strings"""
     
+    # Constants
+    REFLECTION_SUFFIX = 'ReflectionHint'
+    
     # Type sizes and alignments (64-bit platform)
     TYPE_INFO = {
         'int': (4, 4, 'i32'),
@@ -143,8 +146,8 @@ class TypeSignatureCalculator:
         """Generate type signature for a type"""
         # Strip ReflectionHint suffix to get original type name
         original_type = type_str
-        if type_str.endswith('ReflectionHint'):
-            original_type = type_str[:-14]  # Remove 'ReflectionHint'
+        if type_str.endswith(TypeSignatureCalculator.REFLECTION_SUFFIX):
+            original_type = type_str[:-len(TypeSignatureCalculator.REFLECTION_SUFFIX)]
         
         # Handle basic types
         if type_str in TypeSignatureCalculator.TYPE_INFO:
@@ -254,11 +257,14 @@ class TypeSignatureCalculator:
         size = TypeSignatureCalculator.calculate_struct_size(struct, struct_map)
         align = 8  # BASIC_ALIGNMENT
         
+        # Create struct_names set once instead of recreating it in the loop
+        struct_names = {s.name for s in struct_map.values()}
+        
         field_sigs = []
         for i, field in enumerate(struct.fields):
             offset = TypeSignatureCalculator.calculate_field_offset(struct.fields, i, struct_map)
             # Use reflection types for signature
-            field_type = TypeAnalyzer.get_reflection_type(field.type, {s.name for s in struct_map.values()})
+            field_type = TypeAnalyzer.get_reflection_type(field.type, struct_names)
             field_sig = TypeSignatureCalculator.get_type_signature(field_type, struct_map)
             field_sigs.append(f"@{offset}:{field_sig}")
         
