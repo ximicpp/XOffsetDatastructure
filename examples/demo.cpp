@@ -161,8 +161,8 @@ void demo_serialization() {
     print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
     
     print_subsection("Binary Deserialization");
-    XBufferExt dst_buf = XBufferExt::load_from_string(binary_data);
-    auto* dst_game = dst_buf.find<GameData>("save").first;
+    XBuffer dst_buf = XBuffer::load_from_string(binary_data);
+    auto* dst_game = dst_buf.find<GameData>("save");
     
     if (dst_game) {
         print_check("Deserialization successful!");

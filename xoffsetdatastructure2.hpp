@@ -455,7 +455,9 @@ private:
 
 namespace XOffsetDatastructure2 {
 	using namespace boost::interprocess;
-	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBuffer;
+	
+	// Base implementation - users should use XBuffer instead
+	typedef XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index> XBufferBase;
 
 	struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
@@ -464,38 +466,38 @@ namespace XOffsetDatastructure2 {
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename T>
-	using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>>;
+	using XVector = boost::container::vector<T, allocator<T, XBufferBase::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename T>
-	using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option>;
+	using XVector = boost::container::vector<T, allocator<T, XBufferBase::segment_manager>, vector_option>;
 #endif
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename T>
-	using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
-	// using XSet = boost::container::set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
+	using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBufferBase::segment_manager>>;
+	// using XSet = boost::container::set<T, std::less<T>, allocator<T, XBufferBase::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename T>
-	using XVector_flatset = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option_flatset>;
+	using XVector_flatset = boost::container::vector<T, allocator<T, XBufferBase::segment_manager>, vector_option_flatset>;
 	template <typename T>
 	using XSet = boost::container::flat_set<T, std::less<T>, XVector_flatset<T>>;
 #endif
 
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename K, typename V>
-	using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBuffer::segment_manager>>;
-	// using XMap = boost::container::map<K, V, std::less<K>, allocator<std::pair<const K, V>, XBuffer::segment_manager>>;
+	using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBufferBase::segment_manager>>;
+	// using XMap = boost::container::map<K, V, std::less<K>, allocator<std::pair<const K, V>, XBufferBase::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename K, typename V>
-	using XVector_flatmap = boost::container::vector<std::pair<K, V>, allocator<std::pair<K, V>, XBuffer::segment_manager>, vector_option_flatmap>;
+	using XVector_flatmap = boost::container::vector<std::pair<K, V>, allocator<std::pair<K, V>, XBufferBase::segment_manager>, vector_option_flatmap>;
 	template <typename K, typename V>
 	using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V>>;
 #endif
 
-	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
+	using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBufferBase::segment_manager>>;
 
 	// XBuffer Memory Visualization
 	class XBufferVisualizer {
@@ -512,7 +514,7 @@ namespace XOffsetDatastructure2 {
 			}
 		};
 
-		static MemoryStats get_memory_stats(XBuffer& xbuf) {
+		static MemoryStats get_memory_stats(XBufferBase& xbuf) {
 			MemoryStats stats = {};
 			stats.total_size = xbuf.get_size();
 			stats.free_size = xbuf.get_free_memory();
@@ -520,7 +522,7 @@ namespace XOffsetDatastructure2 {
 			return stats;
 		}
 
-		static void print_stats(XBuffer& xbuf) {
+		static void print_stats(XBufferBase& xbuf) {
 			MemoryStats stats = get_memory_stats(xbuf);
 			std::cout << "XBuffer: " << stats.used_size << "/" << stats.total_size 
 			          << " bytes (" << std::fixed << std::setprecision(1) 
@@ -749,9 +751,10 @@ namespace XOffsetDatastructure2 {
 	template<>
 	struct is_xstring<XString> : std::true_type {};
 
-	class XBufferExt : public XBuffer {
+	// Main XBuffer interface - this is what users should use
+	class XBuffer : public XBufferBase {
 	public:
-		using XBuffer::XBuffer;
+		using XBufferBase::XBufferBase;
 
 		// Object Creation API
 		template<typename T>
@@ -760,19 +763,26 @@ namespace XOffsetDatastructure2 {
 		}
 		
 		template<typename T>
-		boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
-			return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
+		boost::interprocess::allocator<T, XBufferBase::segment_manager> allocator() {
+			return boost::interprocess::allocator<T, XBufferBase::segment_manager>(this->get_segment_manager());
 		}
 
 		// Find and Utility Methods
 		template<typename T>
-		std::pair<T*, bool> find_ex(const char* name) {
-			auto result = this->find<T>(name);
-			return {result.first, result.second};
+		T* find(const char* name) {
+			auto result = this->XBufferBase::find<T>(name);
+			return result.first;
 		}
+		
 		template<typename T>
 		T* find_or_make(const char* name) {
 			return this->find_or_construct<T>(name)(this->get_segment_manager());
+		}
+		
+		template<typename T>
+		T& get_or_create(const char* name) {
+			T* ptr = find_or_make<T>(name);
+			return *ptr;
 		}
 
 		// Serialization
@@ -780,34 +790,40 @@ namespace XOffsetDatastructure2 {
 			auto* buffer = this->get_buffer();
 			return std::string(buffer->begin(), buffer->end());
 		}
-		static XBufferExt load_from_string(const std::string& data) {
+		
+		static XBuffer load_from_string(const std::string& data) {
 			std::vector<char> buffer(data.begin(), data.end());
-			XBufferExt xbuf(buffer);
+			XBuffer xbuf(buffer);
 			return xbuf;
 		}
 
+		// Statistics
 		void print_stats() {
 			XBufferVisualizer::print_stats(*this);
 		}
+		
 		XBufferVisualizer::MemoryStats stats() {
 			return XBufferVisualizer::get_memory_stats(*this);
 		}
 	};
+	
+	// Backward compatibility alias (deprecated)
+	using XBufferExt = XBuffer;
 
 	// Memory Compaction (Experimental)
 	template<typename T, typename = void>
 	struct has_migrate : std::false_type {};
 	template<typename T>
-	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBuffer&>(), std::declval<XBuffer&>()))>> : std::true_type {};
+	struct has_migrate<T, std::void_t<decltype(T::migrate(std::declval<XBufferBase&>(), std::declval<XBufferBase&>()))>> : std::true_type {};
 
 	class XBufferCompactor {
 	public:
 		template<typename T>
-		static XBuffer compact(XBuffer& old_xbuf) {
+		static XBufferBase compact(XBufferBase& old_xbuf) {
 			static_assert(sizeof(T) == 0, 
 				"Memory compaction is not yet implemented in this version. "
 				"This feature will be available in a future release with C++26 reflection support.");
-			return XBuffer();
+			return XBufferBase();
 		}
 	};
 }

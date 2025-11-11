@@ -11,7 +11,7 @@ using namespace XOffsetDatastructure2;
 
 int main() {
     // Create buffer
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     
     // Create a player
     auto* player = xbuf.make<Player>("Hero");
@@ -40,10 +40,10 @@ int main() {
     std::cout << "Serialized: " << data.size() << " bytes\n";
     
     // Deserialize
-    XBufferExt loaded = XBufferExt::load_from_string(data);
-    auto [loaded_player, found] = loaded.find_ex<Player>("Hero");
+    XBuffer loaded = XBuffer::load_from_string(data);
+    auto* loaded_player = loaded.find<Player>("Hero");
     
-    if (found) {
+    if (loaded_player) {
         std::cout << "Deserialized: " << loaded_player->name.c_str()
                   << " (Level " << loaded_player->level 
                   << ", Items: " << loaded_player->items.size() << ")\n";
