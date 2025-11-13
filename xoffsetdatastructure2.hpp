@@ -579,7 +579,7 @@ namespace XOffsetDatastructure2 {
 	namespace detail {
 		// 1. Basic Type Checking
 		template<typename T>
-		consteval bool is_basic_type() {
+		constexpr bool is_basic_type() {
 			using CleanT = std::remove_cv_t<T>;
 			return std::is_same_v<CleanT, int8_t> ||
 			       std::is_same_v<CleanT, int16_t> ||
@@ -597,17 +597,17 @@ namespace XOffsetDatastructure2 {
 		
 		// 2. XString Type Checking
 		template<typename T>
-		consteval bool is_xstring() {
+		constexpr bool is_xstring() {
 			return std::is_same_v<std::remove_cv_t<T>, XString>;
 		}
 		
 		// Forward declaration for recursive checking
 		template<typename T>
-		consteval bool is_safe_type();
+		constexpr bool is_safe_type();
 		
 		// 3. XVector Type Checking
 		template<typename T>
-		consteval bool is_safe_xvector() {
+		constexpr bool is_safe_xvector() {
 			using CleanT = std::remove_cv_t<T>;
 			// XVector has size=32, align=8
 			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
@@ -621,7 +621,7 @@ namespace XOffsetDatastructure2 {
 		
 		// 4. XSet Type Checking
 		template<typename T>
-		consteval bool is_safe_xset() {
+		constexpr bool is_safe_xset() {
 			using CleanT = std::remove_cv_t<T>;
 			// XSet has size=32, align=8
 			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
@@ -635,7 +635,7 @@ namespace XOffsetDatastructure2 {
 		
 		// 5. XMap Type Checking
 		template<typename T>
-		consteval bool is_safe_xmap() {
+		constexpr bool is_safe_xmap() {
 			using CleanT = std::remove_cv_t<T>;
 			// XMap has size=32, align=8
 			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
@@ -650,15 +650,9 @@ namespace XOffsetDatastructure2 {
 		
 		// 6. Member Safety Checking
 		template<typename T, size_t Index>
-		consteval bool is_member_safe_at() {
-#ifdef _MSC_VER
-			// MSVC: Use MSVCFieldRegistry to avoid Boost.PFR instantiation issues
-			using MemberType = typename XTypeSignature::MSVCFieldRegistry<T>::template FieldTypeAt<Index>::type;
-#else
-			// GCC/Clang: Use Boost.PFR
-			using MemberType = std::tuple_element_t<Index, 
-				decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
-#endif
+		constexpr bool is_member_safe_at() {
+			// Use lightweight boost::pfr::tuple_element (avoids structure_to_tuple instantiation)
+			using MemberType = typename boost::pfr::tuple_element<Index, T>::type;
 			
 			// Check if member type is safe
 			if (!is_safe_type<MemberType>()) {
@@ -680,12 +674,12 @@ namespace XOffsetDatastructure2 {
 		
 		// 7. Check All Members
 		template<typename T, size_t... Indices>
-		consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
+		constexpr bool check_all_members_impl(std::index_sequence<Indices...>) {
 			return (is_member_safe_at<T, Indices>() && ...);
 		}
 		
 		template<typename T>
-		consteval bool are_all_members_safe() {
+		constexpr bool are_all_members_safe() {
 			// Must be a class/struct
 			if constexpr (!std::is_class_v<T>) {
 				return false;
@@ -701,42 +695,23 @@ namespace XOffsetDatastructure2 {
 				return false;
 			}
 			
-#ifdef _MSC_VER
-			// MSVC: Use MSVCFieldRegistry (already specialized in generated code)
-			// This avoids Boost.PFR instantiation issues with XString/XVector
-			constexpr size_t member_count = XTypeSignature::MSVCFieldRegistry<T>::field_count;
-			
-			// If no field_count is registered, the type is not a valid ReflectionHint
-			if constexpr (member_count == 0) {
-				// Check if it's actually an empty struct or unregistered
-				// For unregistered types, we must be aggregate
-				if constexpr (!std::is_aggregate_v<T>) {
-					return false;
-				}
-				return true;  // Empty aggregate is safe
-			} else {
-				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
-			}
-#else
-			// GCC/Clang: Use Boost.PFR
-			// Must be aggregate for Boost.PFR
+			// Must be aggregate for Boost.PFR (unified for all compilers)
 			if constexpr (!std::is_aggregate_v<T>) {
 				return false;
 			}
 			
-			// Check all members
+			// Check all members using Boost.PFR tuple_size
 			constexpr size_t member_count = boost::pfr::tuple_size_v<T>;
 			if constexpr (member_count == 0) {
 				return true;
 			} else {
 				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
 			}
-#endif
 		}
 		
 		// 8. Comprehensive Type Safety Check
 		template<typename T>
-		consteval bool is_safe_type() {
+		constexpr bool is_safe_type() {
 			using CleanT = std::remove_cv_t<T>;
 			
 			// Basic types are safe
@@ -771,7 +746,7 @@ namespace XOffsetDatastructure2 {
 		
 		// 9. Error Message Generation
 		template<typename T>
-		consteval const char* get_safety_error_message() {
+		constexpr const char* get_safety_error_message() {
 			using CleanT = std::remove_cv_t<T>;
 			
 			if constexpr (is_safe_type<CleanT>()) {
