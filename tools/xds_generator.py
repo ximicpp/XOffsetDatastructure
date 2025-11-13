@@ -401,59 +401,6 @@ class CodeGenerator:
         
         return "\n".join(lines)
     
-    def generate_msvc_field_registry(self, struct: StructDef) -> str:
-        """Generate MSVC field registry specialization"""
-        lines = []
-        
-        lines.append(f"// MSVC Field Registry for {struct.name}ReflectionHint")
-        lines.append(f"// Manual field registration to avoid Boost.PFR issues on MSVC")
-        lines.append("#ifdef _MSC_VER")
-        lines.append(f"namespace XTypeSignature {{")
-        lines.append(f"    template<>")
-        lines.append(f"    struct MSVCFieldRegistry<{struct.name}ReflectionHint> {{")
-        lines.append(f"        static constexpr size_t field_count = {len(struct.fields)};")
-        lines.append("")
-        
-        # Generate FieldTypeAt as a nested template
-        lines.append(f"        template<size_t Index>")
-        lines.append(f"        struct FieldTypeAt;")
-        lines.append("")
-        
-        # Generate FieldTypeAt specializations
-        for i, field in enumerate(struct.fields):
-            reflection_type = TypeAnalyzer.get_reflection_type(field.type, self.struct_names)
-            lines.append(f"        template<>")
-            lines.append(f"        struct FieldTypeAt<{i}> {{")
-            lines.append(f"            using type = {reflection_type};")
-            lines.append(f"        }};")
-            if i < len(struct.fields) - 1:
-                lines.append("")
-        
-        lines.append("")
-        lines.append(f"        template<size_t Index>")
-        lines.append(f"        static constexpr size_t get_offset() noexcept {{")
-        
-        # Generate offset switch
-        if struct.fields:
-            lines.append(f"            if constexpr (Index == 0) {{")
-            lines.append(f"                return offsetof({struct.name}ReflectionHint, {struct.fields[0].name});")
-            for i in range(1, len(struct.fields)):
-                lines.append(f"            }} else if constexpr (Index == {i}) {{")
-                lines.append(f"                return offsetof({struct.name}ReflectionHint, {struct.fields[i].name});")
-            lines.append(f"            }} else {{")
-            lines.append(f"                return 0;")
-            lines.append(f"            }}")
-        else:
-            lines.append(f"            return 0;")
-        
-        lines.append(f"        }}")
-        lines.append(f"    }};")
-        lines.append(f"}}")
-        lines.append("#endif // _MSC_VER")
-        lines.append("")
-        
-        return "\n".join(lines)
-    
     def generate_type_signature_comment(self, struct: StructDef) -> str:
         """Generate expected type signature as a comment for reference"""
         lines = []
