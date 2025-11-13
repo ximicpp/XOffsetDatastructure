@@ -45,61 +45,6 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) PlayerReflectionHint {
 };
 
 // ============================================================================
-// MSVC Field Registration
-// ============================================================================
-// Manual field registration for MSVC to avoid Boost.PFR instantiation issues
-// ============================================================================
-
-// MSVC Field Registry for PlayerReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<PlayerReflectionHint> {
-        static constexpr size_t field_count = 4;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<2> {
-            using type = XString;
-        };
-
-        template<>
-        struct FieldTypeAt<3> {
-            using type = XVector<int32_t>;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(PlayerReflectionHint, id);
-            } else if constexpr (Index == 1) {
-                return offsetof(PlayerReflectionHint, level);
-            } else if constexpr (Index == 2) {
-                return offsetof(PlayerReflectionHint, name);
-            } else if constexpr (Index == 3) {
-                return offsetof(PlayerReflectionHint, items);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// ============================================================================
 // Compile-Time Validation
 // ============================================================================
 
@@ -117,9 +62,8 @@ static_assert(alignof(Player) == alignof(PlayerReflectionHint),
               "Alignment mismatch: Player runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<PlayerReflectionHint>() ==
              "struct[s:72,a:8]{"
              "@0:i32[s:4,a:4],"

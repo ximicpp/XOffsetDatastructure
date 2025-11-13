@@ -489,11 +489,10 @@ class CodeGenerator:
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
         
-        # Type signature validation (NOW ENABLED on MSVC via MSVCFieldRegistry)
+        # Type signature validation (unified implementation)
         lines.append("// 3. Type Signature Check")
-        lines.append("// Type signature verification now works on all compilers")
-        lines.append("// - GCC/Clang: Uses Boost.PFR for automatic reflection")
-        lines.append("// - MSVC: Uses manual MSVCFieldRegistry (generated above)")
+        lines.append("// Type signature verification uses unified Boost.PFR implementation")
+        lines.append("// All compilers use lightweight tuple_element and tuple_size_v APIs")
         
         # Calculate expected type signature
         expected_sig = TypeSignatureCalculator.get_struct_signature(struct, self.struct_map)
@@ -595,16 +594,8 @@ class CodeGenerator:
         for struct in self.structs:
             lines.append(self.generate_reflection_hint_type(struct))
         
-        # Add MSVC field registry section
-        lines.append("// ============================================================================")
-        lines.append("// MSVC Field Registration")
-        lines.append("// ============================================================================")
-        lines.append("// Manual field registration for MSVC to avoid Boost.PFR instantiation issues")
-        lines.append("// ============================================================================")
-        lines.append("")
-        
-        for struct in self.structs:
-            lines.append(self.generate_msvc_field_registry(struct))
+        # MSVC field registry is no longer needed - using unified Boost.PFR approach
+        # The lightweight tuple_element and tuple_size_v APIs work on all platforms
         
         # Add validation section
         lines.append("// ============================================================================")

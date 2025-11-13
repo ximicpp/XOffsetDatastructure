@@ -81,131 +81,6 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameDataReflectionHint {
 };
 
 // ============================================================================
-// MSVC Field Registration
-// ============================================================================
-// Manual field registration for MSVC to avoid Boost.PFR instantiation issues
-// ============================================================================
-
-// MSVC Field Registry for ItemReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<ItemReflectionHint> {
-        static constexpr size_t field_count = 4;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<2> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<3> {
-            using type = XString;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(ItemReflectionHint, item_id);
-            } else if constexpr (Index == 1) {
-                return offsetof(ItemReflectionHint, item_type);
-            } else if constexpr (Index == 2) {
-                return offsetof(ItemReflectionHint, quantity);
-            } else if constexpr (Index == 3) {
-                return offsetof(ItemReflectionHint, name);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// MSVC Field Registry for GameDataReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<GameDataReflectionHint> {
-        static constexpr size_t field_count = 7;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<2> {
-            using type = float;
-        };
-
-        template<>
-        struct FieldTypeAt<3> {
-            using type = XString;
-        };
-
-        template<>
-        struct FieldTypeAt<4> {
-            using type = XVector<ItemReflectionHint>;
-        };
-
-        template<>
-        struct FieldTypeAt<5> {
-            using type = XSet<int32_t>;
-        };
-
-        template<>
-        struct FieldTypeAt<6> {
-            using type = XMap<XString, int32_t>;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(GameDataReflectionHint, player_id);
-            } else if constexpr (Index == 1) {
-                return offsetof(GameDataReflectionHint, level);
-            } else if constexpr (Index == 2) {
-                return offsetof(GameDataReflectionHint, health);
-            } else if constexpr (Index == 3) {
-                return offsetof(GameDataReflectionHint, player_name);
-            } else if constexpr (Index == 4) {
-                return offsetof(GameDataReflectionHint, items);
-            } else if constexpr (Index == 5) {
-                return offsetof(GameDataReflectionHint, achievements);
-            } else if constexpr (Index == 6) {
-                return offsetof(GameDataReflectionHint, quest_progress);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// ============================================================================
 // Compile-Time Validation
 // ============================================================================
 
@@ -223,9 +98,8 @@ static_assert(alignof(Item) == alignof(ItemReflectionHint),
               "Alignment mismatch: Item runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<ItemReflectionHint>() == "struct[s:48,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@16:string[s:32,a:8]}",
               "Type signature mismatch for ItemReflectionHint");
 
@@ -243,9 +117,8 @@ static_assert(alignof(GameData) == alignof(GameDataReflectionHint),
               "Alignment mismatch: GameData runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<GameDataReflectionHint>() ==
              "struct[s:144,a:8]{"
              "@0:i32[s:4,a:4],"

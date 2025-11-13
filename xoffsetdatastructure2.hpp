@@ -199,48 +199,13 @@ namespace XTypeSignature {
     // GCC/Clang: Uses Boost.PFR for automatic reflection
     // ============================================================================
     
-#ifdef _MSC_VER
-    // MSVC-specific implementation using manual field registration
-    // This avoids the C2512 error with boost::interprocess::allocator
-    
-    // Forward declaration of MSVCFieldRegistry
-    // This will be specialized in generated code for each ReflectionHint type
-    template<typename T>
-    struct MSVCFieldRegistry {
-        static constexpr size_t field_count = 0;
-        
-        template<size_t Index>
-        struct FieldTypeAt {
-            // Will be specialized in generated code
-        };
-        
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            return 0;
-        }
-    };
-    
-    // MSVC: Use manual field registration
-    template<typename T, size_t Index>
-    struct field_type {
-        using type = typename MSVCFieldRegistry<T>::template FieldTypeAt<Index>::type;
-    };
-    
-    template<typename T, size_t Index>
-    using field_type_t = typename field_type<T, Index>::type;
-    
-    template<typename T, size_t Index>
-    consteval size_t get_field_offset() noexcept {
-        return MSVCFieldRegistry<T>::template get_offset<Index>();
-    }
-    
-#else
-    // GCC/Clang: Get field type using PFR's tuple_element (lighter than structure_to_tuple)
+    // Unified implementation for all compilers using lightweight Boost.PFR APIs
+    // Get field type using PFR's tuple_element (avoids structure_to_tuple instantiation)
     template<typename T, size_t Index>
     struct field_type {
         using type = typename boost::pfr::tuple_element<Index, T>::type;
     };
-    
+
     template<typename T, size_t Index>
     using field_type_t = typename field_type<T, Index>::type;
 
@@ -257,7 +222,6 @@ namespace XTypeSignature {
             return (prev_offset + prev_size + (curr_align - 1)) & ~(curr_align - 1);
         }
     }
-#endif
 
     // Field Signature Generation (Fold Expression)
     template<typename T, size_t Index>
@@ -286,11 +250,7 @@ namespace XTypeSignature {
 
     template <typename T>
     consteval auto get_fields_signature() noexcept {
-#ifdef _MSC_VER
-        constexpr size_t count = MSVCFieldRegistry<T>::field_count;
-#else
         constexpr size_t count = boost::pfr::tuple_size_v<T>;
-#endif
         if constexpr (count == 0) {
             return CompileString{""};
         } else {

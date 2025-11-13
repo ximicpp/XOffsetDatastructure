@@ -84,138 +84,6 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectionHint {
 };
 
 // ============================================================================
-// MSVC Field Registration
-// ============================================================================
-// Manual field registration for MSVC to avoid Boost.PFR instantiation issues
-// ============================================================================
-
-// MSVC Field Registry for TestTypeInnerReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<TestTypeInnerReflectionHint> {
-        static constexpr size_t field_count = 2;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = XVector<int32_t>;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(TestTypeInnerReflectionHint, mInt);
-            } else if constexpr (Index == 1) {
-                return offsetof(TestTypeInnerReflectionHint, mVector);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// MSVC Field Registry for TestTypeReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<TestTypeReflectionHint> {
-        static constexpr size_t field_count = 10;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = float;
-        };
-
-        template<>
-        struct FieldTypeAt<2> {
-            using type = XVector<int32_t>;
-        };
-
-        template<>
-        struct FieldTypeAt<3> {
-            using type = XVector<XString>;
-        };
-
-        template<>
-        struct FieldTypeAt<4> {
-            using type = TestTypeInnerReflectionHint;
-        };
-
-        template<>
-        struct FieldTypeAt<5> {
-            using type = XVector<TestTypeInnerReflectionHint>;
-        };
-
-        template<>
-        struct FieldTypeAt<6> {
-            using type = XMap<XString, TestTypeInnerReflectionHint>;
-        };
-
-        template<>
-        struct FieldTypeAt<7> {
-            using type = XSet<XString>;
-        };
-
-        template<>
-        struct FieldTypeAt<8> {
-            using type = XSet<int32_t>;
-        };
-
-        template<>
-        struct FieldTypeAt<9> {
-            using type = XString;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(TestTypeReflectionHint, mInt);
-            } else if constexpr (Index == 1) {
-                return offsetof(TestTypeReflectionHint, mFloat);
-            } else if constexpr (Index == 2) {
-                return offsetof(TestTypeReflectionHint, mVector);
-            } else if constexpr (Index == 3) {
-                return offsetof(TestTypeReflectionHint, mStringVector);
-            } else if constexpr (Index == 4) {
-                return offsetof(TestTypeReflectionHint, TestTypeInnerObj);
-            } else if constexpr (Index == 5) {
-                return offsetof(TestTypeReflectionHint, mXXTypeVector);
-            } else if constexpr (Index == 6) {
-                return offsetof(TestTypeReflectionHint, mComplexMap);
-            } else if constexpr (Index == 7) {
-                return offsetof(TestTypeReflectionHint, mStringSet);
-            } else if constexpr (Index == 8) {
-                return offsetof(TestTypeReflectionHint, mSet);
-            } else if constexpr (Index == 9) {
-                return offsetof(TestTypeReflectionHint, mString);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// ============================================================================
 // Compile-Time Validation
 // ============================================================================
 
@@ -233,9 +101,8 @@ static_assert(alignof(TestTypeInner) == alignof(TestTypeInnerReflectionHint),
               "Alignment mismatch: TestTypeInner runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for TestTypeInnerReflectionHint");
 
@@ -253,9 +120,8 @@ static_assert(alignof(TestType) == alignof(TestTypeReflectionHint),
               "Alignment mismatch: TestType runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
              "struct[s:272,a:8]{"
              "@0:i32[s:4,a:4],"

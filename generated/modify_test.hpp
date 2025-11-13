@@ -54,82 +54,6 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ModifyTestDataReflectionHint {
 };
 
 // ============================================================================
-// MSVC Field Registration
-// ============================================================================
-// Manual field registration for MSVC to avoid Boost.PFR instantiation issues
-// ============================================================================
-
-// MSVC Field Registry for ModifyTestDataReflectionHint
-// Manual field registration to avoid Boost.PFR issues on MSVC
-#ifdef _MSC_VER
-namespace XTypeSignature {
-    template<>
-    struct MSVCFieldRegistry<ModifyTestDataReflectionHint> {
-        static constexpr size_t field_count = 7;
-
-        template<size_t Index>
-        struct FieldTypeAt;
-
-        template<>
-        struct FieldTypeAt<0> {
-            using type = int32_t;
-        };
-
-        template<>
-        struct FieldTypeAt<1> {
-            using type = float;
-        };
-
-        template<>
-        struct FieldTypeAt<2> {
-            using type = bool;
-        };
-
-        template<>
-        struct FieldTypeAt<3> {
-            using type = XVector<int32_t>;
-        };
-
-        template<>
-        struct FieldTypeAt<4> {
-            using type = XVector<XString>;
-        };
-
-        template<>
-        struct FieldTypeAt<5> {
-            using type = XMap<XString, int32_t>;
-        };
-
-        template<>
-        struct FieldTypeAt<6> {
-            using type = XSet<int32_t>;
-        };
-
-        template<size_t Index>
-        static constexpr size_t get_offset() noexcept {
-            if constexpr (Index == 0) {
-                return offsetof(ModifyTestDataReflectionHint, counter);
-            } else if constexpr (Index == 1) {
-                return offsetof(ModifyTestDataReflectionHint, ratio);
-            } else if constexpr (Index == 2) {
-                return offsetof(ModifyTestDataReflectionHint, active);
-            } else if constexpr (Index == 3) {
-                return offsetof(ModifyTestDataReflectionHint, numbers);
-            } else if constexpr (Index == 4) {
-                return offsetof(ModifyTestDataReflectionHint, names);
-            } else if constexpr (Index == 5) {
-                return offsetof(ModifyTestDataReflectionHint, scores);
-            } else if constexpr (Index == 6) {
-                return offsetof(ModifyTestDataReflectionHint, tags);
-            } else {
-                return 0;
-            }
-        }
-    };
-}
-#endif // _MSC_VER
-
-// ============================================================================
 // Compile-Time Validation
 // ============================================================================
 
@@ -147,9 +71,8 @@ static_assert(alignof(ModifyTestData) == alignof(ModifyTestDataReflectionHint),
               "Alignment mismatch: ModifyTestData runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification now works on all compilers
-// - GCC/Clang: Uses Boost.PFR for automatic reflection
-// - MSVC: Uses manual MSVCFieldRegistry (generated above)
+// Type signature verification uses unified Boost.PFR implementation
+// All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>() ==
              "struct[s:144,a:8]{"
              "@0:i32[s:4,a:4],"
