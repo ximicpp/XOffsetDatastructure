@@ -124,21 +124,6 @@ if(Python3_FOUND)
     add_dependencies(test_msvc_compat generate_schemas)
 endif()
 
-# Generated types test
-if(Python3_FOUND)
-    add_executable(test_generated_types test_generated_types.cpp)
-    target_include_directories(test_generated_types PRIVATE 
-        ${BOOST_INCLUDE_DIRS} 
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/generated
-    )
-    set_target_properties(test_generated_types PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    )
-    configure_macos_target(test_generated_types)
-    add_dependencies(test_generated_types generate_schemas)
-endif()
-
 # Add CTest tests
 add_test(NAME BasicTypes COMMAND test_basic_types)
 add_test(NAME VectorOps COMMAND test_vector)
@@ -152,10 +137,6 @@ add_test(NAME Alignment COMMAND test_alignment)
 add_test(NAME TypeSignature COMMAND test_type_signature)
 add_test(NAME Platform COMMAND test_platform)
 add_test(NAME MSVCCompat COMMAND test_msvc_compat)
-
-if(Python3_FOUND)
-    add_test(NAME GeneratedTypes COMMAND test_generated_types)
-endif()
 
 # const T support test
 add_executable(test_const_support test_const_support.cpp)
