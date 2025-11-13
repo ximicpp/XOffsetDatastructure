@@ -300,12 +300,12 @@ int main() {
         demo_advanced_features();
         
         print_section("Summary");
-        std::cout << "\n  ✓ All demonstrations completed successfully!\n";
+        std::cout << "\n  [OK] All demonstrations completed successfully!\n";
         std::cout << "\n  Key Features:\n";
-        std::cout << "    • Type-safe offset-based containers\n";
-        std::cout << "    • Zero-copy binary serialization\n";
-        std::cout << "    • Compile-time type verification\n";
-        std::cout << "    • Memory-efficient growth (1.1x)\n\n";
+        std::cout << "    - Type-safe offset-based containers\n";
+        std::cout << "    - Zero-copy binary serialization\n";
+        std::cout << "    - Compile-time type verification\n";
+        std::cout << "    - Memory-efficient growth (1.1x)\n\n";
         
         return 0;
         
