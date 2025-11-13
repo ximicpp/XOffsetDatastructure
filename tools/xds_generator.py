@@ -475,13 +475,10 @@ class CodeGenerator:
         lines.append("")
         
         # Type safety validation (NEW) - Disabled on MSVC due to Boost.PFR issues
-        lines.append("// 1. Type Safety Check (disabled on MSVC)")
+        lines.append("// 1. Type Safety Check")
         lines.append("// Type safety verification uses Boost.PFR for recursive member checking.")
-        lines.append("// MSVC has template instantiation issues with PFR on types containing XString/XVector.")
-        lines.append("#ifndef _MSC_VER")
         lines.append(f"static_assert(XOffsetDatastructure2::is_xbuffer_safe<{struct.name}ReflectionHint>::value,")
         lines.append(f'              "Type safety error for {struct.name}ReflectionHint");')
-        lines.append("#endif // _MSC_VER")
         lines.append("")
         
         # Size and alignment validation (always enabled)

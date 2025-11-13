@@ -648,11 +648,17 @@ namespace XOffsetDatastructure2 {
 			return false;
 		}
 		
-		// 6. Member Safety Checking (using Boost.PFR)
+		// 6. Member Safety Checking
 		template<typename T, size_t Index>
 		consteval bool is_member_safe_at() {
+#ifdef _MSC_VER
+			// MSVC: Use MSVCFieldRegistry to avoid Boost.PFR instantiation issues
+			using MemberType = typename XTypeSignature::MSVCFieldRegistry<T>::template FieldTypeAt<Index>::type;
+#else
+			// GCC/Clang: Use Boost.PFR
 			using MemberType = std::tuple_element_t<Index, 
 				decltype(boost::pfr::structure_to_tuple(std::declval<T>()))>;
+#endif
 			
 			// Check if member type is safe
 			if (!is_safe_type<MemberType>()) {
@@ -695,6 +701,24 @@ namespace XOffsetDatastructure2 {
 				return false;
 			}
 			
+#ifdef _MSC_VER
+			// MSVC: Use MSVCFieldRegistry (already specialized in generated code)
+			// This avoids Boost.PFR instantiation issues with XString/XVector
+			constexpr size_t member_count = XTypeSignature::MSVCFieldRegistry<T>::field_count;
+			
+			// If no field_count is registered, the type is not a valid ReflectionHint
+			if constexpr (member_count == 0) {
+				// Check if it's actually an empty struct or unregistered
+				// For unregistered types, we must be aggregate
+				if constexpr (!std::is_aggregate_v<T>) {
+					return false;
+				}
+				return true;  // Empty aggregate is safe
+			} else {
+				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
+			}
+#else
+			// GCC/Clang: Use Boost.PFR
 			// Must be aggregate for Boost.PFR
 			if constexpr (!std::is_aggregate_v<T>) {
 				return false;
@@ -707,6 +731,7 @@ namespace XOffsetDatastructure2 {
 			} else {
 				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
 			}
+#endif
 		}
 		
 		// 8. Comprehensive Type Safety Check

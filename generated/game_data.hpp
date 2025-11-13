@@ -211,13 +211,10 @@ namespace XTypeSignature {
 
 // Compile-time validation for Item
 
-// 1. Type Safety Check (disabled on MSVC)
+// 1. Type Safety Check
 // Type safety verification uses Boost.PFR for recursive member checking.
-// MSVC has template instantiation issues with PFR on types containing XString/XVector.
-#ifndef _MSC_VER
 static_assert(XOffsetDatastructure2::is_xbuffer_safe<ItemReflectionHint>::value,
               "Type safety error for ItemReflectionHint");
-#endif // _MSC_VER
 
 // 2. Size and Alignment Check
 static_assert(sizeof(Item) == sizeof(ItemReflectionHint),
@@ -234,13 +231,10 @@ static_assert(XTypeSignature::get_XTypeSignature<ItemReflectionHint>() == "struc
 
 // Compile-time validation for GameData
 
-// 1. Type Safety Check (disabled on MSVC)
+// 1. Type Safety Check
 // Type safety verification uses Boost.PFR for recursive member checking.
-// MSVC has template instantiation issues with PFR on types containing XString/XVector.
-#ifndef _MSC_VER
 static_assert(XOffsetDatastructure2::is_xbuffer_safe<GameDataReflectionHint>::value,
               "Type safety error for GameDataReflectionHint");
-#endif // _MSC_VER
 
 // 2. Size and Alignment Check
 static_assert(sizeof(GameData) == sizeof(GameDataReflectionHint),

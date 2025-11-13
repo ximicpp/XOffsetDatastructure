@@ -105,13 +105,10 @@ namespace XTypeSignature {
 
 // Compile-time validation for Player
 
-// 1. Type Safety Check (disabled on MSVC)
+// 1. Type Safety Check
 // Type safety verification uses Boost.PFR for recursive member checking.
-// MSVC has template instantiation issues with PFR on types containing XString/XVector.
-#ifndef _MSC_VER
 static_assert(XOffsetDatastructure2::is_xbuffer_safe<PlayerReflectionHint>::value,
               "Type safety error for PlayerReflectionHint");
-#endif // _MSC_VER
 
 // 2. Size and Alignment Check
 static_assert(sizeof(Player) == sizeof(PlayerReflectionHint),

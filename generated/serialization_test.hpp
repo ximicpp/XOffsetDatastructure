@@ -60,12 +60,110 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ComplexDataReflectionHint {
 };
 
 // ============================================================================
+// MSVC Field Registration
+// ============================================================================
+// Manual field registration for MSVC to avoid Boost.PFR instantiation issues
+// ============================================================================
+
+// MSVC Field Registry for SimpleDataReflectionHint
+// Manual field registration to avoid Boost.PFR issues on MSVC
+#ifdef _MSC_VER
+namespace XTypeSignature {
+    template<>
+    struct MSVCFieldRegistry<SimpleDataReflectionHint> {
+        static constexpr size_t field_count = 3;
+
+        template<size_t Index>
+        struct FieldTypeAt;
+
+        template<>
+        struct FieldTypeAt<0> {
+            using type = int32_t;
+        };
+
+        template<>
+        struct FieldTypeAt<1> {
+            using type = float;
+        };
+
+        template<>
+        struct FieldTypeAt<2> {
+            using type = XString;
+        };
+
+        template<size_t Index>
+        static constexpr size_t get_offset() noexcept {
+            if constexpr (Index == 0) {
+                return offsetof(SimpleDataReflectionHint, id);
+            } else if constexpr (Index == 1) {
+                return offsetof(SimpleDataReflectionHint, value);
+            } else if constexpr (Index == 2) {
+                return offsetof(SimpleDataReflectionHint, name);
+            } else {
+                return 0;
+            }
+        }
+    };
+}
+#endif // _MSC_VER
+
+// MSVC Field Registry for ComplexDataReflectionHint
+// Manual field registration to avoid Boost.PFR issues on MSVC
+#ifdef _MSC_VER
+namespace XTypeSignature {
+    template<>
+    struct MSVCFieldRegistry<ComplexDataReflectionHint> {
+        static constexpr size_t field_count = 4;
+
+        template<size_t Index>
+        struct FieldTypeAt;
+
+        template<>
+        struct FieldTypeAt<0> {
+            using type = XString;
+        };
+
+        template<>
+        struct FieldTypeAt<1> {
+            using type = XVector<int32_t>;
+        };
+
+        template<>
+        struct FieldTypeAt<2> {
+            using type = XSet<int32_t>;
+        };
+
+        template<>
+        struct FieldTypeAt<3> {
+            using type = XMap<XString, int32_t>;
+        };
+
+        template<size_t Index>
+        static constexpr size_t get_offset() noexcept {
+            if constexpr (Index == 0) {
+                return offsetof(ComplexDataReflectionHint, title);
+            } else if constexpr (Index == 1) {
+                return offsetof(ComplexDataReflectionHint, items);
+            } else if constexpr (Index == 2) {
+                return offsetof(ComplexDataReflectionHint, tags);
+            } else if constexpr (Index == 3) {
+                return offsetof(ComplexDataReflectionHint, metadata);
+            } else {
+                return 0;
+            }
+        }
+    };
+}
+#endif // _MSC_VER
+
+// ============================================================================
 // Compile-Time Validation
 // ============================================================================
 
 // Compile-time validation for SimpleData
 
 // 1. Type Safety Check
+// Type safety verification uses Boost.PFR for recursive member checking.
 static_assert(XOffsetDatastructure2::is_xbuffer_safe<SimpleDataReflectionHint>::value,
               "Type safety error for SimpleDataReflectionHint");
 
@@ -76,14 +174,16 @@ static_assert(alignof(SimpleData) == alignof(SimpleDataReflectionHint),
               "Alignment mismatch: SimpleData runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification using boost::pfr::tuple_element (lightweight API)
-// Compatible with MSVC, GCC, and Clang
+// Type signature verification now works on all compilers
+// - GCC/Clang: Uses Boost.PFR for automatic reflection
+// - MSVC: Uses manual MSVCFieldRegistry (generated above)
 static_assert(XTypeSignature::get_XTypeSignature<SimpleDataReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@4:f32[s:4,a:4],@8:string[s:32,a:8]}",
               "Type signature mismatch for SimpleDataReflectionHint");
 
 // Compile-time validation for ComplexData
 
 // 1. Type Safety Check
+// Type safety verification uses Boost.PFR for recursive member checking.
 static_assert(XOffsetDatastructure2::is_xbuffer_safe<ComplexDataReflectionHint>::value,
               "Type safety error for ComplexDataReflectionHint");
 
@@ -94,8 +194,9 @@ static_assert(alignof(ComplexData) == alignof(ComplexDataReflectionHint),
               "Alignment mismatch: ComplexData runtime and reflection types must have identical alignment");
 
 // 3. Type Signature Check
-// Type signature verification using boost::pfr::tuple_element (lightweight API)
-// Compatible with MSVC, GCC, and Clang
+// Type signature verification now works on all compilers
+// - GCC/Clang: Uses Boost.PFR for automatic reflection
+// - MSVC: Uses manual MSVCFieldRegistry (generated above)
 static_assert(XTypeSignature::get_XTypeSignature<ComplexDataReflectionHint>() ==
              "struct[s:128,a:8]{"
              "@0:string[s:32,a:8],"
