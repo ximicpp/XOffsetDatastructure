@@ -401,6 +401,59 @@ class CodeGenerator:
         
         return "\n".join(lines)
     
+    def generate_msvc_field_registry(self, struct: StructDef) -> str:
+        """Generate MSVC field registry specialization"""
+        lines = []
+        
+        lines.append(f"// MSVC Field Registry for {struct.name}ReflectionHint")
+        lines.append(f"// Manual field registration to avoid Boost.PFR issues on MSVC")
+        lines.append("#ifdef _MSC_VER")
+        lines.append(f"namespace XTypeSignature {{")
+        lines.append(f"    template<>")
+        lines.append(f"    struct MSVCFieldRegistry<{struct.name}ReflectionHint> {{")
+        lines.append(f"        static constexpr size_t field_count = {len(struct.fields)};")
+        lines.append("")
+        
+        # Generate FieldTypeAt as a nested template
+        lines.append(f"        template<size_t Index>")
+        lines.append(f"        struct FieldTypeAt;")
+        lines.append("")
+        
+        # Generate FieldTypeAt specializations
+        for i, field in enumerate(struct.fields):
+            reflection_type = TypeAnalyzer.get_reflection_type(field.type, self.struct_names)
+            lines.append(f"        template<>")
+            lines.append(f"        struct FieldTypeAt<{i}> {{")
+            lines.append(f"            using type = {reflection_type};")
+            lines.append(f"        }};")
+            if i < len(struct.fields) - 1:
+                lines.append("")
+        
+        lines.append("")
+        lines.append(f"        template<size_t Index>")
+        lines.append(f"        static constexpr size_t get_offset() noexcept {{")
+        
+        # Generate offset switch
+        if struct.fields:
+            lines.append(f"            if constexpr (Index == 0) {{")
+            lines.append(f"                return offsetof({struct.name}ReflectionHint, {struct.fields[0].name});")
+            for i in range(1, len(struct.fields)):
+                lines.append(f"            }} else if constexpr (Index == {i}) {{")
+                lines.append(f"                return offsetof({struct.name}ReflectionHint, {struct.fields[i].name});")
+            lines.append(f"            }} else {{")
+            lines.append(f"                return 0;")
+            lines.append(f"            }}")
+        else:
+            lines.append(f"            return 0;")
+        
+        lines.append(f"        }}")
+        lines.append(f"    }};")
+        lines.append(f"}}")
+        lines.append("#endif // _MSC_VER")
+        lines.append("")
+        
+        return "\n".join(lines)
+    
     def generate_type_signature_comment(self, struct: StructDef) -> str:
         """Generate expected type signature as a comment for reference"""
         lines = []
@@ -439,12 +492,11 @@ class CodeGenerator:
         lines.append(f'              "Alignment mismatch: {struct.name} runtime and reflection types must have identical alignment");')
         lines.append("")
         
-        # Type signature validation (disabled on MSVC due to template instantiation issues)
-        lines.append("// 3. Type Signature Check (disabled on MSVC)")
-        lines.append("// Type signature verification disabled on MSVC due to deep template instantiation issues")
-        lines.append("// with Boost.PFR reflection on aggregate types containing XString in containers.")
-        lines.append("// See: https://github.com/boostorg/pfr/issues")
-        lines.append("#ifndef _MSC_VER")
+        # Type signature validation (NOW ENABLED on MSVC via MSVCFieldRegistry)
+        lines.append("// 3. Type Signature Check")
+        lines.append("// Type signature verification now works on all compilers")
+        lines.append("// - GCC/Clang: Uses Boost.PFR for automatic reflection")
+        lines.append("// - MSVC: Uses manual MSVCFieldRegistry (generated above)")
         
         # Calculate expected type signature
         expected_sig = TypeSignatureCalculator.get_struct_signature(struct, self.struct_map)
@@ -503,8 +555,6 @@ class CodeGenerator:
             lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
         
         lines.append("")
-        lines.append("#endif // _MSC_VER")
-        lines.append("")
         
         return "\n".join(lines)
     
@@ -547,6 +597,17 @@ class CodeGenerator:
         # Generate reflection hint types
         for struct in self.structs:
             lines.append(self.generate_reflection_hint_type(struct))
+        
+        # Add MSVC field registry section
+        lines.append("// ============================================================================")
+        lines.append("// MSVC Field Registration")
+        lines.append("// ============================================================================")
+        lines.append("// Manual field registration for MSVC to avoid Boost.PFR instantiation issues")
+        lines.append("// ============================================================================")
+        lines.append("")
+        
+        for struct in self.structs:
+            lines.append(self.generate_msvc_field_registry(struct))
         
         # Add validation section
         lines.append("// ============================================================================")
