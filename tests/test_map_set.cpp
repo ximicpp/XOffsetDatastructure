@@ -23,7 +23,7 @@ struct alignas(BASIC_ALIGNMENT) MapSetTest {
 bool test_map_set_operations() {
     std::cout << "\nTesting map and set operations...\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<MapSetTest>("MapSetTest");
     
     // Set insertion
@@ -97,7 +97,7 @@ bool test_map_set_operations() {
     // Persistence
     std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto* loaded_obj = loaded_buf.find<MapSetTest>("MapSetTest").first;
     assert(loaded_obj->intSet.size() == 50);
     assert(loaded_obj->intMap.size() == 20);

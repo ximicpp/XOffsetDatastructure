@@ -21,7 +21,7 @@ bool test_memory_stats() {
     
     // Initial buffer stats
     std::cout << "  initial stats... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats1.total_size == 4096);
     assert(stats1.free_size > 0);

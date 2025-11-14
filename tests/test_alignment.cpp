@@ -55,7 +55,7 @@ bool test_alignment_specification() {
 bool test_aligned_allocation() {
     std::cout << "\nTesting aligned allocation...\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     
     std::cout << "  allocate... ";
     auto* aligned = xbuf.make<AlignedStruct>("Aligned");
@@ -85,7 +85,7 @@ bool test_serialization_with_alignment() {
     std::cout << "\nTesting serialization with alignment...\n";
     
     std::cout << "  create and serialize... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* data = xbuf.make<AlignedStruct>("Data");
     data->a = 1;
     data->b = 2;
@@ -96,8 +96,8 @@ bool test_serialization_with_alignment() {
     std::cout << "ok\n";
     
     std::cout << "  deserialize and verify... ";
-    XBufferExt loaded = XBufferExt::load_from_string(serialized);
-    auto [loaded_data, found] = loaded.find_ex<AlignedStruct>("Data");
+    XBuffer loaded = XBuffer::load_from_string(serialized);
+    auto [loaded_data, found] = loaded.find<AlignedStruct>("Data");
     assert(found);
     assert(loaded_data->a == 1);
     assert(loaded_data->b == 2);
@@ -112,7 +112,7 @@ bool test_serialization_with_alignment() {
 bool test_mixed_alignment() {
     std::cout << "\nTesting mixed alignment...\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     
     std::cout << "  create objects... ";
     auto* aligned = xbuf.make<AlignedStruct>("Aligned");
@@ -136,10 +136,10 @@ bool test_mixed_alignment() {
     
     std::cout << "  serialize/deserialize... ";
     std::string serialized = xbuf.save_to_string();
-    XBufferExt loaded = XBufferExt::load_from_string(serialized);
+    XBuffer loaded = XBuffer::load_from_string(serialized);
     
-    auto [a, fa] = loaded.find_ex<AlignedStruct>("Aligned");
-    auto [u, fu] = loaded.find_ex<UnalignedStruct>("Unaligned");
+    auto [a, fa] = loaded.find<AlignedStruct>("Aligned");
+    auto [u, fu] = loaded.find<UnalignedStruct>("Unaligned");
     
     assert(fa && fu);
     assert(a->name == "Aligned");

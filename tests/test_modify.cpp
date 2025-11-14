@@ -27,7 +27,7 @@ struct alignas(BASIC_ALIGNMENT) ModifyTestData {
 bool test_modify_basic_types() {
     std::cout << "\nTesting basic type modification...\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Initialize values
@@ -82,7 +82,7 @@ bool test_modify_basic_types() {
 bool test_modify_mixed_operations() {
     std::cout << "\nTesting mixed modifications...\n";
     
-    XBufferExt xbuf(16384);
+    XBuffer xbuf(16384);
     auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
     // Initialize all fields
@@ -158,7 +158,7 @@ bool test_modify_mixed_operations() {
     std::cout << "  serialize... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     
-    XBufferExt new_xbuf(buffer);
+    XBuffer new_xbuf(buffer);
     auto [new_data, new_found] = new_xbuf.find<ModifyTestData>("ModifyTest");
     assert(new_found);
     assert(new_data->counter == 100);

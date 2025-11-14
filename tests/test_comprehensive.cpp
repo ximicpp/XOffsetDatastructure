@@ -46,7 +46,7 @@ struct alignas(BASIC_ALIGNMENT) ComprehensiveTestType {
 // ============================================================================
 // Stage 1: Fill Basic Fields
 // ============================================================================
-void fillBasicFields(ComprehensiveTestType* obj, XBufferExt& xbuf) {
+void fillBasicFields(ComprehensiveTestType* obj, XBuffer& xbuf) {
     obj->mInt = 123;
     obj->mFloat = 3.14f;
     obj->mString = XString("abcdefghijklmnopqrstuvwxyz", xbuf.allocator<XString>());
@@ -64,7 +64,7 @@ void fillBasicFields(ComprehensiveTestType* obj, XBufferExt& xbuf) {
 // ============================================================================
 // Stage 2: Fill Small Containers
 // ============================================================================
-void fillSmallContainers(ComprehensiveTestType* obj, XBufferExt& xbuf) {
+void fillSmallContainers(ComprehensiveTestType* obj, XBuffer& xbuf) {
     for (auto i = 0; i < 1; ++i) {
         obj->mVector.push_back(i);
         obj->TestTypeInnerObj.mVector.push_back(64 + i);
@@ -88,7 +88,7 @@ void fillSmallContainers(ComprehensiveTestType* obj, XBufferExt& xbuf) {
 // ============================================================================
 // Stage 3: Fill Large Nested Data
 // ============================================================================
-void fillLargeNestedData(ComprehensiveTestType* obj, XBufferExt& xbuf) {
+void fillLargeNestedData(ComprehensiveTestType* obj, XBuffer& xbuf) {
     // Complex map with nested vectors
     for (auto i = 0; i < 7; ++i) {
         std::string key = "stringinset" + std::to_string(i);
@@ -202,7 +202,7 @@ bool test_comprehensive_creation() {
     
     // Test 1: Create buffer and object
     std::cout << "Test 1: Create initial buffer... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     assert(obj != nullptr);
     std::cout << "[OK]\n";
@@ -252,7 +252,7 @@ bool test_comprehensive_serialization() {
     
     // Test 1: Create and fill data
     std::cout << "Test 1: Create comprehensive data... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
@@ -269,7 +269,7 @@ bool test_comprehensive_serialization() {
     
     // Test 3: Deserialize from memory
     std::cout << "Test 3: Deserialize from memory... ";
-    XBufferExt new_xbuf(buffer);
+    XBuffer new_xbuf(buffer);
     auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj != nullptr);
@@ -300,7 +300,7 @@ bool test_comprehensive_modification() {
     
     // Test 1: Create initial data
     std::cout << "Test 1: Create initial data... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
@@ -331,7 +331,7 @@ bool test_comprehensive_modification() {
     // Test 5: Serialize and verify modifications
     std::cout << "Test 5: Serialize and verify... ";
     std::vector<char> buffer(*xbuf.get_buffer());
-    XBufferExt new_xbuf(buffer);
+    XBuffer new_xbuf(buffer);
     auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj->mInt == 999);
@@ -349,7 +349,7 @@ bool test_comprehensive_memory_operations() {
     
     // Test 1: Initial buffer
     std::cout << "Test 1: Create initial buffer... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto stats1 = XBufferVisualizer::get_memory_stats(xbuf);
     std::cout << "[OK]\n  Initial: " << stats1.total_size << " bytes\n";
     

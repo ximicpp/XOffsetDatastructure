@@ -1,0 +1,44 @@
+# Build directories
+build/
+build-ci-test/
+cmake-build-*/
+
+# Compiled files
+*.exe
+*.obj
+*.o
+*.so
+*.dylib
+*.dll
+*.lib
+*.a
+*.pdb
+*.ilk
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+*.vcxproj
+*.vcxproj.filters
+*.sln
+
+# IDE and editor files
+.vscode/
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+temp_*
+*.tmp
+*.bak
+*.log
+
+# Test outputs
+*.out
+test_output/

@@ -25,7 +25,7 @@ struct GameLikeStruct {
 bool test_init_list_compatibility() {
     std::cout << "\nTesting init list compatibility...\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     
     // Create struct with skipped members
     std::cout << "  create object... ";

@@ -21,7 +21,7 @@ struct alignas(BASIC_ALIGNMENT) VectorTest {
 bool test_vector_operations() {
     std::cout << "\nTesting vector operations...\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<VectorTest>("VectorTest");
     
     // push_back
@@ -72,7 +72,7 @@ bool test_vector_operations() {
     // Persistence
     std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto* loaded_obj = loaded_buf.find<VectorTest>("VectorTest").first;
     assert(loaded_obj->floatVector.size() == 100);
     assert(loaded_obj->stringVector.size() == 20);

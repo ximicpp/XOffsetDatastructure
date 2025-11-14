@@ -38,7 +38,7 @@ struct alignas(BASIC_ALIGNMENT) OuterObject {
 bool test_nested_structures() {
     std::cout << "\nTesting nested structures...\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* obj = xbuf.make<OuterObject>("Nested");
     
     // Initialize nested structure
@@ -87,7 +87,7 @@ bool test_nested_structures() {
     // Persistence
     std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto* loaded = loaded_buf.find<OuterObject>("Nested").first;
     
     assert(loaded->title == "OuterTitle");

@@ -157,7 +157,7 @@ bool test_binary_compatibility() {
     std::cout << "  Testing binary data compatibility...\n";
     
     // Create buffer with known data
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     
     // Write known values - use vector to avoid array construction issues
     typedef XOffsetDatastructure2::XVector<int> IntVector;
@@ -221,7 +221,7 @@ bool test_cross_buffer_compatibility() {
     std::cout << "  Testing cross-buffer data transfer...\n";
     
     // Create source buffer with vector
-    XBufferExt src_buf(1024);
+    XBuffer src_buf(1024);
     typedef XOffsetDatastructure2::XVector<int> IntVector;
     auto* src_vec = src_buf.make<IntVector>("numbers");
     for (int i = 0; i < 5; i++) {
@@ -233,7 +233,7 @@ bool test_cross_buffer_compatibility() {
     std::vector<char> binary_data(src_buffer->begin(), src_buffer->end());
     
     // Load into new buffer
-    XBufferExt dst_buf(binary_data);
+    XBuffer dst_buf(binary_data);
     auto* dst_vec = dst_buf.find<IntVector>("numbers").first;
     
     if (!dst_vec) {

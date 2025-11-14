@@ -10,7 +10,7 @@ using namespace XOffsetDatastructure2;
 void demo_basic_usage() {
     std::cout << "\n--- Basic Container Operations ---\n\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* game = xbuf.make<GameData>("player_save");
     
     game->player_name = XString("Hero", xbuf.allocator<XString>());
@@ -53,7 +53,7 @@ void demo_basic_usage() {
 void demo_memory_management() {
     std::cout << "\n--- Memory Management ---\n\n";
     
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto stats = xbuf.stats();
     std::cout << "Initial: " << stats.used_size << "/" << stats.total_size 
               << " bytes (" << static_cast<int>(stats.usage_percent()) << "%)\n";
@@ -81,7 +81,7 @@ void demo_memory_management() {
 void demo_serialization() {
     std::cout << "\n--- Serialization (zero-encoding/decoding) ---\n\n";
     
-    XBufferExt src_buf(2048);
+    XBuffer src_buf(2048);
     auto* src = src_buf.make<GameData>("save");
     src->player_name = XString("SavedHero", src_buf.allocator<XString>());
     src->player_id = 99999;
@@ -99,7 +99,7 @@ void demo_serialization() {
     std::string data = src_buf.save_to_string();
     std::cout << "Saved to " << data.size() << " bytes\n";
     
-    XBufferExt dst_buf = XBufferExt::load_from_string(data);
+    XBuffer dst_buf = XBuffer::load_from_string(data);
     auto* dst = dst_buf.find<GameData>("save").first;
     
     std::cout << "Loaded: " << dst->player_name.c_str() 
