@@ -258,14 +258,24 @@ namespace XTypeSignature {
         }
     }
 
-    template <> struct TypeSignature<int32_t>  { static constexpr auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<uint32_t> { static constexpr auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<int64_t>  { static constexpr auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<uint64_t> { static constexpr auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<float>    { static constexpr auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<double>   { static constexpr auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<bool>     { static constexpr auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
-    template <> struct TypeSignature<char>     { static constexpr auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
+    // Macro to simplify basic type signature definitions
+    #define DEFINE_BASIC_TYPE_SIGNATURE(TYPE, SIG, SIZE, ALIGN) \
+        template <> struct TypeSignature<TYPE> { \
+            static constexpr auto calculate() noexcept { \
+                return CompileString{SIG "[s:" #SIZE ",a:" #ALIGN "]"}; \
+            } \
+        };
+
+    DEFINE_BASIC_TYPE_SIGNATURE(int32_t,  "i32",  4, 4)
+    DEFINE_BASIC_TYPE_SIGNATURE(uint32_t, "u32",  4, 4)
+    DEFINE_BASIC_TYPE_SIGNATURE(int64_t,  "i64",  8, 8)
+    DEFINE_BASIC_TYPE_SIGNATURE(uint64_t, "u64",  8, 8)
+    DEFINE_BASIC_TYPE_SIGNATURE(float,    "f32",  4, 4)
+    DEFINE_BASIC_TYPE_SIGNATURE(double,   "f64",  8, 8)
+    DEFINE_BASIC_TYPE_SIGNATURE(bool,     "bool", 1, 1)
+    DEFINE_BASIC_TYPE_SIGNATURE(char,     "char", 1, 1)
+
+    #undef DEFINE_BASIC_TYPE_SIGNATURE
     
     template <typename T> struct TypeSignature<T*>   { static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
     template <>           struct TypeSignature<void*>{ static constexpr auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };

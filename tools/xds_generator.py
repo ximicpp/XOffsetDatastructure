@@ -125,6 +125,9 @@ class TypeSignatureCalculator:
     
     # Constants
     REFLECTION_SUFFIX = 'ReflectionHint'
+    CONTAINER_SIZE = 32  # Size of XVector, XSet, XMap, XString
+    BASIC_ALIGNMENT = 8  # Default alignment for structs and containers
+    DEFAULT_POINTER_SIZE = 8  # Default size for unknown types
     
     # Type sizes and alignments (64-bit platform)
     TYPE_INFO = {
@@ -140,6 +143,11 @@ class TypeSignatureCalculator:
         'long long': (8, 8, 'i64'),
         'XString': (32, 8, 'string'),
     }
+    
+    @staticmethod
+    def align_to(size: int, alignment: int) -> int:
+        """Align size to the specified alignment boundary"""
+        return (size + alignment - 1) & ~(alignment - 1)
     
     @staticmethod
     def get_type_signature(type_str: str, struct_map: Dict[str, 'StructDef']) -> str:
@@ -158,13 +166,13 @@ class TypeSignatureCalculator:
         if type_str.startswith('XVector<'):
             inner = type_str[8:-1]
             inner_sig = TypeSignatureCalculator.get_type_signature(inner, struct_map)
-            return f"vector[s:32,a:8]<{inner_sig}>"
+            return f"vector[s:{TypeSignatureCalculator.CONTAINER_SIZE},a:{TypeSignatureCalculator.BASIC_ALIGNMENT}]<{inner_sig}>"
         
         # Handle XSet<T>
         if type_str.startswith('XSet<'):
             inner = type_str[5:-1]
             inner_sig = TypeSignatureCalculator.get_type_signature(inner, struct_map)
-            return f"set[s:32,a:8]<{inner_sig}>"
+            return f"set[s:{TypeSignatureCalculator.CONTAINER_SIZE},a:{TypeSignatureCalculator.BASIC_ALIGNMENT}]<{inner_sig}>"
         
         # Handle XMap<K,V>
         if type_str.startswith('XMap<'):
@@ -173,7 +181,7 @@ class TypeSignatureCalculator:
             if len(parts) == 2:
                 key_sig = TypeSignatureCalculator.get_type_signature(parts[0], struct_map)
                 val_sig = TypeSignatureCalculator.get_type_signature(parts[1], struct_map)
-                return f"map[s:32,a:8]<{key_sig},{val_sig}>"
+                return f"map[s:{TypeSignatureCalculator.CONTAINER_SIZE},a:{TypeSignatureCalculator.BASIC_ALIGNMENT}]<{key_sig},{val_sig}>"
         
         # Handle custom struct types (check original name without ReflectionHint)
         if original_type in struct_map:
@@ -194,12 +202,12 @@ class TypeSignatureCalculator:
             field_align = TypeSignatureCalculator.get_type_align(field.type, struct_map)
             
             # Align current offset
-            offset = (offset + field_align - 1) & ~(field_align - 1)
+            offset = TypeSignatureCalculator.align_to(offset, field_align)
             offset += field_size
         
         # Align for current field
         current_align = TypeSignatureCalculator.get_type_align(fields[index].type, struct_map)
-        offset = (offset + current_align - 1) & ~(current_align - 1)
+        offset = TypeSignatureCalculator.align_to(offset, current_align)
         
         return offset
     
@@ -209,12 +217,12 @@ class TypeSignatureCalculator:
         if type_str in TypeSignatureCalculator.TYPE_INFO:
             return TypeSignatureCalculator.TYPE_INFO[type_str][0]
         if type_str.startswith(('XVector<', 'XSet<', 'XMap<')):
-            return 32
+            return TypeSignatureCalculator.CONTAINER_SIZE
         if type_str == 'XString':
-            return 32
+            return TypeSignatureCalculator.CONTAINER_SIZE
         if type_str in struct_map:
             return TypeSignatureCalculator.calculate_struct_size(struct_map[type_str], struct_map)
-        return 8  # Default pointer size
+        return TypeSignatureCalculator.DEFAULT_POINTER_SIZE
     
     @staticmethod
     def get_type_align(type_str: str, struct_map: Dict[str, 'StructDef']) -> int:
@@ -222,21 +230,21 @@ class TypeSignatureCalculator:
         if type_str in TypeSignatureCalculator.TYPE_INFO:
             return TypeSignatureCalculator.TYPE_INFO[type_str][1]
         if type_str.startswith(('XVector<', 'XSet<', 'XMap<')):
-            return 8
+            return TypeSignatureCalculator.BASIC_ALIGNMENT
         if type_str == 'XString':
-            return 8
+            return TypeSignatureCalculator.BASIC_ALIGNMENT
         if type_str in struct_map:
-            return 8  # BASIC_ALIGNMENT
-        return 8
+            return TypeSignatureCalculator.BASIC_ALIGNMENT
+        return TypeSignatureCalculator.BASIC_ALIGNMENT
     
     @staticmethod
     def calculate_struct_size(struct: 'StructDef', struct_map: Dict[str, 'StructDef']) -> int:
         """Calculate total struct size with alignment"""
         if not struct.fields:
-            return 8  # Minimum size for alignment
+            return TypeSignatureCalculator.BASIC_ALIGNMENT  # Minimum size for alignment
         
         size = 0
-        max_align = 8  # BASIC_ALIGNMENT
+        max_align = TypeSignatureCalculator.BASIC_ALIGNMENT
         
         for field in struct.fields:
             field_size = TypeSignatureCalculator.get_type_size(field.type, struct_map)
@@ -244,18 +252,18 @@ class TypeSignatureCalculator:
             max_align = max(max_align, field_align)
             
             # Align current position
-            size = (size + field_align - 1) & ~(field_align - 1)
+            size = TypeSignatureCalculator.align_to(size, field_align)
             size += field_size
         
         # Final padding to struct alignment
-        size = (size + max_align - 1) & ~(max_align - 1)
+        size = TypeSignatureCalculator.align_to(size, max_align)
         return size
     
     @staticmethod
     def get_struct_signature(struct: 'StructDef', struct_map: Dict[str, 'StructDef']) -> str:
         """Generate complete struct signature"""
         size = TypeSignatureCalculator.calculate_struct_size(struct, struct_map)
-        align = 8  # BASIC_ALIGNMENT
+        align = TypeSignatureCalculator.BASIC_ALIGNMENT
         
         # Create struct_names set once instead of recreating it in the loop
         struct_names = {s.name for s in struct_map.values()}
