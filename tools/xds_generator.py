@@ -288,6 +288,51 @@ class CodeGenerator:
         self.struct_names = {s.name for s in structs}
         self.struct_map = {s.name: s for s in structs}
     
+    def _get_field_param(self, field: Field) -> str:
+        """Get constructor parameter for a field (returns None if field doesn't need parameter)"""
+        if field.type == 'XString':
+            return f"const char* {field.name}_val"
+        elif TypeAnalyzer.is_xoffset_container(field.type):
+            return None  # Containers don't need parameters in full constructor
+        elif field.type in self.struct_names:
+            return None  # Nested structs don't need parameters in full constructor
+        else:
+            return f"{field.type} {field.name}_val"
+    
+    def _get_field_initializer(self, field: Field) -> str:
+        """Get initializer expression for a field"""
+        if field.type == 'XString':
+            return f"{field.name}({field.name}_val, allocator)"
+        elif TypeAnalyzer.is_xoffset_container(field.type):
+            return f"{field.name}(allocator)"
+        elif field.type in self.struct_names:
+            return f"{field.name}(allocator)"
+        else:
+            return f"{field.name}({field.name}_val)"
+    
+    def _format_default_value(self, field: Field) -> str:
+        """Format field default value as C++ initializer syntax"""
+        if field.default is None:
+            return ""
+        
+        if isinstance(field.default, bool):
+            return "{true}" if field.default else "{false}"
+        
+        if isinstance(field.default, str):
+            if field.type == 'char' and len(field.default) <= 3:
+                if not field.default.startswith("'"):
+                    return f"{{'{field.default}'}}"
+                else:
+                    return f"{{{field.default}}}"
+        
+        if isinstance(field.default, (int, float)):
+            if field.type == 'float':
+                return f"{{{field.default}f}}"
+            else:
+                return f"{{{field.default}}}"
+        
+        return ""
+    
     def generate_runtime_type(self, struct: StructDef) -> str:
         """Generate runtime type with allocator constructor"""
         lines = []
@@ -324,36 +369,20 @@ class CodeGenerator:
             lines.append("\t// Full constructor for emplace_back")
             lines.append("\ttemplate <typename Allocator>")
             
-            # Build parameter list
+            # Build parameter list using helper method
             params = ["Allocator allocator"]
             for field in struct.fields:
-                if field.type == 'XString':
-                    params.append(f"const char* {field.name}_val")
-                elif TypeAnalyzer.is_xoffset_container(field.type):
-                    # Skip containers in full constructor (too complex)
-                    continue
-                elif field.type in self.struct_names:
-                    # Skip nested structs (too complex)
-                    continue
-                else:
-                    params.append(f"{field.type} {field.name}_val")
+                param = self._get_field_param(field)
+                if param:
+                    params.append(param)
             
             # Constructor signature
             lines.append(f"\t{struct.name}({', '.join(params)})")
             
-            # Build initializer list
+            # Build initializer list using helper method
             init_list = []
             for field in struct.fields:
-                if field.type == 'XString':
-                    init_list.append(f"{field.name}({field.name}_val, allocator)")
-                elif TypeAnalyzer.is_xoffset_container(field.type):
-                    # Initialize container with allocator
-                    init_list.append(f"{field.name}(allocator)")
-                elif field.type in self.struct_names:
-                    # Initialize nested struct with allocator
-                    init_list.append(f"{field.name}(allocator)")
-                else:
-                    init_list.append(f"{field.name}({field.name}_val)")
+                init_list.append(self._get_field_initializer(field))
             
             if init_list:
                 lines.append(f"\t\t: {init_list[0]}")
@@ -362,29 +391,9 @@ class CodeGenerator:
             lines.append("\t{}")
             lines.append("")
         
-        # Generate fields
+        # Generate fields with formatted default values
         for field in struct.fields:
-            default_val = ""
-            if field.default is not None:
-                if isinstance(field.default, bool):
-                    # Handle bool: true/false
-                    default_val = "{true}" if field.default else "{false}"
-                elif isinstance(field.default, str):
-                    # Handle char: '\0', 'A', etc.
-                    if field.type == 'char' and len(field.default) <= 3:  # Single char like '\0' or 'A'
-                        # Need to wrap in quotes: '\0' → {'\0'}
-                        if not field.default.startswith("'"):
-                            default_val = f"{{'{field.default}'}}"
-                        else:
-                            default_val = f"{{{field.default}}}"
-                    # Could extend for string defaults in the future
-                elif isinstance(field.default, (int, float)):
-                    # Handle numeric types
-                    if field.type == 'float':
-                        default_val = f"{{{field.default}f}}"
-                    else:
-                        default_val = f"{{{field.default}}}"
-            
+            default_val = self._format_default_value(field)
             lines.append(f"\t{field.type} {field.name}{default_val};")
         
         lines.append("};")

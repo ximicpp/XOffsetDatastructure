@@ -29,60 +29,59 @@ echo ======================================================================
 
 set TEST_FAILED=0
 
-if exist "bin\Release\test_basic_types.exe" (
-    echo.
-    echo [1/5] Running Basic Types Test...
-    bin\Release\test_basic_types.exe
-    if errorlevel 1 set TEST_FAILED=1
-) else (
-    echo [1/5] test_basic_types.exe not found (skipped)
+:: Define test list (name^|display name)
+set TEST_COUNT=0
+set TESTS[0]=test_basic_types^|Basic Types Test
+set TESTS[1]=test_vector^|Vector Test
+set TESTS[2]=test_map_set^|Map/Set Test
+set TESTS[3]=test_nested^|Nested Structures Test
+set TESTS[4]=test_compaction^|Memory Compaction Test
+set TEST_COUNT=5
+
+:: Run main tests
+for /L %%i in (0,1,4) do (
+    call :run_test %%i 5
 )
 
-if exist "bin\Release\test_vector.exe" (
-    echo.
-    echo [2/5] Running Vector Test...
-    bin\Release\test_vector.exe
-    if errorlevel 1 set TEST_FAILED=1
-) else (
-    echo [2/5] test_vector.exe not found (skipped)
-)
+:: Run bonus test
+call :run_bonus_test test_msvc_compat "MSVC Compatibility Test"
 
-if exist "bin\Release\test_map_set.exe" (
-    echo.
-    echo [3/5] Running Map/Set Test...
-    bin\Release\test_map_set.exe
-    if errorlevel 1 set TEST_FAILED=1
-) else (
-    echo [3/5] test_map_set.exe not found (skipped)
-)
+goto :after_tests
 
-if exist "bin\Release\test_nested.exe" (
-    echo.
-    echo [4/5] Running Nested Structures Test...
-    bin\Release\test_nested.exe
-    if errorlevel 1 set TEST_FAILED=1
-) else (
-    echo [4/5] test_nested.exe not found (skipped)
+:run_test
+set INDEX=%1
+set TOTAL=%2
+setlocal enabledelayedexpansion
+for /f "tokens=1,2 delims=^|" %%a in ("!TESTS[%INDEX%]!") do (
+    set TEST_NAME=%%a
+    set DISPLAY_NAME=%%b
+    set /a TEST_NUM=%INDEX%+1
+    if exist "bin\Release\!TEST_NAME!.exe" (
+        echo.
+        echo [!TEST_NUM!/%TOTAL%] Running !DISPLAY_NAME!...
+        bin\Release\!TEST_NAME!.exe
+        if errorlevel 1 set TEST_FAILED=1
+    ) else (
+        echo [!TEST_NUM!/%TOTAL%] !TEST_NAME!.exe not found (skipped)
+    )
 )
+endlocal & set TEST_FAILED=%TEST_FAILED%
+goto :eof
 
-if exist "bin\Release\test_compaction.exe" (
+:run_bonus_test
+set TEST_NAME=%~1
+set DISPLAY_NAME=%~2
+if exist "bin\Release\%TEST_NAME%.exe" (
     echo.
-    echo [5/5] Running Memory Compaction Test...
-    bin\Release\test_compaction.exe
+    echo [Bonus] Running %DISPLAY_NAME%...
+    bin\Release\%TEST_NAME%.exe
     if errorlevel 1 set TEST_FAILED=1
 ) else (
-    echo [5/5] test_compaction.exe not found (skipped)
+    echo [Bonus] %TEST_NAME%.exe not found (skipped)
 )
+goto :eof
 
-:: Run MSVC compatibility test
-if exist "bin\Release\test_msvc_compat.exe" (
-    echo.
-    echo [Bonus] Running MSVC Compatibility Test...
-    bin\Release\test_msvc_compat.exe
-    if errorlevel 1 set TEST_FAILED=1
-) else (
-    echo [Bonus] test_msvc_compat.exe not found (skipped)
-)
+:after_tests
 
 :: Run the demo after tests
 echo.
