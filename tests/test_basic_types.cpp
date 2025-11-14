@@ -1,7 +1,4 @@
-// ============================================================================
-// Test: Basic Types
-// Purpose: Test basic POD types (int, float, double, etc.)
-// ============================================================================
+// Test basic POD types
 
 #include <iostream>
 #include <cassert>
@@ -11,8 +8,7 @@
 using namespace XOffsetDatastructure2;
 
 bool test_basic_types() {
-    std::cout << "\n[TEST] Basic Types\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting basic types...\n";
     
     // Create buffer
     XBufferExt xbuf(1024);
@@ -46,7 +42,7 @@ bool test_basic_types() {
     assert(loaded_obj->mBool == true);
     assert(loaded_obj->mInt64 == 9223372036854775807LL);
     
-    std::cout << "[PASS] All basic type tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
@@ -54,7 +50,7 @@ int main() {
     try {
         return test_basic_types() ? 0 : 1;
     } catch (const std::exception& e) {
-        std::cerr << "[FAIL] Exception: " << e.what() << "\n";
+        std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
 }

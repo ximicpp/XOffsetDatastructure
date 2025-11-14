@@ -1,7 +1,4 @@
-// ============================================================================
-// Test: Serialization and Deserialization
-// Purpose: Test save/load functionality
-// ============================================================================
+// Test serialization and deserialization
 
 #include <iostream>
 #include <cassert>
@@ -32,52 +29,50 @@ struct alignas(BASIC_ALIGNMENT) ComplexData {
 };
 
 bool test_simple_serialization() {
-    std::cout << "\n[TEST] Simple Serialization\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting simple serialization...\n";
     
     // Create and populate
-    std::cout << "Test 1: Create and populate... ";
+    std::cout << "  create and populate... ";
     XBufferExt xbuf(4096);
     auto* data = xbuf.make<SimpleData>("TestData");
     data->id = 42;
     data->value = 3.14f;
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Set string field
-    std::cout << "Test 2: Set string field... ";
+    std::cout << "  set string... ";
     data->name = XString("Hello", xbuf.allocator<XString>());
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Serialize
-    std::cout << "Test 3: Serialize to string... ";
+    std::cout << "  serialize... ";
     std::string serialized = xbuf.save_to_string();
     assert(serialized.size() > 0);
-    std::cout << "[OK] (Size: " << serialized.size() << " bytes)\n";
+    std::cout << "ok (" << serialized.size() << " bytes)\n";
     
     // Deserialize
-    std::cout << "Test 4: Deserialize from string... ";
+    std::cout << "  deserialize... ";
     XBufferExt loaded = XBufferExt::load_from_string(serialized);
     auto [loaded_data, found] = loaded.find_ex<SimpleData>("TestData");
     assert(found);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Verify data
-    std::cout << "Test 5: Verify data integrity... ";
+    std::cout << "  verify integrity... ";
     assert(loaded_data->id == 42);
     assert(loaded_data->value == 3.14f);
     assert(loaded_data->name == "Hello");
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] Simple serialization tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 bool test_complex_serialization() {
-    std::cout << "\n[TEST] Complex Serialization\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting complex serialization...\n";
     
     // Create and populate complex structure
-    std::cout << "Test 1: Create complex structure... ";
+    std::cout << "  create complex structure... ";
     XBufferExt xbuf(8192);
     auto* data = xbuf.make<ComplexData>("Complex");
     data->title = XString("Test Title", xbuf.allocator<XString>());
@@ -92,22 +87,22 @@ bool test_complex_serialization() {
     
     data->metadata.emplace(XString("version", xbuf.allocator<XString>()), 1);
     data->metadata.emplace(XString("count", xbuf.allocator<XString>()), 100);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Serialize
-    std::cout << "Test 2: Serialize complex structure... ";
+    std::cout << "  serialize... ";
     std::string serialized = xbuf.save_to_string();
-    std::cout << "[OK] (Size: " << serialized.size() << " bytes)\n";
+    std::cout << "ok (" << serialized.size() << " bytes)\n";
     
     // Deserialize
-    std::cout << "Test 3: Deserialize complex structure... ";
+    std::cout << "  deserialize... ";
     XBufferExt loaded = XBufferExt::load_from_string(serialized);
     auto [loaded_data, found] = loaded.find_ex<ComplexData>("Complex");
     assert(found);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Verify all data
-    std::cout << "Test 4: Verify complex data... ";
+    std::cout << "  verify... ";
     assert(loaded_data->title == "Test Title");
     assert(loaded_data->items.size() == 10);
     assert(loaded_data->items[0] == 0);
@@ -116,18 +111,17 @@ bool test_complex_serialization() {
     assert(loaded_data->tags.count(5) == 1);
     assert(loaded_data->metadata.size() == 2);
     assert(loaded_data->metadata[XString("version", xbuf.allocator<XString>())] == 1);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] Complex serialization tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 bool test_multiple_objects() {
-    std::cout << "\n[TEST] Multiple Objects Serialization\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting multiple objects...\n";
     
     // Create multiple objects
-    std::cout << "Test 1: Create multiple objects... ";
+    std::cout << "  create objects... ";
     XBufferExt xbuf(8192);
     
     auto* obj1 = xbuf.make<SimpleData>("Object1");
@@ -144,15 +138,15 @@ bool test_multiple_objects() {
     obj3->id = 3;
     obj3->value = 3.3f;
     obj3->name = XString("Third", xbuf.allocator<XString>());
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Serialize
-    std::cout << "Test 2: Serialize all objects... ";
+    std::cout << "  serialize... ";
     std::string serialized = xbuf.save_to_string();
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Deserialize
-    std::cout << "Test 3: Deserialize and find all objects... ";
+    std::cout << "  deserialize... ";
     XBufferExt loaded = XBufferExt::load_from_string(serialized);
     
     auto [loaded1, found1] = loaded.find_ex<SimpleData>("Object1");
@@ -160,99 +154,92 @@ bool test_multiple_objects() {
     auto [loaded3, found3] = loaded.find_ex<SimpleData>("Object3");
     
     assert(found1 && found2 && found3);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Verify all objects
-    std::cout << "Test 4: Verify all objects... ";
+    std::cout << "  verify... ";
     assert(loaded1->id == 1 && loaded1->name == "First");
     assert(loaded2->id == 2 && loaded2->name == "Second");
     assert(loaded3->id == 3 && loaded3->name == "Third");
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] Multiple objects serialization tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 bool test_empty_buffer() {
-    std::cout << "\n[TEST] Empty Buffer Serialization\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting empty buffer...\n";
     
     // Create empty buffer
-    std::cout << "Test 1: Create empty buffer... ";
+    std::cout << "  create... ";
     XBufferExt xbuf(1024);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Serialize empty buffer
-    std::cout << "Test 2: Serialize empty buffer... ";
+    std::cout << "  serialize... ";
     std::string serialized = xbuf.save_to_string();
     assert(serialized.size() == 1024);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Deserialize
-    std::cout << "Test 3: Deserialize empty buffer... ";
+    std::cout << "  deserialize... ";
     XBufferExt loaded = XBufferExt::load_from_string(serialized);
     assert(loaded.get_size() == 1024);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] Empty buffer serialization tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 bool test_roundtrip() {
-    std::cout << "\n[TEST] Multiple Roundtrip Serialization\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting multiple roundtrips...\n";
     
     // Create initial data
-    std::cout << "Test 1: Create initial data... ";
+    std::cout << "  create data... ";
     XBufferExt xbuf1(4096);
     auto* data = xbuf1.make<SimpleData>("Roundtrip");
     data->id = 999;
     data->value = 9.99f;
     data->name = XString("Original", xbuf1.allocator<XString>());
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // First roundtrip
-    std::cout << "Test 2: First serialize/deserialize... ";
+    std::cout << "  roundtrip 1... ";
     std::string s1 = xbuf1.save_to_string();
     XBufferExt xbuf2 = XBufferExt::load_from_string(s1);
     auto [data2, f2] = xbuf2.find_ex<SimpleData>("Roundtrip");
     assert(f2 && data2->id == 999);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Second roundtrip
-    std::cout << "Test 3: Second serialize/deserialize... ";
+    std::cout << "  roundtrip 2... ";
     std::string s2 = xbuf2.save_to_string();
     XBufferExt xbuf3 = XBufferExt::load_from_string(s2);
     auto [data3, f3] = xbuf3.find_ex<SimpleData>("Roundtrip");
     assert(f3 && data3->id == 999);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Third roundtrip
-    std::cout << "Test 4: Third serialize/deserialize... ";
+    std::cout << "  roundtrip 3... ";
     std::string s3 = xbuf3.save_to_string();
     XBufferExt xbuf4 = XBufferExt::load_from_string(s3);
     auto [data4, f4] = xbuf4.find_ex<SimpleData>("Roundtrip");
     assert(f4 && data4->id == 999);
     assert(data4->value == 9.99f);
     assert(data4->name == "Original");
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
     // Verify serialized data is identical
-    std::cout << "Test 5: Verify serialized data stability... ";
+    std::cout << "  verify stability... ";
     assert(s1.size() == s2.size());
     assert(s2.size() == s3.size());
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] Multiple roundtrip tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 int main() {
-    std::cout << "\n";
-    std::cout << "========================================\n";
-    std::cout << "  Serialization Tests\n";
-    std::cout << "========================================\n";
-    
     bool all_passed = true;
     
     all_passed &= test_simple_serialization();
@@ -261,14 +248,11 @@ int main() {
     all_passed &= test_empty_buffer();
     all_passed &= test_roundtrip();
     
-    std::cout << "\n";
-    std::cout << "========================================\n";
     if (all_passed) {
-        std::cout << "  ALL TESTS PASSED [OK]\n";
+        std::cout << "\nAll serialization tests passed\n";
     } else {
-        std::cout << "  SOME TESTS FAILED [FAIL]\n";
+        std::cout << "\nSome tests failed\n";
     }
-    std::cout << "========================================\n\n";
     
     return all_passed ? 0 : 1;
 }

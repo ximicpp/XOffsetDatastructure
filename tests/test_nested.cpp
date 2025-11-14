@@ -1,7 +1,4 @@
-// ============================================================================
-// Test: Nested Structures
-// Purpose: Test nested objects and complex hierarchies
-// ============================================================================
+// Test nested structures
 
 #include <iostream>
 #include <cassert>
@@ -39,33 +36,32 @@ struct alignas(BASIC_ALIGNMENT) OuterObject {
 };
 
 bool test_nested_structures() {
-    std::cout << "\n[TEST] Nested Structures\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting nested structures...\n";
     
     XBufferExt xbuf(8192);
     auto* obj = xbuf.make<OuterObject>("Nested");
     
-    // Test 1: Initialize nested structure
-    std::cout << "Test 1: Initialize nested objects... ";
+    // Initialize nested structure
+    std::cout << "  initialize... ";
     obj->title = XString("OuterTitle", xbuf.allocator<XString>());
     obj->middle.name = XString("MiddleName", xbuf.allocator<XString>());
     obj->middle.inner.id = 42;
     for (int i = 0; i < 10; ++i) {
         obj->middle.inner.data.push_back(i * 2);
     }
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 2: Verify nested data
-    std::cout << "Test 2: Verify nested data... ";
+    // Verify nested data
+    std::cout << "  verify data... ";
     assert(obj->title == "OuterTitle");
     assert(obj->middle.name == "MiddleName");
     assert(obj->middle.inner.id == 42);
     assert(obj->middle.inner.data.size() == 10);
     assert(obj->middle.inner.data[5] == 10);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 3: Vector of nested objects
-    std::cout << "Test 3: Vector of nested objects... ";
+    // Vector of nested objects
+    std::cout << "  vector of objects... ";
     for (int i = 0; i < 5; ++i) {
         obj->innerList.emplace_back(xbuf.allocator<InnerObject>());
         obj->innerList.back().id = i * 100;
@@ -77,19 +73,19 @@ bool test_nested_structures() {
     assert(obj->innerList[0].data.size() == 1);
     assert(obj->innerList[4].data.size() == 5);
     assert(obj->innerList[3].id == 300);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 4: Deep access
-    std::cout << "Test 4: Deep access patterns... ";
+    // Deep access
+    std::cout << "  deep access... ";
     std::size_t total_elements = 0;
     for (const auto& inner : obj->innerList) {
         total_elements += inner.data.size();
     }
     assert(total_elements == 15); // 1+2+3+4+5
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 5: Persistence
-    std::cout << "Test 5: Persistence of nested structures... ";
+    // Persistence
+    std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
     XBufferExt loaded_buf(buffer->data(), buffer->size());
     auto* loaded = loaded_buf.find<OuterObject>("Nested").first;
@@ -99,9 +95,9 @@ bool test_nested_structures() {
     assert(loaded->middle.inner.id == 42);
     assert(loaded->innerList.size() == 5);
     assert(loaded->innerList[2].data.size() == 3);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] All nested structure tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
@@ -109,7 +105,7 @@ int main() {
     try {
         return test_nested_structures() ? 0 : 1;
     } catch (const std::exception& e) {
-        std::cerr << "[FAIL] Exception: " << e.what() << "\n";
+        std::cerr << "Exception: " << e.what() << "\n";
         return 1;
     }
 }

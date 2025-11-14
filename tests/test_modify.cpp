@@ -1,7 +1,4 @@
-// ============================================================================
-// Test: Data Modification
-// Purpose: Test in-place data modification operations
-// ============================================================================
+// Test data modification
 
 #include <iostream>
 #include <cassert>
@@ -28,70 +25,68 @@ struct alignas(BASIC_ALIGNMENT) ModifyTestData {
 };
 
 bool test_modify_basic_types() {
-    std::cout << "\n[TEST] Modify Basic Types\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting basic type modification...\n";
     
     XBufferExt xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
-    // Test 1: Initialize values
-    std::cout << "Test 1: Initialize basic values... ";
+    // Initialize values
+    std::cout << "  initialize... ";
     data->counter = 100;
     data->ratio = 1.5f;
     data->active = true;
     assert(data->counter == 100);
     assert(data->ratio == 1.5f);
     assert(data->active == true);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 2: Modify int
-    std::cout << "Test 2: Modify int value... ";
+    // Modify int
+    std::cout << "  modify int... ";
     data->counter += 50;
     assert(data->counter == 150);
     data->counter *= 2;
     assert(data->counter == 300);
     data->counter--;
     assert(data->counter == 299);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 3: Modify float
-    std::cout << "Test 3: Modify float value... ";
+    // Modify float
+    std::cout << "  modify float... ";
     data->ratio += 0.5f;
     assert(data->ratio > 1.99f && data->ratio < 2.01f);
     data->ratio *= 2.0f;
     assert(data->ratio > 3.99f && data->ratio < 4.01f);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 4: Toggle bool
-    std::cout << "Test 4: Toggle bool value... ";
+    // Toggle bool
+    std::cout << "  toggle bool... ";
     data->active = false;
     assert(data->active == false);
     data->active = !data->active;
     assert(data->active == true);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 5: Verify persistence after modification
-    std::cout << "Test 5: Verify persistence... ";
+    // Verify persistence after modification
+    std::cout << "  verify persistence... ";
     auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
     assert(found);
     assert(found_data->counter == 299);
     assert(found_data->ratio > 3.99f && found_data->ratio < 4.01f);
     assert(found_data->active == true);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] All basic type modification tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
 bool test_modify_mixed_operations() {
-    std::cout << "\n[TEST] Mixed Modification Operations\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\nTesting mixed modifications...\n";
     
     XBufferExt xbuf(16384);
     auto* data = xbuf.make<ModifyTestData>("ModifyTest");
     
-    // Test 1: Initialize all fields
-    std::cout << "Test 1: Initialize all fields... ";
+    // Initialize all fields
+    std::cout << "  initialize... ";
     data->counter = 0;
     data->ratio = 1.0f;
     data->active = true;
@@ -108,10 +103,10 @@ bool test_modify_mixed_operations() {
     
     data->tags.insert(1);
     data->tags.insert(2);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 2: Modify all types simultaneously
-    std::cout << "Test 2: Modify all types... ";
+    // Modify all types simultaneously
+    std::cout << "  modify all... ";
     data->counter = 100;
     data->ratio = 2.5f;
     data->active = false;
@@ -126,10 +121,10 @@ bool test_modify_mixed_operations() {
     assert(data->names[0] == "Alicia");
     assert(data->scores[XString("Alice", xbuf.allocator<XString>())] == 95);
     assert(data->tags.find(3) != data->tags.end());
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 3: Verify via find
-    std::cout << "Test 3: Verify via find... ";
+    // Verify via find
+    std::cout << "  verify via find... ";
     auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
     assert(found);
     assert(found_data->counter == 100);
@@ -137,10 +132,10 @@ bool test_modify_mixed_operations() {
     assert(found_data->active == false);
     assert(found_data->numbers[0] == 999);
     assert(found_data->names[0] == "Alicia");
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 4: Complex batch modifications
-    std::cout << "Test 4: Complex batch modifications... ";
+    // Complex batch modifications
+    std::cout << "  batch modify... ";
     // Modify vector
     for (auto& num : data->numbers) {
         num *= 2;
@@ -157,10 +152,10 @@ bool test_modify_mixed_operations() {
     assert(data->numbers[0] == 1998);
     assert(data->scores[XString("Alice", xbuf.allocator<XString>())] == 85);
     assert(data->tags.size() == 8);  // 1,2,3,10,11,12,13,14
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    // Test 5: Serialize and verify
-    std::cout << "Test 5: Serialize to memory... ";
+    // Serialize and verify
+    std::cout << "  serialize... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     
     XBufferExt new_xbuf(buffer);
@@ -171,9 +166,9 @@ bool test_modify_mixed_operations() {
     assert(new_data->names[0] == "Alicia");
     assert(new_data->scores[XString("Alice", xbuf.allocator<XString>())] == 85);
     assert(new_data->tags.size() == 8);
-    std::cout << "[OK]\n";
+    std::cout << "ok\n";
     
-    std::cout << "[PASS] All mixed modification tests passed!\n";
+    std::cout << "All tests passed\n";
     return true;
 }
 
@@ -185,14 +180,14 @@ int main() {
         all_passed &= test_modify_mixed_operations();
         
         if (all_passed) {
-            std::cout << "\n[SUCCESS] All modification tests passed!\n";
+            std::cout << "\nAll modification tests passed\n";
             return 0;
         } else {
-            std::cout << "\n[FAILURE] Some tests failed!\n";
+            std::cout << "\nSome tests failed\n";
             return 1;
         }
     } catch (const std::exception& e) {
-        std::cerr << "[FAIL] Exception: " << e.what() << "\n";
+        std::cerr << "Exception: " << e.what() << "\n";
         return 1;
     }
 }
