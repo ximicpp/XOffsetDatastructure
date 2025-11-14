@@ -32,8 +32,8 @@ int main() {
               << " | Level: " << player->level 
               << " | Items: " << player->items.size() << "\n\n";
     
-    // Step 3: Serialize to binary (zero-copy)
-    std::cout << "[Step 3] Serialize to binary\n";
+    // Step 3: Serialize to binary (zero-encoding/decoding)
+    std::cout << "[Step 3] Serialize to binary (zero-encoding/decoding)\n";
     auto data = xbuf.save_to_string();
     std::cout << "  Binary size: " << data.size() << " bytes\n\n";
     

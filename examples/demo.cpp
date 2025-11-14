@@ -1,6 +1,6 @@
 // ============================================================================
 // XOffsetDatastructure2 - Feature Demonstration
-// Purpose: Demonstrate core features with practical examples
+// Purpose: Demonstrate offset-based containers with zero-encoding/decoding
 // ============================================================================
 
 #include <iostream>
@@ -114,10 +114,10 @@ void demo_memory_management() {
     std::cout << "  Usage: " << static_cast<int>(stats.usage_percent()) << "%\n";
 }
 
-// Demo 3: Zero-Copy Serialization
+// Demo 3: Zero-Encoding/Decoding Serialization
 void demo_serialization() {
     std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "Demo 3: Zero-Copy Serialization\n";
+    std::cout << "Demo 3: Zero-Encoding/Decoding Serialization\n";
     std::cout << std::string(60, '=') << "\n\n";
     
     // Create and populate game data
@@ -143,7 +143,7 @@ void demo_serialization() {
     std::cout << "  ID: " << src_game->player_id << " | Level: " << src_game->level << "\n";
     std::cout << "  Items: " << src_game->items.size() << "\n\n";
     
-    // Serialize to binary (zero-copy)
+    // Serialize to binary (zero-encoding: no encoding/decoding overhead)
     std::cout << "[Serialize to Binary]\n";
     std::string binary_data = src_buf.save_to_string();
     std::cout << "  Binary size: " << binary_data.size() << " bytes\n\n";
@@ -174,7 +174,7 @@ int main() {
     std::cout << R"(
 +============================================================+
 |     XOffsetDatastructure2 - Feature Demonstration         |
-|   Offset-Based Containers with Zero-Copy Serialization    |
+| Offset-Based Containers with Zero-Encoding/Decoding       |
 +============================================================+
 )";
 
@@ -189,7 +189,7 @@ int main() {
         std::cout << "\n✓ All demonstrations completed!\n\n";
         std::cout << "Key Features:\n";
         std::cout << "  • XVector, XSet, XMap - Offset-based containers\n";
-        std::cout << "  • Zero-copy binary serialization\n";
+        std::cout << "  • Zero-encoding/decoding (no encode/decode overhead)\n";
         std::cout << "  • Dynamic memory management (grow/shrink)\n";
         std::cout << "  • Type-safe with compile-time verification\n\n";
         
