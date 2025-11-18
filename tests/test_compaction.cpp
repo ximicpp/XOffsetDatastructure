@@ -32,7 +32,7 @@ bool test_memory_stats() {
     
     // After object creation
     std::cout << "  after object creation... ";
-    auto* obj = xbuf.make<MemoryTestType>("MemTest");
+    auto* obj = xbuf.make_root<MemoryTestType>("MemTest");
     obj->value = 42;
     auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
     assert(stats2.used_size > stats1.used_size);
@@ -81,7 +81,7 @@ bool test_memory_stats() {
     
     // Verify data integrity after shrink
     std::cout << "  verify after shrink... ";
-    auto [found_obj, found] = xbuf.find<MemoryTestType>("MemTest");
+    auto [found_obj, found] = xbuf.find_root<MemoryTestType>("MemTest");
     assert(found);
     assert(found_obj->value == 42);
     assert(found_obj->data.size() == 100);

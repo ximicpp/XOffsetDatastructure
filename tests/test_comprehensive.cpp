@@ -203,7 +203,7 @@ bool test_comprehensive_creation() {
     // Test 1: Create buffer and object
     std::cout << "Test 1: Create initial buffer... ";
     XBuffer xbuf(4096);
-    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
+    auto* obj = xbuf.make_root<ComprehensiveTestType>("CompTest");
     assert(obj != nullptr);
     std::cout << "[OK]\n";
     
@@ -221,7 +221,7 @@ bool test_comprehensive_creation() {
     // Test 4: Grow buffer
     std::cout << "Test 4: Grow buffer for large data... ";
     xbuf.grow(1024 * 32);
-    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
+    obj = xbuf.find_or_make_root<ComprehensiveTestType>("CompTest");
     assert(obj != nullptr);
     std::cout << "[OK]\n";
     
@@ -253,11 +253,11 @@ bool test_comprehensive_serialization() {
     // Test 1: Create and fill data
     std::cout << "Test 1: Create comprehensive data... ";
     XBuffer xbuf(4096);
-    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
+    auto* obj = xbuf.make_root<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     xbuf.grow(1024 * 32);
-    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
+    obj = xbuf.find_or_make_root<ComprehensiveTestType>("CompTest");
     fillLargeNestedData(obj, xbuf);
     std::cout << "[OK]\n";
     
@@ -270,7 +270,7 @@ bool test_comprehensive_serialization() {
     // Test 3: Deserialize from memory
     std::cout << "Test 3: Deserialize from memory... ";
     XBuffer new_xbuf(buffer);
-    auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
+    auto [new_obj, found] = new_xbuf.find_root<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj != nullptr);
     std::cout << "[OK]\n";
@@ -301,7 +301,7 @@ bool test_comprehensive_modification() {
     // Test 1: Create initial data
     std::cout << "Test 1: Create initial data... ";
     XBuffer xbuf(4096);
-    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
+    auto* obj = xbuf.make_root<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     std::cout << "[OK]\n";
@@ -332,7 +332,7 @@ bool test_comprehensive_modification() {
     std::cout << "Test 5: Serialize and verify... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     XBuffer new_xbuf(buffer);
-    auto [new_obj, found] = new_xbuf.find<ComprehensiveTestType>("CompTest");
+    auto [new_obj, found] = new_xbuf.find_root<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(new_obj->mInt == 999);
     assert(new_obj->mVector[0] == 777);
@@ -355,7 +355,7 @@ bool test_comprehensive_memory_operations() {
     
     // Test 2: Add data
     std::cout << "Test 2: Add comprehensive data... ";
-    auto* obj = xbuf.make<ComprehensiveTestType>("CompTest");
+    auto* obj = xbuf.make_root<ComprehensiveTestType>("CompTest");
     fillBasicFields(obj, xbuf);
     fillSmallContainers(obj, xbuf);
     auto stats2 = XBufferVisualizer::get_memory_stats(xbuf);
@@ -374,7 +374,7 @@ bool test_comprehensive_memory_operations() {
     
     // Test 4: Add more data
     std::cout << "Test 4: Add large nested data... ";
-    obj = xbuf.find_or_make<ComprehensiveTestType>("CompTest");
+    obj = xbuf.find_or_make_root<ComprehensiveTestType>("CompTest");
     fillLargeNestedData(obj, xbuf);
     auto stats4 = XBufferVisualizer::get_memory_stats(xbuf);
     std::cout << "[OK]\n  Final used: " << stats4.used_size << " bytes (" 
@@ -390,7 +390,7 @@ bool test_comprehensive_memory_operations() {
     
     // Test 6: Verify data after shrink
     std::cout << "Test 6: Verify data integrity... ";
-    auto [found_obj, found] = xbuf.find<ComprehensiveTestType>("CompTest");
+    auto [found_obj, found] = xbuf.find_root<ComprehensiveTestType>("CompTest");
     assert(found);
     assert(validateBasicFields(found_obj));
     assert(validateContainerSizes(found_obj));

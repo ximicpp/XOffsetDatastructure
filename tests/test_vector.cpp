@@ -22,7 +22,7 @@ bool test_vector_operations() {
     std::cout << "\nTesting vector operations...\n";
     
     XBuffer xbuf(4096);
-    auto* obj = xbuf.make<VectorTest>("VectorTest");
+    auto* obj = xbuf.make_root<VectorTest>("VectorTest");
     
     // push_back
     std::cout << "  push_back... ";
@@ -73,7 +73,7 @@ bool test_vector_operations() {
     std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto* loaded_obj = loaded_buf.find<VectorTest>("VectorTest").first;
+    auto* loaded_obj = loaded_buf.find_root<VectorTest>("VectorTest").first;
     assert(loaded_obj->floatVector.size() == 100);
     assert(loaded_obj->stringVector.size() == 20);
     assert(loaded_obj->stringVector[5] == "String_5");

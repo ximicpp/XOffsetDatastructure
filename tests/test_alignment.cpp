@@ -58,7 +58,7 @@ bool test_aligned_allocation() {
     XBuffer xbuf(8192);
     
     std::cout << "  allocate... ";
-    auto* aligned = xbuf.make<AlignedStruct>("Aligned");
+    auto* aligned = xbuf.make_root<AlignedStruct>("Aligned");
     aligned->a = 1;
     aligned->b = 2;
     aligned->c = 3.14;
@@ -86,7 +86,7 @@ bool test_serialization_with_alignment() {
     
     std::cout << "  create and serialize... ";
     XBuffer xbuf(4096);
-    auto* data = xbuf.make<AlignedStruct>("Data");
+    auto* data = xbuf.make_root<AlignedStruct>("Data");
     data->a = 1;
     data->b = 2;
     data->c = 2.718;
@@ -97,7 +97,7 @@ bool test_serialization_with_alignment() {
     
     std::cout << "  deserialize and verify... ";
     XBuffer loaded = XBuffer::load_from_string(serialized);
-    auto [loaded_data, found] = loaded.find<AlignedStruct>("Data");
+    auto [loaded_data, found] = loaded.find_root<AlignedStruct>("Data");
     assert(found);
     assert(loaded_data->a == 1);
     assert(loaded_data->b == 2);
@@ -115,13 +115,13 @@ bool test_mixed_alignment() {
     XBuffer xbuf(8192);
     
     std::cout << "  create objects... ";
-    auto* aligned = xbuf.make<AlignedStruct>("Aligned");
+    auto* aligned = xbuf.make_root<AlignedStruct>("Aligned");
     aligned->a = 1;
     aligned->b = 2;
     aligned->c = 1.0;
     aligned->name = XString("Aligned", xbuf.allocator<XString>());
     
-    auto* unaligned = xbuf.make<UnalignedStruct>("Unaligned");
+    auto* unaligned = xbuf.make_root<UnalignedStruct>("Unaligned");
     unaligned->a = 10;
     unaligned->b = 20;
     unaligned->c = 2.0;
@@ -138,8 +138,8 @@ bool test_mixed_alignment() {
     std::string serialized = xbuf.save_to_string();
     XBuffer loaded = XBuffer::load_from_string(serialized);
     
-    auto [a, fa] = loaded.find<AlignedStruct>("Aligned");
-    auto [u, fu] = loaded.find<UnalignedStruct>("Unaligned");
+    auto [a, fa] = loaded.find_root<AlignedStruct>("Aligned");
+    auto [u, fu] = loaded.find_root<UnalignedStruct>("Unaligned");
     
     assert(fa && fu);
     assert(a->name == "Aligned");

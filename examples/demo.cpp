@@ -11,9 +11,9 @@ void demo_basic_usage() {
     std::cout << "\n--- Basic Container Operations ---\n\n";
     
     XBuffer xbuf(4096);
-    auto* game = xbuf.make<GameData>("player_save");
+    auto* game = xbuf.make_root<GameData>("player_save");
     
-    game->player_name = XString("Hero", xbuf.allocator<XString>());
+    game->player_name = xbuf.create<XString>("Hero");
     game->player_id = 12345;
     game->level = 42;
     game->health = 100.0f;
@@ -25,6 +25,7 @@ void demo_basic_usage() {
     // Add items (XVector)
     const char* types[] = {"Potion", "Weapon", "Armor"};
     for (int i = 0; i < 5; i++) {
+        // Efficient: pass allocator directly to emplace_back
         game->items.emplace_back(xbuf.allocator<Item>(),
             i + 1, i % 3, (i + 1) * 10, ("Item_" + std::to_string(i+1)).c_str());
     }
@@ -43,8 +44,8 @@ void demo_basic_usage() {
     std::cout << "\n";
     
     // Quest progress (XMap)
-    game->quest_progress[XString("Main Quest", xbuf.allocator<XString>())] = 75;
-    game->quest_progress[XString("Side Quest", xbuf.allocator<XString>())] = 100;
+    game->quest_progress[xbuf.create<XString>("Main Quest")] = 75;
+    game->quest_progress[xbuf.create<XString>("Side Quest")] = 100;
     std::cout << "\nQuests:\n";
     for (const auto& [quest, progress] : game->quest_progress)
         std::cout << "  " << quest.c_str() << ": " << progress << "%\n";
@@ -58,8 +59,8 @@ void demo_memory_management() {
     std::cout << "Initial: " << stats.used_size << "/" << stats.total_size 
               << " bytes (" << static_cast<int>(stats.usage_percent()) << "%)\n";
     
-    auto* game = xbuf.make<GameData>("game");
-    game->player_name = XString("Player1", xbuf.allocator<XString>());
+    auto* game = xbuf.make_root<GameData>("game");
+    game->player_name = xbuf.create<XString>("Player1");
     for (int i = 0; i < 100; i++)
         game->achievements.insert(i);
     
@@ -82,13 +83,14 @@ void demo_serialization() {
     std::cout << "\n--- Serialization (zero-encoding/decoding) ---\n\n";
     
     XBuffer src_buf(2048);
-    auto* src = src_buf.make<GameData>("save");
-    src->player_name = XString("SavedHero", src_buf.allocator<XString>());
+    auto* src = src_buf.make_root<GameData>("save");
+    src->player_name = src_buf.create<XString>("SavedHero");
     src->player_id = 99999;
     src->level = 99;
     src->health = 100.0f;
     
     for (int i = 0; i < 3; i++) {
+        // Efficient: pass allocator directly to emplace_back
         src->items.emplace_back(src_buf.allocator<Item>(),
             i, 0, 1, ("Item_" + std::to_string(i)).c_str());
     }
@@ -100,7 +102,7 @@ void demo_serialization() {
     std::cout << "Saved to " << data.size() << " bytes\n";
     
     XBuffer dst_buf = XBuffer::load_from_string(data);
-    auto* dst = dst_buf.find<GameData>("save").first;
+    auto* dst = dst_buf.find_root<GameData>("save").first;
     
     std::cout << "Loaded: " << dst->player_name.c_str() 
               << " (level " << dst->level << ", " << dst->items.size() << " items)\n";

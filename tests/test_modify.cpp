@@ -28,7 +28,7 @@ bool test_modify_basic_types() {
     std::cout << "\nTesting basic type modification...\n";
     
     XBuffer xbuf(8192);
-    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
+    auto* data = xbuf.make_root<ModifyTestData>("ModifyTest");
     
     // Initialize values
     std::cout << "  initialize... ";
@@ -68,7 +68,7 @@ bool test_modify_basic_types() {
     
     // Verify persistence after modification
     std::cout << "  verify persistence... ";
-    auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
+    auto [found_data, found] = xbuf.find_root<ModifyTestData>("ModifyTest");
     assert(found);
     assert(found_data->counter == 299);
     assert(found_data->ratio > 3.99f && found_data->ratio < 4.01f);
@@ -83,7 +83,7 @@ bool test_modify_mixed_operations() {
     std::cout << "\nTesting mixed modifications...\n";
     
     XBuffer xbuf(16384);
-    auto* data = xbuf.make<ModifyTestData>("ModifyTest");
+    auto* data = xbuf.make_root<ModifyTestData>("ModifyTest");
     
     // Initialize all fields
     std::cout << "  initialize... ";
@@ -125,7 +125,7 @@ bool test_modify_mixed_operations() {
     
     // Verify via find
     std::cout << "  verify via find... ";
-    auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
+    auto [found_data, found] = xbuf.find_root<ModifyTestData>("ModifyTest");
     assert(found);
     assert(found_data->counter == 100);
     assert(found_data->ratio > 2.49f && found_data->ratio < 2.51f);
@@ -159,7 +159,7 @@ bool test_modify_mixed_operations() {
     std::vector<char> buffer(*xbuf.get_buffer());
     
     XBuffer new_xbuf(buffer);
-    auto [new_data, new_found] = new_xbuf.find<ModifyTestData>("ModifyTest");
+    auto [new_data, new_found] = new_xbuf.find_root<ModifyTestData>("ModifyTest");
     assert(new_found);
     assert(new_data->counter == 100);
     assert(new_data->numbers[0] == 1998);

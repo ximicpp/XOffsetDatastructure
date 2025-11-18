@@ -34,7 +34,7 @@ bool test_simple_serialization() {
     // Create and populate
     std::cout << "  create and populate... ";
     XBuffer xbuf(4096);
-    auto* data = xbuf.make<SimpleData>("TestData");
+    auto* data = xbuf.make_root<SimpleData>("TestData");
     data->id = 42;
     data->value = 3.14f;
     std::cout << "ok\n";
@@ -53,7 +53,7 @@ bool test_simple_serialization() {
     // Deserialize
     std::cout << "  deserialize... ";
     XBuffer loaded = XBuffer::load_from_string(serialized);
-    auto [loaded_data, found] = loaded.find<SimpleData>("TestData");
+    auto [loaded_data, found] = loaded.find_root<SimpleData>("TestData");
     assert(found);
     std::cout << "ok\n";
     
@@ -74,7 +74,7 @@ bool test_complex_serialization() {
     // Create and populate complex structure
     std::cout << "  create complex structure... ";
     XBuffer xbuf(8192);
-    auto* data = xbuf.make<ComplexData>("Complex");
+    auto* data = xbuf.make_root<ComplexData>("Complex");
     data->title = XString("Test Title", xbuf.allocator<XString>());
     
     for (int i = 0; i < 10; ++i) {
@@ -97,7 +97,7 @@ bool test_complex_serialization() {
     // Deserialize
     std::cout << "  deserialize... ";
     XBuffer loaded = XBuffer::load_from_string(serialized);
-    auto [loaded_data, found] = loaded.find<ComplexData>("Complex");
+    auto [loaded_data, found] = loaded.find_root<ComplexData>("Complex");
     assert(found);
     std::cout << "ok\n";
     
@@ -124,17 +124,17 @@ bool test_multiple_objects() {
     std::cout << "  create objects... ";
     XBuffer xbuf(8192);
     
-    auto* obj1 = xbuf.make<SimpleData>("Object1");
+    auto* obj1 = xbuf.make_root<SimpleData>("Object1");
     obj1->id = 1;
     obj1->value = 1.1f;
     obj1->name = XString("First", xbuf.allocator<XString>());
     
-    auto* obj2 = xbuf.make<SimpleData>("Object2");
+    auto* obj2 = xbuf.make_root<SimpleData>("Object2");
     obj2->id = 2;
     obj2->value = 2.2f;
     obj2->name = XString("Second", xbuf.allocator<XString>());
     
-    auto* obj3 = xbuf.make<SimpleData>("Object3");
+    auto* obj3 = xbuf.make_root<SimpleData>("Object3");
     obj3->id = 3;
     obj3->value = 3.3f;
     obj3->name = XString("Third", xbuf.allocator<XString>());
@@ -149,9 +149,9 @@ bool test_multiple_objects() {
     std::cout << "  deserialize... ";
     XBuffer loaded = XBuffer::load_from_string(serialized);
     
-    auto [loaded1, found1] = loaded.find<SimpleData>("Object1");
-    auto [loaded2, found2] = loaded.find<SimpleData>("Object2");
-    auto [loaded3, found3] = loaded.find<SimpleData>("Object3");
+    auto [loaded1, found1] = loaded.find_root<SimpleData>("Object1");
+    auto [loaded2, found2] = loaded.find_root<SimpleData>("Object2");
+    auto [loaded3, found3] = loaded.find_root<SimpleData>("Object3");
     
     assert(found1 && found2 && found3);
     std::cout << "ok\n";
@@ -197,7 +197,7 @@ bool test_roundtrip() {
     // Create initial data
     std::cout << "  create data... ";
     XBuffer xbuf1(4096);
-    auto* data = xbuf1.make<SimpleData>("Roundtrip");
+    auto* data = xbuf1.make_root<SimpleData>("Roundtrip");
     data->id = 999;
     data->value = 9.99f;
     data->name = XString("Original", xbuf1.allocator<XString>());
@@ -207,7 +207,7 @@ bool test_roundtrip() {
     std::cout << "  roundtrip 1... ";
     std::string s1 = xbuf1.save_to_string();
     XBuffer xbuf2 = XBuffer::load_from_string(s1);
-    auto [data2, f2] = xbuf2.find<SimpleData>("Roundtrip");
+    auto [data2, f2] = xbuf2.find_root<SimpleData>("Roundtrip");
     assert(f2 && data2->id == 999);
     std::cout << "ok\n";
     
@@ -215,7 +215,7 @@ bool test_roundtrip() {
     std::cout << "  roundtrip 2... ";
     std::string s2 = xbuf2.save_to_string();
     XBuffer xbuf3 = XBuffer::load_from_string(s2);
-    auto [data3, f3] = xbuf3.find<SimpleData>("Roundtrip");
+    auto [data3, f3] = xbuf3.find_root<SimpleData>("Roundtrip");
     assert(f3 && data3->id == 999);
     std::cout << "ok\n";
     
@@ -223,7 +223,7 @@ bool test_roundtrip() {
     std::cout << "  roundtrip 3... ";
     std::string s3 = xbuf3.save_to_string();
     XBuffer xbuf4 = XBuffer::load_from_string(s3);
-    auto [data4, f4] = xbuf4.find<SimpleData>("Roundtrip");
+    auto [data4, f4] = xbuf4.find_root<SimpleData>("Roundtrip");
     assert(f4 && data4->id == 999);
     assert(data4->value == 9.99f);
     assert(data4->name == "Original");

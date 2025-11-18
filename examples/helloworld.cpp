@@ -11,8 +11,8 @@ int main() {
     XBuffer xbuf(4096);
     
     // Create player
-    auto* player = xbuf.make<Player>("Hero");
-    player->name = XString("Alice", xbuf.allocator<XString>());
+    auto* player = xbuf.make_root<Player>("Hero");
+    player->name = xbuf.create<XString>("Alice");
     player->id = 1001;
     player->level = 10;
     player->items.push_back(101);
@@ -29,7 +29,7 @@ int main() {
     
     // Deserialize
     XBuffer loaded = XBuffer::load_from_string(data);
-    auto [loaded_player, found] = loaded.find<Player>("Hero");
+    auto [loaded_player, found] = loaded.find_root<Player>("Hero");
     std::cout << "Loaded player: " << loaded_player->name.c_str()
               << " (level " << loaded_player->level << ")\n";
     

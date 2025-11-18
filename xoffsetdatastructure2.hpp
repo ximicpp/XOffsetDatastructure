@@ -761,36 +761,100 @@ namespace XOffsetDatastructure2 {
 	};
 
 	// XBufferExt: Extended XBuffer
+	
+	// Type trait for XString
 	template<typename T>
 	struct is_xstring : std::false_type {};
 	template<>
 	struct is_xstring<XString> : std::true_type {};
 
+	// Type traits for containers (XVector, XSet, XMap)
+	template<typename T>
+	struct is_xvector : std::false_type {};
+	template<typename T>
+	struct is_xvector<XVector<T>> : std::true_type {};
+
+	template<typename T>
+	struct is_xset : std::false_type {};
+	template<typename T>
+	struct is_xset<XSet<T>> : std::true_type {};
+
+	template<typename T>
+	struct is_xmap : std::false_type {};
+	template<typename K, typename V>
+	struct is_xmap<XMap<K, V>> : std::true_type {};
+
+	// Unified container detection
+	template<typename T>
+	struct is_xcontainer : std::false_type {};
+	template<typename T>
+	struct is_xcontainer<XVector<T>> : std::true_type {};
+	template<typename T>
+	struct is_xcontainer<XSet<T>> : std::true_type {};
+	template<typename K, typename V>
+	struct is_xcontainer<XMap<K, V>> : std::true_type {};
+
 	class XBuffer : public XBufferBase {
 	public:
 		using XBufferBase::XBufferBase;
 
-		// Object Creation API
-		template<typename T>
-		T* make(const char* name) {
-			return this->construct<T>(name)(this->get_segment_manager());
-		}
+	// Object Creation API - Root Objects (named, persistent, findable)
+	template<typename T>
+	T* make_root(const char* name) {
+		return this->construct<T>(name)(this->get_segment_manager());
+	}
 		
+		// Allocator access methods (unified naming)
 		template<typename T>
 		boost::interprocess::allocator<T, XBufferBase::segment_manager> allocator() {
 			return boost::interprocess::allocator<T, XBufferBase::segment_manager>(this->get_segment_manager());
 		}
 
-		// Find and Utility Methods
 		template<typename T>
-		std::pair<T*, bool> find(const char* name) {
-			auto result = XBufferBase::find<T>(name);
-			return {result.first, result.second};
+		boost::interprocess::allocator<T, XBufferBase::segment_manager> get_allocator() {
+			return allocator<T>();
 		}
-		template<typename T>
-		T* find_or_make(const char* name) {
-			return this->find_or_construct<T>(name)(this->get_segment_manager());
+
+		// ========== Convenient Factory Method for Field Values ==========
+		// Unified interface: create<T>() for creating field values with automatic allocator injection
+		// 
+		// Usage examples:
+		//   - XString: xbuf.create<XString>("text")
+		//   - XVector: xbuf.create<XVector<int>>()  (empty vector)
+		//   - XSet:    xbuf.create<XSet<int>>()     (empty set)
+		//   - XMap:    xbuf.create<XMap<XString, int>>()  (empty map)
+		//
+		// NOTE: For custom structs used in emplace_back, it's more efficient to pass 
+		//       the allocator directly rather than using create<T>():
+		//       GOOD:  vec.emplace_back(xbuf.allocator<Item>(), args...)
+		//       AVOID: vec.emplace_back(xbuf.create<Item>(args...))  // Creates temporary
+		template<typename T, typename... Args>
+		T create(Args&&... args) {
+			auto al = this->get_allocator<T>();
+			
+			if constexpr (is_xstring<T>::value) {
+				// XString: allocator as the last parameter
+				return T(std::forward<Args>(args)..., al);
+			} else if constexpr (is_xcontainer<T>::value) {
+				// XVector/XSet/XMap: allocator as the first parameter
+				return T(al, std::forward<Args>(args)...);
+			} else {
+				// User-defined struct: no automatic allocator injection
+				// The user must handle allocator passing themselves if needed
+				return T(std::forward<Args>(args)...);
+			}
 		}
+
+        // Find and Utility Methods - Root Objects
+        template<typename T>
+        std::pair<T*, bool> find_root(const char* name) {
+            auto result = XBufferBase::find<T>(name);
+            return {result.first, result.second};
+        }
+        template<typename T>
+        T* find_or_make_root(const char* name) {
+            return this->find_or_construct<T>(name)(this->get_segment_manager());
+        }
 
 		// Serialization
 		std::string save_to_string() {

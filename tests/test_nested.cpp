@@ -39,7 +39,7 @@ bool test_nested_structures() {
     std::cout << "\nTesting nested structures...\n";
     
     XBuffer xbuf(8192);
-    auto* obj = xbuf.make<OuterObject>("Nested");
+    auto* obj = xbuf.make_root<OuterObject>("Nested");
     
     // Initialize nested structure
     std::cout << "  initialize... ";
@@ -88,7 +88,7 @@ bool test_nested_structures() {
     std::cout << "  persistence... ";
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto* loaded = loaded_buf.find<OuterObject>("Nested").first;
+    auto* loaded = loaded_buf.find_root<OuterObject>("Nested").first;
     
     assert(loaded->title == "OuterTitle");
     assert(loaded->middle.name == "MiddleName");

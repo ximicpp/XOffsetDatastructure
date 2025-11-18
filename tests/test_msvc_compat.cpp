@@ -29,7 +29,7 @@ bool test_init_list_compatibility() {
     
     // Create struct with skipped members
     std::cout << "  create object... ";
-    auto* obj = xbuf.make<GameLikeStruct>("game_like");
+    auto* obj = xbuf.make_root<GameLikeStruct>("game_like");
     std::cout << "ok\n";
     
     // Verify default values

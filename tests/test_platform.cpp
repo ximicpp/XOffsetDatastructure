@@ -161,7 +161,7 @@ bool test_binary_compatibility() {
     
     // Write known values - use vector to avoid array construction issues
     typedef XOffsetDatastructure2::XVector<int> IntVector;
-    auto* int_vec = xbuf.make<IntVector>("test_ints");
+    auto* int_vec = xbuf.make_root<IntVector>("test_ints");
     int_vec->push_back(0x12345678);
     int_vec->push_back(0xABCDEF00);
     int_vec->push_back(0x11223344);
@@ -223,7 +223,7 @@ bool test_cross_buffer_compatibility() {
     // Create source buffer with vector
     XBuffer src_buf(1024);
     typedef XOffsetDatastructure2::XVector<int> IntVector;
-    auto* src_vec = src_buf.make<IntVector>("numbers");
+    auto* src_vec = src_buf.make_root<IntVector>("numbers");
     for (int i = 0; i < 5; i++) {
         src_vec->push_back(i * 1000 + i);  // 0, 1001, 2002, 3003, 4004
     }
@@ -234,7 +234,7 @@ bool test_cross_buffer_compatibility() {
     
     // Load into new buffer
     XBuffer dst_buf(binary_data);
-    auto* dst_vec = dst_buf.find<IntVector>("numbers").first;
+    auto* dst_vec = dst_buf.find_root<IntVector>("numbers").first;
     
     if (!dst_vec) {
         std::cout << "    [FAIL] Failed to find data in destination buffer\n";

@@ -14,7 +14,7 @@ bool test_basic_types() {
     XBuffer xbuf(1024);
     
     // Create and initialize object
-    auto* obj = xbuf.make<BasicTypes>("BasicTypes");
+    auto* obj = xbuf.make_root<BasicTypes>("BasicTypes");
     obj->mInt = 42;
     obj->mFloat = 3.14f;
     obj->mDouble = 2.71828;
@@ -33,7 +33,7 @@ bool test_basic_types() {
     // Test persistence
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto* loaded_obj = loaded_buf.find<BasicTypes>("BasicTypes").first;
+    auto* loaded_obj = loaded_buf.find_root<BasicTypes>("BasicTypes").first;
     
     assert(loaded_obj->mInt == 42);
     assert(loaded_obj->mFloat == 3.14f);
