@@ -545,181 +545,120 @@ namespace XOffsetDatastructure2 {
 		}
 	};
 
-	// Type Safety Checking System
+	// Type Safety Checking System using C++20 Concepts
 	namespace detail {
-		// 1. Basic Type Checking
+		// Forward declaration of the helper function for recursion
 		template<typename T>
-		constexpr bool is_basic_type() {
-			using CleanT = std::remove_cv_t<T>;
-			return std::is_same_v<CleanT, int8_t> ||
-			       std::is_same_v<CleanT, int16_t> ||
-			       std::is_same_v<CleanT, int32_t> ||
-			       std::is_same_v<CleanT, int64_t> ||
-			       std::is_same_v<CleanT, uint8_t> ||
-			       std::is_same_v<CleanT, uint16_t> ||
-			       std::is_same_v<CleanT, uint32_t> ||
-			       std::is_same_v<CleanT, uint64_t> ||
-			       std::is_same_v<CleanT, float> ||
-			       std::is_same_v<CleanT, double> ||
-			       std::is_same_v<CleanT, bool> ||
-			       std::is_same_v<CleanT, char>;
-		}
+		constexpr bool is_xbuffer_safe_impl();
 		
-		// 2. XString Type Checking
+		// 1. Basic Type Concept
 		template<typename T>
-		constexpr bool is_xstring() {
-			return std::is_same_v<std::remove_cv_t<T>, XString>;
-		}
+		concept BasicType = 
+			std::is_same_v<std::remove_cv_t<T>, int8_t> ||
+			std::is_same_v<std::remove_cv_t<T>, int16_t> ||
+			std::is_same_v<std::remove_cv_t<T>, int32_t> ||
+			std::is_same_v<std::remove_cv_t<T>, int64_t> ||
+			std::is_same_v<std::remove_cv_t<T>, uint8_t> ||
+			std::is_same_v<std::remove_cv_t<T>, uint16_t> ||
+			std::is_same_v<std::remove_cv_t<T>, uint32_t> ||
+			std::is_same_v<std::remove_cv_t<T>, uint64_t> ||
+			std::is_same_v<std::remove_cv_t<T>, float> ||
+			std::is_same_v<std::remove_cv_t<T>, double> ||
+			std::is_same_v<std::remove_cv_t<T>, bool> ||
+			std::is_same_v<std::remove_cv_t<T>, char>;
 		
-		// Forward declaration for recursive checking
+		// 2. XString Type Concept
 		template<typename T>
-		constexpr bool is_safe_type();
+		concept XStringType = std::is_same_v<std::remove_cv_t<T>, XString>;
 		
-		// 3. XVector Type Checking
+		// 3. Container Type Detection Concepts
 		template<typename T>
-		constexpr bool is_safe_xvector() {
-			using CleanT = std::remove_cv_t<T>;
-			// XVector has size=32, align=8
-			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-				// Try to extract value_type
-				if constexpr (requires { typename CleanT::value_type; }) {
-					return is_safe_type<typename CleanT::value_type>();
-				}
-			}
-			return false;
-		}
+		concept XVectorLike = 
+			sizeof(std::remove_cv_t<T>) == 32 && 
+			alignof(std::remove_cv_t<T>) == 8 &&
+			requires { typename std::remove_cv_t<T>::value_type; };
 		
-		// 4. XSet Type Checking
 		template<typename T>
-		constexpr bool is_safe_xset() {
-			using CleanT = std::remove_cv_t<T>;
-			// XSet has size=32, align=8
-			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-				// Try to extract key_type (XSet uses key_type, not value_type)
-				if constexpr (requires { typename CleanT::key_type; }) {
-					return is_safe_type<typename CleanT::key_type>();
-				}
-			}
-			return false;
-		}
+		concept XSetLike = 
+			sizeof(std::remove_cv_t<T>) == 32 && 
+			alignof(std::remove_cv_t<T>) == 8 &&
+			requires { typename std::remove_cv_t<T>::key_type; } &&
+			!requires { typename std::remove_cv_t<T>::mapped_type; };
 		
-		// 5. XMap Type Checking
 		template<typename T>
-		constexpr bool is_safe_xmap() {
-			using CleanT = std::remove_cv_t<T>;
-			// XMap has size=32, align=8
-			if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-				// Try to extract key_type and mapped_type
-				if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
-					return is_safe_type<typename CleanT::key_type>() &&
-					       is_safe_type<typename CleanT::mapped_type>();
-				}
-			}
-			return false;
-		}
+		concept XMapLike = 
+			sizeof(std::remove_cv_t<T>) == 32 && 
+			alignof(std::remove_cv_t<T>) == 8 &&
+			requires { 
+				typename std::remove_cv_t<T>::key_type; 
+				typename std::remove_cv_t<T>::mapped_type; 
+			};
 		
-		// 6. Member Safety Checking
+		// 4. Safe Container Concepts (using helper function for recursion)
+		template<typename T>
+		concept SafeXVector = XVectorLike<T> && 
+			is_xbuffer_safe_impl<typename std::remove_cv_t<T>::value_type>();
+		
+		template<typename T>
+		concept SafeXSet = XSetLike<T> && 
+			is_xbuffer_safe_impl<typename std::remove_cv_t<T>::key_type>();
+		
+		template<typename T>
+		concept SafeXMap = XMapLike<T> && 
+			is_xbuffer_safe_impl<typename std::remove_cv_t<T>::key_type>() &&
+			is_xbuffer_safe_impl<typename std::remove_cv_t<T>::mapped_type>();
+		
+		// 5. Member Safety Checking Concepts
 		template<typename T, size_t Index>
-		constexpr bool is_member_safe_at() {
-			// Use lightweight boost::pfr::tuple_element (avoids structure_to_tuple instantiation)
-			using MemberType = typename boost::pfr::tuple_element<Index, T>::type;
-			
-			// Check if member type is safe
-			if (!is_safe_type<MemberType>()) {
-				return false;
-			}
-			
-			// Reject references
-			if constexpr (std::is_reference_v<MemberType>) {
-				return false;
-			}
-			
-			// Reject raw pointers (should use XOffsetPtr)
-			if constexpr (std::is_pointer_v<MemberType>) {
-				return false;
-			}
-			
-			return true;
-		}
+		concept MemberSafeAt = requires {
+			requires is_xbuffer_safe_impl<typename boost::pfr::tuple_element<Index, T>::type>();
+			requires !std::is_reference_v<typename boost::pfr::tuple_element<Index, T>::type>;
+			requires !std::is_pointer_v<typename boost::pfr::tuple_element<Index, T>::type>;
+		};
 		
-		// 7. Check All Members
+		// Helper to check all members
 		template<typename T, size_t... Indices>
-		constexpr bool check_all_members_impl(std::index_sequence<Indices...>) {
-			return (is_member_safe_at<T, Indices>() && ...);
+		constexpr bool check_all_members_safe(std::index_sequence<Indices...>) {
+			return (MemberSafeAt<T, Indices> && ...);
 		}
+		
+		// 6. Aggregate Type Concept with Safe Members
+		template<typename T>
+		concept HasSafeProperties = 
+			!std::is_polymorphic_v<T> &&
+			!std::is_union_v<T> &&
+			(boost::pfr::tuple_size_v<T> == 0 || 
+			 check_all_members_safe<T>(std::make_index_sequence<boost::pfr::tuple_size_v<T>>{}));
 		
 		template<typename T>
-		constexpr bool are_all_members_safe() {
-			// Must be a class/struct
-			if constexpr (!std::is_class_v<T>) {
-				return false;
-			}
-			
-			// Reject polymorphic types (with virtual functions)
-			if constexpr (std::is_polymorphic_v<T>) {
-				return false;
-			}
-			
-			// Reject union types
-			if constexpr (std::is_union_v<T>) {
-				return false;
-			}
-			
-			// Must be aggregate for Boost.PFR (unified for all compilers)
-			if constexpr (!std::is_aggregate_v<T>) {
-				return false;
-			}
-			
-			// Check all members using Boost.PFR tuple_size
-			constexpr size_t member_count = boost::pfr::tuple_size_v<T>;
-			if constexpr (member_count == 0) {
-				return true;
-			} else {
-				return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
-			}
-		}
+		concept ReflectableAggregate = 
+			std::is_class_v<T> && 
+			std::is_aggregate_v<T> &&
+			!XStringType<T> &&
+			HasSafeProperties<T>;
 		
-		// 8. Comprehensive Type Safety Check
+		// 7. Top-level XBufferSafe Concept
 		template<typename T>
-		constexpr bool is_safe_type() {
-			using CleanT = std::remove_cv_t<T>;
-			
-			// Basic types are safe
-			if constexpr (is_basic_type<CleanT>()) {
-				return true;
-			}
-			
-			// XString is safe
-			if constexpr (is_xstring<CleanT>()) {
-				return true;
-			}
-			
-			// Check XOffset containers (MUST check before attempting PFR reflection)
-			if constexpr (is_safe_xvector<CleanT>()) {
-				return true;
-			}
-			if constexpr (is_safe_xset<CleanT>()) {
-				return true;
-			}
-			if constexpr (is_safe_xmap<CleanT>()) {
-				return true;
-			}
-			
-			// User-defined struct/class: check all members recursively
-			// Only attempt this for aggregate types (Boost.PFR requirement)
-			if constexpr (std::is_class_v<CleanT> && std::is_aggregate_v<CleanT> && !is_xstring<CleanT>()) {
-				return are_all_members_safe<CleanT>();
-			}
-			
-			return false;
+		concept XBufferSafe = 
+			BasicType<T> || 
+			XStringType<T> ||
+			SafeXVector<T> ||
+			SafeXSet<T> ||
+			SafeXMap<T> ||
+			ReflectableAggregate<T>;
+		
+		// Implementation of the recursive helper function
+		template<typename T>
+		constexpr bool is_xbuffer_safe_impl() {
+			return XBufferSafe<T>;
 		}
 		
-		// 9. Error Message Generation
+		// 8. Error Message Generation
 		template<typename T>
 		constexpr const char* get_safety_error_message() {
 			using CleanT = std::remove_cv_t<T>;
 			
-			if constexpr (is_safe_type<CleanT>()) {
+			if constexpr (XBufferSafe<CleanT>) {
 				return "Type is SAFE for XBuffer";
 			}
 			else if constexpr (std::is_polymorphic_v<CleanT>) {
@@ -738,7 +677,6 @@ namespace XOffsetDatastructure2 {
 				return "UNSAFE: std::string (use XString instead)";
 			}
 			else if constexpr (requires { typename CleanT::allocator_type; }) {
-				// This might be a std container
 				return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
 			}
 			else if constexpr (std::is_class_v<CleanT>) {
@@ -747,6 +685,12 @@ namespace XOffsetDatastructure2 {
 			else {
 				return "UNSAFE: Type not allowed in XBuffer";
 			}
+		}
+		
+		// Legacy function wrapper for backward compatibility
+		template<typename T>
+		constexpr bool is_safe_type() {
+			return XBufferSafe<T>;
 		}
 	}
 	

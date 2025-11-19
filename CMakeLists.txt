@@ -5,6 +5,11 @@ project(XOffsetDatastructure)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# MSVC specific: Enable correct __cplusplus macro value
+if(MSVC)
+    add_compile_options(/Zc:__cplusplus)
+endif()
+
 # macOS and iOS specific settings
 if(APPLE)
     # Use the system C++ library

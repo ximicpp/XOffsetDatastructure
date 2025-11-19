@@ -1,3 +1,7 @@
+# Ensure C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Hello World Demo
 add_executable(helloworld helloworld.cpp)
 target_include_directories(helloworld PRIVATE 
