@@ -7,7 +7,7 @@ This repository maintains two parallel implementations:
 
 #### [release/v2.0-practical](https://github.com/ximicpp/XOffsetDatastructure/tree/release/v2.0-practical) - **Recommended**
 - **Reflection**: Uses [Boost.PFR](https://github.com/boostorg/pfr) for compile-time reflection
-- **Compatibility**: C++17 and above
+- **Compatibility**: C++20 and above
 - **Stability**: Production-ready, thoroughly tested
 - **Use Case**: Recommended for production environments
 
