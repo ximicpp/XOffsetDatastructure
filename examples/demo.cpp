@@ -82,54 +82,34 @@ void demo_memory_management() {
 void demo_serialization() {
     std::cout << "\n--- Serialization (zero-encoding/decoding) ---\n\n";
     
-    const std::string filename = "demo_save.dat";
+    XBuffer src_buf(2048);
+    auto* src = src_buf.make_root<GameData>("save");
+    src->player_name = src_buf.create<XString>("SavedHero");
+    src->player_id = 99999;
+    src->level = 99;
+    src->health = 100.0f;
     
-    // 1. Save to file
-    {
-        XBuffer src_buf(2048);
-        auto* src = src_buf.make_root<GameData>("save");
-        src->player_name = src_buf.create<XString>("SavedHero");
-        src->player_id = 99999;
-        src->level = 99;
-        src->health = 100.0f;
-        
-        for (int i = 0; i < 3; i++) {
-            // Efficient: pass allocator directly to emplace_back
-            src->items.emplace_back(src_buf.allocator<Item>(),
-                i, 0, 1, ("Item_" + std::to_string(i)).c_str());
-        }
-        
-        std::cout << "Original: " << src->player_name.c_str() 
-                  << " (level " << src->level << ", " << src->items.size() << " items)\n";
-        
-        std::ofstream ofs(filename, std::ios::binary);
-        auto* buf = src_buf.get_buffer();
-        ofs.write(buf->data(), buf->size());
-        std::cout << "Saved to file: " << filename << " (" << buf->size() << " bytes)\n";
+    for (int i = 0; i < 3; i++) {
+        // Efficient: pass allocator directly to emplace_back
+        src->items.emplace_back(src_buf.allocator<Item>(),
+            i, 0, 1, ("Item_" + std::to_string(i)).c_str());
     }
     
-    // 2. Load from file (Zero-Copy via mmap)
-    {
-        std::cout << "Loading via mmap (Zero-Copy)...\n";
-        XBuffer dst_buf(filename, true); // read_only = true
-        
-        auto* dst = dst_buf.find_root<GameData>("save").first;
-        
-        std::cout << "Loaded: " << dst->player_name.c_str() 
-                  << " (level " << dst->level << ", " << dst->items.size() << " items)\n";
-        
-        bool ok = (std::string(dst->player_name.c_str()) == "SavedHero" &&
-                   dst->player_id == 99999 && dst->level == 99 && dst->items.size() == 3);
-        std::cout << "Data integrity: " << (ok ? "OK" : "FAIL") << "\n";
-        
-        // Verify zero-copy (buffer should be nullptr)
-        if (dst_buf.get_buffer() == nullptr) {
-            std::cout << "Verified: No heap buffer allocated (True Zero-Copy)\n";
-        }
-    }
+    std::cout << "Original: " << src->player_name.c_str() 
+              << " (level " << src->level << ", " << src->items.size() << " items)\n";
     
-    // Cleanup
-    std::remove(filename.c_str());
+    std::string data = src_buf.save_to_string();
+    std::cout << "Saved to " << data.size() << " bytes\n";
+    
+    XBuffer dst_buf = XBuffer::load_from_string(data);
+    auto* dst = dst_buf.find_root<GameData>("save").first;
+    
+    std::cout << "Loaded: " << dst->player_name.c_str() 
+              << " (level " << dst->level << ", " << dst->items.size() << " items)\n";
+    
+    bool ok = (std::string(dst->player_name.c_str()) == "SavedHero" &&
+               dst->player_id == 99999 && dst->level == 99 && dst->items.size() == 3);
+    std::cout << "Data integrity: " << (ok ? "OK" : "FAIL") << "\n";
 }
 
 int main() {

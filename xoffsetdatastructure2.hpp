@@ -62,8 +62,6 @@
 #include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
 #include <boost/interprocess/mem_algo/rbtree_best_fit.hpp>
 #include <boost/interprocess/sync/mutex_family.hpp>
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/set.hpp>
@@ -412,22 +410,6 @@ public:
         this->swap(moved);
     }
 
-    XManagedMemory(const std::string& filename, bool read_only = false) {
-        namespace bip = boost::interprocess;
-        bip::mode_t mode = read_only ? bip::read_only : bip::read_write;
-        bip::file_mapping m_file(filename.c_str(), mode);
-        
-        bip::mode_t region_mode = read_only ? bip::read_only : bip::read_write;
-        m_mapped_region = std::make_unique<bip::mapped_region>(m_file, region_mode);
-        
-        void* addr = m_mapped_region->get_address();
-        size_type size = m_mapped_region->get_size();
-        
-        if (!base_t::open_impl(addr, size)) {
-             throw bip::interprocess_exception("Could not open managed memory from mapped file");
-        }
-    }
-
     XManagedMemory &operator=(BOOST_RV_REF(XManagedMemory) moved) noexcept {
         XManagedMemory tmp(boost::move(moved));
         this->swap(tmp);
@@ -435,9 +417,6 @@ public:
     }
 
     bool grow(size_type extra_bytes) {
-        if (m_mapped_region) {
-            return false; // Cannot grow mapped region easily
-        }
         try {
             m_buffer.resize(m_buffer.size() + extra_bytes);
             base_t::close_impl();
@@ -452,11 +431,9 @@ public:
     void swap(XManagedMemory &other) noexcept {
         base_t::swap(other);
         m_buffer.swap(other.m_buffer);
-        m_mapped_region.swap(other.m_mapped_region);
     }
 
     void update_after_shrink() {
-        if (m_mapped_region) return; // Cannot shrink mapped region
         auto *pBuf = get_buffer();
         std::vector<char> new_buf(pBuf->data(), pBuf->data() + pBuf->size());
         XManagedMemory new_mem(new_buf);
@@ -464,39 +441,30 @@ public:
     }
 
     void shrink_to_fit() {
-        if (m_mapped_region) return; // Cannot shrink mapped region
         base_t::shrink_to_fit();
         m_buffer.resize(base_t::get_size());
         update_after_shrink();
     }
 
     std::vector<char> *get_buffer() {
-        return m_mapped_region ? nullptr : &m_buffer;
+        return &m_buffer;
     }
 
     const void* get_address() const {
-        return m_mapped_region ? m_mapped_region->get_address() : m_buffer.data();
+        return m_buffer.data();
     }
 
     size_type get_size() const {
-        return m_mapped_region ? m_mapped_region->get_size() : m_buffer.size();
+        return m_buffer.size();
     }
 
 private:
     void priv_close() {
-        if (!m_mapped_region) {
-            base_t::destroy_impl();
-            std::vector<char>().swap(m_buffer);
-        } else {
-            // For mapped region, we don't destroy the heap structure on disk
-            // just close the handle (handled by unique_ptr)
-            // But we should close the managed memory logic
-            base_t::close_impl();
-        }
+        base_t::destroy_impl();
+        std::vector<char>().swap(m_buffer);
     }
 
     std::vector<char> m_buffer;
-    std::unique_ptr<boost::interprocess::mapped_region> m_mapped_region;
 };
 
 } // namespace interprocess

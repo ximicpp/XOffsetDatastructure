@@ -124,42 +124,6 @@ if(Python3_FOUND)
     add_dependencies(test_msvc_compat generate_schemas)
 endif()
 
-# Mutation cost test
-add_executable(test_mutation_cost test_mutation_cost.cpp)
-target_include_directories(test_mutation_cost PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_mutation_cost PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_mutation_cost)
-add_test(NAME MutationCost COMMAND test_mutation_cost)
-
-# Mmap loading test
-add_executable(test_mmap_loading test_mmap_loading.cpp)
-target_include_directories(test_mmap_loading PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_mmap_loading PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_mmap_loading)
-add_test(NAME MmapLoading COMMAND test_mmap_loading)
-
-# Mmap write test
-add_executable(test_mmap_write test_mmap_write.cpp)
-target_include_directories(test_mmap_write PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_mmap_write PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_mmap_write)
-add_test(NAME MmapWrite COMMAND test_mmap_write)
-
-# Mmap overflow test
-add_executable(test_mmap_overflow test_mmap_overflow.cpp)
-target_include_directories(test_mmap_overflow PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
-set_target_properties(test_mmap_overflow PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-configure_macos_target(test_mmap_overflow)
-add_test(NAME MmapOverflow COMMAND test_mmap_overflow)
-
 # Add CTest tests
 add_test(NAME BasicTypes COMMAND test_basic_types)
 add_test(NAME VectorOps COMMAND test_vector)

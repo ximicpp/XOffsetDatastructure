@@ -86,14 +86,6 @@ else
     echo "[7/7] test_comprehensive not found (skipped)"
 fi
 
-if [ -n "$TEST_DIR" ] && [ -f "$TEST_DIR/test_mmap_loading" ]; then
-    echo
-    echo "[8/8] Running Mmap Loading Test..."
-    ./$TEST_DIR/test_mmap_loading || TEST_FAILED=1
-else
-    echo "[8/8] test_mmap_loading not found (skipped)"
-fi
-
 # Run the demo after tests
 echo
 echo "======================================================================"
