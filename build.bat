@@ -36,11 +36,12 @@ set TESTS[1]=test_vector^|Vector Test
 set TESTS[2]=test_map_set^|Map/Set Test
 set TESTS[3]=test_nested^|Nested Structures Test
 set TESTS[4]=test_compaction^|Memory Compaction Test
-set TEST_COUNT=5
+set TESTS[5]=test_mmap_loading^|Mmap Loading Test
+set TEST_COUNT=6
 
 :: Run main tests
-for /L %%i in (0,1,4) do (
-    call :run_test %%i 5
+for /L %%i in (0,1,5) do (
+    call :run_test %%i 6
 )
 
 :: Run bonus test
