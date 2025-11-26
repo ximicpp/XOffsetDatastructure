@@ -111,6 +111,13 @@ namespace XTypeSignature {
             }
         }
 
+        constexpr CompileString(std::string_view sv) {
+            for (size_t i = 0; i < N - 1 && i < sv.size(); ++i) {
+                value[i] = sv[i];
+            }
+            value[N - 1] = '\0';
+        }
+
         template <typename T>
         static constexpr CompileString<32> from_number(T num) noexcept {
             char result[32] = {};
@@ -223,15 +230,35 @@ namespace XTypeSignature {
         }
     }
 
+    // Helper to detect _field_names
+    template<typename T, typename = void>
+    struct has_field_names : std::false_type {};
+
+    template<typename T>
+    struct has_field_names<T, std::void_t<decltype(T::_field_names)>> : std::true_type {};
+
     // Field Signature Generation (Fold Expression)
     template<typename T, size_t Index>
     consteval auto build_single_field_signature() noexcept {
         using FieldType = field_type_t<T, Index>;
         
-        return CompileString{"@"} +
-               CompileString<32>::from_number(get_field_offset<T, Index>()) +
-               CompileString{":"} +
-               TypeSignature<FieldType>::calculate();
+        if constexpr (has_field_names<T>::value) {
+            // Format: @offset[name]:type
+            constexpr std::string_view sv = T::_field_names[Index];
+            constexpr size_t N = sv.size() + 1;
+            return CompileString{"@"} +
+                   CompileString<32>::from_number(get_field_offset<T, Index>()) +
+                   CompileString{"["} +
+                   CompileString<N>(sv) +
+                   CompileString{"]:"} +
+                   TypeSignature<FieldType>::calculate();
+        } else {
+            // Format: @offset:type (Legacy/Fallback)
+            return CompileString{"@"} +
+                   CompileString<32>::from_number(get_field_offset<T, Index>()) +
+                   CompileString{":"} +
+                   TypeSignature<FieldType>::calculate();
+        }
     }
 
     template<typename T, size_t Index, bool IsFirst>

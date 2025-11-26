@@ -42,6 +42,14 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) PlayerReflectionHint {
 	int32_t level;
 	XString name;
 	XVector<int32_t> items;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"id",
+		"level",
+		"name",
+		"items",
+	};
 };
 
 // ============================================================================
@@ -65,11 +73,8 @@ static_assert(alignof(Player) == alignof(PlayerReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<PlayerReflectionHint>() ==
-             "struct[s:72,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:i32[s:4,a:4],"
-             "@8:string[s:32,a:8],"
-             "@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
-              "Type signature mismatch for PlayerReflectionHint");
+             "struct[s:72,a:8]{@0[id]:i32[s:4,a:4],@4[level]:i32[s:4,a:4],@8[name]:string[s:32"
+             ",a:8],@40[items]:vector[s:32,a:8]<i32[s:4,a:4]>}"
+              , "Type signature mismatch for PlayerReflectionHint");
 
 #endif // GENERATED_PLAYER_HPP_

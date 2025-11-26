@@ -68,6 +68,12 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestType {
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeInnerReflectionHint {
 	int32_t mInt;
 	XVector<int32_t> mVector;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"mInt",
+		"mVector",
+	};
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectionHint {
@@ -81,6 +87,20 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) TestTypeReflectionHint {
 	XSet<XString> mStringSet;
 	XSet<int32_t> mSet;
 	XString mString;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"mInt",
+		"mFloat",
+		"mVector",
+		"mStringVector",
+		"TestTypeInnerObj",
+		"mXXTypeVector",
+		"mComplexMap",
+		"mStringSet",
+		"mSet",
+		"mString",
+	};
 };
 
 // ============================================================================
@@ -103,7 +123,7 @@ static_assert(alignof(TestTypeInner) == alignof(TestTypeInnerReflectionHint),
 // 3. Type Signature Check
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
-static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@8:vector[s:32,a:8]<i32[s:4,a:4]>}",
+static_assert(XTypeSignature::get_XTypeSignature<TestTypeInnerReflectionHint>() == "struct[s:40,a:8]{@0[mInt]:i32[s:4,a:4],@8[mVector]:vector[s:32,a:8]<i32[s:4,a:4]>}",
               "Type signature mismatch for TestTypeInnerReflectionHint");
 
 // Compile-time validation for TestType
@@ -123,20 +143,14 @@ static_assert(alignof(TestType) == alignof(TestTypeReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<TestTypeReflectionHint>() ==
-             "struct[s:272,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:f32[s:4,a:4],"
-             "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
-             "@40:vector[s:32,a:8]<string[s:32,a:8]>,"
-             "@72:struct[s:40,a:8]{@0:i32[s:4,a:4],"
-             "@8:vector[s:32,a:8]<i32[s:4,a:4]>},"
-             "@112:vector[s:32,a:8]<struct[s:40,a:8]{@0:i32[s:4,a:4],"
-             "@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
-             "@144:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0:i32[s:4,a:4],"
-             "@8:vector[s:32,a:8]<i32[s:4,a:4]>}>,"
-             "@176:set[s:32,a:8]<string[s:32,a:8]>,"
-             "@208:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@240:string[s:32,a:8]}",
-              "Type signature mismatch for TestTypeReflectionHint");
+             "struct[s:272,a:8]{@0[mInt]:i32[s:4,a:4],@4[mFloat]:f32[s:4,a:4],@8[mVector]:vect"
+             "or[s:32,a:8]<i32[s:4,a:4]>,@40[mStringVector]:vector[s:32,a:8]<string[s:32,a:8]>"
+             ",@72[TestTypeInnerObj]:struct[s:40,a:8]{@0[mInt]:i32[s:4,a:4],@8[mVector]:vector"
+             "[s:32,a:8]<i32[s:4,a:4]>},@112[mXXTypeVector]:vector[s:32,a:8]<struct[s:40,a:8]{"
+             "@0[mInt]:i32[s:4,a:4],@8[mVector]:vector[s:32,a:8]<i32[s:4,a:4]>}>,@144[mComplex"
+             "Map]:map[s:32,a:8]<string[s:32,a:8],struct[s:40,a:8]{@0[mInt]:i32[s:4,a:4],@8[mV"
+             "ector]:vector[s:32,a:8]<i32[s:4,a:4]>}>,@176[mStringSet]:set[s:32,a:8]<string[s:"
+             "32,a:8]>,@208[mSet]:set[s:32,a:8]<i32[s:4,a:4]>,@240[mString]:string[s:32,a:8]}"
+              , "Type signature mismatch for TestTypeReflectionHint");
 
 #endif // GENERATED_TEST_TYPES_HPP_

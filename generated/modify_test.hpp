@@ -51,6 +51,17 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ModifyTestDataReflectionHint {
 	XVector<XString> names;
 	XMap<XString, int32_t> scores;
 	XSet<int32_t> tags;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"counter",
+		"ratio",
+		"active",
+		"numbers",
+		"names",
+		"scores",
+		"tags",
+	};
 };
 
 // ============================================================================
@@ -74,14 +85,10 @@ static_assert(alignof(ModifyTestData) == alignof(ModifyTestDataReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<ModifyTestDataReflectionHint>() ==
-             "struct[s:144,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:f32[s:4,a:4],"
-             "@8:bool[s:1,a:1],"
-             "@16:vector[s:32,a:8]<i32[s:4,a:4]>,"
-             "@48:vector[s:32,a:8]<string[s:32,a:8]>,"
-             "@80:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>,"
-             "@112:set[s:32,a:8]<i32[s:4,a:4]>}",
-              "Type signature mismatch for ModifyTestDataReflectionHint");
+             "struct[s:144,a:8]{@0[counter]:i32[s:4,a:4],@4[ratio]:f32[s:4,a:4],@8[active]:boo"
+             "l[s:1,a:1],@16[numbers]:vector[s:32,a:8]<i32[s:4,a:4]>,@48[names]:vector[s:32,a:"
+             "8]<string[s:32,a:8]>,@80[scores]:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>,@1"
+             "12[tags]:set[s:32,a:8]<i32[s:4,a:4]>}"
+              , "Type signature mismatch for ModifyTestDataReflectionHint");
 
 #endif // GENERATED_MODIFY_TEST_HPP_

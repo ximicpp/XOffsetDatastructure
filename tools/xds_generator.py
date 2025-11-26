@@ -274,7 +274,8 @@ class TypeSignatureCalculator:
             # Use reflection types for signature
             field_type = TypeAnalyzer.get_reflection_type(field.type, struct_names)
             field_sig = TypeSignatureCalculator.get_type_signature(field_type, struct_map)
-            field_sigs.append(f"@{offset}:{field_sig}")
+            # Include field name in signature: @offset[name]:type
+            field_sigs.append(f"@{offset}[{field.name}]:{field_sig}")
         
         fields_str = ",".join(field_sigs)
         return f"struct[s:{size},a:{align}]{{{fields_str}}}"
@@ -413,6 +414,14 @@ class CodeGenerator:
             reflection_type = TypeAnalyzer.get_reflection_type(field.type, self.struct_names)
             lines.append(f"\t{reflection_type} {field.name};")
         
+        # Inject field names for enhanced reflection (field reordering detection)
+        lines.append("")
+        lines.append("\t// Field names metadata for XTypeSignature")
+        lines.append("\tstatic constexpr std::string_view _field_names[] = {")
+        for field in struct.fields:
+            lines.append(f'\t\t"{field.name}",')
+        lines.append("\t};")
+        
         lines.append("};")
         lines.append("")
         
@@ -466,49 +475,13 @@ class CodeGenerator:
             # Format multi-line signature
             lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() ==")
             
-            # Split at field boundaries
-            import re
-            # Find all field patterns @offset:type
-            parts = re.split(r'(,@\d+:)', expected_sig)
+            # Simple chunking to avoid regex issues
+            chunk_size = 80
+            for i in range(0, len(expected_sig), chunk_size):
+                chunk = expected_sig[i:i+chunk_size]
+                lines.append(f'             "{chunk}"')
             
-            # Reconstruct with proper formatting
-            result_lines = []
-            current_line = ""
-            for part in parts:
-                if part.startswith(',@'):
-                    if current_line:
-                        result_lines.append(current_line)
-                    current_line = part[1:]  # Remove leading comma
-                else:
-                    current_line += part
-            if current_line:
-                result_lines.append(current_line)
-            
-            # Handle struct header separately
-            if result_lines and result_lines[0].startswith('struct'):
-                header_end = result_lines[0].find('{')
-                if header_end > 0:
-                    header = result_lines[0][:header_end+1]
-                    first_field = result_lines[0][header_end+1:]
-                    lines.append(f'             "{header}"')
-                    if first_field:
-                        lines.append(f'             "{first_field},"')
-                    
-                    for field_line in result_lines[1:-1]:
-                        lines.append(f'             "{field_line},"')
-                    
-                    if len(result_lines) > 1:
-                        last = result_lines[-1]
-                        if last.endswith('}'):
-                            lines.append(f'             "{last}",')
-                        else:
-                            lines.append(f'             "{last}"')
-                else:
-                    lines.append(f'             "{expected_sig}",')
-            else:
-                lines.append(f'             "{expected_sig}",')
-            
-            lines.append(f'              "Type signature mismatch for {struct.name}ReflectionHint");')
+            lines.append(f'              , "Type signature mismatch for {struct.name}ReflectionHint");')
         else:
             # Single line signature
             lines.append(f"static_assert(XTypeSignature::get_XTypeSignature<{struct.name}ReflectionHint>() == \"{expected_sig}\",")

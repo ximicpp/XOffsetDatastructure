@@ -59,18 +59,39 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) InnerObjectReflectionHint {
 	int32_t id;
 	XString name;
 	XVector<int32_t> data;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"id",
+		"name",
+		"data",
+	};
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) MiddleObjectReflectionHint {
 	XString name;
 	InnerObjectReflectionHint inner;
 	XVector<int32_t> values;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"name",
+		"inner",
+		"values",
+	};
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) OuterObjectReflectionHint {
 	XString title;
 	MiddleObjectReflectionHint middle;
 	XVector<InnerObjectReflectionHint> innerList;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"title",
+		"middle",
+		"innerList",
+	};
 };
 
 // ============================================================================
@@ -93,8 +114,10 @@ static_assert(alignof(InnerObject) == alignof(InnerObjectReflectionHint),
 // 3. Type Signature Check
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
-static_assert(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>() == "struct[s:72,a:8]{@0:i32[s:4,a:4],@8:string[s:32,a:8],@40:vector[s:32,a:8]<i32[s:4,a:4]>}",
-              "Type signature mismatch for InnerObjectReflectionHint");
+static_assert(XTypeSignature::get_XTypeSignature<InnerObjectReflectionHint>() ==
+             "struct[s:72,a:8]{@0[id]:i32[s:4,a:4],@8[name]:string[s:32,a:8],@40[data]:vector["
+             "s:32,a:8]<i32[s:4,a:4]>}"
+              , "Type signature mismatch for InnerObjectReflectionHint");
 
 // Compile-time validation for MiddleObject
 
@@ -113,13 +136,10 @@ static_assert(alignof(MiddleObject) == alignof(MiddleObjectReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<MiddleObjectReflectionHint>() ==
-             "struct[s:136,a:8]{"
-             "@0:string[s:32,a:8],"
-             "@32:struct[s:72,a:8]{@0:i32[s:4,a:4],"
-             "@8:string[s:32,a:8],"
-             "@40:vector[s:32,a:8]<i32[s:4,a:4]>},"
-             "@104:vector[s:32,a:8]<i32[s:4,a:4]>}",
-              "Type signature mismatch for MiddleObjectReflectionHint");
+             "struct[s:136,a:8]{@0[name]:string[s:32,a:8],@32[inner]:struct[s:72,a:8]{@0[id]:i"
+             "32[s:4,a:4],@8[name]:string[s:32,a:8],@40[data]:vector[s:32,a:8]<i32[s:4,a:4]>},"
+             "@104[values]:vector[s:32,a:8]<i32[s:4,a:4]>}"
+              , "Type signature mismatch for MiddleObjectReflectionHint");
 
 // Compile-time validation for OuterObject
 
@@ -138,16 +158,12 @@ static_assert(alignof(OuterObject) == alignof(OuterObjectReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<OuterObjectReflectionHint>() ==
-             "struct[s:200,a:8]{"
-             "@0:string[s:32,a:8],"
-             "@32:struct[s:136,a:8]{@0:string[s:32,a:8],"
-             "@32:struct[s:72,a:8]{@0:i32[s:4,a:4],"
-             "@8:string[s:32,a:8],"
-             "@40:vector[s:32,a:8]<i32[s:4,a:4]>},"
-             "@104:vector[s:32,a:8]<i32[s:4,a:4]>},"
-             "@168:vector[s:32,a:8]<struct[s:72,a:8]{@0:i32[s:4,a:4],"
-             "@8:string[s:32,a:8],"
-             "@40:vector[s:32,a:8]<i32[s:4,a:4]>}>}",
-              "Type signature mismatch for OuterObjectReflectionHint");
+             "struct[s:200,a:8]{@0[title]:string[s:32,a:8],@32[middle]:struct[s:136,a:8]{@0[na"
+             "me]:string[s:32,a:8],@32[inner]:struct[s:72,a:8]{@0[id]:i32[s:4,a:4],@8[name]:st"
+             "ring[s:32,a:8],@40[data]:vector[s:32,a:8]<i32[s:4,a:4]>},@104[values]:vector[s:3"
+             "2,a:8]<i32[s:4,a:4]>},@168[innerList]:vector[s:32,a:8]<struct[s:72,a:8]{@0[id]:i"
+             "32[s:4,a:4],@8[name]:string[s:32,a:8],@40[data]:vector[s:32,a:8]<i32[s:4,a:4]>}>"
+             "}"
+              , "Type signature mismatch for OuterObjectReflectionHint");
 
 #endif // GENERATED_NESTED_TEST_HPP_

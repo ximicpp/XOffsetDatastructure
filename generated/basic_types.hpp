@@ -48,6 +48,16 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) BasicTypesReflectionHint {
 	char mChar;
 	bool mBool;
 	int64_t mInt64;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"mInt",
+		"mFloat",
+		"mDouble",
+		"mChar",
+		"mBool",
+		"mInt64",
+	};
 };
 
 // ============================================================================
@@ -71,13 +81,9 @@ static_assert(alignof(BasicTypes) == alignof(BasicTypesReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<BasicTypesReflectionHint>() ==
-             "struct[s:32,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:f32[s:4,a:4],"
-             "@8:f64[s:8,a:8],"
-             "@16:char[s:1,a:1],"
-             "@17:bool[s:1,a:1],"
-             "@24:i64[s:8,a:8]}",
-              "Type signature mismatch for BasicTypesReflectionHint");
+             "struct[s:32,a:8]{@0[mInt]:i32[s:4,a:4],@4[mFloat]:f32[s:4,a:4],@8[mDouble]:f64[s"
+             ":8,a:8],@16[mChar]:char[s:1,a:1],@17[mBool]:bool[s:1,a:1],@24[mInt64]:i64[s:8,a:"
+             "8]}"
+              , "Type signature mismatch for BasicTypesReflectionHint");
 
 #endif // GENERATED_BASIC_TYPES_HPP_

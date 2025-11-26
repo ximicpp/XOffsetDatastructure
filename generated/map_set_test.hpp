@@ -33,6 +33,14 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) MapSetTestReflectionHint {
 	XSet<XString> stringSet;
 	XMap<int32_t, XString> intMap;
 	XMap<XString, int32_t> stringMap;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"intSet",
+		"stringSet",
+		"intMap",
+		"stringMap",
+	};
 };
 
 // ============================================================================
@@ -56,11 +64,9 @@ static_assert(alignof(MapSetTest) == alignof(MapSetTestReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<MapSetTestReflectionHint>() ==
-             "struct[s:128,a:8]{"
-             "@0:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@32:set[s:32,a:8]<string[s:32,a:8]>,"
-             "@64:map[s:32,a:8]<i32[s:4,a:4],string[s:32,a:8]>,"
-             "@96:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
-              "Type signature mismatch for MapSetTestReflectionHint");
+             "struct[s:128,a:8]{@0[intSet]:set[s:32,a:8]<i32[s:4,a:4]>,@32[stringSet]:set[s:32"
+             ",a:8]<string[s:32,a:8]>,@64[intMap]:map[s:32,a:8]<i32[s:4,a:4],string[s:32,a:8]>"
+             ",@96[stringMap]:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}"
+              , "Type signature mismatch for MapSetTestReflectionHint");
 
 #endif // GENERATED_MAP_SET_TEST_HPP_

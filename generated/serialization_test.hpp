@@ -50,6 +50,13 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) SimpleDataReflectionHint {
 	int32_t id;
 	float value;
 	XString name;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"id",
+		"value",
+		"name",
+	};
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) ComplexDataReflectionHint {
@@ -57,6 +64,14 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ComplexDataReflectionHint {
 	XVector<int32_t> items;
 	XSet<int32_t> tags;
 	XMap<XString, int32_t> metadata;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"title",
+		"items",
+		"tags",
+		"metadata",
+	};
 };
 
 // ============================================================================
@@ -79,7 +94,7 @@ static_assert(alignof(SimpleData) == alignof(SimpleDataReflectionHint),
 // 3. Type Signature Check
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
-static_assert(XTypeSignature::get_XTypeSignature<SimpleDataReflectionHint>() == "struct[s:40,a:8]{@0:i32[s:4,a:4],@4:f32[s:4,a:4],@8:string[s:32,a:8]}",
+static_assert(XTypeSignature::get_XTypeSignature<SimpleDataReflectionHint>() == "struct[s:40,a:8]{@0[id]:i32[s:4,a:4],@4[value]:f32[s:4,a:4],@8[name]:string[s:32,a:8]}",
               "Type signature mismatch for SimpleDataReflectionHint");
 
 // Compile-time validation for ComplexData
@@ -99,11 +114,9 @@ static_assert(alignof(ComplexData) == alignof(ComplexDataReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<ComplexDataReflectionHint>() ==
-             "struct[s:128,a:8]{"
-             "@0:string[s:32,a:8],"
-             "@32:vector[s:32,a:8]<i32[s:4,a:4]>,"
-             "@64:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@96:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
-              "Type signature mismatch for ComplexDataReflectionHint");
+             "struct[s:128,a:8]{@0[title]:string[s:32,a:8],@32[items]:vector[s:32,a:8]<i32[s:4"
+             ",a:4]>,@64[tags]:set[s:32,a:8]<i32[s:4,a:4]>,@96[metadata]:map[s:32,a:8]<string["
+             "s:32,a:8],i32[s:4,a:4]>}"
+              , "Type signature mismatch for ComplexDataReflectionHint");
 
 #endif // GENERATED_SERIALIZATION_TEST_HPP_

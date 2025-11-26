@@ -68,6 +68,14 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) ItemReflectionHint {
 	int32_t item_type;
 	int32_t quantity;
 	XString name;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"item_id",
+		"item_type",
+		"quantity",
+		"name",
+	};
 };
 
 struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameDataReflectionHint {
@@ -78,6 +86,17 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) GameDataReflectionHint {
 	XVector<ItemReflectionHint> items;
 	XSet<int32_t> achievements;
 	XMap<XString, int32_t> quest_progress;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"player_id",
+		"level",
+		"health",
+		"player_name",
+		"items",
+		"achievements",
+		"quest_progress",
+	};
 };
 
 // ============================================================================
@@ -100,8 +119,10 @@ static_assert(alignof(Item) == alignof(ItemReflectionHint),
 // 3. Type Signature Check
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
-static_assert(XTypeSignature::get_XTypeSignature<ItemReflectionHint>() == "struct[s:48,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@16:string[s:32,a:8]}",
-              "Type signature mismatch for ItemReflectionHint");
+static_assert(XTypeSignature::get_XTypeSignature<ItemReflectionHint>() ==
+             "struct[s:48,a:8]{@0[item_id]:i32[s:4,a:4],@4[item_type]:i32[s:4,a:4],@8[quantity"
+             "]:i32[s:4,a:4],@16[name]:string[s:32,a:8]}"
+              , "Type signature mismatch for ItemReflectionHint");
 
 // Compile-time validation for GameData
 
@@ -120,17 +141,11 @@ static_assert(alignof(GameData) == alignof(GameDataReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<GameDataReflectionHint>() ==
-             "struct[s:144,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:i32[s:4,a:4],"
-             "@8:f32[s:4,a:4],"
-             "@16:string[s:32,a:8],"
-             "@48:vector[s:32,a:8]<struct[s:48,a:8]{@0:i32[s:4,a:4],"
-             "@4:i32[s:4,a:4],"
-             "@8:i32[s:4,a:4],"
-             "@16:string[s:32,a:8]}>,"
-             "@80:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@112:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
-              "Type signature mismatch for GameDataReflectionHint");
+             "struct[s:144,a:8]{@0[player_id]:i32[s:4,a:4],@4[level]:i32[s:4,a:4],@8[health]:f"
+             "32[s:4,a:4],@16[player_name]:string[s:32,a:8],@48[items]:vector[s:32,a:8]<struct"
+             "[s:48,a:8]{@0[item_id]:i32[s:4,a:4],@4[item_type]:i32[s:4,a:4],@8[quantity]:i32["
+             "s:4,a:4],@16[name]:string[s:32,a:8]}>,@80[achievements]:set[s:32,a:8]<i32[s:4,a:"
+             "4]>,@112[quest_progress]:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}"
+              , "Type signature mismatch for GameDataReflectionHint");
 
 #endif // GENERATED_GAME_DATA_HPP_

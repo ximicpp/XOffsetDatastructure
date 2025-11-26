@@ -39,6 +39,13 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) MemoryTestTypeReflectionHint {
 	int32_t value;
 	XVector<int32_t> data;
 	XVector<XString> strings;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"value",
+		"data",
+		"strings",
+	};
 };
 
 // ============================================================================
@@ -62,10 +69,8 @@ static_assert(alignof(MemoryTestType) == alignof(MemoryTestTypeReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<MemoryTestTypeReflectionHint>() ==
-             "struct[s:72,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@8:vector[s:32,a:8]<i32[s:4,a:4]>,"
-             "@40:vector[s:32,a:8]<string[s:32,a:8]>}",
-              "Type signature mismatch for MemoryTestTypeReflectionHint");
+             "struct[s:72,a:8]{@0[value]:i32[s:4,a:4],@8[data]:vector[s:32,a:8]<i32[s:4,a:4]>,"
+             "@40[strings]:vector[s:32,a:8]<string[s:32,a:8]>}"
+              , "Type signature mismatch for MemoryTestTypeReflectionHint");
 
 #endif // GENERATED_COMPACTION_TEST_HPP_

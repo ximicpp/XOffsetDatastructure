@@ -42,6 +42,14 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) AlignedStructReflectionHint {
 	int32_t b;
 	double c;
 	XString name;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"a",
+		"b",
+		"c",
+		"name",
+	};
 };
 
 // ============================================================================
@@ -64,7 +72,9 @@ static_assert(alignof(AlignedStruct) == alignof(AlignedStructReflectionHint),
 // 3. Type Signature Check
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
-static_assert(XTypeSignature::get_XTypeSignature<AlignedStructReflectionHint>() == "struct[s:48,a:8]{@0:char[s:1,a:1],@4:i32[s:4,a:4],@8:f64[s:8,a:8],@16:string[s:32,a:8]}",
-              "Type signature mismatch for AlignedStructReflectionHint");
+static_assert(XTypeSignature::get_XTypeSignature<AlignedStructReflectionHint>() ==
+             "struct[s:48,a:8]{@0[a]:char[s:1,a:1],@4[b]:i32[s:4,a:4],@8[c]:f64[s:8,a:8],@16[n"
+             "ame]:string[s:32,a:8]}"
+              , "Type signature mismatch for AlignedStructReflectionHint");
 
 #endif // GENERATED_ALIGNMENT_TEST_HPP_

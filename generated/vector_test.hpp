@@ -31,6 +31,13 @@ struct alignas(XTypeSignature::BASIC_ALIGNMENT) VectorTestReflectionHint {
 	XVector<int32_t> intVector;
 	XVector<float> floatVector;
 	XVector<XString> stringVector;
+
+	// Field names metadata for XTypeSignature
+	static constexpr std::string_view _field_names[] = {
+		"intVector",
+		"floatVector",
+		"stringVector",
+	};
 };
 
 // ============================================================================
@@ -54,10 +61,9 @@ static_assert(alignof(VectorTest) == alignof(VectorTestReflectionHint),
 // Type signature verification uses unified Boost.PFR implementation
 // All compilers use lightweight tuple_element and tuple_size_v APIs
 static_assert(XTypeSignature::get_XTypeSignature<VectorTestReflectionHint>() ==
-             "struct[s:96,a:8]{"
-             "@0:vector[s:32,a:8]<i32[s:4,a:4]>,"
-             "@32:vector[s:32,a:8]<f32[s:4,a:4]>,"
-             "@64:vector[s:32,a:8]<string[s:32,a:8]>}",
-              "Type signature mismatch for VectorTestReflectionHint");
+             "struct[s:96,a:8]{@0[intVector]:vector[s:32,a:8]<i32[s:4,a:4]>,@32[floatVector]:v"
+             "ector[s:32,a:8]<f32[s:4,a:4]>,@64[stringVector]:vector[s:32,a:8]<string[s:32,a:8"
+             "]>}"
+              , "Type signature mismatch for VectorTestReflectionHint");
 
 #endif // GENERATED_VECTOR_TEST_HPP_
