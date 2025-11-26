@@ -10,6 +10,7 @@
 #include <experimental/meta>
 
 using namespace XOffsetDatastructure2;
+using namespace XTypeSignature;
 
 struct TypeSigTest {
     int a;
@@ -258,7 +259,6 @@ int main() {
     std::cout << "  Reflection Type Signature Test\n";
     std::cout << "========================================\n\n";
 
-#include <experimental/meta>
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
     std::cout << "[INFO] Testing XTypeSignature integration\n\n";
     
