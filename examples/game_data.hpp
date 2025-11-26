@@ -69,27 +69,27 @@ public:
 // Item type signature validation
 static_assert(XTypeSignature::get_XTypeSignature<Item>() == 
              "struct[s:48,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:i32[s:4,a:4],"
-             "@8:i32[s:4,a:4],"
-             "@16:string[s:32,a:8]}",
+             "@0[item_id]:i32[s:4,a:4],"
+             "@4[item_type]:i32[s:4,a:4],"
+             "@8[quantity]:i32[s:4,a:4],"
+             "@16[name]:string[s:32,a:8]}",
               "Type signature mismatch for Item - "
               "Binary layout changed! This breaks serialization compatibility.");
 
 // GameData type signature validation
 static_assert(XTypeSignature::get_XTypeSignature<GameData>() ==
              "struct[s:144,a:8]{"
-             "@0:i32[s:4,a:4],"
-             "@4:i32[s:4,a:4],"
-             "@8:f32[s:4,a:4],"
-             "@16:string[s:32,a:8],"
-             "@48:vector[s:32,a:8]<struct[s:48,a:8]{"
-                 "@0:i32[s:4,a:4],"
-                 "@4:i32[s:4,a:4],"
-                 "@8:i32[s:4,a:4],"
-                 "@16:string[s:32,a:8]}>,"
-             "@80:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@112:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
+             "@0[player_id]:i32[s:4,a:4],"
+             "@4[level]:i32[s:4,a:4],"
+             "@8[health]:f32[s:4,a:4],"
+             "@16[player_name]:string[s:32,a:8],"
+             "@48[items]:vector[s:32,a:8]<struct[s:48,a:8]{"
+                 "@0[item_id]:i32[s:4,a:4],"
+                 "@4[item_type]:i32[s:4,a:4],"
+                 "@8[quantity]:i32[s:4,a:4],"
+                 "@16[name]:string[s:32,a:8]}>,"
+             "@80[achievements]:set[s:32,a:8]<i32[s:4,a:4]>,"
+             "@112[quest_progress]:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
               "Type signature mismatch for GameData - "
               "Binary layout changed! This breaks serialization compatibility.");
 
