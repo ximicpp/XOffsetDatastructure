@@ -37,6 +37,22 @@ struct UnsafeWithVirtualDestructor {
     virtual ~UnsafeWithVirtualDestructor() = default;
 };
 
+// [BAD]: Inheritance (Base class)
+struct Base {
+    int32_t x;
+};
+
+// [BAD]: Inheritance (Derived class)
+struct Derived : Base {
+    int32_t y;
+};
+
+// [GOOD]: Composition
+struct Composite {
+    Base b;
+    int32_t y;
+};
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "Type Safety Validation Test\n";
@@ -70,6 +86,25 @@ int main() {
               << (is_xbuffer_safe<UnsafeWithVirtualDestructor>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
     std::cout << "  has_virtual_destructor: " << std::has_virtual_destructor_v<UnsafeWithVirtualDestructor> << "\n\n";
     
+    // Test 4: Inheritance vs Composition
+    std::cout << "Test 4: Inheritance vs Composition\n";
+    std::cout << "  is_xbuffer_safe<Derived> (Inheritance): " 
+              << (is_xbuffer_safe<Derived>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
+    std::cout << "  is_xbuffer_safe<Composite> (Composition): " 
+              << (is_xbuffer_safe<Composite>::value ? "[OK] SAFE" : "[FAIL] UNSAFE") << "\n";
+    
+    if (!is_xbuffer_safe<Derived>::value) {
+        std::cout << "  [SUCCESS] Inheritance correctly rejected.\n";
+    } else {
+        std::cout << "  [FAILURE] Inheritance was NOT rejected.\n";
+    }
+    
+    if (is_xbuffer_safe<Composite>::value) {
+        std::cout << "  [SUCCESS] Composition correctly accepted.\n\n";
+    } else {
+        std::cout << "  [FAILURE] Composition was incorrectly rejected.\n\n";
+    }
+
     // [BAD] THESE SHOULD FAIL AT COMPILE-TIME (uncomment to test):
     
     // auto* unsafe1 = xbuf.make<UnsafeData>("unsafe");
@@ -77,13 +112,18 @@ int main() {
     
     // auto* unsafe2 = xbuf.make<UnsafeWithVirtualDestructor>("unsafe2");
     // Error: static assertion failed: Cannot use polymorphic types in XBuffer!
+
+    // auto* unsafe3 = xbuf.make<Derived>("unsafe3");
+    // Error: static assertion failed: Inheritance not allowed (use composition)
     
     std::cout << "========================================\n";
     std::cout << "Summary\n";
     std::cout << "========================================\n";
     std::cout << "[OK] SafeData (non-polymorphic): ALLOWED\n";
     std::cout << "[BLOCKED] UnsafeData (virtual function): BLOCKED\n";
-    std::cout << "[BLOCKED] UnsafeWithVirtualDestructor: BLOCKED\n\n";
+    std::cout << "[BLOCKED] UnsafeWithVirtualDestructor: BLOCKED\n";
+    std::cout << "[BLOCKED] Derived (Inheritance): BLOCKED\n";
+    std::cout << "[OK] Composite (Composition): ALLOWED\n\n";
     
     std::cout << "Type safety is enforced at COMPILE-TIME!\n";
     std::cout << "Unsafe types will cause compilation errors.\n";

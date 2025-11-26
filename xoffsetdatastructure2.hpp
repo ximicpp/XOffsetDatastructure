@@ -820,6 +820,13 @@ namespace XOffsetDatastructure2 {
         consteval bool is_xstring() {
             return std::is_same_v<std::remove_cv_t<T>, XString>;
         }
+
+        template<typename T>
+        consteval bool has_bases() {
+            using namespace std::meta;
+            auto bases = bases_of(^^T, access_context::unchecked());
+            return bases.size() > 0;
+        }
         
         template<typename T>
         consteval bool is_safe_type();
@@ -902,6 +909,10 @@ namespace XOffsetDatastructure2 {
                 return false;
             }
             
+            if constexpr (has_bases<T>()) {
+                return false;
+            }
+
             if constexpr (std::is_union_v<T>) {
                 return false;
             }
@@ -954,6 +965,9 @@ namespace XOffsetDatastructure2 {
             }
             else if constexpr (std::is_polymorphic_v<CleanT>) {
                 return "UNSAFE: Type has virtual functions (polymorphic)";
+            }
+            else if constexpr (has_bases<CleanT>()) {
+                return "UNSAFE: Inheritance not allowed (use composition)";
             }
             else if constexpr (std::is_union_v<CleanT>) {
                 return "UNSAFE: Union type not allowed";

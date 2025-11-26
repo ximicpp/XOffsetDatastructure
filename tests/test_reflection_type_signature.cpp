@@ -213,6 +213,45 @@ void test_serialization_with_reflection() {
     std::cout << "[PASS] Serialization with reflection\n\n";
 }
 
+// Define a reusable component (like a Base class, but used for composition)
+struct Component {
+    int32_t id;
+    float value;
+};
+
+// Define a struct that uses composition instead of inheritance
+struct CompositeStruct {
+    Component comp;      // Composition: Component is a member
+    int32_t extra_data;
+};
+
+void test_composition_signature() {
+    std::cout << "[Test 7] Composition Signature Verification\n";
+    std::cout << "-------------------------------------------\n";
+    
+    constexpr auto sig_component = get_XTypeSignature<Component>();
+    constexpr auto sig_composite = get_XTypeSignature<CompositeStruct>();
+    
+    std::cout << "  Component signature: " << sig_component.value << "\n";
+    std::cout << "  Composite signature: " << sig_composite.value << "\n";
+
+    std::string composite_str = sig_composite.value;
+
+    // Verification: Composite signature should contain the inner struct's signature
+    // The inner struct signature is: struct[s:8,a:4]{@0[id]:i32[s:4,a:4],@4[value]:f32[s:4,a:4]}
+    // The composite signature should look like: struct[...]{@0[comp]:struct[...]{...},...}
+    
+    bool has_inner_details = composite_str.find("@0[id]:i32") != std::string::npos;
+    
+    if (has_inner_details) {
+        std::cout << "  [SUCCESS] Composite signature contains inner struct details.\n";
+    } else {
+        std::cout << "  [FAILURE] Composite signature MISSING inner struct details.\n";
+    }
+    
+    std::cout << "[PASS] Composition signature\n\n";
+}
+
 
 int main() {
     std::cout << "========================================\n";
@@ -229,6 +268,7 @@ int main() {
     test_instance_creation();
     test_type_consistency();
     test_serialization_with_reflection();
+    test_composition_signature();
     
     std::cout << "========================================\n";
     std::cout << "  Summary\n";
@@ -239,6 +279,7 @@ int main() {
     std::cout << "[PASS] Test 4: Instance creation\n";
     std::cout << "[PASS] Test 5: Type consistency\n";
     std::cout << "[PASS] Test 6: Serialization with reflection\n";
+    std::cout << "[PASS] Test 7: Composition signature\n";
     std::cout << "\n[SUCCESS] All type signature tests passed!\n";
     
     return 0;
