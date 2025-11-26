@@ -8,7 +8,7 @@ import yaml
 import sys
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
 
 @dataclass
@@ -549,7 +549,7 @@ class CodeGenerator:
         
         return "\n".join(lines)
 
-def parse_yaml_schema(yaml_file: Path) -> tuple[List[StructDef], Dict[str, Any]]:
+def parse_yaml_schema(yaml_file: Path) -> Tuple[List[StructDef], Dict[str, Any]]:
     """Parse YAML schema file"""
     with open(yaml_file, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
