@@ -86,6 +86,13 @@ namespace XTypeSignature {
             }
         }
 
+        constexpr CompileString(std::string_view sv) {
+            for (size_t i = 0; i < N - 1 && i < sv.size(); ++i) {
+                value[i] = sv[i];
+            }
+            value[N - 1] = '\0';
+        }
+
         template <typename T>
         static constexpr CompileString<32> from_number(T num) noexcept {
             char result[32] = {};
@@ -194,9 +201,15 @@ namespace XTypeSignature {
         
         using FieldType = [:type_of(member):];
         constexpr std::size_t offset = offset_of(member).bytes;
+        
+        constexpr std::string_view name = identifier_of(member);
+        constexpr size_t N = name.size() + 1;
+
         return CompileString{"@"} +
                CompileString<32>::from_number(offset) +
-               CompileString{":"} +
+               CompileString{"["} +
+               CompileString<N>(name) +
+               CompileString{"]:"} +
                TypeSignature<FieldType>::calculate();
     }
 
