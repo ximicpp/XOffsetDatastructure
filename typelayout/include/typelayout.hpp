@@ -85,6 +85,56 @@ namespace typelayout {
     #endif
 
     //==========================================================================
+    // Platform-dependent type detection
+    // These types have different sizes/alignments across platforms
+    //==========================================================================
+    
+    // Primary template: assume portable by default
+    template <typename T>
+    struct is_platform_dependent : std::false_type {};
+    
+    // Helper: check if a type is a fixed-width integer type
+    template <typename T>
+    struct is_fixed_width_integer : std::false_type {};
+    
+    template <> struct is_fixed_width_integer<int8_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<uint8_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<int16_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<uint16_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<int32_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<uint32_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<int64_t> : std::true_type {};
+    template <> struct is_fixed_width_integer<uint64_t> : std::true_type {};
+    
+    template <typename T>
+    inline constexpr bool is_fixed_width_integer_v = is_fixed_width_integer<T>::value;
+    
+    // wchar_t: 2 bytes (Windows) vs 4 bytes (Linux)
+    template <> struct is_platform_dependent<wchar_t> : std::true_type {};
+    // long double: 8/12/16 bytes depending on platform
+    template <> struct is_platform_dependent<long double> : std::true_type {};
+    
+#if defined(_WIN32) || defined(_WIN64)
+    // Windows LLP64: long is 4 bytes, int64_t is 8 bytes (long long)
+    template <> struct is_platform_dependent<long> : std::true_type {};
+    template <> struct is_platform_dependent<unsigned long> : std::true_type {};
+#endif
+    // Linux LP64: long = int64_t, cannot distinguish, so don't flag
+    
+    // CV-qualified variants
+    template <typename T> struct is_platform_dependent<const T> : is_platform_dependent<T> {};
+    template <typename T> struct is_platform_dependent<volatile T> : is_platform_dependent<T> {};
+    template <typename T> struct is_platform_dependent<const volatile T> : is_platform_dependent<T> {};
+    
+    // Arrays of platform-dependent types
+    template <typename T, std::size_t N> 
+    struct is_platform_dependent<T[N]> : is_platform_dependent<T> {};
+    
+    // Helper variable template
+    template <typename T>
+    inline constexpr bool is_platform_dependent_v = is_platform_dependent<T>::value;
+
+    //==========================================================================
     // Compile-time string class for signature building
     //==========================================================================
     template <size_t N>
@@ -848,5 +898,125 @@ namespace typelayout {
 } // namespace typelayout
 
 #endif // BOOST_INTERPROCESS_OFFSET_PTR_HPP
+
+//==========================================================================
+// Portability checking - detect platform-dependent types in struct members
+//==========================================================================
+
+namespace typelayout {
+
+    // Forward declaration for recursive checking
+    template <typename T>
+    [[nodiscard]] consteval bool is_portable() noexcept;
+
+    // Check if a single member type is portable (recursive)
+    template<typename T, std::size_t Index>
+    consteval bool check_member_portable() noexcept {
+        using namespace std::meta;
+        constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
+        using FieldType = [:type_of(member):];
+        
+        // Use is_portable for recursive checking of nested structs
+        return is_portable<FieldType>();
+    }
+
+    // Check all members for portability
+    template<typename T, std::size_t... Indices>
+    consteval bool check_all_members_portable(std::index_sequence<Indices...>) noexcept {
+        return (check_member_portable<T, Indices>() && ...);
+    }
+
+    // Check if a single base class is portable (recursive)
+    template<typename T, std::size_t Index>
+    consteval bool check_base_portable() noexcept {
+        using namespace std::meta;
+        constexpr auto base_info = bases_of(^^T, access_context::unchecked())[Index];
+        using BaseType = [:type_of(base_info):];
+        
+        // Recursively check the base class
+        return is_portable<BaseType>();
+    }
+
+    // Check all base classes for portability
+    template<typename T, std::size_t... Indices>
+    consteval bool check_all_bases_portable(std::index_sequence<Indices...>) noexcept {
+        return (check_base_portable<T, Indices>() && ...);
+    }
+
+    // Check if a type is portable (no platform-dependent members)
+    // Recursively checks nested structs AND base classes
+    template <typename T>
+    [[nodiscard]] consteval bool is_portable() noexcept {
+        // Strip CV qualifiers
+        using CleanT = std::remove_cv_t<T>;
+        
+        // Check if it's a platform-dependent primitive
+        if constexpr (is_platform_dependent_v<CleanT>) {
+            return false;
+        }
+        // Check arrays recursively
+        else if constexpr (std::is_array_v<CleanT>) {
+            using ElementType = std::remove_extent_t<CleanT>;
+            return is_portable<ElementType>();
+        }
+        // Unions: we cannot know which member is active at runtime, but
+        // we CAN check all members for portability at compile time.
+        // Conservative strategy: if ANY member is non-portable, the union
+        // is considered non-portable (safer than missing a problem).
+        else if constexpr (std::is_union_v<CleanT>) {
+            constexpr std::size_t member_count = get_member_count<CleanT>();
+            if constexpr (member_count == 0) {
+                return true;
+            } else {
+                return check_all_members_portable<CleanT>(
+                    std::make_index_sequence<member_count>{});
+            }
+        }
+        // Check structs/classes recursively (including base classes)
+        else if constexpr (std::is_class_v<CleanT>) {
+            // First check all base classes
+            constexpr std::size_t base_count = get_base_count<CleanT>();
+            bool bases_portable = true;
+            if constexpr (base_count > 0) {
+                bases_portable = check_all_bases_portable<CleanT>(
+                    std::make_index_sequence<base_count>{});
+            }
+            
+            if (!bases_portable) {
+                return false;
+            }
+            
+            // Then check all direct members
+            constexpr std::size_t member_count = get_member_count<CleanT>();
+            if constexpr (member_count == 0) {
+                return true;
+            } else {
+                return check_all_members_portable<CleanT>(
+                    std::make_index_sequence<member_count>{});
+            }
+        }
+        // All other types (primitives, pointers, etc.) are portable
+        else {
+            return true;
+        }
+    }
+
+    // Helper variable template for is_portable
+    template <typename T>
+    inline constexpr bool is_portable_v = is_portable<T>();
+
+} // namespace typelayout
+
+/**
+ * @brief Assert that a type contains no platform-dependent members
+ * @param Type The type to check for portability
+ * 
+ * Platform-dependent types include: long, unsigned long, wchar_t, long double
+ * These types have different sizes on Windows (LLP64) vs Linux (LP64)
+ */
+#define TYPELAYOUT_ASSERT_PORTABLE(Type) \
+    static_assert(::typelayout::is_portable<Type>(), \
+                  "Type " #Type " contains platform-dependent members (long, wchar_t, long double). " \
+                  "Use fixed-width types (int32_t, int64_t, char16_t, double) for cross-platform compatibility.")
 
 #endif // TYPELAYOUT_HPP

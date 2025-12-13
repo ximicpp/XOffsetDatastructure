@@ -419,6 +419,221 @@ struct TypeD { int32_t x; int64_t y; };
 static_assert(!signatures_match<TypeA, TypeD>()); // Different layout
 
 //=============================================================================
+// 17. Platform-dependent Type Detection (Portability Warnings)
+//=============================================================================
+
+// Platform-dependent primitive types should be detected
+// NOTE: wchar_t and long double are ALWAYS platform-dependent
+static_assert(is_platform_dependent_v<wchar_t> == true);
+static_assert(is_platform_dependent_v<long double> == true);
+
+// Windows: long is 4 bytes, different from int64_t
+#if defined(_WIN32) || defined(_WIN64)
+static_assert(is_platform_dependent_v<long> == true);
+static_assert(is_platform_dependent_v<unsigned long> == true);
+static_assert(is_platform_dependent_v<const long> == true);
+static_assert(is_platform_dependent_v<long[4]> == true);
+#else
+// On Linux, long = int64_t, so long is NOT flagged as platform-dependent
+static_assert(is_platform_dependent_v<long> == false);
+static_assert(is_platform_dependent_v<unsigned long> == false);
+#endif
+
+// CV-qualified variants for wchar_t and long double
+static_assert(is_platform_dependent_v<volatile wchar_t> == true);
+static_assert(is_platform_dependent_v<const volatile long double> == true);
+
+// Arrays of platform-dependent types
+static_assert(is_platform_dependent_v<wchar_t[16]> == true);
+static_assert(is_platform_dependent_v<long double[4]> == true);
+
+// Portable types should NOT be detected as platform-dependent
+static_assert(is_platform_dependent_v<int> == false);
+static_assert(is_platform_dependent_v<int32_t> == false);
+static_assert(is_platform_dependent_v<int64_t> == false);
+static_assert(is_platform_dependent_v<double> == false);
+static_assert(is_platform_dependent_v<char> == false);
+static_assert(is_platform_dependent_v<char16_t> == false);
+static_assert(is_platform_dependent_v<char32_t> == false);
+
+// Fixed-width integer type detection
+static_assert(is_fixed_width_integer_v<int8_t> == true);
+static_assert(is_fixed_width_integer_v<uint8_t> == true);
+static_assert(is_fixed_width_integer_v<int16_t> == true);
+static_assert(is_fixed_width_integer_v<uint16_t> == true);
+static_assert(is_fixed_width_integer_v<int32_t> == true);
+static_assert(is_fixed_width_integer_v<uint32_t> == true);
+static_assert(is_fixed_width_integer_v<int64_t> == true);
+static_assert(is_fixed_width_integer_v<uint64_t> == true);
+// NOTE: On Linux, int = int32_t (same type via typedef), so int IS a fixed-width integer
+// This is expected behavior - we detect actual types, not names
+static_assert(is_fixed_width_integer_v<float> == false);
+
+//=============================================================================
+// 18. Struct Portability Checking
+//=============================================================================
+
+// Portable struct - uses only fixed-width types
+struct PortableStruct {
+    int32_t x;
+    int64_t y;
+    double z;
+    char name[16];
+};
+static_assert(is_portable<PortableStruct>() == true);
+TYPELAYOUT_ASSERT_PORTABLE(PortableStruct);  // Should compile successfully
+
+// Non-portable struct - contains wchar_t (always platform-dependent)
+struct NonPortableWithWchar {
+    int32_t id;
+    wchar_t name[16];  // Platform-dependent: 2 bytes on Windows, 4 bytes on Linux
+};
+static_assert(is_portable<NonPortableWithWchar>() == false);
+
+// Non-portable struct - contains long double (always platform-dependent)
+struct NonPortableWithLongDouble {
+    double normal;
+    long double extended;  // Platform-dependent: 8/12/16 bytes
+};
+static_assert(is_portable<NonPortableWithLongDouble>() == false);
+
+// On Windows, long is platform-dependent
+#if defined(_WIN32) || defined(_WIN64)
+struct NonPortableWithLong {
+    int32_t x;
+    long y;  // Platform-dependent on Windows: 4 bytes (vs 8 bytes on Linux)
+};
+static_assert(is_portable<NonPortableWithLong>() == false);
+#endif
+
+// Empty struct is portable
+static_assert(is_portable<EmptyStruct>() == true);
+
+// Nested struct portability
+struct NestedPortable {
+    PortableStruct inner;
+    int32_t extra;
+};
+static_assert(is_portable<NestedPortable>() == true);
+
+// Nested non-portable struct
+struct NestedNonPortable {
+    NonPortableWithWchar inner;
+    int32_t extra;
+};
+static_assert(is_portable<NestedNonPortable>() == false);
+
+// Primitives are portable (except platform-dependent ones)
+static_assert(is_portable<int32_t>() == true);
+static_assert(is_portable<double>() == true);
+static_assert(is_portable<wchar_t>() == false);
+static_assert(is_portable<long double>() == false);
+
+//=============================================================================
+// 19. Inheritance and Portability
+//=============================================================================
+
+// Base class with platform-dependent type
+struct NonPortableBase {
+    wchar_t name[8];  // Platform-dependent
+};
+
+// Derived class should inherit non-portability from base
+struct DerivedFromNonPortable : NonPortableBase {
+    int32_t id;  // This field is portable, but base is not
+};
+static_assert(is_portable<DerivedFromNonPortable>() == false);
+
+// Portable base class
+struct PortableBase {
+    int32_t value;
+};
+
+// Derived from portable base should be portable
+struct DerivedFromPortable : PortableBase {
+    int64_t extra;
+};
+static_assert(is_portable<DerivedFromPortable>() == true);
+TYPELAYOUT_ASSERT_PORTABLE(DerivedFromPortable);
+
+// Multiple inheritance - one non-portable base
+struct MultiBaseNonPortable : PortableBase, NonPortableBase {
+    double data;
+};
+static_assert(is_portable<MultiBaseNonPortable>() == false);
+
+// Deep inheritance chain
+struct Level1 { int32_t a; };
+struct Level2 : Level1 { int64_t b; };
+struct Level3 : Level2 { double c; };
+static_assert(is_portable<Level3>() == true);
+
+// Deep inheritance with non-portable at root
+struct BadRoot { wchar_t w; };
+struct Level2Bad : BadRoot { int32_t x; };
+struct Level3Bad : Level2Bad { double y; };
+static_assert(is_portable<Level3Bad>() == false);
+
+//=============================================================================
+// 20. Union Portability Tests
+//=============================================================================
+
+// Union with all portable members
+union PortableUnion {
+    int32_t i;
+    float f;
+    char c[8];
+};
+static_assert(is_portable<PortableUnion>() == true);
+TYPELAYOUT_ASSERT_PORTABLE(PortableUnion);
+
+// Union with a non-portable member (wchar_t)
+union NonPortableUnion1 {
+    int32_t i;
+    wchar_t w;  // Platform-dependent (2 bytes on Windows, 4 bytes on Linux)
+};
+static_assert(is_portable<NonPortableUnion1>() == false);
+
+// Union containing non-portable struct
+struct StructWithWchar {
+    wchar_t name[16];
+};
+
+union NonPortableUnion2 {
+    int32_t id;
+    StructWithWchar s;  // Contains wchar_t
+};
+static_assert(is_portable<NonPortableUnion2>() == false);
+
+// Empty union (edge case)
+union EmptyUnion {};
+static_assert(is_portable<EmptyUnion>() == true);
+
+// Union with portable nested union
+union InnerPortableUnion {
+    int32_t a;
+    double b;
+};
+
+union OuterPortableUnion {
+    InnerPortableUnion inner;
+    int64_t value;
+};
+static_assert(is_portable<OuterPortableUnion>() == true);
+
+// Union with non-portable nested union
+union InnerNonPortableUnion {
+    wchar_t w;
+    int32_t i;
+};
+
+union OuterNonPortableUnion {
+    InnerNonPortableUnion inner;  // Contains wchar_t
+    int64_t value;
+};
+static_assert(is_portable<OuterNonPortableUnion>() == false);
+
+//=============================================================================
 // Main - if this compiles, all static_assert tests pass
 //=============================================================================
 
