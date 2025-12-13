@@ -49,7 +49,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <limits>
-#include <cstddef>  // for std::byte
+#include <memory>
 
 namespace typelayout {
 
@@ -779,5 +779,74 @@ namespace typelayout {
         constexpr auto sig = ::typelayout::get_layout_signature<Type>(); \
         std::cout << #Type << " layout signature:\n  " << sig.c_str() << std::endl; \
     } while(0)
+
+//==========================================================================
+// Smart pointer specializations
+// Treat smart pointers as opaque pointer-like types to prevent deep recursion
+//==========================================================================
+
+namespace typelayout {
+
+    // std::unique_ptr - treat as pointer
+    template <typename T, typename Deleter>
+    struct TypeSignature<std::unique_ptr<T, Deleter>> {
+        static consteval auto calculate() noexcept {
+            return CompileString{"unique_ptr[s:"} +
+                   CompileString<32>::from_number(sizeof(std::unique_ptr<T, Deleter>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(std::unique_ptr<T, Deleter>)) +
+                   CompileString{"]"};
+        }
+    };
+
+    // std::shared_ptr - treat as pointer
+    template <typename T>
+    struct TypeSignature<std::shared_ptr<T>> {
+        static consteval auto calculate() noexcept {
+            return CompileString{"shared_ptr[s:"} +
+                   CompileString<32>::from_number(sizeof(std::shared_ptr<T>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(std::shared_ptr<T>)) +
+                   CompileString{"]"};
+        }
+    };
+
+    // std::weak_ptr - treat as pointer
+    template <typename T>
+    struct TypeSignature<std::weak_ptr<T>> {
+        static consteval auto calculate() noexcept {
+            return CompileString{"weak_ptr[s:"} +
+                   CompileString<32>::from_number(sizeof(std::weak_ptr<T>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(std::weak_ptr<T>)) +
+                   CompileString{"]"};
+        }
+    };
+
+} // namespace typelayout
+
+//==========================================================================
+// Boost.Interprocess offset_ptr specialization (conditional)
+// Only enabled when boost/interprocess/offset_ptr.hpp has been included
+//==========================================================================
+
+#ifdef BOOST_INTERPROCESS_OFFSET_PTR_HPP
+
+namespace typelayout {
+
+    template <typename T, typename DifferenceType, typename OffsetType, std::size_t Alignment>
+    struct TypeSignature<boost::interprocess::offset_ptr<T, DifferenceType, OffsetType, Alignment>> {
+        static consteval auto calculate() noexcept {
+            return CompileString{"offset_ptr[s:"} +
+                   CompileString<32>::from_number(sizeof(boost::interprocess::offset_ptr<T, DifferenceType, OffsetType, Alignment>)) +
+                   CompileString{",a:"} +
+                   CompileString<32>::from_number(alignof(boost::interprocess::offset_ptr<T, DifferenceType, OffsetType, Alignment>)) +
+                   CompileString{"]"};
+        }
+    };
+
+} // namespace typelayout
+
+#endif // BOOST_INTERPROCESS_OFFSET_PTR_HPP
 
 #endif // TYPELAYOUT_HPP
