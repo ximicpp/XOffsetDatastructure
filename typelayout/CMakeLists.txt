@@ -50,6 +50,57 @@ target_link_libraries(typelayout_demo PRIVATE typelayout)
 add_executable(typelayout_test test/test_all_types.cpp)
 target_link_libraries(typelayout_test PRIVATE typelayout)
 
+# XOffsetDatastructure verification demo (requires Boost)
+option(TYPELAYOUT_BUILD_XOFFSET_DEMO "Build XOffsetDatastructure verification demo" ON)
+if(TYPELAYOUT_BUILD_XOFFSET_DEMO)
+    # Use local Boost from external directory
+    set(LOCAL_BOOST_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../external/boost")
+    if(EXISTS "${LOCAL_BOOST_PATH}")
+        # Boost include directories (same as main project)
+        set(BOOST_INCLUDE_DIRS
+            ${LOCAL_BOOST_PATH}
+            ${LOCAL_BOOST_PATH}/libs/any/include
+            ${LOCAL_BOOST_PATH}/libs/container/include
+            ${LOCAL_BOOST_PATH}/libs/interprocess/include
+            ${LOCAL_BOOST_PATH}/libs/type_index/include
+            ${LOCAL_BOOST_PATH}/libs/core/include
+            ${LOCAL_BOOST_PATH}/libs/config/include
+            ${LOCAL_BOOST_PATH}/libs/throw_exception/include
+            ${LOCAL_BOOST_PATH}/libs/assert/include
+            ${LOCAL_BOOST_PATH}/libs/static_assert/include
+            ${LOCAL_BOOST_PATH}/libs/container_hash/include
+            ${LOCAL_BOOST_PATH}/libs/pfr/include
+            ${LOCAL_BOOST_PATH}/libs/move/include
+            ${LOCAL_BOOST_PATH}/libs/type_traits/include
+            ${LOCAL_BOOST_PATH}/libs/winapi/include
+            ${LOCAL_BOOST_PATH}/libs/intrusive/include
+            ${LOCAL_BOOST_PATH}/libs/predef/include
+        )
+        
+        add_executable(typelayout_xoffset_demo demo/xoffset_demo.cpp)
+        target_link_libraries(typelayout_xoffset_demo PRIVATE typelayout)
+        target_include_directories(typelayout_xoffset_demo PRIVATE 
+            ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ${BOOST_INCLUDE_DIRS}
+        )
+        message(STATUS "  XOffset Demo: Enabled (using local Boost)")
+    else()
+        # Fallback to system Boost
+        find_package(Boost 1.74 QUIET)
+        if(Boost_FOUND)
+            add_executable(typelayout_xoffset_demo demo/xoffset_demo.cpp)
+            target_link_libraries(typelayout_xoffset_demo PRIVATE typelayout)
+            target_include_directories(typelayout_xoffset_demo PRIVATE 
+                ${CMAKE_CURRENT_SOURCE_DIR}/..
+                ${Boost_INCLUDE_DIRS}
+            )
+            message(STATUS "  XOffset Demo: Enabled (Boost ${Boost_VERSION} found)")
+        else()
+            message(STATUS "  XOffset Demo: Disabled (Boost not found)")
+        endif()
+    endif()
+endif()
+
 # Installation rules
 include(GNUInstallDirs)
 
