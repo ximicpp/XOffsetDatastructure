@@ -1,19 +1,22 @@
 // xoffset_demo.cpp - TypeLayout verification for XOffsetDatastructure types
 
 #include <iostream>
-#include "../include/typelayout.hpp"
+// Include xoffsetdatastructure first (includes Boost headers)
+// This enables the conditional offset_ptr specialization in typelayout.hpp
 #include "../../xoffsetdatastructure2.hpp"
+#include "../include/typelayout.hpp"
 
 using namespace typelayout;
 using namespace XOffsetDatastructure2;
 
-// TypeSignature specializations for XOffsetDatastructure container types
+// Optional: User-provided specializations for cleaner container signatures
+// If removed, containers will use generic signatures (more verbose but still valid)
 namespace typelayout {
 
 template <>
 struct TypeSignature<XString> {
     static consteval auto calculate() noexcept {
-        return CompileString{"string[s:"} +
+        return CompileString{"xstring[s:"} +
                CompileString<32>::from_number(sizeof(XString)) +
                CompileString{",a:"} +
                CompileString<32>::from_number(alignof(XString)) +
@@ -24,7 +27,7 @@ struct TypeSignature<XString> {
 template <typename T>
 struct TypeSignature<XVector<T>> {
     static consteval auto calculate() noexcept {
-        return CompileString{"vector[s:"} +
+        return CompileString{"xvector[s:"} +
                CompileString<32>::from_number(sizeof(XVector<T>)) +
                CompileString{",a:"} +
                CompileString<32>::from_number(alignof(XVector<T>)) +
@@ -37,7 +40,7 @@ struct TypeSignature<XVector<T>> {
 template <typename T>
 struct TypeSignature<XSet<T>> {
     static consteval auto calculate() noexcept {
-        return CompileString{"set[s:"} +
+        return CompileString{"xset[s:"} +
                CompileString<32>::from_number(sizeof(XSet<T>)) +
                CompileString{",a:"} +
                CompileString<32>::from_number(alignof(XSet<T>)) +
@@ -50,7 +53,7 @@ struct TypeSignature<XSet<T>> {
 template <typename K, typename V>
 struct TypeSignature<XMap<K, V>> {
     static consteval auto calculate() noexcept {
-        return CompileString{"map[s:"} +
+        return CompileString{"xmap[s:"} +
                CompileString<32>::from_number(sizeof(XMap<K, V>)) +
                CompileString{",a:"} +
                CompileString<32>::from_number(alignof(XMap<K, V>)) +
@@ -59,17 +62,6 @@ struct TypeSignature<XMap<K, V>> {
                CompileString{","} +
                TypeSignature<V>::calculate() +
                CompileString{">"};
-    }
-};
-
-template <typename T>
-struct TypeSignature<XOffsetPtr<T>> {
-    static consteval auto calculate() noexcept {
-        return CompileString{"offset_ptr[s:"} +
-               CompileString<32>::from_number(sizeof(XOffsetPtr<T>)) +
-               CompileString{",a:"} +
-               CompileString<32>::from_number(alignof(XOffsetPtr<T>)) +
-               CompileString{"]"};
     }
 };
 
