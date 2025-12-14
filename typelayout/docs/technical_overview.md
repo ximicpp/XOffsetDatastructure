@@ -2,137 +2,172 @@
 
 ## Abstract
 
-**The nightmare of binary compatibility is subtle and catastrophic: two systems exchange raw bytes, both compile successfully, but the data is silently corrupted.** A struct compiled on Windows has different padding than the same struct on Linux. A field renamed from `price` to `cost` passes all type checks but reads garbage. These bugs are invisible at compile time and explosive at runtime.
+Binary compatibility bugs are among the most insidious in systems programming. Two programs exchange raw bytes through shared memory or network protocols—both compile successfully, both pass unit tests, yet one reads garbage from the other. The culprit: invisible differences in struct layout caused by compiler variations, platform differences, or innocent refactoring.
 
-Traditional solutions—manual `static_assert` chains, documentation contracts, version numbers—are tedious, error-prone, and fundamentally incomplete. They require human discipline to maintain and provide no semantic guarantees.
-
-This talk introduces **TypeLayout**, a header-only C++26 library that leverages **Static Reflection (P2996)** to generate **complete, semantic layout signatures** at compile time. The core guarantee is simple and powerful:
+This session introduces **TypeLayout**, a header-only C++26 library that leverages P2996 Static Reflection to generate **complete, semantic layout signatures** at compile time. The core guarantee is:
 
 > **Identical signature ⟺ Identical memory layout**
 
-| Traditional Approach | TypeLayout Solution |
-|---------------------|---------------------|
-| Manual `offsetof()` checks | Automatic `offset_of(member).bytes` via reflection |
-| No field name verification | `identifier_of(member)` captures semantic identity |
-| Runtime-only validation | Compile-time `static_assert` failure |
-| Per-platform maintenance | Single "golden signature" works everywhere |
-| Hope-based compatibility | **Proof-based compatibility** |
-
-The result: **one line of code** creates an unbreakable binary contract that catches layout mismatches *before* your code ships, not after your users report data corruption.
+With a single macro, developers can bind a type to its expected layout signature. If the layout ever differs—on any platform, with any compiler—**compilation fails immediately**:
 
 ```cpp
-TYPELAYOUT_BIND(Player, "struct[s:56,a:8]{@0[id]:u64[s:8,a:8],@8[name]:bytes[s:32,a:1],...}");
+struct Player { uint64_t id; char name[32]; float health; };
+TYPELAYOUT_BIND(Player, "struct[s:48,a:8]{@0[id]:u64[s:8,a:8],@8[name]:bytes[s:32,a:1],@40[health]:f32[s:4,a:4]}");
 ```
 
-If the layout ever changes—different compiler, different platform, refactored field—**compilation fails immediately** with a clear error message.
+Unlike manual `sizeof()` checks that only verify total size, TypeLayout signatures capture the **complete internal layout**—field offsets, alignments, and nested structure details. The library also provides portability checking to detect platform-dependent types (`wchar_t`, `long`, `long double`) hidden in nested structures.
+
+This talk covers the problem space, demonstrates the C++26 reflection APIs that make this possible, walks through the implementation, and shows practical integration patterns for IPC, serialization, and cross-platform development.
 
 ---
 
 ## Outline
 
-**1. The Problem: Silent Binary Incompatibility (5 min)**
-- What is binary compatibility? Why does it matter?
-- Real-world failure modes:
-  - Cross-platform IPC with mismatched struct padding
-  - Shared memory corruption after field reordering
-  - Network protocol breakage after innocent refactoring
-- Why existing tools fail: no semantic awareness, no compile-time guarantees
-- *Takeaway: Binary compatibility bugs are silent, catastrophic, and preventable*
+### 1. The Problem: Silent Binary Incompatibility (8 min)
 
-**2. The C++26 Reflection Foundation (8 min)**
-- Introduction to P2996 Static Reflection (`<experimental/meta>`)
-- Four key APIs that make TypeLayout possible:
-  - `nonstatic_data_members_of(^^T)` — enumerate all fields
-  - `identifier_of(member)` — extract field names as `string_view`
-  - `offset_of(member).bytes` — compiler-verified byte offsets
-  - `type_of(member)` — recursive type introspection
-- Live code walkthrough: `typelayout.hpp:lines 244-314`
-- *Takeaway: C++26 reflection provides complete structural AND semantic introspection*
+- What is binary compatibility and why does it matter?
+  - The core problem: **same source code, different binary layout across platforms**
+    - Different compilers may use different padding strategies
+    - Different platforms have different type sizes (`long`: 4 bytes on Windows, 8 bytes on Linux)
+    - Struct layout is implementation-defined, not guaranteed by the standard
+- Real-world failure scenarios:
+  - Cross-platform shared memory: data written on Linux, corrupted when read on Windows
+  - Network protocols: sender and receiver disagree on field offsets
+  - File formats: data files become unreadable after compiler upgrade
+- Why traditional solutions fail:
+  - Manual `static_assert(sizeof(...))` only checks size, not internal layout
+  - `#pragma pack` is non-portable and error-prone
+  - Runtime checks catch bugs too late—after deployment
 
-**3. Anatomy of a Layout Signature (10 min)**
-- Signature format design: human-readable, machine-comparable
-- Example breakdown:
+```cpp
+// The problem: same struct, different layout on Windows vs Linux
+struct Record {
+    int32_t id;
+    long    timestamp;  // 4 bytes on Windows (LLP64), 8 bytes on Linux (LP64)!
+    int32_t flags;
+};
+// Windows: sizeof = 12, offsets: id@0, timestamp@4, flags@8
+// Linux:   sizeof = 24, offsets: id@0, timestamp@8, flags@16
+// Cross-platform shared memory or network protocol = silent data corruption!
+
+// TypeLayout solution: compile-time layout verification
+TYPELAYOUT_BIND(Record, "struct[s:12,a:4]{@0[id]:i32[s:4,a:4],@4[timestamp]:long[s:4,a:4],@8[flags]:i32[s:4,a:4]}");
+// Compiles on Windows, FAILS on Linux — catches the incompatibility at compile time!
+```
+
+---
+
+### 2. C++26 Static Reflection Primer (10 min)
+
+- Introduction to P2996 and `<experimental/meta>`
+- Four key APIs used by TypeLayout:
+  - `nonstatic_data_members_of(^^T)` — enumerate all fields at compile time
+  - `identifier_of(member)` — extract field name as `std::string_view`
+  - `offset_of(member).bytes` — compiler-verified byte offset
+  - `type_of(member)` — get field type for recursive introspection
+- The splice syntax: `obj.[:member:]` for programmatic member access
+- Why this was impossible before C++26
+
+```cpp
+template<typename T>
+consteval auto get_first_field_name() {
+    constexpr auto members = std::meta::nonstatic_data_members_of(^^T);
+    return std::meta::identifier_of(members[0]);  // Returns "id" for struct { int id; }
+}
+```
+
+---
+
+### 3. Anatomy of a Layout Signature (10 min)
+
+- Design goals: human-readable, machine-comparable, semantically complete
+- Signature format breakdown:
   ```
-  struct[s:56,a:8]{@0[id]:u64[s:8,a:8],@8[name]:bytes[s:32,a:1],@40[pos]:struct[s:8,a:4]{...}}
+  struct[s:48,a:8]{@0[id]:u64[s:8,a:8],@8[name]:bytes[s:32,a:1],@40[health]:f32[s:4,a:4]}
   ```
-  - `s:56` — total size in bytes
-  - `a:8` — alignment requirement
+  - `struct[s:48,a:8]` — type category, size 48 bytes, alignment 8
   - `@0[id]` — offset 0, field name "id"
-  - Nested structs expand recursively
-- Bit-field support: `@4.2[flags]:bits<3,u8>` — byte 4, bit 2, width 3
+  - `:u64[s:8,a:8]` — type signature with size/alignment
+- Nested struct expansion (recursive signatures)
+- Bit-field support: `@4.2[flags]:bits<3,u8>` — byte 4, bit offset 2, width 3 bits
 - Type coverage: primitives, arrays, enums, unions, inheritance, polymorphic classes
-- *Takeaway: Signatures capture everything that affects binary layout*
 
-**4. The TYPELAYOUT_BIND Pattern (8 min)**
+---
+
+### 4. The TYPELAYOUT_BIND Pattern (8 min)
+
 - The "golden signature" workflow:
-  1. Define your struct
-  2. Generate signature on reference platform
-  3. Bind with `TYPELAYOUT_BIND(Type, Signature)`
+  1. Define your struct on a reference platform
+  2. Generate its signature (runtime print or tooling)
+  3. Add `TYPELAYOUT_BIND(Type, "signature")` next to the definition
   4. Compilation fails on any platform where layout differs
-- Code example from `demo/demo.cpp:lines 22-25`:
-  ```cpp
-  struct Player { uint64_t id; char name[32]; Point pos; float health; };
-  TYPELAYOUT_BIND(Player, "struct[s:56,a:8]{...}");
-  ```
-- What happens when layout changes: clear `static_assert` error
-- *Takeaway: One line creates an unbreakable, self-documenting binary contract*
+- What happens when layout changes: clear `static_assert` error message
 
-**5. Beyond Binding: Template Constraints with Concepts (7 min)**
-- Using `LayoutMatch` concept for generic programming:
-  ```cpp
-  template<typename T>
-      requires LayoutMatch<T, "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}">
-  void send_over_network(const T& data);
-  ```
+```cpp
+struct Point { int32_t x, y; };
+TYPELAYOUT_BIND(Point, "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}");
+
+// If compiled on a platform where layout differs:
+// error: static_assert failed: "Layout mismatch for Point"
+```
+
+---
+
+### 5. Template Constraints with Layout Concepts (8 min)
+
+- `LayoutMatch<T, Signature>` concept for generic programming
 - `LayoutCompatible<T, U>` — verify two types share identical layout
-- `Portable<T>` — verify no platform-dependent members (`wchar_t`, `long double`, etc.)
-- Real-world use case: IPC message validation at compile time
-- *Takeaway: Layout constraints enable safe generic binary interfaces*
+- `Portable<T>` — verify no platform-dependent members
+- Use case: compile-time validated IPC message types
 
-**6. Portability Checking: Catching Platform-Dependent Types (7 min)**
-- The hidden dangers: `wchar_t` (2 bytes Windows, 4 bytes Linux), `long` (4 vs 8 bytes)
+```cpp
+template<typename T>
+    requires LayoutMatch<T, "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}">
+void send_point(const T& p) {
+    send_raw_bytes(&p, sizeof(T));  // Safe: layout is guaranteed
+}
+```
+
+---
+
+### 6. Portability Checking (8 min)
+
+- Hidden dangers of platform-dependent types:
+  - `wchar_t`: 2 bytes (Windows) vs 4 bytes (Linux)
+  - `long`: 4 bytes (Windows LLP64) vs 8 bytes (Linux LP64)
+  - `long double`: 8/12/16 bytes depending on platform
 - `is_portable<T>()` recursively checks all members and base classes
-- Example: detecting `wchar_t` in deeply nested struct hierarchy
-- Code walkthrough: `typelayout.hpp:lines 848-902`
-- *Takeaway: Catch platform-dependent types before they cause cross-platform bugs*
+- Detection through nested struct hierarchies and inheritance chains
 
-**7. Implementation Deep Dive: CompileString and consteval (10 min)**
+```cpp
+struct BadMessage {
+    int32_t id;
+    wchar_t name[16];  // Platform-dependent!
+};
+static_assert(is_portable<BadMessage>());  // FAILS: wchar_t is not portable
+```
+
+---
+
+### 7. Implementation Deep Dive (10 min)
+
 - Challenge: building complex strings at compile time
-- Solution: `CompileString<N>` with concatenation and comparison operators
-- All signature generation happens in `consteval` context
-- Zero runtime overhead: signatures exist only at compile time
-- Template metaprogramming techniques: fold expressions, index sequences
-- *Takeaway: Understand the compile-time string building that powers TypeLayout*
+- Solution: `CompileString<N>` template with:
+  - `consteval` constructor
+  - `operator+` for concatenation
+  - `operator==` for comparison
+- Recursive signature generation using fold expressions
+- Zero runtime overhead: all work done at compile time
 
-**8. Conclusion & Future Directions (5 min)**
+---
+
+### 8. Conclusion and Future Directions (8 min)
+
 - Summary: C++26 reflection enables proof-based binary compatibility
 - TypeLayout provides:
-  - Complete semantic signatures (names + offsets + types)
+  - Complete semantic signatures (field names + offsets + types)
   - Compile-time contract enforcement
   - Portability verification
   - Zero runtime cost
-- Future work: signature diffing tools, migration path generation
+- Future work: signature diff tooling, serialization integration
 - Q&A
-
----
-
-## Key Code References
-
-| Feature | File | Lines |
-|---------|------|-------|
-| Reflection API usage | `include/typelayout.hpp` | 244-314 |
-| Field signature generation | `include/typelayout.hpp` | 275-314 |
-| Bit-field handling | `include/typelayout.hpp` | 285-303 |
-| Portability checking | `include/typelayout.hpp` | 848-902 |
-| TYPELAYOUT_BIND macro | `include/typelayout.hpp` | 936-938 |
-| Concepts (LayoutMatch, etc.) | `include/typelayout.hpp` | 919-931 |
-| Demo usage | `demo/demo.cpp` | 22-52 |
-| Comprehensive tests | `test/test_all_types.cpp` | 1-680 |
-
----
-
-## Requirements
-
-- **Compiler**: [Bloomberg Clang P2996 fork](https://github.com/bloomberg/clang-p2996)
-- **Platform**: 64-bit, little-endian (x86-64, ARM64)
-- **Standard**: C++26 with `<experimental/meta>`
