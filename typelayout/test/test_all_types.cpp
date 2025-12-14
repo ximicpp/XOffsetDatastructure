@@ -76,6 +76,14 @@ struct SimpleStruct {
 static_assert(get_layout_signature<SimpleStruct>() == 
     "struct[s:8,a:4]{@0[a]:i32[s:4,a:4],@4[b]:i32[s:4,a:4]}");
 
+// Simple point (for LayoutMatch concept test)
+struct SimplePoint {
+    int32_t x;
+    int32_t y;
+};
+static_assert(get_layout_signature<SimplePoint>() ==
+    "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}");
+
 // Struct with padding
 struct PaddedStruct {
     int8_t x;     // offset 0
@@ -456,18 +464,6 @@ static_assert(is_platform_dependent_v<char> == false);
 static_assert(is_platform_dependent_v<char16_t> == false);
 static_assert(is_platform_dependent_v<char32_t> == false);
 
-// Fixed-width integer type detection
-static_assert(is_fixed_width_integer_v<int8_t> == true);
-static_assert(is_fixed_width_integer_v<uint8_t> == true);
-static_assert(is_fixed_width_integer_v<int16_t> == true);
-static_assert(is_fixed_width_integer_v<uint16_t> == true);
-static_assert(is_fixed_width_integer_v<int32_t> == true);
-static_assert(is_fixed_width_integer_v<uint32_t> == true);
-static_assert(is_fixed_width_integer_v<int64_t> == true);
-static_assert(is_fixed_width_integer_v<uint64_t> == true);
-// NOTE: On Linux, int = int32_t (same type via typedef), so int IS a fixed-width integer
-// This is expected behavior - we detect actual types, not names
-static_assert(is_fixed_width_integer_v<float> == false);
 
 //=============================================================================
 // 18. Struct Portability Checking
@@ -481,7 +477,6 @@ struct PortableStruct {
     char name[16];
 };
 static_assert(is_portable<PortableStruct>() == true);
-TYPELAYOUT_ASSERT_PORTABLE(PortableStruct);  // Should compile successfully
 
 // Non-portable struct - contains wchar_t (always platform-dependent)
 struct NonPortableWithWchar {
@@ -554,7 +549,6 @@ struct DerivedFromPortable : PortableBase {
     int64_t extra;
 };
 static_assert(is_portable<DerivedFromPortable>() == true);
-TYPELAYOUT_ASSERT_PORTABLE(DerivedFromPortable);
 
 // Multiple inheritance - one non-portable base
 struct MultiBaseNonPortable : PortableBase, NonPortableBase {
@@ -585,7 +579,6 @@ union PortableUnion {
     char c[8];
 };
 static_assert(is_portable<PortableUnion>() == true);
-TYPELAYOUT_ASSERT_PORTABLE(PortableUnion);
 
 // Union with a non-portable member (wchar_t)
 union NonPortableUnion1 {
@@ -644,16 +637,22 @@ static_assert(Portable<PortableUnion>);
 static_assert(!Portable<wchar_t>);
 static_assert(!Portable<NonPortableWithWchar>);
 
-// PlatformIndependent concept
-static_assert(PlatformIndependent<int32_t>);
-static_assert(PlatformIndependent<double>);
-static_assert(!PlatformIndependent<wchar_t>);
-static_assert(!PlatformIndependent<long double>);
-
 // LayoutCompatible concept
 static_assert(LayoutCompatible<TypeA, TypeB>);
 static_assert(!LayoutCompatible<TypeA, TypeC>);
 static_assert(!LayoutCompatible<TypeA, TypeD>);
+
+// LayoutMatch concept - verify type matches expected signature
+static_assert(LayoutMatch<SimplePoint, "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}">);
+static_assert(LayoutMatch<int32_t, "i32[s:4,a:4]">);
+static_assert(LayoutMatch<double, "f64[s:8,a:8]">);
+
+// Template constraint using LayoutMatch
+template<typename T>
+    requires LayoutMatch<T, "struct[s:8,a:4]{@0[x]:i32[s:4,a:4],@4[y]:i32[s:4,a:4]}">
+constexpr bool requires_point_layout() { return true; }
+
+static_assert(requires_point_layout<SimplePoint>());
 
 // Template constraint usage example
 template<Portable T>

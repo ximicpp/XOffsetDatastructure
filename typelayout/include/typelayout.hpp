@@ -88,21 +88,6 @@ namespace typelayout {
     template <typename T>
     struct is_platform_dependent : std::false_type {};
     
-    template <typename T>
-    struct is_fixed_width_integer : std::false_type {};
-    
-    template <> struct is_fixed_width_integer<int8_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<uint8_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<int16_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<uint16_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<int32_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<uint32_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<int64_t> : std::true_type {};
-    template <> struct is_fixed_width_integer<uint64_t> : std::true_type {};
-    
-    template <typename T>
-    inline constexpr bool is_fixed_width_integer_v = is_fixed_width_integer<T>::value;
-    
     // wchar_t: 2 bytes (Windows) vs 4 bytes (Linux)
     template <> struct is_platform_dependent<wchar_t> : std::true_type {};
     // long double: 8/12/16 bytes depending on platform
@@ -748,35 +733,10 @@ namespace typelayout {
 
 } // namespace typelayout
 
-// Static assertion macros
-
-/**
- * @brief Assert that a type's layout matches an expected signature string
- * @param Type The type to check
- * @param ExpectedSig The expected signature as a string literal
- */
-#define TYPELAYOUT_ASSERT_MATCH(Type, ExpectedSig) \
-    static_assert(::typelayout::get_layout_signature<Type>() == ExpectedSig, \
-                  "Layout signature mismatch for " #Type)
-
-/**
- * @brief Assert that two types have identical layout signatures
- * @param Type1 First type
- * @param Type2 Second type
- */
+/// Assert two types have identical layout
 #define TYPELAYOUT_ASSERT_COMPATIBLE(Type1, Type2) \
     static_assert(::typelayout::signatures_match<Type1, Type2>(), \
-                  "Layout incompatibility between " #Type1 " and " #Type2)
-
-/**
- * @brief Print the layout signature (for debugging/development)
- * @param Type The type to print signature for
- */
-#define TYPELAYOUT_PRINT(Type) \
-    do { \
-        constexpr auto sig = ::typelayout::get_layout_signature<Type>(); \
-        std::cout << #Type << " layout signature:\n  " << sig.c_str() << std::endl; \
-    } while(0)
+                  "Layout incompatibility: " #Type1 " vs " #Type2)
 
 // Smart pointer specializations
 
@@ -945,32 +905,41 @@ namespace typelayout {
     template <typename T>
     inline constexpr bool is_portable_v = is_portable<T>();
 
+    // Fixed string for NTTP (Non-Type Template Parameter)
+    template<size_t N>
+    struct fixed_string {
+        char data[N];
+        constexpr fixed_string(const char (&str)[N]) {
+            for (size_t i = 0; i < N; ++i) data[i] = str[i];
+        }
+        constexpr operator const char*() const { return data; }
+    };
+    template<size_t N> fixed_string(const char (&)[N]) -> fixed_string<N>;
+
     // Concepts
 
     /// Type contains no platform-dependent members
     template<typename T>
     concept Portable = is_portable<T>();
 
-    /// Type is not platform-dependent (primitive check only)
-    template<typename T>
-    concept PlatformIndependent = !is_platform_dependent_v<T>;
-
     /// Two types have compatible memory layouts
     template<typename T, typename U>
     concept LayoutCompatible = signatures_match<T, U>();
 
+    /// Type layout matches expected signature string
+    template<typename T, fixed_string ExpectedSig>
+    concept LayoutMatch = (get_layout_signature<T>() == static_cast<const char*>(ExpectedSig));
+
 } // namespace typelayout
 
-/**
- * @brief Assert that a type contains no platform-dependent members
- * @param Type The type to check for portability
- * 
- * Platform-dependent types include: long, unsigned long, wchar_t, long double
- * These types have different sizes on Windows (LLP64) vs Linux (LP64)
- */
+/// Assert type has no platform-dependent members (long, wchar_t, long double)
 #define TYPELAYOUT_ASSERT_PORTABLE(Type) \
     static_assert(::typelayout::is_portable<Type>(), \
-                  "Type " #Type " contains platform-dependent members (long, wchar_t, long double). " \
-                  "Use fixed-width types (int32_t, int64_t, char16_t, double) for cross-platform compatibility.")
+                  #Type " contains platform-dependent members")
+
+/// Bind type to expected signature - fails if layout differs
+#define TYPELAYOUT_BIND(Type, ExpectedSig) \
+    static_assert(::typelayout::get_layout_signature<Type>() == ExpectedSig, \
+                  "Layout mismatch for " #Type)
 
 #endif // TYPELAYOUT_HPP
