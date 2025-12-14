@@ -29,14 +29,14 @@ TYPELAYOUT_BIND(Player, "struct[s:56,a:8]{@0[id]:u64[s:8,a:8],@8[name]:bytes[s:3
 // ===========================================================================
 
 struct Vec2 { int32_t x, y; };  // Same layout as Point
-TYPELAYOUT_ASSERT_COMPATIBLE(Point, Vec2);
+static_assert(signatures_match<Point, Vec2>(), "Point and Vec2 must have same layout");
 
 // ===========================================================================
 // Example: Portability checks (no platform-dependent types)
 // ===========================================================================
 
-TYPELAYOUT_ASSERT_PORTABLE(Point);
-TYPELAYOUT_ASSERT_PORTABLE(Player);
+static_assert(is_portable<Point>(), "Point must be portable");
+static_assert(is_portable<Player>(), "Player must be portable");
 
 // ===========================================================================
 // Example: Using LayoutMatch concept as template constraint
