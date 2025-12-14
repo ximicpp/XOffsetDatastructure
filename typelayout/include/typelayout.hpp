@@ -733,11 +733,6 @@ namespace typelayout {
 
 } // namespace typelayout
 
-/// Assert two types have identical layout
-#define TYPELAYOUT_ASSERT_COMPATIBLE(Type1, Type2) \
-    static_assert(::typelayout::signatures_match<Type1, Type2>(), \
-                  "Layout incompatibility: " #Type1 " vs " #Type2)
-
 // Smart pointer specializations
 
 namespace typelayout {
@@ -931,11 +926,6 @@ namespace typelayout {
     concept LayoutMatch = (get_layout_signature<T>() == static_cast<const char*>(ExpectedSig));
 
 } // namespace typelayout
-
-/// Assert type has no platform-dependent members (long, wchar_t, long double)
-#define TYPELAYOUT_ASSERT_PORTABLE(Type) \
-    static_assert(::typelayout::is_portable<Type>(), \
-                  #Type " contains platform-dependent members")
 
 /// Bind type to expected signature - fails if layout differs
 #define TYPELAYOUT_BIND(Type, ExpectedSig) \
