@@ -634,6 +634,35 @@ union OuterNonPortableUnion {
 static_assert(is_portable<OuterNonPortableUnion>() == false);
 
 //=============================================================================
+// 21. Concept Tests
+//=============================================================================
+
+// Portable concept
+static_assert(Portable<int32_t>);
+static_assert(Portable<PortableStruct>);
+static_assert(Portable<PortableUnion>);
+static_assert(!Portable<wchar_t>);
+static_assert(!Portable<NonPortableWithWchar>);
+
+// PlatformIndependent concept
+static_assert(PlatformIndependent<int32_t>);
+static_assert(PlatformIndependent<double>);
+static_assert(!PlatformIndependent<wchar_t>);
+static_assert(!PlatformIndependent<long double>);
+
+// LayoutCompatible concept
+static_assert(LayoutCompatible<TypeA, TypeB>);
+static_assert(!LayoutCompatible<TypeA, TypeC>);
+static_assert(!LayoutCompatible<TypeA, TypeD>);
+
+// Template constraint usage example
+template<Portable T>
+constexpr bool accepts_portable() { return true; }
+
+static_assert(accepts_portable<PortableStruct>());
+static_assert(accepts_portable<int32_t>());
+
+//=============================================================================
 // Main - if this compiles, all static_assert tests pass
 //=============================================================================
 

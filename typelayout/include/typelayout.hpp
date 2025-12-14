@@ -84,16 +84,10 @@ namespace typelayout {
                       "double must be IEEE 754");
     #endif
 
-    //==========================================================================
     // Platform-dependent type detection
-    // These types have different sizes/alignments across platforms
-    //==========================================================================
-    
-    // Primary template: assume portable by default
     template <typename T>
     struct is_platform_dependent : std::false_type {};
     
-    // Helper: check if a type is a fixed-width integer type
     template <typename T>
     struct is_fixed_width_integer : std::false_type {};
     
@@ -134,9 +128,7 @@ namespace typelayout {
     template <typename T>
     inline constexpr bool is_platform_dependent_v = is_platform_dependent<T>::value;
 
-    //==========================================================================
-    // Compile-time string class for signature building
-    //==========================================================================
+    // Compile-time string
     template <size_t N>
     struct CompileString {
         char value[N];
@@ -257,23 +249,13 @@ namespace typelayout {
         }
     };
 
-    //==========================================================================
-    // Type trait helper
-    //==========================================================================
     template <typename T>
     struct always_false : std::false_type {};
 
-    //==========================================================================
-    // Forward declaration of TypeSignature
-    //==========================================================================
     template <typename T>
     struct TypeSignature;
 
-    //==========================================================================
-    // C++26 Reflection helpers
-    //==========================================================================
-    
-    // Get member count of a type
+    // Reflection helpers
     template <typename T>
     consteval std::size_t get_member_count() noexcept {
         using namespace std::meta;
@@ -374,12 +356,7 @@ namespace typelayout {
         }
     }
 
-    //==========================================================================
-    // Base class signature generation helpers
-    //==========================================================================
-
-    // Build signature for a single base class
-    // Distinguishes between regular and virtual inheritance
+    // Base class signature
     template<typename T, std::size_t Index>
     static consteval auto get_base_signature() noexcept {
         using namespace std::meta;
@@ -450,13 +427,7 @@ namespace typelayout {
         }
     }
 
-    //==========================================================================
-    // TypeSignature specializations for primitive types
-    //==========================================================================
-    
-    //==========================================================================
-    // Fixed-width integer types (canonical signatures)
-    //==========================================================================
+    // Fixed-width integer types
     
     // 8-bit types
     template <> struct TypeSignature<int8_t>   { static consteval auto calculate() noexcept { return CompileString{"i8[s:1,a:1]"}; } };
@@ -474,13 +445,7 @@ namespace typelayout {
     template <> struct TypeSignature<int64_t>  { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
     template <> struct TypeSignature<uint64_t> { static consteval auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
 
-    //==========================================================================
-    // Standard integer types
-    // NOTE: On most platforms, intN_t types are typedefs to standard types:
-    //   - Linux LP64: int8_t=signed char, int16_t=short, int32_t=int, int64_t=long
-    //   - Windows LLP64: int8_t=signed char, int16_t=short, int32_t=int, int64_t=long long
-    // We use conditional compilation to avoid redefinition errors.
-    //==========================================================================
+    // Standard integer types (conditional to avoid redefinition)
     
     // signed char / unsigned char - only define if not same as int8_t/uint8_t
     #if !defined(__GNUC__) && !defined(__clang__)
@@ -510,9 +475,7 @@ namespace typelayout {
     template <> struct TypeSignature<unsigned long long> { static consteval auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
     #endif
 
-    //==========================================================================
     // Floating point types
-    //==========================================================================
     template <> struct TypeSignature<float>    { static consteval auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
     template <> struct TypeSignature<double>   { static consteval auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
     // long double - platform dependent, typically 8, 12, or 16 bytes
@@ -526,9 +489,7 @@ namespace typelayout {
         } 
     };
     
-    //==========================================================================
     // Character types
-    //==========================================================================
     template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
     template <> struct TypeSignature<wchar_t>  { 
         static consteval auto calculate() noexcept { 
@@ -544,25 +505,16 @@ namespace typelayout {
     template <> struct TypeSignature<char16_t> { static consteval auto calculate() noexcept { return CompileString{"char16[s:2,a:2]"}; } };
     template <> struct TypeSignature<char32_t> { static consteval auto calculate() noexcept { return CompileString{"char32[s:4,a:4]"}; } };
     
-    //==========================================================================
     // Boolean type
-    //==========================================================================
     template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
     
-    //==========================================================================
     // nullptr_t
-    //==========================================================================
     template <> struct TypeSignature<std::nullptr_t> { static consteval auto calculate() noexcept { return CompileString{"nullptr[s:8,a:8]"}; } };
 
-    //==========================================================================
-    // std::byte (C++17)
-    //==========================================================================
+    // std::byte
     template <> struct TypeSignature<std::byte> { static consteval auto calculate() noexcept { return CompileString{"byte[s:1,a:1]"}; } };
 
-    //==========================================================================
     // Function pointer types
-    // All function pointers are 8 bytes on 64-bit systems
-    //==========================================================================
     
     // Generic function pointer (R(*)(Args...))
     template <typename R, typename... Args>
@@ -760,9 +712,7 @@ namespace typelayout {
         }
     };
 
-    //==========================================================================
     // Public API
-    //==========================================================================
 
     /**
      * @brief Get the compile-time layout signature for a type
@@ -798,9 +748,7 @@ namespace typelayout {
 
 } // namespace typelayout
 
-//==========================================================================
-// Static assertion macros for layout verification
-//==========================================================================
+// Static assertion macros
 
 /**
  * @brief Assert that a type's layout matches an expected signature string
@@ -830,10 +778,7 @@ namespace typelayout {
         std::cout << #Type << " layout signature:\n  " << sig.c_str() << std::endl; \
     } while(0)
 
-//==========================================================================
 // Smart pointer specializations
-// Treat smart pointers as opaque pointer-like types to prevent deep recursion
-//==========================================================================
 
 namespace typelayout {
 
@@ -875,10 +820,7 @@ namespace typelayout {
 
 } // namespace typelayout
 
-//==========================================================================
-// Boost.Interprocess offset_ptr specialization (conditional)
-// Only enabled when boost/interprocess/offset_ptr.hpp has been included
-//==========================================================================
+// Boost.Interprocess offset_ptr specialization (if header included)
 
 #ifdef BOOST_INTERPROCESS_OFFSET_PTR_HPP
 
@@ -899,9 +841,7 @@ namespace typelayout {
 
 #endif // BOOST_INTERPROCESS_OFFSET_PTR_HPP
 
-//==========================================================================
-// Portability checking - detect platform-dependent types in struct members
-//==========================================================================
+// Portability checking
 
 namespace typelayout {
 
@@ -1004,6 +944,20 @@ namespace typelayout {
     // Helper variable template for is_portable
     template <typename T>
     inline constexpr bool is_portable_v = is_portable<T>();
+
+    // Concepts
+
+    /// Type contains no platform-dependent members
+    template<typename T>
+    concept Portable = is_portable<T>();
+
+    /// Type is not platform-dependent (primitive check only)
+    template<typename T>
+    concept PlatformIndependent = !is_platform_dependent_v<T>;
+
+    /// Two types have compatible memory layouts
+    template<typename T, typename U>
+    concept LayoutCompatible = signatures_match<T, U>();
 
 } // namespace typelayout
 
