@@ -744,6 +744,38 @@ namespace typelayout {
         return get_layout_hash<T1>() == get_layout_hash<T2>();
     }
 
+    // Triple verification: hash + length + checksum (minimizes collision risk)
+    struct LayoutVerification {
+        uint64_t hash;      // FNV-1a hash
+        uint32_t length;    // Signature length
+        uint32_t checksum;  // Sum of all characters
+        
+        constexpr bool operator==(const LayoutVerification&) const noexcept = default;
+    };
+
+    [[nodiscard]] consteval uint32_t compute_checksum(const char* str, size_t len) noexcept {
+        uint32_t sum = 0;
+        for (size_t i = 0; i < len; ++i) {
+            sum += static_cast<uint32_t>(static_cast<unsigned char>(str[i]));
+        }
+        return sum;
+    }
+
+    template <typename T>
+    [[nodiscard]] consteval LayoutVerification get_layout_verification() noexcept {
+        constexpr auto sig = get_layout_signature<T>();
+        return { 
+            fnv1a_hash(sig.c_str(), sig.length()), 
+            static_cast<uint32_t>(sig.length()),
+            compute_checksum(sig.c_str(), sig.length())
+        };
+    }
+
+    template <typename T1, typename T2>
+    [[nodiscard]] consteval bool verifications_match() noexcept {
+        return get_layout_verification<T1>() == get_layout_verification<T2>();
+    }
+
 } // namespace typelayout
 
 // Smart pointer specializations
