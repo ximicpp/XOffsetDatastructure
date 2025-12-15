@@ -627,7 +627,115 @@ union OuterNonPortableUnion {
 static_assert(is_portable<OuterNonPortableUnion>() == false);
 
 //=============================================================================
-// 21. Concept Tests
+// 21. Bit-field Portability Tests
+//=============================================================================
+
+// Basic bit-field detection
+struct SimpleBitfield {
+    uint32_t a : 3;
+    uint32_t b : 5;
+    uint32_t c : 8;
+};
+static_assert(has_bitfields<SimpleBitfield>() == true);
+static_assert(is_portable<SimpleBitfield>() == false);  // Bit-fields are NOT portable
+
+// Multiple bit-field members
+struct MultipleBitfields {
+    uint8_t flags : 4;
+    uint8_t priority : 4;
+    uint16_t id : 12;
+    uint16_t reserved : 4;
+};
+static_assert(has_bitfields<MultipleBitfields>() == true);
+static_assert(is_portable<MultipleBitfields>() == false);
+
+// Struct with nested bit-field
+struct NestedBitfield {
+    int32_t x;
+    SimpleBitfield flags;  // Contains bit-fields via nesting
+};
+static_assert(has_bitfields<NestedBitfield>() == true);
+static_assert(is_portable<NestedBitfield>() == false);
+
+// Struct without bit-fields (control case)
+struct NoBitfield {
+    int32_t a;
+    int32_t b;
+    double c;
+};
+static_assert(has_bitfields<NoBitfield>() == false);
+static_assert(is_portable<NoBitfield>() == true);
+
+// Primitive types have no bit-fields
+static_assert(has_bitfields<int32_t>() == false);
+static_assert(has_bitfields<double>() == false);
+static_assert(has_bitfields<char>() == false);
+
+// Array of bit-field structs
+static_assert(has_bitfields<SimpleBitfield[4]>() == true);
+static_assert(is_portable<SimpleBitfield[4]>() == false);
+
+// Array of non-bit-field structs
+static_assert(has_bitfields<NoBitfield[4]>() == false);
+static_assert(is_portable<NoBitfield[4]>() == true);
+
+// Inheritance with bit-fields in base
+struct BitfieldBase {
+    uint32_t flags : 16;
+    uint32_t type : 8;
+    uint32_t reserved : 8;
+};
+struct DerivedFromBitfield : BitfieldBase {
+    int32_t value;
+};
+static_assert(has_bitfields<BitfieldBase>() == true);
+static_assert(has_bitfields<DerivedFromBitfield>() == true);
+static_assert(is_portable<BitfieldBase>() == false);
+static_assert(is_portable<DerivedFromBitfield>() == false);
+
+// Inheritance with bit-fields in derived only
+struct CleanBase {
+    int32_t x;
+    int32_t y;
+};
+struct DerivedWithBitfield : CleanBase {
+    uint8_t flags : 4;
+    uint8_t priority : 4;
+};
+static_assert(has_bitfields<CleanBase>() == false);
+static_assert(has_bitfields<DerivedWithBitfield>() == true);
+static_assert(is_portable<CleanBase>() == true);
+static_assert(is_portable<DerivedWithBitfield>() == false);
+
+// Union with bit-fields
+union BitfieldUnion {
+    uint32_t raw;
+    struct {
+        uint32_t a : 8;
+        uint32_t b : 8;
+        uint32_t c : 16;
+    } bits;
+};
+static_assert(has_bitfields<BitfieldUnion>() == true);
+static_assert(is_portable<BitfieldUnion>() == false);
+
+// Deep nesting: Portable -> Non-portable (via bit-field)
+struct Level1Clean { int32_t a; };
+struct Level2Clean : Level1Clean { int64_t b; };
+struct Level3WithBits : Level2Clean { uint8_t flags : 4; uint8_t priority : 4; };
+static_assert(has_bitfields<Level1Clean>() == false);
+static_assert(has_bitfields<Level2Clean>() == false);
+static_assert(has_bitfields<Level3WithBits>() == true);
+static_assert(is_portable<Level1Clean>() == true);
+static_assert(is_portable<Level2Clean>() == true);
+static_assert(is_portable<Level3WithBits>() == false);
+
+// has_bitfields_v variable template
+static_assert(has_bitfields_v<SimpleBitfield> == true);
+static_assert(has_bitfields_v<NoBitfield> == false);
+
+//=============================================================================
+// 22. Concept Tests
 //=============================================================================
 
 // Portable concept
