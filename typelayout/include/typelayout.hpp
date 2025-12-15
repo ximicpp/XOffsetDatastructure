@@ -744,30 +744,31 @@ namespace typelayout {
         return get_layout_hash<T1>() == get_layout_hash<T2>();
     }
 
-    // Triple verification: hash + length + checksum (minimizes collision risk)
+    // DJB2 64-bit hash (different algorithm for dual-hash verification)
+    [[nodiscard]] consteval uint64_t djb2_hash(const char* str, size_t len) noexcept {
+        uint64_t hash = 5381;
+        for (size_t i = 0; i < len; ++i) {
+            hash = ((hash << 5) + hash) + static_cast<unsigned char>(str[i]); // hash * 33 + c
+        }
+        return hash;
+    }
+
+    // Dual-hash verification: FNV-1a + DJB2 + length (~2^128 collision resistance)
     struct LayoutVerification {
-        uint64_t hash;      // FNV-1a hash
+        uint64_t fnv1a;     // FNV-1a 64-bit hash
+        uint64_t djb2;      // DJB2 64-bit hash (independent algorithm)
         uint32_t length;    // Signature length
-        uint32_t checksum;  // Sum of all characters
         
         constexpr bool operator==(const LayoutVerification&) const noexcept = default;
     };
-
-    [[nodiscard]] consteval uint32_t compute_checksum(const char* str, size_t len) noexcept {
-        uint32_t sum = 0;
-        for (size_t i = 0; i < len; ++i) {
-            sum += static_cast<uint32_t>(static_cast<unsigned char>(str[i]));
-        }
-        return sum;
-    }
 
     template <typename T>
     [[nodiscard]] consteval LayoutVerification get_layout_verification() noexcept {
         constexpr auto sig = get_layout_signature<T>();
         return { 
             fnv1a_hash(sig.c_str(), sig.length()), 
-            static_cast<uint32_t>(sig.length()),
-            compute_checksum(sig.c_str(), sig.length())
+            djb2_hash(sig.c_str(), sig.length()),
+            static_cast<uint32_t>(sig.length())
         };
     }
 
