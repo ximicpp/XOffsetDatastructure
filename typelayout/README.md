@@ -30,18 +30,40 @@ void send(const T& data);
 
 ## API
 
+### Signature Functions
+
 | Macro/Function | Description |
 |----------------|-------------|
 | `TYPELAYOUT_BIND(T, Sig)` | Bind type to signature |
 | `get_layout_signature<T>()` | Get type's layout signature |
+| `get_layout_signature_cstr<T>()` | Get signature as C-string (runtime) |
 | `signatures_match<T, U>()` | Check if two types have same layout |
 | `is_portable<T>()` | Check for platform-dependent members |
 | `is_platform_dependent_v<T>` | Check if type is platform-dependent |
+
+### Hash Functions (for runtime/protocol use)
+
+| Function | Description |
+|----------|-------------|
+| `get_layout_hash<T>()` | Get 64-bit FNV-1a hash of layout signature |
+| `hashes_match<T, U>()` | Check if two types have same layout hash |
+
+```cpp
+// Compile-time hash for protocol headers
+constexpr uint64_t MESSAGE_HASH = get_layout_hash<Message>();
+
+// Runtime validation
+if (received_hash != MESSAGE_HASH) { /* layout mismatch */ }
+```
+
+### Concepts
 
 | Concept | Description |
 |---------|-------------|
 | `LayoutMatch<T, Sig>` | Layout matches signature |
 | `LayoutCompatible<T, U>` | Identical layout |
+| `LayoutHashMatch<T, Hash>` | Layout hash matches expected value |
+| `LayoutHashCompatible<T, U>` | Identical layout hash |
 | `Portable<T>` | No platform-dependent members |
 
 ## Build

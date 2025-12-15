@@ -699,36 +699,49 @@ namespace typelayout {
 
     // Public API
 
-    /**
-     * @brief Get the compile-time layout signature for a type
-     * @tparam T The type to generate signature for
-     * @return A CompileString containing the layout signature
-     */
+    // Get compile-time layout signature
     template <typename T>
     [[nodiscard]] consteval auto get_layout_signature() noexcept {
         return TypeSignature<T>::calculate();
     }
 
-    /**
-     * @brief Compare two layout signatures at compile time
-     * @tparam T1 First type
-     * @tparam T2 Second type
-     * @return true if signatures match, false otherwise
-     */
+    // Check if two types have identical layout
     template <typename T1, typename T2>
     [[nodiscard]] consteval bool signatures_match() noexcept {
         return get_layout_signature<T1>() == get_layout_signature<T2>();
     }
 
-    /**
-     * @brief Get the layout signature as a C-string (for runtime use)
-     * @tparam T The type to generate signature for
-     * @return Pointer to null-terminated C-string
-     */
+    // Get signature as C-string (for runtime use)
     template <typename T>
     [[nodiscard]] constexpr const char* get_layout_signature_cstr() noexcept {
         static constexpr auto sig = get_layout_signature<T>();
         return sig.c_str();
+    }
+
+    // FNV-1a 64-bit hash
+    [[nodiscard]] consteval uint64_t fnv1a_hash(const char* str, size_t len) noexcept {
+        constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ull;
+        constexpr uint64_t FNV_PRIME = 1099511628211ull;
+        
+        uint64_t hash = FNV_OFFSET_BASIS;
+        for (size_t i = 0; i < len; ++i) {
+            hash ^= static_cast<uint64_t>(static_cast<unsigned char>(str[i]));
+            hash *= FNV_PRIME;
+        }
+        return hash;
+    }
+
+    // Get 64-bit layout hash (for runtime validation / protocol headers)
+    template <typename T>
+    [[nodiscard]] consteval uint64_t get_layout_hash() noexcept {
+        constexpr auto sig = get_layout_signature<T>();
+        return fnv1a_hash(sig.c_str(), sig.length());
+    }
+
+    // Check if two types have the same layout hash
+    template <typename T1, typename T2>
+    [[nodiscard]] consteval bool hashes_match() noexcept {
+        return get_layout_hash<T1>() == get_layout_hash<T2>();
     }
 
 } // namespace typelayout
@@ -924,6 +937,14 @@ namespace typelayout {
     /// Type layout matches expected signature string
     template<typename T, fixed_string ExpectedSig>
     concept LayoutMatch = (get_layout_signature<T>() == static_cast<const char*>(ExpectedSig));
+
+    /// Type layout hash matches expected hash value
+    template<typename T, uint64_t ExpectedHash>
+    concept LayoutHashMatch = (get_layout_hash<T>() == ExpectedHash);
+
+    /// Two types have compatible layout hashes
+    template<typename T, typename U>
+    concept LayoutHashCompatible = hashes_match<T, U>();
 
 } // namespace typelayout
 
