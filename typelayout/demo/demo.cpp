@@ -40,6 +40,18 @@ constexpr uint64_t POINT_LAYOUT_HASH = get_layout_hash<Point>();
 constexpr uint64_t PLAYER_LAYOUT_HASH = get_layout_hash<Player>();
 static_assert(hashes_match<Point, Vec2>(), "Point and Vec2 must have same layout hash");
 
+// Dual-hash verification (FNV-1a + DJB2, ~2^128 collision resistance)
+constexpr auto PLAYER_VERIFICATION = get_layout_verification<Player>();
+static_assert(verifications_match<Point, Vec2>(), "Point and Vec2 must have same verification");
+
+// Type library collision detection (compile-time guarantee)
+struct Enemy { uint64_t id; Point pos; int32_t hp; };
+struct Item  { uint32_t id; float weight; };
+static_assert(no_hash_collision<Point, Player, Vec2, Enemy, Item>(), 
+              "Hash collision in type library!");
+static_assert(no_verification_collision<Point, Player, Vec2, Enemy, Item>(),
+              "Verification collision in type library!");
+
 // Template constraint using hash
 template<typename T>
     requires LayoutHashMatch<T, POINT_LAYOUT_HASH>

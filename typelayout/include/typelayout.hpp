@@ -777,6 +777,40 @@ namespace typelayout {
         return get_layout_verification<T1>() == get_layout_verification<T2>();
     }
 
+    // Check no hash collision within a type library (compile-time)
+    template<typename... Types>
+    [[nodiscard]] consteval bool no_hash_collision() noexcept {
+        if constexpr (sizeof...(Types) <= 1) {
+            return true;
+        } else {
+            constexpr uint64_t hashes[] = { get_layout_hash<Types>()... };
+            constexpr size_t N = sizeof...(Types);
+            for (size_t i = 0; i < N; ++i) {
+                for (size_t j = i + 1; j < N; ++j) {
+                    if (hashes[i] == hashes[j]) return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    // Check no verification collision (dual-hash + length)
+    template<typename... Types>
+    [[nodiscard]] consteval bool no_verification_collision() noexcept {
+        if constexpr (sizeof...(Types) <= 1) {
+            return true;
+        } else {
+            constexpr LayoutVerification vs[] = { get_layout_verification<Types>()... };
+            constexpr size_t N = sizeof...(Types);
+            for (size_t i = 0; i < N; ++i) {
+                for (size_t j = i + 1; j < N; ++j) {
+                    if (vs[i] == vs[j]) return false;
+                }
+            }
+            return true;
+        }
+    }
+
 } // namespace typelayout
 
 // Smart pointer specializations
