@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # build_and_run.sh - Build and run typelayout demos
-# For Linux/WSL with Clang P2996 (Bloomberg fork)
+# For Linux/macOS/WSL with Clang P2996 (Bloomberg fork)
 
 set -e
 
@@ -16,7 +16,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 BUILD_TYPE="Release"
-NUM_JOBS=$(nproc 2>/dev/null || echo 4)
+NUM_JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -30,10 +30,29 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check for Clang P2996
-CLANG_P2996="$HOME/clang-p2996-install/bin/clang++"
-if [ ! -f "$CLANG_P2996" ]; then
-    echo -e "${RED}Error: Clang P2996 not found at $CLANG_P2996${NC}"
+# Check for Clang P2996 in common locations
+find_clang_p2996() {
+    local candidates=(
+        "/usr/local/bin/clang++"
+        "$HOME/clang-p2996-install/bin/clang++"
+        "/opt/clang-p2996/bin/clang++"
+    )
+    for path in "${candidates[@]}"; do
+        if [ -f "$path" ]; then
+            # Verify it's the P2996 fork
+            if "$path" --version 2>/dev/null | grep -q "clang-p2996"; then
+                echo "$path"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+CLANG_P2996=$(find_clang_p2996)
+if [ -z "$CLANG_P2996" ]; then
+    echo -e "${RED}Error: Clang P2996 (Bloomberg fork) not found${NC}"
+    echo -e "Searched: /usr/local/bin, \$HOME/clang-p2996-install/bin, /opt/clang-p2996/bin"
     exit 1
 fi
 
@@ -43,11 +62,14 @@ echo -e "Build Type: ${GREEN}$BUILD_TYPE${NC}, Jobs: ${GREEN}$NUM_JOBS${NC}\n"
 # Configure and build
 mkdir -p "$BUILD_DIR" && cd "$BUILD_DIR"
 
+# Get compiler install directory for library path
+CLANG_DIR=$(dirname "$(dirname "$CLANG_P2996")")
+
 cmake .. \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
     -DCMAKE_CXX_COMPILER=$CLANG_P2996 \
-    -DCMAKE_CXX_FLAGS='-stdlib=libc++' \
-    -DCMAKE_EXE_LINKER_FLAGS="-L$HOME/clang-p2996-install/lib -Wl,-rpath,$HOME/clang-p2996-install/lib"
+    -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isysroot $(xcrun --show-sdk-path 2>/dev/null || echo '')" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$CLANG_DIR/lib -Wl,-rpath,$CLANG_DIR/lib"
 
 cmake --build . -j$NUM_JOBS
 
