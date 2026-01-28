@@ -125,10 +125,10 @@ void test_reflection_with_instances() {
     std::cout << "    y = " << obj->y << "\n";
     std::cout << "    name = " << obj->name.c_str() << "\n";
     
-    // Access via reflection
+    // Access via reflection (use dereferencing to work around P2996 arrow bug)
     std::cout << "\n  Access via splice:\n";
-    std::cout << "    x = " << obj->[:^^TestStruct::x:] << "\n";
-    std::cout << "    y = " << obj->[:^^TestStruct::y:] << "\n";
+    std::cout << "    x = " << (*obj).[:^^TestStruct::x:] << "\n";
+    std::cout << "    y = " << (*obj).[:^^TestStruct::y:] << "\n";
     
     std::cout << "[PASS] Reflection with instances\n\n";
 }
