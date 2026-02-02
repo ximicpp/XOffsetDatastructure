@@ -64,7 +64,7 @@ FROM ubuntu:22.04 AS xoffset-dev
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies
+# Install runtime dependencies including Boost
 RUN apt-get update && apt-get install -y \
     git \
     cmake \
@@ -72,6 +72,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3 \
     ca-certificates \
+    libboost-all-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Clang P2996 from builder stage
