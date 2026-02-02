@@ -90,6 +90,7 @@ set(REFLECTION_TESTS
     test_type_safety
     test_type_safety_comprehensive
     test_vptr_layout
+    test_type_erased_detection
 )
 
 # Add each reflection test
@@ -115,8 +116,8 @@ message(STATUS "========================================")
 message(STATUS "C++ Standard: C++26")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Basic Tests: 6 tests")
-message(STATUS "Reflection Tests: 12 tests")
-message(STATUS "Total Tests: 18 tests")
+message(STATUS "Reflection Tests: 14 tests")
+message(STATUS "Total Tests: 20 tests")
 message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")
