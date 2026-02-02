@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(XOffsetDatastructure)
 
 # This project requires C++26 with reflection support
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Note: CMake 3.10 doesn't know about C++26, so we set flags manually
 message(STATUS "Using C++26 with reflection")
 
 # Verify we're using Clang with P2996 support
@@ -11,8 +10,9 @@ if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(FATAL_ERROR "This project requires Clang with P2996 reflection support")
 endif()
 
-# Add reflection flag and standard library
-add_compile_options(-freflection -fexpansion-statements -stdlib=libc++)
+# Manually set C++26 flags and reflection support
+# CMake 3.10 doesn't recognize CMAKE_CXX_STANDARD 26, so we use flags directly
+add_compile_options(-std=c++26 -freflection -fexpansion-statements -stdlib=libc++)
 add_link_options(-stdlib=libc++)
 
 # Get the clang install directory
