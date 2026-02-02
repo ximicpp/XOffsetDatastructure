@@ -1,0 +1,29 @@
+name: CI-Test
+
+on:
+  push:
+    branches: [ next_cpp26 ]
+  workflow_dispatch:
+
+jobs:
+  test-basic:
+    name: Basic Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Test environment
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Files:"
+          ls -la
+          echo "Docker version:"
+          docker --version
+      
+      - name: Test Docker build
+        run: |
+          echo "Testing simple Docker build..."
+          docker build --help | head -10
+
