@@ -1,0 +1,52 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Test binaries
+tests/test_*
+!tests/test_*.cpp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitmodules
+.gitattributes
+
+# Documentation (not needed in container)
+docs/
+
+# CI/CD files (not needed in container)
+.github/
+
+# OpenSpec files (not needed for building)
+openspec/
+
+# Scripts that are only for host
+scripts/build_clang_p2996_wsl.sh
+
+# Temporary files
+*.tmp
+*.log
+.cache/
+
+# Docker itself
+Dockerfile
+.dockerignore
+docker-compose.yml
