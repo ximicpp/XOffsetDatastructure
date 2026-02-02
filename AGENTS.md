@@ -24,22 +24,34 @@ This file contains build commands, code style guidelines, and development practi
 ## Build System
 
 ### Docker Build (Recommended for New Users)
+
+**⚠️ IMPORTANT: Always test locally before pushing to GitHub Actions!**
+
 ```bash
+# RECOMMENDED: Test locally first (in WSL)
+./scripts/local-docker-test.sh
+
 # Build Docker image (one-time, 1-3 hours)
 ./scripts/docker-build.sh
 
 # Or with docker-compose
 docker-compose build
 
-# Run tests in Docker
-docker-compose run --rm xoffset-dev ./build.sh
+# Run tests in Docker (CORRECT way - use 'bash')
+docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest bash ./build.sh
 
-# Interactive shell
+# ❌ WRONG: Direct execution may fail due to permissions
+# docker run ... ./build.sh
+
+# Interactive shell for debugging
 docker-compose run --rm xoffset-dev bash
-
-# Direct docker run
-docker run -it -v $(pwd):/workspace xoffset-clang-p2996:latest ./build.sh
+./scripts/local-docker-test.sh -i
 ```
+
+**Key Points**:
+1. **Use `bash ./build.sh`** not `./build.sh` in Docker
+2. **Test locally** before pushing to CI
+3. **Review** `docs/BUILD_AND_TEST_GUIDE.md` for details
 
 ### Primary Build Commands
 ```bash
