@@ -38,20 +38,29 @@ RUN apt-get update && apt-get install -y \
     libboost-all-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build Clang P2996
-WORKDIR /tmp
-RUN git clone --depth 1 https://github.com/bloomberg/clang-p2996.git llvm-project || \
-    git clone --depth 1 https://gitee.com/mirrors/clang-p2996.git llvm-project
+# Build Clang P2996 (following original Dockerfile structure)
+WORKDIR /tmp/clang-build
 
-RUN cmake -S llvm-project/llvm -B build \
-    -DLLVM_ENABLE_PROJECTS="clang" \
+# Clone the correct repository structure
+RUN git clone -b p2996 --single-branch --depth 1 https://github.com/bloomberg/clang-p2996.git
+
+# Configure and build
+WORKDIR /tmp/clang-build/clang-p2996/build
+RUN cmake -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DLLVM_ENABLE_RTTI=ON \
-    -DLLVM_TARGETS_TO_BUILD="X86" \
-    -G Ninja
+    -DLLVM_ENABLE_PROJECTS='clang' \
+    -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
+    -DLLVM_TARGETS_TO_BUILD='X86' \
+    -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DLLVM_ENABLE_ASSERTIONS=OFF \
+    -DLLVM_OPTIMIZED_TABLEGEN=ON \
+    -DLLVM_BUILD_TESTS=OFF \
+    -DLLVM_INCLUDE_TESTS=OFF \
+    -DLIBCXX_ENABLE_EXPERIMENTAL_LIBRARY=ON \
+    ../llvm
 
-RUN cmake --build build -j$(nproc)
-RUN cmake --install build --prefix /usr/local
+RUN ninja -j$(nproc)
+RUN ninja install
 
 # Runtime image
 FROM registry.cn-hangzhou.aliyuncs.com/acs/ubuntu:22.04 AS xoffset-dev
