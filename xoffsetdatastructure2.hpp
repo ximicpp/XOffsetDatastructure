@@ -47,6 +47,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <functional>
+#include <memory>
+#include <any>
 
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
@@ -828,6 +831,63 @@ namespace XOffsetDatastructure2 {
             return bases.size() > 0;
         }
         
+        // ============================================================================
+        // Type-Erased Container Blacklist Detection
+        // These types contain hidden pointers and are UNSAFE for cross-process use
+        // ============================================================================
+        
+        template<typename T>
+        struct is_std_function : std::false_type {};
+        
+        template<typename R, typename... Args>
+        struct is_std_function<std::function<R(Args...)>> : std::true_type {};
+        
+        template<typename T>
+        struct is_std_shared_ptr : std::false_type {};
+        
+        template<typename U>
+        struct is_std_shared_ptr<std::shared_ptr<U>> : std::true_type {};
+        
+        template<typename T>
+        struct is_std_unique_ptr : std::false_type {};
+        
+        template<typename U, typename D>
+        struct is_std_unique_ptr<std::unique_ptr<U, D>> : std::true_type {};
+        
+        template<typename T>
+        struct is_std_weak_ptr : std::false_type {};
+        
+        template<typename U>
+        struct is_std_weak_ptr<std::weak_ptr<U>> : std::true_type {};
+        
+        template<typename T>
+        consteval bool is_type_erased_container() {
+            using CleanT = std::remove_cv_t<T>;
+            
+            // std::function - contains virtual function pointer
+            if constexpr (is_std_function<CleanT>::value) {
+                return true;
+            }
+            // std::any - contains type-erased storage with virtual dispatch
+            if constexpr (std::is_same_v<CleanT, std::any>) {
+                return true;
+            }
+            // std::shared_ptr - contains control block pointer
+            if constexpr (is_std_shared_ptr<CleanT>::value) {
+                return true;
+            }
+            // std::unique_ptr - contains raw pointer
+            if constexpr (is_std_unique_ptr<CleanT>::value) {
+                return true;
+            }
+            // std::weak_ptr - contains control block pointer
+            if constexpr (is_std_weak_ptr<CleanT>::value) {
+                return true;
+            }
+            
+            return false;
+        }
+        
         template<typename T>
         consteval bool is_safe_type();
         
@@ -929,6 +989,11 @@ namespace XOffsetDatastructure2 {
         consteval bool is_safe_type() {
             using CleanT = std::remove_cv_t<T>;
             
+            // First check: reject type-erased containers (std::function, std::any, etc.)
+            if constexpr (is_type_erased_container<CleanT>()) {
+                return false;
+            }
+            
             if constexpr (is_basic_type<CleanT>()) {
                 return true;
             }
@@ -1029,6 +1094,9 @@ namespace XOffsetDatastructure2 {
             "  ✗ std::map (use XMap<K,V>)\n"
             "  ✗ std::set (use XSet<T>)\n"
             "  ✗ Union types\n"
+            "  ✗ std::function (type-erased, contains hidden pointers)\n"
+            "  ✗ std::any (type-erased, contains hidden pointers)\n"
+            "  ✗ std::shared_ptr/unique_ptr/weak_ptr (smart pointers)\n"
             "========================================\n");
     }
 
