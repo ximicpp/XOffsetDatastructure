@@ -1,0 +1,293 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
+# AGENTS.md - XOffsetDatastructure Development Guide
+
+This file contains build commands, code style guidelines, and development practices for agentic coding agents working in this repository.
+
+## Build System
+
+### Docker Build (Recommended for New Users)
+```bash
+# Build Docker image (one-time, 1-3 hours)
+./scripts/docker-build.sh
+
+# Or with docker-compose
+docker-compose build
+
+# Run tests in Docker
+docker-compose run --rm xoffset-dev ./build.sh
+
+# Interactive shell
+docker-compose run --rm xoffset-dev bash
+
+# Direct docker run
+docker run -it -v $(pwd):/workspace xoffset-clang-p2996:latest ./build.sh
+```
+
+### Primary Build Commands
+```bash
+# Full build with tests (recommended)
+./build.sh
+
+# Build without reflection support
+./build.sh --no-reflection
+
+# Debug build
+./build.sh --debug
+
+# Build with specific job count
+./build.sh -j 8
+
+# Build with system compiler (no P2996)
+./build.sh --no-p2996
+```
+
+### CMake Commands
+```bash
+# Configure and build
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --config Release
+
+# Build specific target
+cmake --build . --target test_basic_types --config Release
+```
+
+### Running Tests
+```bash
+# Run all tests (via build script)
+./build.sh
+
+# In Docker
+docker-compose run --rm xoffset-dev ./build.sh
+
+# Run individual tests
+cd build
+./bin/Release/test_basic_types
+./bin/Release/test_vector
+./bin/Release/test_reflection_operators
+
+# Run tests via CTest
+cd build
+ctest --verbose
+ctest -R "test_basic_types" --verbose
+```
+
+### TypeLayout Module
+```bash
+# Build TypeLayout demos
+cd typelayout
+./build_and_run.sh
+
+# Debug build
+./build_and_run.sh --debug
+```
+
+## Code Style Guidelines
+
+### File Organization
+- **Header files**: Use `.hpp` extension
+- **Source files**: Use `.cpp` extension
+- **Main library**: `xoffsetdatastructure2.hpp` (single header library)
+- **Tests**: Organized in `tests/` directory with descriptive names
+- **Examples**: Organized in `examples/` directory
+
+### Include Order
+```cpp
+// 1. System headers (if needed)
+#include <iostream>
+#include <vector>
+#include <cassert>
+
+// 2. Conditional includes (platform-specific)
+#if !defined(__clang__) || __clang_major__ >= 15
+#include <chrono>
+#endif
+
+// 3. Main library header
+#include "../xoffsetdatastructure2.hpp"
+
+// 4. Local headers
+#include "game_data.hpp"
+```
+
+### Namespace Conventions
+```cpp
+// Main library namespace
+using namespace XOffsetDatastructure2;
+
+// Type signatures namespace
+namespace XTypeSignature {
+    // Implementation details
+}
+
+// Reflection code (C++26 only)
+#ifdef __cpp_reflection
+using namespace std::meta;
+#endif
+```
+
+### Naming Conventions
+- **Classes**: `PascalCase` (e.g., `BasicTypes`, `XVector`)
+- **Functions**: `snake_case` (e.g., `test_basic_types`, `print_section`)
+- **Member variables**: `mPascalCase` (e.g., `mInt`, `mFloat`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `BASIC_ALIGNMENT`, `ANY_SIZE`)
+- **Templates**: `T` or descriptive names (e.g., `typename Allocator`)
+
+### Error Handling
+```cpp
+// Use static_assert for compile-time validation
+static_assert(is_xbuffer_safe<BasicTypes>::value, 
+              "BasicTypes must be safe for XBuffer");
+
+// Use assert for runtime validation
+assert(result == expected && "Data integrity check failed");
+
+// Return bool for test functions
+bool test_function() {
+    // Test implementation
+    return true; // or false on failure
+}
+```
+
+### Test Structure
+```cpp
+// ============================================================================
+// Test: Feature Name
+// Purpose: Brief description of what this test validates
+// ============================================================================
+
+#include <iostream>
+#include <cassert>
+#include "../xoffsetdatastructure2.hpp"
+
+using namespace XOffsetDatastructure2;
+
+// Test data structures
+struct TestStruct {
+    template <typename Allocator>
+    TestStruct(Allocator allocator) {}
+    
+    // Members...
+};
+
+bool test_feature() {
+    std::cout << "\n[TEST] Feature Name\n";
+    std::cout << std::string(50, '-') << "\n";
+    
+    // Test implementation
+    std::cout << "Test 1: Description... [OK]\n";
+    
+    return true;
+}
+
+int main() {
+    if (test_feature()) {
+        std::cout << "[PASS] All tests passed!\n";
+        return 0;
+    }
+    return 1;
+}
+```
+
+### Platform-Specific Code
+```cpp
+// Compiler detection
+#if defined(_MSC_VER)
+    // Windows/MSVC specific
+#elif defined(__clang__) || defined(__GNUC__)
+    // Clang/GCC specific
+#endif
+
+// Architecture detection
+#if defined(__LP64__) || defined(_WIN64)
+    // 64-bit specific
+#endif
+
+// Endianness detection
+#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
+    // Endianness specific
+#endif
+```
+
+## Development Practices
+
+### Compiler Requirements
+- **Primary**: Clang with P2996 reflection support
+- **Standard**: C++26 (`-std=c++26`)
+- **Flags**: `-freflection -fexpansion-statements -stdlib=libc++`
+- **Architecture**: 64-bit little-endian only
+
+### Adding New Tests
+1. Create `tests/test_feature.cpp` following the test structure
+2. Add to `tests/CMakeLists.txt`:
+   ```cmake
+   add_executable(test_feature test_feature.cpp)
+   target_include_directories(test_feature PRIVATE ${BOOST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR})
+   set_target_properties(test_feature PROPERTIES
+       RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>
+   )
+   add_test(NAME FeatureTest COMMAND test_feature)
+   ```
+3. Update `tests/README.md` with documentation
+
+### Adding New Examples
+1. Create `examples/feature_example.cpp`
+2. Add to `examples/CMakeLists.txt` following existing pattern
+3. Update examples documentation
+
+### Memory Management
+- Use Boost.Interprocess allocators for shared memory
+- Follow RAII principles for resource management
+- Validate buffer safety with `is_xbuffer_safe<T>::value`
+
+### Reflection Code (C++26)
+```cpp
+#ifdef __cpp_reflection
+// Reflection-specific code
+using namespace std::meta;
+
+// Use reflection operators
+auto members = nonstatic_data_members_of(^T);
+for (auto member : members) {
+    // Process member
+}
+#endif
+```
+
+### Performance Considerations
+- Zero-encoding serialization is the primary goal
+- Avoid unnecessary copies in serialization paths
+- Use compile-time optimizations where possible
+- Profile with real-world data structures
+
+## Documentation
+- Update relevant README files when adding features
+- Document test purposes in test file headers
+- Maintain technical overview in `docs/technical_overview.md`
+- Update build scripts when adding new dependencies
+
+## Common Issues
+- **Clang P2996 not found**: Install in `~/clang-p2996-install/` or use Docker
+- **Docker build timeout**: First build takes 1-3 hours, use pre-built image if available
+- **Reflection tests fail**: Use `--no-reflection` or ensure proper Clang version
+- **Memory alignment issues**: Check `is_xbuffer_safe<T>::value` validation
+- **Platform compatibility**: Ensure 64-bit little-endian architecture
+- **Docker permission issues**: Add user to docker group: `sudo usermod -aG docker $USER`

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  xoffset-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CLANG_P2996_COMMIT: HEAD
+    image: xoffset-clang-p2996:latest
+    container_name: xoffset-dev
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: /bin/bash
+    stdin_open: true
+    tty: true
