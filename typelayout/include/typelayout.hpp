@@ -454,10 +454,18 @@ namespace typelayout {
     };
     #endif
     
-    // long long - define only on Linux where it's different from int64_t (which is long)
-    #if !defined(_WIN32) && !defined(_WIN64)
+    // long long - define only on Linux (LP64) where int64_t is 'long', not 'long long'
+    // On macOS and Windows, int64_t is already 'long long', so skip to avoid redefinition
+    #if defined(__linux__) && !defined(__APPLE__)
     template <> struct TypeSignature<long long>          { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
     template <> struct TypeSignature<unsigned long long> { static consteval auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
+    #endif
+    
+    // On Linux (LP64), long is 8 bytes and same as int64_t, but 'long' might be a distinct type
+    // Define it only if it's a distinct type from int64_t
+    #if defined(__linux__) && !defined(__APPLE__) && !defined(_WIN32)
+    // Linux LP64: long = int64_t (both 8 bytes), but we need this for 'long' type explicitly
+    // Note: This may or may not cause redefinition depending on compiler's typedef
     #endif
 
     // Floating point types
