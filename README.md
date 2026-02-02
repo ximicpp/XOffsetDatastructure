@@ -11,6 +11,17 @@ XOffsetDatastructure is a serialization library designed to reduce or even elimi
 ### CppCon 2025
 [CppCon 2025: Cross-platform XOffsetDatastructure: Ensuring Zero-encoding/Zero-decoding Serialization Compatibility Through Compile-time Type Signatures](https://github.com/ximicpp/XOffsetDatastructure/blob/main/docs/Compile-timeTypeSignatures.pdf)
 
+### Requirements
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| **C++26 Reflection (P2996)** | ✅ Required | Library depends on `<experimental/meta>` |
+| **Clang P2996 Fork** | ✅ Required | Standard compilers not supported |
+| **64-bit Architecture** | ✅ Required | 32-bit not supported |
+| **Little-endian** | ✅ Required | Big-endian not supported |
+
+> ⚠️ **Non-Reflection Mode**: This library does **NOT** support a non-reflection fallback mode. The C++26 P2996 reflection feature is integral to the type signature system and cannot be disabled. Use the provided Docker image or build Clang P2996 manually.
+
 ### Build and Test
 
 #### Option 1: Docker (Recommended for CI and Quick Start)
