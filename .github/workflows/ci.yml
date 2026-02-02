@@ -27,4 +27,4 @@ jobs:
       
       - name: Run tests in Docker
         run: |
-          docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest ./build.sh
+          docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest bash ./build.sh
