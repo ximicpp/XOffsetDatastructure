@@ -13,13 +13,57 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Platform detection
+detect_platform() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "linux"
+    else
+        echo "unknown"
+    fi
+}
+
+PLATFORM=$(detect_platform)
+
+# Get CPU count (cross-platform)
+get_cpu_count() {
+    if [[ "$PLATFORM" == "macos" ]]; then
+        sysctl -n hw.ncpu 2>/dev/null || echo 4
+    else
+        nproc 2>/dev/null || echo 4
+    fi
+}
+
+# Find Clang P2996 compiler
+find_clang_p2996() {
+    # Search paths in order of preference
+    local search_paths=(
+        "/usr/local/bin/clang++"
+        "$HOME/clang-p2996-install/bin/clang++"
+        "/opt/clang-p2996/bin/clang++"
+    )
+    
+    for path in "${search_paths[@]}"; do
+        if [[ -f "$path" ]]; then
+            # Verify it supports reflection
+            if "$path" --help 2>&1 | grep -q "freflection" || "$path" -freflection -x c++ -E - < /dev/null 2>&1 | head -1 > /dev/null; then
+                echo "$path"
+                return 0
+            fi
+        fi
+    done
+    
+    return 1
+}
+
 # Default configuration
 USE_CLANG_P2996=1
 ENABLE_REFLECTION=1
 BUILD_TYPE="Release"
 SHOW_HELP=0
 VERBOSE=0
-NUM_JOBS=$(nproc 2>/dev/null || echo 4)
+NUM_JOBS=$(get_cpu_count)
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -66,7 +110,7 @@ if [ $SHOW_HELP -eq 1 ]; then
     echo "  --no-reflection     Disable C++26 reflection tests"
     echo "  --debug             Build in Debug mode instead of Release"
     echo "  --verbose, -v       Show verbose build output"
-    echo "  -j N                Use N parallel jobs (default: $(nproc))"
+    echo "  -j N                Use N parallel jobs (default: auto-detected)"
     echo "  --help, -h          Show this help message"
     echo ""
     echo "Default: Use Clang P2996 with reflection enabled in Release mode"
@@ -113,18 +157,36 @@ CMAKE_CXX_FLAGS=""
 CMAKE_EXE_LINKER_FLAGS=""
 
 if [ $USE_CLANG_P2996 -eq 1 ]; then
-    CLANG_P2996_PATH="$HOME/clang-p2996-install/bin/clang++"
+    # Use dynamic compiler discovery
+    CLANG_P2996_PATH=$(find_clang_p2996)
     
-    if [ ! -f "$CLANG_P2996_PATH" ]; then
-        echo -e "${RED}Error: Clang P2996 not found at $CLANG_P2996_PATH${NC}"
+    if [ -z "$CLANG_P2996_PATH" ]; then
+        echo -e "${RED}Error: Clang P2996 not found in standard locations${NC}"
+        echo -e "${YELLOW}Searched: /usr/local/bin, ~/clang-p2996-install, /opt/clang-p2996${NC}"
         echo -e "${YELLOW}Please install Clang P2996 or use --no-p2996 flag${NC}"
         exit 1
     fi
     
-    CMAKE_CXX_COMPILER="$HOME/clang-p2996-install/bin/clang++"
-    CMAKE_C_COMPILER="$HOME/clang-p2996-install/bin/clang"
+    echo -e "${GREEN}Found Clang P2996 at: $CLANG_P2996_PATH${NC}"
+    
+    CLANG_P2996_DIR=$(dirname "$CLANG_P2996_PATH")
+    CLANG_INSTALL_DIR=$(dirname "$CLANG_P2996_DIR")
+    
+    CMAKE_CXX_COMPILER="$CLANG_P2996_PATH"
+    CMAKE_C_COMPILER="${CLANG_P2996_DIR}/clang"
     CMAKE_CXX_FLAGS="-stdlib=libc++"
-    CMAKE_EXE_LINKER_FLAGS="-L$HOME/clang-p2996-install/lib -Wl,-rpath,$HOME/clang-p2996-install/lib"
+    
+    # macOS specific: add SDK path
+    if [[ "$PLATFORM" == "macos" ]]; then
+        MACOS_SDK=$(xcrun --show-sdk-path 2>/dev/null)
+        if [ -n "$MACOS_SDK" ]; then
+            CMAKE_CXX_FLAGS="$CMAKE_CXX_FLAGS -isysroot $MACOS_SDK"
+            echo -e "${GREEN}Using macOS SDK: $MACOS_SDK${NC}"
+        fi
+        CMAKE_EXE_LINKER_FLAGS="-L${CLANG_INSTALL_DIR}/lib -Wl,-rpath,${CLANG_INSTALL_DIR}/lib -Wl,-rpath,/usr/lib"
+    else
+        CMAKE_EXE_LINKER_FLAGS="-L${CLANG_INSTALL_DIR}/lib -Wl,-rpath,${CLANG_INSTALL_DIR}/lib"
+    fi
 fi
 
 # Create build directory

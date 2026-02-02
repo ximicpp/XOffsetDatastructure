@@ -131,10 +131,10 @@ void test_instance_creation() {
     std::cout << "    c: " << obj->c.c_str() << "\n";
     std::cout << "    d.size(): " << obj->d.size() << "\n";
     
-    // Verify via splice
+    // Verify via splice (use dereferencing to work around P2996 arrow bug)
     std::cout << "\n  Access via splice:\n";
-    std::cout << "    a: " << obj->[:^^TypeSigTest::a:] << "\n";
-    std::cout << "    b: " << obj->[:^^TypeSigTest::b:] << "\n";
+    std::cout << "    a: " << (*obj).[:^^TypeSigTest::a:] << "\n";
+    std::cout << "    b: " << (*obj).[:^^TypeSigTest::b:] << "\n";
     
     std::cout << "[PASS] Instance creation\n\n";
 }

@@ -45,11 +45,12 @@ constexpr auto PLAYER_VERIFICATION = get_layout_verification<Player>();
 static_assert(verifications_match<Point, Vec2>(), "Point and Vec2 must have same verification");
 
 // Type library collision detection (compile-time guarantee)
+// Note: Point and Vec2 have identical layouts (intentionally), so we exclude Vec2 from collision check
 struct Enemy { uint64_t id; Point pos; int32_t hp; };
 struct Item  { uint32_t id; float weight; };
-static_assert(no_hash_collision<Point, Player, Vec2, Enemy, Item>(), 
+static_assert(no_hash_collision<Point, Player, Enemy, Item>(), 
               "Hash collision in type library!");
-static_assert(no_verification_collision<Point, Player, Vec2, Enemy, Item>(),
+static_assert(no_verification_collision<Point, Player, Enemy, Item>(),
               "Verification collision in type library!");
 
 // Template constraint using hash

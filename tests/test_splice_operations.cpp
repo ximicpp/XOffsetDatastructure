@@ -121,14 +121,14 @@ void test_xoffsetdatastructure_splice() {
     std::cout << "    value: " << data->value << "\n";
     std::cout << "    name: " << data->name.c_str() << "\n";
     
-    // Access via splice
+    // Access via splice (use dereferencing to work around P2996 arrow bug)
     std::cout << "\n  Access via splice:\n";
-    std::cout << "    id: " << data->[:^^DataStruct::id:] << "\n";
-    std::cout << "    value: " << data->[:^^DataStruct::value:] << "\n";
+    std::cout << "    id: " << (*data).[:^^DataStruct::id:] << "\n";
+    std::cout << "    value: " << (*data).[:^^DataStruct::value:] << "\n";
     
     // Modify via splice
-    data->[:^^DataStruct::id:] = 2002;
-    data->[:^^DataStruct::value:] = 88.88;
+    (*data).[:^^DataStruct::id:] = 2002;
+    (*data).[:^^DataStruct::value:] = 88.88;
     
     std::cout << "\n  After modification:\n";
     std::cout << "    id: " << data->id << "\n";
