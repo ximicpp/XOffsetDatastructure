@@ -515,11 +515,6 @@ namespace XOffsetDatastructure2 {
             }
         }
         
-        template<typename T>
-        static consteval std::size_t get_member_count_impl() {
-            using namespace std::meta;
-            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-        }
         
         template<typename T, std::size_t Index>
         static consteval auto get_member_at() {
@@ -549,7 +544,7 @@ namespace XOffsetDatastructure2 {
         template<typename T>
         static void migrate_members(const T& old_obj, T& new_obj, 
                                    XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            constexpr std::size_t member_count = get_member_count_impl<T>();
+            constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
             migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
                                 std::make_index_sequence<member_count>{});
         }
@@ -679,11 +674,6 @@ namespace XOffsetDatastructure2 {
             return false;
         }
 		
-        template<typename T>
-        consteval std::size_t get_safe_member_count() {
-            using namespace std::meta;
-            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-        }
         
         template<typename T, std::size_t Index>
         consteval bool is_member_safe_at() {
