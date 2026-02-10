@@ -147,10 +147,8 @@ git submodule update --init --recursive
 // Main library namespace
 using namespace XOffsetDatastructure2;
 
-// Type signatures namespace
-namespace XTypeSignature {
-    // Implementation details
-}
+// Type signatures (provided by TypeLayout library)
+using namespace boost::typelayout;
 
 // Reflection code (C++26 only)
 #ifdef __cpp_reflection

@@ -213,7 +213,7 @@ run_reflection_tests.bat
 - Member properties (`is_public()`, `is_static_member()`)
 
 **9. test_reflection_type_signature.cpp** (6 tests)
-- Integration with `XTypeSignature`
+- Integration with `boost::typelayout`
 - Compile-time type validation
 - Serialization with reflection
 

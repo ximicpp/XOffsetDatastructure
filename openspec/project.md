@@ -20,7 +20,7 @@ See `AGENTS.md` for complete style guide. Key conventions:
   - Classes: `PascalCase` (e.g., `BasicTypes`, `XVector`)
   - Functions: `snake_case` (e.g., `test_basic_types`)
   - Members: `mPascalCase` (e.g., `mInt`, `mFloat`)
-- **Namespaces:** `XOffsetDatastructure2`, `XTypeSignature`
+- **Namespaces:** `XOffsetDatastructure2`, `boost::typelayout`
 - **Include order:** System → Platform-specific → Library → Local
 
 ### Architecture Patterns
@@ -37,7 +37,7 @@ See `AGENTS.md` for complete style guide. Key conventions:
   - Basic tests (6): Core functionality without reflection
   - Reflection tests (12): C++26 reflection features
 - **Execution:** Via `build.sh` or individual test binaries
-- **CI requirement:** All 18 tests must pass for PR merge
+- **CI requirement:** All 21 tests must pass for PR merge
 
 ### Git Workflow
 - **Main branch:** `main` (or `master`)

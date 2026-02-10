@@ -275,6 +275,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Ensure libc++ can be found at runtime (needed in Docker with P2996 Clang)
+if [ -d "/opt/clang-p2996/lib/x86_64-unknown-linux-gnu" ]; then
+    export LD_LIBRARY_PATH="/opt/clang-p2996/lib/x86_64-unknown-linux-gnu:${LD_LIBRARY_PATH:-}"
+fi
+
 # Run tests
 echo ""
 echo -e "${CYAN}======================================================================${NC}"

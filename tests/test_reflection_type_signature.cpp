@@ -1,6 +1,6 @@
 // ============================================================================
 // Test: Reflection Type Signature Integration
-// Purpose: Test integration between reflection and XTypeSignature
+// Purpose: Test integration between reflection and boost::typelayout
 // ============================================================================
 
 #include "../xoffsetdatastructure2.hpp"
@@ -10,7 +10,7 @@
 #include <experimental/meta>
 
 using namespace XOffsetDatastructure2;
-using namespace XTypeSignature;
+using namespace boost::typelayout;
 
 struct TypeSigTest {
     int a;
@@ -260,7 +260,7 @@ int main() {
     std::cout << "========================================\n\n";
 
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
-    std::cout << "[INFO] Testing XTypeSignature integration\n\n";
+    std::cout << "[INFO] Testing boost::typelayout integration\n\n";
     
     test_type_signature_generation();
     test_reflection_member_count();

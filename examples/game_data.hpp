@@ -9,7 +9,7 @@ using namespace XOffsetDatastructure2;
 // Item - Direct Type Definition (C++26 Reflection)
 // ============================================================================
 
-class alignas(XTypeSignature::BASIC_ALIGNMENT) Item {
+class alignas(8) Item {
 public:
 	// Default constructor
 	template <typename Allocator>
@@ -34,7 +34,7 @@ public:
 // GameData - Direct Type Definition (C++26 Reflection)
 // ============================================================================
 
-class alignas(XTypeSignature::BASIC_ALIGNMENT) GameData {
+class alignas(8) GameData {
 public:
 	// Default constructor
 	template <typename Allocator>
