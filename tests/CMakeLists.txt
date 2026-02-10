@@ -92,6 +92,7 @@ set(REFLECTION_TESTS
     test_vptr_layout
     test_type_erased_detection
     test_typelayout_integration
+    test_enum_support
 )
 
 # Add each reflection test
