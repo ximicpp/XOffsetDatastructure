@@ -612,64 +612,36 @@ namespace XOffsetDatastructure2 {
         template<typename T>
         consteval bool is_type_erased_container() {
             using CleanT = std::remove_cv_t<T>;
-            
-            // std::function - contains virtual function pointer
-            if constexpr (is_std_function<CleanT>::value) {
-                return true;
-            }
-            // std::any - contains type-erased storage with virtual dispatch
-            if constexpr (std::is_same_v<CleanT, std::any>) {
-                return true;
-            }
-            // std::shared_ptr - contains control block pointer
-            if constexpr (is_std_shared_ptr<CleanT>::value) {
-                return true;
-            }
-            // std::unique_ptr - contains raw pointer
-            if constexpr (is_std_unique_ptr<CleanT>::value) {
-                return true;
-            }
-            // std::weak_ptr - contains control block pointer
-            if constexpr (is_std_weak_ptr<CleanT>::value) {
-                return true;
-            }
-            
-            return false;
+            return is_std_function<CleanT>::value ||
+                   std::is_same_v<CleanT, std::any> ||
+                   is_std_shared_ptr<CleanT>::value ||
+                   is_std_unique_ptr<CleanT>::value ||
+                   is_std_weak_ptr<CleanT>::value;
         }
         
         template<typename T>
         consteval bool is_safe_type();
         
+        // Unified XBuffer container safety check (XVector, XSet, XMap).
+        // All XBuffer containers share: sizeof == 32, alignof == 8.
         template<typename T>
-        consteval bool is_safe_xvector() {
+        consteval bool is_safe_xcontainer() {
             using CleanT = std::remove_cv_t<T>;
-            if constexpr (requires { typename CleanT::value_type; }) {
-                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-                    return is_safe_type<typename CleanT::value_type>();
-                }
+            if constexpr (sizeof(CleanT) != 32 || alignof(CleanT) != 8) {
+                return false;
             }
-            return false;
-        }
-        
-        template<typename T>
-        consteval bool is_safe_xset() {
-            using CleanT = std::remove_cv_t<T>;
-            if constexpr (requires { typename CleanT::key_type; }) {
-                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-                    return is_safe_type<typename CleanT::key_type>();
-                }
-            }
-            return false;
-        }
-        
-        template<typename T>
-        consteval bool is_safe_xmap() {
-            using CleanT = std::remove_cv_t<T>;
+            // XMap: has both key_type and mapped_type
             if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
-                if constexpr (sizeof(CleanT) == 32 && alignof(CleanT) == 8) {
-                    return is_safe_type<typename CleanT::key_type>() &&
-                           is_safe_type<typename CleanT::mapped_type>();
-                }
+                return is_safe_type<typename CleanT::key_type>() &&
+                       is_safe_type<typename CleanT::mapped_type>();
+            }
+            // XVector: has value_type
+            if constexpr (requires { typename CleanT::value_type; }) {
+                return is_safe_type<typename CleanT::value_type>();
+            }
+            // XSet: has key_type only
+            if constexpr (requires { typename CleanT::key_type; }) {
+                return is_safe_type<typename CleanT::key_type>();
             }
             return false;
         }
@@ -678,22 +650,9 @@ namespace XOffsetDatastructure2 {
         template<typename T, std::size_t Index>
         consteval bool is_member_safe_at() {
             using namespace std::meta;
-            
             constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
             using MemberType = [:type_of(member):];
-            
-            if (!is_safe_type<MemberType>()) {
-                return false;
-            }
-            
-            if constexpr (std::is_reference_v<MemberType>) {
-                return false;
-            }
-            if constexpr (std::is_pointer_v<MemberType>) {
-                return false;
-            }
-            
-            return true;
+            return is_safe_type<MemberType>();
         }
         
         template<typename T, std::size_t... Indices>
@@ -751,19 +710,10 @@ namespace XOffsetDatastructure2 {
                 return true;
             }
             
-            if constexpr (std::is_class_v<CleanT>) {
-                if constexpr (is_safe_xvector<CleanT>()) {
-                    return true;
-                }
-                if constexpr (is_safe_xset<CleanT>()) {
-                    return true;
-                }
-                if constexpr (is_safe_xmap<CleanT>()) {
-                    return true;
-                }
-            }
-            
             if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
+                if constexpr (is_safe_xcontainer<CleanT>()) {
+                    return true;
+                }
                 return are_all_members_safe<CleanT>();
             }
             
