@@ -5,6 +5,7 @@ add_executable(xoffsetdatastructure2_demo demo.cpp)
 target_include_directories(xoffsetdatastructure2_demo PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
+    ${TYPELAYOUT_INCLUDE_DIRS}
 )
 
 # Set output directory
@@ -31,6 +32,7 @@ add_executable(helloworld helloworld.cpp)
 target_include_directories(helloworld PRIVATE 
     ${CMAKE_SOURCE_DIR}
     ${BOOST_INCLUDE_DIRS}
+    ${TYPELAYOUT_INCLUDE_DIRS}
 )
 set_target_properties(helloworld PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"

@@ -74,10 +74,8 @@ void test_type_signature_generation() {
     
     // Test 15-field struct
     std::cout << "\n  LargeStruct (15 fields):\n";
-    constexpr auto sig15 = XTypeSignature::get_XTypeSignature<LargeStruct>();
-    std::cout << "    Signature: ";
-    sig15.print();
-    std::cout << "\n";
+    constexpr auto sig15 = boost::typelayout::get_definition_signature<LargeStruct>();
+    std::cout << "    Signature: " << sig15 << "\n";
     
     // Verify it's not the error message
     constexpr bool has_error15 = sig15 == "TOO_MANY_FIELDS";
@@ -86,18 +84,14 @@ void test_type_signature_generation() {
     
     // Test 10-field struct (boundary)
     std::cout << "\n  BoundaryStruct (10 fields):\n";
-    constexpr auto sig10 = XTypeSignature::get_XTypeSignature<BoundaryStruct>();
-    std::cout << "    Signature: ";
-    sig10.print();
-    std::cout << "\n";
+    constexpr auto sig10 = boost::typelayout::get_definition_signature<BoundaryStruct>();
+    std::cout << "    Signature: " << sig10 << "\n";
     std::cout << "    [OK] Boundary case works\n";
     
     // Test 20-field struct
     std::cout << "\n  VeryLargeStruct (20 fields):\n";
-    constexpr auto sig20 = XTypeSignature::get_XTypeSignature<VeryLargeStruct>();
-    std::cout << "    Signature: ";
-    sig20.print();
-    std::cout << "\n";
+    constexpr auto sig20 = boost::typelayout::get_definition_signature<VeryLargeStruct>();
+    std::cout << "    Signature: " << sig20 << "\n";
     
     constexpr bool has_error20 = sig20 == "TOO_MANY_FIELDS";
     static_assert(!has_error20, "VeryLargeStruct should not produce error signature");
@@ -153,9 +147,9 @@ void test_field_count_detection() {
     std::cout << "-------------------------------\n";
     
     // Use reflection to count fields at compile-time
-    constexpr size_t count_boundary = XTypeSignature::get_member_count<BoundaryStruct>();
-    constexpr size_t count_large = XTypeSignature::get_member_count<LargeStruct>();
-    constexpr size_t count_very_large = XTypeSignature::get_member_count<VeryLargeStruct>();
+    constexpr size_t count_boundary = boost::typelayout::get_member_count<BoundaryStruct>();
+    constexpr size_t count_large = boost::typelayout::get_member_count<LargeStruct>();
+    constexpr size_t count_very_large = boost::typelayout::get_member_count<VeryLargeStruct>();
     
     std::cout << "  BoundaryStruct: " << count_boundary << " fields\n";
     std::cout << "  LargeStruct: " << count_large << " fields\n";

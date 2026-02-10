@@ -40,6 +40,11 @@ if(APPLE)
     endif()
 endif()
 
+# Set TypeLayout include directories
+set(TYPELAYOUT_INCLUDE_DIRS
+    ${CMAKE_SOURCE_DIR}/external/typelayout/include
+)
+
 # Set Boost include directories
 set(BOOST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/boost

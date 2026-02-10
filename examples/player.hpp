@@ -27,9 +27,9 @@ public:
 	XVector<int32_t> items;
 };
 
-// Full type signature validation using C++26 reflection
-static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
-             "struct[s:72,a:8]{"
+// Full type signature validation using boost::typelayout (Definition Signature)
+static_assert(boost::typelayout::get_definition_signature<Player>() ==
+             "[64-le]record[s:72,a:8]{"
              "@0[id]:i32[s:4,a:4],"
              "@4[level]:i32[s:4,a:4],"
              "@8[name]:string[s:32,a:8],"

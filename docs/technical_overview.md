@@ -50,17 +50,21 @@ The result is **fully automatic, semantically complete Type Signatures**—and t
   - `offset_of(member).bytes` — Compiler-provided accurate offsets (`next_cpp26:lines 186, 203`)
   - `type_of(member)` — Get member types
 - The splice syntax `obj.[:member:]` for programmatic member access
-- Building complete Type Signatures: `struct[s:48,a:8]{@0[item_id]:i32,...}`
-- *Example signature (with names):* `@0[item_id]:i32[s:4,a:4],@4[item_type]:i32[s:4,a:4],@8[quantity]:i32[s:4,a:4]`
+- Building complete Type Signatures via [TypeLayout](https://github.com/ximicpp/TypeLayout): `[64-le]record[s:48,a:8]{@0[item_id]:i32,...}`
+- Two-layer system: **Definition** (with names, inheritance) and **Layout** (pure byte identity)
+- *Example definition signature:* `[64-le]record[s:48,a:8]{@0[item_id]:i32[s:4,a:4],@4[item_type]:i32[s:4,a:4],@8[quantity]:i32[s:4,a:4],@16[name]:string[s:32,a:8]}`
+- *Example layout signature:* `[64-le]record[s:48,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@16:string[s:32,a:8]}`
 - *Takeaway: Master the four key `std::meta` APIs and splice syntax*
 
 **5. The "Binary Contract" Pattern (10 min)**
 - Compile-time `static_assert` catching field renaming/reordering
 - Live demo: Compile fails when struct layout changes
-- Code example from `examples/player.hpp`:
+- Code example from `examples/player.hpp` (using TypeLayout):
   ```cpp
-  static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
-      "struct[s:72,a:8]{@0[id]:i32,...}", "Binary layout changed!");
+  static_assert(boost::typelayout::get_definition_signature<Player>() ==
+      "[64-le]record[s:72,a:8]{@0[id]:i32,...}", "Binary layout changed!");
+  // NEW: layout-only comparison for binary compatibility
+  static_assert(boost::typelayout::layout_signatures_match<PlayerV1, PlayerV2>());
   ```
 - Runtime handshake with embedded signature hash for IPC/network protocols
 - *Takeaway: Compile-time static_assert + runtime signature hashing = cross-platform safety*

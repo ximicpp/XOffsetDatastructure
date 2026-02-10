@@ -2,3 +2,7 @@
 	path = external/boost
 	url = https://github.com/boostorg/boost.git
 	branch = boost-1.81.0
+[submodule "external/typelayout"]
+	path = external/typelayout
+	url = https://github.com/ximicpp/TypeLayout.git
+	branch = main

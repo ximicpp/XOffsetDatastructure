@@ -11,6 +11,25 @@ XOffsetDatastructure is a serialization library designed to reduce or even elimi
 ### CppCon 2025
 [CppCon 2025: Cross-platform XOffsetDatastructure: Ensuring Zero-encoding/Zero-decoding Serialization Compatibility Through Compile-time Type Signatures](https://github.com/ximicpp/XOffsetDatastructure/blob/main/docs/Compile-timeTypeSignatures.pdf)
 
+### Type Signature System (powered by TypeLayout)
+
+XOffsetDatastructure uses [TypeLayout](https://github.com/ximicpp/TypeLayout) as its type-signature engine. TypeLayout provides a two-layer compile-time signature system:
+
+- **Definition Signatures** — full structural identity including field names, inheritance, and platform info
+- **Layout Signatures** — pure byte-layout comparison for binary compatibility checks
+
+```cpp
+// Compile-time type safety: detect layout changes at build time
+static_assert(boost::typelayout::get_definition_signature<Player>() ==
+    "[64-le]record[s:72,a:8]{@0[id]:i32[s:4,a:4],@4[level]:i32[s:4,a:4],...}",
+    "Binary layout changed! This breaks serialization compatibility.");
+
+// Check binary compatibility between two types
+static_assert(boost::typelayout::layout_signatures_match<StructA, StructB>());
+```
+
+See `docs/MIGRATION_TYPELAYOUT.md` for the full API reference and migration guide.
+
 ### Requirements
 
 | Requirement | Status | Notes |
@@ -23,6 +42,12 @@ XOffsetDatastructure is a serialization library designed to reduce or even elimi
 > ⚠️ **Non-Reflection Mode**: This library does **NOT** support a non-reflection fallback mode. The C++26 P2996 reflection feature is integral to the type signature system and cannot be disabled. Use the provided Docker image or build Clang P2996 manually.
 
 ### Build and Test
+
+> **Important:** This project uses Git submodules. Always clone with `--recursive`:
+> ```bash
+> git clone --recursive https://github.com/ximicpp/XOffsetDatastructure.git
+> ```
+> If you already cloned without `--recursive`, run: `git submodule update --init --recursive`
 
 #### Option 1: Docker (Recommended for CI and Quick Start)
 

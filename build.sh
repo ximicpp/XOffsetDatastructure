@@ -132,6 +132,27 @@ echo -e "${CYAN}  XOffsetDatastructure2 Build Script (with Reflection Support)${
 echo -e "${CYAN}======================================================================${NC}"
 echo ""
 
+# Check submodules
+echo -e "${BLUE}Checking submodules...${NC}"
+
+if [ ! -f "external/typelayout/include/boost/typelayout.hpp" ]; then
+    echo -e "${YELLOW}TypeLayout submodule not initialized. Initializing...${NC}"
+    git submodule update --init --recursive external/typelayout
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to initialize TypeLayout submodule${NC}"
+        echo -e "${YELLOW}Try: git submodule update --init --recursive${NC}"
+        exit 1
+    fi
+fi
+
+if [ ! -d "external/boost" ]; then
+    echo -e "${YELLOW}Boost submodule not initialized. Initializing...${NC}"
+    git submodule update --init external/boost
+fi
+
+echo -e "${GREEN}Submodules OK${NC}"
+echo ""
+
 # Display configuration
 echo -e "${BLUE}Configuration:${NC}"
 if [ $USE_CLANG_P2996 -eq 1 ]; then
@@ -305,7 +326,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=18
+    TOTAL_TESTS=19
 fi
 
 # Basic tests (6 tests)
@@ -336,6 +357,7 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_class_type_signatures" 16 $TOTAL_TESTS
     run_test "test_type_safety" 17 $TOTAL_TESTS
     run_test "test_vptr_layout" 18 $TOTAL_TESTS
+    run_test "test_typelayout_integration" 19 $TOTAL_TESTS
 fi
 
 # Run demo
