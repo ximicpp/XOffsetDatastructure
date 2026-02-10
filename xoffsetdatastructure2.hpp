@@ -52,67 +52,32 @@
 #include <any>
 
 // TypeLayout library — the authoritative type-signature engine
-#include <boost/typelayout.hpp>
-
-// ============================================================================
-// XTypeSignature — Backward-compatible API layer delegating to boost::typelayout
-//
-// All original XTypeSignature APIs are preserved but marked [[deprecated]].
-// New code should use boost::typelayout directly:
+// Use boost::typelayout directly for all type signature operations:
 //   - boost::typelayout::get_definition_signature<T>()
 //   - boost::typelayout::get_layout_signature<T>()
 //   - boost::typelayout::definition_signatures_match<T1, T2>()
 //   - boost::typelayout::layout_signatures_match<T1, T2>()
+#include <boost/typelayout.hpp>
+
 // ============================================================================
-
-namespace XTypeSignature {
-    inline constexpr int BASIC_ALIGNMENT = 8;
-    inline constexpr int ANY_SIZE = 64;
-
-    // Platform assertions (unchanged — still useful as a safety net)
-    static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
-    static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
-    static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
-    static_assert(sizeof(uint16_t) == 2, "uint16_t must be 2 bytes");
-    static_assert(sizeof(int32_t) == 4, "int32_t must be 4 bytes");
-    static_assert(sizeof(uint32_t) == 4, "uint32_t must be 4 bytes");
-    static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
-    static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
-    
-    static_assert(sizeof(float) == 4, "float must be 4 bytes");
-    static_assert(sizeof(double) == 8, "double must be 8 bytes");
-    
-    static_assert(sizeof(char) == 1, "char must be 1 byte");
-    static_assert(sizeof(bool) == 1, "bool must be 1 byte");
-    
-    static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
-    static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
-    static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
-    static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
-
-    // Re-export FixedString from TypeLayout as CompileString for backward compat
-    template <size_t N>
-    using CompileString = boost::typelayout::FixedString<N>;
-
-    // Re-export TypeSignature from TypeLayout (Definition mode by default)
-    template <typename T>
-    using TypeSignature = boost::typelayout::TypeSignature<T, boost::typelayout::SignatureMode::Definition>;
-
-    // Backward-compatible helper: get member count via TypeLayout
-    using boost::typelayout::get_member_count;
-
-    // -----------------------------------------------------------------------
-    // Deprecated API — delegates to boost::typelayout
-    // -----------------------------------------------------------------------
-
-    /// @deprecated Use boost::typelayout::get_definition_signature<T>() instead
-    template <typename T>
-    [[deprecated("Use boost::typelayout::get_definition_signature<T>() instead")]]
-    [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
-        return boost::typelayout::get_definition_signature<T>();
-    }
-
-} // namespace XTypeSignature
+// Platform type-size assertions (safety net for cross-platform builds)
+// ============================================================================
+static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
+static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
+static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
+static_assert(sizeof(uint16_t) == 2, "uint16_t must be 2 bytes");
+static_assert(sizeof(int32_t) == 4, "int32_t must be 4 bytes");
+static_assert(sizeof(uint32_t) == 4, "uint32_t must be 4 bytes");
+static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
+static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
+static_assert(sizeof(float) == 4, "float must be 4 bytes");
+static_assert(sizeof(double) == 8, "double must be 8 bytes");
+static_assert(sizeof(char) == 1, "char must be 1 byte");
+static_assert(sizeof(bool) == 1, "bool must be 1 byte");
+static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
+static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
+static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
+static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
 
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
@@ -937,8 +902,8 @@ namespace XOffsetDatastructure2 {
 // ============================================================================
 // TypeLayout specializations for XOffsetDatastructure2 containers
 //
-// These are registered in boost::typelayout so both TypeLayout and the
-// XTypeSignature compatibility layer can resolve them.
+// These are registered in boost::typelayout so the type-signature engine
+// can resolve XOffsetDatastructure2 container types correctly.
 // ============================================================================
 namespace boost {
 namespace typelayout {

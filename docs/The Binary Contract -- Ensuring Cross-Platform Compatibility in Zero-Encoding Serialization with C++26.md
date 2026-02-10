@@ -184,8 +184,8 @@ private:
 
 From `examples/player.hpp` (`next_cpp26` branch):
 ```cpp
-static_assert(XTypeSignature::get_XTypeSignature<Player>() ==
-    "struct[s:72,a:8]{"
+static_assert(boost::typelayout::get_definition_signature<Player>() ==
+    "[64-le]record[s:72,a:8]{"
     "@0[id]:i32[s:4,a:4],"
     "@4[level]:i32[s:4,a:4],"
     "@8[name]:string[s:32,a:8],"

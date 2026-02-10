@@ -1,12 +1,15 @@
 # Migration Guide: XTypeSignature → TypeLayout
 
-This guide covers the migration from the legacy `XTypeSignature` API to the new
-`boost::typelayout` library integrated into XOffsetDatastructure2.
+This guide covers the migration from the legacy `XTypeSignature` API (removed) to the
+`boost::typelayout` library, which is now the sole type-signature engine in XOffsetDatastructure2.
+
+> **Note**: The `XTypeSignature` compatibility namespace has been fully removed.
+> All code must use `boost::typelayout` directly.
 
 ## Overview
 
-| Aspect | Old (XTypeSignature) | New (boost::typelayout) |
-|--------|---------------------|------------------------|
+| Aspect | Old (XTypeSignature) — REMOVED | New (boost::typelayout) |
+|--------|-------------------------------|------------------------|
 | Namespace | `XTypeSignature` | `boost::typelayout` |
 | String type | `CompileString<N>` | `FixedString<N>` |
 | Signature function | `get_XTypeSignature<T>()` | `get_definition_signature<T>()` |
@@ -15,26 +18,20 @@ This guide covers the migration from the legacy `XTypeSignature` API to the new
 | Signature layers | 1 (definition-like) | 2 (Layout + Definition) |
 | Match check | Manual `operator==` | `definition_signatures_match<T1,T2>()` |
 | Layout match | _(not available)_ | `layout_signatures_match<T1,T2>()` |
+| Alignment constant | `XTypeSignature::BASIC_ALIGNMENT` | Use literal `8` or define your own |
 
 ## Quick Migration
 
-### Before (old API)
+### Before (old API — no longer compiles)
 
 ```cpp
-#include "xoffsetdatastructure2.hpp"
-
-// Generate signature
+// ❌ These no longer exist:
 constexpr auto sig = XTypeSignature::get_XTypeSignature<MyStruct>();
-
-// Validate with static_assert
-static_assert(sig == "struct[s:16,a:8]{@0[x]:i32[s:4,a:4],@8[y]:f64[s:8,a:8]}",
-              "Layout changed!");
-
-// Print
-sig.print();
+XTypeSignature::CompileString<6> cs("hello");
+class alignas(XTypeSignature::BASIC_ALIGNMENT) MyClass { ... };
 ```
 
-### After (new API)
+### After (current API)
 
 ```cpp
 #include "xoffsetdatastructure2.hpp"
@@ -50,16 +47,19 @@ static_assert(sig == "[64-le]record[s:16,a:8]{@0[x]:i32[s:4,a:4],@8[y]:f64[s:8,a
 // Print (use operator<< instead of .print())
 std::cout << sig << "\n";
 
-// NEW: Check if two types have matching signatures
+// Check if two types have matching signatures
 static_assert(boost::typelayout::definition_signatures_match<MyStruct, MyStruct>());
 
-// NEW: Layout-only comparison (ignores field names, only compares byte layout)
+// Layout-only comparison (ignores field names, only compares byte layout)
 static_assert(boost::typelayout::layout_signatures_match<StructA, StructB>());
+
+// Alignment: use literal 8
+class alignas(8) MyClass { ... };
 ```
 
 ## Signature Format Changes
 
-### Old format
+### Old format (no longer generated)
 ```
 struct[s:72,a:8]{@0[id]:i32[s:4,a:4],@4[level]:i32[s:4,a:4],@8[name]:string[s:32,a:8]}
 ```
@@ -94,33 +94,10 @@ TypeLayout provides two signature layers:
 - **Definition**: When you need to ensure the **exact same type** (same fields, same names, same hierarchy)
 - **Layout**: When you need to ensure **binary compatibility** (same bytes at same offsets, regardless of names)
 
-## Backward Compatibility
-
-The `XTypeSignature` namespace is preserved as a thin compatibility layer:
-
-```cpp
-namespace XTypeSignature {
-    // Still available:
-    inline constexpr int BASIC_ALIGNMENT = 8;
-    inline constexpr int ANY_SIZE = 64;
-
-    // Aliases to TypeLayout types:
-    template <size_t N>
-    using CompileString = boost::typelayout::FixedString<N>;
-
-    template <typename T>
-    using TypeSignature = boost::typelayout::TypeSignature<T, boost::typelayout::SignatureMode::Definition>;
-
-    // Deprecated — delegates to boost::typelayout::get_definition_signature<T>()
-    template <typename T>
-    [[deprecated]] consteval auto get_XTypeSignature() noexcept;
-}
-```
-
 ## Container Specializations
 
 XOffsetDatastructure2 containers (XString, XVector, XSet, XMap) are registered
-in `boost::typelayout` namespace. They produce the same opaque signatures as before:
+in `boost::typelayout` namespace. They produce opaque signatures with fixed size:
 
 | Container | Signature |
 |-----------|-----------|
@@ -131,18 +108,18 @@ in `boost::typelayout` namespace. They produce the same opaque signatures as bef
 
 ## FAQ
 
-**Q: Will my existing code still compile?**
-A: Yes. The `XTypeSignature` namespace is preserved with backward-compatible aliases.
-You will see deprecation warnings for `get_XTypeSignature<T>()`.
+**Q: Will my existing code using `XTypeSignature` still compile?**
+A: No. The `XTypeSignature` namespace has been completely removed. You must migrate
+to `boost::typelayout`. See the "Quick Migration" section above.
 
 **Q: Do I need to update my `static_assert` strings?**
-A: Yes, if you have hardcoded signature strings. The format changed from `struct[...]` to
-`[64-le]record[...]`. Update the expected strings accordingly.
+A: Yes. The format changed from `struct[...]` to `[64-le]record[...]`.
+Update the expected strings accordingly.
 
 **Q: What about `CompileString::print()`?**
 A: TypeLayout's `FixedString` uses `operator<<` instead of `.print()`.
 Replace `sig.print()` with `std::cout << sig`.
 
-**Q: Can I use the old and new API simultaneously?**
-A: Yes. `XTypeSignature::TypeSignature<T>` delegates to
-`boost::typelayout::TypeSignature<T, Definition>`, so they produce the same results.
+**Q: What replaces `BASIC_ALIGNMENT` and `ANY_SIZE`?**
+A: Use the literal value `8` for alignment (or define your own constant).
+The `ANY_SIZE` constant (64) was rarely used; define it locally if needed.

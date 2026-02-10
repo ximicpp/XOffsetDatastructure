@@ -38,7 +38,7 @@ XOffsetDatastructure2 是一个专为 **C++26** 设计的零拷贝序列化库�
 │   is_xbuffer_safe<T> + validate_xbuffer_type<T>     │
 ├─────────────────────────────────────────────────────┤
 │                   反射层                              │
-│   XTypeSignature + 成员迭代 + 自动迁移               │
+│   boost::typelayout + 成员迭代 + 自动迁移            │
 ├─────────────────────────────────────────────────────┤
 │                   容器层                              │
 │   XBuffer + XVector + XMap + XSet + XString         │
@@ -262,9 +262,9 @@ using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V
 
 ## 3. C++26 反射集成
 
-### 3.1 类型签名系统 (XTypeSignature)
+### 3.1 类型签名系统 (boost::typelayout)
 
-**实现位置**: 行 51-323 (namespace `XTypeSignature`)
+**实现位置**: 由外部库 `external/typelayout` 提供，通过 `#include <boost/typelayout.hpp>` 引入
 
 #### 3.1.1 签名生成算法
 
@@ -275,53 +275,31 @@ using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V
 
 **基本类型签名**:
 ```cpp
-template <> struct TypeSignature<int32_t>  { 
-    static consteval auto calculate() noexcept { 
-        return CompileString{"i32[s:4,a:4]"}; 
-    } 
-};
+// TypeLayout 内部自动处理基本类型
+// 例: boost::typelayout::TypeSignature<int32_t, SignatureMode::Definition>::calculate()
+// 输出: "i32[s:4,a:4]"
 ```
 
 格式: `类型名[s:大小,a:对齐]`
 
-**复合类型签名** (使用反射):
+**复合类型签名** (使用 TypeLayout + P2996 反射自动生成):
 ```cpp
-template <typename T>
-struct TypeSignature {
-    static consteval auto calculate() noexcept {
-        if constexpr (std::is_class_v<T>) {
-            return CompileString{"struct[s:"} +
-                   CompileString<32>::from_number(sizeof(T)) +
-                   CompileString{",a:"} +
-                   CompileString<32>::from_number(alignof(T)) +
-                   CompileString{"]{"} +
-                   get_fields_signature<T>() +  // 反射遍历字段
-                   CompileString{"}"};
-        }
-    }
-};
+// TypeLayout 库自动遍历所有字段并生成签名
+constexpr auto sig = boost::typelayout::get_definition_signature<T>();
+// 输出格式: [64-le]record[s:N,a:M]{@offset[name]:type,...}
 ```
 
-**字段签名生成** (核心反射代码):
+**两层签名系统**:
 ```cpp
-template<typename T, std::size_t Index>
-static consteval auto get_field_signature() noexcept {
-    using namespace std::meta;
-    
-    // 获取第 Index 个成员
-    constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
-    
-    // 提取类型、偏移量、名称
-    using FieldType = [:type_of(member):];
-    constexpr std::size_t offset = offset_of(member).bytes;
-    constexpr std::string_view name = identifier_of(member);
-    
-    // 生成签名: @偏移[字段名]:类型签名
-    return CompileString{"@"} +
-           CompileString<32>::from_number(offset) +
-           CompileString{"["} + name + CompileString{"]:"} +
-           TypeSignature<FieldType>::calculate();
-}
+// Definition Signature — 包含字段名，用于严格类型身份验证
+constexpr auto def_sig = boost::typelayout::get_definition_signature<T>();
+
+// Layout Signature — 不含字段名，用于纯字节布局兼容性检查
+constexpr auto lay_sig = boost::typelayout::get_layout_signature<T>();
+
+// 类型匹配 API
+static_assert(boost::typelayout::definition_signatures_match<T1, T2>());
+static_assert(boost::typelayout::layout_signatures_match<T1, T2>());
 ```
 
 **示例输出**:
@@ -329,11 +307,10 @@ static consteval auto get_field_signature() noexcept {
 struct Player {
     int32_t id;
     float score;
-    char name[64];
 };
 
-// 生成签名:
-// struct[s:72,a:4]{@0[id]:i32[s:4,a:4],@4[score]:f32[s:4,a:4],@8[name]:bytes[s:64,a:1]}
+// Definition 签名:
+// [64-le]record[s:8,a:4]{@0[id]:i32[s:4,a:4],@4[score]:f32[s:4,a:4]}
 ```
 
 #### 💡 改进建议 #5: 签名哈希
@@ -592,7 +569,8 @@ T* XBufferExt::make(const char* name) {
 | 功能 | 文件 | 行号 |
 |------|------|------|
 | 平台检测 | xoffsetdatastructure2.hpp | 1-37 |
-| XTypeSignature | xoffsetdatastructure2.hpp | 51-323 |
+| TypeLayout 集成 | external/typelayout/include | (外部库) |
+| 平台断言 | xoffsetdatastructure2.hpp | 62-78 |
 | XManagedMemory | xoffsetdatastructure2.hpp | 377-502 |
 | XBuffer 定义 | xoffsetdatastructure2.hpp | 511 |
 | 容器定义 | xoffsetdatastructure2.hpp | 556-592 |

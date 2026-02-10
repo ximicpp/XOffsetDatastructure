@@ -223,36 +223,6 @@ bool test_primitive_signatures() {
 }
 
 // ============================================================================
-// Test 7: Backward Compatibility (XTypeSignature namespace)
-// ============================================================================
-
-bool test_backward_compatibility() {
-    std::cout << "\n[Test 7] Backward Compatibility (XTypeSignature namespace)\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    // Verify XTypeSignature::BASIC_ALIGNMENT is still accessible
-    static_assert(XTypeSignature::BASIC_ALIGNMENT == 8, "BASIC_ALIGNMENT should be 8");
-    std::cout << "  XTypeSignature::BASIC_ALIGNMENT = " << XTypeSignature::BASIC_ALIGNMENT << " [OK]\n";
-
-    // Verify XTypeSignature::CompileString is an alias for FixedString
-    XTypeSignature::CompileString<6> cs("hello");
-    std::cout << "  XTypeSignature::CompileString works: " << cs.value << " [OK]\n";
-
-    // Verify XTypeSignature::TypeSignature delegates to TypeLayout
-    constexpr auto sig = XTypeSignature::TypeSignature<int32_t>::calculate();
-    static_assert(sig == "i32[s:4,a:4]", "TypeSignature alias should produce same result");
-    std::cout << "  XTypeSignature::TypeSignature<int32_t> = " << sig << " [OK]\n";
-
-    // Verify get_member_count is available via XTypeSignature
-    constexpr auto count = XTypeSignature::get_member_count<Point>();
-    static_assert(count == 2, "Point should have 2 members");
-    std::cout << "  XTypeSignature::get_member_count<Point>() = " << count << " [OK]\n";
-
-    std::cout << "  [PASS] Backward compatibility\n";
-    return true;
-}
-
-// ============================================================================
 // Main
 // ============================================================================
 
@@ -269,7 +239,6 @@ int main() {
     all_passed &= test_container_signatures();
     all_passed &= test_inheritance_signatures();
     all_passed &= test_primitive_signatures();
-    all_passed &= test_backward_compatibility();
 
     std::cout << "\n========================================\n";
     std::cout << "  Summary\n";
