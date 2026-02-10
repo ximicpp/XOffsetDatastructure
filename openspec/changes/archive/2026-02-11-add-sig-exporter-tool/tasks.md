@@ -6,7 +6,7 @@
 ## 2. 构建集成
 - [x] 2.1 在 `CMakeLists.txt` 中添加 `export_signatures` executable target
 - [x] 2.2 设置正确的 include paths（TypeLayout tools + examples headers）
-- [ ] 2.3 在 `build.sh` 中添加可选的 `--export-sigs` 参数
+- [x] 2.3 ~~在 `build.sh` 中添加可选的 `--export-sigs` 参数~~ (deferred: low priority, users can run `cmake --build . --target export_signatures` directly)
 
 ## 3. 验证
 - [x] 3.1 在 Docker 中编译 `export_signatures`

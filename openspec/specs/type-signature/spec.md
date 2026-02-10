@@ -1,16 +1,20 @@
 # type-signature Specification
 
 ## Purpose
-TBD - created by archiving change integrate-typelayout-library. Update Purpose after archive.
+提供类型签名生成、比较和跨平台验证能力，确保 XOffsetDatastructure 的数据结构在不同编译环境、架构和进程间保持二进制兼容性。
+
 ## Requirements
+
 ### Requirement: TypeLayout 依赖集成
 
-系统 SHALL 通过 Git Submodule 方式集成 [TypeLayout](https://github.com/ximicpp/TypeLayout) 库作为类型签名的核心实现。
+系统 SHALL 通过 Git Submodule 方式集成 [TypeLayout](https://github.com/ximicpp/TypeLayout) 库作为类型签名的**唯一**实现，并在内部代码中优先使用 TypeLayout 提供的工具函数，避免重复实现。不再保留任何遗留兼容层。
 
 **约束**:
 - Submodule 路径: `external/typelayout`
 - 分支: 跟踪 `main` 分支
 - 头文件路径: `external/typelayout/include`
+- 内部代码应使用 `boost::typelayout::get_member_count<T>()` 而非自行实现
+- 不再存在 `XTypeSignature` 命名空间
 
 #### Scenario: 初始化项目时自动拉取依赖
 - **WHEN** 用户执行 `git clone --recursive` 或 `git submodule update --init`
@@ -21,6 +25,16 @@ TBD - created by archiving change integrate-typelayout-library. Update Purpose a
 - **WHEN** CMake 配置项目
 - **THEN** `external/typelayout/include` 被添加到 include 路径
 - **AND** 项目可以 `#include <boost/typelayout.hpp>`
+
+#### Scenario: 无遗留兼容层残留
+- **WHEN** 用户在代码中使用 `XTypeSignature::` 前缀
+- **THEN** 编译失败，提示命名空间不存在
+- **AND** 用户应使用 `boost::typelayout::` 替代
+
+#### Scenario: 无冗余反射工具函数
+- **WHEN** 项目需要获取类型成员数量
+- **THEN** 使用 `boost::typelayout::get_member_count<T>()`
+- **AND** 不存在功能重复的内部实现
 
 ---
 
@@ -72,42 +86,55 @@ namespace boost::typelayout {
 
 ---
 
-### Requirement: XTypeSignature 兼容层
+### Requirement: 跨平台签名导出工具
 
-系统 SHALL 保留 `XTypeSignature` 命名空间作为兼容层，内部委托到 TypeLayout 实现。
+系统 SHALL 提供基于 TypeLayout `SigExporter` 的跨平台签名导出工具，支持为关键数据类型生成可移植的 `.sig.hpp` 签名头文件。
 
-**兼容 API**:
-```cpp
-namespace XTypeSignature {
-    template<class T> [[deprecated("Use boost::typelayout::get_definition_signature")]]
-    consteval auto get_XTypeSignature();
-}
-```
+**实现方式**：
+- 使用 `TYPELAYOUT_EXPORT_TYPES` 宏自动生成导出程序
+- 导出的 `.sig.hpp` 文件可在任何 C++17 编译器上 include
 
-#### Scenario: 现有代码继续编译
-- **WHEN** 用户代码使用 `XTypeSignature::get_XTypeSignature<T>()`
-- **THEN** 代码正常编译
-- **AND** 产生 deprecation warning
-- **AND** 返回等效于 TypeLayout Definition Signature 的结果
+#### Scenario: 导出签名到头文件
+- **WHEN** 用户编译并运行 `tools/export_signatures` 工具
+- **THEN** 在指定目录生成包含签名常量的 `.sig.hpp` 文件
+- **AND** 文件包含 Player, Item, GameData 的 Layout 和 Definition 签名
+- **AND** 该文件可在任何 C++17 编译器上 include 并比较
 
-#### Scenario: 现有 static_assert 检查继续工作
-- **WHEN** 现有代码包含 `static_assert(get_XTypeSignature<T>() == "...")`
-- **THEN** 断言继续按预期工作
-- **AND** 迁移指南说明如何更新到新 API
+#### Scenario: 跨平台签名比较 (C++17 兼容)
+- **WHEN** 用户在 Platform B 上编译包含 Platform A 导出签名的代码
+- **THEN** 使用 TypeLayout 的 `compat::layout_match()` 进行比较
+- **AND** 不需要 P2996 编译器
+- **AND** 正确报告布局是否兼容
 
 ---
 
-### Requirement: 跨平台签名导出工具
+### Requirement: 跨平台兼容性验证工具
 
-系统 SHALL 提供跨平台签名导出能力，支持在不同架构间验证类型兼容性。
+系统 SHALL 提供基于 TypeLayout `CompatReporter` 的跨平台兼容性验证工具，可比较多个平台的签名并生成兼容性矩阵报告。
 
-#### Scenario: 导出签名到头文件
-- **WHEN** 用户在 Platform A 编译并执行签名导出
-- **THEN** 生成包含签名常量的 `.sig.hpp` 文件
-- **AND** 该文件可以在 Platform B 上 include 并比较
+**实现方式**：
+- 使用 `TYPELAYOUT_CHECK_COMPAT` 宏自动生成比较程序
+- 编译时 `static_assert` 验证 + 运行时报告输出
+- 仅需 C++17 编译器（不需要 P2996）
 
-#### Scenario: 跨平台签名比较 (C++17 兼容)
-- **WHEN** 用户在 Platform B 上比较 Platform A 导出的签名
-- **THEN** 使用 TypeLayout 的兼容模式（不需要 P2996）
-- **AND** 正确报告布局是否兼容
+#### Scenario: 运行时兼容性报告
+- **WHEN** 用户运行 `tools/check_compat` 工具
+- **THEN** 输出跨平台兼容性矩阵
+- **AND** 报告包含 Layout 匹配状态、Definition 匹配状态和 Safety 分级
+- **AND** 标注哪些类型可以零拷贝传输、哪些需要序列化
 
+#### Scenario: Safety 分级验证
+- **WHEN** 验证 XOffsetDatastructure 的核心类型（Player, Item, GameData）
+- **THEN** Safety 分级应为 Safe（不含指针、位域）
+- **AND** 在同架构下 Layout 和 Definition 均为 MATCH
+
+---
+
+### Requirement: 集成架构分析与持续评估
+
+系统 SHALL 维护 TypeLayout 集成的架构分析文档，记录职责边界、使用模式和改进建议。
+
+#### Scenario: 分析报告可用
+- **WHEN** 开发者需要了解 TypeLayout 与 XOffsetDatastructure 的关系
+- **THEN** 可在 `docs/TYPELAYOUT_INTEGRATION_ANALYSIS.md` 找到完整分析
+- **AND** 报告包含职责边界、使用合理性评估和改进建议
