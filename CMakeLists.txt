@@ -69,5 +69,8 @@ set(BOOST_INCLUDE_DIRS
 # Add examples subdirectory
 add_subdirectory(examples)
 
+# Add tools subdirectory
+add_subdirectory(tools)
+
 # Add tests subdirectory
 add_subdirectory(tests)
