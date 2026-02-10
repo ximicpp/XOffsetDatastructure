@@ -742,6 +742,11 @@ namespace XOffsetDatastructure2 {
                 return true;
             }
             
+            // Fixed-underlying-type enums are trivially copyable and safe
+            if constexpr (std::is_enum_v<CleanT>) {
+                return boost::typelayout::is_fixed_enum<CleanT>();
+            }
+            
             if constexpr (is_xstring<CleanT>()) {
                 return true;
             }
@@ -892,47 +897,16 @@ namespace XOffsetDatastructure2 {
 // ============================================================================
 // TypeLayout specializations for XOffsetDatastructure2 containers
 //
-// These are registered in boost::typelayout so the type-signature engine
+// Registered using TYPELAYOUT_OPAQUE_* macros so the type-signature engine
 // can resolve XOffsetDatastructure2 container types correctly.
 // ============================================================================
 namespace boost {
 namespace typelayout {
 
-    template <SignatureMode Mode>
-    struct TypeSignature<XOffsetDatastructure2::XString, Mode> {
-        static consteval auto calculate() noexcept {
-            return FixedString{"string[s:32,a:8]"};
-        }
-    };
-
-    template <typename T, SignatureMode Mode>
-    struct TypeSignature<XOffsetDatastructure2::XVector<T>, Mode> {
-        static consteval auto calculate() noexcept {
-            return FixedString{"vector[s:32,a:8]<"} +
-                   TypeSignature<T, Mode>::calculate() +
-                   FixedString{">"};
-        }
-    };
-
-    template <typename T, SignatureMode Mode>
-    struct TypeSignature<XOffsetDatastructure2::XSet<T>, Mode> {
-        static consteval auto calculate() noexcept {
-            return FixedString{"set[s:32,a:8]<"} +
-                   TypeSignature<T, Mode>::calculate() +
-                   FixedString{">"};
-        }
-    };
-
-    template <typename K, typename V, SignatureMode Mode>
-    struct TypeSignature<XOffsetDatastructure2::XMap<K, V>, Mode> {
-        static consteval auto calculate() noexcept {
-            return FixedString{"map[s:32,a:8]<"} +
-                   TypeSignature<K, Mode>::calculate() +
-                   FixedString{","} +
-                   TypeSignature<V, Mode>::calculate() +
-                   FixedString{">"};
-        }
-    };
+    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure2::XString, "string", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XVector, "vector", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XSet, "set", 32, 8)
+    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure2::XMap, "map", 32, 8)
 
 } // namespace typelayout
 } // namespace boost
