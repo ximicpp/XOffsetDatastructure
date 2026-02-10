@@ -102,14 +102,16 @@ ctest --verbose
 ctest -R "test_basic_types" --verbose
 ```
 
-### TypeLayout Module
-```bash
-# Build TypeLayout demos
-cd typelayout
-./build_and_run.sh
+### TypeLayout Library (external dependency)
+TypeLayout is integrated as a Git submodule at `external/typelayout`.
+It provides the type-signature engine used by XOffsetDatastructure2.
 
-# Debug build
-./build_and_run.sh --debug
+```bash
+# Initialize submodules (required after fresh clone)
+git submodule update --init --recursive
+
+# TypeLayout include path: external/typelayout/include
+# Main header: #include <boost/typelayout.hpp>
 ```
 
 ## Code Style Guidelines

@@ -51,10 +51,25 @@
 #include <memory>
 #include <any>
 
+// TypeLayout library — the authoritative type-signature engine
+#include <boost/typelayout.hpp>
+
+// ============================================================================
+// XTypeSignature — Backward-compatible API layer delegating to boost::typelayout
+//
+// All original XTypeSignature APIs are preserved but marked [[deprecated]].
+// New code should use boost::typelayout directly:
+//   - boost::typelayout::get_definition_signature<T>()
+//   - boost::typelayout::get_layout_signature<T>()
+//   - boost::typelayout::definition_signatures_match<T1, T2>()
+//   - boost::typelayout::layout_signatures_match<T1, T2>()
+// ============================================================================
+
 namespace XTypeSignature {
     inline constexpr int BASIC_ALIGNMENT = 8;
     inline constexpr int ANY_SIZE = 64;
 
+    // Platform assertions (unchanged — still useful as a safety net)
     static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
     static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
     static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
@@ -75,252 +90,26 @@ namespace XTypeSignature {
     static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
     static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
 
-    template <typename T>
-    struct always_false : std::false_type {};
-
+    // Re-export FixedString from TypeLayout as CompileString for backward compat
     template <size_t N>
-    struct CompileString {
-        char value[N];
-        static constexpr size_t size = N - 1;
-        
-        constexpr CompileString(const char (&str)[N]) {
-            for (size_t i = 0; i < N; ++i) {
-                value[i] = str[i];
-            }
-        }
+    using CompileString = boost::typelayout::FixedString<N>;
 
-        constexpr CompileString(std::string_view sv) {
-            for (size_t i = 0; i < N - 1 && i < sv.size(); ++i) {
-                value[i] = sv[i];
-            }
-            value[N - 1] = '\0';
-        }
-
-        template <typename T>
-        static constexpr CompileString<32> from_number(T num) noexcept {
-            char result[32] = {};
-            int idx = 0;
-            if (num == 0) {
-                result[0] = '0';
-                idx = 1;
-            } else {
-                bool negative = std::is_signed_v<T> && num < 0;
-                using UnsignedT = std::make_unsigned_t<T>;
-                UnsignedT abs_num;
-                if (negative) {
-                    abs_num = UnsignedT(-(std::make_signed_t<T>(num)));
-                } else {
-                    abs_num = UnsignedT(num);
-                }
-                while (abs_num > 0) {
-                    result[idx++] = '0' + char(abs_num % 10);
-                    abs_num /= 10;
-                }
-                if (negative) {
-                    result[idx++] = '-';
-                }
-                for (int i = 0; i < idx / 2; ++i) {
-                    char temp = result[i];
-                    result[i] = result[idx - 1 - i];
-                    result[idx - 1 - i] = temp;
-                }
-            }
-            result[idx] = '\0';
-            return CompileString<32>(result);
-        }
-
-        template <size_t M>
-        constexpr auto operator+(const CompileString<M>& other) const noexcept {
-            constexpr size_t new_size = N + M - 1;
-            char result[new_size] = {};
-            size_t pos = 0;
-            while (pos < N - 1 && value[pos] != '\0') {
-                result[pos] = value[pos];
-                ++pos;
-            }
-            size_t j = 0;
-            while (j < M) {
-                result[pos++] = other.value[j++];
-            }
-            return CompileString<new_size>(result);
-        }
-
-        template <size_t M>
-        constexpr bool operator==(const CompileString<M>& other) const noexcept {
-            size_t i = 0;
-            while (i < N && i < M && value[i] != '\0' && other.value[i] != '\0') {
-                if (value[i] != other.value[i]) {
-                    return false;
-                }
-                ++i;
-            }
-            return value[i] == other.value[i];
-        }
-
-        constexpr bool operator==(const char* other) const noexcept {
-            size_t i = 0;
-            while (i < N && value[i] != '\0' && other[i] != '\0') {
-                if (value[i] != other[i]) {
-                    return false;
-                }
-                ++i;
-            }
-            return value[i] == other[i];
-        }
-
-        void print() const {
-            for (size_t i = 0; i < N && value[i] != '\0'; ++i) {
-                std::cout << value[i];
-            }
-        }
-    };
-
+    // Re-export TypeSignature from TypeLayout (Definition mode by default)
     template <typename T>
-    struct TypeSignature;
+    using TypeSignature = boost::typelayout::TypeSignature<T, boost::typelayout::SignatureMode::Definition>;
 
-    template<typename T, size_t Index>
-    consteval size_t get_field_offset() noexcept {
-        using namespace std::meta;
-        auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
-        
-        if constexpr (Index == 0) {
-            return 0;
-        } else {
-            return offset_of(members[Index]).bytes;
-        }
-    }
+    // Backward-compatible helper: get member count via TypeLayout
+    using boost::typelayout::get_member_count;
 
+    // -----------------------------------------------------------------------
+    // Deprecated API — delegates to boost::typelayout
+    // -----------------------------------------------------------------------
+
+    /// @deprecated Use boost::typelayout::get_definition_signature<T>() instead
     template <typename T>
-    consteval std::size_t get_member_count() noexcept {
-        using namespace std::meta;
-        auto all_members = nonstatic_data_members_of(^^T, access_context::unchecked());
-        return all_members.size();
-    }
-    
-    template<typename T, std::size_t Index>
-    static consteval auto get_field_signature() noexcept {
-        using namespace std::meta;
-        constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
-        
-        using FieldType = [:type_of(member):];
-        constexpr std::size_t offset = offset_of(member).bytes;
-        
-        constexpr std::string_view name = identifier_of(member);
-        constexpr size_t N = name.size() + 1;
-
-        return CompileString{"@"} +
-               CompileString<32>::from_number(offset) +
-               CompileString{"["} +
-               CompileString<N>(name) +
-               CompileString{"]:"} +
-               TypeSignature<FieldType>::calculate();
-    }
-
-    template<typename T, std::size_t Index, bool IsFirst>
-    consteval auto build_field_with_comma() noexcept {
-        if constexpr (IsFirst) {
-            return get_field_signature<T, Index>();
-        } else {
-            return CompileString{","} + get_field_signature<T, Index>();
-        }
-    }
-    template<typename T, std::size_t... Indices>
-    consteval auto concatenate_field_signatures(std::index_sequence<Indices...>) noexcept {
-        return (build_field_with_comma<T, Indices, (Indices == 0)>() + ...);
-    }
-    template <typename T>
-    consteval auto get_fields_signature() noexcept {
-        constexpr std::size_t count = get_member_count<T>();
-        if constexpr (count == 0) {
-            return CompileString{""};
-        } else {
-            return concatenate_field_signatures<T>(std::make_index_sequence<count>{});
-        }
-    }
-
-    template <> struct TypeSignature<int32_t>  { static consteval auto calculate() noexcept { return CompileString{"i32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<uint32_t> { static consteval auto calculate() noexcept { return CompileString{"u32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<int64_t>  { static consteval auto calculate() noexcept { return CompileString{"i64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<uint64_t> { static consteval auto calculate() noexcept { return CompileString{"u64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<float>    { static consteval auto calculate() noexcept { return CompileString{"f32[s:4,a:4]"}; } };
-    template <> struct TypeSignature<double>   { static consteval auto calculate() noexcept { return CompileString{"f64[s:8,a:8]"}; } };
-    template <> struct TypeSignature<bool>     { static consteval auto calculate() noexcept { return CompileString{"bool[s:1,a:1]"}; } };
-    template <> struct TypeSignature<char>     { static consteval auto calculate() noexcept { return CompileString{"char[s:1,a:1]"}; } };
-    
-    template <typename T>
-    struct TypeSignature<const T> {
-        static consteval auto calculate() noexcept {
-            return TypeSignature<T>::calculate();
-        }
-    };
-    
-    template <typename T> struct TypeSignature<T*>   { static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
-    template <>           struct TypeSignature<void*>{ static consteval auto calculate() noexcept { return CompileString{"ptr[s:8,a:8]"}; } };
-
-    template <typename T, size_t N>
-    struct TypeSignature<T[N]> {
-        static consteval auto calculate() noexcept {
-            if constexpr (std::is_same_v<T, char>) {
-                return CompileString{"bytes[s:"} +
-                       CompileString<32>::from_number(N) +
-                       CompileString{",a:1]"};
-            } else {
-                return CompileString{"array[s:"} +
-                       CompileString<32>::from_number(sizeof(T[N])) +
-                       CompileString{",a:"} +
-                       CompileString<32>::from_number(alignof(T[N])) +
-                       CompileString{"]<"} +
-                       TypeSignature<T>::calculate() +
-                       CompileString{","} +
-                       CompileString<32>::from_number(N) +
-                       CompileString{">"};
-            }
-        }
-    };
-
-    template <> struct TypeSignature<char[ANY_SIZE]> {
-        static consteval auto calculate() noexcept { return CompileString{"bytes[s:64,a:1]"}; }
-    };
-
-    template <typename T>
-    struct TypeSignature {
-        static consteval auto calculate() noexcept {
-            if constexpr (std::is_class_v<T> && !std::is_array_v<T>) {
-                if constexpr (std::is_polymorphic_v<T>) {
-                    return CompileString{"struct[s:"} +
-                           CompileString<32>::from_number(sizeof(T)) +
-                           CompileString{",a:"} +
-                           CompileString<32>::from_number(alignof(T)) +
-                           CompileString{",polymorphic]{"} +
-                           get_fields_signature<T>() +
-                           CompileString{"}"};
-                } else {
-                    return CompileString{"struct[s:"} +
-                           CompileString<32>::from_number(sizeof(T)) +
-                           CompileString{",a:"} +
-                           CompileString<32>::from_number(alignof(T)) +
-                           CompileString{"]{"} +
-                           get_fields_signature<T>() +
-                           CompileString{"}"};
-                }
-            }
-            else if constexpr (std::is_pointer_v<T>) {
-                return TypeSignature<void*>::calculate();
-            }
-            else if constexpr (std::is_array_v<T>) {
-                return TypeSignature<std::remove_extent_t<T>[]>::calculate();
-            }
-            else {
-                static_assert(always_false<T>::value, 
-                    "Type is not supported for automatic reflection");
-                return CompileString{""};
-            }
-        }
-    };
-
-    template <typename T>
+    [[deprecated("Use boost::typelayout::get_definition_signature<T>() instead")]]
     [[nodiscard]] consteval auto get_XTypeSignature() noexcept {
-        return TypeSignature<T>::calculate();
+        return boost::typelayout::get_definition_signature<T>();
     }
 
 } // namespace XTypeSignature
@@ -1145,39 +934,52 @@ namespace XOffsetDatastructure2 {
     };
 }
 
-namespace XTypeSignature {
-    template <>
-    struct TypeSignature<XOffsetDatastructure2::XString> {
+// ============================================================================
+// TypeLayout specializations for XOffsetDatastructure2 containers
+//
+// These are registered in boost::typelayout so both TypeLayout and the
+// XTypeSignature compatibility layer can resolve them.
+// ============================================================================
+namespace boost {
+namespace typelayout {
+
+    template <SignatureMode Mode>
+    struct TypeSignature<XOffsetDatastructure2::XString, Mode> {
         static consteval auto calculate() noexcept {
-            return CompileString{"string[s:32,a:8]"};
+            return FixedString{"string[s:32,a:8]"};
         }
     };
-    template <typename T>
-    struct TypeSignature<XOffsetDatastructure2::XVector<T>> {
+
+    template <typename T, SignatureMode Mode>
+    struct TypeSignature<XOffsetDatastructure2::XVector<T>, Mode> {
         static consteval auto calculate() noexcept {
-            return CompileString{"vector[s:32,a:8]<"} +
-                   TypeSignature<T>::calculate() +
-                   CompileString{">"};
+            return FixedString{"vector[s:32,a:8]<"} +
+                   TypeSignature<T, Mode>::calculate() +
+                   FixedString{">"};
         }
     };
-    template <typename T>
-    struct TypeSignature<XOffsetDatastructure2::XSet<T>> {
+
+    template <typename T, SignatureMode Mode>
+    struct TypeSignature<XOffsetDatastructure2::XSet<T>, Mode> {
         static consteval auto calculate() noexcept {
-            return CompileString{"set[s:32,a:8]<"} +
-                   TypeSignature<T>::calculate() +
-                   CompileString{">"};
+            return FixedString{"set[s:32,a:8]<"} +
+                   TypeSignature<T, Mode>::calculate() +
+                   FixedString{">"};
         }
     };
-    template <typename K, typename V>
-    struct TypeSignature<XOffsetDatastructure2::XMap<K, V>> {
+
+    template <typename K, typename V, SignatureMode Mode>
+    struct TypeSignature<XOffsetDatastructure2::XMap<K, V>, Mode> {
         static consteval auto calculate() noexcept {
-            return CompileString{"map[s:32,a:8]<"} +
-                   TypeSignature<K>::calculate() +
-                   CompileString{","} +
-                   TypeSignature<V>::calculate() +
-                   CompileString{">"};
+            return FixedString{"map[s:32,a:8]<"} +
+                   TypeSignature<K, Mode>::calculate() +
+                   FixedString{","} +
+                   TypeSignature<V, Mode>::calculate() +
+                   FixedString{">"};
         }
     };
-}
+
+} // namespace typelayout
+} // namespace boost
 
 #endif

@@ -218,19 +218,15 @@ void demo_type_signatures() {
     print_info("Implementation", "std::meta namespace");
     print_info("Key Operations", "members_of, offset_of, type_of");
     
-    print_subsection("Type Signature Display");
+    print_subsection("Type Signature Display (via boost::typelayout)");
     
-    // Display Item signature
-    constexpr auto item_sig = XTypeSignature::get_XTypeSignature<Item>();
-    std::cout << "  Item:\n    ";
-    item_sig.print();
-    std::cout << "\n\n";
+    // Display Item definition signature
+    constexpr auto item_sig = boost::typelayout::get_definition_signature<Item>();
+    std::cout << "  Item (definition):\n    " << item_sig.value << "\n\n";
     
-    // Display GameData signature
-    constexpr auto game_sig = XTypeSignature::get_XTypeSignature<GameData>();
-    std::cout << "  GameData:\n    ";
-    game_sig.print();
-    std::cout << "\n";
+    // Display GameData definition signature
+    constexpr auto game_sig = boost::typelayout::get_definition_signature<GameData>();
+    std::cout << "  GameData (definition):\n    " << game_sig.value << "\n";
     
     print_subsection("Key Advantages over Boost.PFR (next_practical)");
     print_check("No code generation required");

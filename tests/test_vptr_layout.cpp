@@ -28,20 +28,16 @@ int main() {
     std::cout << "   sizeof:  " << sizeof(NonPolymorphic) << " bytes\n";
     std::cout << "   alignof: " << alignof(NonPolymorphic) << " bytes\n";
     
-    constexpr auto sig_non = XTypeSignature::get_XTypeSignature<NonPolymorphic>();
-    std::cout << "   Signature: ";
-    sig_non.print();
-    std::cout << "\n\n";
+    constexpr auto sig_non = boost::typelayout::get_definition_signature<NonPolymorphic>();
+    std::cout << "   Signature: " << sig_non << "\n\n";
     
     // Test 2: Polymorphic class
     std::cout << "2. Polymorphic class:\n";
     std::cout << "   sizeof:  " << sizeof(Polymorphic) << " bytes\n";
     std::cout << "   alignof: " << alignof(Polymorphic) << " bytes\n";
     
-    constexpr auto sig_poly = XTypeSignature::get_XTypeSignature<Polymorphic>();
-    std::cout << "   Signature: ";
-    sig_poly.print();
-    std::cout << "\n\n";
+    constexpr auto sig_poly = boost::typelayout::get_definition_signature<Polymorphic>();
+    std::cout << "   Signature: " << sig_poly << "\n\n";
     
     // Analysis
     std::cout << "========================================\n";
@@ -49,7 +45,7 @@ int main() {
     std::cout << "========================================\n";
     std::cout << "Non-polymorphic:\n";
     std::cout << "  - Size: " << sizeof(NonPolymorphic) << " bytes (just int32_t)\n";
-    std::cout << "  - Expected signature: struct[s:4,a:4]{@0:i32[s:4,a:4]}\n";
+    std::cout << "  - Expected signature: [64-le]record[s:4,a:4]{@0[data]:i32[s:4,a:4]}\n";
     std::cout << "  - data at offset 0 [OK]\n\n";
     
     std::cout << "Polymorphic:\n";
@@ -61,7 +57,7 @@ int main() {
     
     std::cout << "[Problem]:\n";
     std::cout << "  - Reflection only sees explicit data members (not vptr)\n";
-    std::cout << "  - Signature shows: struct[s:16,a:8]{@8:i32[s:4,a:4]}\n";
+    std::cout << "  - Signature shows: [64-le]record[s:16,a:8,polymorphic]{@8[data]:i32[s:4,a:4]}\n";
     std::cout << "  - Missing info: vptr at @0 (8 bytes)\n";
     std::cout << "  - This is MISLEADING - offsets are correct but incomplete!\n\n";
     

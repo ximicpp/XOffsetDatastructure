@@ -187,11 +187,9 @@ void test_type_signature(const char* name, bool should_succeed = true) {
     std::cout << "  alignof: " << alignof(T) << " bytes\n";
     
     try {
-        constexpr auto sig = XTypeSignature::get_XTypeSignature<T>();
+        constexpr auto sig = boost::typelayout::get_definition_signature<T>();
         
-        std::cout << "  Signature: ";
-        sig.print();
-        std::cout << "\n";
+        std::cout << "  Signature: " << sig << "\n";
         
         if (should_succeed) {
             std::cout << "  [OK] SUCCESS - Type signature generated\n";

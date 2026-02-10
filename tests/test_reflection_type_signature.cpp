@@ -230,8 +230,8 @@ void test_composition_signature() {
     std::cout << "[Test 7] Composition Signature Verification\n";
     std::cout << "-------------------------------------------\n";
     
-    constexpr auto sig_component = get_XTypeSignature<Component>();
-    constexpr auto sig_composite = get_XTypeSignature<CompositeStruct>();
+    constexpr auto sig_component = boost::typelayout::get_definition_signature<Component>();
+    constexpr auto sig_composite = boost::typelayout::get_definition_signature<CompositeStruct>();
     
     std::cout << "  Component signature: " << sig_component.value << "\n";
     std::cout << "  Composite signature: " << sig_composite.value << "\n";
@@ -239,8 +239,8 @@ void test_composition_signature() {
     std::string composite_str = sig_composite.value;
 
     // Verification: Composite signature should contain the inner struct's signature
-    // The inner struct signature is: struct[s:8,a:4]{@0[id]:i32[s:4,a:4],@4[value]:f32[s:4,a:4]}
-    // The composite signature should look like: struct[...]{@0[comp]:struct[...]{...},...}
+    // The inner struct signature is: [64-le]record[s:8,a:4]{@0[id]:i32[s:4,a:4],@4[value]:f32[s:4,a:4]}
+    // The composite signature should look like: [64-le]record[...]{@0[comp]:record[...]{...},...}
     
     bool has_inner_details = composite_str.find("@0[id]:i32") != std::string::npos;
     
