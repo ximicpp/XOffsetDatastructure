@@ -60,24 +60,77 @@
 #include <boost/typelayout.hpp>
 
 // ============================================================================
-// Platform type-size assertions (safety net for cross-platform builds)
+// Target Architecture Definition
+//
+// XOffset defines two explicit sets:
+//   A (Architecture Set) — what platform the data lives on
+//   S (Safe Type Subset) — what types can be stored
+// Zero-copy safety = Platform ∈ A ∧ Type ∈ S
 // ============================================================================
-static_assert(sizeof(int8_t) == 1, "int8_t must be 1 byte");
-static_assert(sizeof(uint8_t) == 1, "uint8_t must be 1 byte");
-static_assert(sizeof(int16_t) == 2, "int16_t must be 2 bytes");
-static_assert(sizeof(uint16_t) == 2, "uint16_t must be 2 bytes");
-static_assert(sizeof(int32_t) == 4, "int32_t must be 4 bytes");
-static_assert(sizeof(uint32_t) == 4, "uint32_t must be 4 bytes");
-static_assert(sizeof(int64_t) == 8, "int64_t must be 8 bytes");
-static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
-static_assert(sizeof(float) == 4, "float must be 4 bytes");
-static_assert(sizeof(double) == 8, "double must be 8 bytes");
-static_assert(sizeof(char) == 1, "char must be 1 byte");
-static_assert(sizeof(bool) == 1, "bool must be 1 byte");
-static_assert(sizeof(void*) == 8, "Pointer size must be 8 bytes (64-bit required)");
-static_assert(alignof(void*) == 8, "Pointer alignment must be 8 bytes");
-static_assert(sizeof(size_t) == 8, "size_t must be 8 bytes (64-bit architecture required)");
-static_assert(IS_LITTLE_ENDIAN, "Little-endian architecture required");
+namespace XOffsetDatastructure2 {
+
+    /// Architecture specification descriptor (pure data, no logic)
+    struct ArchSpec {
+        std::size_t pointer_size;
+        bool        little_endian;
+        std::size_t sizeof_int8;
+        std::size_t sizeof_int16;
+        std::size_t sizeof_int32;
+        std::size_t sizeof_int64;
+        std::size_t sizeof_float;
+        std::size_t sizeof_double;
+        std::size_t sizeof_bool;
+        std::size_t sizeof_char;
+        std::size_t pointer_align;
+    };
+
+    // Architecture Presets
+    inline constexpr ArchSpec Arch64LE = {
+        .pointer_size = 8, .little_endian = true,
+        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
+        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
+        .pointer_align = 8,
+    };
+    inline constexpr ArchSpec Arch64BE = {
+        .pointer_size = 8, .little_endian = false,
+        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
+        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
+        .pointer_align = 8,
+    };
+    inline constexpr ArchSpec Arch32LE = {
+        .pointer_size = 4, .little_endian = true,
+        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
+        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
+        .pointer_align = 4,
+    };
+    inline constexpr ArchSpec Arch32BE = {
+        .pointer_size = 4, .little_endian = false,
+        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
+        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
+        .pointer_align = 4,
+    };
+
+    /// Active target architecture. Change this line to switch presets.
+    inline constexpr ArchSpec TargetArchitecture = Arch64LE;
+
+} // namespace XOffsetDatastructure2
+
+// ============================================================================
+// Platform validation: current compiler environment ∈ TargetArchitecture
+// ============================================================================
+static_assert(sizeof(void*) == XOffsetDatastructure2::TargetArchitecture.pointer_size,
+    "Platform pointer size does not match TargetArchitecture");
+static_assert(IS_LITTLE_ENDIAN == XOffsetDatastructure2::TargetArchitecture.little_endian,
+    "Platform endianness does not match TargetArchitecture");
+static_assert(sizeof(int8_t)  == XOffsetDatastructure2::TargetArchitecture.sizeof_int8);
+static_assert(sizeof(int16_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int16);
+static_assert(sizeof(int32_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int32);
+static_assert(sizeof(int64_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int64);
+static_assert(sizeof(float)   == XOffsetDatastructure2::TargetArchitecture.sizeof_float);
+static_assert(sizeof(double)  == XOffsetDatastructure2::TargetArchitecture.sizeof_double);
+static_assert(sizeof(bool)    == XOffsetDatastructure2::TargetArchitecture.sizeof_bool);
+static_assert(sizeof(char)    == XOffsetDatastructure2::TargetArchitecture.sizeof_char);
+static_assert(alignof(void*)  == XOffsetDatastructure2::TargetArchitecture.pointer_align);
 
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
@@ -380,10 +433,17 @@ namespace XOffsetDatastructure2 {
         }
     };
 
+    // Forward declaration for safety gate in XBufferCompactor
+    namespace detail {
+        template<typename T> consteval bool is_safe_type();
+    }
+    template<typename T> constexpr void validate_xbuffer_type();
+
     class XBufferCompactor {
     public:
         template<typename T>
         static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
+            validate_xbuffer_type<T>();
             auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
             if (new_size < 4096) new_size = 4096;
@@ -402,6 +462,7 @@ namespace XOffsetDatastructure2 {
         
         template<typename T>
         static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
+            validate_xbuffer_type<T>();
             auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
             if (new_size < 4096) new_size = 4096;
@@ -551,27 +612,43 @@ namespace XOffsetDatastructure2 {
     };
 
     namespace detail {
-        template<typename T>
-        consteval bool is_basic_type() {
-            using CleanT = std::remove_cv_t<T>;
-            return std::is_same_v<CleanT, int8_t> ||
-                   std::is_same_v<CleanT, int16_t> ||
-                   std::is_same_v<CleanT, int32_t> ||
-                   std::is_same_v<CleanT, int64_t> ||
-                   std::is_same_v<CleanT, uint8_t> ||
-                   std::is_same_v<CleanT, uint16_t> ||
-                   std::is_same_v<CleanT, uint32_t> ||
-                   std::is_same_v<CleanT, uint64_t> ||
-                   std::is_same_v<CleanT, float> ||
-                   std::is_same_v<CleanT, double> ||
-                   std::is_same_v<CleanT, bool> ||
-                   std::is_same_v<CleanT, char>;
-        }
-        
-        template<typename T>
-        consteval bool is_xstring() {
-            return std::is_same_v<std::remove_cv_t<T>, XString>;
-        }
+
+        // ============================================================================
+        // Safe Type Subset — Explicit Whitelist (is_safe_leaf)
+        //
+        // The Safe Type Subset S is defined by two mechanisms:
+        //   1. is_safe_leaf<T>  — declares leaf types that are directly safe
+        //   2. Recursive check  — composite types are safe if all members ∈ S
+        // No blacklist needed: types not in the whitelist are rejected.
+        // ============================================================================
+
+        template<typename T> struct is_safe_leaf : std::false_type {};
+
+        // — LEAF-1: Primitives (fixed-width, architecture-independent) —
+        template<> struct is_safe_leaf<int8_t>   : std::true_type {};
+        template<> struct is_safe_leaf<int16_t>  : std::true_type {};
+        template<> struct is_safe_leaf<int32_t>  : std::true_type {};
+        template<> struct is_safe_leaf<int64_t>  : std::true_type {};
+        template<> struct is_safe_leaf<uint8_t>  : std::true_type {};
+        template<> struct is_safe_leaf<uint16_t> : std::true_type {};
+        template<> struct is_safe_leaf<uint32_t> : std::true_type {};
+        template<> struct is_safe_leaf<uint64_t> : std::true_type {};
+        template<> struct is_safe_leaf<float>    : std::true_type {};
+        template<> struct is_safe_leaf<double>   : std::true_type {};
+        template<> struct is_safe_leaf<bool>     : std::true_type {};
+        template<> struct is_safe_leaf<char>     : std::true_type {};
+
+        // — LEAF-3: XString —
+        template<> struct is_safe_leaf<XString>  : std::true_type {};
+
+        // — LEAF-4: XContainers (precise template matching) —
+        template<typename T>             struct is_safe_leaf<XVector<T>>  : std::true_type {};
+        template<typename T>             struct is_safe_leaf<XSet<T>>     : std::true_type {};
+        template<typename K, typename V> struct is_safe_leaf<XMap<K, V>>  : std::true_type {};
+
+        // ============================================================================
+        // Recursive safety check helpers
+        // ============================================================================
 
         template<typename T>
         consteval bool has_bases() {
@@ -579,74 +656,10 @@ namespace XOffsetDatastructure2 {
             auto bases = bases_of(^^T, access_context::unchecked());
             return bases.size() > 0;
         }
-        
-        // ============================================================================
-        // Type-Erased Container Blacklist Detection
-        // These types contain hidden pointers and are UNSAFE for cross-process use
-        // ============================================================================
-        
-        template<typename T>
-        struct is_std_function : std::false_type {};
-        
-        template<typename R, typename... Args>
-        struct is_std_function<std::function<R(Args...)>> : std::true_type {};
-        
-        template<typename T>
-        struct is_std_shared_ptr : std::false_type {};
-        
-        template<typename U>
-        struct is_std_shared_ptr<std::shared_ptr<U>> : std::true_type {};
-        
-        template<typename T>
-        struct is_std_unique_ptr : std::false_type {};
-        
-        template<typename U, typename D>
-        struct is_std_unique_ptr<std::unique_ptr<U, D>> : std::true_type {};
-        
-        template<typename T>
-        struct is_std_weak_ptr : std::false_type {};
-        
-        template<typename U>
-        struct is_std_weak_ptr<std::weak_ptr<U>> : std::true_type {};
-        
-        template<typename T>
-        consteval bool is_type_erased_container() {
-            using CleanT = std::remove_cv_t<T>;
-            return is_std_function<CleanT>::value ||
-                   std::is_same_v<CleanT, std::any> ||
-                   is_std_shared_ptr<CleanT>::value ||
-                   is_std_unique_ptr<CleanT>::value ||
-                   is_std_weak_ptr<CleanT>::value;
-        }
-        
+
         template<typename T>
         consteval bool is_safe_type();
-        
-        // Unified XBuffer container safety check (XVector, XSet, XMap).
-        // All XBuffer containers share: sizeof == 32, alignof == 8.
-        template<typename T>
-        consteval bool is_safe_xcontainer() {
-            using CleanT = std::remove_cv_t<T>;
-            if constexpr (sizeof(CleanT) != 32 || alignof(CleanT) != 8) {
-                return false;
-            }
-            // XMap: has both key_type and mapped_type
-            if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
-                return is_safe_type<typename CleanT::key_type>() &&
-                       is_safe_type<typename CleanT::mapped_type>();
-            }
-            // XVector: has value_type
-            if constexpr (requires { typename CleanT::value_type; }) {
-                return is_safe_type<typename CleanT::value_type>();
-            }
-            // XSet: has key_type only
-            if constexpr (requires { typename CleanT::key_type; }) {
-                return is_safe_type<typename CleanT::key_type>();
-            }
-            return false;
-        }
-		
-        
+
         template<typename T, std::size_t Index>
         consteval bool is_member_safe_at() {
             using namespace std::meta;
@@ -664,21 +677,10 @@ namespace XOffsetDatastructure2 {
         consteval bool are_all_members_safe() {
             using namespace std::meta;
             
-            if constexpr (!std::is_class_v<T>) {
-                return false;
-            }
-            
-            if constexpr (std::is_polymorphic_v<T>) {
-                return false;
-            }
-            
-            if constexpr (has_bases<T>()) {
-                return false;
-            }
-
-            if constexpr (std::is_union_v<T>) {
-                return false;
-            }
+            if constexpr (!std::is_class_v<T>) return false;
+            if constexpr (std::is_polymorphic_v<T>) return false;
+            if constexpr (has_bases<T>()) return false;
+            if constexpr (std::is_union_v<T>) return false;
             
             constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
             if constexpr (member_count == 0) {
@@ -687,36 +689,37 @@ namespace XOffsetDatastructure2 {
                 return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
             }
         }
-        
+
+        // ============================================================================
+        // is_safe_type<T>() — unified safety check using whitelist
+        // ============================================================================
         template<typename T>
         consteval bool is_safe_type() {
             using CleanT = std::remove_cv_t<T>;
-            
-            // First check: reject type-erased containers (std::function, std::any, etc.)
-            if constexpr (is_type_erased_container<CleanT>()) {
-                return false;
-            }
-            
-            if constexpr (is_basic_type<CleanT>()) {
+
+            // 1. Leaf types: check whitelist
+            if constexpr (is_safe_leaf<CleanT>::value) {
+                // Containers need recursive element check
+                if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
+                    return is_safe_type<typename CleanT::key_type>() &&
+                           is_safe_type<typename CleanT::mapped_type>();
+                } else if constexpr (requires { typename CleanT::value_type; }) {
+                    return is_safe_type<typename CleanT::value_type>();
+                }
                 return true;
             }
-            
-            // Fixed-underlying-type enums are trivially copyable and safe
+
+            // 2. Enums: delegate to TypeLayout
             if constexpr (std::is_enum_v<CleanT>) {
                 return boost::typelayout::is_fixed_enum<CleanT>();
             }
-            
-            if constexpr (is_xstring<CleanT>()) {
-                return true;
-            }
-            
-            if constexpr (std::is_class_v<CleanT> && !is_xstring<CleanT>()) {
-                if constexpr (is_safe_xcontainer<CleanT>()) {
-                    return true;
-                }
+
+            // 3. Composite types: recursive member check
+            if constexpr (std::is_class_v<CleanT>) {
                 return are_all_members_safe<CleanT>();
             }
-            
+
+            // 4. Everything else: rejected (pointers, references, etc.)
             return false;
         }
         
