@@ -7,7 +7,6 @@
 #include <iostream>
 
 #include <experimental/meta>
-#include <experimental/meta>
 
 using namespace XOffsetDatastructure2;
 
@@ -204,7 +203,6 @@ int main() {
     std::cout << "  Reflection Compaction Test\n";
     std::cout << "========================================\n\n";
 
-#include <experimental/meta>
     std::cout << "[INFO] C++26 Reflection: ENABLED\n";
     std::cout << "[INFO] Testing reflection with memory operations\n\n";
     
