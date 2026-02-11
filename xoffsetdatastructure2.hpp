@@ -47,9 +47,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <functional>
-#include <memory>
-#include <any>
 
 // TypeLayout library — the authoritative type-signature engine
 // Use boost::typelayout directly for all type signature operations:
@@ -271,6 +268,8 @@ public:
         m_buffer.swap(other.m_buffer);
     }
 
+    // WARNING: All existing pointers/references into the buffer are invalidated
+    // after this call. Re-acquire them via find<T>() or find_or_construct<T>().
     void update_after_shrink()
     {
         auto *pBuf = get_buffer();
@@ -279,6 +278,8 @@ public:
         this->swap(new_mem);
     }
 
+    // WARNING: Invalidates ALL existing pointers/references into this buffer.
+    // After calling, re-acquire object pointers via find<T>().
     void shrink_to_fit()
     {
         base_t::shrink_to_fit();
@@ -537,8 +538,9 @@ namespace XOffsetDatastructure2 {
             if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 return old_elem;
             } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
-                // XString-like: reconstruct with new allocator
-                return ElementType(old_elem.c_str(), new_xbuf.get_segment_manager());
+                // Allocator-aware copy: reconstruct with new allocator
+                // Requires ElementType(const ElementType&, allocator_type) constructor
+                return ElementType(old_elem, new_xbuf.get_segment_manager());
             } else {
                 ElementType new_elem(new_xbuf.get_segment_manager());
                 migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
@@ -582,7 +584,7 @@ namespace XOffsetDatastructure2 {
             if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 new_member = old_member;
             } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
-                new_member = MemberType(old_member.c_str(), new_xbuf.get_segment_manager());
+                new_member = MemberType(old_member, new_xbuf.get_segment_manager());
             } else if constexpr (strategy == MigrateStrategy::Container) {
                 migrate_container(old_member, new_member, old_xbuf, new_xbuf);
             } else {
@@ -651,6 +653,10 @@ namespace XOffsetDatastructure2 {
         template<> struct is_safe_leaf<double>   : std::true_type {};
         template<> struct is_safe_leaf<bool>     : std::true_type {};
         template<> struct is_safe_leaf<char>     : std::true_type {};
+
+        // — LEAF-2: Enums —
+        // Not registered here; enums are checked dynamically in is_safe_type()
+        // via TypeLayout's is_fixed_enum<T>().
 
         // — LEAF-3: XString —
         template<> struct is_safe_leaf<XString>  : std::true_type {};
