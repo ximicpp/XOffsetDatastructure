@@ -3,6 +3,67 @@
 
 This file contains build commands, code style guidelines, and development practices for agentic coding agents working in this repository.
 
+## ⚡ Local Testing Quick Reference (READ THIS FIRST)
+
+> **Every code change MUST be verified locally before considering it done.**
+> There are two ways to build and test. Pick whichever is available.
+
+### Option A: Native P2996 Compiler (if installed locally)
+
+The host machine has Clang P2996 installed. The build script auto-detects it.
+
+```bash
+# Just run from the repo root — build.sh finds the compiler automatically
+./build.sh
+
+# Searched paths (in order):
+#   /usr/local/bin/clang++
+#   ~/clang-p2996-install/bin/clang++
+#   /opt/clang-p2996/bin/clang++
+#   /opt/p2996-toolchain/bin/clang++  (Docker image)
+```
+
+### Option B: Docker (if no local P2996 compiler)
+
+Use one of these pre-built Docker images (check which is available locally):
+- `ghcr.io/ximicpp/typelayout-p2996:latest` — from TypeLayout CI (P2996 at `/opt/p2996-toolchain/`)
+- `xoffset-clang-p2996:latest` — custom local build (P2996 at `~/clang-p2996-install/`)
+
+```bash
+# One-liner: build + test in Docker (MUST use 'bash')
+# Use whichever image is available:
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/ximicpp/typelayout-p2996:latest bash ./build.sh
+
+# Or with the local custom image:
+docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest bash ./build.sh
+
+# On Apple Silicon (M1/M2/M3), add --platform flag:
+docker run --rm --platform linux/amd64 -v $(pwd):/workspace -w /workspace ghcr.io/ximicpp/typelayout-p2996:latest bash ./build.sh
+
+# Or use the convenience script
+./scripts/local-docker-test.sh
+
+# Interactive debugging shell
+docker run --rm -it -v $(pwd):/workspace -w /workspace ghcr.io/ximicpp/typelayout-p2996:latest bash
+```
+
+**⚠️ Docker gotchas:**
+- Use `bash ./build.sh`, NOT `./build.sh` (permission issues)
+- First local image build takes 1-3 hours: `./scripts/docker-build.sh`
+- The image is Linux x86_64; on Apple Silicon **always** use `--platform linux/amd64`
+
+### How to know which option is available
+
+```bash
+# Check if P2996 compiler exists locally
+ls ~/clang-p2996-install/bin/clang++ 2>/dev/null && echo "Option A available" || echo "Option A NOT available"
+
+# Check if Docker images exist (check both)
+docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep -E "typelayout-p2996|xoffset-clang" && echo "Option B available" || echo "Option B NOT available"
+```
+
+---
+
 ## Build System
 
 ### Docker Build (Recommended for New Users)
