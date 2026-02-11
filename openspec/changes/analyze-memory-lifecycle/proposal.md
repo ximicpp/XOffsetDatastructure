@@ -20,7 +20,13 @@ stability, or the subtle interactions between stack temporaries and segment memo
 
 ### Part I: 逐行内存生命周期分析
 
-产出 `docs/MEMORY_LIFECYCLE_ANALYSIS.md`，对 `examples/helloworld.cpp` 逐行追踪：
+产出 `docs/MEMORY_LIFECYCLE_ANALYSIS.md`，对 `examples/` 目录下所有文件逐行追踪：
+
+分析范围：
+- `examples/player.hpp` — Player 数据结构定义、TypeLayout 签名验证
+- `examples/game_data.hpp` — Item/GameData 数据结构定义、嵌套容器、TypeLayout 签名验证
+- `examples/helloworld.cpp` — 完整生命周期：创建→填充→序列化→反序列化→compaction
+- `examples/demo.cpp` — 7 个独立 demo 函数覆盖全部 API 使用场景
 
 #### Phase 1 — Buffer Creation (line 17)
 1. `XBufferExt xbuf(4096)`:
@@ -62,11 +68,41 @@ stability, or the subtle interactions between stack temporaries and segment memo
 #### Phase 7 — Memory Reclamation (end of main)
 11. Destructor chain — bulk deallocation, no individual object destruction
 
+#### Phase 8 — Data Structure Definitions (player.hpp, game_data.hpp)
+12. `alignas(8)` 对 buffer 内对象布局的影响
+13. Template allocator 构造函数模式：`Player(Allocator allocator)` 的机制
+14. XString/XVector 成员的 allocator 传播与初始化
+15. TypeLayout `static_assert` 签名验证：编译期 ABI 指纹工作原理
+16. 嵌套容器类型 `XVector<Item>` 的安全类型递归检查路径
+
+#### Phase 9 — Demo: 基本使用 (demo.cpp: demo_basic_usage)
+17. `xbuf.make<GameData>("player_save")` — 复合类型命名对象构造
+18. `game->items.emplace_back(allocator, ...)` — 嵌套容器元素的段内原位构造
+19. `game->achievements.insert(i)` — flat_set 有序插入与内存分配
+20. `game->quest_progress[XString(...)] = 75` — flat_map 键值对插入（XString key 的段内分配）
+
+#### Phase 10 — Demo: 内存管理 (demo.cpp: demo_memory_management)
+21. `xbuf.grow(4096)` — buffer 扩容：resize + close_impl + open_impl + grow
+22. `xbuf.shrink_to_fit()` — buffer 收缩：base_t::shrink_to_fit + resize + update_after_shrink 的二次重建
+23. grow/shrink 后指针失效的完整影响链
+
+#### Phase 11 — Demo: 序列化 (demo.cpp: demo_serialization)
+24. 完整的 src_buf → binary_data → dst_buf 数据流（对比 helloworld.cpp 的路径）
+25. `dst_buf.find<GameData>("save")` — 反序列化后的 iset_index 查找
+
+#### Phase 12 — Demo: 自动 Compaction (demo.cpp: demo_automatic_compaction)
+26. `compact_automatic<GameData>(xbuf, "save_game")` — 全量迁移路径
+27. 迁移过程中 XVector<Item> 的递归迁移：Item 含 XString → AllocatorAware 策略
+28. 碎片前后的 free-list 变化
+
+#### Phase 13 — Demo: 性能 (demo.cpp: demo_performance)
+29. 1000 次 emplace_back 的 1.1x growth 触发次数和内存碎片分析
+
 #### Cross-cutting Concerns
-12. offset_ptr mechanics across stack↔segment
-13. Allocator propagation in Boost.Container
-14. Free-list fragmentation patterns (ASCII diagrams)
-15. x_seq_fit vs x_best_fit comparison
+30. offset_ptr mechanics across stack↔segment
+31. Allocator propagation in Boost.Container
+32. Free-list fragmentation patterns (ASCII diagrams)
+33. x_seq_fit vs x_best_fit comparison
 
 ### Part II: 正确性问题审计
 
