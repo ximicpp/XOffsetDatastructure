@@ -442,7 +442,7 @@ namespace XOffsetDatastructure2 {
     class XBufferCompactor {
     public:
         template<typename T>
-        static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name = "MyTest") {
+        static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name) {
             validate_xbuffer_type<T>();
             auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
@@ -492,37 +492,54 @@ namespace XOffsetDatastructure2 {
         }
 
     private:
-        template<typename T>
-        struct is_xstring : std::false_type {};
-        
-        template<>
-        struct is_xstring<XString> : std::true_type {};
-        
-        template<typename T, typename = void>
-        struct container_value_type {};
-        
-        template<typename T>
-        struct container_value_type<T, std::void_t<typename T::value_type>> {
-            using type = typename T::value_type;
+        // ================================================================
+        // Migration strategy trait (extensible by users)
+        //
+        // Users who register is_safe_leaf<MyType> can also register
+        // migrate_as<MyType> to tell the Compactor how to migrate it.
+        // ================================================================
+        enum class MigrateStrategy {
+            TrivialCopy,      // direct assignment (primitives, enums, POD)
+            AllocatorAware,   // reconstruct with new allocator (XString-like)
+            Container,        // iterate elements, recurse (XVector/XSet/XMap)
+            Composite,        // reflect members, recurse (user structs)
+            NotRegistered     // use built-in auto-detection
         };
-        
+
         template<typename T>
-        using container_value_type_t = typename container_value_type<T>::type;
-        
+        struct migrate_as { static constexpr MigrateStrategy value = MigrateStrategy::NotRegistered; };
+
+        // Built-in registrations for XOffset types
+        template<>             struct migrate_as<XString>  { static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware; };
+        template<typename T>   struct migrate_as<XVector<T>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+        template<typename T>   struct migrate_as<XSet<T>>    { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+        template<typename K, typename V> struct migrate_as<XMap<K,V>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+
+        // Resolve migration strategy: user-registered > auto-detect
         template<typename T>
-        static constexpr bool is_simple_pod_v = std::is_trivially_copyable_v<T> && 
-                                                 !SupportedContainer<T> && 
-                                                 !is_xstring<T>::value;
-        
+        static consteval MigrateStrategy resolve_strategy() {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
+                return migrate_as<CleanT>::value;
+            } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
+                return MigrateStrategy::TrivialCopy;
+            } else {
+                return MigrateStrategy::Composite;
+            }
+        }
+
+        // ================================================================
+        // Migration dispatch (uses is_safe_leaf + migrate_as)
+        // ================================================================
         template<typename ElementType>
         static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            if constexpr (is_simple_pod_v<ElementType>) {
+            constexpr auto strategy = resolve_strategy<ElementType>();
+            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 return old_elem;
-            }
-            else if constexpr (is_xstring<ElementType>::value) {
-                return XString(old_elem.c_str(), new_xbuf.get_segment_manager());
-            }
-            else {
+            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
+                // XString-like: reconstruct with new allocator
+                return ElementType(old_elem.c_str(), new_xbuf.get_segment_manager());
+            } else {
                 ElementType new_elem(new_xbuf.get_segment_manager());
                 migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
                 return new_elem;
@@ -533,9 +550,9 @@ namespace XOffsetDatastructure2 {
         static void migrate_container(const ContainerType& old_container, 
                                       ContainerType& new_container,
                                       XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            using ElementType = container_value_type_t<ContainerType>;
-            
-            if constexpr (is_simple_pod_v<ElementType>) {
+            using ElementType = typename ContainerType::value_type;
+
+            if constexpr (std::is_trivially_copyable_v<ElementType>) {
                 new_container = old_container;
                 return;
             }
@@ -546,8 +563,7 @@ namespace XOffsetDatastructure2 {
                     auto new_value = migrate_element(value, old_xbuf, new_xbuf);
                     new_container.emplace(std::move(new_key), std::move(new_value));
                 }
-            }
-            else {
+            } else {
                 for (const auto& elem : old_container) {
                     auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
                     if constexpr (SetLikeContainer<ContainerType>) {
@@ -562,16 +578,14 @@ namespace XOffsetDatastructure2 {
         template<typename MemberType>
         static void migrate_member(const MemberType& old_member, MemberType& new_member, 
                                   XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            if constexpr (is_simple_pod_v<MemberType>) {
+            constexpr auto strategy = resolve_strategy<MemberType>();
+            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 new_member = old_member;
-            }
-            else if constexpr (is_xstring<MemberType>::value) {
-                new_member = XString(old_member.c_str(), new_xbuf.get_segment_manager());
-            }
-            else if constexpr (SupportedContainer<MemberType>) {
+            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
+                new_member = MemberType(old_member.c_str(), new_xbuf.get_segment_manager());
+            } else if constexpr (strategy == MigrateStrategy::Container) {
                 migrate_container(old_member, new_member, old_xbuf, new_xbuf);
-            }
-            else {
+            } else {
                 migrate_members(old_member, new_member, old_xbuf, new_xbuf);
             }
         }
