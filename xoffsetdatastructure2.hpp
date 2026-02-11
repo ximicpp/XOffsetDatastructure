@@ -246,18 +246,29 @@ public:
         return *this;
     }
 
+    // Grows the buffer by extra_bytes. Best-effort rollback on failure:
+    // if resize succeeds but re-open fails, restores original size.
     bool grow(size_type extra_bytes)
     {
+        const size_type original_size = m_buffer.size();
         try
         {
-            m_buffer.resize(m_buffer.size() + extra_bytes);
+            m_buffer.resize(original_size + extra_bytes);
             base_t::close_impl();
-            base_t::open_impl(&m_buffer[0], m_buffer.size());
+            if (!base_t::open_impl(&m_buffer[0], m_buffer.size()))
+            {
+                m_buffer.resize(original_size);
+                base_t::open_impl(&m_buffer[0], m_buffer.size());
+                return false;
+            }
             base_t::grow(extra_bytes);
             return true;
         }
         catch(...)
         {
+            // Best-effort rollback: try to restore original size
+            try { m_buffer.resize(original_size); } catch(...) {}
+            try { base_t::open_impl(&m_buffer[0], m_buffer.size()); } catch(...) {}
             return false;
         }
     }
