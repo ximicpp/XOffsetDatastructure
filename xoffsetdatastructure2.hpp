@@ -76,6 +76,10 @@ namespace XOffsetDatastructure2 {
         std::size_t sizeof_bool;
         std::size_t sizeof_char;
         std::size_t pointer_align;
+        std::size_t alignof_int32;
+        std::size_t alignof_int64;
+        std::size_t alignof_float;
+        std::size_t alignof_double;
     };
 
     // Architecture Presets
@@ -84,24 +88,32 @@ namespace XOffsetDatastructure2 {
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
         .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
         .pointer_align = 8,
+        .alignof_int32 = 4, .alignof_int64 = 8,
+        .alignof_float = 4, .alignof_double = 8,
     };
     inline constexpr ArchSpec Arch64BE = {
         .pointer_size = 8, .little_endian = false,
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
         .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
         .pointer_align = 8,
+        .alignof_int32 = 4, .alignof_int64 = 8,
+        .alignof_float = 4, .alignof_double = 8,
     };
     inline constexpr ArchSpec Arch32LE = {
         .pointer_size = 4, .little_endian = true,
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
         .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
         .pointer_align = 4,
+        .alignof_int32 = 4, .alignof_int64 = 8,
+        .alignof_float = 4, .alignof_double = 8,
     };
     inline constexpr ArchSpec Arch32BE = {
         .pointer_size = 4, .little_endian = false,
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
         .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
         .pointer_align = 4,
+        .alignof_int32 = 4, .alignof_int64 = 8,
+        .alignof_float = 4, .alignof_double = 8,
     };
 
     /// Active target architecture. Change this line to switch presets.
@@ -125,6 +137,14 @@ static_assert(sizeof(double)  == XOffsetDatastructure2::TargetArchitecture.sizeo
 static_assert(sizeof(bool)    == XOffsetDatastructure2::TargetArchitecture.sizeof_bool);
 static_assert(sizeof(char)    == XOffsetDatastructure2::TargetArchitecture.sizeof_char);
 static_assert(alignof(void*)  == XOffsetDatastructure2::TargetArchitecture.pointer_align);
+static_assert(alignof(int32_t) == XOffsetDatastructure2::TargetArchitecture.alignof_int32,
+    "Platform alignof(int32_t) does not match TargetArchitecture");
+static_assert(alignof(int64_t) == XOffsetDatastructure2::TargetArchitecture.alignof_int64,
+    "Platform alignof(int64_t) does not match TargetArchitecture");
+static_assert(alignof(float)   == XOffsetDatastructure2::TargetArchitecture.alignof_float,
+    "Platform alignof(float) does not match TargetArchitecture");
+static_assert(alignof(double)  == XOffsetDatastructure2::TargetArchitecture.alignof_double,
+    "Platform alignof(double) does not match TargetArchitecture");
 
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
