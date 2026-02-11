@@ -666,6 +666,22 @@ namespace XOffsetDatastructure2 {
         template<typename T>             struct is_safe_leaf<XSet<T>>     : std::true_type {};
         template<typename K, typename V> struct is_safe_leaf<XMap<K, V>>  : std::true_type {};
 
+        // — LEAF-5: XOffsetPtr<T> — NOT registered by default.
+        //
+        // XOffsetPtr is reference-semantic (points to data it does not own).
+        // All LEAF-1~4 types are value-semantic and self-contained.
+        // XOffsetPtr's validity depends on external state (the target object),
+        // so it is excluded from the default Safe Type Subset.
+        //
+        // User opt-in: specialize is_safe_leaf for your specific use case:
+        //
+        //   template<>
+        //   struct XOffsetDatastructure2::detail::is_safe_leaf<XOffsetPtr<MyType>>
+        //       : std::true_type {};
+        //
+        // If you also need compaction support, register a migrate_as strategy.
+        // The library does NOT provide built-in migration for XOffsetPtr.
+
         // ============================================================================
         // Recursive safety check helpers
         // ============================================================================
@@ -760,7 +776,7 @@ namespace XOffsetDatastructure2 {
                 return "UNSAFE: Union type not allowed";
             }
             else if constexpr (std::is_pointer_v<CleanT>) {
-                return "UNSAFE: Raw pointer (use XOffsetPtr<T> instead)";
+                return "UNSAFE: Raw pointer (use XOffsetPtr<T> with opt-in, see docs)";
             }
             else if constexpr (std::is_reference_v<CleanT>) {
                 return "UNSAFE: Reference type not allowed";
@@ -809,7 +825,7 @@ namespace XOffsetDatastructure2 {
             "    (no virtual functions, no raw pointers)\n\n"
             "NOT ALLOWED:\n"
             "  ✗ Virtual functions (polymorphic types)\n"
-            "  ✗ Raw pointers (use XOffsetPtr<T>)\n"
+            "  ✗ Raw pointers\n"
             "  ✗ References\n"
             "  ✗ std::string (use XString)\n"
             "  ✗ std::vector (use XVector<T>)\n"

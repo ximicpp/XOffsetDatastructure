@@ -242,8 +242,10 @@ Type T
 ├── [LEAF-3] XString?                → 精确类型匹配
 ├── [LEAF-4] XContainer?             → XVector<T> / XSet<T> / XMap<K,V> 模板匹配
 │   └── 递归检查元素类型 ∈ S
+├── [LEAF-5] XOffsetPtr<T>?          → 默认拒绝（引用语义，非值语义）
+│   └── 用户可通过 is_safe_leaf 特化 opt-in
 ├── [REJECT] Structural violation?   → polymorphic / inheritance / union
-├── [LEAF-5] Safe Composite?         → 所有成员递归 ∈ S
+├── [LEAF-6] Safe Composite?         → 所有成员递归 ∈ S
 └── [REJECT] Everything else         → 指针、引用、未知类型
 ```
 
@@ -255,7 +257,8 @@ Type T
 | **LEAF-2** Safe Enum | ✅ accept | 直接赋值 `=` (trivially copyable) | TypeLayout 原生签名 (`enum[s:N,a:M]<underlying>`) |
 | **LEAF-3** XString | ✅ accept | `XString(old.c_str(), new_alloc)` | Opaque 签名 (`string[s:32,a:8]`) |
 | **LEAF-4** XContainer | ✅ accept + 递归 | 遍历元素，递归迁移 | Opaque 签名 (`vector[s:32,a:8]<elem>`) |
-| **LEAF-5** Safe Composite | ✅ accept + 递归 | 反射遍历成员，递归迁移 | TypeLayout 原生签名 (`record[s:N,a:M]{...}`) |
+| **LEAF-5** XOffsetPtr | ❌ 默认拒绝 (opt-in) | 用户负责 (via `migrate_as`) | 用户负责 |
+| **LEAF-6** Safe Composite | ✅ accept + 递归 | 反射遍历成员，递归迁移 | TypeLayout 原生签名 (`record[s:N,a:M]{...}`) |
 | **REJECT** | ❌ reject | N/A (不应到达) | N/A |
 
 ### 2.3 关键不变式 (Invariants)

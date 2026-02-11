@@ -23,22 +23,20 @@ ranked by severity (Critical > High > Medium > Low > Note).
 
 ## Findings
 
-### [H1] `XOffsetPtr<T>` is NOT registered as a safe leaf — HIGH
+### [H1] `XOffsetPtr<T>` safety model — RESOLVED
 
-**Location:** `detail::is_safe_leaf` whitelist (line 639–661)
+**Location:** `detail::is_safe_leaf` whitelist (LEAF-5 comment block)
 
-`XOffsetPtr<T>` is defined (line 369) and recommended in error messages (line 757, 806),
-but it is **not registered** in `is_safe_leaf`. A struct containing `XOffsetPtr<Foo>` will
-be rejected by the safety check, even though `offset_ptr<T>` is trivially copyable and
-is the canonical way to store cross-buffer pointers.
+**Original finding:** `XOffsetPtr<T>` is not registered as a safe leaf.
 
-**Recommendation:** Add:
-```cpp
-// — LEAF-5: XOffsetPtr —
-template<typename T> struct is_safe_leaf<XOffsetPtr<T>> : std::true_type {};
-```
-No migration strategy needed — `offset_ptr<T>` is trivially copyable, so
-`resolve_strategy` will auto-detect `TrivialCopy`.
+**Resolution (design-xoffsetptr-safety proposal):** After analysis, `XOffsetPtr<T>` is
+intentionally NOT registered by default. Key reasons:
+1. `offset_ptr` is **NOT trivially copyable** (has custom copy ctor that recalculates offsets)
+2. It is **reference-semantic** (does not own data), unlike all LEAF-1~4 types (value-semantic)
+3. Compaction migration cannot be automated (library can't know target's new address)
+
+**Design decision:** User opt-in via `is_safe_leaf` specialization. Error messages updated
+to reflect this. See `design.md` in the `design-xoffsetptr-safety` proposal for full rationale.
 
 ---
 
