@@ -36,9 +36,6 @@
     #endif
 #endif
 
-#ifndef OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR
-#define OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR 1
-#endif
 
 #include <experimental/meta>
 #include <type_traits>
@@ -331,6 +328,7 @@ namespace XOffsetDatastructure2 {
     using namespace boost::interprocess;
 
     using XBuffer = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
+    using XBufferBestFit = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
 
     template<typename T>
     concept HasIterator = requires(T t) {
@@ -375,43 +373,50 @@ namespace XOffsetDatastructure2 {
     template<typename T>
     concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
 
-    struct growth_factor_custom : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
-
     template <typename T>
     using XOffsetPtr = boost::interprocess::offset_ptr<T>;
 
-#if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-    template <typename T>
-    using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>>;
-#elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-    using vector_option = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-    template <typename T>
-    using XVector = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option>;
-#endif
+    // ========================================================================
+    // Container Implementation Details (detail namespace)
+    //
+    // Growth factor policy and internal vector option types are
+    // implementation details — not part of the public API.
+    // ========================================================================
+    namespace detail {
+        /// Custom growth factor: 1.1x (11/10) to minimize buffer waste
+        struct growth_factor_custom
+            : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
 
-#if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-    template <typename T>
-    using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBuffer::segment_manager>>;
-#elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-    using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-    template <typename T>
-    using XVector_flatset = boost::container::vector<T, allocator<T, XBuffer::segment_manager>, vector_option_flatset>;
-    template <typename T>
-    using XSet = boost::container::flat_set<T, std::less<T>, XVector_flatset<T>>;
-#endif
+        /// Common vector options with custom growth factor
+        using x_vector_options = boost::container::vector_options_t<
+            boost::container::growth_factor<growth_factor_custom>>;
 
-#if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
-    template <typename K, typename V>
-    using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBuffer::segment_manager>>;
-#elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
-    using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
-    template <typename K, typename V>
-    using XVector_flatmap = boost::container::vector<std::pair<K, V>, allocator<std::pair<K, V>, XBuffer::segment_manager>, vector_option_flatmap>;
-    template <typename K, typename V>
-    using XMap = boost::container::flat_map<K, V, std::less<K>, XVector_flatmap<K, V>>;
-#endif
+        /// Internal vector alias used as backing store for flat containers
+        template <typename T>
+        using x_vector_impl = boost::container::vector<
+            T, allocator<T, XBuffer::segment_manager>, x_vector_options>;
+    } // namespace detail
 
-    using XString = boost::container::basic_string<char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
+    // ========================================================================
+    // Public Container Aliases
+    // ========================================================================
+
+    /// Managed vector with 1.1x growth factor
+    template <typename T>
+    using XVector = detail::x_vector_impl<T>;
+
+    /// Managed flat_set backed by detail::x_vector_impl
+    template <typename T>
+    using XSet = boost::container::flat_set<T, std::less<T>, detail::x_vector_impl<T>>;
+
+    /// Managed flat_map backed by detail::x_vector_impl
+    template <typename K, typename V>
+    using XMap = boost::container::flat_map<K, V, std::less<K>,
+        detail::x_vector_impl<std::pair<K, V>>>;
+
+    /// Managed string with shared-memory allocator
+    using XString = boost::container::basic_string<
+        char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
 
     class XBufferVisualizer {
     public:

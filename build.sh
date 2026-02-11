@@ -42,6 +42,7 @@ find_clang_p2996() {
         "/usr/local/bin/clang++"
         "$HOME/clang-p2996-install/bin/clang++"
         "/opt/clang-p2996/bin/clang++"
+        "/opt/p2996-toolchain/bin/clang++"
     )
     
     for path in "${search_paths[@]}"; do
@@ -278,6 +279,8 @@ fi
 # Ensure libc++ can be found at runtime (needed in Docker with P2996 Clang)
 if [ -d "/opt/clang-p2996/lib/x86_64-unknown-linux-gnu" ]; then
     export LD_LIBRARY_PATH="/opt/clang-p2996/lib/x86_64-unknown-linux-gnu:${LD_LIBRARY_PATH:-}"
+elif [ -d "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu" ]; then
+    export LD_LIBRARY_PATH="/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:${LD_LIBRARY_PATH:-}"
 fi
 
 # Run tests
