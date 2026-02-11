@@ -15,7 +15,9 @@
 
 | 文档 | 描述 |
 |------|------|
+| **[CORE_FORMAL_MODEL.md](CORE_FORMAL_MODEL.md)** | 🔬 核心形式化模型 — 零编码正确性的理论基础（C1+C2定理与证明） |
 | `technical_overview.md` | 技术架构概览 |
+| `MIGRATION_TYPELAYOUT.md` | TypeLayout 迁移指南与 API 参考 |
 | `README.md` | (本文件) 文档索引 |
 
 ## 🎯 使用建议

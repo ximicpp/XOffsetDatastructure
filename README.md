@@ -11,6 +11,28 @@ XOffsetDatastructure is a serialization library designed to reduce or even elimi
 ### CppCon 2025
 [CppCon 2025: Cross-platform XOffsetDatastructure: Ensuring Zero-encoding/Zero-decoding Serialization Compatibility Through Compile-time Type Signatures](https://github.com/ximicpp/XOffsetDatastructure/blob/main/docs/Compile-timeTypeSignatures.pdf)
 
+### Formal Correctness Model
+
+XOffsetDatastructure's zero-encoding approach is backed by a formal correctness
+model that answers: **under what conditions is direct byte-copy semantically
+equivalent to full serialization/deserialization?**
+
+The answer: **two conditions, necessary and sufficient.**
+
+| Condition | Role | Mechanism |
+|-----------|------|-----------|
+| **C1: Layout Determinism** | Value preservation — same bytes = same values | Architecture constraints + TypeLayout signature verification |
+| **C2: Referential Integrity** | Reference preservation — all pointers survive copy | `offset_ptr` (relative addressing) + Safe Type Set |
+
+```
+C1 (value preservation) + C2 (reference preservation) = semantic equivalence
+```
+
+Both conditions operate within a **Safe Type Set S** (only fixed-width types,
+no raw pointers, no virtual classes) and are verified at compile time. The full
+formal model, including theorem, proof, and boundary conditions, is in
+[`docs/CORE_FORMAL_MODEL.md`](docs/CORE_FORMAL_MODEL.md).
+
 ### Type Signature System (powered by TypeLayout)
 
 XOffsetDatastructure uses [TypeLayout](https://github.com/ximicpp/TypeLayout) as its type-signature engine. TypeLayout provides a two-layer compile-time signature system:
