@@ -6,7 +6,8 @@ TBD - created by archiving change analyze-examples-readiness. Update Purpose aft
 ### Requirement: Example Code Correctness
 Example code (helloworld.cpp, demo.cpp) SHALL correctly follow all safety rules
 documented in the README, including pointer invalidation handling, buffer access
-patterns, and error checking.
+patterns, and error checking. All references SHALL use the canonical namespace
+name `XOffsetDatastructure` and header `xoffsetdatastructure.hpp`.
 
 #### Scenario: No dangling pointer usage after buffer resize
 - **WHEN** an example calls grow(), shrink_to_fit(), or compact_automatic()
@@ -17,6 +18,14 @@ patterns, and error checking.
 - **WHEN** an example creates a compacted buffer via compact_automatic<T>()
 - **THEN** it SHALL access the compacted data using the public API (root<T>() or find<T>())
 - **AND** it SHALL NOT expose internal implementation details like XBUFFER_ROOT_NAME to users
+
+#### Scenario: No legacy namespace in examples
+- **WHEN** inspecting all files under `examples/`
+- **THEN** zero occurrences of `XOffsetDatastructure2` SHALL be found
+
+#### Scenario: Include path uses canonical header name
+- **WHEN** inspecting `#include` directives in example files
+- **THEN** all references SHALL use `xoffsetdatastructure.hpp` (not `xoffsetdatastructure2.hpp`)
 
 ### Requirement: Example Code Usability
 Example code SHALL be directly copyable and runnable by new users without
