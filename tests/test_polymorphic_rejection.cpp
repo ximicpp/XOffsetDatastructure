@@ -14,7 +14,7 @@ int main() {
     XBufferExt xbuf(1024);
     
     // This line should cause a COMPILE ERROR with a helpful message
-    auto* obj = xbuf.make<BadType>("test");
+    auto* obj = xbuf.make<BadType>();
     
     // Expected error message:
     // static assertion failed: Cannot use polymorphic types in XBuffer!

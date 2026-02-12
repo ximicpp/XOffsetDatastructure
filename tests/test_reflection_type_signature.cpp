@@ -116,7 +116,7 @@ void test_instance_creation() {
     std::cout << "------------------------------------------\n";
     
     XBufferExt xbuf(2048);
-    auto* obj = xbuf.make<TypeSigTest>("test");
+    auto* obj = xbuf.make<TypeSigTest>();
     
     obj->a = 42;
     obj->b = 3.14;
@@ -181,7 +181,7 @@ void test_serialization_with_reflection() {
     std::cout << "---------------------------------------\n";
     
     XBufferExt xbuf(2048);
-    auto* data = xbuf.make<SimpleData>("data");
+    auto* data = xbuf.make<SimpleData>();
     
     data->id = 9999;
     data->value = 123.45f;
@@ -196,18 +196,18 @@ void test_serialization_with_reflection() {
     
     // Deserialize
     XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
-    auto* loaded = xbuf2.find<SimpleData>("data").first;
+    auto& loaded = xbuf2.root<SimpleData>();
     
-    if (loaded) {
+    if (true) { // root always valid after load
         std::cout << "\n  Loaded data:\n";
-        std::cout << "    id: " << loaded->id << "\n";
-        std::cout << "    value: " << loaded->value << "\n";
+        std::cout << "    id: " << loaded.id << "\n";
+        std::cout << "    value: " << loaded.value << "\n";
         
         // Verify via reflection
         constexpr size_t member_count = get_member_count_consteval<SimpleData>();
         std::cout << "\n  Member count (reflection): " << member_count << "\n";
         
-        bool integrity = (loaded->id == 9999 && loaded->value == 123.45f);
+        bool integrity = (loaded.id == 9999 && loaded.value == 123.45f);
         std::cout << "  Data integrity: " << (integrity ? "OK" : "FAIL") << "\n";
     }
     

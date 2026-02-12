@@ -334,7 +334,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=19
+    TOTAL_TESTS=25
 fi
 
 # Basic tests (6 tests)
@@ -366,6 +366,12 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_type_safety" 17 $TOTAL_TESTS
     run_test "test_vptr_layout" 18 $TOTAL_TESTS
     run_test "test_typelayout_integration" 19 $TOTAL_TESTS
+    run_test "test_enum_support" 20 $TOTAL_TESTS
+    run_test "test_type_safety_comprehensive" 21 $TOTAL_TESTS
+    run_test "test_type_erased_detection" 22 $TOTAL_TESTS
+    run_test "test_xbufferext_api" 23 $TOTAL_TESTS
+    run_test "test_xstring_direct_assign" 24 $TOTAL_TESTS
+    run_test "test_xhandle" 25 $TOTAL_TESTS
 fi
 
 # Run demo

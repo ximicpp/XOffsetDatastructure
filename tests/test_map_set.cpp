@@ -27,8 +27,8 @@ bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(4096);
-    auto* obj = xbuf.construct<MapSetTest>("MapSetTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<MapSetTest>();
     
     // Test 1: Set insertion
     std::cout << "Test 1: Set insertion... ";
@@ -101,11 +101,11 @@ bool test_map_set_operations() {
     // Test 8: Persistence
     std::cout << "Test 8: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
-    XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto* loaded_obj = loaded_buf.find<MapSetTest>("MapSetTest").first;
-    assert(loaded_obj->intSet.size() == 50);
-    assert(loaded_obj->intMap.size() == 20);
-    assert(loaded_obj->stringMap.size() == 15);
+    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    auto& loaded_obj = loaded_buf.root<MapSetTest>();
+    assert(loaded_obj.intSet.size() == 50);
+    assert(loaded_obj.intMap.size() == 20);
+    assert(loaded_obj.stringMap.size() == 15);
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All map/set tests passed!\n";

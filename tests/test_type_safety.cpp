@@ -67,7 +67,7 @@ int main() {
     
     // This should compile fine
     XBufferExt xbuf(1024);
-    auto* data = xbuf.make<SafeData>("test");
+    auto* data = xbuf.make<SafeData>();
     data->id = 42;
     data->value = 3.14f;
     std::cout << "  Created SafeData successfully!\n";
@@ -107,13 +107,13 @@ int main() {
 
     // [BAD] THESE SHOULD FAIL AT COMPILE-TIME (uncomment to test):
     
-    // auto* unsafe1 = xbuf.make<UnsafeData>("unsafe");
+    // auto* unsafe1 = xbuf.make<UnsafeData>();
     // Error: static assertion failed: Cannot use polymorphic types in XBuffer!
     
-    // auto* unsafe2 = xbuf.make<UnsafeWithVirtualDestructor>("unsafe2");
+    // auto* unsafe2 = xbuf.make<UnsafeWithVirtualDestructor>();
     // Error: static assertion failed: Cannot use polymorphic types in XBuffer!
 
-    // auto* unsafe3 = xbuf.make<Derived>("unsafe3");
+    // auto* unsafe3 = xbuf.make<Derived>();
     // Error: static assertion failed: Inheritance not allowed (use composition)
     
     std::cout << "========================================\n";

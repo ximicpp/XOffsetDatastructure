@@ -114,7 +114,7 @@ void test_reflection_with_instances() {
     std::cout << "-----------------------------------\n";
     
     XBufferExt xbuf(1024);
-    auto* obj = xbuf.make<TestStruct>("test");
+    auto* obj = xbuf.make<TestStruct>();
     
     obj->x = 42;
     obj->y = 3.14;

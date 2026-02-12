@@ -60,10 +60,10 @@ void demo_basic_usage() {
     
     // Create game data
     print_subsection("Creating Game Data");
-    auto* game = xbuf.make<GameData>("player_save");
+    auto* game = xbuf.make<GameData>();
     
     // Set player data
-    game->player_name = XString("Hero", xbuf.allocator<XString>());
+    game->player_name = "Hero";
     game->player_id = 12345;
     game->level = 42;
     game->health = 100.0f;
@@ -129,8 +129,8 @@ void demo_memory_management() {
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     
     print_subsection("Adding Data");
-    auto* game = xbuf.make<GameData>("game");
-    game->player_name = XString("TestPlayer", xbuf.allocator<XString>());
+    auto* game = xbuf.make<GameData>();
+    game->player_name = "TestPlayer";
     for (int i = 0; i < 100; i++) {
         game->achievements.insert(i);  // Add achievement IDs
     }
@@ -163,8 +163,8 @@ void demo_serialization() {
     
     print_subsection("Creating Source Data");
     XBufferExt src_buf(2048);
-    auto* src_game = src_buf.make<GameData>("save");
-    src_game->player_name = XString("SavedHero", src_buf.allocator<XString>());
+    auto* src_game = src_buf.make<GameData>();
+    src_game->player_name = "SavedHero";
     src_game->player_id = 99999;
     src_game->level = 99;
     src_game->health = 100.0f;
@@ -180,7 +180,7 @@ void demo_serialization() {
     
     print_subsection("Deserializing from Binary");
     XBufferExt dst_buf = XBufferExt::load_from_string(binary_data);
-    auto* dst_game = dst_buf.find<GameData>("save").first;
+    auto* dst_game = dst_buf.find<GameData>(XBUFFER_ROOT_NAME).first;
     
     if (dst_game) {
         print_check("Deserialization successful!");
@@ -255,8 +255,8 @@ void demo_automatic_compaction() {
     XBufferExt xbuf(8192);  // 8KB buffer
     
     // Create game data with items
-    auto* game = xbuf.make<GameData>("save_game");
-    game->player_name = XString("FragmentedHero", xbuf.allocator<XString>());
+    auto* game = xbuf.make<GameData>();
+    game->player_name = "FragmentedHero";
     game->player_id = 77777;
     game->level = 50;
     game->health = 85.5f;
@@ -296,7 +296,7 @@ void demo_automatic_compaction() {
     std::cout << "  Using XBufferCompactor::compact_automatic<GameData>()\n\n";
     
     // Compact using C++26 reflection
-    XBuffer compacted = XBufferCompactor::compact_automatic<GameData>(xbuf, "save_game");
+    XBuffer compacted = XBufferCompactor::compact_automatic<GameData>(xbuf);
     
     auto stats_after = XBufferVisualizer::get_memory_stats(compacted);
     print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");
@@ -306,7 +306,7 @@ void demo_automatic_compaction() {
     print_check("Memory compacted successfully!");
     
     print_subsection("Data Integrity Verification");
-    auto [compacted_game, found] = compacted.find<GameData>("save_game");
+    auto* compacted_game = compacted.find<GameData>(XBUFFER_ROOT_NAME).first; bool found = (compacted_game != nullptr);
     if (found) {
         bool integrity_ok = (
             std::string(compacted_game->player_name.c_str()) == "FragmentedHero" &&
@@ -364,7 +364,7 @@ void demo_performance() {
 #endif
     
     // Insert 1000 items using emplace_back for better performance
-    auto* game = xbuf.make<GameData>("perf_test");
+    auto* game = xbuf.make<GameData>();
     for (int i = 0; i < 1000; i++) {
         std::string item_name = "Item_" + std::to_string(i);
         game->items.emplace_back(
