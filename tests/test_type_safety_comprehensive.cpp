@@ -200,7 +200,7 @@ void test_container_types() {
     auto* data = xbuf.make<ContainerTypes>();
     
     // Test XString
-    data->name = XString("TestName", xbuf.allocator<char>());
+    data->name = "TestName";
     
     // Test XVector
     data->numbers.push_back(10);
@@ -213,8 +213,8 @@ void test_container_types() {
     data->unique_ids.insert(100);  // Duplicate, should be ignored
     
     // Test XMap - use emplace like in demo
-    data->id_to_name.emplace(1, XString("Alice", xbuf.allocator<XString>()));
-    data->id_to_name.emplace(2, XString("Bob", xbuf.allocator<XString>()));
+    data->id_to_name.emplace(1, "Alice");
+    data->id_to_name.emplace(2, "Bob");
     
     // Verify
     assert(data->name == "TestName");
@@ -233,7 +233,7 @@ void test_nested_types() {
     XBufferExt xbuf(1024 * 1024);
     auto* player = xbuf.make<Player>();
     
-    player->name = XString("Hero", xbuf.allocator<char>());
+    player->name = "Hero";
     player->level = 99;
     player->position.x = 10.5f;
     player->position.y = 20.3f;
@@ -258,13 +258,13 @@ void test_complex_structure() {
     auto* game = xbuf.make<GameState>();
     
     // Setup player
-    game->player.name = XString("Alice", xbuf.allocator<char>());
+    game->player.name = "Alice";
     game->player.level = 50;
     game->player.position = {1.0f, 2.0f, 3.0f};
     
     // Setup inventory
-    Item sword{1, XString("Sword", xbuf.allocator<char>()), 5.5f};
-    Item shield{2, XString("Shield", xbuf.allocator<char>()), 8.2f};
+    Item sword{1, XString("Sword", xbuf.get_segment_manager()), 5.5f};
+    Item shield{2, XString("Shield", xbuf.get_segment_manager()), 8.2f};
     
     game->inventory.items.push_back(sword);
     game->inventory.items.push_back(shield);

@@ -50,7 +50,7 @@ bool test_vector_operations() {
     std::cout << "Test 3: String vector operations... ";
     for (int i = 0; i < 10; ++i) {
         std::string str = "String_" + std::to_string(i);
-        obj->stringVector.emplace_back(str.c_str(), xbuf.get_segment_manager());
+        obj->stringVector.push_back(str.c_str());
     }
     assert(obj->stringVector.size() == 10);
     assert(obj->stringVector[0] == "String_0");

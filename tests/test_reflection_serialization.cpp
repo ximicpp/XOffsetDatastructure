@@ -138,7 +138,7 @@ void test_complex_structure_analysis() {
     auto* data = xbuf.make<ComplexData>();
     
     data->type = 100;
-    data->name = XString("TestObject", xbuf.allocator<XString>());
+    data->name = "0";
     data->items.push_back(1);
     data->items.push_back(2);
     data->items.push_back(3);

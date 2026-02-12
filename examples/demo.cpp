@@ -73,12 +73,11 @@ void demo_basic_usage() {
     print_info("Level", std::to_string(game->level));
     print_info("Health", std::to_string(game->health));
     
-    // Add items
+    // Add items — allocator auto-injected by scoped_allocator_adaptor
     print_subsection("Adding Items to Inventory");
     for (int i = 0; i < 5; i++) {
         std::string item_name = "Potion " + std::to_string(i+1);
         game->items.emplace_back(
-            xbuf.allocator<Item>(),
             i + 1,              // item_id
             i % 3,              // item_type (0=Potion, 1=Weapon, 2=Armor)
             (i + 1) * 10,       // quantity
@@ -95,11 +94,11 @@ void demo_basic_usage() {
     }
     print_check("Unlocked " + std::to_string(game->achievements.size()) + " achievements");
     
-    // Add quest progress
+    // Add quest progress — string keys auto-constructed via wrapper operator[]
     print_subsection("Quest Progress");
-    game->quest_progress[XString("Main Quest", xbuf.allocator<XString>())] = 75;
-    game->quest_progress[XString("Side Quest A", xbuf.allocator<XString>())] = 100;
-    game->quest_progress[XString("Side Quest B", xbuf.allocator<XString>())] = 50;
+    game->quest_progress["Main Quest"] = 75;
+    game->quest_progress["Side Quest A"] = 100;
+    game->quest_progress["Side Quest B"] = 50;
     print_check("Tracking " + std::to_string(game->quest_progress.size()) + " quests");
     
     // Display inventory
@@ -261,13 +260,10 @@ void demo_automatic_compaction() {
     game->level = 50;
     game->health = 85.5f;
     
-    // Add items
+    // Add items — allocator auto-injected
     for (int i = 0; i < 20; i++) {
         std::string item_name = "Item_" + std::to_string(i);
-        game->items.emplace_back(
-            xbuf.allocator<Item>(),
-            i, i % 3, i * 5, item_name.c_str()
-        );
+        game->items.emplace_back(i, i % 3, i * 5, item_name.c_str());
     }
     
     // Add achievements
@@ -363,17 +359,11 @@ void demo_performance() {
     auto start = std::chrono::high_resolution_clock::now();
 #endif
     
-    // Insert 1000 items using emplace_back for better performance
+    // Insert 1000 items — allocator auto-injected
     auto* game = xbuf.make<GameData>();
     for (int i = 0; i < 1000; i++) {
         std::string item_name = "Item_" + std::to_string(i);
-        game->items.emplace_back(
-            xbuf.allocator<Item>(),
-            i,                  // item_id
-            i % 3,              // item_type
-            i,                  // quantity
-            item_name.c_str()   // name
-        );
+        game->items.emplace_back(i, i % 3, i, item_name.c_str());
     }
     
 #if HAS_CHRONO

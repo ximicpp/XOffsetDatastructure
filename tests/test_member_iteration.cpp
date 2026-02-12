@@ -182,7 +182,7 @@ void test_instance_access() {
     item->item_id = 1001;
     item->item_type = 2;
     item->quantity = 50;
-    item->name = XString("Magic Sword", xbuf.allocator<XString>());
+    item->name = "0";
     
     std::cout << "  Created GameItem instance:\n";
     std::cout << "    item_id: " << item->item_id << "\n";

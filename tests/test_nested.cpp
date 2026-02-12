@@ -10,9 +10,23 @@
 using namespace XOffsetDatastructure2;
 
 struct InnerObject {
+    using allocator_type = XAllocator;
+
+    // Primary allocator constructor.
+    // Constrained to reject allocator_arg_t so that scoped_allocator_adaptor's
+    // prefix-mode detection (allocator_arg, alloc, args...) does not match
+    // this single-arg template, which would cause a hard error.
     template <typename Allocator>
-    InnerObject(Allocator allocator) : data(allocator) {}
-    
+        requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
+    InnerObject(Allocator allocator) : id(0), data(allocator) {}
+
+    // Move + allocator constructor (required by uses_allocator protocol
+    // when scoped_allocator_adaptor needs to move-construct elements
+    // during vector reallocation).
+    template <typename Allocator>
+    InnerObject(InnerObject&& other, Allocator allocator)
+        : id(other.id), data(std::move(other.data), allocator) {}
+
     int id;
     XVector<int> data;
 };
@@ -45,8 +59,8 @@ bool test_nested_structures() {
     
     // Test 1: Initialize nested structure
     std::cout << "Test 1: Initialize nested objects... ";
-    obj->title = XString("OuterTitle", xbuf.get_segment_manager());
-    obj->middle.name = XString("MiddleName", xbuf.get_segment_manager());
+    obj->title = "OuterTitle";
+    obj->middle.name = "MiddleName";
     obj->middle.inner.id = 42;
     for (int i = 0; i < 10; ++i) {
         obj->middle.inner.data.push_back(i * 2);
@@ -65,7 +79,7 @@ bool test_nested_structures() {
     // Test 3: Vector of nested objects
     std::cout << "Test 3: Vector of nested objects... ";
     for (int i = 0; i < 5; ++i) {
-        obj->innerList.emplace_back(xbuf.get_segment_manager());
+        obj->innerList.emplace_back();
         obj->innerList.back().id = i * 100;
         for (int j = 0; j < i + 1; ++j) {
             obj->innerList.back().data.push_back(j);

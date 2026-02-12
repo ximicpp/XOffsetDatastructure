@@ -153,25 +153,24 @@ bool test_modify_vector_string() {
     
     // Test 1: Add string elements
     std::cout << "Test 1: Add string elements... ";
-    data->names.emplace_back("Alice", xbuf.get_segment_manager());
-    data->names.emplace_back("Bob", xbuf.get_segment_manager());
-    data->names.emplace_back("Carol", xbuf.get_segment_manager());
+    data->names.push_back("Alice");
+    data->names.push_back("Bob");
+    data->names.push_back("Carol");
     assert(data->names.size() == 3);
     assert(data->names[0] == "Alice");
     std::cout << "[OK]\n";
     
     // Test 2: Modify string element
     std::cout << "Test 2: Modify string element... ";
-    data->names[1] = XString("Bobby", xbuf.get_segment_manager());
+    data->names[1] = "Bobby";
     assert(data->names[1] == "Bobby");
     std::cout << "[OK]\n";
     
     // Test 3: Modify via iterator
     std::cout << "Test 3: Append to strings via iterator... ";
     for (auto& name : data->names) {
-        XString suffix("_Modified", xbuf.get_segment_manager());
-        name = XString((std::string(name.c_str()) + std::string(suffix.c_str())).c_str(), 
-                       xbuf.get_segment_manager());
+        std::string tmp = std::string(name.c_str()) + "_Modified";
+        name = tmp.c_str();
     }
     assert(data->names[0] == "Alice_Modified");
     assert(data->names[1] == "Bobby_Modified");
@@ -181,7 +180,7 @@ bool test_modify_vector_string() {
     // Test 4: Insert new element
     std::cout << "Test 4: Insert new element... ";
     auto it = data->names.begin() + 1;
-    data->names.insert(it, XString("David", xbuf.get_segment_manager()));
+    data->names.insert(it, "David");
     assert(data->names.size() == 4);
     assert(data->names[1] == "David");
     assert(data->names[2] == "Bobby_Modified");
@@ -207,31 +206,31 @@ bool test_modify_map() {
     
     // Test 1: Add key-value pairs
     std::cout << "Test 1: Add key-value pairs... ";
-    data->scores.emplace(XString("Alice", xbuf.get_segment_manager()), 85);
-    data->scores.emplace(XString("Bob", xbuf.get_segment_manager()), 90);
-    data->scores.emplace(XString("Carol", xbuf.get_segment_manager()), 78);
+    data->scores.emplace("Alice", 85);
+    data->scores.emplace("Bob", 90);
+    data->scores.emplace("Carol", 78);
     assert(data->scores.size() == 3);
     std::cout << "[OK]\n";
     
     // Test 2: Modify existing value by key
     std::cout << "Test 2: Modify value by key... ";
-    auto it = data->scores.find(XString("Alice", xbuf.get_segment_manager()));
+    auto it = data->scores.find("Alice");
     assert(it != data->scores.end());
     it->second = 95;
-    assert(data->scores.find(XString("Alice", xbuf.get_segment_manager()))->second == 95);
+    assert(data->scores.find("Alice")->second == 95);
     std::cout << "[OK]\n";
     
     // Test 3: Modify via operator[]
     std::cout << "Test 3: Modify via operator[]... ";
-    data->scores[XString("Bob", xbuf.get_segment_manager())] = 92;
-    assert(data->scores[XString("Bob", xbuf.get_segment_manager())] == 92);
+    data->scores["Bob"] = 92;
+    assert(data->scores["Bob"] == 92);
     std::cout << "[OK]\n";
     
     // Test 4: Add new entry via operator[]
     std::cout << "Test 4: Add via operator[]... ";
-    data->scores[XString("David", xbuf.get_segment_manager())] = 88;
+    data->scores["David"] = 88;
     assert(data->scores.size() == 4);
-    assert(data->scores[XString("David", xbuf.get_segment_manager())] == 88);
+    assert(data->scores["David"] == 88);
     std::cout << "[OK]\n";
     
     // Test 5: Modify all values via iterator
@@ -239,17 +238,17 @@ bool test_modify_map() {
     for (auto& pair : data->scores) {
         pair.second += 5;
     }
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 100);
-    assert(data->scores[XString("Bob", xbuf.get_segment_manager())] == 97);
-    assert(data->scores[XString("Carol", xbuf.get_segment_manager())] == 83);
-    assert(data->scores[XString("David", xbuf.get_segment_manager())] == 93);
+    assert(data->scores["Alice"] == 100);
+    assert(data->scores["Bob"] == 97);
+    assert(data->scores["Carol"] == 83);
+    assert(data->scores["David"] == 93);
     std::cout << "[OK]\n";
     
     // Test 6: Erase entry
     std::cout << "Test 6: Erase entry... ";
-    data->scores.erase(XString("Carol", xbuf.get_segment_manager()));
+    data->scores.erase("Carol");
     assert(data->scores.size() == 3);
-    assert(data->scores.find(XString("Carol", xbuf.get_segment_manager())) == data->scores.end());
+    assert(data->scores.find("Carol") == data->scores.end());
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All map modification tests passed!\n";
@@ -324,11 +323,11 @@ bool test_modify_mixed_operations() {
         data->numbers.push_back(i);
     }
     
-    data->names.emplace_back("Alice", xbuf.get_segment_manager());
-    data->names.emplace_back("Bob", xbuf.get_segment_manager());
+    data->names.push_back("Alice");
+    data->names.push_back("Bob");
     
-    data->scores.emplace(XString("Alice", xbuf.get_segment_manager()), 80);
-    data->scores.emplace(XString("Bob", xbuf.get_segment_manager()), 85);
+    data->scores.emplace("Alice", 80);
+    data->scores.emplace("Bob", 85);
     
     data->tags.insert(1);
     data->tags.insert(2);
@@ -341,14 +340,14 @@ bool test_modify_mixed_operations() {
     data->active = false;
     
     data->numbers[0] = 999;
-    data->names[0] = XString("Alicia", xbuf.get_segment_manager());
-    data->scores[XString("Alice", xbuf.get_segment_manager())] = 95;
+    data->names[0] = "Alicia";
+    data->scores["Alice"] = 95;
     data->tags.insert(3);
     
     assert(data->counter == 100);
     assert(data->numbers[0] == 999);
     assert(data->names[0] == "Alicia");
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 95);
+    assert(data->scores["Alice"] == 95);
     assert(data->tags.find(3) != data->tags.end());
     std::cout << "[OK]\n";
     
@@ -379,7 +378,7 @@ bool test_modify_mixed_operations() {
     }
     
     assert(data->numbers[0] == 1998);
-    assert(data->scores[XString("Alice", xbuf.get_segment_manager())] == 85);
+    assert(data->scores["Alice"] == 85);
     assert(data->tags.size() == 8);  // 1,2,3,10,11,12,13,14
     std::cout << "[OK]\n";
     
@@ -393,7 +392,7 @@ bool test_modify_mixed_operations() {
     assert(new_data.counter == 100);
     assert(new_data.numbers[0] == 1998);
     assert(new_data.names[0] == "Alicia");
-    assert(new_data.scores[XString("Alice", xbuf.get_segment_manager())] == 85);
+    assert(new_data.scores["Alice"] == 85);
     assert(new_data.tags.size() == 8);
     std::cout << "[OK]\n";
     
