@@ -48,13 +48,28 @@ public:
 
 class alignas(8) GameData {
 public:
-	// Default constructor (suffix mode)
+	using allocator_type = XAllocator;
+
+	// Allocator constructor (suffix mode — standard uses_allocator protocol)
 	template <typename Allocator>
+		requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
 	GameData(Allocator allocator) 
 		: player_name(allocator)
 		, items(allocator)
 		, achievements(allocator)
 		, quest_progress(allocator) 
+	{}
+
+	// Move + allocator constructor (required for vector reallocation)
+	template <typename Allocator>
+	GameData(GameData&& other, Allocator allocator)
+		: player_id(other.player_id)
+		, level(other.level)
+		, health(other.health)
+		, player_name(std::move(other.player_name), allocator)
+		, items(std::move(other.items), allocator)
+		, achievements(std::move(other.achievements), allocator)
+		, quest_progress(std::move(other.quest_progress), allocator)
 	{}
 
 	int32_t player_id{0};

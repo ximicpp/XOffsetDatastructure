@@ -47,9 +47,8 @@ int main() {
     // 6. Deserialize from string
     std::cout << "6. Deserializing...\n";
     XBufferExt loaded = XBufferExt::load_from_string(data);
-    assert(loaded.has_root<Player>()); auto& loaded_player = loaded.root<Player>(); bool found = true;
-    
-    if (found) {
+    if (loaded.has_root<Player>()) {
+        auto& loaded_player = loaded.root<Player>();
         std::cout << "   Loaded player: " << loaded_player.name 
                   << " (Level " << loaded_player.level << ")\n";
         std::cout << "   Items count: " << loaded_player.items.size() << "\n";
@@ -97,13 +96,15 @@ int main() {
               << stats_after.usage_percent() << "%\n";
     
     // Verify data integrity after compaction
-    auto* compacted_player = compacted.find<Player>(XBUFFER_ROOT_NAME).first; bool found2 = (compacted_player != nullptr);
-    if (found2) {
+    // compact_automatic returns XBuffer; wrap in XBufferExt for convenient access
+    XBufferExt compacted_ext(compacted.get_buffer()->data(), compacted.get_buffer()->size());
+    if (compacted_ext.has_root<Player>()) {
+        auto& compacted_player = compacted_ext.root<Player>();
         std::cout << "\n   [OK] Data integrity verified:\n";
-        std::cout << "     Name: " << compacted_player->name << "\n";
-        std::cout << "     Level: " << compacted_player->level << "\n";
+        std::cout << "     Name: " << compacted_player.name << "\n";
+        std::cout << "     Level: " << compacted_player.level << "\n";
         std::cout << "     Items: ";
-        for (int item : compacted_player->items) {
+        for (int item : compacted_player.items) {
             std::cout << item << " ";
         }
         std::cout << "\n";
