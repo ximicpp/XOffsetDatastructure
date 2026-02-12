@@ -22,10 +22,10 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include "../examples/player.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct StringTestData {
     template <typename Allocator>

@@ -3,12 +3,12 @@
 // Purpose: Test nonstatic_data_members_of and member queries
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <experimental/meta>
 #include <utility>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // Helper structure to cross compile-time/runtime boundary
 struct MemberInfo {

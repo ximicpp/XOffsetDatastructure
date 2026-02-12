@@ -1,7 +1,7 @@
-# XOffsetDatastructure2 — Core Formal Model
+# XOffsetDatastructure — Core Formal Model
 
 > Version 3.0 | 2026-02-11
-> This document defines the theoretical foundation of XOffsetDatastructure2.
+> This document defines the theoretical foundation of XOffsetDatastructure.
 > Every claim maps to code; every invariant maps to an enforcement mechanism.
 
 ---
@@ -17,7 +17,7 @@ Write:  In-memory objects  →  encode()  →  Wire format
 Read:   Wire format        →  decode()  →  In-memory objects
 ```
 
-XOffsetDatastructure2 eliminates both transformations:
+XOffsetDatastructure eliminates both transformations:
 
 ```
 Write:  Buffer bytes  →  (identity)  →  Buffer bytes

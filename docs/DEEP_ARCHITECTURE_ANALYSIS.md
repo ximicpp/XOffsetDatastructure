@@ -1,13 +1,13 @@
 # Deep Architecture Analysis — Industry Benchmark
 
-> XOffsetDatastructure2 v2.x | 914 lines | Single-header C++26 library
+> XOffsetDatastructure v2.x | 914 lines | Single-header C++26 library
 > Reviewed: 2026-02-11
 
 ---
 
 ## Executive Summary
 
-XOffsetDatastructure2 occupies a unique niche: **zero-encoding serialization via C++26 reflection
+XOffsetDatastructure occupies a unique niche: **zero-encoding serialization via C++26 reflection
 with compile-time type safety**. No other library combines these three properties. This analysis
 benchmarks the library's architecture against industry-leading alternatives across 6 dimensions.
 
@@ -362,7 +362,7 @@ and `basic_managed_memory_impl`'s methods. Users can bypass safety checks by cal
 
 ## §8 Conclusion
 
-XOffsetDatastructure2 is architecturally unique. No other library delivers:
+XOffsetDatastructure is architecturally unique. No other library delivers:
 1. **Zero-encoding + Zero-decoding** (both directions are zero-cost)
 2. **No IDL/schema files** (native C++ structs)
 3. **Compile-time safety** (static_assert at all entry points)

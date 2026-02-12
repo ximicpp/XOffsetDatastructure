@@ -9,9 +9,9 @@
 #include <functional>
 #include <memory>
 #include <any>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // ============================================================================
 // Test Data Structures

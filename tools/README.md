@@ -1,4 +1,4 @@
-# XOffsetDatastructure2 Tools
+# XOffsetDatastructure Tools
 
 ## Signature Export Tool (`export_signatures`)
 

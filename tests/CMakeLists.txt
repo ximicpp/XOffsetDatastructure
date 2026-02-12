@@ -123,7 +123,7 @@ message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR} reflection tests")
 # Display configuration summary
 message(STATUS "")
 message(STATUS "========================================")
-message(STATUS "  XOffsetDatastructure2 Test Summary")
+message(STATUS "  XOffsetDatastructure Test Summary")
 message(STATUS "========================================")
 message(STATUS "C++ Standard: C++26")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")

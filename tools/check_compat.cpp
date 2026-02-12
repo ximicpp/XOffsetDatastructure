@@ -1,5 +1,5 @@
 // ============================================================================
-// XOffsetDatastructure2 Cross-Platform Compatibility Check
+// XOffsetDatastructure Cross-Platform Compatibility Check
 //
 // Compares exported .sig.hpp files across platforms.
 // This file can be compiled with any C++17 compiler — P2996 is NOT required.

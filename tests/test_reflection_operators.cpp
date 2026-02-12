@@ -3,11 +3,11 @@
 // Purpose: Test basic reflection and splice operators
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct TestStruct {
     int x;
@@ -97,7 +97,7 @@ void test_container_types() {
     std::cout << "[Test 4] Container Types\n";
     std::cout << "------------------------\n";
     
-    // Reflect XOffsetDatastructure2 container types
+    // Reflect XOffsetDatastructure container types
     constexpr auto xvector_refl = ^^XVector<int>;
     constexpr auto xset_refl = ^^XSet<int>;
     constexpr auto xmap_refl = ^^XMap<int, double>;

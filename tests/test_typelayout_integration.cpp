@@ -1,15 +1,15 @@
 // ============================================================================
 // Test: TypeLayout Integration
-// Purpose: Verify boost::typelayout works correctly with XOffsetDatastructure2
+// Purpose: Verify boost::typelayout works correctly with XOffsetDatastructure
 //          Tests both Definition and Layout signature layers.
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <boost/typelayout.hpp>
 #include <iostream>
 #include <cassert>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 using namespace boost::typelayout;
 
 // ============================================================================
@@ -146,7 +146,7 @@ bool test_platform_prefix() {
 // ============================================================================
 
 bool test_container_signatures() {
-    std::cout << "\n[Test 4] XOffsetDatastructure2 Container Signatures\n";
+    std::cout << "\n[Test 4] XOffsetDatastructure Container Signatures\n";
     std::cout << std::string(50, '-') << "\n";
 
     constexpr auto sig_string = get_definition_signature<WithString>();

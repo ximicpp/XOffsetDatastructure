@@ -1,4 +1,4 @@
-# XOffsetDatastructure2 — Memory Lifecycle Analysis
+# XOffsetDatastructure — Memory Lifecycle Analysis
 
 > This document traces every memory operation in `examples/` line by line,
 > mapping each to the formal model (C1, C2, P1–P3, Domain A, Domain S).

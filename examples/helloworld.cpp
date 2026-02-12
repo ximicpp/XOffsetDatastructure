@@ -1,16 +1,16 @@
 // ============================================================================
-// XOffsetDatastructure2 Hello World Demo (C++26 Reflection Version)
+// XOffsetDatastructure Hello World Demo (C++26 Reflection Version)
 // Purpose: Simple introduction to basic usage
 // ============================================================================
 
 #include <iostream>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include "player.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 int main() {
-    std::cout << "\n=== XOffsetDatastructure2 Hello World (C++26) ===\n\n";
+    std::cout << "\n=== XOffsetDatastructure Hello World (C++26) ===\n\n";
     
     // 1. Create buffer
     std::cout << "1. Creating buffer...\n";

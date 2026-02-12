@@ -1,10 +1,10 @@
 // Test: Compile-time validation of polymorphic types
 // This test demonstrates that polymorphic types are REJECTED at compile-time
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // [GOOD]: Non-polymorphic type (no virtual functions)
 struct SafeData {

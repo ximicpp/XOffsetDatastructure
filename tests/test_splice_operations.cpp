@@ -3,13 +3,13 @@
 // Purpose: Test the splice operator [: :] in various scenarios
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
 #include <experimental/meta>
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct Point {
     int x;
@@ -106,7 +106,7 @@ void test_expression_splice() {
 }
 
 void test_xoffsetdatastructure_splice() {
-    std::cout << "[Test 5] XOffsetDatastructure2 Splice\n";
+    std::cout << "[Test 5] XOffsetDatastructure Splice\n";
     std::cout << "--------------------------------------\n";
     
     XBufferExt xbuf(1024);
@@ -134,7 +134,7 @@ void test_xoffsetdatastructure_splice() {
     std::cout << "    id: " << data->id << "\n";
     std::cout << "    value: " << data->value << "\n";
     
-    std::cout << "[PASS] XOffsetDatastructure2 splice\n\n";
+    std::cout << "[PASS] XOffsetDatastructure splice\n\n";
 }
 
 void test_const_member_splice() {
@@ -184,7 +184,7 @@ int main() {
     std::cout << "[PASS] Test 2: Member pointer splice\n";
     std::cout << "[PASS] Test 3: Type splice\n";
     std::cout << "[PASS] Test 4: Expression splice\n";
-    std::cout << "[PASS] Test 5: XOffsetDatastructure2 splice\n";
+    std::cout << "[PASS] Test 5: XOffsetDatastructure splice\n";
     std::cout << "[PASS] Test 6: Const member splice\n";
     std::cout << "\n[SUCCESS] All splice operation tests passed!\n";
     

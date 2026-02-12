@@ -3,12 +3,12 @@
 // Purpose: Test reflection in memory optimization scenarios
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct CompactData {
     uint32_t id;

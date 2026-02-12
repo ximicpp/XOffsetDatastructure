@@ -23,7 +23,7 @@ struct TestCase {
 int main() {
     std::cout << "\n";
     std::cout << "========================================================================\n";
-    std::cout << "  XOffsetDatastructure2 Test Suite\n";
+    std::cout << "  XOffsetDatastructure Test Suite\n";
     std::cout << "========================================================================\n";
     
     std::vector<TestCase> tests = {

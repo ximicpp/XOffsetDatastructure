@@ -255,7 +255,7 @@ echo
 echo "   # Legacy syntax (if modern fails):"
 echo "   clang++ -std=c++2c -freflection-latest your_file.cpp"
 echo
-echo "3. Build XOffsetDatastructure2:"
+echo "3. Build XOffsetDatastructure:"
 echo "   cd /mnt/g/workspace/XOffsetDatastructure"
 echo "   ./build_cpp26_wsl.sh"
 echo

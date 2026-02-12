@@ -21,7 +21,7 @@ If the memory layout differs even slightly between writer and reader—due to pa
 Our existing implementation (`main` branch) uses **Boost.PFR** for aggregate introspection:
 
 ```cpp
-// main branch: xoffsetdatastructure2.hpp, line 56
+// main branch: xoffsetdatastructure.hpp, line 56
 #include <boost/pfr.hpp>
 
 // line 213: Getting field types via Boost.PFR
@@ -38,7 +38,7 @@ This approach achieves **partial** safety—it can verify structure (types and o
 3. **Manual Workaround Required**: To capture names, users must manually define a `_field_names` array:
 
 ```cpp
-// main branch: xoffsetdatastructure2.hpp, lines 233-247
+// main branch: xoffsetdatastructure.hpp, lines 233-247
 template<typename T, typename = void>
 struct has_field_names : std::false_type {};
 
@@ -59,7 +59,7 @@ This workaround is **error-prone** and defeats the purpose of "automatic" reflec
 The `next_cpp26` branch demonstrates how **C++26 Static Reflection (P2996)** closes this gap:
 
 ```cpp
-// next_cpp26 branch: xoffsetdatastructure2.hpp, line 43
+// next_cpp26 branch: xoffsetdatastructure.hpp, line 43
 #include <experimental/meta>
 
 // line 200-205: Direct member introspection
@@ -81,7 +81,7 @@ With complete reflection, we can implement features that were **impossible** wit
 
 **main branch (NOT implemented):**
 ```cpp
-// main branch: xoffsetdatastructure2.hpp, lines 855-862
+// main branch: xoffsetdatastructure.hpp, lines 855-862
 class XBufferCompactor {
 public:
     template<typename T>
@@ -96,7 +96,7 @@ public:
 
 **next_cpp26 branch (FULLY implemented):**
 ```cpp
-// next_cpp26 branch: xoffsetdatastructure2.hpp, lines 626-810
+// next_cpp26 branch: xoffsetdatastructure.hpp, lines 626-810
 class XBufferCompactor {
 public:
     template<typename T>

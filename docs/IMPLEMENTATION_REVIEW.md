@@ -1,7 +1,7 @@
-# Implementation Review — XOffsetDatastructure2
+# Implementation Review — XOffsetDatastructure
 
 > Reviewed at commit `c887e5b4` (next_cpp26), 2026-02-11
-> File under review: `xoffsetdatastructure2.hpp` (881 lines)
+> File under review: `xoffsetdatastructure.hpp` (881 lines)
 
 ---
 

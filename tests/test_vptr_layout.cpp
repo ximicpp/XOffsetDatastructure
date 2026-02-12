@@ -1,8 +1,8 @@
 // Test: Verify vptr in polymorphic class
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // Non-polymorphic class
 class NonPolymorphic {

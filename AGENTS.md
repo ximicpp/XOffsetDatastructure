@@ -147,7 +147,7 @@ ctest -R "test_basic_types" --verbose
 
 ### TypeLayout Library (external dependency)
 TypeLayout is integrated as a Git submodule at `external/typelayout`.
-It provides the type-signature engine used by XOffsetDatastructure2.
+It provides the type-signature engine used by XOffsetDatastructure.
 
 ```bash
 # Initialize submodules (required after fresh clone)
@@ -162,7 +162,7 @@ git submodule update --init --recursive
 ### File Organization
 - **Header files**: Use `.hpp` extension
 - **Source files**: Use `.cpp` extension
-- **Main library**: `xoffsetdatastructure2.hpp` (single header library)
+- **Main library**: `xoffsetdatastructure.hpp` (single header library)
 - **Tests**: Organized in `tests/` directory with descriptive names
 - **Examples**: Organized in `examples/` directory
 
@@ -179,7 +179,7 @@ git submodule update --init --recursive
 #endif
 
 // 3. Main library header
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
 // 4. Local headers
 #include "game_data.hpp"
@@ -188,7 +188,7 @@ git submodule update --init --recursive
 ### Namespace Conventions
 ```cpp
 // Main library namespace
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // Type signatures (provided by TypeLayout library)
 using namespace boost::typelayout;
@@ -231,9 +231,9 @@ bool test_function() {
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // Test data structures
 struct TestStruct {

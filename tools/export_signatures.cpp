@@ -1,5 +1,5 @@
 // ============================================================================
-// XOffsetDatastructure2 Signature Export Tool
+// XOffsetDatastructure Signature Export Tool
 //
 // Exports type signatures for Player, Item, and GameData to .sig.hpp files.
 // Compile with P2996 Clang, run: ./export_signatures [output_dir]
@@ -9,7 +9,7 @@
 //   ./export_signatures tools/sigs/  # Write to tools/sigs/<platform>.sig.hpp
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include "../examples/player.hpp"
 #include "../examples/game_data.hpp"
 
