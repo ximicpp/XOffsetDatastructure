@@ -77,7 +77,7 @@ void test_memory_usage_tracking() {
     // Create data
     auto* data = xbuf.make<CompactData>();
     data->id = 1001;
-    data->name = XString("TestObject", xbuf.allocator<XString>());
+    data->name = "0";
     
     for (int i = 0; i < 100; ++i) {
         data->values.push_back(i);
@@ -101,7 +101,7 @@ void test_compaction_with_reflection() {
     auto* data = xbuf.make<CompactData>();
     
     data->id = 2002;
-    data->name = XString("CompactionTest", xbuf.allocator<XString>());
+    data->name = "0";
     for (int i = 0; i < 50; ++i) {
         data->values.push_back(i * 2);
     }
@@ -143,7 +143,7 @@ void test_grow_and_verify() {
     auto* data = xbuf.make<CompactData>();
     
     data->id = 3003;
-    data->name = XString("GrowTest", xbuf.allocator<XString>());
+    data->name = "0";
     
     std::cout << "  Initial buffer: " << xbuf.stats().total_size << " bytes\n";
     
@@ -172,7 +172,7 @@ void test_serialization_size() {
     auto* data = xbuf.make<CompactData>();
     
     data->id = 4004;
-    data->name = XString("SerializationTest", xbuf.allocator<XString>());
+    data->name = "0";
     for (int i = 0; i < 20; ++i) {
         data->values.push_back(i);
     }

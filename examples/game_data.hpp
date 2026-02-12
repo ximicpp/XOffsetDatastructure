@@ -11,17 +11,29 @@ using namespace XOffsetDatastructure2;
 
 class alignas(8) Item {
 public:
-	// Default constructor
+	using allocator_type = XAllocator;
+
+	// Default allocator constructor (suffix mode — required by uses_allocator protocol)
 	template <typename Allocator>
+		requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
 	Item(Allocator allocator) : name(allocator) {}
 
-	// Full constructor for emplace_back
+	// Full constructor (suffix mode — allocator last)
 	template <typename Allocator>
-	Item(Allocator allocator, int item_id_val, int item_type_val, int quantity_val, const char* name_val)
+	Item(int item_id_val, int item_type_val, int quantity_val, const char* name_val, Allocator allocator)
 		: item_id(item_id_val)
 		, item_type(item_type_val)
 		, quantity(quantity_val)
 		, name(name_val, allocator)
+	{}
+
+	// Move + allocator constructor (required for vector reallocation)
+	template <typename Allocator>
+	Item(Item&& other, Allocator allocator)
+		: item_id(other.item_id)
+		, item_type(other.item_type)
+		, quantity(other.quantity)
+		, name(std::move(other.name), allocator)
 	{}
 
 	int32_t item_id{0};
@@ -36,25 +48,13 @@ public:
 
 class alignas(8) GameData {
 public:
-	// Default constructor
+	// Default constructor (suffix mode)
 	template <typename Allocator>
 	GameData(Allocator allocator) 
 		: player_name(allocator)
 		, items(allocator)
 		, achievements(allocator)
 		, quest_progress(allocator) 
-	{}
-
-	// Full constructor for emplace_back
-	template <typename Allocator>
-	GameData(Allocator allocator, int player_id_val, int level_val, float health_val, const char* player_name_val)
-		: player_id(player_id_val)
-		, level(level_val)
-		, health(health_val)
-		, player_name(player_name_val, allocator)
-		, items(allocator)
-		, achievements(allocator)
-		, quest_progress(allocator)
 	{}
 
 	int32_t player_id{0};

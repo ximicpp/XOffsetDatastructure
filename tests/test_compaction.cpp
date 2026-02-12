@@ -35,7 +35,7 @@ bool test_memory_compaction() {
     }
     for (int i = 0; i < 20; ++i) {
         std::string str = "TestString_" + std::to_string(i);
-        obj->strings.emplace_back(str.c_str(), xbuf.get_segment_manager());
+        obj->strings.push_back(str.c_str());
     }
     std::cout << "[OK]\n";
     

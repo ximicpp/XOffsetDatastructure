@@ -118,6 +118,46 @@ static_assert(is_xbuffer_safe<Player>::value,
               "Player contains unsafe types for XBuffer");
 ```
 
+#### Rule 5: Automatic Allocator Propagation
+
+**Container operations automatically inject the buffer's allocator.** You never need to pass `get_segment_manager()` when using XVector, XMap, or XSet.
+
+```cpp
+XBufferExt xbuf(4096);
+auto* data = xbuf.make<MyData>();
+
+// ✅ Just use containers like STL — allocator is injected automatically
+data->names.push_back("Alice");          // XVector<XString>
+data->names.insert(it, "Bob");
+data->scores.emplace("Alice", 95);       // XMap<XString, int>
+data->scores["Bob"] = 88;
+data->scores.erase("Alice");
+data->tags.insert("vip");                // XSet<XString>
+```
+
+For **user-defined types** stored in containers, add `allocator_type` to enable automatic allocator injection:
+
+```cpp
+struct InnerObject {
+    using allocator_type = XAllocator;   // ← enables automatic injection
+
+    template <typename Allocator>
+        requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
+    InnerObject(Allocator alloc) : data(alloc) {}
+
+    // Move + allocator constructor (required for vector reallocation)
+    template <typename Allocator>
+    InnerObject(InnerObject&& other, Allocator alloc)
+        : data(std::move(other.data), alloc) {}
+
+    XVector<int> data;
+};
+
+// Now emplace_back() works without manually passing the allocator
+XVector<InnerObject> vec(sm);
+vec.emplace_back();  // allocator auto-injected ✅
+```
+
 ### Type Signature System (powered by TypeLayout)
 
 XOffsetDatastructure uses [TypeLayout](https://github.com/ximicpp/TypeLayout) as its type-signature engine. TypeLayout provides a two-layer compile-time signature system:

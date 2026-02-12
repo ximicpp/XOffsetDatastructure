@@ -114,7 +114,7 @@ void test_xoffsetdatastructure_splice() {
     
     data->id = 1001;
     data->value = 99.99;
-    data->name = XString("TestData", xbuf.allocator<XString>());
+    data->name = "TestData";
     
     std::cout << "  Original:\n";
     std::cout << "    id: " << data->id << "\n";

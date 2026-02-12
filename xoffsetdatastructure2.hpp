@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 // TypeLayout library — the authoritative type-signature engine
@@ -52,6 +53,7 @@
 //   - boost::typelayout::definition_signatures_match<T1, T2>()
 //   - boost::typelayout::layout_signatures_match<T1, T2>()
 #include <boost/typelayout.hpp>
+#include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
 // Target Architecture Definition
@@ -416,33 +418,237 @@ namespace XOffsetDatastructure2 {
         using x_vector_options = boost::container::vector_options_t<
             boost::container::growth_factor<growth_factor_custom>>;
 
+        /// Scoped allocator adaptor: automatically propagates the allocator
+        /// to element construction via allocator_traits::construct().
+        /// This is the C++ standard answer to "allocator propagation in
+        /// nested containers" (N2554, scoped_allocator_adaptor).
+        /// Zero overhead: inherits from OuterAlloc, adds no data members.
+        template <typename T>
+        using x_scoped_alloc = boost::container::scoped_allocator_adaptor<
+            boost::interprocess::allocator<T, XBuffer::segment_manager>>;
+
         /// Internal vector alias used as backing store for flat containers
         template <typename T>
         using x_vector_impl = boost::container::vector<
-            T, allocator<T, XBuffer::segment_manager>, x_vector_options>;
+            T, x_scoped_alloc<T>, x_vector_options>;
+
+        /// Internal flat_map alias
+        template <typename K, typename V>
+        using x_map_impl = boost::container::flat_map<K, V, std::less<void>,
+            x_vector_impl<std::pair<K, V>>>;
+
+        /// Internal flat_set alias
+        template <typename T>
+        using x_set_impl = boost::container::flat_set<T, std::less<void>, x_vector_impl<T>>;
+
     } // namespace detail
-
-    // ========================================================================
-    // Public Container Aliases
-    // ========================================================================
-
-    /// Managed vector with 1.1x growth factor
-    template <typename T>
-    using XVector = detail::x_vector_impl<T>;
-
-    /// Managed flat_set with transparent comparator (supports heterogeneous lookup)
-    template <typename T>
-    using XSet = boost::container::flat_set<T, std::less<void>, detail::x_vector_impl<T>>;
-
-    /// Managed flat_map with transparent comparator (supports heterogeneous lookup,
-    /// e.g. map.find("key") without constructing a temporary XString)
-    template <typename K, typename V>
-    using XMap = boost::container::flat_map<K, V, std::less<void>,
-        detail::x_vector_impl<std::pair<K, V>>>;
 
     /// Managed string with shared-memory allocator
     using XString = boost::container::basic_string<
         char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
+
+    /// Convenience allocator typedef for user-defined allocator-aware types.
+    /// Usage:  using allocator_type = XAllocator;
+    using XAllocator = boost::interprocess::allocator<char, XBuffer::segment_manager>;
+
+    // ========================================================================
+    // Public Container Wrapper Classes
+    //
+    // Two layers of allocator convenience:
+    //   Layer 1: scoped_allocator_adaptor — auto-injects allocator in all
+    //            emplace/emplace_back/emplace_hint paths (via construct()).
+    //   Layer 2: Wrapper overloads below — cover push_back, insert, operator[],
+    //            erase, resize, assign where the base API signature requires
+    //            a fully-constructed T or key_type.
+    //
+    // Detection logic (requires constraints):
+    //   "If args can't directly construct T, but (args..., SM*) can → inject SM*"
+    //   "If key arg isn't convertible to K → use find + emplace"
+    // ========================================================================
+
+    /// Managed vector with 1.1x growth factor and automatic allocator propagation.
+    template <typename T>
+    class XVector : public detail::x_vector_impl<T> {
+        using Base = detail::x_vector_impl<T>;
+        using SM = XBuffer::segment_manager;
+        auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
+
+    public:
+        using Base::Base;           // inherit all constructors
+        using Base::push_back;      // keep base push_back(const T&), push_back(T&&)
+        using Base::insert;         // keep all base insert overloads
+        using Base::resize;
+        using Base::assign;
+
+        // --- Overloads for allocator-aware element types ---
+        // These forward to emplace so scoped_allocator_adaptor can inject
+        // the allocator. The requires constraint activates when:
+        //   1. T has an allocator_type (i.e. T is allocator-aware), AND
+        //   2. Arg is NOT the same type as T (so T itself still routes to base).
+        //
+        // We use !is_same<decay_t<Arg>, T> instead of !is_convertible because
+        // is_convertible only checks constructor declaration signatures, not
+        // bodies. Boost.Interprocess allocators have no default constructor,
+        // so basic_string(const char*) is declared (is_convertible says true)
+        // but instantiation fails (hard error). is_same avoids this entirely.
+
+        template<typename Arg>
+            requires (requires { typename T::allocator_type; } &&
+                      !std::is_same_v<std::decay_t<Arg>, T>)
+        void push_back(Arg&& arg) {
+            Base::emplace_back(std::forward<Arg>(arg));
+        }
+
+        template<typename Arg>
+            requires (requires { typename T::allocator_type; } &&
+                      !std::is_same_v<std::decay_t<Arg>, T>)
+        typename Base::iterator insert(typename Base::const_iterator pos, Arg&& arg) {
+            return Base::emplace(pos, std::forward<Arg>(arg));
+        }
+
+        template<typename Arg>
+            requires (requires { typename T::allocator_type; } &&
+                      !std::is_same_v<std::decay_t<Arg>, T>)
+        typename Base::iterator insert(typename Base::const_iterator pos,
+                                       typename Base::size_type n, Arg&& arg) {
+            T tmp(std::forward<Arg>(arg), sm());
+            return Base::insert(pos, n, tmp);
+        }
+
+        template<typename Arg>
+            requires (requires { typename T::allocator_type; } &&
+                      !std::is_same_v<std::decay_t<Arg>, T>)
+        void resize(typename Base::size_type n, Arg&& arg) {
+            T tmp(std::forward<Arg>(arg), sm());
+            Base::resize(n, tmp);
+        }
+
+        template<typename Arg>
+            requires (requires { typename T::allocator_type; } &&
+                      !std::is_same_v<std::decay_t<Arg>, T>)
+        void assign(typename Base::size_type n, Arg&& arg) {
+            T tmp(std::forward<Arg>(arg), sm());
+            Base::assign(n, tmp);
+        }
+    };
+
+    /// Managed flat_map with transparent comparator and automatic allocator propagation.
+    template <typename K, typename V>
+    class XMap : public detail::x_map_impl<K, V> {
+        using Base = detail::x_map_impl<K, V>;
+        using SM = XBuffer::segment_manager;
+        auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
+
+    public:
+        using Base::Base;
+        using Base::operator[];
+        using Base::erase;
+        using Base::try_emplace;
+        using Base::insert_or_assign;
+
+        // --- operator[](key): heterogeneous key that needs allocator ---
+        // Uses piecewise_construct so that V is constructed via
+        // scoped_allocator_adaptor::construct() with zero args, which
+        // auto-injects the allocator when V is allocator-aware (e.g. XString).
+        // This avoids the hard error from V{} when V has no default ctor.
+        template<typename KeyArg>
+            requires (!std::is_same_v<std::decay_t<KeyArg>, K>)
+        V& operator[](const KeyArg& key) {
+            auto it = this->find(key);  // transparent comparator
+            if (it != this->end()) return it->second;
+            auto result = this->emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(key),
+                std::forward_as_tuple());
+            return result.first->second;
+        }
+
+        // --- erase(key): heterogeneous key ---
+        template<typename KeyArg>
+            requires (!std::is_same_v<std::decay_t<KeyArg>, K> &&
+                      !std::is_convertible_v<const KeyArg&, typename Base::const_iterator>)
+        typename Base::size_type erase(const KeyArg& key) {
+            auto it = this->find(key);
+            if (it == this->end()) return 0;
+            Base::erase(it);
+            return 1;
+        }
+
+        // --- try_emplace(key, args...): heterogeneous key ---
+        // Uses piecewise_construct to ensure pair::first and pair::second
+        // are each constructed through dispatch_uses_allocator individually.
+        template<typename KeyArg, typename... Args>
+            requires (!std::is_same_v<std::decay_t<KeyArg>, K>)
+        std::pair<typename Base::iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
+            auto it = this->find(key);
+            if (it != this->end()) return {it, false};
+            return this->emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(std::forward<KeyArg>(key)),
+                std::forward_as_tuple(std::forward<Args>(args)...));
+        }
+
+        // --- insert_or_assign(key, obj): heterogeneous key ---
+        template<typename KeyArg, typename M>
+            requires (!std::is_same_v<std::decay_t<KeyArg>, K>)
+        std::pair<typename Base::iterator, bool> insert_or_assign(KeyArg&& key, M&& obj) {
+            auto it = this->find(key);
+            if (it != this->end()) {
+                it->second = std::forward<M>(obj);
+                return {it, false};
+            }
+            return this->emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(std::forward<KeyArg>(key)),
+                std::forward_as_tuple(std::forward<M>(obj)));
+        }
+    };
+
+    /// Managed flat_set with transparent comparator and automatic allocator propagation.
+    template <typename T>
+    class XSet : public detail::x_set_impl<T> {
+        using Base = detail::x_set_impl<T>;
+        using SM = XBuffer::segment_manager;
+
+    public:
+        using Base::Base;
+        using Base::insert;
+        using Base::erase;
+
+        // --- insert(val): when val can't convert to T directly ---
+        template<typename Arg>
+            requires (!std::is_same_v<std::decay_t<Arg>, T>)
+        std::pair<typename Base::iterator, bool> insert(const Arg& val) {
+            return this->emplace(val);  // scoped_alloc handles T construction
+        }
+
+        // --- insert(pos, val): hint version ---
+        template<typename Arg>
+            requires (!std::is_same_v<std::decay_t<Arg>, T>)
+        typename Base::iterator insert(typename Base::const_iterator pos, const Arg& val) {
+            return this->emplace_hint(pos, val);
+        }
+
+        // --- erase(key): heterogeneous key ---
+        template<typename KeyArg>
+            requires (!std::is_same_v<std::decay_t<KeyArg>, T> &&
+                      !std::is_convertible_v<const KeyArg&, typename Base::const_iterator>)
+        typename Base::size_type erase(const KeyArg& key) {
+            auto it = this->find(key);
+            if (it == this->end()) return 0;
+            Base::erase(it);
+            return 1;
+        }
+    };
+
+    // Verify wrapper classes add zero overhead — same size as the underlying
+    // container implementation (no extra data members).
+    static_assert(sizeof(XVector<int>) == sizeof(detail::x_vector_impl<int>),
+        "XVector wrapper must be zero-overhead");
+    static_assert(sizeof(XMap<int,int>) == sizeof(detail::x_map_impl<int,int>),
+        "XMap wrapper must be zero-overhead");
+    static_assert(sizeof(XSet<int>) == sizeof(detail::x_set_impl<int>),
+        "XSet wrapper must be zero-overhead");
 
     class XBufferVisualizer {
     public:

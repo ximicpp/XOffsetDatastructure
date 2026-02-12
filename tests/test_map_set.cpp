@@ -52,7 +52,7 @@ bool test_map_set_operations() {
     std::cout << "Test 3: String set operations... ";
     for (int i = 0; i < 10; ++i) {
         std::string str = "Item_" + std::to_string(i);
-        obj->stringSet.emplace(str.c_str(), xbuf.get_segment_manager());
+        obj->stringSet.emplace(str.c_str());
     }
     assert(obj->stringSet.size() == 10);
     std::cout << "[OK]\n";
@@ -61,8 +61,8 @@ bool test_map_set_operations() {
     std::cout << "Test 4: Map insertion... ";
     for (int i = 0; i < 20; ++i) {
         std::string value = "Value_" + std::to_string(i);
-        XString xvalue(value.c_str(), xbuf.get_segment_manager());
-        obj->intMap.emplace(i, xvalue);
+        
+        obj->intMap.emplace(i, value.c_str());
     }
     assert(obj->intMap.size() == 20);
     std::cout << "[OK]\n";
@@ -78,13 +78,13 @@ bool test_map_set_operations() {
     std::cout << "Test 6: String key map... ";
     for (int i = 0; i < 15; ++i) {
         std::string key = "Key_" + std::to_string(i);
-        XString xkey(key.c_str(), xbuf.get_segment_manager());
-        obj->stringMap.emplace(xkey, i * 10);
+        
+        obj->stringMap.emplace(key.c_str(), i * 10);
     }
     assert(obj->stringMap.size() == 15);
     
-    XString search_key("Key_5", xbuf.get_segment_manager());
-    auto it2 = obj->stringMap.find(search_key);
+    
+    auto it2 = obj->stringMap.find("Key_5");
     assert(it2 != obj->stringMap.end());
     assert(it2->second == 50);
     std::cout << "[OK]\n";

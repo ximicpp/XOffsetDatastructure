@@ -120,7 +120,7 @@ void test_instance_creation() {
     
     obj->a = 42;
     obj->b = 3.14;
-    obj->c = XString("test_string", xbuf.allocator<XString>());
+    obj->c = "0";
     obj->d.push_back(1);
     obj->d.push_back(2);
     obj->d.push_back(3);

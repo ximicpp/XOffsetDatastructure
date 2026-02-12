@@ -118,7 +118,7 @@ void test_reflection_with_instances() {
     
     obj->x = 42;
     obj->y = 3.14;
-    obj->name = XString("ReflectionTest", xbuf.allocator<XString>());
+    obj->name = "0";
     
     std::cout << "  Created instance:\n";
     std::cout << "    x = " << obj->x << "\n";

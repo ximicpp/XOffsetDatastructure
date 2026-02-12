@@ -129,9 +129,9 @@ bool test_vector_of_strings() {
 
     // Test 8: Add strings to vector using emplace_back
     std::cout << "Test 8: Populate vector... ";
-    data->names.emplace_back("Initial1", xbuf.get_segment_manager());
-    data->names.emplace_back("Initial2", xbuf.get_segment_manager());
-    data->names.emplace_back("Initial3", xbuf.get_segment_manager());
+    data->names.push_back("Initial1");
+    data->names.push_back("Initial2");
+    data->names.push_back("Initial3");
     assert(data->names.size() == 3);
     std::cout << "[OK]\n";
 
