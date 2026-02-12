@@ -138,8 +138,17 @@ void demo_memory_management() {
     print_info("After Adding Data", std::to_string(stats.used_size) + " bytes used");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     
-    print_subsection("Growing Buffer");
+    // ── Rule 1: Pointer Invalidation ──
+    // grow() may relocate the underlying buffer, invalidating all existing
+    // pointers.  Always re-acquire pointers through root<T>() after grow().
+    print_subsection("Growing Buffer (Pointer Invalidation Demo)");
     xbuf.grow(4096);
+    // ⚠  'game' is now DANGLING — the buffer has been relocated.
+    //    Re-acquire through root<T>() before any further access.
+    if (xbuf.has_root<GameData>()) {
+        game = &xbuf.root<GameData>();
+        print_check("Pointer re-acquired after grow()");
+    }
     stats = xbuf.stats();
     print_info("New Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
@@ -147,6 +156,10 @@ void demo_memory_management() {
     
     print_subsection("Shrinking to Fit");
     xbuf.shrink_to_fit();
+    // shrink_to_fit() may also relocate — re-acquire again.
+    if (xbuf.has_root<GameData>()) {
+        game = &xbuf.root<GameData>();
+    }
     stats = xbuf.stats();
     print_info("After Shrink", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
@@ -179,19 +192,19 @@ void demo_serialization() {
     
     print_subsection("Deserializing from Binary");
     XBufferExt dst_buf = XBufferExt::load_from_string(binary_data);
-    auto* dst_game = dst_buf.find<GameData>(XBUFFER_ROOT_NAME).first;
     
-    if (dst_game) {
+    if (dst_buf.has_root<GameData>()) {
+        auto& dst_game = dst_buf.root<GameData>();
         print_check("Deserialization successful!");
-        print_info("Player", std::string(dst_game->player_name.c_str()));
-        print_info("Player ID", std::to_string(dst_game->player_id));
-        print_info("Level", std::to_string(dst_game->level));
+        print_info("Player", std::string(dst_game.player_name.c_str()));
+        print_info("Player ID", std::to_string(dst_game.player_id));
+        print_info("Level", std::to_string(dst_game.level));
         
         // Verify integrity
         bool integrity_ok = (
-            std::string(dst_game->player_name.c_str()) == "SavedHero" &&
-            dst_game->player_id == 99999 &&
-            dst_game->level == 99
+            std::string(dst_game.player_name.c_str()) == "SavedHero" &&
+            dst_game.player_id == 99999 &&
+            dst_game.level == 99
         );
         
         if (integrity_ok) {
@@ -302,21 +315,26 @@ void demo_automatic_compaction() {
     print_check("Memory compacted successfully!");
     
     print_subsection("Data Integrity Verification");
-    auto* compacted_game = compacted.find<GameData>(XBUFFER_ROOT_NAME).first; bool found = (compacted_game != nullptr);
-    if (found) {
+    // compact_automatic returns XBuffer (base class).
+    // Wrap it in XBufferExt to access the ergonomic root<T>() API.
+    XBufferExt compacted_ext(compacted.get_buffer()->data(),
+                             compacted.get_buffer()->size());
+    
+    if (compacted_ext.has_root<GameData>()) {
+        auto& compacted_game = compacted_ext.root<GameData>();
         bool integrity_ok = (
-            std::string(compacted_game->player_name.c_str()) == "FragmentedHero" &&
-            compacted_game->player_id == 77777 &&
-            compacted_game->level == 50 &&
-            compacted_game->items.size() == 17 &&  // 20 - 3 removed
-            compacted_game->achievements.size() == 50
+            std::string(compacted_game.player_name.c_str()) == "FragmentedHero" &&
+            compacted_game.player_id == 77777 &&
+            compacted_game.level == 50 &&
+            compacted_game.items.size() == 17 &&  // 20 - 3 removed
+            compacted_game.achievements.size() == 50
         );
         
         if (integrity_ok) {
             print_check("All data verified after compaction");
-            print_info("Player Name", std::string(compacted_game->player_name.c_str()));
-            print_info("Items Count", std::to_string(compacted_game->items.size()));
-            print_info("Achievements", std::to_string(compacted_game->achievements.size()));
+            print_info("Player Name", std::string(compacted_game.player_name.c_str()));
+            print_info("Items Count", std::to_string(compacted_game.items.size()));
+            print_info("Achievements", std::to_string(compacted_game.achievements.size()));
         } else {
             std::cout << "  [FAIL] Data integrity check failed\n";
         }
