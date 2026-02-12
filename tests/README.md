@@ -1,6 +1,6 @@
-# XOffsetDatastructure2 Tests
+# XOffsetDatastructure Tests
 
-This directory contains comprehensive test cases for the XOffsetDatastructure2 library.
+This directory contains comprehensive test cases for the XOffsetDatastructure library.
 
 ## Test Files
 
@@ -171,7 +171,7 @@ Common exceptions:
 
 ### Build Errors
 If tests don't compile:
-- Ensure `xoffsetdatastructure2.hpp` is in the parent directory
+- Ensure `xoffsetdatastructure.hpp` is in the parent directory
 - Check Boost library paths
 - Verify C++17 or later compiler support
 
@@ -180,7 +180,7 @@ If tests don't compile:
 ## 🆕 C++26 Reflection Tests (NEW!)
 
 ### Purpose
-Test C++26 reflection features (P2996) with XOffsetDatastructure2.
+Test C++26 reflection features (P2996) with XOffsetDatastructure.
 
 ### Quick Start
 

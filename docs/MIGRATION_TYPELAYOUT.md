@@ -1,7 +1,7 @@
 # Migration Guide: XTypeSignature → TypeLayout
 
 This guide covers the migration from the legacy `XTypeSignature` API (removed) to the
-`boost::typelayout` library, which is now the sole type-signature engine in XOffsetDatastructure2.
+`boost::typelayout` library, which is now the sole type-signature engine in XOffsetDatastructure.
 
 > **Note**: The `XTypeSignature` compatibility namespace has been fully removed.
 > All code must use `boost::typelayout` directly.
@@ -34,8 +34,8 @@ class alignas(XTypeSignature::BASIC_ALIGNMENT) MyClass { ... };
 ### After (current API)
 
 ```cpp
-#include "xoffsetdatastructure2.hpp"
-// boost::typelayout is already included via xoffsetdatastructure2.hpp
+#include "xoffsetdatastructure.hpp"
+// boost::typelayout is already included via xoffsetdatastructure.hpp
 
 // Generate signature (definition layer — includes field names)
 constexpr auto sig = boost::typelayout::get_definition_signature<MyStruct>();
@@ -96,7 +96,7 @@ TypeLayout provides two signature layers:
 
 ## Container Specializations
 
-XOffsetDatastructure2 containers (XString, XVector, XSet, XMap) are registered
+XOffsetDatastructure containers (XString, XVector, XSet, XMap) are registered
 in `boost::typelayout` namespace. They produce opaque signatures with fixed size:
 
 | Container | Signature |

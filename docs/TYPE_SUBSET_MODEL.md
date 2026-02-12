@@ -60,7 +60,7 @@ static_assert(sizeof(int32_t) == 4); // line 69
 架构定义为 `constexpr` 结构体，预置多种常见架构，通过 `using` 选择当前目标：
 
 ```cpp
-namespace XOffsetDatastructure2 {
+namespace XOffsetDatastructure {
 
     /// 架构规格描述符
     struct ArchSpec {

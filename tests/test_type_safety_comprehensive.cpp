@@ -1,8 +1,8 @@
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <cassert>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // ============================================================================
 // Test 1: Basic Types (Should PASS)

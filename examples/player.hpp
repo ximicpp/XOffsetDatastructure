@@ -1,9 +1,9 @@
 #ifndef PLAYER_HPP_
 #define PLAYER_HPP_
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 class alignas(8) Player {
 public:

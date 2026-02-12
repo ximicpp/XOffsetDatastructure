@@ -3,13 +3,13 @@
 // Purpose: Test reflection for comparison and validation operations
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
 #include <experimental/meta>
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct ComparableData {
     int x;

@@ -1,6 +1,6 @@
 # Examples
 
-Quick-start examples for XOffsetDatastructure2.
+Quick-start examples for XOffsetDatastructure.
 
 | File | Purpose |
 |------|---------|
@@ -26,7 +26,7 @@ After building, run the examples directly:
 
 ```bash
 ./build/bin/helloworld
-./build/bin/xoffsetdatastructure2_demo
+./build/bin/xoffsetdatastructure_demo
 ```
 
 ## Start Here: helloworld.cpp

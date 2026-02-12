@@ -3,13 +3,13 @@
 // Purpose: Test type queries and introspection APIs
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 
 #include <experimental/meta>
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct ComplexType {
     int x;
@@ -200,7 +200,7 @@ void test_container_introspection() {
     std::cout << "[Test 7] Container Type Introspection\n";
     std::cout << "--------------------------------------\n";
     
-    std::cout << "  XOffsetDatastructure2 containers:\n";
+    std::cout << "  XOffsetDatastructure containers:\n";
     std::cout << "    XVector<int>: " << display_string_of(^^XVector<int>) << "\n";
     std::cout << "    XVector<double>: " << display_string_of(^^XVector<double>) << "\n";
     std::cout << "    XSet<int>: " << display_string_of(^^XSet<int>) << "\n";

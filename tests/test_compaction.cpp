@@ -5,9 +5,9 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct CompactTestType {
     template <typename Allocator>

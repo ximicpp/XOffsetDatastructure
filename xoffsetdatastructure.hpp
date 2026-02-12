@@ -1,5 +1,5 @@
-#ifndef X_OFFSET_DATA_STRUCTURE_2_HPP
-#define X_OFFSET_DATA_STRUCTURE_2_HPP
+#ifndef X_OFFSET_DATA_STRUCTURE_HPP
+#define X_OFFSET_DATA_STRUCTURE_HPP
 
 #if defined(_MSC_VER)
     #define TYPESIG_PLATFORM_WINDOWS 1
@@ -29,10 +29,10 @@
 
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
     #if !XOFFSET_ARCH_64BIT
-        #error "XOffsetDatastructure2 requires 64-bit architecture"
+        #error "XOffsetDatastructure requires 64-bit architecture"
     #endif
     #if !XOFFSET_LITTLE_ENDIAN
-        #error "XOffsetDatastructure2 requires little-endian architecture"
+        #error "XOffsetDatastructure requires little-endian architecture"
     #endif
 #endif
 
@@ -63,7 +63,7 @@
 //   S (Safe Type Subset) — what types can be stored
 // Zero-copy safety = Platform ∈ A ∧ Type ∈ S
 // ============================================================================
-namespace XOffsetDatastructure2 {
+namespace XOffsetDatastructure {
 
     /// Architecture specification descriptor (pure data, no logic)
     struct ArchSpec {
@@ -121,31 +121,31 @@ namespace XOffsetDatastructure2 {
     /// Active target architecture. Change this line to switch presets.
     inline constexpr ArchSpec TargetArchitecture = Arch64LE;
 
-} // namespace XOffsetDatastructure2
+} // namespace XOffsetDatastructure
 
 // ============================================================================
 // Platform validation: current compiler environment ∈ TargetArchitecture
 // ============================================================================
-static_assert(sizeof(void*) == XOffsetDatastructure2::TargetArchitecture.pointer_size,
+static_assert(sizeof(void*) == XOffsetDatastructure::TargetArchitecture.pointer_size,
     "Platform pointer size does not match TargetArchitecture");
-static_assert(IS_LITTLE_ENDIAN == XOffsetDatastructure2::TargetArchitecture.little_endian,
+static_assert(IS_LITTLE_ENDIAN == XOffsetDatastructure::TargetArchitecture.little_endian,
     "Platform endianness does not match TargetArchitecture");
-static_assert(sizeof(int8_t)  == XOffsetDatastructure2::TargetArchitecture.sizeof_int8);
-static_assert(sizeof(int16_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int16);
-static_assert(sizeof(int32_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int32);
-static_assert(sizeof(int64_t) == XOffsetDatastructure2::TargetArchitecture.sizeof_int64);
-static_assert(sizeof(float)   == XOffsetDatastructure2::TargetArchitecture.sizeof_float);
-static_assert(sizeof(double)  == XOffsetDatastructure2::TargetArchitecture.sizeof_double);
-static_assert(sizeof(bool)    == XOffsetDatastructure2::TargetArchitecture.sizeof_bool);
-static_assert(sizeof(char)    == XOffsetDatastructure2::TargetArchitecture.sizeof_char);
-static_assert(alignof(void*)  == XOffsetDatastructure2::TargetArchitecture.pointer_align);
-static_assert(alignof(int32_t) == XOffsetDatastructure2::TargetArchitecture.alignof_int32,
+static_assert(sizeof(int8_t)  == XOffsetDatastructure::TargetArchitecture.sizeof_int8);
+static_assert(sizeof(int16_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int16);
+static_assert(sizeof(int32_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int32);
+static_assert(sizeof(int64_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int64);
+static_assert(sizeof(float)   == XOffsetDatastructure::TargetArchitecture.sizeof_float);
+static_assert(sizeof(double)  == XOffsetDatastructure::TargetArchitecture.sizeof_double);
+static_assert(sizeof(bool)    == XOffsetDatastructure::TargetArchitecture.sizeof_bool);
+static_assert(sizeof(char)    == XOffsetDatastructure::TargetArchitecture.sizeof_char);
+static_assert(alignof(void*)  == XOffsetDatastructure::TargetArchitecture.pointer_align);
+static_assert(alignof(int32_t) == XOffsetDatastructure::TargetArchitecture.alignof_int32,
     "Platform alignof(int32_t) does not match TargetArchitecture");
-static_assert(alignof(int64_t) == XOffsetDatastructure2::TargetArchitecture.alignof_int64,
+static_assert(alignof(int64_t) == XOffsetDatastructure::TargetArchitecture.alignof_int64,
     "Platform alignof(int64_t) does not match TargetArchitecture");
-static_assert(alignof(float)   == XOffsetDatastructure2::TargetArchitecture.alignof_float,
+static_assert(alignof(float)   == XOffsetDatastructure::TargetArchitecture.alignof_float,
     "Platform alignof(float) does not match TargetArchitecture");
-static_assert(alignof(double)  == XOffsetDatastructure2::TargetArchitecture.alignof_double,
+static_assert(alignof(double)  == XOffsetDatastructure::TargetArchitecture.alignof_double,
     "Platform alignof(double) does not match TargetArchitecture");
 
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -351,7 +351,7 @@ private:
 } // namespace boost
 
 
-namespace XOffsetDatastructure2 {
+namespace XOffsetDatastructure {
     using namespace boost::interprocess;
 
     using XBuffer = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
@@ -899,7 +899,7 @@ namespace XOffsetDatastructure2 {
         // User opt-in: specialize is_safe_leaf for your specific use case:
         //
         //   template<>
-        //   struct XOffsetDatastructure2::detail::is_safe_leaf<XOffsetPtr<MyType>>
+        //   struct XOffsetDatastructure::detail::is_safe_leaf<XOffsetPtr<MyType>>
         //       : std::true_type {};
         //
         // If you also need compaction support, register a migrate_as strategy.
@@ -1245,18 +1245,18 @@ namespace XOffsetDatastructure2 {
 }
 
 // ============================================================================
-// TypeLayout specializations for XOffsetDatastructure2 containers
+// TypeLayout specializations for XOffsetDatastructure containers
 //
 // Registered using TYPELAYOUT_OPAQUE_* macros so the type-signature engine
-// can resolve XOffsetDatastructure2 container types correctly.
+// can resolve XOffsetDatastructure container types correctly.
 // ============================================================================
 namespace boost {
 namespace typelayout {
 
-    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure2::XString, "string", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XVector, "vector", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XSet, "set", 32, 8)
-    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure2::XMap, "map", 32, 8)
+    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure::XString, "string", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XVector, "vector", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XSet, "set", 32, 8)
+    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure::XMap, "map", 32, 8)
 
 } // namespace typelayout
 } // namespace boost

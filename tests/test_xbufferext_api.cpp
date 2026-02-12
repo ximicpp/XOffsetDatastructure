@@ -8,9 +8,9 @@
 #include <iostream>
 #include <cassert>
 #include <string>
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct TestData {
     template <typename Allocator>

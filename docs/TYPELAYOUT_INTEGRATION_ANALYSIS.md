@@ -69,12 +69,12 @@ TypeLayout                          XOffsetDatastructure
 
 ### 2.1 容器特化模式（Opaque Signature）
 
-当前实现（`xoffsetdatastructure2.hpp` 底部）：
+当前实现（`xoffsetdatastructure.hpp` 底部）：
 
 ```cpp
 namespace boost { namespace typelayout {
     template <SignatureMode Mode>
-    struct TypeSignature<XOffsetDatastructure2::XString, Mode> {
+    struct TypeSignature<XOffsetDatastructure::XString, Mode> {
         static consteval auto calculate() noexcept {
             return FixedString{"string[s:32,a:8]"};
         }
@@ -98,13 +98,13 @@ namespace boost { namespace typelayout {
 
 ### 2.2 特化放置位置
 
-特化在 `xoffsetdatastructure2.hpp` 中、`namespace boost::typelayout` 内注册。
+特化在 `xoffsetdatastructure.hpp` 中、`namespace boost::typelayout` 内注册。
 
 **评估：✅ 正确做法**
 
 C++ 标准要求模板特化必须在原始模板声明的命名空间中。这不是"命名空间侵入"，而是 C++ 模板特化的标准模式（类似 `std::hash` 特化）。
 
-**发现 #3（位置问题）**：特化放在文件末尾（`#endif` 之前），位于 `XOffsetDatastructure2` 命名空间关闭之后。这意味着所有容器类型定义必须在特化之前完成。当前代码已正确处理此依赖顺序。
+**发现 #3（位置问题）**：特化放在文件末尾（`#endif` 之前），位于 `XOffsetDatastructure` 命名空间关闭之后。这意味着所有容器类型定义必须在特化之前完成。当前代码已正确处理此依赖顺序。
 
 ### 2.3 Definition vs Layout 签名选择策略
 

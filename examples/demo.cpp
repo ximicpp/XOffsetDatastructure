@@ -1,5 +1,5 @@
 // ============================================================================
-// XOffsetDatastructure2 - Comprehensive Demo (C++26 Reflection Version)
+// XOffsetDatastructure - Comprehensive Demo (C++26 Reflection Version)
 // Purpose: Showcase the main features and C++26 reflection capabilities
 // ============================================================================
 
@@ -14,10 +14,10 @@
 #else
 #define HAS_CHRONO 0
 #endif
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include "game_data.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // ============================================================================
 // Demo Utilities
@@ -447,7 +447,7 @@ int main() {
     std::cout << R"(
 +======================================================================+
 |                                                                      |
-|     XOffsetDatastructure2 - Comprehensive Demo (C++26 Edition)      |
+|     XOffsetDatastructure - Comprehensive Demo (C++26 Edition)      |
 |                                                                      |
 |     Offset-Based Data Structures with C++26 Reflection              |
 |                                                                      |

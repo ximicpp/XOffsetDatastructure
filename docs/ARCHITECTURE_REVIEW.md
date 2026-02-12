@@ -2,21 +2,21 @@
 
 > **版本**: v1.0  
 > **审查日期**: 2026-02-11  
-> **范围**: `xoffsetdatastructure2.hpp` (864 行) + TypeLayout 集成  
+> **范围**: `xoffsetdatastructure.hpp` (864 行) + TypeLayout 集成  
 > **前序文档**: `TYPELAYOUT_INTEGRATION_ANALYSIS.md` (v1.0, 2026-02-10)
 
 ---
 
 ## §1 Component Inventory
 
-`xoffsetdatastructure2.hpp` 作为单头文件库，包含 7 个逻辑组件：
+`xoffsetdatastructure.hpp` 作为单头文件库，包含 7 个逻辑组件：
 
 | # | 组件 | 行范围 | 职责 | 依赖 |
 |---|------|--------|------|------|
 | **C1** | Platform Detection & Guards | 1–80 | 编译器检测、64-bit/LE 静态断言、类型尺寸验证 | 无 |
 | **C2** | Include Dependencies | 43–96 | 标准库 + TypeLayout + Boost.Interprocess/Container 头文件 | TypeLayout, Boost |
 | **C3** | Memory Allocators (`boost::interprocess`) | 99–262 | `x_best_fit`, `x_seq_fit`, `XManagedMemory` — 内存分配策略和托管内存实现 | Boost.Interprocess |
-| **C4** | Container Aliases & Concepts (`XOffsetDatastructure2`) | 265–349 | `XBuffer`, `XVector`, `XSet`, `XMap`, `XString` 类型别名 + 6 个容器概念 | Boost.Container |
+| **C4** | Container Aliases & Concepts (`XOffsetDatastructure`) | 265–349 | `XBuffer`, `XVector`, `XSet`, `XMap`, `XString` 类型别名 + 6 个容器概念 | Boost.Container |
 | **C5** | Utilities (`XBufferVisualizer`, `XBufferCompactor`) | 351–551 | 内存统计 + 基于反射的自动迁移/压缩 | C++26 Reflection, TypeLayout (`get_member_count`) |
 | **C6** | Safety System (`detail::*`, `is_xbuffer_safe`) | 553–800 | 编译时类型安全检查 (11 条规则)、错误信息生成 | C++26 Reflection, TypeLayout (`is_fixed_enum`) |
 | **C7** | TypeLayout Specializations | 853–862 | 4 个 Opaque 签名注册 (XString, XVector, XSet, XMap) | TypeLayout Opaque Macros |
@@ -49,7 +49,7 @@ C7 TypeLayout  █░░░░░░░░░░░░░░░░░░░  10 
                     └──────────┬───────────┘
                                │ uses
                     ┌──────────▼───────────┐
-                    │  XOffsetDatastructure2 │
+                    │  XOffsetDatastructure │
                     │  (single header)       │
                     └──┬───────┬──────┬────┘
                        │       │      │
@@ -217,7 +217,7 @@ template<typename T> struct is_safe_container<MyCustomVector<T>> : std::true_typ
 |------|-----|------|
 | 总行数 | 864 | ✅ 可管理 |
 | 逻辑组件数 | 7 | ✅ 可理解 |
-| 命名空间数 | 3 (`boost::interprocess`, `XOffsetDatastructure2`, `boost::typelayout`) | ✅ 合理 |
+| 命名空间数 | 3 (`boost::interprocess`, `XOffsetDatastructure`, `boost::typelayout`) | ✅ 合理 |
 | 编译依赖 | 17 个 include | 🟡 偏多 |
 | 模板深度 | 3 层 (Container alias → Allocator → SegmentManager) | ✅ 合理 |
 
@@ -226,7 +226,7 @@ template<typename T> struct is_safe_container<MyCustomVector<T>> : std::true_typ
 如果要拆分，自然边界为：
 
 ```
-xoffsetdatastructure2/
+xoffsetdatastructure/
 ├── platform.hpp       ← C1 (80 行)
 ├── memory.hpp         ← C3 (164 行) — boost::interprocess 扩展
 ├── containers.hpp     ← C4 (85 行) — 类型别名 + 概念
@@ -234,7 +234,7 @@ xoffsetdatastructure2/
 ├── compactor.hpp      ← C5 (201 行) — 迁移/压缩
 ├── xbuffer_ext.hpp    ← XBufferExt + Visualizer (85 行)
 ├── typelayout_reg.hpp ← C7 (10 行) — TypeLayout 注册
-└── xoffsetdatastructure2.hpp  ← 聚合 include
+└── xoffsetdatastructure.hpp  ← 聚合 include
 ```
 
 **Finding #9 (🟢 Low)**: **当前无需拆分**。

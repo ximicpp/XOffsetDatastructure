@@ -3,11 +3,11 @@
 // Purpose: Verify that structures with > 10 fields now work correctly
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <cassert>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // Test struct with 15 fields (previously would fail!)
 struct LargeStruct {

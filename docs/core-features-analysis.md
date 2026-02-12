@@ -1,4 +1,4 @@
-# XOffsetDatastructure2 核心功能分析报告
+# XOffsetDatastructure 核心功能分析报告
 
 > **版本**: v1.0  
 > **分析日期**: 2026-02-02  
@@ -20,7 +20,7 @@
 
 ## 1. 概述
 
-XOffsetDatastructure2 是一个专为 **C++26** 设计的零拷贝序列化库，核心特性：
+XOffsetDatastructure 是一个专为 **C++26** 设计的零拷贝序列化库，核心特性：
 
 - **零拷贝**: 数据直接在缓冲区中操作，无需反序列化
 - **跨进程**: 使用 offset_ptr 支持共享内存
@@ -397,10 +397,10 @@ consteval void diagnose_reflection_issues() {
 
 ```cpp
 #if !XOFFSET_ARCH_64BIT
-    #error "XOffsetDatastructure2 requires 64-bit architecture"
+    #error "XOffsetDatastructure requires 64-bit architecture"
 #endif
 #if !XOFFSET_LITTLE_ENDIAN
-    #error "XOffsetDatastructure2 requires little-endian architecture"
+    #error "XOffsetDatastructure requires little-endian architecture"
 #endif
 ```
 
@@ -568,21 +568,21 @@ T* XBufferExt::make(const char* name) {
 
 | 功能 | 文件 | 行号 |
 |------|------|------|
-| 平台检测 | xoffsetdatastructure2.hpp | 1-37 |
+| 平台检测 | xoffsetdatastructure.hpp | 1-37 |
 | TypeLayout 集成 | external/typelayout/include | (外部库) |
-| 平台断言 | xoffsetdatastructure2.hpp | 62-78 |
-| XManagedMemory | xoffsetdatastructure2.hpp | 377-502 |
-| XBuffer 定义 | xoffsetdatastructure2.hpp | 511 |
-| 容器定义 | xoffsetdatastructure2.hpp | 556-592 |
-| XBufferCompactor | xoffsetdatastructure2.hpp | 626-799 |
-| is_xbuffer_safe | xoffsetdatastructure2.hpp | 801-1003 |
-| XBufferExt | xoffsetdatastructure2.hpp | 1035-1077 |
-| 容器签名 | xoffsetdatastructure2.hpp | 1080-1112 |
+| 平台断言 | xoffsetdatastructure.hpp | 62-78 |
+| XManagedMemory | xoffsetdatastructure.hpp | 377-502 |
+| XBuffer 定义 | xoffsetdatastructure.hpp | 511 |
+| 容器定义 | xoffsetdatastructure.hpp | 556-592 |
+| XBufferCompactor | xoffsetdatastructure.hpp | 626-799 |
+| is_xbuffer_safe | xoffsetdatastructure.hpp | 801-1003 |
+| XBufferExt | xoffsetdatastructure.hpp | 1035-1077 |
+| 容器签名 | xoffsetdatastructure.hpp | 1080-1112 |
 
 ### B. 依赖关系
 
 ```
-XOffsetDatastructure2
+XOffsetDatastructure
 ├── C++26 标准库
 │   └── <experimental/meta> (P2996 反射)
 ├── Boost.Interprocess
@@ -769,7 +769,7 @@ struct SafetyDiagnostic {
 
 ### 总体评价
 
-XOffsetDatastructure2 是一个**架构稳健**的零拷贝序列化库：
+XOffsetDatastructure 是一个**架构稳健**的零拷贝序列化库：
 
 - ✅ **创新性**: 首批利用 C++26 P2996 反射的实际应用
 - ✅ **性能**: 真正的零拷贝，无反序列化开销

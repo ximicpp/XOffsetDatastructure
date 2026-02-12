@@ -3,14 +3,14 @@
 // Purpose: Test reflection for serialization and structure analysis
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <sstream>
 
 #include <experimental/meta>
 #include <experimental/meta>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct SerializableData {
     int id;

@@ -1,9 +1,9 @@
 // Test: This file SHOULD NOT COMPILE
 // Purpose: Demonstrate compile-time error when using polymorphic types
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 struct BadType {
     int id;

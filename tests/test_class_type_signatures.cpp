@@ -3,11 +3,11 @@
 // Purpose: Test type signature generation for various class configurations
 // ============================================================================
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <cassert>
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // ============================================================================
 // Test Cases: Various Class Configurations

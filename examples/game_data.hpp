@@ -1,9 +1,9 @@
 #ifndef GAME_DATA_HPP_
 #define GAME_DATA_HPP_
 
-#include "../xoffsetdatastructure2.hpp"
+#include "../xoffsetdatastructure.hpp"
 
-using namespace XOffsetDatastructure2;
+using namespace XOffsetDatastructure;
 
 // ============================================================================
 // Item - Direct Type Definition (C++26 Reflection)

@@ -17,8 +17,8 @@
 |---|---------|------|----------------|
 | 1 | 编译时二进制合约 | `player.hpp:31` | `get_definition_signature<T>()` |
 | 2 | 编译时二进制合约 | `game_data.hpp:70,80` | `get_definition_signature<T>()` |
-| 3 | 成员计数（Compactor） | `xoffsetdatastructure2.hpp:547` | `get_member_count<T>()` |
-| 4 | 容器 Opaque 特化 | `xoffsetdatastructure2.hpp:901-935` | `TypeSignature<T, Mode>` 扩展点 |
+| 3 | 成员计数（Compactor） | `xoffsetdatastructure.hpp:547` | `get_member_count<T>()` |
+| 4 | 容器 Opaque 特化 | `xoffsetdatastructure.hpp:901-935` | `TypeSignature<T, Mode>` 扩展点 |
 | 5 | 签名导出工具 | `tools/export_signatures.cpp` | `SigExporter` |
 | 6 | 兼容性检查工具 | `tools/check_compat.cpp` | `CompatReporter` |
 
@@ -26,9 +26,9 @@
 
 | # | 功能 | 代码位置 | 行数 |
 |---|------|---------|------|
-| A | `is_xbuffer_safe<T>` 类型安全检查 | `xoffsetdatastructure2.hpp:553-812` | ~260 行 |
-| B | `XBufferCompactor` 成员迭代 | `xoffsetdatastructure2.hpp:519-550` | ~30 行 |
-| C | Type-erased 容器黑名单 | `xoffsetdatastructure2.hpp:588-638` | ~50 行 |
+| A | `is_xbuffer_safe<T>` 类型安全检查 | `xoffsetdatastructure.hpp:553-812` | ~260 行 |
+| B | `XBufferCompactor` 成员迭代 | `xoffsetdatastructure.hpp:519-550` | ~30 行 |
+| C | Type-erased 容器黑名单 | `xoffsetdatastructure.hpp:588-638` | ~50 行 |
 
 ---
 
@@ -43,7 +43,7 @@ XOffsetDatastructure 当前为 4 种容器类型手写了 4 个 `TypeSignature` 
 ```cpp
 // 当前：每个容器 7-9 行
 template <SignatureMode Mode>
-struct TypeSignature<XOffsetDatastructure2::XString, Mode> {
+struct TypeSignature<XOffsetDatastructure::XString, Mode> {
     static consteval auto calculate() noexcept {
         return FixedString{"string[s:32,a:8]"};
     }
@@ -68,10 +68,10 @@ struct TypeSignature<XOffsetDatastructure2::XString, Mode> {
 
 ```cpp
 namespace boost { namespace typelayout {
-    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure2::XString, "string", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XVector, "vector", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure2::XSet, "set", 32, 8)
-    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure2::XMap, "map", 32, 8)
+    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure::XString, "string", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XVector, "vector", 32, 8)
+    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XSet, "set", 32, 8)
+    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure::XMap, "map", 32, 8)
 }}
 ```
 

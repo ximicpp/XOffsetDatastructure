@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# XOffsetDatastructure2 Build Script (with Reflection Support)
+# XOffsetDatastructure Build Script (with Reflection Support)
 # For Linux/WSL environments
 
 set -e  # Exit on error
@@ -129,7 +129,7 @@ fi
 # Print header
 echo ""
 echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}  XOffsetDatastructure2 Build Script (with Reflection Support)${NC}"
+echo -e "${CYAN}  XOffsetDatastructure Build Script (with Reflection Support)${NC}"
 echo -e "${CYAN}======================================================================${NC}"
 echo ""
 
@@ -381,9 +381,9 @@ echo -e "${CYAN}================================================================
 echo ""
 
 # Try both possible paths
-DEMO_PATH="bin/xoffsetdatastructure2_demo"
+DEMO_PATH="bin/xoffsetdatastructure_demo"
 if [ ! -f "$DEMO_PATH" ]; then
-    DEMO_PATH="bin/$BUILD_TYPE/xoffsetdatastructure2_demo"
+    DEMO_PATH="bin/$BUILD_TYPE/xoffsetdatastructure_demo"
 fi
 
 if [ -f "$DEMO_PATH" ]; then
@@ -399,7 +399,7 @@ if [ -f "$DEMO_PATH" ]; then
     fi
 else
     echo -e "${YELLOW}Demo executable not found (skipped)${NC}"
-    echo -e "${YELLOW}Checked paths: bin/xoffsetdatastructure2_demo and bin/$BUILD_TYPE/xoffsetdatastructure2_demo${NC}"
+    echo -e "${YELLOW}Checked paths: bin/xoffsetdatastructure_demo and bin/$BUILD_TYPE/xoffsetdatastructure_demo${NC}"
 fi
 
 echo ""
