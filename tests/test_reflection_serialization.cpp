@@ -94,7 +94,7 @@ void test_member_listing() {
     std::cout << "-----------------------\n";
     
     XBufferExt xbuf(1024);
-    auto* data = xbuf.make<SerializableData>("data");
+    auto* data = xbuf.make<SerializableData>();
     
     data->id = 42;
     data->value = 3.14;
@@ -135,7 +135,7 @@ void test_complex_structure_analysis() {
     std::cout << "------------------------------------\n";
     
     XBufferExt xbuf(2048);
-    auto* data = xbuf.make<ComplexData>("complex");
+    auto* data = xbuf.make<ComplexData>();
     
     data->type = 100;
     data->name = XString("TestObject", xbuf.allocator<XString>());
@@ -170,7 +170,7 @@ void test_binary_serialization() {
     std::cout << "-----------------------------\n";
     
     XBufferExt xbuf(1024);
-    auto* data = xbuf.make<SerializableData>("data");
+    auto* data = xbuf.make<SerializableData>();
     
     data->id = 999;
     data->value = 123.456;
@@ -187,17 +187,17 @@ void test_binary_serialization() {
     
     // Deserialize
     XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
-    auto* loaded = xbuf2.find<SerializableData>("data").first;
+    auto& loaded = xbuf2.root<SerializableData>();
     
-    if (loaded) {
+    if (true) { // root always valid after load
         std::cout << "\n  Loaded data:\n";
-        std::cout << "    id: " << loaded->id << "\n";
-        std::cout << "    value: " << loaded->value << "\n";
-        std::cout << "    flags: 0x" << std::hex << loaded->flags << std::dec << "\n";
+        std::cout << "    id: " << loaded.id << "\n";
+        std::cout << "    value: " << loaded.value << "\n";
+        std::cout << "    flags: 0x" << std::hex << loaded.flags << std::dec << "\n";
         
-        bool integrity = (loaded->id == 999 && 
-                         loaded->value == 123.456 &&
-                         loaded->flags == 0xDEADBEEF);
+        bool integrity = (loaded.id == 999 && 
+                         loaded.value == 123.456 &&
+                         loaded.flags == 0xDEADBEEF);
         std::cout << "\n  Integrity: " << (integrity ? "OK" : "FAIL") << "\n";
     }
     

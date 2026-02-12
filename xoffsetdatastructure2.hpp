@@ -217,6 +217,11 @@ public:
         this->priv_close();
     }
 
+    // Returns a monotonically increasing counter that is bumped whenever
+    // the buffer's backing memory is reallocated (grow / shrink / compact).
+    // Used by XHandle<T> to detect stale cached pointers.
+    uint64_t epoch() const noexcept { return m_epoch; }
+
     XManagedMemory(size_type size)
         : m_buffer(size, char(0))
     {
@@ -265,6 +270,10 @@ public:
 
     // Grows the buffer by extra_bytes. Best-effort rollback on failure:
     // if resize succeeds but re-open fails, restores original size.
+    //
+    // WARNING: All existing pointers, references, and iterators into the
+    // buffer are INVALIDATED after this call. The underlying std::vector
+    // may relocate to a new heap address. Re-acquire pointers via find<T>().
     bool grow(size_type extra_bytes)
     {
         const size_type original_size = m_buffer.size();
@@ -279,6 +288,7 @@ public:
                 return false;
             }
             base_t::grow(extra_bytes);
+            ++m_epoch;
             return true;
         }
         catch(...)
@@ -296,23 +306,17 @@ public:
         m_buffer.swap(other.m_buffer);
     }
 
-    // WARNING: All existing pointers/references into the buffer are invalidated
-    // after this call. Re-acquire them via find<T>() or find_or_construct<T>().
-    void update_after_shrink()
-    {
-        auto *pBuf = get_buffer();
-        std::vector<char> new_buf(pBuf->data(), pBuf->data() + pBuf->size());
-        XManagedMemory new_mem(new_buf);
-        this->swap(new_mem);
-    }
-
     // WARNING: Invalidates ALL existing pointers/references into this buffer.
-    // After calling, re-acquire object pointers via find<T>().
+    // After calling, re-acquire object pointers via find<T>() or root<T>().
+    //
+    // Optimized: 2 copies instead of 3 — reuses close/open pattern from grow().
     void shrink_to_fit()
     {
         base_t::shrink_to_fit();
         m_buffer.resize(base_t::get_size());
-        update_after_shrink();
+        base_t::close_impl();
+        base_t::open_impl(&m_buffer[0], m_buffer.size());
+        ++m_epoch;
     }
 
     std::vector<char> *get_buffer()
@@ -338,6 +342,7 @@ private:
     }
 
     std::vector<char> m_buffer;
+    uint64_t m_epoch = 0;
 };
 
 } // namespace interprocess
@@ -425,13 +430,14 @@ namespace XOffsetDatastructure2 {
     template <typename T>
     using XVector = detail::x_vector_impl<T>;
 
-    /// Managed flat_set backed by detail::x_vector_impl
+    /// Managed flat_set with transparent comparator (supports heterogeneous lookup)
     template <typename T>
-    using XSet = boost::container::flat_set<T, std::less<T>, detail::x_vector_impl<T>>;
+    using XSet = boost::container::flat_set<T, std::less<void>, detail::x_vector_impl<T>>;
 
-    /// Managed flat_map backed by detail::x_vector_impl
+    /// Managed flat_map with transparent comparator (supports heterogeneous lookup,
+    /// e.g. map.find("key") without constructing a temporary XString)
     template <typename K, typename V>
-    using XMap = boost::container::flat_map<K, V, std::less<K>,
+    using XMap = boost::container::flat_map<K, V, std::less<void>,
         detail::x_vector_impl<std::pair<K, V>>>;
 
     /// Managed string with shared-memory allocator
@@ -476,55 +482,30 @@ namespace XOffsetDatastructure2 {
     }
     template<typename T> constexpr void validate_xbuffer_type();
 
+    // Internal constant for the single root object name.
+    // Users never see this — all public APIs hide the naming layer.
+    inline constexpr const char* XBUFFER_ROOT_NAME = "__root__";
+
     class XBufferCompactor {
     public:
+        // Single-object compaction: migrates the root object to a new,
+        // tightly-packed buffer.
         template<typename T>
-        static XBuffer compact_automatic(XBuffer& old_xbuf, const char* object_name) {
+        static XBuffer compact_automatic(XBuffer& old_xbuf) {
             validate_xbuffer_type<T>();
             auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
             if (new_size < 4096) new_size = 4096;
             
             XBuffer new_xbuf(new_size);
-            auto* old_obj = old_xbuf.find<T>(object_name).first;
+            auto* old_obj = old_xbuf.find<T>(XBUFFER_ROOT_NAME).first;
             if (!old_obj) {
                 return new_xbuf;
             }
             
-            auto* new_obj = new_xbuf.construct<T>(object_name)(new_xbuf.get_segment_manager());
+            auto* new_obj = new_xbuf.construct<T>(XBUFFER_ROOT_NAME)(new_xbuf.get_segment_manager());
             migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
             new_xbuf.shrink_to_fit();
-            return new_xbuf;
-        }
-        
-        template<typename T>
-        static XBuffer compact_automatic_all(XBuffer& old_xbuf) {
-            validate_xbuffer_type<T>();
-            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-            std::size_t new_size = stats.used_size + (stats.used_size / 10);
-            if (new_size < 4096) new_size = 4096;
-            
-            XBuffer new_xbuf(new_size);
-            auto* segment = old_xbuf.get_segment_manager();
-            using const_named_it = typename XBuffer::segment_manager::const_named_iterator;
-            const_named_it named_beg = segment->named_begin();
-            const_named_it named_end = segment->named_end();
-            
-            std::size_t migrated_count = 0;
-            
-            for(const_named_it it = named_beg; it != named_end; ++it) {
-                const char* name = it->name();
-                auto* old_obj = old_xbuf.find<T>(name).first;
-                if (old_obj) {
-                    auto* new_obj = new_xbuf.construct<T>(name)(new_xbuf.get_segment_manager());
-                    migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-                    ++migrated_count;
-                }
-            }
-            if (migrated_count > 0) {
-                new_xbuf.shrink_to_fit();
-            }
-            
             return new_xbuf;
         }
 
@@ -841,6 +822,21 @@ namespace XOffsetDatastructure2 {
         }
     };
     
+    // Per-member diagnostic helper: triggers a static_assert for each unsafe member,
+    // so the compiler error points to the exact field name.
+    template<typename T>
+    consteval void diagnose_unsafe_members() {
+        if constexpr (std::is_class_v<T> && !std::is_polymorphic_v<T> && !std::is_union_v<T>) {
+            template for (constexpr auto member :
+                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())) {
+                using MemberT = [:std::meta::type_of(member):];
+                static_assert(
+                    detail::is_safe_type<MemberT>(),
+                    "Unsafe member detected in XBuffer type (see compiler note for field name and type)");
+            }
+        }
+    }
+
     template<typename T>
     constexpr void validate_xbuffer_type() {
         static_assert(is_xbuffer_safe<T>::value, 
@@ -872,49 +868,172 @@ namespace XOffsetDatastructure2 {
             "  ✗ std::any (type-erased, contains hidden pointers)\n"
             "  ✗ std::shared_ptr/unique_ptr/weak_ptr (smart pointers)\n"
             "========================================\n");
+        // If the top-level assert fires and T is a struct, also fire per-member
+        // asserts so the compiler names the exact offending field(s).
+        if constexpr (!is_xbuffer_safe<T>::value) {
+            diagnose_unsafe_members<T>();
+        }
     }
+
+    // ========================================================================
+    // XHandle<T> — Epoch-cached safe handle for the root object
+    //
+    // Caches the raw pointer + buffer epoch. On dereference, if the epoch
+    // hasn't changed (no grow/shrink/compact happened), returns the cached
+    // pointer in O(1). If the epoch changed, re-finds the root object
+    // and updates the cache.
+    //
+    // Cost model:
+    //   - No resize between accesses: O(1) (single uint64_t comparison)
+    //   - After resize: O(log n) one-time re-find, then O(1) again
+    // ========================================================================
+    template <typename T>
+    class XHandle {
+    public:
+        XHandle() noexcept : buffer_(nullptr) {}
+
+        explicit XHandle(XBuffer& buf) noexcept
+            : buffer_(&buf), cached_ptr_(nullptr), cached_epoch_(0)
+        {
+            resolve();
+        }
+
+        // Dereference — returns cached pointer or re-finds if epoch changed
+        T* operator->() const {
+            return resolve();
+        }
+
+        T& operator*() const {
+            return *resolve();
+        }
+
+        // Explicit access — same semantics as operator->
+        T* get() const {
+            return resolve();
+        }
+
+        // Check if handle points to a valid (existing) object
+        explicit operator bool() const {
+            return resolve() != nullptr;
+        }
+
+    private:
+        T* resolve() const {
+            if (!buffer_) return nullptr;
+            uint64_t current_epoch = buffer_->epoch();
+            if (cached_ptr_ && cached_epoch_ == current_epoch) {
+                return cached_ptr_;   // O(1) fast path
+            }
+            // Epoch changed or first access — re-find
+            auto result = buffer_->find<T>(XBUFFER_ROOT_NAME);
+            cached_ptr_ = result.first;
+            cached_epoch_ = current_epoch;
+            return cached_ptr_;
+        }
+
+        XBuffer* buffer_;
+        mutable T* cached_ptr_ = nullptr;
+        mutable uint64_t cached_epoch_ = 0;
+    };
 
     class XBufferExt : public XBuffer {
     public:
         using XBuffer::XBuffer;
 
+        // Constructs the single root object of type T in the buffer.
+        //
+        // WARNING: The returned pointer is a raw T* that becomes DANGLING
+        // after grow(), shrink_to_fit(), or compact. Use root<T>() or
+        // make_handle<T>() for safer access patterns.
         template<typename T>
-        T* make(const char* name) {
+        T* make() {
             validate_xbuffer_type<T>();
-            return this->construct<T>(name)(this->get_segment_manager());
+            return this->construct<T>(XBUFFER_ROOT_NAME)(this->get_segment_manager());
         }
         
+        // Returns a reference to the root object. Use after deserialization
+        // or after grow/shrink to re-acquire a valid reference.
+        //
+        // Asserts if the root object does not exist.
+        template<typename T>
+        T& root() {
+            auto result = this->find<T>(XBUFFER_ROOT_NAME);
+            assert(result.first && "root<T>(): no root object in buffer");
+            return *result.first;
+        }
+
+        // Returns true if a root object of type T exists in this buffer.
+        template<typename T>
+        bool has_root() {
+            return this->find<T>(XBUFFER_ROOT_NAME).first != nullptr;
+        }
+
+        // Creates the root object and returns an epoch-cached XHandle<T>.
+        // The handle automatically re-finds the object after grow/shrink/compact.
+        template<typename T>
+        XHandle<T> make_handle() {
+            validate_xbuffer_type<T>();
+            this->construct<T>(XBUFFER_ROOT_NAME)(this->get_segment_manager());
+            return XHandle<T>(*this);
+        }
+
+        // Returns an epoch-cached XHandle<T> to the existing root object.
+        template<typename T>
+        XHandle<T> handle() {
+            return XHandle<T>(*this);
+        }
+
         template<typename T>
         boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
             validate_xbuffer_type<T>();
             return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
         }
 
-        template<typename T>
-        std::pair<T*, bool> find_ex(const char* name) {
-            auto result = this->find<T>(name);
-            return {result.first, result.second};
-        }
-        
-        template<typename T>
-        T* find_or_make(const char* name) {
-            validate_xbuffer_type<T>();
-            return this->find_or_construct<T>(name)(this->get_segment_manager());
+        // Returns the number of bytes actually used (excluding free space).
+        std::size_t used_size() {
+            return stats().used_size;
         }
 
+        // Serializes the full buffer (including free space) to a string.
+        // Fast but may include unused padding. For minimal output, use save_to_vector().
         std::string save_to_string() {
             auto* buffer = this->get_buffer();
             return std::string(buffer->begin(), buffer->end());
         }
-        
+
+        // Serializes the buffer to a compact vector<char> by shrinking first.
+        // Output size ≈ used_size(). Ideal for network transfer or persistent storage.
+        //
+        // WARNING: Invalidates all existing pointers. Re-acquire via root<T>() after calling.
+        std::vector<char> save_to_vector() {
+            this->shrink_to_fit();
+            auto* buf = this->get_buffer();
+            return std::vector<char>(buf->begin(), buf->end());
+        }
+
         static XBufferExt load_from_string(const std::string& data) {
             std::vector<char> buffer(data.begin(), data.end());
             XBufferExt xbuf(buffer);
             return xbuf;
         }
 
+        static XBufferExt load_from_vector(const std::vector<char>& data) {
+            std::vector<char> buffer(data);
+            XBufferExt xbuf(buffer);
+            return xbuf;
+        }
+
         XBufferVisualizer::MemoryStats stats() {
             return XBufferVisualizer::get_memory_stats(*this);
+        }
+
+        // Estimates a suitable buffer size for the given user data payload.
+        // Accounts for segment_manager overhead + 20% headroom for container growth.
+        static std::size_t estimate_buffer_size(std::size_t user_data_bytes) {
+            std::size_t min_overhead = XBuffer::segment_manager::get_min_size();
+            std::size_t estimated = min_overhead + user_data_bytes;
+            estimated += estimated / 5;  // +20% headroom
+            return std::max(estimated, (std::size_t)512);
         }
     };
 }

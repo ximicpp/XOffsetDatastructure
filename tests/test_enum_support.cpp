@@ -119,8 +119,8 @@ bool test_enum_in_xbuffer() {
     std::cout << "\n[TEST] Enum in XBuffer\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBuffer xbuf(4096);
-    auto* stats = xbuf.construct<PlayerStats>("stats")(xbuf.get_segment_manager());
+    XBufferExt xbuf(4096);
+    auto* stats = xbuf.make<PlayerStats>();
 
     stats->id = 42;
     stats->weapon = WeaponType::Staff;
@@ -129,19 +129,18 @@ bool test_enum_in_xbuffer() {
     stats->level = 10;
 
     // Read back and verify
-    auto* found = xbuf.find<PlayerStats>("stats").first;
-    assert(found != nullptr);
-    assert(found->id == 42);
-    assert(found->weapon == WeaponType::Staff);
-    assert(found->quest == QuestStatus::InProgress);
-    assert(found->color == Blue);
-    assert(found->level == 10);
+    auto& found = xbuf.root<PlayerStats>();
+    assert(found.id == 42);
+    assert(found.weapon == WeaponType::Staff);
+    assert(found.quest == QuestStatus::InProgress);
+    assert(found.color == Blue);
+    assert(found.level == 10);
 
     std::cout << "  Create PlayerStats in XBuffer... [OK]\n";
     std::cout << "  Read back enum fields... [OK]\n";
-    std::cout << "  WeaponType = Staff (" << static_cast<int>(found->weapon) << ") [OK]\n";
-    std::cout << "  QuestStatus = InProgress (" << static_cast<int>(found->quest) << ") [OK]\n";
-    std::cout << "  Color = Blue (" << static_cast<int>(found->color) << ") [OK]\n";
+    std::cout << "  WeaponType = Staff (" << static_cast<int>(found.weapon) << ") [OK]\n";
+    std::cout << "  QuestStatus = InProgress (" << static_cast<int>(found.quest) << ") [OK]\n";
+    std::cout << "  Color = Blue (" << static_cast<int>(found.color) << ") [OK]\n";
 
     return true;
 }

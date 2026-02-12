@@ -173,7 +173,7 @@ void test_basic_types() {
     std::cout << "\n[Test] Basic Types..." << std::endl;
     
     XBufferExt xbuf(1024 * 1024);
-    auto* data = xbuf.make<BasicTypes>("basic");
+    auto* data = xbuf.make<BasicTypes>();
     
     data->i32 = -123;
     data->i64 = -9876543210LL;
@@ -197,7 +197,7 @@ void test_container_types() {
     std::cout << "\n[Test] Container Types..." << std::endl;
     
     XBufferExt xbuf(1024 * 1024);
-    auto* data = xbuf.make<ContainerTypes>("containers");
+    auto* data = xbuf.make<ContainerTypes>();
     
     // Test XString
     data->name = XString("TestName", xbuf.allocator<char>());
@@ -231,7 +231,7 @@ void test_nested_types() {
     std::cout << "\n[Test] Nested User Types..." << std::endl;
     
     XBufferExt xbuf(1024 * 1024);
-    auto* player = xbuf.make<Player>("player");
+    auto* player = xbuf.make<Player>();
     
     player->name = XString("Hero", xbuf.allocator<char>());
     player->level = 99;
@@ -255,7 +255,7 @@ void test_complex_structure() {
     std::cout << "\n[Test] Complex Nested Structure..." << std::endl;
     
     XBufferExt xbuf(1024 * 1024);
-    auto* game = xbuf.make<GameState>("game");
+    auto* game = xbuf.make<GameState>();
     
     // Setup player
     game->player.name = XString("Alice", xbuf.allocator<char>());

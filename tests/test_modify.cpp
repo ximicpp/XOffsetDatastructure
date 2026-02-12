@@ -31,8 +31,8 @@ bool test_modify_basic_types() {
     std::cout << "\n[TEST] Modify Basic Types\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Initialize values
     std::cout << "Test 1: Initialize basic values... ";
@@ -72,11 +72,11 @@ bool test_modify_basic_types() {
     
     // Test 5: Verify persistence after modification
     std::cout << "Test 5: Verify persistence... ";
-    auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
+    auto& found_data = xbuf.root<ModifyTestData>(); bool found = xbuf.has_root<ModifyTestData>();
     assert(found);
-    assert(found_data->counter == 299);
-    assert(found_data->ratio > 3.99f && found_data->ratio < 4.01f);
-    assert(found_data->active == true);
+    assert(found_data.counter == 299);
+    assert(found_data.ratio > 3.99f && found_data.ratio < 4.01f);
+    assert(found_data.active == true);
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All basic type modification tests passed!\n";
@@ -87,8 +87,8 @@ bool test_modify_vector() {
     std::cout << "\n[TEST] Modify Vector Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add elements
     std::cout << "Test 1: Add elements to vector... ";
@@ -148,8 +148,8 @@ bool test_modify_vector_string() {
     std::cout << "\n[TEST] Modify Vector of Strings\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add string elements
     std::cout << "Test 1: Add string elements... ";
@@ -202,8 +202,8 @@ bool test_modify_map() {
     std::cout << "\n[TEST] Modify Map Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add key-value pairs
     std::cout << "Test 1: Add key-value pairs... ";
@@ -260,8 +260,8 @@ bool test_modify_set() {
     std::cout << "\n[TEST] Modify Set Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(8192);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(8192);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add elements
     std::cout << "Test 1: Add elements to set... ";
@@ -311,8 +311,8 @@ bool test_modify_mixed_operations() {
     std::cout << "\n[TEST] Mixed Modification Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(16384);
-    auto* data = xbuf.construct<ModifyTestData>("ModifyTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(16384);
+    auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Initialize all fields
     std::cout << "Test 1: Initialize all fields... ";
@@ -354,13 +354,13 @@ bool test_modify_mixed_operations() {
     
     // Test 3: Verify via find
     std::cout << "Test 3: Verify via find... ";
-    auto [found_data, found] = xbuf.find<ModifyTestData>("ModifyTest");
+    auto& found_data = xbuf.root<ModifyTestData>(); bool found = xbuf.has_root<ModifyTestData>();
     assert(found);
-    assert(found_data->counter == 100);
-    assert(found_data->ratio > 2.49f && found_data->ratio < 2.51f);
-    assert(found_data->active == false);
-    assert(found_data->numbers[0] == 999);
-    assert(found_data->names[0] == "Alicia");
+    assert(found_data.counter == 100);
+    assert(found_data.ratio > 2.49f && found_data.ratio < 2.51f);
+    assert(found_data.active == false);
+    assert(found_data.numbers[0] == 999);
+    assert(found_data.names[0] == "Alicia");
     std::cout << "[OK]\n";
     
     // Test 4: Complex batch modifications
@@ -387,14 +387,14 @@ bool test_modify_mixed_operations() {
     std::cout << "Test 5: Serialize to memory... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     
-    XBuffer new_xbuf(buffer);
-    auto [new_data, new_found] = new_xbuf.find<ModifyTestData>("ModifyTest");
+    XBufferExt new_xbuf(buffer);
+    auto& new_data = new_xbuf.root<ModifyTestData>(); bool new_found = new_xbuf.has_root<ModifyTestData>();
     assert(new_found);
-    assert(new_data->counter == 100);
-    assert(new_data->numbers[0] == 1998);
-    assert(new_data->names[0] == "Alicia");
-    assert(new_data->scores[XString("Alice", xbuf.get_segment_manager())] == 85);
-    assert(new_data->tags.size() == 8);
+    assert(new_data.counter == 100);
+    assert(new_data.numbers[0] == 1998);
+    assert(new_data.names[0] == "Alicia");
+    assert(new_data.scores[XString("Alice", xbuf.get_segment_manager())] == 85);
+    assert(new_data.tags.size() == 8);
     std::cout << "[OK]\n";
     
     std::cout << "[PASS] All mixed modification tests passed!\n";

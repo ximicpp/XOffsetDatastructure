@@ -101,6 +101,8 @@ set(REFLECTION_TESTS
     test_type_erased_detection
     test_typelayout_integration
     test_enum_support
+    test_xstring_direct_assign
+    test_xhandle
 )
 
 # Add each reflection test
@@ -126,8 +128,8 @@ message(STATUS "========================================")
 message(STATUS "C++ Standard: C++26")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Basic Tests: 6 tests")
-message(STATUS "Reflection Tests: 15 tests")
-message(STATUS "Total Tests: 21 tests")
+message(STATUS "Reflection Tests: 16 tests")
+message(STATUS "Total Tests: 22 tests")
 message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")

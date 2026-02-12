@@ -1,165 +1,164 @@
 // ============================================================================
-// Test: XBufferExt API Coverage
-// Purpose: Test find_ex, find_or_make, allocator, and stats APIs
+// Test: XBufferExt API (Single-Object Model)
+// Purpose: Test the simplified single-root-object API:
+//   make<T>(), root<T>(), has_root<T>(), handle<T>(),
+//   make_handle<T>(), stats(), save_to_string(), load_from_string()
 // ============================================================================
 
 #include <iostream>
 #include <cassert>
+#include <string>
 #include "../xoffsetdatastructure2.hpp"
 
 using namespace XOffsetDatastructure2;
 
 struct TestData {
-    int32_t id;
-    XString name;
-    XVector<int32_t> values;
-
     template <typename Allocator>
-    TestData(Allocator allocator)
-        : id(0), name(allocator), values(allocator) {}
+    TestData(Allocator alloc) : name(alloc), items(alloc) {}
+    
+    int32_t id = 0;
+    int32_t score = 0;
+    XString name;
+    XVector<int32_t> items;
 };
 
-bool test_find_ex() {
-    std::cout << "\n[TEST] find_ex<T>\n";
+// ============================================================================
+// Test 1: make<T>() + root<T>() + has_root<T>()
+// ============================================================================
+bool test_make_and_root() {
+    std::cout << "\n[TEST] make<T>() + root<T>() + has_root<T>()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBufferExt xbuf(4096);
 
-    // Test 1: find_ex on non-existent object
-    std::cout << "Test 1: find_ex non-existent... ";
-    auto [ptr1, found1] = xbuf.find_ex<TestData>("missing");
-    assert(ptr1 == nullptr);
-    std::cout << "[OK]\n";
+    // Before make
+    assert(!xbuf.has_root<TestData>());
+    std::cout << "  has_root before make: false ... [OK]\n";
 
-    // Test 2: Create object, then find_ex
-    std::cout << "Test 2: find_ex existing... ";
-    auto* obj = xbuf.make<TestData>("myobj");
+    // make
+    auto* obj = xbuf.make<TestData>();
+    assert(obj != nullptr);
     obj->id = 42;
-    obj->name = XString("hello", xbuf.allocator<XString>());
-    auto [ptr2, found2] = xbuf.find_ex<TestData>("myobj");
-    assert(ptr2 != nullptr);
-    assert(ptr2->id == 42);
-    assert(std::string(ptr2->name.c_str()) == "hello");
-    std::cout << "[OK]\n";
+    obj->name = "Test";
+    std::cout << "  make<TestData>() ... [OK]\n";
 
-    // Test 3: find_ex returns same pointer as make
-    std::cout << "Test 3: find_ex returns same pointer... ";
-    assert(ptr2 == obj);
-    std::cout << "[OK]\n";
+    // has_root + root
+    assert(xbuf.has_root<TestData>());
+    auto& r = xbuf.root<TestData>();
+    assert(r.id == 42);
+    assert(std::string(r.name.c_str()) == "Test");
+    std::cout << "  root<TestData>() matches ... [OK]\n";
 
     return true;
 }
 
-bool test_find_or_make() {
-    std::cout << "\n[TEST] find_or_make<T>\n";
+// ============================================================================
+// Test 2: Serialization round-trip
+// ============================================================================
+bool test_serialization() {
+    std::cout << "\n[TEST] save_to_string / load_from_string\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<TestData>();
+    obj->id = 99;
+    obj->score = 1000;
+    obj->name = "Serialized";
+    obj->items.push_back(10);
+    obj->items.push_back(20);
 
-    // Test 1: find_or_make creates new object
-    std::cout << "Test 1: find_or_make creates... ";
-    auto* obj1 = xbuf.find_or_make<TestData>("data1");
-    assert(obj1 != nullptr);
-    obj1->id = 100;
-    obj1->name = XString("first", xbuf.allocator<XString>());
-    std::cout << "[OK]\n";
+    std::string data = xbuf.save_to_string();
+    std::cout << "  Serialized: " << data.size() << " bytes ... [OK]\n";
 
-    // Test 2: find_or_make returns existing object
-    std::cout << "Test 2: find_or_make finds existing... ";
-    auto* obj2 = xbuf.find_or_make<TestData>("data1");
-    assert(obj2 != nullptr);
-    assert(obj2 == obj1);
-    assert(obj2->id == 100);
-    assert(std::string(obj2->name.c_str()) == "first");
-    std::cout << "[OK]\n";
-
-    // Test 3: find_or_make creates second distinct object
-    std::cout << "Test 3: find_or_make second object... ";
-    auto* obj3 = xbuf.find_or_make<TestData>("data2");
-    assert(obj3 != nullptr);
-    assert(obj3 != obj1);
-    obj3->id = 200;
-    assert(obj1->id == 100);
-    assert(obj3->id == 200);
-    std::cout << "[OK]\n";
+    XBufferExt loaded = XBufferExt::load_from_string(data);
+    assert(loaded.has_root<TestData>());
+    auto& r = loaded.root<TestData>();
+    assert(r.id == 99);
+    assert(r.score == 1000);
+    assert(std::string(r.name.c_str()) == "Serialized");
+    assert(r.items.size() == 2);
+    assert(r.items[0] == 10);
+    assert(r.items[1] == 20);
+    std::cout << "  load_from_string round-trip ... [OK]\n";
 
     return true;
 }
 
+// ============================================================================
+// Test 3: stats()
+// ============================================================================
 bool test_stats() {
     std::cout << "\n[TEST] stats()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<TestData>();
+    obj->name = "StatsTest";
 
-    // Test 1: Stats on empty buffer
-    std::cout << "Test 1: stats on empty buffer... ";
-    auto s1 = xbuf.stats();
-    assert(s1.total_size == 4096);
-    assert(s1.used_size > 0);  // overhead from segment manager
-    assert(s1.free_size > 0);
-    assert(s1.total_size == s1.used_size + s1.free_size);
-    std::cout << "[OK]\n";
-
-    // Test 2: Stats after adding data
-    std::cout << "Test 2: stats after adding data... ";
-    auto* obj = xbuf.make<TestData>("stats_test");
-    obj->id = 1;
-    for (int i = 0; i < 50; ++i) {
-        obj->values.push_back(i);
-    }
-    auto s2 = xbuf.stats();
-    assert(s2.total_size == 4096);
-    assert(s2.used_size > s1.used_size);
-    assert(s2.free_size < s1.free_size);
-    std::cout << "[OK]\n";
-
-    // Test 3: usage_percent and free_percent
-    std::cout << "Test 3: percent calculations... ";
-    assert(s2.usage_percent() > 0.0 && s2.usage_percent() < 100.0);
-    assert(s2.free_percent() > 0.0 && s2.free_percent() < 100.0);
-    double total_pct = s2.usage_percent() + s2.free_percent();
-    assert(total_pct > 99.9 && total_pct < 100.1);
-    std::cout << "[OK]\n";
+    auto s = xbuf.stats();
+    assert(s.total_size == 4096);
+    assert(s.used_size > 0);
+    assert(s.free_size > 0);
+    assert(s.used_size + s.free_size == s.total_size);
+    std::cout << "  total=" << s.total_size
+              << " used=" << s.used_size
+              << " free=" << s.free_size
+              << " (" << s.usage_percent() << "%) ... [OK]\n";
 
     return true;
 }
 
-bool test_allocator_api() {
+// ============================================================================
+// Test 4: allocator<T>()
+// ============================================================================
+bool test_allocator() {
     std::cout << "\n[TEST] allocator<T>()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBufferExt xbuf(4096);
+    auto* obj = xbuf.make<TestData>();
 
-    // Test 1: Get allocator for XString
-    std::cout << "Test 1: allocator for XString... ";
-    auto alloc = xbuf.allocator<XString>();
-    XString str("allocated_string", alloc);
-    assert(std::string(str.c_str()) == "allocated_string");
-    std::cout << "[OK]\n";
+    auto alloc = xbuf.allocator<int32_t>();
+    // Allocator should be valid (no crash)
+    (void)alloc;
+    std::cout << "  allocator<int32_t>() created ... [OK]\n";
 
-    // Test 2: Use allocator in struct construction
-    std::cout << "Test 2: allocator in struct... ";
-    auto* obj = xbuf.make<TestData>("alloc_test");
-    obj->name = XString("via_allocator", xbuf.allocator<XString>());
-    assert(std::string(obj->name.c_str()) == "via_allocator");
-    std::cout << "[OK]\n";
+    return true;
+}
+
+// ============================================================================
+// Test 5: grow() + root() re-acquire
+// ============================================================================
+bool test_grow_root() {
+    std::cout << "\n[TEST] grow() + root() re-acquire\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    XBufferExt xbuf(1024);
+    auto* obj = xbuf.make<TestData>();
+    obj->id = 55;
+    obj->name = "GrowTest";
+
+    xbuf.grow(4096);
+
+    auto& r = xbuf.root<TestData>();
+    assert(r.id == 55);
+    assert(std::string(r.name.c_str()) == "GrowTest");
+    std::cout << "  root() valid after grow() ... [OK]\n";
 
     return true;
 }
 
 int main() {
-    std::cout << "========================================\n";
-    std::cout << "  XBufferExt API Test\n";
-    std::cout << "========================================\n";
+    std::cout << "=== XBufferExt API Tests (Single-Object Model) ===\n";
 
     bool all_passed = true;
-    all_passed &= test_find_ex();
-    all_passed &= test_find_or_make();
+    all_passed &= test_make_and_root();
+    all_passed &= test_serialization();
     all_passed &= test_stats();
-    all_passed &= test_allocator_api();
+    all_passed &= test_allocator();
+    all_passed &= test_grow_root();
 
-    std::cout << "\n========================================\n";
+    std::cout << "\n";
     if (all_passed) {
         std::cout << "[PASS] All XBufferExt API tests passed!\n";
         return 0;

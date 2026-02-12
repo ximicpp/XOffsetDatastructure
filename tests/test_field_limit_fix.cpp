@@ -107,7 +107,7 @@ void test_serialization_with_large_struct() {
     XBufferExt xbuf(4096);
     
     // Create and populate large struct
-    auto* data = xbuf.make<LargeStruct>("large");
+    auto* data = xbuf.make<LargeStruct>();
     data->field01 = 1;
     data->field02 = 2;
     data->field11 = 11;  // Beyond old limit
@@ -125,19 +125,19 @@ void test_serialization_with_large_struct() {
     
     // Deserialize
     XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
-    auto* data2 = xbuf2.find<LargeStruct>("large").first;
+    auto& data2 = xbuf2.root<LargeStruct>();
     
     std::cout << "\n  After deserialization:\n";
-    std::cout << "    field01: " << data2->field01 << "\n";
-    std::cout << "    field02: " << data2->field02 << "\n";
-    std::cout << "    field11: " << data2->field11 << "\n";
-    std::cout << "    field15: " << data2->field15 << "\n";
+    std::cout << "    field01: " << data2.field01 << "\n";
+    std::cout << "    field02: " << data2.field02 << "\n";
+    std::cout << "    field11: " << data2.field11 << "\n";
+    std::cout << "    field15: " << data2.field15 << "\n";
     
     // Verify
-    assert(data2->field01 == 1);
-    assert(data2->field02 == 2);
-    assert(data2->field11 == 11);
-    assert(data2->field15 == 15);
+    assert(data2.field01 == 1);
+    assert(data2.field02 == 2);
+    assert(data2.field11 == 11);
+    assert(data2.field15 == 15);
     
     std::cout << "\n[PASS] Serialization with large struct\n\n";
 }

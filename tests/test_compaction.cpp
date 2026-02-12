@@ -24,8 +24,8 @@ bool test_memory_compaction() {
     std::cout << std::string(50, '-') << "\n";
     
     // Create initial buffer with extra space
-    XBuffer xbuf(16384);
-    auto* obj = xbuf.construct<CompactTestType>("CompactTest")(xbuf.get_segment_manager());
+    XBufferExt xbuf(16384);
+    auto* obj = xbuf.make<CompactTestType>();
     
     // Test 1: Fill with data
     std::cout << "Test 1: Fill buffer with data... ";
@@ -50,7 +50,7 @@ bool test_memory_compaction() {
     
     // Test 3: Perform automatic compaction (C++26 reflection-based)
     std::cout << "Test 3: Compact memory (automatic)... ";
-    XBuffer compact_buf = XBufferCompactor::compact_automatic<CompactTestType>(xbuf, "CompactTest");
+    XBuffer compact_buf = XBufferCompactor::compact_automatic<CompactTestType>(xbuf);
     assert(compact_buf.get_size() > 0);
     std::cout << "[OK]\n";
     
@@ -70,7 +70,7 @@ bool test_memory_compaction() {
     
     // Test 5: Verify data integrity after compaction
     std::cout << "Test 5: Verify data integrity... ";
-    auto* compact_obj = compact_buf.find<CompactTestType>("CompactTest").first;
+    auto* compact_obj = compact_buf.find<CompactTestType>(XBUFFER_ROOT_NAME).first;
     assert(compact_obj != nullptr);
     assert(compact_obj->value == 999);
     assert(compact_obj->data.size() == 100);

@@ -33,6 +33,91 @@ no raw pointers, no virtual classes) and are verified at compile time. The full
 formal model, including theorem, proof, and boundary conditions, is in
 [`docs/CORE_FORMAL_MODEL.md`](docs/CORE_FORMAL_MODEL.md).
 
+### Critical Safety Rules
+
+> ⚠️ **Read this before writing any application code.** Violating these rules leads to silent data corruption.
+
+#### Rule 1: Pointer Invalidation
+
+**Any operation that resizes the buffer invalidates ALL existing pointers into it.**
+
+```cpp
+auto* player = buffer.make<Player>();
+
+// ❌ DANGEROUS — pointer 'player' is now INVALID
+buffer.grow(new_size);
+player->level = 10;  // undefined behavior!
+
+// ✅ CORRECT — re-acquire via root() after resize
+buffer.grow(new_size);
+auto& player = buffer.root<Player>();
+player.level = 10;  // safe
+
+// ✅ BEST — use XHandle for automatic safety
+auto player = buffer.make_handle<Player>();
+buffer.grow(new_size);
+player->level = 10;  // handle auto re-finds, always safe
+```
+
+Operations that invalidate pointers:
+| Operation | Invalidates All Pointers? |
+|-----------|:------------------------:|
+| `grow()` | ✅ Yes |
+| `shrink_to_fit()` | ✅ Yes |
+| `compact()` / `compact_automatic<T>()` | ✅ Yes |
+| `make<T>()` | ❌ No (but may fail if full) |
+| `root<T>()` / `has_root<T>()` | ❌ No |
+| Read/write to existing objects | ❌ No |
+
+#### Rule 2: Bulk Deallocation
+
+**There is no per-object `delete`.** The buffer is a memory arena — all objects are freed together when the buffer is destroyed or reset.
+
+```cpp
+// ❌ NOT AVAILABLE — no individual deallocation
+// buffer.deallocate(player);
+
+// ✅ The buffer owns all memory; it is freed when the buffer goes out of scope
+{
+    XBufferExt buffer(4096);
+    auto* p = buffer.make<Player>();
+    p->name = "Alice";
+    // ... use p ...
+}  // ← all memory freed here, including Player and its XString/XVector contents
+```
+
+#### Rule 3: Thread Safety
+
+**XBufferExt is NOT thread-safe.** Concurrent reads are safe, but any write (including container modifications like `push_back`) requires external synchronization.
+
+```cpp
+// ❌ DATA RACE — concurrent writes
+std::thread t1([&]{ player->items.push_back(item1); });
+std::thread t2([&]{ player->items.push_back(item2); });
+
+// ✅ CORRECT — external mutex
+std::mutex mtx;
+std::thread t1([&]{ std::lock_guard lk(mtx); player->items.push_back(item1); });
+std::thread t2([&]{ std::lock_guard lk(mtx); player->items.push_back(item2); });
+```
+
+#### Rule 4: Safe Type Constraints
+
+Only types satisfying the **Safe Type Set** can be stored in the buffer. The compiler enforces this via `is_xbuffer_safe<T>`:
+
+| ✅ Safe | ❌ Unsafe |
+|---------|----------|
+| `int`, `float`, `double` | `std::string` (uses heap pointers) |
+| `XString`, `XVector<T>`, `XMap<K,V>`, `XSet<T>` | `std::vector<T>` (uses heap pointers) |
+| Fixed-size arrays `T[N]` | `T*` (raw pointers) |
+| Structs of the above | Classes with `virtual` functions |
+
+```cpp
+// Compile-time validation
+static_assert(is_xbuffer_safe<Player>::value,
+              "Player contains unsafe types for XBuffer");
+```
+
 ### Type Signature System (powered by TypeLayout)
 
 XOffsetDatastructure uses [TypeLayout](https://github.com/ximicpp/TypeLayout) as its type-signature engine. TypeLayout provides a two-layer compile-time signature system:

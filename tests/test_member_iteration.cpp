@@ -177,7 +177,7 @@ void test_instance_access() {
     std::cout << "--------------------------------\n";
     
     XBufferExt xbuf(2048);
-    auto* item = xbuf.make<GameItem>("test_item");
+    auto* item = xbuf.make<GameItem>();
     
     item->item_id = 1001;
     item->item_type = 2;

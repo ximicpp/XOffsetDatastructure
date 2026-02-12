@@ -18,10 +18,10 @@ int main() {
     
     // 2. Create an object
     std::cout << "2. Creating player...\n";
-    auto* player = xbuf.make<Player>("Hero");
+    auto* player = xbuf.make<Player>();
     player->id = 1;
     player->level = 10;
-    player->name = XString("Alice", xbuf.allocator<XString>());
+    player->name = "Alice";
     
     // 3. Add some data
     std::cout << "3. Adding items...\n";
@@ -47,12 +47,12 @@ int main() {
     // 6. Deserialize from string
     std::cout << "6. Deserializing...\n";
     XBufferExt loaded = XBufferExt::load_from_string(data);
-    auto [loaded_player, found] = loaded.find_ex<Player>("Hero");
+    assert(loaded.has_root<Player>()); auto& loaded_player = loaded.root<Player>(); bool found = true;
     
     if (found) {
-        std::cout << "   Loaded player: " << loaded_player->name 
-                  << " (Level " << loaded_player->level << ")\n";
-        std::cout << "   Items count: " << loaded_player->items.size() << "\n";
+        std::cout << "   Loaded player: " << loaded_player.name 
+                  << " (Level " << loaded_player.level << ")\n";
+        std::cout << "   Items count: " << loaded_player.items.size() << "\n";
     }
     
     // 7. Memory Statistics
@@ -84,7 +84,7 @@ int main() {
     
     // Compact the buffer
     std::cout << "\n   Compacting buffer...\n";
-    XBuffer compacted = XBufferCompactor::compact_automatic<Player>(xbuf, "Hero");
+    XBuffer compacted = XBufferCompactor::compact_automatic<Player>(xbuf);
     
     // Show stats after compaction
     auto stats_after = XBufferVisualizer::get_memory_stats(compacted);
@@ -97,7 +97,7 @@ int main() {
               << stats_after.usage_percent() << "%\n";
     
     // Verify data integrity after compaction
-    auto [compacted_player, found2] = compacted.find<Player>("Hero");
+    auto* compacted_player = compacted.find<Player>(XBUFFER_ROOT_NAME).first; bool found2 = (compacted_player != nullptr);
     if (found2) {
         std::cout << "\n   [OK] Data integrity verified:\n";
         std::cout << "     Name: " << compacted_player->name << "\n";

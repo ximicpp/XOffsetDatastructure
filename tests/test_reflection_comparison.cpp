@@ -54,9 +54,10 @@ void test_manual_comparison() {
     std::cout << "[Test 2] Manual Comparison\n";
     std::cout << "--------------------------\n";
     
-    XBufferExt xbuf(1024);
-    auto* data1 = xbuf.make<ComparableData>("data1");
-    auto* data2 = xbuf.make<ComparableData>("data2");
+    XBufferExt xbuf1(1024);
+    XBufferExt xbuf2(1024);
+    auto* data1 = xbuf1.make<ComparableData>();
+    auto* data2 = xbuf2.make<ComparableData>();
     
     data1->x = 10;
     data1->y = 20.5;
