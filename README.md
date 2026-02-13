@@ -158,6 +158,48 @@ XVector<InnerObject> vec(sm);
 vec.emplace_back();  // allocator auto-injected ✅
 ```
 
+#### Rule 6: Custom Type Registration (Advanced)
+
+XOffset container types (XString, XVector, XSet, XMap) are registered via **unified registration macros** that perform three tasks in one call:
+
+1. **TypeLayout opaque signature** — type identity for cross-platform compatibility
+2. **Safety whitelist** — allows the type in `is_xbuffer_safe<T>` checks
+3. **Migration strategy** — enables automatic memory compaction
+
+```cpp
+// Built-in registrations (already included in the library):
+XOFFSET_REGISTER_TYPE(XString, "string", AllocatorAware)
+XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)
+XOFFSET_REGISTER_CONTAINER(XSet, "set", Container)
+XOFFSET_REGISTER_MAP(XMap, "map", Container)
+```
+
+To register your own custom allocator-aware type:
+
+```cpp
+// After #include "xoffsetdatastructure.hpp", at file scope:
+XOFFSET_REGISTER_TYPE(MyCustomType, "mycustom", AllocatorAware)
+```
+
+**Strategy options:**
+
+| Strategy | Use For |
+|----------|---------|
+| `TrivialCopy` | POD types (direct `memcpy`) |
+| `AllocatorAware` | Types with `allocator_type` (e.g., strings) |
+| `Container` | Iterable containers with elements to recurse |
+| `Composite` | Structs with members to reflect and recurse |
+
+**Macro variants:**
+
+| Macro | Parameters | For |
+|-------|-----------|-----|
+| `XOFFSET_REGISTER_TYPE` | `(Type, name, strategy)` | Non-template types |
+| `XOFFSET_REGISTER_CONTAINER` | `(Template, name, strategy)` | Single-param templates `T<U>` |
+| `XOFFSET_REGISTER_MAP` | `(Template, name, strategy)` | Two-param templates `T<K,V>` |
+
+> **Note:** `sizeof`/`alignof` are automatically deduced at compile time — no manual size/alignment parameters needed.
+
 ### Type Signature System (powered by TypeLayout)
 
 XOffsetDatastructure uses [TypeLayout](https://github.com/ximicpp/TypeLayout) as its type-signature engine. TypeLayout provides a two-layer compile-time signature system:
