@@ -191,6 +191,7 @@ bool test_player_direct_assign() {
 
     // Test 13: Reassign and re-serialize
     std::cout << "Test 13: Reassign and re-serialize... ";
+    player = &xbuf.root<Player>();  // re-acquire after save_to_string shrink
     player->name = "Bob";
     binary = xbuf.save_to_string();
     XBufferExt loaded2 = XBufferExt::load_from_string(binary);

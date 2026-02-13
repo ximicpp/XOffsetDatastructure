@@ -103,6 +103,7 @@ set(REFLECTION_TESTS
     test_enum_support
     test_xstring_direct_assign
     test_xhandle
+    test_error_paths
 )
 
 # Add each reflection test

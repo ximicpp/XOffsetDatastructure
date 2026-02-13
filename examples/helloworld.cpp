@@ -40,8 +40,11 @@ int main() {
     std::cout << "\n";
     
     // 5. Serialize to string
+    // Use save_to_string_full() here to preserve buffer capacity for later
+    // operations. save_to_string() would shrink first (smaller output, but
+    // invalidates pointers and reduces capacity).
     std::cout << "\n5. Serializing...\n";
-    auto data = xbuf.save_to_string();
+    auto data = xbuf.save_to_string_full();
     std::cout << "   Serialized size: " << data.size() << " bytes\n";
     
     // 6. Deserialize from string

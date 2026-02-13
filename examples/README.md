@@ -86,6 +86,31 @@ Key points:
 
 See `player.hpp` and `game_data.hpp` for complete working examples.
 
+## Buffer Sizing
+
+How much space do you need? Use `estimate_buffer_size()`:
+
+```cpp
+// Estimate for ~500 bytes of user data
+std::size_t size = XBufferExt::estimate_buffer_size(500);  // ~720 bytes
+XBufferExt xbuf(size);
+```
+
+If unsure, start with 4096 (4KB). The buffer can be grown later with `grow()`.
+
+**What happens when the buffer is full?** Container operations (`push_back`, `emplace`, etc.)
+throw `boost::interprocess::bad_alloc`. Handle it by growing the buffer:
+
+```cpp
+try {
+    data->items.push_back(42);
+} catch (const boost::interprocess::bad_alloc&) {
+    xbuf.grow(4096);
+    data = &xbuf.root<MyType>();  // re-acquire after grow
+    data->items.push_back(42);    // retry
+}
+```
+
 ## Critical Safety Rules
 
 These rules apply to all code using XBufferExt. See the project README for full details.
