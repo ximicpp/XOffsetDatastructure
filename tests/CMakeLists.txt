@@ -104,6 +104,7 @@ set(REFLECTION_TESTS
     test_xstring_direct_assign
     test_xhandle
     test_error_paths
+    test_memory_efficiency
 )
 
 # Add each reflection test
