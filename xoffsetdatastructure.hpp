@@ -728,13 +728,9 @@ namespace XOffsetDatastructure {
         // Not registered here; enums are checked dynamically in is_safe_type()
         // via TypeLayout's is_fixed_enum<T>().
 
-        // — LEAF-3: XString —
-        template<> struct is_safe_leaf<XString>  : std::true_type {};
-
-        // — LEAF-4: XContainers (precise template matching) —
-        template<typename T>             struct is_safe_leaf<XVector<T>>  : std::true_type {};
-        template<typename T>             struct is_safe_leaf<XSet<T>>     : std::true_type {};
-        template<typename K, typename V> struct is_safe_leaf<XMap<K, V>>  : std::true_type {};
+        // — LEAF-3/4: XString & XContainers —
+        // Registered via XOFFSET_REGISTER_* unified macros (see end of file).
+        // User-defined types can still specialize is_safe_leaf manually.
 
         // — LEAF-5: XOffsetPtr<T> — NOT registered by default.
         //
@@ -1135,6 +1131,25 @@ namespace XOffsetDatastructure {
     // ================================================================
     class XBufferCompactor {
     public:
+        // ================================================================
+        // Migration strategy enum & trait — public so XOFFSET_REGISTER_*
+        // macros can specialize migrate_as from outside the class.
+        // ================================================================
+        enum class MigrateStrategy {
+            TrivialCopy,      // direct assignment (primitives, enums, POD)
+            AllocatorAware,   // reconstruct with new allocator (XString-like)
+            Container,        // iterate elements, recurse (XVector/XSet/XMap)
+            Composite,        // reflect members, recurse (user structs)
+            NotRegistered     // use built-in auto-detection
+        };
+
+        template<typename T>
+        struct migrate_as { static constexpr MigrateStrategy value = MigrateStrategy::NotRegistered; };
+
+        // Built-in registrations for XOffset types:
+        // Registered via XOFFSET_REGISTER_* unified macros (see end of file).
+        // User-defined types can still specialize migrate_as manually.
+
         // Single-object compaction: migrates the root object to a new,
         // tightly-packed buffer.  Returns XBufferExt for ergonomic access.
         template<typename T>
@@ -1157,25 +1172,6 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        // ================================================================
-        // Migration strategy trait (extensible by users)
-        // ================================================================
-        enum class MigrateStrategy {
-            TrivialCopy,      // direct assignment (primitives, enums, POD)
-            AllocatorAware,   // reconstruct with new allocator (XString-like)
-            Container,        // iterate elements, recurse (XVector/XSet/XMap)
-            Composite,        // reflect members, recurse (user structs)
-            NotRegistered     // use built-in auto-detection
-        };
-
-        template<typename T>
-        struct migrate_as { static constexpr MigrateStrategy value = MigrateStrategy::NotRegistered; };
-
-        // Built-in registrations for XOffset types
-        template<>             struct migrate_as<XString>  { static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware; };
-        template<typename T>   struct migrate_as<XVector<T>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
-        template<typename T>   struct migrate_as<XSet<T>>    { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
-        template<typename K, typename V> struct migrate_as<XMap<K,V>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
 
         // Resolve migration strategy: user-registered > auto-detect
         template<typename T>
@@ -1288,20 +1284,76 @@ namespace XOffsetDatastructure {
 }
 
 // ============================================================================
-// TypeLayout specializations for XOffsetDatastructure containers
+// Unified Registration Macros — XOFFSET_REGISTER_*
 //
-// Registered using TYPELAYOUT_OPAQUE_* macros so the type-signature engine
-// can resolve XOffsetDatastructure container types correctly.
+// Each macro performs THREE registrations in one call:
+//   1. TypeLayout opaque signature  (boost::typelayout namespace)
+//   2. Safety whitelist entry       (is_safe_leaf specialization)
+//   3. Migration strategy           (migrate_as specialization)
+//
+// sizeof/alignof are auto-deduced — no manual size/align parameters needed.
+//
+// Usage (must be placed OUTSIDE all namespaces, after XOffsetDatastructure
+// namespace is closed):
+//
+//   XOFFSET_REGISTER_TYPE(XString, "string", AllocatorAware)
+//   XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)
+//   XOFFSET_REGISTER_CONTAINER(XSet, "set", Container)
+//   XOFFSET_REGISTER_MAP(XMap, "map", Container)
+//
+// Strategy options: TrivialCopy, AllocatorAware, Container, Composite
 // ============================================================================
-namespace boost {
-namespace typelayout {
 
-    TYPELAYOUT_OPAQUE_TYPE(XOffsetDatastructure::XString, "string", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XVector, "vector", 32, 8)
-    TYPELAYOUT_OPAQUE_CONTAINER(XOffsetDatastructure::XSet, "set", 32, 8)
-    TYPELAYOUT_OPAQUE_MAP(XOffsetDatastructure::XMap, "map", 32, 8)
+// --- XOFFSET_REGISTER_TYPE(Type, name, strategy) ---
+// For non-template types (e.g., XString).
+#define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
+    namespace boost { namespace typelayout {                                    \
+        TYPELAYOUT_OPAQUE_TYPE_AUTO(XOffsetDatastructure::Type, name)           \
+    }}                                                                         \
+    template<> struct XOffsetDatastructure::detail::is_safe_leaf<               \
+        XOffsetDatastructure::Type> : std::true_type {};                       \
+    template<> struct XOffsetDatastructure::XBufferCompactor::migrate_as<       \
+        XOffsetDatastructure::Type> {                                          \
+        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
+            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+    };
 
-} // namespace typelayout
-} // namespace boost
+// --- XOFFSET_REGISTER_CONTAINER(Template, name, strategy) ---
+// For single-type-parameter templates (e.g., XVector<T>, XSet<T>).
+#define XOFFSET_REGISTER_CONTAINER(Template, name, strategy)                   \
+    namespace boost { namespace typelayout {                                    \
+        TYPELAYOUT_OPAQUE_CONTAINER_AUTO(XOffsetDatastructure::Template, name)  \
+    }}                                                                         \
+    template<typename T_> struct XOffsetDatastructure::detail::is_safe_leaf<    \
+        XOffsetDatastructure::Template<T_>> : std::true_type {};               \
+    template<typename T_> struct XOffsetDatastructure::XBufferCompactor::migrate_as< \
+        XOffsetDatastructure::Template<T_>> {                                  \
+        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
+            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+    };
+
+// --- XOFFSET_REGISTER_MAP(Template, name, strategy) ---
+// For two-type-parameter templates (e.g., XMap<K,V>).
+#define XOFFSET_REGISTER_MAP(Template, name, strategy)                         \
+    namespace boost { namespace typelayout {                                    \
+        TYPELAYOUT_OPAQUE_MAP_AUTO(XOffsetDatastructure::Template, name)        \
+    }}                                                                         \
+    template<typename K_, typename V_>                                          \
+    struct XOffsetDatastructure::detail::is_safe_leaf<                          \
+        XOffsetDatastructure::Template<K_, V_>> : std::true_type {};           \
+    template<typename K_, typename V_>                                          \
+    struct XOffsetDatastructure::XBufferCompactor::migrate_as<                  \
+        XOffsetDatastructure::Template<K_, V_>> {                              \
+        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
+            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+    };
+
+// ============================================================================
+// Built-in XOffsetDatastructure container registrations
+// ============================================================================
+XOFFSET_REGISTER_TYPE(XString, "string", AllocatorAware)
+XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)
+XOFFSET_REGISTER_CONTAINER(XSet, "set", Container)
+XOFFSET_REGISTER_MAP(XMap, "map", Container)
 
 #endif
