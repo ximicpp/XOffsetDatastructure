@@ -246,9 +246,9 @@ signatures differ, and `static_assert` fails at compile time.
 
 | Role | Mechanism | What it checks | Location |
 |------|-----------|---------------|----------|
-| **Domain A** | Preprocessor `#error` | Rejects 32-bit or big-endian | Lines 30–37 |
-| **Domain A** | 15 `static_assert` | sizeof/alignof of primitives match TargetArch | Lines 119–135 |
-| **Domain S** | `is_safe_type()` check | Only fixed-width, pointer-safe types | §3, Lines 748–776 |
+| **Domain A** | Preprocessor `#error` | Rejects 32-bit or big-endian | `#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS` block |
+| **Domain A** | 15 `static_assert` | sizeof/alignof of primitives match TargetArch | Platform validation block after `namespace XOffsetDatastructure` |
+| **Domain S** | `is_safe_type()` check | Only fixed-width, pointer-safe types | §3, `detail::is_safe_type()` |
 | **Verifier** | TypeLayout signature | Exact field offsets, sizes, padding, nesting | `static_assert(get_definition_signature<T>() == ...)` |
 
 ---
@@ -359,8 +359,8 @@ The Safe Type Set S is defined in detail in §3.
 
 | Role | Mechanism | What it checks | Location |
 |------|-----------|---------------|----------|
-| **Domain S** | `is_safe_type()` check | No absolute address types | §3, Lines 748–776 |
-| **Domain S** | `validate_xbuffer_type<T>()` | User-facing gate rejects unsafe types | Lines 825–855 |
+| **Domain S** | `is_safe_type()` check | No absolute address types | §3, `detail::is_safe_type()` |
+| **Domain S** | `validate_xbuffer_type<T>()` | User-facing gate rejects unsafe types | `validate_xbuffer_type<T>()` function |
 | **Mechanism** | offset_ptr via Boost.IPC allocator | All containers use relative pointers | Boost.Container + allocator |
 | **P3** | Same Boost.IPC version | Infrastructure types (index, free-list) use offset_ptr | Dependency assumption |
 
@@ -492,15 +492,15 @@ S = S₀ ∪ S_enum ∪ S_string ∪ S_container ∪ S_composite
 
 | Model concept | Code mechanism | Location |
 |---------------|----------------|----------|
-| S₀ | `is_safe_leaf<int8_t>` ... `<char>` : true_type | Lines 679–691 |
-| S_enum | `is_fixed_enum<CleanT>()` in `is_safe_type` | Line 786 |
-| S_string | `is_safe_leaf<XString>` : true_type | Line 698 |
-| S_container | `is_safe_leaf<XVector<T>>`, `<XSet<T>>`, `<XMap<K,V>>` | Lines 701–703 |
-| S_composite | `are_all_members_safe<CleanT>()` | Lines 749–763 |
-| Exclusion of polymorphic | `std::is_polymorphic_v<T>` | Line 753 |
-| Exclusion of bases | `has_bases<T>()` via reflection | Line 754 |
-| Exclusion of union | `std::is_union_v<T>` | Line 755 |
-| User-facing gate | `validate_xbuffer_type<T>()` static_assert | Lines 845–875 |
+| S₀ | `is_safe_leaf<int8_t>` ... `<char>` : true_type | LEAF-1 block in `detail` namespace |
+| S_enum | `is_fixed_enum<CleanT>()` in `is_safe_type` | `is_safe_type()` enum branch |
+| S_string | `is_safe_leaf<XString>` : true_type | LEAF-3 in `detail` namespace |
+| S_container | `is_safe_leaf<XVector<T>>`, `<XSet<T>>`, `<XMap<K,V>>` | LEAF-4 in `detail` namespace |
+| S_composite | `are_all_members_safe<CleanT>()` | `are_all_members_safe()` function |
+| Exclusion of polymorphic | `std::is_polymorphic_v<T>` | Inside `are_all_members_safe()` |
+| Exclusion of bases | `has_bases<T>()` via reflection | Inside `are_all_members_safe()` |
+| Exclusion of union | `std::is_union_v<T>` | Inside `are_all_members_safe()` |
+| User-facing gate | `validate_xbuffer_type<T>()` static_assert | `validate_xbuffer_type()` function |
 
 ---
 
@@ -642,14 +642,14 @@ then both C1 and C2 must hold. This establishes that C1 and C2 are the
 
 | Condition | Enforcement | Code |
 |-----------|-------------|------|
-| **C1**: Same architecture | 15 `static_assert` matching TargetArch | Lines 119–135 |
-| **C1**: Same architecture | Preprocessor `#error` for wrong platform | Lines 30–37 |
+| **C1**: Same architecture | 15 `static_assert` matching TargetArch | Platform validation block |
+| **C1**: Same architecture | Preprocessor `#error` for wrong platform | `XOFFSET_DISABLE_PLATFORM_CHECKS` block |
 | **C1**: Same ABI | TypeLayout signature comparison | `get_definition_signature<T>()` |
-| **C2**: No absolute addresses | `is_safe_leaf` whitelist | Lines 677–703 |
-| **C2**: No absolute addresses | `is_safe_type()` recursive check | Lines 769–795 |
-| **C2**: No absolute addresses | `validate_xbuffer_type<T>()` gate | Lines 845–875 |
+| **C2**: No absolute addresses | `is_safe_leaf` whitelist | LEAF-1~5 in `detail` namespace |
+| **C2**: No absolute addresses | `is_safe_type()` recursive check | `detail::is_safe_type()` function |
+| **C2**: No absolute addresses | `validate_xbuffer_type<T>()` gate | `validate_xbuffer_type()` function |
 | **C2**: offset_ptr usage | Boost.IPC containers with segment_manager allocator | Boost.Container + allocator |
-| **P1**: Alignment | `BOOST_ASSERT` on buffer address | Lines 235, 247 |
+| **P1**: Alignment | `BOOST_ASSERT` on buffer address | `XManagedMemory` constructors |
 | **P2**: Lifetime | Boost.IPC "memory-as-bytes" pattern | Boost.Interprocess convention |
 | **P3**: Infrastructure | Same Boost.IPC version on producer and consumer | Dependency assumption |
 

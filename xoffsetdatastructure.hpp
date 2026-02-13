@@ -84,7 +84,10 @@ namespace XOffsetDatastructure {
         std::size_t alignof_double;
     };
 
-    // Architecture Presets
+    // Architecture Presets.
+    // Currently only Arch64LE is actively supported and tested.
+    // The other presets are defined for forward-compatibility and
+    // cross-platform migration tooling (see §6.2 in CORE_FORMAL_MODEL.md).
     inline constexpr ArchSpec Arch64LE = {
         .pointer_size = 8, .little_endian = true,
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
@@ -275,7 +278,7 @@ public:
     //
     // WARNING: All existing pointers, references, and iterators into the
     // buffer are INVALIDATED after this call. The underlying std::vector
-    // may relocate to a new heap address. Re-acquire pointers via find<T>().
+    // may relocate to a new heap address. Re-acquire pointers via root<T>().
     bool grow(size_type extra_bytes)
     {
         const size_type original_size = m_buffer.size();
@@ -309,7 +312,7 @@ public:
     }
 
     // WARNING: Invalidates ALL existing pointers/references into this buffer.
-    // After calling, re-acquire object pointers via find<T>() or root<T>().
+    // After calling, re-acquire object pointers via root<T>() or handle<T>().
     //
     // Optimized: 2 copies instead of 3 — reuses close/open pattern from grow().
     void shrink_to_fit()
@@ -355,6 +358,8 @@ namespace XOffsetDatastructure {
     using namespace boost::interprocess;
 
     using XBuffer = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
+    // Alternative allocator policy (rbtree best-fit). Currently unused —
+    // provided for future experimentation with allocation strategies.
     using XBufferBestFit = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
 
     template<typename T>
@@ -1142,6 +1147,22 @@ namespace XOffsetDatastructure {
         mutable uint64_t cached_epoch_ = 0;
     };
 
+    // ========================================================================
+    // XBufferExt — Single-Root-Object Model
+    //
+    // XBufferExt is designed around a single root object per buffer:
+    //   - make<T>()       creates the one root object
+    //   - root<T>()       retrieves it
+    //   - has_root<T>()   checks if it exists
+    //
+    // This is a deliberate simplification over the underlying Boost.IPC
+    // multi-named-object capability. The single-root model eliminates the
+    // need for string-based naming, provides a cleaner API, and matches the
+    // common serialization pattern (one top-level object with nested containers).
+    //
+    // For advanced multi-object scenarios, use the base XBuffer class directly
+    // with construct<T>("name") / find<T>("name").
+    // ========================================================================
     class XBufferExt : public XBuffer {
     public:
         using XBuffer::XBuffer;
@@ -1154,17 +1175,26 @@ namespace XOffsetDatastructure {
         template<typename T>
         T* make() {
             validate_xbuffer_type<T>();
+            if (this->find<T>(XBUFFER_ROOT_NAME).first != nullptr) {
+                throw boost::interprocess::interprocess_exception(
+                    "make<T>(): root object already exists. "
+                    "Call root<T>() to access the existing object.");
+            }
             return this->construct<T>(XBUFFER_ROOT_NAME)(this->get_segment_manager());
         }
         
         // Returns a reference to the root object. Use after deserialization
         // or after grow/shrink to re-acquire a valid reference.
         //
-        // Asserts if the root object does not exist.
+        // Throws if the root object does not exist.
         template<typename T>
         T& root() {
             auto result = this->find<T>(XBUFFER_ROOT_NAME);
-            assert(result.first && "root<T>(): no root object in buffer");
+            if (!result.first) {
+                throw boost::interprocess::interprocess_exception(
+                    "root<T>(): no root object in buffer. "
+                    "Call make<T>() first or check with has_root<T>().");
+            }
             return *result.first;
         }
 
@@ -1200,9 +1230,20 @@ namespace XOffsetDatastructure {
             return stats().used_size;
         }
 
-        // Serializes the full buffer (including free space) to a string.
-        // Fast but may include unused padding. For minimal output, use save_to_vector().
+        // Serializes the buffer to a compact string by shrinking first.
+        // Output size ≈ used_size(). This is the recommended serialization method.
+        //
+        // WARNING: Invalidates all existing pointers. Re-acquire via root<T>() after calling.
         std::string save_to_string() {
+            this->shrink_to_fit();
+            auto* buffer = this->get_buffer();
+            return std::string(buffer->begin(), buffer->end());
+        }
+
+        // Serializes the full buffer including free space (no shrink).
+        // Faster than save_to_string() but output includes unused padding.
+        // Use when performance matters and output size is not a concern.
+        std::string save_to_string_full() {
             auto* buffer = this->get_buffer();
             return std::string(buffer->begin(), buffer->end());
         }
