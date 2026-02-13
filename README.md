@@ -64,7 +64,7 @@ Operations that invalidate pointers:
 |-----------|:------------------------:|
 | `grow()` | ✅ Yes |
 | `shrink_to_fit()` | ✅ Yes |
-| `compact()` / `compact_automatic<T>()` | ✅ Yes |
+| `compact()` / `compact_automatic<T>()` | ✅ Yes (returns a **new** `XBufferExt`) |
 | `make<T>()` | ❌ No (but may fail if full) |
 | `root<T>()` / `has_root<T>()` | ❌ No |
 | Read/write to existing objects | ❌ No |

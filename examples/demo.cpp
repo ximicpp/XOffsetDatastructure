@@ -164,6 +164,41 @@ void demo_memory_management() {
     print_info("After Shrink", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     print_check("Memory optimized");
+    
+    // ── XHandle: Epoch-Cached Safe Handle ──
+    // Instead of manually re-acquiring pointers after every grow/shrink,
+    // XHandle<T> caches the pointer + buffer epoch. On dereference it checks
+    // if the epoch changed (O(1) integer comparison). If not, it returns the
+    // cached pointer directly. If yes, it re-finds the root object once.
+    print_subsection("XHandle - Safe Pointer Access");
+    
+    XBufferExt hbuf(2048);
+    hbuf.make<GameData>();
+    
+    // Create a handle — no manual pointer management needed
+    auto h = hbuf.handle<GameData>();
+    h->player_name = "HandleHero";
+    h->level = 77;
+    print_check("XHandle created, player_name = " + std::string(h->player_name.c_str()));
+    
+    // grow() invalidates raw pointers, but XHandle auto-recovers
+    hbuf.grow(4096);
+    // No need to call root<T>() — XHandle detects the epoch change
+    print_info("After grow()", std::string("level = ") + std::to_string(h->level));
+    print_check("XHandle survived grow() — no manual re-acquire needed");
+    
+    // shrink_to_fit() also invalidates — XHandle still works
+    hbuf.shrink_to_fit();
+    print_info("After shrink()", std::string("player_name = ") + std::string(h->player_name.c_str()));
+    print_check("XHandle survived shrink_to_fit()");
+    
+    // make_handle() — create + handle in one call
+    XBufferExt hbuf2(1024);
+    auto h2 = hbuf2.make_handle<GameData>();
+    h2->player_name = "OneCall";
+    h2->level = 42;
+    print_check("make_handle() — create + handle in one step");
+    print_info("Result", std::string(h2->player_name.c_str()) + " (Level " + std::to_string(h2->level) + ")");
 }
 
 // ============================================================================
@@ -304,10 +339,10 @@ void demo_automatic_compaction() {
     print_subsection("Automatic Compaction (C++26 Reflection)");
     std::cout << "  Using XBufferCompactor::compact_automatic<GameData>()\n\n";
     
-    // Compact using C++26 reflection
-    XBuffer compacted = XBufferCompactor::compact_automatic<GameData>(xbuf);
+    // Compact using C++26 reflection — returns XBufferExt directly
+    XBufferExt compacted = XBufferCompactor::compact_automatic<GameData>(xbuf);
     
-    auto stats_after = XBufferVisualizer::get_memory_stats(compacted);
+    auto stats_after = compacted.stats();
     print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");
     print_info("Used Size", std::to_string(stats_after.used_size) + " bytes");
     print_info("Efficiency", std::to_string(static_cast<int>(stats_after.usage_percent())) + "%");
@@ -315,13 +350,8 @@ void demo_automatic_compaction() {
     print_check("Memory compacted successfully!");
     
     print_subsection("Data Integrity Verification");
-    // compact_automatic returns XBuffer (base class).
-    // Wrap it in XBufferExt to access the ergonomic root<T>() API.
-    XBufferExt compacted_ext(compacted.get_buffer()->data(),
-                             compacted.get_buffer()->size());
-    
-    if (compacted_ext.has_root<GameData>()) {
-        auto& compacted_game = compacted_ext.root<GameData>();
+    if (compacted.has_root<GameData>()) {
+        auto& compacted_game = compacted.root<GameData>();
         bool integrity_ok = (
             std::string(compacted_game.player_name.c_str()) == "FragmentedHero" &&
             compacted_game.player_id == 77777 &&

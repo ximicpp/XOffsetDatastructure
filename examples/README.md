@@ -118,14 +118,27 @@ These rules apply to all code using XBufferExt. See the project README for full 
 ### Pointer Invalidation
 
 `grow()`, `shrink_to_fit()`, and `compact_automatic()` may relocate the buffer.
-**All existing pointers become invalid.** Re-acquire through `root<T>()`:
+**All existing pointers become invalid.** Re-acquire through `root<T>()`,
+or use `XHandle` to avoid manual re-acquisition entirely:
 
 ```cpp
 auto* obj = xbuf.make<MyType>();
 xbuf.grow(8192);
 // ⚠ 'obj' is DANGLING here
-obj = &xbuf.root<MyType>();  // ✅ re-acquire
+obj = &xbuf.root<MyType>();  // ✅ manual re-acquire
+
+// ✅ BETTER — XHandle auto-recovers after any buffer relocation
+auto h = xbuf.handle<MyType>();
+xbuf.grow(8192);
+h->field = 42;  // safe — handle detects the epoch change
 ```
+
+> `compact_automatic<T>()` returns a **new** `XBufferExt` (not the original buffer).
+> Use the returned object directly — no wrapper needed:
+> ```cpp
+> XBufferExt compacted = XBufferCompactor::compact_automatic<MyType>(xbuf);
+> auto& obj = compacted.root<MyType>();  // ✅ direct access
+> ```
 
 ### Bulk Deallocation
 
