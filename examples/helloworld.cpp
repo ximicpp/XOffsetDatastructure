@@ -84,12 +84,12 @@ int main() {
     std::cout << "   After operations - Used: " << stats_frag.used_size 
               << " bytes (" << std::setprecision(1) << stats_frag.usage_percent() << "%)\n";
     
-    // Compact the buffer
+    // Compact the buffer — returns XBufferExt directly
     std::cout << "\n   Compacting buffer...\n";
-    XBuffer compacted = XBufferCompactor::compact_automatic<Player>(xbuf);
+    XBufferExt compacted = XBufferCompactor::compact_automatic<Player>(xbuf);
     
     // Show stats after compaction
-    auto stats_after = XBufferVisualizer::get_memory_stats(compacted);
+    auto stats_after = compacted.stats();
     std::cout << "   After compaction:\n";
     std::cout << "   - Total size: " << stats_after.total_size << " bytes\n";
     std::cout << "   - Used size: " << stats_after.used_size << " bytes\n";
@@ -99,10 +99,8 @@ int main() {
               << stats_after.usage_percent() << "%\n";
     
     // Verify data integrity after compaction
-    // compact_automatic returns XBuffer; wrap in XBufferExt for convenient access
-    XBufferExt compacted_ext(compacted.get_buffer()->data(), compacted.get_buffer()->size());
-    if (compacted_ext.has_root<Player>()) {
-        auto& compacted_player = compacted_ext.root<Player>();
+    if (compacted.has_root<Player>()) {
+        auto& compacted_player = compacted.root<Player>();
         std::cout << "\n   [OK] Data integrity verified:\n";
         std::cout << "     Name: " << compacted_player.name << "\n";
         std::cout << "     Level: " << compacted_player.level << "\n";

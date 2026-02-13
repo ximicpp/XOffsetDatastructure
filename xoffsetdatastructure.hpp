@@ -697,164 +697,6 @@ namespace XOffsetDatastructure {
     // Users never see this — all public APIs hide the naming layer.
     inline constexpr const char* XBUFFER_ROOT_NAME = "__root__";
 
-    class XBufferCompactor {
-    public:
-        // Single-object compaction: migrates the root object to a new,
-        // tightly-packed buffer.
-        template<typename T>
-        static XBuffer compact_automatic(XBuffer& old_xbuf) {
-            validate_xbuffer_type<T>();
-            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
-            std::size_t new_size = stats.used_size + (stats.used_size / 10);
-            if (new_size < 4096) new_size = 4096;
-            
-            XBuffer new_xbuf(new_size);
-            auto* old_obj = old_xbuf.find<T>(XBUFFER_ROOT_NAME).first;
-            if (!old_obj) {
-                return new_xbuf;
-            }
-            
-            auto* new_obj = new_xbuf.construct<T>(XBUFFER_ROOT_NAME)(new_xbuf.get_segment_manager());
-            migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-            new_xbuf.shrink_to_fit();
-            return new_xbuf;
-        }
-
-    private:
-        // ================================================================
-        // Migration strategy trait (extensible by users)
-        //
-        // Users who register is_safe_leaf<MyType> can also register
-        // migrate_as<MyType> to tell the Compactor how to migrate it.
-        // ================================================================
-        enum class MigrateStrategy {
-            TrivialCopy,      // direct assignment (primitives, enums, POD)
-            AllocatorAware,   // reconstruct with new allocator (XString-like)
-            Container,        // iterate elements, recurse (XVector/XSet/XMap)
-            Composite,        // reflect members, recurse (user structs)
-            NotRegistered     // use built-in auto-detection
-        };
-
-        template<typename T>
-        struct migrate_as { static constexpr MigrateStrategy value = MigrateStrategy::NotRegistered; };
-
-        // Built-in registrations for XOffset types
-        template<>             struct migrate_as<XString>  { static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware; };
-        template<typename T>   struct migrate_as<XVector<T>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
-        template<typename T>   struct migrate_as<XSet<T>>    { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
-        template<typename K, typename V> struct migrate_as<XMap<K,V>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
-
-        // Resolve migration strategy: user-registered > auto-detect
-        template<typename T>
-        static consteval MigrateStrategy resolve_strategy() {
-            using CleanT = std::remove_cv_t<T>;
-            if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
-                return migrate_as<CleanT>::value;
-            } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
-                return MigrateStrategy::TrivialCopy;
-            } else {
-                return MigrateStrategy::Composite;
-            }
-        }
-
-        // ================================================================
-        // Migration dispatch (uses is_safe_leaf + migrate_as)
-        // ================================================================
-        template<typename ElementType>
-        static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            constexpr auto strategy = resolve_strategy<ElementType>();
-            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
-                return old_elem;
-            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
-                // Allocator-aware copy: reconstruct with new allocator
-                // Requires ElementType(const ElementType&, allocator_type) constructor
-                return ElementType(old_elem, new_xbuf.get_segment_manager());
-            } else {
-                ElementType new_elem(new_xbuf.get_segment_manager());
-                migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
-                return new_elem;
-            }
-        }
-        
-        template<typename ContainerType>
-        static void migrate_container(const ContainerType& old_container, 
-                                      ContainerType& new_container,
-                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            using ElementType = typename ContainerType::value_type;
-
-            if constexpr (std::is_trivially_copyable_v<ElementType>) {
-                new_container = old_container;
-                return;
-            }
-            
-            if constexpr (MapLikeContainer<ContainerType>) {
-                for (const auto& [key, value] : old_container) {
-                    auto new_key = migrate_element(key, old_xbuf, new_xbuf);
-                    auto new_value = migrate_element(value, old_xbuf, new_xbuf);
-                    new_container.emplace(std::move(new_key), std::move(new_value));
-                }
-            } else {
-                for (const auto& elem : old_container) {
-                    auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
-                    if constexpr (SetLikeContainer<ContainerType>) {
-                        new_container.emplace(std::move(migrated_elem));
-                    } else {
-                        new_container.emplace_back(std::move(migrated_elem));
-                    }
-                }
-            }
-        }
-        
-        template<typename MemberType>
-        static void migrate_member(const MemberType& old_member, MemberType& new_member, 
-                                  XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            constexpr auto strategy = resolve_strategy<MemberType>();
-            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
-                new_member = old_member;
-            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
-                new_member = MemberType(old_member, new_xbuf.get_segment_manager());
-            } else if constexpr (strategy == MigrateStrategy::Container) {
-                migrate_container(old_member, new_member, old_xbuf, new_xbuf);
-            } else {
-                migrate_members(old_member, new_member, old_xbuf, new_xbuf);
-            }
-        }
-        
-        
-        template<typename T, std::size_t Index>
-        static consteval auto get_member_at() {
-            using namespace std::meta;
-            auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
-            return members[Index];
-        }
-        
-        template<typename T, std::size_t Index>
-        static void migrate_member_at(const T& old_obj, T& new_obj,
-                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            using namespace std::meta;
-            constexpr auto member = get_member_at<T, Index>();
-            using MemberType = [:type_of(member):];
-            const auto& old_member = old_obj.[:member:];
-            auto& new_member = new_obj.[:member:];
-            migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
-        }
-        
-        template<typename T, std::size_t... Is>
-        static void migrate_members_impl(const T& old_obj, T& new_obj,
-                                         XBuffer& old_xbuf, XBuffer& new_xbuf,
-                                         std::index_sequence<Is...>) {
-            (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
-        }
-        
-        template<typename T>
-        static void migrate_members(const T& old_obj, T& new_obj, 
-                                   XBuffer& old_xbuf, XBuffer& new_xbuf) {
-            constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
-            migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
-                                std::make_index_sequence<member_count>{});
-        }
-    };
-
     namespace detail {
 
         // ============================================================================
@@ -1281,6 +1123,166 @@ namespace XOffsetDatastructure {
             std::size_t estimated = min_overhead + user_data_bytes;
             estimated += estimated / 5;  // +20% headroom
             return std::max(estimated, (std::size_t)512);
+        }
+    };
+
+    // ================================================================
+    // XBufferCompactor — Automatic memory compaction using C++26 reflection
+    //
+    // Defined after XBufferExt so that compact_automatic<T>() can return
+    // XBufferExt directly, giving callers immediate access to root<T>(),
+    // save_to_string(), etc.
+    // ================================================================
+    class XBufferCompactor {
+    public:
+        // Single-object compaction: migrates the root object to a new,
+        // tightly-packed buffer.  Returns XBufferExt for ergonomic access.
+        template<typename T>
+        static XBufferExt compact_automatic(XBuffer& old_xbuf) {
+            validate_xbuffer_type<T>();
+            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+            std::size_t new_size = stats.used_size + (stats.used_size / 10);
+            if (new_size < 4096) new_size = 4096;
+            
+            XBufferExt new_xbuf(new_size);
+            auto* old_obj = old_xbuf.find<T>(XBUFFER_ROOT_NAME).first;
+            if (!old_obj) {
+                return new_xbuf;
+            }
+            
+            auto* new_obj = new_xbuf.construct<T>(XBUFFER_ROOT_NAME)(new_xbuf.get_segment_manager());
+            migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
+            new_xbuf.shrink_to_fit();
+            return new_xbuf;
+        }
+
+    private:
+        // ================================================================
+        // Migration strategy trait (extensible by users)
+        // ================================================================
+        enum class MigrateStrategy {
+            TrivialCopy,      // direct assignment (primitives, enums, POD)
+            AllocatorAware,   // reconstruct with new allocator (XString-like)
+            Container,        // iterate elements, recurse (XVector/XSet/XMap)
+            Composite,        // reflect members, recurse (user structs)
+            NotRegistered     // use built-in auto-detection
+        };
+
+        template<typename T>
+        struct migrate_as { static constexpr MigrateStrategy value = MigrateStrategy::NotRegistered; };
+
+        // Built-in registrations for XOffset types
+        template<>             struct migrate_as<XString>  { static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware; };
+        template<typename T>   struct migrate_as<XVector<T>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+        template<typename T>   struct migrate_as<XSet<T>>    { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+        template<typename K, typename V> struct migrate_as<XMap<K,V>> { static constexpr MigrateStrategy value = MigrateStrategy::Container; };
+
+        // Resolve migration strategy: user-registered > auto-detect
+        template<typename T>
+        static consteval MigrateStrategy resolve_strategy() {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
+                return migrate_as<CleanT>::value;
+            } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
+                return MigrateStrategy::TrivialCopy;
+            } else {
+                return MigrateStrategy::Composite;
+            }
+        }
+
+        // ================================================================
+        // Migration dispatch (uses is_safe_leaf + migrate_as)
+        // ================================================================
+        template<typename ElementType>
+        static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            constexpr auto strategy = resolve_strategy<ElementType>();
+            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
+                return old_elem;
+            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
+                return ElementType(old_elem, new_xbuf.get_segment_manager());
+            } else {
+                ElementType new_elem(new_xbuf.get_segment_manager());
+                migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
+                return new_elem;
+            }
+        }
+        
+        template<typename ContainerType>
+        static void migrate_container(const ContainerType& old_container, 
+                                      ContainerType& new_container,
+                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            using ElementType = typename ContainerType::value_type;
+
+            if constexpr (std::is_trivially_copyable_v<ElementType>) {
+                new_container = old_container;
+                return;
+            }
+            
+            if constexpr (MapLikeContainer<ContainerType>) {
+                for (const auto& [key, value] : old_container) {
+                    auto new_key = migrate_element(key, old_xbuf, new_xbuf);
+                    auto new_value = migrate_element(value, old_xbuf, new_xbuf);
+                    new_container.emplace(std::move(new_key), std::move(new_value));
+                }
+            } else {
+                for (const auto& elem : old_container) {
+                    auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
+                    if constexpr (SetLikeContainer<ContainerType>) {
+                        new_container.emplace(std::move(migrated_elem));
+                    } else {
+                        new_container.emplace_back(std::move(migrated_elem));
+                    }
+                }
+            }
+        }
+        
+        template<typename MemberType>
+        static void migrate_member(const MemberType& old_member, MemberType& new_member, 
+                                  XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            constexpr auto strategy = resolve_strategy<MemberType>();
+            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
+                new_member = old_member;
+            } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
+                new_member = MemberType(old_member, new_xbuf.get_segment_manager());
+            } else if constexpr (strategy == MigrateStrategy::Container) {
+                migrate_container(old_member, new_member, old_xbuf, new_xbuf);
+            } else {
+                migrate_members(old_member, new_member, old_xbuf, new_xbuf);
+            }
+        }
+        
+        
+        template<typename T, std::size_t Index>
+        static consteval auto get_member_at() {
+            using namespace std::meta;
+            auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
+            return members[Index];
+        }
+        
+        template<typename T, std::size_t Index>
+        static void migrate_member_at(const T& old_obj, T& new_obj,
+                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            using namespace std::meta;
+            constexpr auto member = get_member_at<T, Index>();
+            using MemberType = [:type_of(member):];
+            const auto& old_member = old_obj.[:member:];
+            auto& new_member = new_obj.[:member:];
+            migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
+        }
+        
+        template<typename T, std::size_t... Is>
+        static void migrate_members_impl(const T& old_obj, T& new_obj,
+                                         XBuffer& old_xbuf, XBuffer& new_xbuf,
+                                         std::index_sequence<Is...>) {
+            (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+        }
+        
+        template<typename T>
+        static void migrate_members(const T& old_obj, T& new_obj, 
+                                   XBuffer& old_xbuf, XBuffer& new_xbuf) {
+            constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
+            migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
+                                std::make_index_sequence<member_count>{});
         }
     };
 }
