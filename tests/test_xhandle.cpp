@@ -30,7 +30,7 @@ bool test_basic_handle() {
     std::cout << "\n[TEST] Basic XHandle creation and access\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     auto player = buffer.make_handle<Player>();
 
     player->id = 42;
@@ -63,7 +63,7 @@ bool test_handle_survives_grow() {
     std::cout << "\n[TEST] XHandle survives grow()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(1024);
+    XBuffer buffer(1024);
     auto player = buffer.make_handle<Player>();
     player->id = 99;
     player->name = "BeforeGrow";
@@ -101,7 +101,7 @@ bool test_handle_survives_shrink() {
     std::cout << "\n[TEST] XHandle survives shrink_to_fit()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(8192);
+    XBuffer buffer(8192);
     auto player = buffer.make_handle<Player>();
     player->id = 77;
     player->name = "BeforeShrink";
@@ -127,14 +127,14 @@ bool test_handle_survives_compact() {
     std::cout << "\n[TEST] XHandle with compact_automatic()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(8192);
+    XBuffer buffer(8192);
     auto player = buffer.make_handle<Player>();
     player->id = 55;
     player->name = "BeforeCompact";
     player->items.push_back(100);
     player->items.push_back(200);
 
-    XBuffer compacted = XBufferCompactor::compact_automatic<Player>(buffer);
+    XBuffer compacted = XCompactor::compact_automatic<Player>(buffer);
     auto player2 = XHandle<Player>(compacted);
     assert(player2->id == 55);
     assert(std::string(player2->name.c_str()) == "BeforeCompact");
@@ -151,7 +151,7 @@ bool test_epoch_cache_efficiency() {
     std::cout << "\n[TEST] Epoch cache O(1) efficiency\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     auto player = buffer.make_handle<Player>();
     player->id = 1;
 
@@ -179,7 +179,7 @@ bool test_handle_existing() {
     std::cout << "\n[TEST] handle() for existing objects\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     auto* raw = buffer.make<Player>();
     raw->id = 123;
     raw->name = "RawCreated";
@@ -199,7 +199,7 @@ bool test_root_api() {
     std::cout << "\n[TEST] root() and has_root() API\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     assert(!buffer.has_root<Player>());
     std::cout << "  Test 7.1: has_root() false before make ... [OK]\n";
 
@@ -223,7 +223,7 @@ bool test_handle_serialization() {
     std::cout << "\n[TEST] Handles with serialization round-trip\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     auto player = buffer.make_handle<Player>();
     player->id = 42;
     player->name = "Serialized";
@@ -233,7 +233,7 @@ bool test_handle_serialization() {
     std::string data = buffer.save_to_string();
     std::cout << "  Serialized: " << data.size() << " bytes\n";
 
-    XBufferExt loaded = XBufferExt::load_from_string(data);
+    XBuffer loaded = XBuffer::load_from_string(data);
     auto& lp = loaded.root<Player>();
 
     assert(lp.id == 42);

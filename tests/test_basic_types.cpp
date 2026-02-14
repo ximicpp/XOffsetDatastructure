@@ -29,7 +29,7 @@ bool test_basic_types() {
     std::cout << std::string(50, '-') << "\n";
     
     // Create buffer
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     
     // Create and initialize object
     auto* obj = xbuf.make<BasicTypes>();
@@ -48,7 +48,7 @@ bool test_basic_types() {
     
     // Test persistence
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto& loaded_obj = loaded_buf.root<BasicTypes>();
     
     assert(loaded_obj.mInt == 42);

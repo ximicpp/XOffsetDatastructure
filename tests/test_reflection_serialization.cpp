@@ -93,7 +93,7 @@ void test_member_listing() {
     std::cout << "[Test 2] Member Listing\n";
     std::cout << "-----------------------\n";
     
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto* data = xbuf.make<SerializableData>();
     
     data->id = 42;
@@ -134,7 +134,7 @@ void test_complex_structure_analysis() {
     std::cout << "[Test 3] Complex Structure Analysis\n";
     std::cout << "------------------------------------\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     auto* data = xbuf.make<ComplexData>();
     
     data->type = 100;
@@ -169,7 +169,7 @@ void test_binary_serialization() {
     std::cout << "[Test 4] Binary Serialization\n";
     std::cout << "-----------------------------\n";
     
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto* data = xbuf.make<SerializableData>();
     
     data->id = 999;
@@ -186,7 +186,7 @@ void test_binary_serialization() {
     std::cout << "\n  Serialized to " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load_from_string(binary);
     auto& loaded = xbuf2.root<SerializableData>();
     
     if (true) { // root always valid after load

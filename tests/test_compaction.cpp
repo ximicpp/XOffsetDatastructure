@@ -24,7 +24,7 @@ bool test_memory_compaction() {
     std::cout << std::string(50, '-') << "\n";
     
     // Create initial buffer with extra space
-    XBufferExt xbuf(16384);
+    XBuffer xbuf(16384);
     auto* obj = xbuf.make<CompactTestType>();
     
     // Test 1: Fill with data
@@ -41,7 +41,7 @@ bool test_memory_compaction() {
     
     // Test 2: Check memory stats before compaction
     std::cout << "Test 2: Memory stats before compaction... ";
-    auto stats_before = XBufferVisualizer::get_memory_stats(xbuf);
+    auto stats_before = XBufferStats::get_memory_stats(xbuf);
     std::cout << "\n  Total size: " << stats_before.total_size << " bytes\n";
     std::cout << "  Used:       " << stats_before.used_size << " bytes\n";
     std::cout << "  Free:       " << stats_before.free_size << " bytes\n";
@@ -50,13 +50,13 @@ bool test_memory_compaction() {
     
     // Test 3: Perform automatic compaction (C++26 reflection-based)
     std::cout << "Test 3: Compact memory (automatic)... ";
-    XBuffer compact_buf = XBufferCompactor::compact_automatic<CompactTestType>(xbuf);
+    XBuffer compact_buf = XCompactor::compact_automatic<CompactTestType>(xbuf);
     assert(compact_buf.get_size() > 0);
     std::cout << "[OK]\n";
     
     // Test 4: Check memory stats after compaction
     std::cout << "Test 4: Memory stats after compaction... ";
-    auto stats_after = XBufferVisualizer::get_memory_stats(compact_buf);
+    auto stats_after = XBufferStats::get_memory_stats(compact_buf);
     std::cout << "\n  Total size: " << stats_after.total_size << " bytes\n";
     std::cout << "  Used:       " << stats_after.used_size << " bytes\n";
     std::cout << "  Free:       " << stats_after.free_size << " bytes\n";

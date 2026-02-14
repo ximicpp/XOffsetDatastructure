@@ -40,14 +40,14 @@ The hello world example walks through the core workflow in ~120 lines:
 5. **Inspect** the compile-time type signature
 
 ```cpp
-XBufferExt xbuf(4096);
+XBuffer xbuf(4096);
 auto* player = xbuf.make<Player>();
 player->name = "Alice";
 player->items.push_back(101);
 
 // Serialize → deserialize (zero-encoding)
 auto data = xbuf.save_to_string();
-XBufferExt loaded = XBufferExt::load_from_string(data);
+XBuffer loaded = XBuffer::load_from_string(data);
 auto& p = loaded.root<Player>();
 ```
 
@@ -92,8 +92,8 @@ How much space do you need? Use `estimate_buffer_size()`:
 
 ```cpp
 // Estimate for ~500 bytes of user data
-std::size_t size = XBufferExt::estimate_buffer_size(500);  // ~720 bytes
-XBufferExt xbuf(size);
+std::size_t size = XBuffer::estimate_buffer_size(500);  // ~720 bytes
+XBuffer xbuf(size);
 ```
 
 If unsure, start with 4096 (4KB). The buffer can be grown later with `grow()`.
@@ -113,7 +113,7 @@ try {
 
 ## Critical Safety Rules
 
-These rules apply to all code using XBufferExt. See the project README for full details.
+These rules apply to all code using XBuffer. See the project README for full details.
 
 ### Pointer Invalidation
 
@@ -133,10 +133,10 @@ xbuf.grow(8192);
 h->field = 42;  // safe — handle detects the epoch change
 ```
 
-> `compact_automatic<T>()` returns a **new** `XBufferExt` (not the original buffer).
+> `compact_automatic<T>()` returns a **new** `XBuffer` (not the original buffer).
 > Use the returned object directly — no wrapper needed:
 > ```cpp
-> XBufferExt compacted = XBufferCompactor::compact_automatic<MyType>(xbuf);
+> XBuffer compacted = XCompactor::compact_automatic<MyType>(xbuf);
 > auto& obj = compacted.root<MyType>();  // ✅ direct access
 > ```
 
@@ -147,4 +147,4 @@ are freed together when the buffer is destroyed.
 
 ### Thread Safety
 
-XBufferExt is **not** thread-safe. Concurrent writes require external synchronization.
+XBuffer is **not** thread-safe. Concurrent writes require external synchronization.

@@ -66,7 +66,7 @@ void test_memory_usage_tracking() {
     std::cout << "[Test 2] Memory Usage Tracking\n";
     std::cout << "------------------------------\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     
     auto stats_empty = xbuf.stats();
     std::cout << "  Initial state:\n";
@@ -97,7 +97,7 @@ void test_compaction_with_reflection() {
     std::cout << "[Test 3] Compaction with Reflection\n";
     std::cout << "------------------------------------\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<CompactData>();
     
     data->id = 2002;
@@ -139,7 +139,7 @@ void test_grow_and_verify() {
     std::cout << "[Test 4] Buffer Growth and Verification\n";
     std::cout << "----------------------------------------\n";
     
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto* data = xbuf.make<CompactData>();
     
     data->id = 3003;
@@ -168,7 +168,7 @@ void test_serialization_size() {
     std::cout << "[Test 5] Serialization Size Analysis\n";
     std::cout << "-------------------------------------\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     auto* data = xbuf.make<CompactData>();
     
     data->id = 4004;
@@ -187,7 +187,7 @@ void test_serialization_size() {
     std::cout << "\n  Serialized size: " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load_from_string(binary);
     auto stats2 = xbuf2.stats();
     
     std::cout << "\n  After deserialization:\n";
