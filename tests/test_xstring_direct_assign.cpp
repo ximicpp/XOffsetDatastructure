@@ -95,8 +95,8 @@ bool test_serialization_roundtrip() {
     data->name = "SerializedAlice";
     data->title = "ArchMage";
 
-    std::string binary = xbuf.save_to_string();
-    XBuffer loaded = XBuffer::load_from_string(binary);
+    std::string binary = xbuf.save();
+    XBuffer loaded = XBuffer::load(binary);
     assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
     assert(std::string(loaded_data.name.c_str()) == "SerializedAlice");
     assert(std::string(loaded_data.title.c_str()) == "ArchMage");
@@ -110,8 +110,8 @@ bool test_serialization_roundtrip() {
 
     // Test 7: Re-serialize and verify
     std::cout << "Test 7: Re-serialize and verify... ";
-    std::string binary2 = loaded.save_to_string();
-    XBuffer loaded2 = XBuffer::load_from_string(binary2);
+    std::string binary2 = loaded.save();
+    XBuffer loaded2 = XBuffer::load(binary2);
     assert(loaded2.has_root<StringTestData>()); auto& loaded_data2 = loaded2.root<StringTestData>();
     assert(std::string(loaded_data2.name.c_str()) == "ModifiedBob");
     assert(std::string(loaded_data2.title.c_str()) == "ArchMage");
@@ -147,8 +147,8 @@ bool test_vector_of_strings() {
 
     // Test 10: Verify through serialization
     std::cout << "Test 10: Serialize vector of strings... ";
-    std::string binary = xbuf.save_to_string();
-    XBuffer loaded = XBuffer::load_from_string(binary);
+    std::string binary = xbuf.save();
+    XBuffer loaded = XBuffer::load(binary);
     assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
     assert(loaded_data.names.size() == 3);
     assert(std::string(loaded_data.names[0].c_str()) == "Modified1");
@@ -181,8 +181,8 @@ bool test_player_direct_assign() {
 
     // Test 12: Verify serialization
     std::cout << "Test 12: Serialize Player... ";
-    std::string binary = xbuf.save_to_string();
-    XBuffer loaded = XBuffer::load_from_string(binary);
+    std::string binary = xbuf.save();
+    XBuffer loaded = XBuffer::load(binary);
     assert(loaded.has_root<Player>()); auto& loaded_player = loaded.root<Player>();
     assert(std::string(loaded_player.name.c_str()) == "Alice");
     assert(loaded_player.id == 1);
@@ -191,10 +191,10 @@ bool test_player_direct_assign() {
 
     // Test 13: Reassign and re-serialize
     std::cout << "Test 13: Reassign and re-serialize... ";
-    player = &xbuf.root<Player>();  // re-acquire after save_to_string shrink
+    player = &xbuf.root<Player>();  // re-acquire after save shrink
     player->name = "Bob";
-    binary = xbuf.save_to_string();
-    XBuffer loaded2 = XBuffer::load_from_string(binary);
+    binary = xbuf.save();
+    XBuffer loaded2 = XBuffer::load(binary);
     assert(loaded2.has_root<Player>()); auto& loaded_player2 = loaded2.root<Player>();
     assert(std::string(loaded_player2.name.c_str()) == "Bob");
     std::cout << "[OK]\n";

@@ -4,7 +4,7 @@
 //   - F3: make<T>() duplicate call detection
 //   - F4: root<T>() on empty buffer (throws, not UB)
 //   - F5: Buffer full / corrupted data / grow failure
-//   - F8: save_to_vector() / load_from_vector() / estimate_buffer_size()
+//   - F8: save_bytes() / load() / estimate_buffer_size()
 // ============================================================================
 
 #include <iostream>
@@ -68,10 +68,10 @@ bool test_root_empty() {
 }
 
 // ============================================================================
-// Test 3: save_to_vector() / load_from_vector() round-trip
+// Test 3: save_bytes() / load() round-trip
 // ============================================================================
 bool test_save_load_vector() {
-    std::cout << "\n[TEST] save_to_vector / load_from_vector round-trip\n";
+    std::cout << "\n[TEST] save_bytes / load round-trip\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(4096);
@@ -79,17 +79,17 @@ bool test_save_load_vector() {
     data->id = 42;
     data->name = "VectorTest";
 
-    std::vector<char> vec = xbuf.save_to_vector();
-    std::cout << "  save_to_vector: " << vec.size() << " bytes\n";
+    std::vector<char> vec = xbuf.save_bytes();
+    std::cout << "  save_bytes: " << vec.size() << " bytes\n";
     assert(vec.size() > 0);
     assert(vec.size() < 4096);  // should be compacted (smaller than original)
 
-    XBuffer loaded = XBuffer::load_from_vector(vec);
+    XBuffer loaded = XBuffer::load(vec);
     assert(loaded.has_root<SimpleData>());
     auto& r = loaded.root<SimpleData>();
     assert(r.id == 42);
     assert(std::string(r.name.c_str()) == "VectorTest");
-    std::cout << "  [OK] save_to_vector / load_from_vector round-trip successful\n";
+    std::cout << "  [OK] save_bytes / load round-trip successful\n";
 
     return true;
 }
@@ -121,10 +121,10 @@ bool test_estimate_buffer_size() {
 }
 
 // ============================================================================
-// Test 5: save_to_string() produces compact output
+// Test 5: save() produces compact output
 // ============================================================================
-bool test_save_to_string_compact() {
-    std::cout << "\n[TEST] save_to_string() produces compact output\n";
+bool test_save_compact() {
+    std::cout << "\n[TEST] save() produces compact output\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(8192);  // large buffer
@@ -132,19 +132,19 @@ bool test_save_to_string_compact() {
     data->id = 99;
     data->name = "CompactTest";
 
-    std::string compact = xbuf.save_to_string();
-    std::string full = xbuf.save_to_string_full();  // already shrunk, same size now
+    std::string compact = xbuf.save();
+    std::string full = xbuf.save_raw();  // already shrunk, same size now
 
-    std::cout << "  save_to_string:      " << compact.size() << " bytes\n";
-    std::cout << "  save_to_string_full: " << full.size() << " bytes\n";
-    // After save_to_string() shrinks, buffer is compact.
-    // save_to_string_full() on the already-shrunk buffer should be same size.
+    std::cout << "  save:      " << compact.size() << " bytes\n";
+    std::cout << "  save_raw: " << full.size() << " bytes\n";
+    // After save() shrinks, buffer is compact.
+    // save_raw() on the already-shrunk buffer should be same size.
     assert(compact.size() < 8192);
     assert(compact.size() > 0);
-    std::cout << "  [OK] save_to_string() output is compact (< 8192 original)\n";
+    std::cout << "  [OK] save() output is compact (< 8192 original)\n";
 
     // Verify round-trip
-    XBuffer loaded = XBuffer::load_from_string(compact);
+    XBuffer loaded = XBuffer::load(compact);
     assert(loaded.has_root<SimpleData>());
     auto& r = loaded.root<SimpleData>();
     assert(r.id == 99);
@@ -188,7 +188,7 @@ int main() {
     all_passed &= test_root_empty();
     all_passed &= test_save_load_vector();
     all_passed &= test_estimate_buffer_size();
-    all_passed &= test_save_to_string_compact();
+    all_passed &= test_save_compact();
     all_passed &= test_has_root_states();
 
     std::cout << "\n";

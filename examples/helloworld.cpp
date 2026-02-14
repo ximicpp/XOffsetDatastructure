@@ -40,16 +40,16 @@ int main() {
     std::cout << "\n";
     
     // 5. Serialize to string
-    // Use save_to_string_full() here to preserve buffer capacity for later
-    // operations. save_to_string() would shrink first (smaller output, but
+    // Use save_raw() here to preserve buffer capacity for later
+    // operations. save() would shrink first (smaller output, but
     // invalidates pointers and reduces capacity).
     std::cout << "\n5. Serializing...\n";
-    auto data = xbuf.save_to_string_full();
+    auto data = xbuf.save_raw();
     std::cout << "   Serialized size: " << data.size() << " bytes\n";
     
     // 6. Deserialize from string
     std::cout << "6. Deserializing...\n";
-    XBuffer loaded = XBuffer::load_from_string(data);
+    XBuffer loaded = XBuffer::load(data);
     if (loaded.has_root<Player>()) {
         auto& loaded_player = loaded.root<Player>();
         std::cout << "   Loaded player: " << loaded_player.name 
@@ -86,7 +86,7 @@ int main() {
     
     // Compact the buffer — returns XBuffer directly
     std::cout << "\n   Compacting buffer...\n";
-    XBuffer compacted = XCompactor::compact_automatic<Player>(xbuf);
+    XBuffer compacted = XCompactor::compact<Player>(xbuf);
     
     // Show stats after compaction
     auto stats_after = compacted.stats();

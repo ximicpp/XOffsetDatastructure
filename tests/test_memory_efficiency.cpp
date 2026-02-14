@@ -507,7 +507,7 @@ bool test_profile_midgame() {
     r.print();
 
     // Compaction
-    XBuffer compacted = XCompactor::compact_automatic<CharacterMidGame>(xbuf);
+    XBuffer compacted = XCompactor::compact<CharacterMidGame>(xbuf);
     auto sc = compacted.stats();
     Report rc{"Mid-Game (compacted)", sc.total_size, sc.used_size,
               logical, est_proto(logical)};
@@ -566,7 +566,7 @@ bool test_profile_endgame() {
     r.print();
 
     // Compaction
-    XBuffer compacted = XCompactor::compact_automatic<CharacterEndGame>(xbuf);
+    XBuffer compacted = XCompactor::compact<CharacterEndGame>(xbuf);
     auto sc = compacted.stats();
     Report rc{"End-Game (compacted)", sc.total_size, sc.used_size,
               logical, est_proto(logical)};
@@ -574,14 +574,14 @@ bool test_profile_endgame() {
     rc.print();
 
     // Serialization
-    std::string serialized = compacted.save_to_string();
+    std::string serialized = compacted.save();
     std::cout << "\n  Serialized wire size: " << serialized.size() << " bytes\n";
     std::cout << "  Estimated protobuf:   ~" << est_proto(logical) << " bytes\n";
     std::cout << "  Wire overhead vs proto: " << std::fixed << std::setprecision(2)
               << (double)serialized.size() / est_proto(logical) << "x\n";
 
     // Verify
-    auto loaded = XBuffer::load_from_string(serialized);
+    auto loaded = XBuffer::load(serialized);
     auto& v = loaded.root<CharacterEndGame>();
     assert(v.player_id == 7);
     assert(v.level == 100);

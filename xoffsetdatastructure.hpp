@@ -671,7 +671,7 @@ namespace XOffsetDatastructure {
             }
         };
 
-        static MemoryStats get_memory_stats(XBufferCore& xbuf) {
+        static MemoryStats memory_stats(XBufferCore& xbuf) {
             MemoryStats stats = {};
             stats.total_size = xbuf.get_size();
             stats.free_size = xbuf.get_free_memory();
@@ -679,8 +679,8 @@ namespace XOffsetDatastructure {
             return stats;
         }
 
-        static void print_stats(XBufferCore& xbuf) {
-            MemoryStats stats = get_memory_stats(xbuf);
+        static void print(XBufferCore& xbuf) {
+            MemoryStats stats = memory_stats(xbuf);
             std::cout << "XBufferCore: " << stats.used_size << "/" << stats.total_size
                       << " bytes (" << std::fixed << std::setprecision(1) 
                       << stats.usage_percent() << "% used)" << std::endl;
@@ -1072,16 +1072,16 @@ namespace XOffsetDatastructure {
         // Output size ≈ used_size(). This is the recommended serialization method.
         //
         // WARNING: Invalidates all existing pointers. Re-acquire via root<T>() after calling.
-        std::string save_to_string() {
+        std::string save() {
             this->shrink_to_fit();
             auto* buffer = this->get_buffer();
             return std::string(buffer->begin(), buffer->end());
         }
 
         // Serializes the full buffer including free space (no shrink).
-        // Faster than save_to_string() but output includes unused padding.
+        // Faster than save() but output includes unused padding.
         // Use when performance matters and output size is not a concern.
-        std::string save_to_string_full() {
+        std::string save_raw() {
             auto* buffer = this->get_buffer();
             return std::string(buffer->begin(), buffer->end());
         }
@@ -1090,26 +1090,26 @@ namespace XOffsetDatastructure {
         // Output size ≈ used_size(). Ideal for network transfer or persistent storage.
         //
         // WARNING: Invalidates all existing pointers. Re-acquire via root<T>() after calling.
-        std::vector<char> save_to_vector() {
+        std::vector<char> save_bytes() {
             this->shrink_to_fit();
             auto* buf = this->get_buffer();
             return std::vector<char>(buf->begin(), buf->end());
         }
 
-        static XBuffer load_from_string(const std::string& data) {
+        static XBuffer load(const std::string& data) {
             std::vector<char> buffer(data.begin(), data.end());
             XBuffer xbuf(buffer);
             return xbuf;
         }
 
-        static XBuffer load_from_vector(const std::vector<char>& data) {
+        static XBuffer load(const std::vector<char>& data) {
             std::vector<char> buffer(data);
             XBuffer xbuf(buffer);
             return xbuf;
         }
 
         XBufferStats::MemoryStats stats() {
-            return XBufferStats::get_memory_stats(*this);
+            return XBufferStats::memory_stats(*this);
         }
 
         // Estimates a suitable buffer size for the given user data payload.
@@ -1125,9 +1125,9 @@ namespace XOffsetDatastructure {
     // ================================================================
     // XCompactor — Automatic memory compaction using C++26 reflection
     //
-    // Defined after XBuffer so that compact_automatic<T>() can return
+    // Defined after XBuffer so that compact<T>() can return
     // XBuffer directly, giving callers immediate access to root<T>(),
-    // save_to_string(), etc.
+    // save(), etc.
     // ================================================================
     class XCompactor {
     public:
@@ -1153,9 +1153,9 @@ namespace XOffsetDatastructure {
         // Single-object compaction: migrates the root object to a new,
         // tightly-packed buffer.  Returns XBuffer for ergonomic access.
         template<typename T>
-        static XBuffer compact_automatic(XBufferCore& old_xbuf) {
+        static XBuffer compact(XBufferCore& old_xbuf) {
             validate_xbuffer_type<T>();
-            auto stats = XBufferStats::get_memory_stats(old_xbuf);
+            auto stats = XBufferStats::memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
             if (new_size < 4096) new_size = 4096;
             

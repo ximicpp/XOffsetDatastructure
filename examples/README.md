@@ -46,8 +46,8 @@ player->name = "Alice";
 player->items.push_back(101);
 
 // Serialize → deserialize (zero-encoding)
-auto data = xbuf.save_to_string();
-XBuffer loaded = XBuffer::load_from_string(data);
+auto data = xbuf.save();
+XBuffer loaded = XBuffer::load(data);
 auto& p = loaded.root<Player>();
 ```
 
@@ -117,7 +117,7 @@ These rules apply to all code using XBuffer. See the project README for full det
 
 ### Pointer Invalidation
 
-`grow()`, `shrink_to_fit()`, and `compact_automatic()` may relocate the buffer.
+`grow()`, `shrink_to_fit()`, and `compact()` may relocate the buffer.
 **All existing pointers become invalid.** Re-acquire through `root<T>()`,
 or use `XHandle` to avoid manual re-acquisition entirely:
 
@@ -133,10 +133,10 @@ xbuf.grow(8192);
 h->field = 42;  // safe — handle detects the epoch change
 ```
 
-> `compact_automatic<T>()` returns a **new** `XBuffer` (not the original buffer).
+> `compact<T>()` returns a **new** `XBuffer` (not the original buffer).
 > Use the returned object directly — no wrapper needed:
 > ```cpp
-> XBuffer compacted = XCompactor::compact_automatic<MyType>(xbuf);
+> XBuffer compacted = XCompactor::compact<MyType>(xbuf);
 > auto& obj = compacted.root<MyType>();  // ✅ direct access
 > ```
 

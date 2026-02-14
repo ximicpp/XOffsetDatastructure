@@ -120,11 +120,11 @@ void test_serialization_with_large_struct() {
     std::cout << "    field15: " << data->field15 << "\n";
     
     // Serialize
-    std::string binary = xbuf.save_to_string();
+    std::string binary = xbuf.save();
     std::cout << "\n  Serialized size: " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBuffer xbuf2 = XBuffer::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load(binary);
     auto& data2 = xbuf2.root<LargeStruct>();
     
     std::cout << "\n  After deserialization:\n";

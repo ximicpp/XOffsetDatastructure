@@ -121,10 +121,10 @@ bool test_handle_survives_shrink() {
 }
 
 // ============================================================================
-// Test 4: Handle with compact_automatic()
+// Test 4: Handle with compact()
 // ============================================================================
 bool test_handle_survives_compact() {
-    std::cout << "\n[TEST] XHandle with compact_automatic()\n";
+    std::cout << "\n[TEST] XHandle with compact()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer buffer(8192);
@@ -134,7 +134,7 @@ bool test_handle_survives_compact() {
     player->items.push_back(100);
     player->items.push_back(200);
 
-    XBuffer compacted = XCompactor::compact_automatic<Player>(buffer);
+    XBuffer compacted = XCompactor::compact<Player>(buffer);
     auto player2 = XHandle<Player>(compacted);
     assert(player2->id == 55);
     assert(std::string(player2->name.c_str()) == "BeforeCompact");
@@ -230,10 +230,10 @@ bool test_handle_serialization() {
     player->items.push_back(10);
     player->items.push_back(20);
 
-    std::string data = buffer.save_to_string();
+    std::string data = buffer.save();
     std::cout << "  Serialized: " << data.size() << " bytes\n";
 
-    XBuffer loaded = XBuffer::load_from_string(data);
+    XBuffer loaded = XBuffer::load(data);
     auto& lp = loaded.root<Player>();
 
     assert(lp.id == 42);
