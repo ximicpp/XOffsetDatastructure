@@ -2,7 +2,7 @@
 // Test: XBuffer API (Single-Object Model)
 // Purpose: Test the simplified single-root-object API:
 //   make<T>(), root<T>(), has_root<T>(), handle<T>(),
-//   make_handle<T>(), stats(), save_to_string(), load_from_string()
+//   make_handle<T>(), stats(), save(), load()
 // ============================================================================
 
 #include <iostream>
@@ -56,7 +56,7 @@ bool test_make_and_root() {
 // Test 2: Serialization round-trip
 // ============================================================================
 bool test_serialization() {
-    std::cout << "\n[TEST] save_to_string / load_from_string\n";
+    std::cout << "\n[TEST] save / load\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(4096);
@@ -67,10 +67,10 @@ bool test_serialization() {
     obj->items.push_back(10);
     obj->items.push_back(20);
 
-    std::string data = xbuf.save_to_string();
+    std::string data = xbuf.save();
     std::cout << "  Serialized: " << data.size() << " bytes ... [OK]\n";
 
-    XBuffer loaded = XBuffer::load_from_string(data);
+    XBuffer loaded = XBuffer::load(data);
     assert(loaded.has_root<TestData>());
     auto& r = loaded.root<TestData>();
     assert(r.id == 99);
@@ -79,7 +79,7 @@ bool test_serialization() {
     assert(r.items.size() == 2);
     assert(r.items[0] == 10);
     assert(r.items[1] == 20);
-    std::cout << "  load_from_string round-trip ... [OK]\n";
+    std::cout << "  load round-trip ... [OK]\n";
 
     return true;
 }

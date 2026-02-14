@@ -222,11 +222,11 @@ void demo_serialization() {
     print_info("Level", std::to_string(src_game->level));
     
     print_subsection("Serializing to Binary");
-    std::string binary_data = src_buf.save_to_string();
+    std::string binary_data = src_buf.save();
     print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
     
     print_subsection("Deserializing from Binary");
-    XBuffer dst_buf = XBuffer::load_from_string(binary_data);
+    XBuffer dst_buf = XBuffer::load(binary_data);
     
     if (dst_buf.has_root<GameData>()) {
         auto& dst_game = dst_buf.root<GameData>();
@@ -337,10 +337,10 @@ void demo_automatic_compaction() {
     print_check("Buffer is now fragmented");
     
     print_subsection("Automatic Compaction (C++26 Reflection)");
-    std::cout << "  Using XCompactor::compact_automatic<GameData>()\n\n";
+    std::cout << "  Using XCompactor::compact<GameData>()\n\n";
     
     // Compact using C++26 reflection — returns XBuffer directly
-    XBuffer compacted = XCompactor::compact_automatic<GameData>(xbuf);
+    XBuffer compacted = XCompactor::compact<GameData>(xbuf);
     
     auto stats_after = compacted.stats();
     print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");

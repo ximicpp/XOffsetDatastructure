@@ -191,11 +191,11 @@ void test_serialization_with_reflection() {
     std::cout << "    value: " << data->value << "\n";
     
     // Serialize
-    std::string binary = xbuf.save_to_string();
+    std::string binary = xbuf.save();
     std::cout << "\n  Serialized to " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBuffer xbuf2 = XBuffer::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load(binary);
     auto& loaded = xbuf2.root<SimpleData>();
     
     if (true) { // root always valid after load
