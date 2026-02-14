@@ -66,7 +66,7 @@ int main() {
     std::cout << "  sizeof: " << sizeof(SafeData) << " bytes\n\n";
     
     // This should compile fine
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto* data = xbuf.make<SafeData>();
     data->id = 42;
     data->value = 3.14f;

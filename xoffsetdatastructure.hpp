@@ -357,10 +357,10 @@ private:
 namespace XOffsetDatastructure {
     using namespace boost::interprocess;
 
-    using XBuffer = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
+    using XBufferCore = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
     // Alternative allocator policy (rbtree best-fit). Currently unused —
     // provided for future experimentation with allocation strategies.
-    using XBufferBestFit = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
+    using XBufferCoreBestFit = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
 
     template<typename T>
     concept HasIterator = requires(T t) {
@@ -430,7 +430,7 @@ namespace XOffsetDatastructure {
         /// Zero overhead: inherits from OuterAlloc, adds no data members.
         template <typename T>
         using x_scoped_alloc = boost::container::scoped_allocator_adaptor<
-            boost::interprocess::allocator<T, XBuffer::segment_manager>>;
+            boost::interprocess::allocator<T, XBufferCore::segment_manager>>;
 
         /// Internal vector alias used as backing store for flat containers
         template <typename T>
@@ -450,11 +450,11 @@ namespace XOffsetDatastructure {
 
     /// Managed string with shared-memory allocator
     using XString = boost::container::basic_string<
-        char, std::char_traits<char>, allocator<char, XBuffer::segment_manager>>;
+        char, std::char_traits<char>, allocator<char, XBufferCore::segment_manager>>;
 
     /// Convenience allocator typedef for user-defined allocator-aware types.
     /// Usage:  using allocator_type = XAllocator;
-    using XAllocator = boost::interprocess::allocator<char, XBuffer::segment_manager>;
+    using XAllocator = boost::interprocess::allocator<char, XBufferCore::segment_manager>;
 
     // ========================================================================
     // Public Container Wrapper Classes
@@ -475,7 +475,7 @@ namespace XOffsetDatastructure {
     template <typename T>
     class XVector : public detail::x_vector_impl<T> {
         using Base = detail::x_vector_impl<T>;
-        using SM = XBuffer::segment_manager;
+        using SM = XBufferCore::segment_manager;
         auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
 
     public:
@@ -541,7 +541,7 @@ namespace XOffsetDatastructure {
     template <typename K, typename V>
     class XMap : public detail::x_map_impl<K, V> {
         using Base = detail::x_map_impl<K, V>;
-        using SM = XBuffer::segment_manager;
+        using SM = XBufferCore::segment_manager;
         auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
 
     public:
@@ -613,7 +613,7 @@ namespace XOffsetDatastructure {
     template <typename T>
     class XSet : public detail::x_set_impl<T> {
         using Base = detail::x_set_impl<T>;
-        using SM = XBuffer::segment_manager;
+        using SM = XBufferCore::segment_manager;
 
     public:
         using Base::Base;
@@ -655,7 +655,7 @@ namespace XOffsetDatastructure {
     static_assert(sizeof(XSet<int>) == sizeof(detail::x_set_impl<int>),
         "XSet wrapper must be zero-overhead");
 
-    class XBufferVisualizer {
+    class XBufferStats {
     public:
         struct MemoryStats {
             std::size_t total_size;
@@ -671,7 +671,7 @@ namespace XOffsetDatastructure {
             }
         };
 
-        static MemoryStats get_memory_stats(XBuffer& xbuf) {
+        static MemoryStats get_memory_stats(XBufferCore& xbuf) {
             MemoryStats stats = {};
             stats.total_size = xbuf.get_size();
             stats.free_size = xbuf.get_free_memory();
@@ -679,15 +679,15 @@ namespace XOffsetDatastructure {
             return stats;
         }
 
-        static void print_stats(XBuffer& xbuf) {
+        static void print_stats(XBufferCore& xbuf) {
             MemoryStats stats = get_memory_stats(xbuf);
-            std::cout << "XBuffer: " << stats.used_size << "/" << stats.total_size 
+            std::cout << "XBufferCore: " << stats.used_size << "/" << stats.total_size
                       << " bytes (" << std::fixed << std::setprecision(1) 
                       << stats.usage_percent() << "% used)" << std::endl;
         }
     };
 
-    // Forward declaration for safety gate in XBufferCompactor
+    // Forward declaration for safety gate in XCompactor
     namespace detail {
         template<typename T> consteval bool is_safe_type();
     }
@@ -830,7 +830,7 @@ namespace XOffsetDatastructure {
             using CleanT = std::remove_cv_t<T>;
             
             if constexpr (is_safe_type<CleanT>()) {
-                return "Type is SAFE for XBuffer";
+                return "Type is SAFE for XBufferCore";
             }
             else if constexpr (std::is_polymorphic_v<CleanT>) {
                 return "UNSAFE: Type has virtual functions (polymorphic)";
@@ -857,7 +857,7 @@ namespace XOffsetDatastructure {
                 return "UNSAFE: Struct/class contains unsafe members";
             }
             else {
-                return "UNSAFE: Type not allowed in XBuffer";
+                return "UNSAFE: Type not allowed in XBufferCore";
             }
         }
     }
@@ -881,7 +881,7 @@ namespace XOffsetDatastructure {
                 using MemberT = [:std::meta::type_of(member):];
                 static_assert(
                     detail::is_safe_type<MemberT>(),
-                    "Unsafe member detected in XBuffer type (see compiler note for field name and type)");
+                    "Unsafe member detected in XBufferCore type (see compiler note for field name and type)");
             }
         }
     }
@@ -941,7 +941,7 @@ namespace XOffsetDatastructure {
     public:
         XHandle() noexcept : buffer_(nullptr) {}
 
-        explicit XHandle(XBuffer& buf) noexcept
+        explicit XHandle(XBufferCore& buf) noexcept
             : buffer_(&buf), cached_ptr_(nullptr), cached_epoch_(0)
         {
             resolve();
@@ -980,15 +980,15 @@ namespace XOffsetDatastructure {
             return cached_ptr_;
         }
 
-        XBuffer* buffer_;
+        XBufferCore* buffer_;
         mutable T* cached_ptr_ = nullptr;
         mutable uint64_t cached_epoch_ = 0;
     };
 
     // ========================================================================
-    // XBufferExt — Single-Root-Object Model
+    // XBuffer — Single-Root-Object Model
     //
-    // XBufferExt is designed around a single root object per buffer:
+    // XBuffer is designed around a single root object per buffer:
     //   - make<T>()       creates the one root object
     //   - root<T>()       retrieves it
     //   - has_root<T>()   checks if it exists
@@ -998,12 +998,12 @@ namespace XOffsetDatastructure {
     // need for string-based naming, provides a cleaner API, and matches the
     // common serialization pattern (one top-level object with nested containers).
     //
-    // For advanced multi-object scenarios, use the base XBuffer class directly
+    // For advanced multi-object scenarios, use the base XBufferCore class directly
     // with construct<T>("name") / find<T>("name").
     // ========================================================================
-    class XBufferExt : public XBuffer {
+    class XBuffer : public XBufferCore {
     public:
-        using XBuffer::XBuffer;
+        using XBufferCore::XBufferCore;
 
         // Constructs the single root object of type T in the buffer.
         //
@@ -1058,9 +1058,9 @@ namespace XOffsetDatastructure {
         }
 
         template<typename T>
-        boost::interprocess::allocator<T, XBuffer::segment_manager> allocator() {
+        boost::interprocess::allocator<T, XBufferCore::segment_manager> allocator() {
             validate_xbuffer_type<T>();
-            return boost::interprocess::allocator<T, XBuffer::segment_manager>(this->get_segment_manager());
+            return boost::interprocess::allocator<T, XBufferCore::segment_manager>(this->get_segment_manager());
         }
 
         // Returns the number of bytes actually used (excluding free space).
@@ -1096,26 +1096,26 @@ namespace XOffsetDatastructure {
             return std::vector<char>(buf->begin(), buf->end());
         }
 
-        static XBufferExt load_from_string(const std::string& data) {
+        static XBuffer load_from_string(const std::string& data) {
             std::vector<char> buffer(data.begin(), data.end());
-            XBufferExt xbuf(buffer);
+            XBuffer xbuf(buffer);
             return xbuf;
         }
 
-        static XBufferExt load_from_vector(const std::vector<char>& data) {
+        static XBuffer load_from_vector(const std::vector<char>& data) {
             std::vector<char> buffer(data);
-            XBufferExt xbuf(buffer);
+            XBuffer xbuf(buffer);
             return xbuf;
         }
 
-        XBufferVisualizer::MemoryStats stats() {
-            return XBufferVisualizer::get_memory_stats(*this);
+        XBufferStats::MemoryStats stats() {
+            return XBufferStats::get_memory_stats(*this);
         }
 
         // Estimates a suitable buffer size for the given user data payload.
         // Accounts for segment_manager overhead + 20% headroom for container growth.
         static std::size_t estimate_buffer_size(std::size_t user_data_bytes) {
-            std::size_t min_overhead = XBuffer::segment_manager::get_min_size();
+            std::size_t min_overhead = XBufferCore::segment_manager::get_min_size();
             std::size_t estimated = min_overhead + user_data_bytes;
             estimated += estimated / 5;  // +20% headroom
             return std::max(estimated, (std::size_t)512);
@@ -1123,13 +1123,13 @@ namespace XOffsetDatastructure {
     };
 
     // ================================================================
-    // XBufferCompactor — Automatic memory compaction using C++26 reflection
+    // XCompactor — Automatic memory compaction using C++26 reflection
     //
-    // Defined after XBufferExt so that compact_automatic<T>() can return
-    // XBufferExt directly, giving callers immediate access to root<T>(),
+    // Defined after XBuffer so that compact_automatic<T>() can return
+    // XBuffer directly, giving callers immediate access to root<T>(),
     // save_to_string(), etc.
     // ================================================================
-    class XBufferCompactor {
+    class XCompactor {
     public:
         // ================================================================
         // Migration strategy enum & trait — public so XOFFSET_REGISTER_*
@@ -1151,15 +1151,15 @@ namespace XOffsetDatastructure {
         // User-defined types can still specialize migrate_as manually.
 
         // Single-object compaction: migrates the root object to a new,
-        // tightly-packed buffer.  Returns XBufferExt for ergonomic access.
+        // tightly-packed buffer.  Returns XBuffer for ergonomic access.
         template<typename T>
-        static XBufferExt compact_automatic(XBuffer& old_xbuf) {
+        static XBuffer compact_automatic(XBufferCore& old_xbuf) {
             validate_xbuffer_type<T>();
-            auto stats = XBufferVisualizer::get_memory_stats(old_xbuf);
+            auto stats = XBufferStats::get_memory_stats(old_xbuf);
             std::size_t new_size = stats.used_size + (stats.used_size / 10);
             if (new_size < 4096) new_size = 4096;
             
-            XBufferExt new_xbuf(new_size);
+            XBuffer new_xbuf(new_size);
             auto* old_obj = old_xbuf.find<T>(XBUFFER_ROOT_NAME).first;
             if (!old_obj) {
                 return new_xbuf;
@@ -1190,7 +1190,7 @@ namespace XOffsetDatastructure {
         // Migration dispatch (uses is_safe_leaf + migrate_as)
         // ================================================================
         template<typename ElementType>
-        static auto migrate_element(const ElementType& old_elem, XBuffer& old_xbuf, XBuffer& new_xbuf) {
+        static auto migrate_element(const ElementType& old_elem, XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             constexpr auto strategy = resolve_strategy<ElementType>();
             if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 return old_elem;
@@ -1206,7 +1206,7 @@ namespace XOffsetDatastructure {
         template<typename ContainerType>
         static void migrate_container(const ContainerType& old_container, 
                                       ContainerType& new_container,
-                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+                                      XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             using ElementType = typename ContainerType::value_type;
 
             if constexpr (std::is_trivially_copyable_v<ElementType>) {
@@ -1234,7 +1234,7 @@ namespace XOffsetDatastructure {
         
         template<typename MemberType>
         static void migrate_member(const MemberType& old_member, MemberType& new_member, 
-                                  XBuffer& old_xbuf, XBuffer& new_xbuf) {
+                                  XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             constexpr auto strategy = resolve_strategy<MemberType>();
             if constexpr (strategy == MigrateStrategy::TrivialCopy) {
                 new_member = old_member;
@@ -1257,7 +1257,7 @@ namespace XOffsetDatastructure {
         
         template<typename T, std::size_t Index>
         static void migrate_member_at(const T& old_obj, T& new_obj,
-                                      XBuffer& old_xbuf, XBuffer& new_xbuf) {
+                                      XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             using namespace std::meta;
             constexpr auto member = get_member_at<T, Index>();
             using MemberType = [:type_of(member):];
@@ -1268,14 +1268,14 @@ namespace XOffsetDatastructure {
         
         template<typename T, std::size_t... Is>
         static void migrate_members_impl(const T& old_obj, T& new_obj,
-                                         XBuffer& old_xbuf, XBuffer& new_xbuf,
+                                         XBufferCore& old_xbuf, XBufferCore& new_xbuf,
                                          std::index_sequence<Is...>) {
             (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
         }
         
         template<typename T>
         static void migrate_members(const T& old_obj, T& new_obj, 
-                                   XBuffer& old_xbuf, XBuffer& new_xbuf) {
+                                   XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
             migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
                                 std::make_index_sequence<member_count>{});
@@ -1312,10 +1312,10 @@ namespace XOffsetDatastructure {
     }}                                                                         \
     template<> struct XOffsetDatastructure::detail::is_safe_leaf<               \
         XOffsetDatastructure::Type> : std::true_type {};                       \
-    template<> struct XOffsetDatastructure::XBufferCompactor::migrate_as<       \
+    template<> struct XOffsetDatastructure::XCompactor::migrate_as<            \
         XOffsetDatastructure::Type> {                                          \
-        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
-            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+        static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
+            value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
 // --- XOFFSET_REGISTER_CONTAINER(Template, name, strategy) ---
@@ -1326,10 +1326,10 @@ namespace XOffsetDatastructure {
     }}                                                                         \
     template<typename T_> struct XOffsetDatastructure::detail::is_safe_leaf<    \
         XOffsetDatastructure::Template<T_>> : std::true_type {};               \
-    template<typename T_> struct XOffsetDatastructure::XBufferCompactor::migrate_as< \
+    template<typename T_> struct XOffsetDatastructure::XCompactor::migrate_as< \
         XOffsetDatastructure::Template<T_>> {                                  \
-        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
-            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+        static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
+            value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
 // --- XOFFSET_REGISTER_MAP(Template, name, strategy) ---
@@ -1342,10 +1342,10 @@ namespace XOffsetDatastructure {
     struct XOffsetDatastructure::detail::is_safe_leaf<                          \
         XOffsetDatastructure::Template<K_, V_>> : std::true_type {};           \
     template<typename K_, typename V_>                                          \
-    struct XOffsetDatastructure::XBufferCompactor::migrate_as<                  \
+    struct XOffsetDatastructure::XCompactor::migrate_as<                        \
         XOffsetDatastructure::Template<K_, V_>> {                              \
-        static constexpr XOffsetDatastructure::XBufferCompactor::MigrateStrategy \
-            value = XOffsetDatastructure::XBufferCompactor::MigrateStrategy::strategy; \
+        static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
+            value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
 // ============================================================================

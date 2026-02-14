@@ -25,7 +25,7 @@ bool test_vector_operations() {
     std::cout << "\n[TEST] Vector Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<VectorTest>();
     
     // Test 1: push_back
@@ -76,7 +76,7 @@ bool test_vector_operations() {
     // Test 6: Persistence
     std::cout << "Test 6: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto& loaded_obj = loaded_buf.root<VectorTest>();
     assert(loaded_obj.floatVector.size() == 100);
     assert(loaded_obj.stringVector.size() == 10);

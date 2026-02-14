@@ -14,7 +14,7 @@ int main() {
     
     // 1. Create buffer
     std::cout << "1. Creating buffer...\n";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     
     // 2. Create an object
     std::cout << "2. Creating player...\n";
@@ -49,7 +49,7 @@ int main() {
     
     // 6. Deserialize from string
     std::cout << "6. Deserializing...\n";
-    XBufferExt loaded = XBufferExt::load_from_string(data);
+    XBuffer loaded = XBuffer::load_from_string(data);
     if (loaded.has_root<Player>()) {
         auto& loaded_player = loaded.root<Player>();
         std::cout << "   Loaded player: " << loaded_player.name 
@@ -84,9 +84,9 @@ int main() {
     std::cout << "   After operations - Used: " << stats_frag.used_size 
               << " bytes (" << std::setprecision(1) << stats_frag.usage_percent() << "%)\n";
     
-    // Compact the buffer — returns XBufferExt directly
+    // Compact the buffer — returns XBuffer directly
     std::cout << "\n   Compacting buffer...\n";
-    XBufferExt compacted = XBufferCompactor::compact_automatic<Player>(xbuf);
+    XBuffer compacted = XCompactor::compact_automatic<Player>(xbuf);
     
     // Show stats after compaction
     auto stats_after = compacted.stats();

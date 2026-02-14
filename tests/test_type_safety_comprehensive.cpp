@@ -172,7 +172,7 @@ static_assert(!is_xbuffer_safe<UnsafeNested>::value,
 void test_basic_types() {
     std::cout << "\n[Test] Basic Types..." << std::endl;
     
-    XBufferExt xbuf(1024 * 1024);
+    XBuffer xbuf(1024 * 1024);
     auto* data = xbuf.make<BasicTypes>();
     
     data->i32 = -123;
@@ -196,7 +196,7 @@ void test_basic_types() {
 void test_container_types() {
     std::cout << "\n[Test] Container Types..." << std::endl;
     
-    XBufferExt xbuf(1024 * 1024);
+    XBuffer xbuf(1024 * 1024);
     auto* data = xbuf.make<ContainerTypes>();
     
     // Test XString
@@ -230,7 +230,7 @@ void test_container_types() {
 void test_nested_types() {
     std::cout << "\n[Test] Nested User Types..." << std::endl;
     
-    XBufferExt xbuf(1024 * 1024);
+    XBuffer xbuf(1024 * 1024);
     auto* player = xbuf.make<Player>();
     
     player->name = "Hero";
@@ -254,7 +254,7 @@ void test_nested_types() {
 void test_complex_structure() {
     std::cout << "\n[Test] Complex Nested Structure..." << std::endl;
     
-    XBufferExt xbuf(1024 * 1024);
+    XBuffer xbuf(1024 * 1024);
     auto* game = xbuf.make<GameState>();
     
     // Setup player

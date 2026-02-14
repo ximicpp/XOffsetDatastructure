@@ -29,7 +29,7 @@ bool test_make_duplicate() {
     std::cout << "\n[TEST] make<T>() throws on duplicate call\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     xbuf.make<SimpleData>();
 
     bool threw = false;
@@ -52,7 +52,7 @@ bool test_root_empty() {
     std::cout << "\n[TEST] root<T>() throws on empty buffer\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
 
     bool threw = false;
     try {
@@ -74,7 +74,7 @@ bool test_save_load_vector() {
     std::cout << "\n[TEST] save_to_vector / load_from_vector round-trip\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* data = xbuf.make<SimpleData>();
     data->id = 42;
     data->name = "VectorTest";
@@ -84,7 +84,7 @@ bool test_save_load_vector() {
     assert(vec.size() > 0);
     assert(vec.size() < 4096);  // should be compacted (smaller than original)
 
-    XBufferExt loaded = XBufferExt::load_from_vector(vec);
+    XBuffer loaded = XBuffer::load_from_vector(vec);
     assert(loaded.has_root<SimpleData>());
     auto& r = loaded.root<SimpleData>();
     assert(r.id == 42);
@@ -101,17 +101,17 @@ bool test_estimate_buffer_size() {
     std::cout << "\n[TEST] estimate_buffer_size()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    std::size_t estimated = XBufferExt::estimate_buffer_size(100);
+    std::size_t estimated = XBuffer::estimate_buffer_size(100);
     std::cout << "  estimate_buffer_size(100) = " << estimated << " bytes\n";
     assert(estimated >= 512);  // minimum 512
     assert(estimated > 100);   // must be larger than payload
 
-    std::size_t small = XBufferExt::estimate_buffer_size(0);
+    std::size_t small = XBuffer::estimate_buffer_size(0);
     std::cout << "  estimate_buffer_size(0) = " << small << " bytes\n";
     assert(small >= 512);
 
     // Verify the estimate actually works — create a buffer of that size
-    XBufferExt xbuf(estimated);
+    XBuffer xbuf(estimated);
     auto* data = xbuf.make<SimpleData>();
     data->id = 1;
     data->name = "EstimateTest";
@@ -127,7 +127,7 @@ bool test_save_to_string_compact() {
     std::cout << "\n[TEST] save_to_string() produces compact output\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(8192);  // large buffer
+    XBuffer xbuf(8192);  // large buffer
     auto* data = xbuf.make<SimpleData>();
     data->id = 99;
     data->name = "CompactTest";
@@ -144,7 +144,7 @@ bool test_save_to_string_compact() {
     std::cout << "  [OK] save_to_string() output is compact (< 8192 original)\n";
 
     // Verify round-trip
-    XBufferExt loaded = XBufferExt::load_from_string(compact);
+    XBuffer loaded = XBuffer::load_from_string(compact);
     assert(loaded.has_root<SimpleData>());
     auto& r = loaded.root<SimpleData>();
     assert(r.id == 99);
@@ -161,7 +161,7 @@ bool test_has_root_states() {
     std::cout << "\n[TEST] has_root<T>() on various states\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     assert(!xbuf.has_root<SimpleData>());
     std::cout << "  Before make: has_root = false ... [OK]\n";
 

@@ -31,7 +31,7 @@ bool test_modify_basic_types() {
     std::cout << "\n[TEST] Modify Basic Types\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Initialize values
@@ -87,7 +87,7 @@ bool test_modify_vector() {
     std::cout << "\n[TEST] Modify Vector Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add elements
@@ -148,7 +148,7 @@ bool test_modify_vector_string() {
     std::cout << "\n[TEST] Modify Vector of Strings\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add string elements
@@ -201,7 +201,7 @@ bool test_modify_map() {
     std::cout << "\n[TEST] Modify Map Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add key-value pairs
@@ -259,7 +259,7 @@ bool test_modify_set() {
     std::cout << "\n[TEST] Modify Set Contents\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Add elements
@@ -310,7 +310,7 @@ bool test_modify_mixed_operations() {
     std::cout << "\n[TEST] Mixed Modification Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(16384);
+    XBuffer xbuf(16384);
     auto* data = xbuf.make<ModifyTestData>();
     
     // Test 1: Initialize all fields
@@ -386,7 +386,7 @@ bool test_modify_mixed_operations() {
     std::cout << "Test 5: Serialize to memory... ";
     std::vector<char> buffer(*xbuf.get_buffer());
     
-    XBufferExt new_xbuf(buffer);
+    XBuffer new_xbuf(buffer);
     auto& new_data = new_xbuf.root<ModifyTestData>(); bool new_found = new_xbuf.has_root<ModifyTestData>();
     assert(new_found);
     assert(new_data.counter == 100);

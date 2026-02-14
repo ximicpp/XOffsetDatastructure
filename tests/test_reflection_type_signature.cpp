@@ -115,7 +115,7 @@ void test_instance_creation() {
     std::cout << "[Test 4] Instance Creation and Validation\n";
     std::cout << "------------------------------------------\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     auto* obj = xbuf.make<TypeSigTest>();
     
     obj->a = 42;
@@ -180,7 +180,7 @@ void test_serialization_with_reflection() {
     std::cout << "[Test 6] Serialization with Reflection\n";
     std::cout << "---------------------------------------\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     auto* data = xbuf.make<SimpleData>();
     
     data->id = 9999;
@@ -195,7 +195,7 @@ void test_serialization_with_reflection() {
     std::cout << "\n  Serialized to " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load_from_string(binary);
     auto& loaded = xbuf2.root<SimpleData>();
     
     if (true) { // root always valid after load

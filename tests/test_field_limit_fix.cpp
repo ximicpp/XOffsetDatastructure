@@ -104,7 +104,7 @@ void test_serialization_with_large_struct() {
     std::cout << "[Test 2] Serialization with Large Struct\n";
     std::cout << "-----------------------------------------\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     
     // Create and populate large struct
     auto* data = xbuf.make<LargeStruct>();
@@ -124,7 +124,7 @@ void test_serialization_with_large_struct() {
     std::cout << "\n  Serialized size: " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBufferExt xbuf2 = XBufferExt::load_from_string(binary);
+    XBuffer xbuf2 = XBuffer::load_from_string(binary);
     auto& data2 = xbuf2.root<LargeStruct>();
     
     std::cout << "\n  After deserialization:\n";

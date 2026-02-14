@@ -54,8 +54,8 @@ void demo_basic_usage() {
     print_section("1. Basic Usage - Creating and Accessing Data");
     
     // Create buffer
-    print_subsection("Creating XBufferExt with 4KB");
-    XBufferExt xbuf(4096);
+    print_subsection("Creating XBuffer with 4KB");
+    XBuffer xbuf(4096);
     print_check("Buffer created");
     
     // Create game data
@@ -121,7 +121,7 @@ void demo_memory_management() {
     print_section("2. Memory Management - Buffer Operations");
     
     print_subsection("Initial Buffer");
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto stats = xbuf.stats();
     print_info("Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Free Size", std::to_string(stats.free_size) + " bytes");
@@ -172,7 +172,7 @@ void demo_memory_management() {
     // cached pointer directly. If yes, it re-finds the root object once.
     print_subsection("XHandle - Safe Pointer Access");
     
-    XBufferExt hbuf(2048);
+    XBuffer hbuf(2048);
     hbuf.make<GameData>();
     
     // Create a handle — no manual pointer management needed
@@ -193,7 +193,7 @@ void demo_memory_management() {
     print_check("XHandle survived shrink_to_fit()");
     
     // make_handle() — create + handle in one call
-    XBufferExt hbuf2(1024);
+    XBuffer hbuf2(1024);
     auto h2 = hbuf2.make_handle<GameData>();
     h2->player_name = "OneCall";
     h2->level = 42;
@@ -209,7 +209,7 @@ void demo_serialization() {
     print_section("3. Serialization - Save and Load");
     
     print_subsection("Creating Source Data");
-    XBufferExt src_buf(2048);
+    XBuffer src_buf(2048);
     auto* src_game = src_buf.make<GameData>();
     src_game->player_name = "SavedHero";
     src_game->player_id = 99999;
@@ -226,7 +226,7 @@ void demo_serialization() {
     print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
     
     print_subsection("Deserializing from Binary");
-    XBufferExt dst_buf = XBufferExt::load_from_string(binary_data);
+    XBuffer dst_buf = XBuffer::load_from_string(binary_data);
     
     if (dst_buf.has_root<GameData>()) {
         auto& dst_game = dst_buf.root<GameData>();
@@ -299,7 +299,7 @@ void demo_automatic_compaction() {
     print_section("5. Automatic Memory Compaction (C++26 Reflection)");
     
     print_subsection("Creating Fragmented Buffer");
-    XBufferExt xbuf(8192);  // 8KB buffer
+    XBuffer xbuf(8192);  // 8KB buffer
     
     // Create game data with items
     auto* game = xbuf.make<GameData>();
@@ -337,10 +337,10 @@ void demo_automatic_compaction() {
     print_check("Buffer is now fragmented");
     
     print_subsection("Automatic Compaction (C++26 Reflection)");
-    std::cout << "  Using XBufferCompactor::compact_automatic<GameData>()\n\n";
+    std::cout << "  Using XCompactor::compact_automatic<GameData>()\n\n";
     
-    // Compact using C++26 reflection — returns XBufferExt directly
-    XBufferExt compacted = XBufferCompactor::compact_automatic<GameData>(xbuf);
+    // Compact using C++26 reflection — returns XBuffer directly
+    XBuffer compacted = XCompactor::compact_automatic<GameData>(xbuf);
     
     auto stats_after = compacted.stats();
     print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");
@@ -401,7 +401,7 @@ void demo_performance() {
     print_info("Compatibility", "x86-64, ARM64");
     
     print_subsection("Benchmarking Example");
-    XBufferExt xbuf(65536);  // 64KB buffer for 1000 items
+    XBuffer xbuf(65536);  // 64KB buffer for 1000 items
     
 #if HAS_CHRONO
     auto start = std::chrono::high_resolution_clock::now();

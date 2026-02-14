@@ -458,7 +458,7 @@ bool test_profile_minimal() {
     std::cout << "  Fields: id, level, exp, 3 floats, 3 doubles, 2 strings\n";
     std::cout << "  Collections: none\n\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* c = xbuf.make<CharacterMinimal>();
     populate_minimal(*c);
     xbuf.shrink_to_fit();
@@ -487,7 +487,7 @@ bool test_profile_midgame() {
     std::cout << "  Fields: ~20 scalars, 3 strings\n";
     std::cout << "  Collections: 30 items, 8 equip, 15 skills, 5 quests, 20 friends\n\n";
 
-    XBufferExt xbuf(65536);
+    XBuffer xbuf(65536);
     auto* c = xbuf.make<CharacterMidGame>();
     populate_midgame(*c);
 
@@ -507,7 +507,7 @@ bool test_profile_midgame() {
     r.print();
 
     // Compaction
-    XBufferExt compacted = XBufferCompactor::compact_automatic<CharacterMidGame>(xbuf);
+    XBuffer compacted = XCompactor::compact_automatic<CharacterMidGame>(xbuf);
     auto sc = compacted.stats();
     Report rc{"Mid-Game (compacted)", sc.total_size, sc.used_size,
               logical, est_proto(logical)};
@@ -546,7 +546,7 @@ bool test_profile_endgame() {
     std::cout << "               500 completed IDs, 100 friends, 20 blocked,\n";
     std::cout << "               150 achievements, 30 settings, 50 chat msgs\n\n";
 
-    XBufferExt xbuf(524288);  // 512KB
+    XBuffer xbuf(524288);  // 512KB
     auto* c = xbuf.make<CharacterEndGame>();
     populate_endgame(*c);
 
@@ -566,7 +566,7 @@ bool test_profile_endgame() {
     r.print();
 
     // Compaction
-    XBufferExt compacted = XBufferCompactor::compact_automatic<CharacterEndGame>(xbuf);
+    XBuffer compacted = XCompactor::compact_automatic<CharacterEndGame>(xbuf);
     auto sc = compacted.stats();
     Report rc{"End-Game (compacted)", sc.total_size, sc.used_size,
               logical, est_proto(logical)};
@@ -581,7 +581,7 @@ bool test_profile_endgame() {
               << (double)serialized.size() / est_proto(logical) << "x\n";
 
     // Verify
-    auto loaded = XBufferExt::load_from_string(serialized);
+    auto loaded = XBuffer::load_from_string(serialized);
     auto& v = loaded.root<CharacterEndGame>();
     assert(v.player_id == 7);
     assert(v.level == 100);

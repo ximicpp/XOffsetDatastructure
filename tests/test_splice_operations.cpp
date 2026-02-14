@@ -109,7 +109,7 @@ void test_xoffsetdatastructure_splice() {
     std::cout << "[Test 5] XOffsetDatastructure Splice\n";
     std::cout << "--------------------------------------\n";
     
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     auto* data = xbuf.make<DataStruct>();
     
     data->id = 1001;

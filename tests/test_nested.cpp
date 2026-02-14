@@ -54,7 +54,7 @@ bool test_nested_structures() {
     std::cout << "\n[TEST] Nested Structures\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* obj = xbuf.make<OuterObject>();
     
     // Test 1: Initialize nested structure
@@ -103,7 +103,7 @@ bool test_nested_structures() {
     // Test 5: Persistence
     std::cout << "Test 5: Persistence of nested structures... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto& loaded = loaded_buf.root<OuterObject>();
     
     assert(loaded.title == "OuterTitle");

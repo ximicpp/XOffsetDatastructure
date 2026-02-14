@@ -119,7 +119,7 @@ bool test_enum_in_xbuffer() {
     std::cout << "\n[TEST] Enum in XBuffer\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* stats = xbuf.make<PlayerStats>();
 
     stats->id = 42;

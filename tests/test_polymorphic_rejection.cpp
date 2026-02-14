@@ -11,7 +11,7 @@ struct BadType {
 };
 
 int main() {
-    XBufferExt xbuf(1024);
+    XBuffer xbuf(1024);
     
     // This line should cause a COMPILE ERROR with a helpful message
     auto* obj = xbuf.make<BadType>();

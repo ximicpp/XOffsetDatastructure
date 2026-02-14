@@ -41,7 +41,7 @@ bool test_basic_assign() {
     std::cout << "\n[TEST] XString operator=(const char*)\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* data = xbuf.make<StringTestData>();
 
     // Test 1: Basic assignment from const char*
@@ -90,13 +90,13 @@ bool test_serialization_roundtrip() {
 
     // Test 5: Create data with direct assignment, serialize, deserialize
     std::cout << "Test 5: Serialize after direct assign... ";
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* data = xbuf.make<StringTestData>();
     data->name = "SerializedAlice";
     data->title = "ArchMage";
 
     std::string binary = xbuf.save_to_string();
-    XBufferExt loaded = XBufferExt::load_from_string(binary);
+    XBuffer loaded = XBuffer::load_from_string(binary);
     assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
     assert(std::string(loaded_data.name.c_str()) == "SerializedAlice");
     assert(std::string(loaded_data.title.c_str()) == "ArchMage");
@@ -111,7 +111,7 @@ bool test_serialization_roundtrip() {
     // Test 7: Re-serialize and verify
     std::cout << "Test 7: Re-serialize and verify... ";
     std::string binary2 = loaded.save_to_string();
-    XBufferExt loaded2 = XBufferExt::load_from_string(binary2);
+    XBuffer loaded2 = XBuffer::load_from_string(binary2);
     assert(loaded2.has_root<StringTestData>()); auto& loaded_data2 = loaded2.root<StringTestData>();
     assert(std::string(loaded_data2.name.c_str()) == "ModifiedBob");
     assert(std::string(loaded_data2.title.c_str()) == "ArchMage");
@@ -124,7 +124,7 @@ bool test_vector_of_strings() {
     std::cout << "\n[TEST] XVector<XString> element direct assign\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(8192);
+    XBuffer xbuf(8192);
     auto* data = xbuf.make<StringTestData>();
 
     // Test 8: Add strings to vector using emplace_back
@@ -148,7 +148,7 @@ bool test_vector_of_strings() {
     // Test 10: Verify through serialization
     std::cout << "Test 10: Serialize vector of strings... ";
     std::string binary = xbuf.save_to_string();
-    XBufferExt loaded = XBufferExt::load_from_string(binary);
+    XBuffer loaded = XBuffer::load_from_string(binary);
     assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
     assert(loaded_data.names.size() == 3);
     assert(std::string(loaded_data.names[0].c_str()) == "Modified1");
@@ -163,7 +163,7 @@ bool test_player_direct_assign() {
     std::cout << "\n[TEST] Player struct with direct assign (replaces verbose pattern)\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
 
     // Test 11: Old verbose pattern vs new direct assign
     std::cout << "Test 11: Direct assign on Player... ";
@@ -182,7 +182,7 @@ bool test_player_direct_assign() {
     // Test 12: Verify serialization
     std::cout << "Test 12: Serialize Player... ";
     std::string binary = xbuf.save_to_string();
-    XBufferExt loaded = XBufferExt::load_from_string(binary);
+    XBuffer loaded = XBuffer::load_from_string(binary);
     assert(loaded.has_root<Player>()); auto& loaded_player = loaded.root<Player>();
     assert(std::string(loaded_player.name.c_str()) == "Alice");
     assert(loaded_player.id == 1);
@@ -194,7 +194,7 @@ bool test_player_direct_assign() {
     player = &xbuf.root<Player>();  // re-acquire after save_to_string shrink
     player->name = "Bob";
     binary = xbuf.save_to_string();
-    XBufferExt loaded2 = XBufferExt::load_from_string(binary);
+    XBuffer loaded2 = XBuffer::load_from_string(binary);
     assert(loaded2.has_root<Player>()); auto& loaded_player2 = loaded2.root<Player>();
     assert(std::string(loaded_player2.name.c_str()) == "Bob");
     std::cout << "[OK]\n";

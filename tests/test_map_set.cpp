@@ -27,7 +27,7 @@ bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBufferExt xbuf(4096);
+    XBuffer xbuf(4096);
     auto* obj = xbuf.make<MapSetTest>();
     
     // Test 1: Set insertion
@@ -101,7 +101,7 @@ bool test_map_set_operations() {
     // Test 8: Persistence
     std::cout << "Test 8: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
-    XBufferExt loaded_buf(buffer->data(), buffer->size());
+    XBuffer loaded_buf(buffer->data(), buffer->size());
     auto& loaded_obj = loaded_buf.root<MapSetTest>();
     assert(loaded_obj.intSet.size() == 50);
     assert(loaded_obj.intMap.size() == 20);

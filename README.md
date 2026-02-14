@@ -64,7 +64,7 @@ Operations that invalidate pointers:
 |-----------|:------------------------:|
 | `grow()` | ✅ Yes |
 | `shrink_to_fit()` | ✅ Yes |
-| `compact()` / `compact_automatic<T>()` | ✅ Yes (returns a **new** `XBufferExt`) |
+| `compact()` / `compact_automatic<T>()` | ✅ Yes (returns a **new** `XBuffer`) |
 | `make<T>()` | ❌ No (but may fail if full) |
 | `root<T>()` / `has_root<T>()` | ❌ No |
 | Read/write to existing objects | ❌ No |
@@ -79,7 +79,7 @@ Operations that invalidate pointers:
 
 // ✅ The buffer owns all memory; it is freed when the buffer goes out of scope
 {
-    XBufferExt buffer(4096);
+    XBuffer buffer(4096);
     auto* p = buffer.make<Player>();
     p->name = "Alice";
     // ... use p ...
@@ -88,7 +88,7 @@ Operations that invalidate pointers:
 
 #### Rule 3: Thread Safety
 
-**XBufferExt is NOT thread-safe.** Concurrent reads are safe, but any write (including container modifications like `push_back`) requires external synchronization.
+**XBuffer is NOT thread-safe.** Concurrent reads are safe, but any write (including container modifications like `push_back`) requires external synchronization.
 
 ```cpp
 // ❌ DATA RACE — concurrent writes
@@ -123,7 +123,7 @@ static_assert(is_xbuffer_safe<Player>::value,
 **Container operations automatically inject the buffer's allocator.** You never need to pass `get_segment_manager()` when using XVector, XMap, or XSet.
 
 ```cpp
-XBufferExt xbuf(4096);
+XBuffer xbuf(4096);
 auto* data = xbuf.make<MyData>();
 
 // ✅ Just use containers like STL — allocator is injected automatically

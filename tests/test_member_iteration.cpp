@@ -176,7 +176,7 @@ void test_instance_access() {
     std::cout << "[Test 5] Instance Member Access\n";
     std::cout << "--------------------------------\n";
     
-    XBufferExt xbuf(2048);
+    XBuffer xbuf(2048);
     auto* item = xbuf.make<GameItem>();
     
     item->item_id = 1001;
