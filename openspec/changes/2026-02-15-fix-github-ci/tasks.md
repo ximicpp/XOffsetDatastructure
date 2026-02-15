@@ -11,6 +11,12 @@
 - **Fix**: Updated to `test_xbuffer_api` matching the renamed file
 - **Verification**: Local build now shows 25/25 tests passed (was 24/25 with 1 skipped)
 
+### 2. 🔴 CRITICAL - TypeLayout Submodule Issue (NEW)
+- **Issue**: `external/typelayout` submodule references invalid commit `70d9d6323ffd60ea037742e1175b26867b9955ed`
+- **Impact**: CI fails during submodule checkout phase before build even starts
+- **Root Cause**: Submodule reference points to commit that doesn't exist in remote repository
+- **Status**: NEEDS IMMEDIATE FIX
+
 ## Analysis Phase
 
 ### ✅ Phase 1: Status Assessment (COMPLETED)
