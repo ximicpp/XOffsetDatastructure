@@ -107,6 +107,7 @@ set(REFLECTION_TESTS
     test_memory_efficiency
     test_zero_boilerplate
     test_zero_boilerplate_vector
+    test_complex_nesting
 )
 
 # Count for summary
