@@ -9,24 +9,54 @@ on:
 
 jobs:
   test:
+    name: Build & Test (P2996 Docker)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      
-      - name: Verify environment
+
+      - name: Verify checkout
         run: |
-          echo "Environment check passed"
-          docker --version
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Build Docker image
+          echo "=== Repository ==="
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Branch: $(git branch --show-current)"
+          echo ""
+          echo "=== Submodules ==="
+          git submodule status
+          echo ""
+          echo "=== TypeLayout check ==="
+          ls -la external/typelayout/include/boost/typelayout.hpp
+          echo ""
+          echo "=== Test files ==="
+          ls tests/test_*.cpp | wc -l
+          echo "test files found"
+
+      - name: Pull P2996 Docker image
         run: |
-          docker build -t xoffset-clang-p2996:latest .
-      
-      - name: Run tests in Docker
+          echo "Pulling pre-built P2996 Docker image..."
+          docker pull ghcr.io/ximicpp/typelayout-p2996:latest
+          echo ""
+          echo "=== Image info ==="
+          docker images ghcr.io/ximicpp/typelayout-p2996:latest
+
+      - name: Build & run all tests
         run: |
-          docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest bash ./build.sh
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/ximicpp/typelayout-p2996:latest \
+            bash ./build.sh
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-log
+          path: |
+            build/CMakeFiles/CMakeOutput.log
+            build/CMakeFiles/CMakeError.log
+          retention-days: 7
