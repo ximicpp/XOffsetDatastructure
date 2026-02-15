@@ -369,7 +369,7 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_enum_support" 20 $TOTAL_TESTS
     run_test "test_type_safety_comprehensive" 21 $TOTAL_TESTS
     run_test "test_type_erased_detection" 22 $TOTAL_TESTS
-    run_test "test_xbufferext_api" 23 $TOTAL_TESTS
+    run_test "test_xbuffer_api" 23 $TOTAL_TESTS
     run_test "test_xstring_direct_assign" 24 $TOTAL_TESTS
     run_test "test_xhandle" 25 $TOTAL_TESTS
 fi
