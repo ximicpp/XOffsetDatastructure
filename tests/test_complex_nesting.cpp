@@ -102,7 +102,7 @@ struct ManyFields {
 bool test_deep_nesting() {
     fprintf(stderr, "\n[TEST] 4-level deep nesting: World > Guild > Character > Skill > Tag\n");
 
-    XBuffer xbuf(1024 * 256);  // 256KB for deep nesting
+    XBuffer xbuf(1024 * 512);  // 512KB for deep nesting (generous for Linux overhead)
     auto* world = xbuf.make<World>();
     world->world_id = 1;
     world->world_name = "Azeroth";

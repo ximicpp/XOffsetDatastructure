@@ -1424,10 +1424,11 @@ namespace XOffsetDatastructure {
         static XBuffer compact(XBufferCore& old_xbuf) {
             validate_xbuffer_type<T>();
             auto stats = XBufferStats::memory_stats(old_xbuf);
-            // Allocate 2x used_size for migration headroom — nested structs
-            // need temporary space during element-by-element rebuild.
+            // Allocate 3x used_size for migration headroom — nested structs
+            // with many small allocations (strings, vectors) need extra space
+            // due to per-allocation header overhead in the segment manager.
             // shrink_to_fit() at the end reclaims the excess.
-            std::size_t new_size = stats.used_size * 2;
+            std::size_t new_size = stats.used_size * 3;
             if (new_size < 4096) new_size = 4096;
             
             XBuffer new_xbuf(new_size);
