@@ -334,7 +334,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=27
+    TOTAL_TESTS=29
 fi
 
 # Basic tests (6 tests)
@@ -374,6 +374,8 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_xhandle" 25 $TOTAL_TESTS
     run_test "test_error_paths" 26 $TOTAL_TESTS
     run_test "test_memory_efficiency" 27 $TOTAL_TESTS
+    run_test "test_zero_boilerplate" 28 $TOTAL_TESTS
+    run_test "test_zero_boilerplate_vector" 29 $TOTAL_TESTS
 fi
 
 # Run demo

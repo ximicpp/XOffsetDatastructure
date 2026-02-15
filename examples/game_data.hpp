@@ -6,36 +6,13 @@
 using namespace XOffsetDatastructure;
 
 // ============================================================================
-// Item - Direct Type Definition (C++26 Reflection)
+// Item — Zero-Boilerplate Type Definition (C++26 Reflection)
+//
+// Pure aggregate: no constructors, no macros, no typedefs.
+// Works as both root object and XVector element automatically.
 // ============================================================================
 
-class alignas(8) Item {
-public:
-	using allocator_type = XAllocator;
-
-	// Default allocator constructor (suffix mode — required by uses_allocator protocol)
-	template <typename Allocator>
-		requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
-	Item(Allocator allocator) : name(allocator) {}
-
-	// Full constructor (suffix mode — allocator last)
-	template <typename Allocator>
-	Item(int item_id_val, int item_type_val, int quantity_val, const char* name_val, Allocator allocator)
-		: item_id(item_id_val)
-		, item_type(item_type_val)
-		, quantity(quantity_val)
-		, name(name_val, allocator)
-	{}
-
-	// Move + allocator constructor (required for vector reallocation)
-	template <typename Allocator>
-	Item(Item&& other, Allocator allocator)
-		: item_id(other.item_id)
-		, item_type(other.item_type)
-		, quantity(other.quantity)
-		, name(std::move(other.name), allocator)
-	{}
-
+struct alignas(8) Item {
 	int32_t item_id{0};
 	int32_t item_type{0};
 	int32_t quantity{0};
@@ -43,35 +20,14 @@ public:
 };
 
 // ============================================================================
-// GameData - Direct Type Definition (C++26 Reflection)
+// GameData — Zero-Boilerplate Type Definition (C++26 Reflection)
+//
+// Complex type with XString, XVector<Item>, XSet, and XMap members.
+// All allocator plumbing is handled by C++26 reflection — the user
+// just writes a plain struct.
 // ============================================================================
 
-class alignas(8) GameData {
-public:
-	using allocator_type = XAllocator;
-
-	// Allocator constructor (suffix mode — standard uses_allocator protocol)
-	template <typename Allocator>
-		requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
-	GameData(Allocator allocator) 
-		: player_name(allocator)
-		, items(allocator)
-		, achievements(allocator)
-		, quest_progress(allocator) 
-	{}
-
-	// Move + allocator constructor (required for vector reallocation)
-	template <typename Allocator>
-	GameData(GameData&& other, Allocator allocator)
-		: player_id(other.player_id)
-		, level(other.level)
-		, health(other.health)
-		, player_name(std::move(other.player_name), allocator)
-		, items(std::move(other.items), allocator)
-		, achievements(std::move(other.achievements), allocator)
-		, quest_progress(std::move(other.quest_progress), allocator)
-	{}
-
+struct alignas(8) GameData {
 	int32_t player_id{0};
 	int32_t level{0};
 	float health{0.0f};
