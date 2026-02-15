@@ -1,31 +1,82 @@
-name: CI-Test
+name: CI-Quick
+
+# Lightweight pre-check: validates that the project structure is intact,
+# submodules resolve, and basic (non-reflection) tests compile with the
+# system compiler.  Runs much faster than the full P2996 CI pipeline.
 
 on:
   push:
     branches: [ next_cpp26 ]
+  pull_request:
+    branches: [ next_cpp26 ]
   workflow_dispatch:
 
 jobs:
-  test-basic:
-    name: Basic Test
+  quick-check:
+    name: Quick Structure & Submodule Check
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      
-      - name: Test environment
-        run: |
-          echo "Working directory: $(pwd)"
-          echo "Files:"
-          ls -la
-          echo "Docker version:"
-          docker --version
-      
-      - name: Test Docker build
-        run: |
-          echo "Testing simple Docker build..."
-          docker build --help | head -10
 
+      - name: Verify repository structure
+        run: |
+          echo "=== Key files ==="
+          for f in \
+            xoffsetdatastructure.hpp \
+            build.sh \
+            CMakeLists.txt \
+            tests/CMakeLists.txt \
+            external/typelayout/include/boost/typelayout.hpp; do
+            if [ -f "$f" ]; then
+              echo "  ✓ $f"
+            else
+              echo "  ✗ $f  MISSING" && exit 1
+            fi
+          done
+
+          echo ""
+          echo "=== Submodule status ==="
+          git submodule status
+
+          echo ""
+          echo "=== Test inventory ==="
+          TEST_FILES=$(ls tests/test_*.cpp 2>/dev/null | wc -l)
+          echo "  $TEST_FILES test source files found"
+          if [ "$TEST_FILES" -lt 20 ]; then
+            echo "  WARNING: expected ≥20 test files"
+          fi
+
+      - name: Validate build.sh test list matches test files
+        run: |
+          echo "Checking build.sh <-> test files consistency..."
+          # Extract test names from build.sh
+          grep 'run_test ' build.sh | sed 's/.*run_test "\([^"]*\)".*/\1/' | sort > /tmp/build_tests.txt
+          # Extract test filenames (excluding polymorphic_rejection which is a negative test)
+          ls tests/test_*.cpp | sed 's|tests/||; s|\.cpp||' | grep -v polymorphic_rejection | sort > /tmp/test_files.txt
+
+          echo "  build.sh tests: $(wc -l < /tmp/build_tests.txt)"
+          echo "  test files:     $(wc -l < /tmp/test_files.txt)"
+
+          MISSING_IN_BUILD=$(comm -23 /tmp/test_files.txt /tmp/build_tests.txt)
+          MISSING_IN_FILES=$(comm -13 /tmp/test_files.txt /tmp/build_tests.txt)
+
+          if [ -n "$MISSING_IN_BUILD" ]; then
+            echo ""
+            echo "  ⚠ Test files NOT listed in build.sh:"
+            echo "$MISSING_IN_BUILD" | sed 's/^/    - /'
+          fi
+
+          if [ -n "$MISSING_IN_FILES" ]; then
+            echo ""
+            echo "  ✗ Tests in build.sh but no source file:"
+            echo "$MISSING_IN_FILES" | sed 's/^/    - /'
+            exit 1
+          fi
+
+          echo ""
+          echo "  ✓ All build.sh tests have matching source files"

@@ -107,6 +107,10 @@ set(REFLECTION_TESTS
     test_memory_efficiency
 )
 
+# Count for summary
+list(LENGTH REFLECTION_TESTS REFLECTION_TEST_COUNT)
+math(EXPR TOTAL_TEST_COUNT "7 + ${REFLECTION_TEST_COUNT}")
+
 # Add each reflection test
 foreach(test_name ${REFLECTION_TESTS})
     add_executable(${test_name} ${test_name}.cpp)
@@ -122,6 +126,27 @@ endforeach()
 
 message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR} reflection tests")
 
+# ============================================================================
+# Negative Compile Test (expected to FAIL compilation)
+# ============================================================================
+# test_polymorphic_rejection.cpp should NOT compile — it validates that
+# static_assert fires for polymorphic types.  We do NOT add it as a normal
+# executable; instead we use try_compile so a successful build still passes.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_polymorphic_rejection.cpp")
+    try_compile(POLYMORPHIC_COMPILES
+        ${CMAKE_BINARY_DIR}/try_compile_polymorphic
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_polymorphic_rejection.cpp
+        CMAKE_FLAGS
+            "-DINCLUDE_DIRECTORIES=${BOOST_INCLUDE_DIRS};${TYPELAYOUT_INCLUDE_DIRS};${CMAKE_SOURCE_DIR}"
+        COMPILE_DEFINITIONS -std=c++26 -freflection -fexpansion-statements -stdlib=libc++
+    )
+    if(NOT POLYMORPHIC_COMPILES)
+        message(STATUS "✓ test_polymorphic_rejection correctly fails to compile (static_assert works)")
+    else()
+        message(WARNING "✗ test_polymorphic_rejection compiled successfully — static_assert may be broken!")
+    endif()
+endif()
+
 # Display configuration summary
 message(STATUS "")
 message(STATUS "========================================")
@@ -129,9 +154,10 @@ message(STATUS "  XOffsetDatastructure Test Summary")
 message(STATUS "========================================")
 message(STATUS "C++ Standard: C++26")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Basic Tests: 6 tests")
-message(STATUS "Reflection Tests: 16 tests")
-message(STATUS "Total Tests: 22 tests")
+message(STATUS "Basic Tests: 7 tests (including XBufferAPI)")
+message(STATUS "Reflection Tests: ${REFLECTION_TEST_COUNT} tests")
+message(STATUS "Total Tests: ${TOTAL_TEST_COUNT} tests")
+message(STATUS "Negative Compile Tests: 1 (polymorphic_rejection)")
 message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")
