@@ -118,45 +118,57 @@ static_assert(is_xbuffer_safe<Player>::value,
               "Player contains unsafe types for XBuffer");
 ```
 
-#### Rule 5: Automatic Allocator Propagation
+#### Rule 5: Zero-Boilerplate Type Definitions
 
-**Container operations automatically inject the buffer's allocator.** You never need to pass `get_segment_manager()` when using XVector, XMap, or XSet.
-
-```cpp
-XBuffer xbuf(4096);
-auto* data = xbuf.make<MyData>();
-
-// ✅ Just use containers like STL — allocator is injected automatically
-data->names.push_back("Alice");          // XVector<XString>
-data->names.insert(it, "Bob");
-data->scores.emplace("Alice", 95);       // XMap<XString, int>
-data->scores["Bob"] = 88;
-data->scores.erase("Alice");
-data->tags.insert("vip");                // XSet<XString>
-```
-
-For **user-defined types** stored in containers, add `allocator_type` to enable automatic allocator injection:
+**User-defined types are plain structs — no constructors, macros, or typedefs needed.** C++26 reflection automatically handles allocator injection for all container members.
 
 ```cpp
-struct InnerObject {
-    using allocator_type = XAllocator;   // ← enables automatic injection
-
-    template <typename Allocator>
-        requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
-    InnerObject(Allocator alloc) : data(alloc) {}
-
-    // Move + allocator constructor (required for vector reallocation)
-    template <typename Allocator>
-    InnerObject(InnerObject&& other, Allocator alloc)
-        : data(std::move(other.data), alloc) {}
-
-    XVector<int> data;
+// Just a plain struct — that's it!
+struct Player {
+    int32_t id{0};
+    int32_t level{0};
+    XString name;
+    XVector<int32_t> items;
 };
 
-// Now emplace_back() works without manually passing the allocator
-XVector<InnerObject> vec(sm);
-vec.emplace_back();  // allocator auto-injected ✅
+XBuffer xbuf(4096);
+auto* p = xbuf.make<Player>();   // ✅ reflection constructs each member
+p->name = "Alice";
+p->items.push_back(100);
 ```
+
+**Works as container elements too** — including reallocation:
+
+```cpp
+struct Item {
+    int32_t id;
+    XString name;
+};
+
+struct Inventory {
+    XVector<Item> items;          // ← pure aggregate as element
+};
+
+auto* inv = xbuf.make<Inventory>();
+inv->items.emplace_back();       // ✅ reflection auto-injects allocator
+inv->items[0].name = "Sword";
+
+for (int i = 0; i < 100; i++)
+    inv->items.emplace_back();   // ✅ reallocation moves correctly
+```
+
+**Backward compatible** — types with explicit allocator constructors still work:
+
+```cpp
+// Legacy style still supported (auto-detected)
+struct LegacyType {
+    template <typename Allocator>
+    LegacyType(Allocator alloc) : name(alloc) {}
+    XString name;
+};
+```
+
+> 📖 See [`docs/ZERO_BOILERPLATE.md`](docs/ZERO_BOILERPLATE.md) for the full architecture, deep nesting examples, and implementation details.
 
 #### Rule 6: Custom Type Registration (Advanced)
 

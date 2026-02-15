@@ -144,15 +144,16 @@ docker run --rm xoffset-clang-p2996:latest \
 ## 📊 测试矩阵
 
 ```
-总测试: 18个
-├── 基础测试 (6个) - 不需要反射
+总测试: 30个
+├── 基础测试 (7个) - 核心功能
 │   ├── test_basic_types
 │   ├── test_vector
 │   ├── test_map_set
 │   ├── test_nested
 │   ├── test_compaction
-│   └── test_modify
-└── 反射测试 (12个) - 需要Clang P2996
+│   ├── test_modify
+│   └── test_xbuffer_api
+└── 反射测试 (23个) - 需要Clang P2996
     ├── test_reflection_operators
     ├── test_member_iteration
     ├── test_reflection_type_signature
@@ -164,11 +165,22 @@ docker run --rm xoffset-clang-p2996:latest \
     ├── test_field_limit_fix
     ├── test_class_type_signatures
     ├── test_type_safety
-    └── test_vptr_layout
+    ├── test_type_safety_comprehensive
+    ├── test_vptr_layout
+    ├── test_type_erased_detection
+    ├── test_typelayout_integration
+    ├── test_enum_support
+    ├── test_xstring_direct_assign
+    ├── test_xhandle
+    ├── test_error_paths
+    ├── test_memory_efficiency
+    ├── test_zero_boilerplate          ← Layer 1 零模板化
+    ├── test_zero_boilerplate_vector   ← Layer 2 容器元素
+    └── test_complex_nesting           ← 深层嵌套压力测试
 
 预期结果:
-  Tests Run: 18
-  Tests Passed: 18
+  Tests Run: 30
+  Tests Passed: 30
   Status: ✓ SUCCESS
 ```
 
