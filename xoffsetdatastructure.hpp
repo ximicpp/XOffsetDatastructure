@@ -45,6 +45,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <cstring>
 
 // TypeLayout library — the authoritative type-signature engine
 // Use boost::typelayout directly for all type signature operations:
@@ -423,14 +424,107 @@ namespace XOffsetDatastructure {
         using x_vector_options = boost::container::vector_options_t<
             boost::container::growth_factor<growth_factor_custom>>;
 
-        /// Scoped allocator adaptor: automatically propagates the allocator
-        /// to element construction via allocator_traits::construct().
-        /// This is the C++ standard answer to "allocator propagation in
-        /// nested containers" (N2554, scoped_allocator_adaptor).
-        /// Zero overhead: inherits from OuterAlloc, adds no data members.
+        /// Base scoped allocator (standard Boost version, used internally).
         template <typename T>
-        using x_scoped_alloc = boost::container::scoped_allocator_adaptor<
+        using x_base_scoped_alloc = boost::container::scoped_allocator_adaptor<
             boost::interprocess::allocator<T, XBufferCore::segment_manager>>;
+
+        // Forward declarations of reflection helpers (defined later in this header).
+        // These are used by x_reflect_scoped_alloc::construct() and are resolved
+        // at template instantiation time, so forward declaration is sufficient here.
+        template <typename T, typename Alloc>
+        void reflect_init_all(void* raw, Alloc alloc);
+
+        template <typename T, typename Src>
+        void reflect_transfer_init_all(void* dst, Src&& src,
+            XBufferCore::segment_manager* sm);
+
+        // ================================================================
+        // needs_reflect_construct<T>
+        //
+        // True when T is a pure aggregate (no allocator_type, no user
+        // constructor from SM*) that contains non-trivial members
+        // (e.g. XString, XVector).  These types cannot be default-
+        // constructed or move-constructed by the standard uses_allocator
+        // protocol, so we intercept construct() and use C++26 reflection.
+        //
+        // Trivially-copyable types are excluded because the default
+        // placement-new path already handles them correctly.
+        // ================================================================
+        template <typename T>
+        concept needs_reflect_construct =
+            std::is_class_v<T> &&
+            !std::is_trivially_copyable_v<T> &&
+            !requires { typename T::allocator_type; } &&
+            !requires(XBufferCore::segment_manager* sm) { T(sm); };
+
+        // ================================================================
+        // x_reflect_scoped_alloc<T>
+        //
+        // Custom scoped allocator that intercepts construct() for pure
+        // aggregates (needs_reflect_construct<U>).  For such types:
+        //   - Default construct → reflect_init_all  (zero + alloc inject)
+        //   - Move/Copy construct → reflect_transfer_init_all (per-member)
+        //
+        // For all other types, delegates to base scoped_allocator_adaptor
+        // which uses the standard uses_allocator protocol.
+        // ================================================================
+        template <typename T>
+        class x_reflect_scoped_alloc : public x_base_scoped_alloc<T> {
+            using Base = x_base_scoped_alloc<T>;
+        public:
+            using Base::Base;
+
+            /// Rebind: preserve our derived type across allocator rebinding.
+            template <typename U>
+            struct rebind { using other = x_reflect_scoped_alloc<U>; };
+
+            /// Converting constructor from rebound allocator.
+            template <typename U>
+            x_reflect_scoped_alloc(const x_reflect_scoped_alloc<U>& other) noexcept
+                : Base(other) {}
+
+            // ── construct overload (0): default construction ──
+            template <typename U>
+            void construct(U* p) {
+                if constexpr (needs_reflect_construct<U>) {
+                    reflect_init_all<U>(
+                        static_cast<void*>(p),
+                        this->outer_allocator().get_segment_manager());
+                } else {
+                    Base::construct(p);
+                }
+            }
+
+            // ── construct overload (1): single-arg (move or copy) ──
+            template <typename U, typename Arg>
+            void construct(U* p, Arg&& arg) {
+                if constexpr (needs_reflect_construct<U> &&
+                              std::is_same_v<std::decay_t<Arg>, U>) {
+                    // Move or copy of the same type → per-member transfer
+                    reflect_transfer_init_all<U>(
+                        static_cast<void*>(p),
+                        std::forward<Arg>(arg),
+                        this->outer_allocator().get_segment_manager());
+                } else {
+                    Base::construct(p, std::forward<Arg>(arg));
+                }
+            }
+
+            // ── construct overload (2+): multi-arg → delegate to base ──
+            template <typename U, typename A1, typename A2, typename... Rest>
+            void construct(U* p, A1&& a1, A2&& a2, Rest&&... rest) {
+                Base::construct(p,
+                    std::forward<A1>(a1),
+                    std::forward<A2>(a2),
+                    std::forward<Rest>(rest)...);
+            }
+        };
+
+        /// The allocator used by all XOffset containers (XVector, XMap, XSet).
+        /// Reflection-aware: automatically handles pure aggregates.
+        template <typename T>
+        using x_scoped_alloc = x_reflect_scoped_alloc<T>;
 
         /// Internal vector alias used as backing store for flat containers
         template <typename T>
@@ -925,6 +1019,182 @@ namespace XOffsetDatastructure {
     }
 
     // ========================================================================
+    // Reflection-Based Construction (Zero-Boilerplate Support)
+    //
+    // C++26 reflection enables constructing user types WITHOUT requiring any
+    // user-written constructors, macros, or typedefs. Users just write:
+    //
+    //   struct Player {
+    //       int32_t id{0};
+    //       XString name;
+    //       XVector<int32_t> items;
+    //   };
+    //   auto* p = xbuf.make<Player>();  // Just works!
+    //
+    // Implementation: allocate raw memory, then use reflection to
+    // construct_at each member individually (POD→value-init, containers→alloc).
+    //
+    // For types WITH traditional allocator constructors, the old path is used
+    // automatically (detected via has_segment_manager_ctor concept).
+    // ========================================================================
+    namespace detail {
+
+        /// Concept: T has allocator_type typedef (allocator-aware)
+        template <typename T>
+        concept has_allocator_type_member = requires { typename T::allocator_type; };
+
+        /// Concept: T is constructible from segment_manager* (traditional path)
+        template <typename T>
+        concept has_segment_manager_ctor = requires(XBufferCore::segment_manager* sm) {
+            T(sm);
+        };
+
+        // ── Member count (consteval) ──
+        template <typename T>
+        consteval std::size_t reflect_member_count_of() {
+            return std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked()).size();
+        }
+
+        // ── Per-member init on raw memory (index-based) ──
+        // Uses obj.[:member:] (reference syntax) to avoid P2996 compiler
+        // assertion failure with -> operator on cast pointers.
+        template <typename T, std::size_t N, typename Alloc>
+        void reflect_init_nth(void* raw, Alloc alloc) {
+            using namespace std::meta;
+            constexpr auto member =
+                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+            using M = [:type_of(member):];
+            T& obj = *reinterpret_cast<T*>(raw);
+            if constexpr (has_allocator_type_member<M>) {
+                std::construct_at(&(obj.[:member:]), alloc);
+            } else {
+                std::construct_at(&(obj.[:member:]));  // value-init (zero)
+            }
+        }
+
+        // ── Fold-expression expander ──
+        template <typename T, typename Alloc, std::size_t... Is>
+        void reflect_init_expand(void* raw, Alloc alloc, std::index_sequence<Is...>) {
+            (reflect_init_nth<T, Is>(raw, alloc), ...);
+        }
+
+        /// Construct all members of T on zeroed raw memory using reflection.
+        /// POD members are value-initialized (zero), allocator-aware members
+        /// receive the allocator.
+        template <typename T, typename Alloc>
+        void reflect_init_all(void* raw, Alloc alloc) {
+            std::memset(raw, 0, sizeof(T));
+            reflect_init_expand<T>(raw, alloc,
+                std::make_index_sequence<reflect_member_count_of<T>()>{});
+        }
+
+        // ================================================================
+        // Reflection Transfer Helpers (Move / Copy with allocator injection)
+        //
+        // Used by x_reflect_scoped_alloc::construct() to handle move and
+        // copy construction of pure aggregates inside XVector reallocation.
+        //
+        // For each member:
+        //   - allocator-aware (XString, XVector, etc.) →
+        //       construct_at(&dst.member, forward(src.member), sm)
+        //       This invokes the container's move/copy+allocator constructor.
+        //   - POD →
+        //       construct_at(&dst.member, forward(src.member))
+        //       Standard move/copy.
+        // ================================================================
+
+        // ── Per-member transfer (index-based, perfect-forwarding) ──
+        template <typename T, std::size_t N, typename Src>
+        void reflect_transfer_init_nth(void* dst, Src&& src,
+                                       XBufferCore::segment_manager* sm) {
+            using namespace std::meta;
+            constexpr auto member =
+                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+            using M = [:type_of(member):];
+            T& d = *reinterpret_cast<T*>(dst);
+            if constexpr (has_allocator_type_member<M>) {
+                // Container/string: move or copy + inject allocator
+                std::construct_at(&(d.[:member:]),
+                    std::forward<Src>(src).[:member:], sm);
+            } else {
+                // POD: direct move or copy
+                std::construct_at(&(d.[:member:]),
+                    std::forward<Src>(src).[:member:]);
+            }
+        }
+
+        // ── Fold-expression expander for transfer ──
+        template <typename T, typename Src, std::size_t... Is>
+        void reflect_transfer_init_expand(void* dst, Src&& src,
+                                          XBufferCore::segment_manager* sm,
+                                          std::index_sequence<Is...>) {
+            (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
+        }
+
+        /// Transfer (move or copy) all members of T from src to dst,
+        /// injecting the segment_manager for allocator-aware members.
+        /// dst must point to raw (uninitialized) memory of sizeof(T).
+        /// Src is T&& (move) or const T& (copy), resolved via forwarding.
+        template <typename T, typename Src>
+        void reflect_transfer_init_all(void* dst, Src&& src,
+                                       XBufferCore::segment_manager* sm) {
+            std::memset(dst, 0, sizeof(T));
+            reflect_transfer_init_expand<T>(dst, std::forward<Src>(src), sm,
+                std::make_index_sequence<reflect_member_count_of<T>()>{});
+        }
+
+        // ── ReflectRoot<T> ──
+        // Wrapper that constructs T via reflection on raw storage.
+        // Layout: alignas(T) unsigned char[sizeof(T)] — same size as T.
+        // Has an allocator constructor so it works with Boost.IPC construct().
+        // Users never see this type; it's purely internal plumbing.
+        template <typename T>
+        struct ReflectRoot {
+            alignas(T) unsigned char storage[sizeof(T)];
+
+            template <typename Alloc>
+            ReflectRoot(Alloc alloc) {
+                reflect_init_all<T>(storage, alloc);
+            }
+
+            T& ref() noexcept {
+                return *std::launder(reinterpret_cast<T*>(storage));
+            }
+            const T& ref() const noexcept {
+                return *std::launder(reinterpret_cast<const T*>(storage));
+            }
+        };
+
+        /// Construct the root object in managed memory.
+        /// Dispatches: types with allocator ctor → old path, others → reflection.
+        template <typename T>
+        T* construct_root(XBufferCore& xbuf) {
+            auto* sm = xbuf.get_segment_manager();
+            if constexpr (has_segment_manager_ctor<T>) {
+                return xbuf.template construct<T>(XBUFFER_ROOT_NAME)(sm);
+            } else {
+                auto* wrapper = xbuf.template construct<ReflectRoot<T>>(
+                    XBUFFER_ROOT_NAME)(sm);
+                return &wrapper->ref();
+            }
+        }
+
+        /// Find the root object in managed memory.
+        /// Returns nullptr if not found.
+        template <typename T>
+        T* find_root(XBufferCore& xbuf) {
+            if constexpr (has_segment_manager_ctor<T>) {
+                return xbuf.template find<T>(XBUFFER_ROOT_NAME).first;
+            } else {
+                auto result = xbuf.template find<ReflectRoot<T>>(XBUFFER_ROOT_NAME);
+                return result.first ? &result.first->ref() : nullptr;
+            }
+        }
+
+    } // namespace detail (reflection)
+
+    // ========================================================================
     // XHandle<T> — Epoch-cached safe handle for the root object
     //
     // Caches the raw pointer + buffer epoch. On dereference, if the epoch
@@ -973,9 +1243,8 @@ namespace XOffsetDatastructure {
             if (cached_ptr_ && cached_epoch_ == current_epoch) {
                 return cached_ptr_;   // O(1) fast path
             }
-            // Epoch changed or first access — re-find
-            auto result = buffer_->find<T>(XBUFFER_ROOT_NAME);
-            cached_ptr_ = result.first;
+            // Epoch changed or first access — re-find via reflection dispatch
+            cached_ptr_ = detail::find_root<T>(*buffer_);
             cached_epoch_ = current_epoch;
             return cached_ptr_;
         }
@@ -1005,49 +1274,48 @@ namespace XOffsetDatastructure {
     public:
         using XBufferCore::XBufferCore;
 
-        // Constructs the single root object of type T in the buffer.
-        //
-        // WARNING: The returned pointer is a raw T* that becomes DANGLING
-        // after grow(), shrink_to_fit(), or compact. Use root<T>() or
-        // make_handle<T>() for safer access patterns.
+        /// Creates the single root object of type T in the buffer.
+        /// Supports both traditional types (with allocator ctor) and
+        /// zero-boilerplate pure aggregates (via C++26 reflection).
+        ///
+        /// WARNING: The returned pointer is a raw T* that becomes DANGLING
+        /// after grow(), shrink_to_fit(), or compact. Use root<T>() or
+        /// make_handle<T>() for safer access patterns.
         template<typename T>
         T* make() {
             validate_xbuffer_type<T>();
-            if (this->find<T>(XBUFFER_ROOT_NAME).first != nullptr) {
+            if (detail::find_root<T>(*this) != nullptr) {
                 throw boost::interprocess::interprocess_exception(
                     "make<T>(): root object already exists. "
                     "Call root<T>() to access the existing object.");
             }
-            return this->construct<T>(XBUFFER_ROOT_NAME)(this->get_segment_manager());
+            return detail::construct_root<T>(*this);
         }
         
-        // Returns a reference to the root object. Use after deserialization
-        // or after grow/shrink to re-acquire a valid reference.
-        //
-        // Throws if the root object does not exist.
+        /// Returns a reference to the root object.
+        /// Works with both traditional and zero-boilerplate types.
         template<typename T>
         T& root() {
-            auto result = this->find<T>(XBUFFER_ROOT_NAME);
-            if (!result.first) {
+            T* ptr = detail::find_root<T>(*this);
+            if (!ptr) {
                 throw boost::interprocess::interprocess_exception(
                     "root<T>(): no root object in buffer. "
                     "Call make<T>() first or check with has_root<T>().");
             }
-            return *result.first;
+            return *ptr;
         }
 
-        // Returns true if a root object of type T exists in this buffer.
+        /// Returns true if a root object of type T exists in this buffer.
         template<typename T>
         bool has_root() {
-            return this->find<T>(XBUFFER_ROOT_NAME).first != nullptr;
+            return detail::find_root<T>(*this) != nullptr;
         }
 
-        // Creates the root object and returns an epoch-cached XHandle<T>.
-        // The handle automatically re-finds the object after grow/shrink/compact.
+        /// Creates the root object and returns an epoch-cached XHandle<T>.
         template<typename T>
         XHandle<T> make_handle() {
             validate_xbuffer_type<T>();
-            this->construct<T>(XBUFFER_ROOT_NAME)(this->get_segment_manager());
+            detail::construct_root<T>(*this);
             return XHandle<T>(*this);
         }
 
@@ -1160,12 +1428,12 @@ namespace XOffsetDatastructure {
             if (new_size < 4096) new_size = 4096;
             
             XBuffer new_xbuf(new_size);
-            auto* old_obj = old_xbuf.find<T>(XBUFFER_ROOT_NAME).first;
+            auto* old_obj = detail::find_root<T>(old_xbuf);
             if (!old_obj) {
                 return new_xbuf;
             }
             
-            auto* new_obj = new_xbuf.construct<T>(XBUFFER_ROOT_NAME)(new_xbuf.get_segment_manager());
+            auto* new_obj = detail::construct_root<T>(new_xbuf);
             migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
             new_xbuf.shrink_to_fit();
             return new_xbuf;
@@ -1196,8 +1464,16 @@ namespace XOffsetDatastructure {
                 return old_elem;
             } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
                 return ElementType(old_elem, new_xbuf.get_segment_manager());
-            } else {
+            } else if constexpr (detail::has_segment_manager_ctor<ElementType>) {
+                // Traditional path: type has allocator constructor
                 ElementType new_elem(new_xbuf.get_segment_manager());
+                migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
+                return new_elem;
+            } else {
+                // Zero-boilerplate path: pure aggregate, use reflection
+                alignas(ElementType) unsigned char buf[sizeof(ElementType)];
+                detail::reflect_init_all<ElementType>(buf, new_xbuf.get_segment_manager());
+                ElementType& new_elem = *std::launder(reinterpret_cast<ElementType*>(buf));
                 migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
                 return new_elem;
             }

@@ -5,27 +5,17 @@
 
 using namespace XOffsetDatastructure;
 
-class alignas(8) Player {
-public:
-	using allocator_type = XAllocator;
+// ============================================================================
+// Player — Zero-Boilerplate Type Definition (C++26 Reflection)
+//
+// No constructors, no macros, no typedefs needed!
+// C++26 reflection automatically handles:
+//   - Root object construction (XBuffer::make<Player>())
+//   - Container element construction (XVector<Player>::emplace_back())
+//   - Move during vector reallocation (allocator auto-injected)
+// ============================================================================
 
-	// Allocator constructor (suffix mode — standard uses_allocator protocol).
-	// The allocator_arg_t constraint prevents scoped_allocator_adaptor's
-	// prefix-mode detection from matching this single-arg template.
-	template <typename Allocator>
-		requires (!std::is_same_v<std::decay_t<Allocator>, std::allocator_arg_t>)
-	Player(Allocator allocator) : name(allocator), items(allocator) {}
-
-	// Move + allocator constructor (required for vector reallocation
-	// when scoped_allocator_adaptor moves elements).
-	template <typename Allocator>
-	Player(Player&& other, Allocator allocator)
-		: id(other.id)
-		, level(other.level)
-		, name(std::move(other.name), allocator)
-		, items(std::move(other.items), allocator)
-	{}
-
+struct Player {
 	int32_t id{0};
 	int32_t level{0};
 	XString name;

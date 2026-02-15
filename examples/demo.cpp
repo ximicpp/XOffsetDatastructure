@@ -73,16 +73,16 @@ void demo_basic_usage() {
     print_info("Level", std::to_string(game->level));
     print_info("Health", std::to_string(game->health));
     
-    // Add items — allocator auto-injected by scoped_allocator_adaptor
+    // Add items — reflection auto-injects allocator for each member
     print_subsection("Adding Items to Inventory");
     for (int i = 0; i < 5; i++) {
+        game->items.emplace_back();
+        auto& item = game->items.back();
+        item.item_id = i + 1;
+        item.item_type = i % 3;  // 0=Potion, 1=Weapon, 2=Armor
+        item.quantity = (i + 1) * 10;
         std::string item_name = "Potion " + std::to_string(i+1);
-        game->items.emplace_back(
-            i + 1,              // item_id
-            i % 3,              // item_type (0=Potion, 1=Weapon, 2=Armor)
-            (i + 1) * 10,       // quantity
-            item_name.c_str()   // name
-        );
+        item.name = item_name.c_str();
     }
     print_check("Added " + std::to_string(game->items.size()) + " items");
     
@@ -308,10 +308,15 @@ void demo_automatic_compaction() {
     game->level = 50;
     game->health = 85.5f;
     
-    // Add items — allocator auto-injected
+    // Add items — reflection auto-injects allocator
     for (int i = 0; i < 20; i++) {
+        game->items.emplace_back();
+        auto& item = game->items.back();
+        item.item_id = i;
+        item.item_type = i % 3;
+        item.quantity = i * 5;
         std::string item_name = "Item_" + std::to_string(i);
-        game->items.emplace_back(i, i % 3, i * 5, item_name.c_str());
+        item.name = item_name.c_str();
     }
     
     // Add achievements
@@ -407,11 +412,16 @@ void demo_performance() {
     auto start = std::chrono::high_resolution_clock::now();
 #endif
     
-    // Insert 1000 items — allocator auto-injected
+    // Insert 1000 items — reflection auto-injects allocator
     auto* game = xbuf.make<GameData>();
     for (int i = 0; i < 1000; i++) {
+        game->items.emplace_back();
+        auto& item = game->items.back();
+        item.item_id = i;
+        item.item_type = i % 3;
+        item.quantity = i;
         std::string item_name = "Item_" + std::to_string(i);
-        game->items.emplace_back(i, i % 3, i, item_name.c_str());
+        item.name = item_name.c_str();
     }
     
 #if HAS_CHRONO
