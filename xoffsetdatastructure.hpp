@@ -846,16 +846,69 @@ namespace XOffsetDatastructure {
         // Recursive safety check helpers
         // ============================================================================
 
+        // ── has_virtual_bases<T>() ──
+        // Recursively checks whether T or any of its bases use virtual
+        // inheritance.  Virtual inheritance inserts hidden vbase offset
+        // pointers that are ABI-specific and not valid across processes.
+        // Non-virtual inheritance (single or multiple) is safe because
+        // the layout is fully deterministic under all standard ABIs, and
+        // TypeLayout signatures capture exact byte offsets for detection
+        // of any cross-platform differences.
+
         template<typename T>
-        consteval bool has_bases() {
+        consteval bool has_virtual_bases();  // forward declaration
+
+        template<typename T, std::size_t N>
+        consteval bool has_virtual_base_at() {
             using namespace std::meta;
-            auto bases = bases_of(^^T, access_context::unchecked());
-            return bases.size() > 0;
+            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
+            if (is_virtual(base_info)) return true;
+            using BaseType = [:type_of(base_info):];
+            if constexpr (std::is_class_v<BaseType>) {
+                return has_virtual_bases<BaseType>();
+            }
+            return false;
+        }
+
+        template<typename T, std::size_t... Is>
+        consteval bool check_any_virtual_base_impl(std::index_sequence<Is...>) {
+            return (has_virtual_base_at<T, Is>() || ...);
+        }
+
+        template<typename T>
+        consteval bool has_virtual_bases() {
+            using namespace std::meta;
+            constexpr std::size_t bc = bases_of(^^T, access_context::unchecked()).size();
+            if constexpr (bc == 0) return false;
+            else return check_any_virtual_base_impl<T>(std::make_index_sequence<bc>{});
         }
 
         template<typename T>
         consteval bool is_safe_type();
 
+        // ── Base safety checks (index-based expansion) ──
+        template<typename T, std::size_t N>
+        consteval bool is_base_safe_at() {
+            using namespace std::meta;
+            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
+            using BaseType = [:type_of(base_info):];
+            return is_safe_type<BaseType>();
+        }
+
+        template<typename T, std::size_t... Is>
+        consteval bool check_all_bases_impl(std::index_sequence<Is...>) {
+            return (is_base_safe_at<T, Is>() && ...);
+        }
+
+        template<typename T>
+        consteval bool are_all_bases_safe() {
+            using namespace std::meta;
+            constexpr std::size_t bc = bases_of(^^T, access_context::unchecked()).size();
+            if constexpr (bc == 0) return true;
+            else return check_all_bases_impl<T>(std::make_index_sequence<bc>{});
+        }
+
+        // ── Member safety checks (index-based expansion, unchanged) ──
         template<typename T, std::size_t Index>
         consteval bool is_member_safe_at() {
             using namespace std::meta;
@@ -875,9 +928,13 @@ namespace XOffsetDatastructure {
             
             if constexpr (!std::is_class_v<T>) return false;
             if constexpr (std::is_polymorphic_v<T>) return false;
-            if constexpr (has_bases<T>()) return false;
+            if constexpr (has_virtual_bases<T>()) return false;
             if constexpr (std::is_union_v<T>) return false;
             
+            // Check all base classes are safe (recursive)
+            if constexpr (!are_all_bases_safe<T>()) return false;
+            
+            // Check direct members
             constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
             if constexpr (member_count == 0) {
                 return true;
@@ -929,8 +986,8 @@ namespace XOffsetDatastructure {
             else if constexpr (std::is_polymorphic_v<CleanT>) {
                 return "UNSAFE: Type has virtual functions (polymorphic)";
             }
-            else if constexpr (has_bases<CleanT>()) {
-                return "UNSAFE: Inheritance not allowed (use composition)";
+            else if constexpr (has_virtual_bases<CleanT>()) {
+                return "UNSAFE: virtual inheritance not allowed (use non-virtual inheritance)";
             }
             else if constexpr (std::is_union_v<CleanT>) {
                 return "UNSAFE: Union type not allowed";
@@ -970,6 +1027,15 @@ namespace XOffsetDatastructure {
     template<typename T>
     consteval void diagnose_unsafe_members() {
         if constexpr (std::is_class_v<T> && !std::is_polymorphic_v<T> && !std::is_union_v<T>) {
+            // Diagnose base classes
+            template for (constexpr auto base :
+                std::meta::bases_of(^^T, std::meta::access_context::unchecked())) {
+                using BaseT = [:std::meta::type_of(base):];
+                static_assert(
+                    detail::is_safe_type<BaseT>(),
+                    "Unsafe base class detected in XBufferCore type");
+            }
+            // Diagnose direct members
             template for (constexpr auto member :
                 std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())) {
                 using MemberT = [:std::meta::type_of(member):];
@@ -997,9 +1063,11 @@ namespace XOffsetDatastructure {
             "    XString, XVector<T>, XMap<K,V>, XSet<T>\n\n"
             "  User-Defined Types:\n"
             "    struct/class containing only safe types\n"
-            "    (no virtual functions, no raw pointers)\n\n"
+            "    (no virtual functions/inheritance, no raw pointers)\n"
+            "    (non-virtual inheritance IS allowed)\n\n"
             "NOT ALLOWED:\n"
             "  ✗ Virtual functions (polymorphic types)\n"
+            "  ✗ Virtual inheritance\n"
             "  ✗ Raw pointers\n"
             "  ✗ References\n"
             "  ✗ std::string (use XString)\n"
@@ -1049,10 +1117,16 @@ namespace XOffsetDatastructure {
             T(sm);
         };
 
-        // ── Member count (consteval) ──
+        // ── Member / base count (consteval) ──
         template <typename T>
         consteval std::size_t reflect_member_count_of() {
             return std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked()).size();
+        }
+
+        template <typename T>
+        consteval std::size_t reflect_base_count_of() {
+            return std::meta::bases_of(
                 ^^T, std::meta::access_context::unchecked()).size();
         }
 
@@ -1079,14 +1153,47 @@ namespace XOffsetDatastructure {
             (reflect_init_nth<T, Is>(raw, alloc), ...);
         }
 
+        // ── Internal recursive impl (no memset — called for bases too) ──
+        template <typename T, typename Alloc>
+        void reflect_init_all_impl(void* raw, Alloc alloc);
+
+        // ── Per-base init: cast to base subobject, recurse ──
+        template <typename T, std::size_t N, typename Alloc>
+        void reflect_init_base_nth(void* raw, Alloc alloc) {
+            using namespace std::meta;
+            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
+            using BaseType = [:type_of(base_info):];
+            T* obj = reinterpret_cast<T*>(raw);
+            BaseType* base_ptr = static_cast<BaseType*>(obj);
+            reflect_init_all_impl<BaseType>(static_cast<void*>(base_ptr), alloc);
+        }
+
+        template <typename T, typename Alloc, std::size_t... Is>
+        void reflect_init_bases_expand(void* raw, Alloc alloc, std::index_sequence<Is...>) {
+            (reflect_init_base_nth<T, Is>(raw, alloc), ...);
+        }
+
+        /// Internal: recursively init bases then direct members (no memset).
+        template <typename T, typename Alloc>
+        void reflect_init_all_impl(void* raw, Alloc alloc) {
+            if constexpr (reflect_base_count_of<T>() > 0) {
+                reflect_init_bases_expand<T>(raw, alloc,
+                    std::make_index_sequence<reflect_base_count_of<T>()>{});
+            }
+            if constexpr (reflect_member_count_of<T>() > 0) {
+                reflect_init_expand<T>(raw, alloc,
+                    std::make_index_sequence<reflect_member_count_of<T>()>{});
+            }
+        }
+
         /// Construct all members of T on zeroed raw memory using reflection.
         /// POD members are value-initialized (zero), allocator-aware members
-        /// receive the allocator.
+        /// receive the allocator.  Handles inheritance: base class members
+        /// are initialized recursively before direct members.
         template <typename T, typename Alloc>
         void reflect_init_all(void* raw, Alloc alloc) {
-            std::memset(raw, 0, sizeof(T));
-            reflect_init_expand<T>(raw, alloc,
-                std::make_index_sequence<reflect_member_count_of<T>()>{});
+            std::memset(raw, 0, sizeof(T));  // zero ONCE at top level
+            reflect_init_all_impl<T>(raw, alloc);
         }
 
         // ================================================================
@@ -1132,16 +1239,65 @@ namespace XOffsetDatastructure {
             (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
         }
 
+        // ── Internal recursive transfer impl (no memset) ──
+        template <typename T, typename Src>
+        void reflect_transfer_init_all_impl(void* dst, Src&& src,
+                                            XBufferCore::segment_manager* sm);
+
+        // ── Per-base transfer: cast both dst and src to base, recurse ──
+        template <typename T, std::size_t N, typename Src>
+        void reflect_transfer_base_nth(void* dst, Src&& src,
+                                       XBufferCore::segment_manager* sm) {
+            using namespace std::meta;
+            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
+            using BaseType = [:type_of(base_info):];
+
+            T* dst_obj = reinterpret_cast<T*>(dst);
+            BaseType* dst_base = static_cast<BaseType*>(dst_obj);
+
+            // Preserve value category: T&& → BaseType&&, const T& → const BaseType&
+            if constexpr (std::is_lvalue_reference_v<Src&&>) {
+                reflect_transfer_init_all_impl<BaseType>(
+                    static_cast<void*>(dst_base),
+                    static_cast<const BaseType&>(src), sm);
+            } else {
+                reflect_transfer_init_all_impl<BaseType>(
+                    static_cast<void*>(dst_base),
+                    static_cast<BaseType&&>(std::move(src)), sm);
+            }
+        }
+
+        template <typename T, typename Src, std::size_t... Is>
+        void reflect_transfer_bases_expand(void* dst, Src&& src,
+                                           XBufferCore::segment_manager* sm,
+                                           std::index_sequence<Is...>) {
+            (reflect_transfer_base_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
+        }
+
+        /// Internal: recursively transfer bases then direct members (no memset).
+        template <typename T, typename Src>
+        void reflect_transfer_init_all_impl(void* dst, Src&& src,
+                                            XBufferCore::segment_manager* sm) {
+            if constexpr (reflect_base_count_of<T>() > 0) {
+                reflect_transfer_bases_expand<T>(dst, std::forward<Src>(src), sm,
+                    std::make_index_sequence<reflect_base_count_of<T>()>{});
+            }
+            if constexpr (reflect_member_count_of<T>() > 0) {
+                reflect_transfer_init_expand<T>(dst, std::forward<Src>(src), sm,
+                    std::make_index_sequence<reflect_member_count_of<T>()>{});
+            }
+        }
+
         /// Transfer (move or copy) all members of T from src to dst,
         /// injecting the segment_manager for allocator-aware members.
         /// dst must point to raw (uninitialized) memory of sizeof(T).
         /// Src is T&& (move) or const T& (copy), resolved via forwarding.
+        /// Handles inheritance: base class members are transferred first.
         template <typename T, typename Src>
         void reflect_transfer_init_all(void* dst, Src&& src,
                                        XBufferCore::segment_manager* sm) {
-            std::memset(dst, 0, sizeof(T));
-            reflect_transfer_init_expand<T>(dst, std::forward<Src>(src), sm,
-                std::make_index_sequence<reflect_member_count_of<T>()>{});
+            std::memset(dst, 0, sizeof(T));  // zero ONCE at top level
+            reflect_transfer_init_all_impl<T>(dst, std::forward<Src>(src), sm);
         }
 
         // ── ReflectRoot<T> ──
@@ -1552,13 +1708,41 @@ namespace XOffsetDatastructure {
                                          std::index_sequence<Is...>) {
             (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
         }
+
+        // ── Per-base migration: cast to base subobject, recurse ──
+        template<typename T, std::size_t N>
+        static void migrate_base_at(const T& old_obj, T& new_obj,
+                                    XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
+            using namespace std::meta;
+            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
+            using BaseType = [:type_of(base_info):];
+            const BaseType& old_base = static_cast<const BaseType&>(old_obj);
+            BaseType& new_base = static_cast<BaseType&>(new_obj);
+            migrate_members(old_base, new_base, old_xbuf, new_xbuf);
+        }
+
+        template<typename T, std::size_t... Is>
+        static void migrate_bases_impl(const T& old_obj, T& new_obj,
+                                       XBufferCore& old_xbuf, XBufferCore& new_xbuf,
+                                       std::index_sequence<Is...>) {
+            (migrate_base_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+        }
         
         template<typename T>
         static void migrate_members(const T& old_obj, T& new_obj, 
                                    XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
+            // Migrate base class members first (recursive)
+            constexpr std::size_t base_count = boost::typelayout::get_base_count<T>();
+            if constexpr (base_count > 0) {
+                migrate_bases_impl(old_obj, new_obj, old_xbuf, new_xbuf,
+                                  std::make_index_sequence<base_count>{});
+            }
+            // Then migrate direct members
             constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
-            migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
-                                std::make_index_sequence<member_count>{});
+            if constexpr (member_count > 0) {
+                migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
+                                    std::make_index_sequence<member_count>{});
+            }
         }
     };
 }

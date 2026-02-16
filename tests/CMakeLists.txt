@@ -108,6 +108,7 @@ set(REFLECTION_TESTS
     test_zero_boilerplate
     test_zero_boilerplate_vector
     test_complex_nesting
+    test_inheritance
 )
 
 # Count for summary
