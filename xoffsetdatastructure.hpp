@@ -358,10 +358,15 @@ private:
 namespace XOffsetDatastructure {
     using namespace boost::interprocess;
 
-    using XBufferCore = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
-    // Alternative allocator policy (rbtree best-fit). Currently unused —
-    // provided for future experimentation with allocation strategies.
-    using XBufferCoreBestFit = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
+    // rbtree_best_fit: O(log n) allocation with automatic free-block coalescing.
+    // Reduces fragmentation compared to simple_seq_fit, at the cost of slightly
+    // larger per-allocation headers (~32-64 bytes vs ~16 bytes).
+    // This is the right choice for XOffset's workload pattern (frequent
+    // alloc+dealloc cycles from container growth and string reassignment).
+    using XBufferCore = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
+    // Alternative allocator policy (sequential fit). Faster allocation O(n)
+    // but no free-block coalescing — only suitable for append-only workloads.
+    using XBufferCoreSeqFit = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
 
     template<typename T>
     concept HasIterator = requires(T t) {
@@ -1546,6 +1551,57 @@ namespace XOffsetDatastructure {
         }
     };
 
+    // ========================================================================
+    // TypedXBuffer<T> — Type-bound buffer with compile-time root type
+    //
+    // Wraps XBuffer and binds it to a specific root type T at compile time.
+    // Eliminates the need to repeat <T> on every make/root/handle call.
+    //
+    // Usage:
+    //   TypedXBuffer<GameData> buf(4096);
+    //   auto* game = buf.make();         // no <GameData> needed
+    //   auto& g = buf.root();            // no <GameData> needed
+    //   auto bytes = buf.save();          // standard save
+    //   auto loaded = TypedXBuffer<GameData>::load(bytes);
+    // ========================================================================
+    template<typename T>
+    class TypedXBuffer : public XBuffer {
+    public:
+        using XBuffer::XBuffer;
+
+        /// Creates the single root object of type T.
+        T* make() { return XBuffer::make<T>(); }
+
+        /// Returns a reference to the root object.
+        T& root() { return XBuffer::root<T>(); }
+
+        /// Returns true if a root object exists.
+        bool has_root() { return XBuffer::has_root<T>(); }
+
+        /// Creates root and returns an epoch-cached handle.
+        XHandle<T> make_handle() { return XBuffer::make_handle<T>(); }
+
+        /// Returns an epoch-cached handle to the existing root.
+        XHandle<T> handle() { return XBuffer::handle<T>(); }
+
+        /// Load from serialized data and return a typed buffer.
+        static TypedXBuffer load(const std::string& data) {
+            std::vector<char> buffer(data.begin(), data.end());
+            TypedXBuffer xbuf(buffer);
+            return xbuf;
+        }
+
+        static TypedXBuffer load(const std::vector<char>& data) {
+            std::vector<char> buffer(data);
+            TypedXBuffer xbuf(buffer);
+            return xbuf;
+        }
+
+        /// Construct from an existing XBuffer (e.g., after compaction).
+        TypedXBuffer(XBuffer&& other) noexcept
+            : XBuffer(std::move(other)) {}
+    };
+
     // ================================================================
     // XCompactor — Automatic memory compaction using C++26 reflection
     //
@@ -1576,27 +1632,40 @@ namespace XOffsetDatastructure {
 
         // Single-object compaction: migrates the root object to a new,
         // tightly-packed buffer.  Returns XBuffer for ergonomic access.
+        //
+        // Uses progressive allocation: tries 2x first, then 2.5x, 3x, 4x.
+        // Most workloads succeed at 2x; the larger multipliers are fallbacks
+        // for deeply nested structures with many small allocations where
+        // per-allocation header overhead is significant.
         template<typename T>
         static XBuffer compact(XBufferCore& old_xbuf) {
             validate_xbuffer_type<T>();
             auto stats = XBufferStats::memory_stats(old_xbuf);
-            // Allocate 3x used_size for migration headroom — nested structs
-            // with many small allocations (strings, vectors) need extra space
-            // due to per-allocation header overhead in the segment manager.
-            // shrink_to_fit() at the end reclaims the excess.
-            std::size_t new_size = stats.used_size * 3;
-            if (new_size < 4096) new_size = 4096;
-            
-            XBuffer new_xbuf(new_size);
             auto* old_obj = detail::find_root<T>(old_xbuf);
-            if (!old_obj) {
-                return new_xbuf;
+
+            // Progressive multipliers: try smaller first, fall back to larger
+            constexpr double multipliers[] = {2.0, 2.5, 3.0, 4.0};
+            for (double mult : multipliers) {
+                std::size_t new_size = static_cast<std::size_t>(stats.used_size * mult);
+                if (new_size < 4096) new_size = 4096;
+
+                try {
+                    XBuffer new_xbuf(new_size);
+                    if (!old_obj) {
+                        return new_xbuf;
+                    }
+                    auto* new_obj = detail::construct_root<T>(new_xbuf);
+                    migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
+                    new_xbuf.shrink_to_fit();
+                    return new_xbuf;
+                } catch (const boost::interprocess::bad_alloc&) {
+                    // Not enough headroom — try next multiplier
+                    continue;
+                }
             }
-            
-            auto* new_obj = detail::construct_root<T>(new_xbuf);
-            migrate_members(*old_obj, *new_obj, old_xbuf, new_xbuf);
-            new_xbuf.shrink_to_fit();
-            return new_xbuf;
+            // All multipliers exhausted — should not happen in practice
+            throw boost::interprocess::interprocess_exception(
+                "XCompactor::compact failed: insufficient memory even at 4x multiplier");
         }
 
     private:
