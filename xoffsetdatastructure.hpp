@@ -168,269 +168,8 @@ static_assert(alignof(double)  == XOffsetDatastructure::TargetArchitecture.align
 #include <boost/move/utility_core.hpp>
 #include <boost/assert.hpp>
 
-// Platform headers for virtual memory (mmap / VirtualAlloc)
-#if defined(__unix__) || defined(__APPLE__)
-#include <sys/mman.h>
-#include <unistd.h>
-#define XOFFSET_HAS_MMAP 1
-#else
-#define XOFFSET_HAS_MMAP 0
-#endif
-
 namespace boost {
 namespace interprocess {
-
-// ============================================================================
-// VirtualMemoryBuffer — Fixed-address backing store using mmap
-//
-// Reserves a large virtual address range (default 256 MB) but only commits
-// physical pages for the portion actually used.  The base address NEVER
-// changes, so grow() does not invalidate any pointers.
-//
-// On platforms without mmap (WASM, exotic), falls back to std::vector<char>.
-// ============================================================================
-class VirtualMemoryBuffer {
-public:
-    // ── Adaptive reservation policy ──
-    // max_reserved = clamp(initial_size × GROWTH_HEADROOM, MIN_RESERVE, MAX_RESERVE)
-    // This keeps virtual address space usage proportional to actual need,
-    // enabling 10,000+ independent XBuffer instances without exhausting
-    // the process's virtual address space.
-    static constexpr std::size_t GROWTH_HEADROOM = 16;
-    static constexpr std::size_t MIN_RESERVE = 64ULL * 1024;         // 64 KB
-    static constexpr std::size_t MAX_RESERVE = 256ULL * 1024 * 1024; // 256 MB
-
-    static constexpr std::size_t compute_reservation(std::size_t initial_size) {
-        // Overflow-safe: if initial_size * 16 would overflow, clamp to MAX_RESERVE
-        std::size_t r;
-        if (initial_size > MAX_RESERVE / GROWTH_HEADROOM) {
-            r = MAX_RESERVE;
-        } else {
-            r = initial_size * GROWTH_HEADROOM;
-        }
-        if (r < MIN_RESERVE) r = MIN_RESERVE;
-        if (r > MAX_RESERVE) r = MAX_RESERVE;
-        return r;
-    }
-
-    VirtualMemoryBuffer() noexcept = default;
-
-    /// Adaptive reservation: reserves compute_reservation(initial_size).
-    explicit VirtualMemoryBuffer(std::size_t initial_size)
-        : VirtualMemoryBuffer(initial_size, compute_reservation(initial_size))
-    {}
-
-    /// Explicit reservation: caller specifies exact max_reserved.
-    VirtualMemoryBuffer(std::size_t initial_size, std::size_t max_reserved)
-    {
-#if XOFFSET_HAS_MMAP
-        long page_sz = sysconf(_SC_PAGESIZE);
-        m_page_size = static_cast<std::size_t>(page_sz);
-        m_reserved = round_up(max_reserved, m_page_size);
-        std::size_t commit = round_up(initial_size, m_page_size);
-        if (commit > m_reserved) commit = m_reserved;
-
-        // Reserve entire virtual address range (PROT_NONE = no physical pages)
-        m_base = static_cast<char*>(::mmap(nullptr, m_reserved, PROT_NONE,
-                                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-        if (m_base == MAP_FAILED) {
-            m_base = nullptr;
-            throw std::bad_alloc();
-        }
-        // Commit initial pages
-        if (commit > 0 && ::mprotect(m_base, commit, PROT_READ | PROT_WRITE) != 0) {
-            ::munmap(m_base, m_reserved);
-            m_base = nullptr;
-            throw std::bad_alloc();
-        }
-        m_committed = commit;
-        std::memset(m_base, 0, m_committed);
-#else
-        m_fallback.resize(initial_size, 0);
-        m_page_size = 4096;
-        m_reserved = max_reserved;
-        m_committed = initial_size;
-#endif
-    }
-
-    /// Construct from external data (adaptive reservation).
-    VirtualMemoryBuffer(const char* data, std::size_t size)
-        : VirtualMemoryBuffer(size, compute_reservation(size))
-    {
-        std::memcpy(this->data(), data, size);
-    }
-
-    /// Construct from external data (explicit reservation).
-    VirtualMemoryBuffer(const char* data, std::size_t size, std::size_t max_reserved)
-        : VirtualMemoryBuffer(size, max_reserved)
-    {
-        std::memcpy(this->data(), data, size);
-    }
-
-    ~VirtualMemoryBuffer() {
-#if XOFFSET_HAS_MMAP
-        if (m_base) ::munmap(m_base, m_reserved);
-#endif
-    }
-
-    // Move-only
-    VirtualMemoryBuffer(VirtualMemoryBuffer&& other) noexcept { swap(other); }
-    VirtualMemoryBuffer& operator=(VirtualMemoryBuffer&& other) noexcept {
-        VirtualMemoryBuffer tmp(std::move(other));
-        swap(tmp);
-        return *this;
-    }
-    VirtualMemoryBuffer(const VirtualMemoryBuffer&) = delete;
-    VirtualMemoryBuffer& operator=(const VirtualMemoryBuffer&) = delete;
-
-    void swap(VirtualMemoryBuffer& o) noexcept {
-#if XOFFSET_HAS_MMAP
-        std::swap(m_base, o.m_base);
-#else
-        m_fallback.swap(o.m_fallback);
-#endif
-        std::swap(m_reserved, o.m_reserved);
-        std::swap(m_committed, o.m_committed);
-        std::swap(m_page_size, o.m_page_size);
-    }
-
-    char* data() noexcept {
-#if XOFFSET_HAS_MMAP
-        return m_base;
-#else
-        return m_fallback.data();
-#endif
-    }
-    const char* data() const noexcept {
-#if XOFFSET_HAS_MMAP
-        return m_base;
-#else
-        return m_fallback.data();
-#endif
-    }
-
-    std::size_t size() const noexcept { return m_committed; }
-    std::size_t capacity() const noexcept { return m_reserved; }
-
-    /// Grow the buffer.
-    ///
-    /// Fast path (within reservation): commit more pages via mprotect.
-    ///   Base address does NOT change.  *address_changed remains false.
-    ///
-    /// Slow path (exceeds reservation): remap to a larger mmap region.
-    ///   Base address CHANGES.  *address_changed is set to true.
-    ///   The caller (XManagedMemory) must reopen the segment at the new address.
-    ///   This is safe because Boost.Interprocess uses offset_ptr internally.
-    bool grow(std::size_t extra_bytes, bool* address_changed = nullptr) {
-        if (address_changed) *address_changed = false;
-        std::size_t new_committed = m_committed + extra_bytes;
-#if XOFFSET_HAS_MMAP
-        new_committed = round_up(new_committed, m_page_size);
-        if (new_committed <= m_reserved) {
-            // Fast path: commit in place, address stable
-            if (new_committed > m_committed) {
-                if (::mprotect(m_base + m_committed, new_committed - m_committed,
-                               PROT_READ | PROT_WRITE) != 0) return false;
-                std::memset(m_base + m_committed, 0, new_committed - m_committed);
-            }
-            m_committed = new_committed;
-            return true;
-        }
-        // Slow path: remap to larger reservation
-        return grow_remap(new_committed, address_changed);
-#else
-        // Fallback: std::vector
-        // m_reserved is the upper bound for in-place growth (address-stable).
-        // Beyond m_reserved, growth still works (vector relocates) but reports
-        // address_changed so the caller can reopen the segment.
-        const char* old_ptr = m_fallback.data();
-        if (new_committed > MAX_RESERVE) return false;
-        m_fallback.resize(new_committed, 0);
-        m_committed = new_committed;
-        if (m_fallback.data() != old_ptr) {
-            // Vector relocated — address changed
-            if (address_changed) *address_changed = true;
-        }
-        return true;
-#endif
-    }
-
-    /// Shrink: decommit trailing pages.  Base address does NOT change.
-    void shrink(std::size_t new_size) {
-#if XOFFSET_HAS_MMAP
-        std::size_t new_committed = round_up(new_size, m_page_size);
-        if (new_committed < m_committed) {
-            ::madvise(m_base + new_committed, m_committed - new_committed, MADV_DONTNEED);
-            ::mprotect(m_base + new_committed, m_committed - new_committed, PROT_NONE);
-            m_committed = new_committed;
-        }
-#else
-        m_fallback.resize(new_size);
-        m_fallback.shrink_to_fit();
-        m_committed = new_size;
-#endif
-    }
-
-    /// Compatibility: copy to std::vector<char> (for save/serialization).
-    std::vector<char> to_vector() const {
-        return std::vector<char>(data(), data() + m_committed);
-    }
-
-    /// Compatibility: provide begin/end for std::string construction.
-    const char* begin() const noexcept { return data(); }
-    const char* end() const noexcept { return data() + m_committed; }
-
-private:
-    static std::size_t round_up(std::size_t val, std::size_t align) {
-        return (val + align - 1) / align * align;
-    }
-
-#if XOFFSET_HAS_MMAP
-    /// Slow path: remap to a larger virtual address reservation.
-    /// Doubles the reserved size until it fits (capped at MAX_RESERVE).
-    /// Copies existing data to the new region, releases the old one.
-    bool grow_remap(std::size_t new_committed, bool* address_changed) {
-        std::size_t new_reserved = m_reserved;
-        while (new_reserved < new_committed) {
-            if (new_reserved >= MAX_RESERVE) return false;  // hard ceiling
-            new_reserved = std::min(new_reserved * 2, MAX_RESERVE);
-        }
-        new_reserved = round_up(new_reserved, m_page_size);
-
-        // Map new, larger region
-        char* new_base = static_cast<char*>(::mmap(nullptr, new_reserved, PROT_NONE,
-                                                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-        if (new_base == MAP_FAILED) return false;
-
-        // Commit needed pages in the new region
-        if (::mprotect(new_base, new_committed, PROT_READ | PROT_WRITE) != 0) {
-            ::munmap(new_base, new_reserved);
-            return false;
-        }
-
-        // Copy old data, zero new area
-        std::memcpy(new_base, m_base, m_committed);
-        std::memset(new_base + m_committed, 0, new_committed - m_committed);
-
-        // Release old region
-        ::munmap(m_base, m_reserved);
-
-        m_base = new_base;
-        m_reserved = new_reserved;
-        m_committed = new_committed;
-
-        if (address_changed) *address_changed = true;
-        return true;
-    }
-
-    char* m_base = nullptr;
-#else
-    std::vector<char> m_fallback;
-#endif
-    std::size_t m_reserved = 0;
-    std::size_t m_committed = 0;
-    std::size_t m_page_size = 4096;
-};
 
 
 template <class MutexFamily, class VoidPointer = offset_ptr<void>, std::size_t MemAlignment = 0>
@@ -461,6 +200,28 @@ public:
     }
 };
 
+// ============================================================================
+// XManagedMemory — Managed memory segment backed by std::vector<char>
+//
+// Strategy D: std::vector + reserve() + address-change detection + re-reserve.
+//
+// Principle:
+//   - vector::reserve(N) pre-allocates N bytes of virtual address space via
+//     malloc.  Modern OSes use lazy allocation, so untouched pages consume
+//     zero physical RAM (same as mmap PROT_NONE).
+//   - grow() calls vector::resize().  If size <= capacity, the C++ standard
+//     guarantees data() does not change → fast path (O(1), no epoch bump).
+//   - If resize exceeds capacity, vector relocates → slow path: close_impl,
+//     open_impl at the new address, epoch++.  After relocation, we re-reserve
+//     (size * GROWTH_HEADROOM) to restore address stability for future grows.
+//
+// Benefits over the previous mmap backend:
+//   - Zero platform dependencies (pure C++ standard library)
+//   - Byte-exact memory usage (no page-alignment waste)
+//   - ~15 lines vs ~200 lines of code
+//   - Same physical memory efficiency (lazy allocation)
+//   - Same address stability within reserve range
+// ============================================================================
 template <
     class CharType,
     class AllocationAlgorithm,
@@ -475,6 +236,27 @@ private:
 public:
     typedef typename base_t::size_type size_type;
 
+    // ── Adaptive reservation policy ──
+    // reserve_size = clamp(initial_size × GROWTH_HEADROOM, MIN_RESERVE, MAX_RESERVE)
+    // Keeps virtual address space proportional to actual need, enabling
+    // 10,000+ independent XBuffer instances without exhausting VA space.
+    static constexpr std::size_t GROWTH_HEADROOM = 16;
+    static constexpr std::size_t MIN_RESERVE = 64ULL * 1024;         // 64 KB
+    static constexpr std::size_t MAX_RESERVE = 256ULL * 1024 * 1024; // 256 MB
+
+    /// Overflow-safe adaptive reservation computation.
+    static constexpr std::size_t compute_reservation(std::size_t size) {
+        std::size_t r;
+        if (size > MAX_RESERVE / GROWTH_HEADROOM) {
+            r = MAX_RESERVE;
+        } else {
+            r = size * GROWTH_HEADROOM;
+        }
+        if (r < MIN_RESERVE) r = MIN_RESERVE;
+        if (r > MAX_RESERVE) r = MAX_RESERVE;
+        return r;
+    }
+
     XManagedMemory() noexcept
     {
     }
@@ -485,14 +267,17 @@ public:
     }
 
     // Returns a monotonically increasing counter that is bumped whenever
-    // the buffer's base address changes (remap during grow, or shrink_to_fit).
-    // Fast-path grow() (within reservation) does NOT change the address,
+    // the buffer's base address changes (vector relocation during grow).
+    // Fast-path grow() (within reserve capacity) does NOT change the address,
     // so epoch stays constant and XHandle<T> works in O(1).
     uint64_t epoch() const noexcept { return m_epoch; }
 
+    /// Construct with adaptive reservation: reserve = clamp(size × 16, 64KB, 256MB).
+    /// Physical RAM consumed = size bytes (reserve pages are untouched → lazy alloc).
     XManagedMemory(size_type size)
-        : m_buffer(size)
+        : m_buffer(size, char(0))
     {
+        m_buffer.reserve(compute_reservation(size));
         void *addr = m_buffer.data();
         if (!base_t::create_impl(addr, size))
         {
@@ -501,11 +286,12 @@ public:
         }
     }
 
-    /// Construct with explicit max virtual address reservation.
+    /// Construct with explicit max capacity (overrides adaptive reservation).
     /// Usage: XManagedMemory(4096, 64*1024*1024) reserves 64MB.
     XManagedMemory(size_type size, size_type max_reserved)
-        : m_buffer(size, max_reserved)
+        : m_buffer(size, char(0))
     {
+        m_buffer.reserve(max_reserved);
         void *addr = m_buffer.data();
         if (!base_t::create_impl(addr, size))
         {
@@ -514,9 +300,12 @@ public:
         }
     }
 
+    /// Construct from external serialized data (load path).
+    /// Copies data into the vector, then opens the existing segment.
     XManagedMemory(const char* data, size_type size)
-        : m_buffer(data, size)
+        : m_buffer(data, data + size)
     {
+        m_buffer.reserve(compute_reservation(size));
         void *addr = m_buffer.data();
         BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
         if (!base_t::open_impl(addr, size))
@@ -525,9 +314,11 @@ public:
         }
     }
 
+    /// Construct from an existing std::vector<char> (legacy compatibility).
     XManagedMemory(std::vector<char> &externalBuffer)
-        : m_buffer(externalBuffer.data(), externalBuffer.size())
+        : m_buffer(externalBuffer)
     {
+        m_buffer.reserve(compute_reservation(m_buffer.size()));
         void *addr = m_buffer.data();
         size_type size = m_buffer.size();
         BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
@@ -551,37 +342,44 @@ public:
 
     // Grows the buffer by extra_bytes.
     //
-    // Fast path (within mmap reservation): base address does NOT change.
+    // Fast path (within vector capacity): data() does NOT change.
     //   Existing pointers, references, and iterators remain valid.
-    //   Epoch is NOT incremented.
+    //   Epoch is NOT incremented.  C++ standard guarantees this.
     //
-    // Slow path (exceeds reservation): remaps to a larger region.
+    // Slow path (exceeds capacity): vector relocates.
     //   Base address CHANGES.  Epoch is incremented.
+    //   After relocation, re-reserves (size * 16) to restore stability.
     //   XHandle<T> automatically re-finds the root on next access.
-    //   Internal offset_ptr-based data remains valid after remap.
+    //   Internal offset_ptr-based data remains valid after relocation.
     bool grow(size_type extra_bytes)
     {
         size_type old_size = m_buffer.size();
-        bool address_changed = false;
+        char* old_addr = m_buffer.data();
 
-        if (!m_buffer.grow(extra_bytes, &address_changed))
+        try {
+            m_buffer.resize(old_size + extra_bytes, char(0));
+        } catch (...) {
             return false;
+        }
 
-        if (!address_changed) {
-            // Fast path: address stable, just extend segment metadata
+        if (m_buffer.data() == old_addr) {
+            // Fast path: within reserve capacity, address stable
             base_t::grow(extra_bytes);
         } else {
-            // Slow path: remap occurred — reopen segment at new address.
+            // Slow path: vector relocated — reopen segment at new address.
             // close_impl() just nulls mp_header (no memory access on old addr).
-            // open_impl() then attaches to the new (memcpy'd) segment data.
+            // open_impl() then attaches to the relocated segment data.
             base_t::close_impl();
             if (!base_t::open_impl(m_buffer.data(), old_size)) {
                 throw interprocess_exception(
-                    "XManagedMemory: failed to reopen segment after remap");
+                    "XManagedMemory: failed to reopen segment after vector relocation");
             }
             // Extend the segment to account for the newly available space
             base_t::grow(extra_bytes);
             ++m_epoch;  // Invalidate XHandle caches
+            // Re-reserve to restore address stability for future grows.
+            // This prevents consecutive relocations after exceeding capacity.
+            m_buffer.reserve(compute_reservation(m_buffer.size()));
         }
         return true;
     }
@@ -590,21 +388,28 @@ public:
     {
         base_t::swap(other);
         m_buffer.swap(other.m_buffer);
+        std::swap(m_epoch, other.m_epoch);
     }
 
-    // Shrinks the managed segment to reclaim trailing free space.
-    // With mmap backend: base address does NOT change, existing pointers
-    // and XHandle caches remain valid.  Epoch is NOT incremented.
+    // Shrinks the managed segment's logical size (reclaims trailing free space
+    // in the rbtree allocator).  Does NOT shrink the vector — this preserves
+    // the base address and avoids epoch invalidation.
+    //
+    // The vector capacity remains at its high-water mark, which means:
+    //   - Future grow() calls are more likely to stay on the fast path
+    //   - base address and all pointers/XHandles remain valid
+    //   - Physical RAM for untouched pages is reclaimable by the OS (lazy alloc)
     void shrink_to_fit()
     {
         base_t::shrink_to_fit();
-        m_buffer.shrink(base_t::get_size());
-        // No ++m_epoch: mmap shrink only decommits trailing pages via
-        // madvise+mprotect. Base address and all allocated objects are untouched.
+        // Intentionally NOT shrinking the vector.
+        // The vector's excess capacity acts as pre-reserved space for future
+        // grows, and the OS can reclaim untouched physical pages anyway.
     }
 
-    // Returns a pointer to the VirtualMemoryBuffer for serialization.
-    VirtualMemoryBuffer *get_buffer()
+    /// Returns a pointer to the underlying std::vector<char> buffer.
+    /// Primarily used in tests and for serialization (to_vector()).
+    std::vector<char> *get_buffer()
     {
         return &m_buffer;
     }
@@ -619,10 +424,10 @@ public:
         return m_buffer.size();
     }
 
-    /// Returns the segment's logical size (byte-exact, not page-aligned).
+    /// Returns the segment's logical size (byte-exact).
     /// This is the size recorded in the segment_manager header after
     /// shrink_to_fit(). Use this for serialization instead of get_size()
-    /// which returns the page-aligned committed size.
+    /// which may include unused trailing space.
     size_type segment_size() const
     {
         return base_t::get_size();
@@ -632,11 +437,11 @@ private:
     void priv_close()
     {
         base_t::destroy_impl();
-        // VirtualMemoryBuffer destructor handles munmap
-        m_buffer = VirtualMemoryBuffer();
+        m_buffer.clear();
+        m_buffer.shrink_to_fit();
     }
 
-    VirtualMemoryBuffer m_buffer;
+    std::vector<char> m_buffer;
     uint64_t m_epoch = 0;
 };
 
@@ -1723,7 +1528,7 @@ namespace XOffsetDatastructure {
     public:
         using XBufferCore::XBufferCore;
 
-        /// Capacity hint for controlling mmap virtual address reservation.
+        /// Capacity hint for controlling vector reserve size.
         ///
         /// By default, XBuffer uses adaptive reservation:
         ///   reserved = clamp(initial_size × 16, 64KB, 256MB)
@@ -1732,7 +1537,7 @@ namespace XOffsetDatastructure {
         ///   XBuffer buf(4096, XBuffer::max_capacity(64 * 1024 * 1024));  // 64MB
         ///
         /// For many small buffers (10,000+), the default adaptive policy is optimal.
-        /// For few large buffers that need guaranteed no-remap growth, set a large value.
+        /// For few large buffers that need guaranteed no-relocation growth, set a large value.
         struct MaxCapacity { std::size_t value; };
         static MaxCapacity max_capacity(std::size_t bytes) { return {bytes}; }
 
@@ -1804,10 +1609,10 @@ namespace XOffsetDatastructure {
 
         // Serializes the buffer to a compact string.
         // Shrinks the segment first, then copies exactly the segment's logical
-        // size (base_t::get_size()) — no page-alignment padding.
+        // size (base_t::get_size()) — byte-exact, no padding.
         //
-        // With mmap backend: base address does NOT change, existing pointers
-        // and XHandle caches remain valid after this call.
+        // shrink_to_fit() only updates the rbtree logical size, does NOT
+        // shrink the vector → base address unchanged, XHandle caches valid.
         std::string save() {
             this->shrink_to_fit();
             const char* base = static_cast<const char*>(this->get_address());
