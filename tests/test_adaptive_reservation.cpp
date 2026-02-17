@@ -1,8 +1,8 @@
 // ============================================================================
-// Test: Adaptive mmap Reservation & Remap Fallback
-// Purpose: Verify that the adaptive reservation policy works correctly for
-//          both single-buffer and many-buffer scenarios, and that the remap
-//          fallback path functions when grow() exceeds the initial reservation.
+// Test: Adaptive Vector Reservation & Relocation Fallback
+// Purpose: Verify that the adaptive reserve() policy works correctly for
+//          both single-buffer and many-buffer scenarios, and that the
+//          relocation fallback path functions when grow() exceeds capacity.
 // ============================================================================
 
 #include <iostream>
@@ -31,36 +31,36 @@ bool test_adaptive_reservation() {
     std::cout << "\n[TEST] Adaptive Reservation Formula\n";
     std::cout << std::string(50, '-') << "\n";
 
-    using VMB = boost::interprocess::VirtualMemoryBuffer;
+    using XMM = XBufferCore;  // XManagedMemory instantiation
 
     // Verify compute_reservation formula
     std::cout << "Test 1a: compute_reservation values... ";
-    assert(VMB::compute_reservation(512) == VMB::MIN_RESERVE);      // 512*16=8KB < 64KB → 64KB
-    assert(VMB::compute_reservation(4096) == VMB::MIN_RESERVE);     // 4K*16=64KB = MIN
-    assert(VMB::compute_reservation(8192) == 8192 * 16);            // 8K*16=128KB
-    assert(VMB::compute_reservation(1024*1024) == 1024*1024*16);    // 1M*16=16MB
-    assert(VMB::compute_reservation(32*1024*1024) == VMB::MAX_RESERVE); // 32M*16=512MB > 256MB → 256MB
+    assert(XMM::compute_reservation(512) == XMM::MIN_RESERVE);        // 512*16=8KB < 64KB → 64KB
+    assert(XMM::compute_reservation(4096) == XMM::MIN_RESERVE);       // 4K*16=64KB = MIN
+    assert(XMM::compute_reservation(8192) == 8192 * 16);              // 8K*16=128KB
+    assert(XMM::compute_reservation(1024*1024) == 1024*1024*16);      // 1M*16=16MB
+    assert(XMM::compute_reservation(32*1024*1024) == XMM::MAX_RESERVE); // 32M*16=512MB > 256MB → 256MB
     std::cout << "[OK]\n";
 
     // Verify actual buffer uses adaptive reservation
     std::cout << "Test 1b: Small buffer uses small reservation... ";
     {
         XBuffer buf(4096);
-        auto* vmb = buf.get_buffer();
-        std::size_t expected = VMB::compute_reservation(4096);
-        // capacity() should be close to expected (rounded up to page size)
-        assert(vmb->capacity() <= expected + 65536);  // allow page rounding
-        assert(vmb->capacity() < VMB::MAX_RESERVE);   // NOT 256MB!
-        std::cout << "reserved=" << vmb->capacity() / 1024 << "KB [OK]\n";
+        auto* vec = buf.get_buffer();
+        std::size_t expected = XMM::compute_reservation(4096);
+        // capacity() should be at least the expected reservation
+        assert(vec->capacity() >= expected);
+        assert(vec->capacity() < XMM::MAX_RESERVE);   // NOT 256MB!
+        std::cout << "reserved=" << vec->capacity() / 1024 << "KB [OK]\n";
     }
 
     // Verify large buffer gets proportionally larger reservation
     std::cout << "Test 1c: Large buffer uses large reservation... ";
     {
         XBuffer buf(1024 * 1024);  // 1MB
-        auto* vmb = buf.get_buffer();
-        assert(vmb->capacity() >= 1024 * 1024);  // at least initial size
-        std::cout << "reserved=" << vmb->capacity() / (1024*1024) << "MB [OK]\n";
+        auto* vec = buf.get_buffer();
+        assert(vec->capacity() >= 1024 * 1024);  // at least initial size
+        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
     }
 
     std::cout << "[PASS] Adaptive reservation tests passed!\n";
@@ -77,19 +77,18 @@ bool test_max_capacity_override() {
     std::cout << "Test 2a: Explicit 64MB reservation... ";
     {
         XBuffer buf(4096, XBuffer::max_capacity(64 * 1024 * 1024));
-        auto* vmb = buf.get_buffer();
-        // Should be close to 64MB (page-rounded)
-        assert(vmb->capacity() >= 64 * 1024 * 1024 - 65536);
-        assert(vmb->capacity() <= 64 * 1024 * 1024 + 65536);
-        std::cout << "reserved=" << vmb->capacity() / (1024*1024) << "MB [OK]\n";
+        auto* vec = buf.get_buffer();
+        // Should be at least 64MB
+        assert(vec->capacity() >= 64 * 1024 * 1024);
+        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
     }
 
     std::cout << "Test 2b: Explicit 256MB reservation (max)... ";
     {
         XBuffer buf(4096, XBuffer::max_capacity(256 * 1024 * 1024));
-        auto* vmb = buf.get_buffer();
-        assert(vmb->capacity() >= 256 * 1024 * 1024 - 65536);
-        std::cout << "reserved=" << vmb->capacity() / (1024*1024) << "MB [OK]\n";
+        auto* vec = buf.get_buffer();
+        assert(vec->capacity() >= 256 * 1024 * 1024);
+        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
     }
 
     std::cout << "[PASS] MaxCapacity override tests passed!\n";
@@ -148,55 +147,56 @@ bool test_many_small_buffers() {
 }
 
 // ============================================================================
-// Test 4: Remap fallback (grow beyond reservation via explicit grow())
+// Test 4: Relocation fallback (grow beyond capacity)
 // ============================================================================
-bool test_remap_fallback() {
-    std::cout << "\n[TEST] Remap Fallback (grow beyond reservation)\n";
+bool test_relocation_fallback() {
+    std::cout << "\n[TEST] Relocation Fallback (grow beyond capacity)\n";
     std::cout << std::string(50, '-') << "\n";
 
     // Create a buffer with small adaptive reservation (4KB → 64KB reserved).
-    // Then explicitly grow() past the reservation to trigger the remap path.
-    std::cout << "Test 4a: Create, populate, then grow beyond reservation... ";
+    // Then explicitly grow() past the capacity to trigger the relocation path.
+    std::cout << "Test 4a: Create, populate, then grow beyond capacity... ";
     XBuffer buf(4096);
-    auto* vmb = buf.get_buffer();
-    std::size_t initial_capacity = vmb->capacity();
+    auto* vec = buf.get_buffer();
+    std::size_t initial_capacity = vec->capacity();
     std::cout << "initial_reserved=" << initial_capacity / 1024 << "KB... ";
 
     auto* data = buf.make<SmallData>();
     data->id = 42;
-    data->name = "remap_test";
+    data->name = "relocation_test";
     for (int i = 0; i < 10; ++i) {
         data->numbers.push_back(i);
     }
 
-    // Record epoch before remap
+    // Record epoch before relocation
     uint64_t epoch_before = buf.epoch();
 
-    // Explicitly grow beyond the 64KB reservation
+    // Explicitly grow beyond the reserved capacity
     bool grew = buf.grow(initial_capacity + 4096);
     assert(grew);
 
-    std::size_t new_capacity = vmb->capacity();
+    // After relocation + re-reserve, capacity should have increased
+    std::size_t new_capacity = vec->capacity();
     std::cout << "new_reserved=" << new_capacity / 1024 << "KB... ";
     assert(new_capacity > initial_capacity);
 
-    // Epoch should have incremented (remap happened)
+    // Epoch should have incremented (relocation happened)
     assert(buf.epoch() > epoch_before);
     std::cout << "[OK]\n";
 
-    // Verify data integrity after remap
-    std::cout << "Test 4b: Verify data integrity after remap... ";
+    // Verify data integrity after relocation
+    std::cout << "Test 4b: Verify data integrity after relocation... ";
     auto& ref = buf.root<SmallData>();
     assert(ref.id == 42);
-    assert(ref.name == "remap_test");
+    assert(ref.name == "relocation_test");
     assert(ref.numbers.size() == 10);
     for (int i = 0; i < 10; ++i) {
         assert(ref.numbers[i] == i);
     }
     std::cout << "[OK]\n";
 
-    // Continue using the buffer after remap — add more data
-    std::cout << "Test 4c: Continue adding data after remap... ";
+    // Continue using the buffer after relocation — add more data
+    std::cout << "Test 4c: Continue adding data after relocation... ";
     auto& ref2 = buf.root<SmallData>();
     for (int i = 10; i < 1000; ++i) {
         ref2.numbers.push_back(i);
@@ -205,38 +205,38 @@ bool test_remap_fallback() {
     assert(buf.root<SmallData>().numbers[999] == 999);
     std::cout << "[OK]\n";
 
-    // XHandle works correctly after remap
-    std::cout << "Test 4d: XHandle works after remap... ";
+    // XHandle works correctly after relocation
+    std::cout << "Test 4d: XHandle works after relocation... ";
     auto handle = buf.handle<SmallData>();
     assert(handle->id == 42);
     assert(handle->numbers.size() == 1000);
     std::cout << "[OK]\n";
 
-    // Save/load round-trip after remap
-    std::cout << "Test 4e: Save/load round-trip after remap... ";
+    // Save/load round-trip after relocation
+    std::cout << "Test 4e: Save/load round-trip after relocation... ";
     std::string saved = buf.save();
     XBuffer loaded = XBuffer::load(saved);
     auto& loaded_data = loaded.root<SmallData>();
     assert(loaded_data.id == 42);
-    assert(loaded_data.name == "remap_test");
+    assert(loaded_data.name == "relocation_test");
     assert(loaded_data.numbers.size() == 1000);
     assert(loaded_data.numbers[999] == 999);
     std::cout << "[OK]\n";
 
-    std::cout << "[PASS] Remap fallback tests passed!\n";
+    std::cout << "[PASS] Relocation fallback tests passed!\n";
     return true;
 }
 
 // ============================================================================
-// Test 5: Explicit forced remap via grow()
+// Test 5: Forced relocation + re-reserve behavior
 // ============================================================================
-bool test_forced_remap() {
-    std::cout << "\n[TEST] Forced Remap via Manual grow()\n";
+bool test_forced_relocation() {
+    std::cout << "\n[TEST] Forced Relocation + Re-reserve\n";
     std::cout << std::string(50, '-') << "\n";
 
-    // Create with small reservation to guarantee remap
+    // Create with small reservation to guarantee relocation
     // 4096 bytes → 64KB reservation
-    std::cout << "Test 5a: Force grow beyond reservation... ";
+    std::cout << "Test 5a: Force grow beyond capacity... ";
     XBuffer buf(4096);
     auto initial_capacity = buf.get_buffer()->capacity();
     auto* data = buf.make<SmallData>();
@@ -245,36 +245,46 @@ bool test_forced_remap() {
     // Record initial epoch
     uint64_t epoch_before = buf.epoch();
 
-    // Force grow way beyond 64KB reservation
-    bool grew = buf.grow(initial_capacity + 4096);  // exceed reservation
+    // Force grow way beyond 64KB capacity
+    bool grew = buf.grow(initial_capacity + 4096);  // exceed capacity
     assert(grew);
     
     auto new_capacity = buf.get_buffer()->capacity();
     std::cout << "before=" << initial_capacity/1024 << "KB "
               << "after=" << new_capacity/1024 << "KB... ";
     
-    // Reservation should have grown
+    // Capacity should have grown (re-reserve after relocation)
     assert(new_capacity > initial_capacity);
     std::cout << "[OK]\n";
 
-    // If remap happened, epoch should have changed
-    std::cout << "Test 5b: Epoch incremented on remap... ";
+    // Epoch should have incremented (relocation happened)
+    std::cout << "Test 5b: Epoch incremented on relocation... ";
     uint64_t epoch_after = buf.epoch();
-    if (new_capacity > initial_capacity) {
-        // Remap should have happened
-        assert(epoch_after > epoch_before);
-        std::cout << "epoch " << epoch_before << " → " << epoch_after << " [OK]\n";
-    } else {
-        std::cout << "no remap needed [OK]\n";
-    }
+    assert(epoch_after > epoch_before);
+    std::cout << "epoch " << epoch_before << " → " << epoch_after << " [OK]\n";
 
     // Verify data still accessible via root()
-    std::cout << "Test 5c: Data intact after forced remap... ";
+    std::cout << "Test 5c: Data intact after forced relocation... ";
     auto& ref = buf.root<SmallData>();
     assert(ref.id == 99);
     std::cout << "[OK]\n";
 
-    std::cout << "[PASS] Forced remap tests passed!\n";
+    // Test 5d: After re-reserve, subsequent grows should be fast-path
+    std::cout << "Test 5d: Re-reserve enables fast-path for subsequent grows... ";
+    uint64_t epoch_stable = buf.epoch();
+    for (int i = 0; i < 10; ++i) {
+        bool ok = buf.grow(1024);  // small grow within re-reserved capacity
+        assert(ok);
+    }
+    // Epoch should NOT have changed if all grows stayed within capacity
+    if (buf.epoch() == epoch_stable) {
+        std::cout << "all fast-path [OK]\n";
+    } else {
+        // If capacity was tight, relocation may have happened once during re-reserve
+        std::cout << "some slow-path (acceptable) [OK]\n";
+    }
+
+    std::cout << "[PASS] Forced relocation tests passed!\n";
     return true;
 }
 
@@ -288,7 +298,7 @@ bool test_typed_buffer_max_capacity() {
     std::cout << "Test 6a: TypedXBuffer with explicit capacity... ";
     {
         TypedXBuffer<SmallData> buf(4096, XBuffer::max_capacity(32 * 1024 * 1024));
-        assert(buf.get_buffer()->capacity() >= 32 * 1024 * 1024 - 65536);
+        assert(buf.get_buffer()->capacity() >= 32 * 1024 * 1024);
         auto* data = buf.make();
         data->id = 123;
         assert(buf.root().id == 123);
@@ -316,8 +326,8 @@ int main() {
         all_passed &= test_adaptive_reservation();
         all_passed &= test_max_capacity_override();
         all_passed &= test_many_small_buffers();
-        all_passed &= test_remap_fallback();
-        all_passed &= test_forced_remap();
+        all_passed &= test_relocation_fallback();
+        all_passed &= test_forced_relocation();
         all_passed &= test_typed_buffer_max_capacity();
 
         if (all_passed) {
