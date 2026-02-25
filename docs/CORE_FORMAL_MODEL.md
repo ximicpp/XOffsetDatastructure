@@ -57,7 +57,10 @@ to actually use the copied buffer at runtime.
 > The copy is lossless and order-preserving. B' may reside at a different base
 > address than B; the displacement `δ = base(B') − base(B)` may be arbitrary.
 >
-> *Precondition*: B must be quiescent during the copy — no concurrent writes.
+> *Precondition*: B must be in a **quiescent state** during the copy — no
+> concurrent writes are in progress, and all prior writes to B have been made
+> visible (e.g., via appropriate memory barriers or process-level synchronization).
+> This ensures that the byte sequence read during copy is a consistent snapshot.
 
 ### 1.4 Definition: Buffer Model
 
@@ -314,6 +317,13 @@ resolve()  = new_this + stored_value
 > *Precondition*: The copy is a whole-buffer copy — every byte at offset k in B
 > appears at offset k in B'. Both the pointer and its target are within B.
 >
+> *Implicit dependency on C1*: The `stored_value` of an `offset_ptr` is a scalar
+> of type `ptrdiff_t`. For byte-copy to preserve its numeric value, C1 must hold
+> for `ptrdiff_t` (same width and endianness on producer and consumer). Within
+> the Domain A architecture constraint (which fixes pointer size and endianness),
+> this is automatically satisfied. The dependency is structural: C2's relocation
+> guarantee relies on C1's value preservation for the offset_ptr's internal data.
+>
 > *Proof*: `stored = a_t - a_p`. Copied pointer is at `a_p + δ`.
 > `resolve() = (a_p + δ) + (a_t - a_p) = a_t + δ`. ∎
 >
@@ -460,8 +470,9 @@ S_container = { XVector<T> | T ∈ S }
             ∪ { XSet<T>    | T ∈ S }
             ∪ { XMap<K,V>  | K ∈ S ∧ V ∈ S }
 
-S_composite = { C | is_class(C) ∧ ¬polymorphic(C) ∧ ¬has_bases(C)
+S_composite = { C | is_class(C) ∧ ¬polymorphic(C) ∧ ¬has_virtual_bases(C)
                    ∧ ¬union(C)
+                   ∧ ∀b ∈ bases(C) : type(b) ∈ S
                    ∧ ∀m ∈ nonstatic_data_members(C) : type(m) ∈ S }
 
 S = S₀ ∪ S_enum ∪ S_string ∪ S_container ∪ S_composite
@@ -472,6 +483,16 @@ S = S₀ ∪ S_enum ∪ S_string ∪ S_container ∪ S_composite
 > direct member). Containers break the containment chain via indirection
 > (offset_ptr), so the membership check always reaches a base case (S₀).
 
+> **Note on C-style arrays**: Bounded array types `T[N]` (e.g., `int32_t[10]`)
+> are **not explicitly included** in S. In the current implementation,
+> `is_safe_type<T[N]>()` returns false because `T[N]` is neither a leaf type, an
+> enum, nor a class — it falls through to the default rejection. This is a
+> conservative design choice: C-style arrays as direct struct members have
+> deterministic layout (contiguous elements, no padding between them for
+> standard types), but they are not commonly used in modern C++ idioms.
+> Users should prefer `std::array<T, N>` wrapped in a struct, or `XVector<T>`.
+> Future relaxation to accept `T[N]` where `T ∈ S` is straightforward if needed.
+
 ### 3.2 Each Rule Protects a Condition
 
 | Rule | What it excludes | Which condition it protects |
@@ -481,8 +502,8 @@ S = S₀ ∪ S_enum ∪ S_string ∪ S_container ∪ S_composite
 | S excludes raw pointers `T*` | Absolute addresses | C2 (referential integrity) |
 | S excludes `std::string`, `std::vector` | Internal heap raw pointers | C2 (referential integrity) |
 | S excludes polymorphic classes | vtable pointer (absolute address) | C2 (referential integrity) |
-| S excludes classes with base classes | Potential vtable; ABI-sensitive layout | C2 + C1 (conservative: non-virtual inheritance may be safe if TypeLayout signature matches; future relaxation possible) |
-| S excludes unions | Active member ambiguous after byte copy | C1 (active member is value information; byte copy cannot preserve it) |
+| S excludes virtual inheritance | Hidden vbase offset pointers (ABI-specific absolute addresses) | C2 + C1 (virtual inheritance inserts hidden vbase offset pointers; non-virtual inheritance is allowed — all base classes must recursively belong to S, and TypeLayout signatures capture exact byte offsets for cross-platform detection) |
+| S excludes unions | Active member ambiguous after byte copy | C1 + P2 (the union's byte layout is deterministic, but the *active member identity* — which determines how those bytes are interpreted — is a semantic property not encoded in the byte representation; after byte-copy, the consumer cannot determine which member is active, and accessing the wrong member is undefined behavior under ISO C++) |
 | S excludes `std::function`, `std::any` | Type-erased, hidden raw pointers | C2 (referential integrity) |
 | S_container requires elements ∈ S | Recursive safety | C2 (referential integrity) |
 | S_composite requires all members ∈ S | Recursive safety | C2 (referential integrity) |
@@ -498,7 +519,8 @@ S = S₀ ∪ S_enum ∪ S_string ∪ S_container ∪ S_composite
 | S_container | `is_safe_leaf<XVector<T>>`, `<XSet<T>>`, `<XMap<K,V>>` | LEAF-4 in `detail` namespace |
 | S_composite | `are_all_members_safe<CleanT>()` | `are_all_members_safe()` function |
 | Exclusion of polymorphic | `std::is_polymorphic_v<T>` | Inside `are_all_members_safe()` |
-| Exclusion of bases | `has_bases<T>()` via reflection | Inside `are_all_members_safe()` |
+| Exclusion of virtual bases | `has_virtual_bases<T>()` via reflection | Inside `are_all_members_safe()` |
+| Base class safety | `are_all_bases_safe<T>()` recursive check | Inside `are_all_members_safe()` |
 | Exclusion of union | `std::is_union_v<T>` | Inside `are_all_members_safe()` |
 | User-facing gate | `validate_xbuffer_type<T>()` static_assert | `validate_xbuffer_type()` function |
 
@@ -597,6 +619,12 @@ then both C1 and C2 must hold. This establishes that C1 and C2 are the
 > following differs: a field offset, a field size, or the endianness of a
 > scalar field.
 >
+> *Exhaustiveness*: These three cases are exhaustive for layout(T). A type's byte
+> layout is fully determined by (a) the starting offset of each field, (b) the
+> byte width of each field, and (c) the byte-order interpretation of each scalar
+> field. Padding differences manifest as offset differences (a subsequent field
+> starts at a different position), so padding is subsumed by Case 1.
+>
 > *Case 1 — field offset differs*: An object `o` of type T occupies bytes
 > `[k, k + sizeof(T))` in B. After byte_copy, the consumer interprets
 > field `f` starting at `k + offset_consumer(f)` instead of `k + offset_producer(f)`.
@@ -606,8 +634,10 @@ then both C1 and C2 must hold. This establishes that C1 and C2 are the
 > *Case 2 — field size differs*: The consumer reads fewer or more bytes for
 > field `f`, yielding a truncated or over-extended value. Property (2) violated. ∎
 >
-> *Case 3 — endianness differs*: The consumer interprets the byte sequence
-> in reversed order, yielding a byte-swapped value. Property (2) violated. ∎
+> *Case 3 — endianness differs*: For a multi-byte scalar field, the consumer
+> interprets the byte sequence with a different byte-order convention (e.g.,
+> most-significant byte first instead of least-significant byte first), yielding
+> a numerically different value. Property (2) violated. ∎
 >
 > In all cases, ¬C1 ⟹ ¬semantic_equivalence. Contrapositive: semantic
 > equivalence ⟹ C1. ∎
@@ -617,9 +647,10 @@ then both C1 and C2 must hold. This establishes that C1 and C2 are the
 > Assume ¬C2: there exists an address reference `r` in B that is either
 > (a) an absolute address, or (b) an offset_ptr whose target is outside B.
 >
-> *Case (a) — absolute address*: After byte_copy with displacement δ ≠ 0,
-> the absolute address still points to the **original** location in B, not
-> the copy in B'. The reference does not resolve to the corresponding
+> *Case (a) — absolute address*: Choose any byte_copy with displacement
+> δ ≠ 0 (such a copy exists by definition, since B' may reside at a different
+> base address). The absolute address still points to the **original** location
+> in B, not the copy in B'. The reference does not resolve to the corresponding
 > target in B'. Semantic equivalence property (3) is violated. ∎
 >
 > *Case (b) — offset_ptr target outside B*: The target is not copied as
@@ -760,8 +791,9 @@ Step 4 (C1+C2, ind.)  structural induction on S: every field preserved
 - The framework assumes **quiescent buffers** — no concurrent writes during copy.
 - TypeLayout provides **complete** verification for user composite types but only
   **outer-shell** verification for library container types (P3 bridges the gap).
-- Domain S's exclusion of base classes is **conservative** — future relaxation is
-  possible when TypeLayout signature matching is sufficient.
+- Domain S allows **non-virtual inheritance** (all base classes must recursively
+  belong to S); **virtual inheritance** is excluded because it introduces hidden
+  vbase offset pointers that are ABI-specific and not captured by the type system.
 
 ---
 
