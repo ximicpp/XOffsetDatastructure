@@ -54,6 +54,7 @@
 //   - boost::typelayout::definition_signatures_match<T1, T2>()
 //   - boost::typelayout::layout_signatures_match<T1, T2>()
 #include <boost/typelayout.hpp>
+#include <boost/typelayout/tools/consteval_safety.hpp>
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
@@ -909,17 +910,25 @@ namespace XOffsetDatastructure {
     namespace detail {
 
         // ============================================================================
-        // Safe Type Subset — Explicit Whitelist (is_safe_leaf)
+        // Safe Type Subset — Container Whitelist (is_safe_leaf)
         //
-        // The Safe Type Subset S is defined by two mechanisms:
-        //   1. is_safe_leaf<T>  — declares leaf types that are directly safe
-        //   2. Recursive check  — composite types are safe if all members ∈ S
-        // No blacklist needed: types not in the whitelist are rejected.
+        // is_safe_leaf<T> marks types as "known safe leaves" — primarily used for
+        // XOffset containers (XVector, XString, XMap, XSet) whose internals contain
+        // Boost.Interprocess allocators (pointers, etc.) that would fail the generic
+        // safety engine. Containers registered here are treated as opaque safe
+        // wrappers; the engine recurses into their value_type instead.
+        //
+        // Primitive types (int32_t, float, etc.) no longer need is_safe_leaf
+        // registration — they are classified directly by the TypeLayout consteval
+        // safety engine. The specializations below are kept for backward
+        // compatibility with user code that may check is_safe_leaf<int32_t>.
+        //
+        // Registered via XOFFSET_REGISTER_* unified macros (see end of file).
         // ============================================================================
 
         template<typename T> struct is_safe_leaf : std::false_type {};
 
-        // — LEAF-1: Primitives (fixed-width, architecture-independent) —
+        // — Primitives (backward compatibility; engine classifies these directly) —
         template<> struct is_safe_leaf<int8_t>   : std::true_type {};
         template<> struct is_safe_leaf<int16_t>  : std::true_type {};
         template<> struct is_safe_leaf<int32_t>  : std::true_type {};
@@ -933,225 +942,98 @@ namespace XOffsetDatastructure {
         template<> struct is_safe_leaf<bool>     : std::true_type {};
         template<> struct is_safe_leaf<char>     : std::true_type {};
 
-        // — NOTE: `long` and `unsigned long` are intentionally EXCLUDED —
-        //
-        // sizeof(long) varies across data models:
-        //   • LP64  (Linux/macOS 64-bit): sizeof(long) == 8
-        //   • LLP64 (Windows 64-bit):     sizeof(long) == 4
-        //
-        // This means a struct containing `long` would have different binary
-        // layouts on different platforms, breaking zero-copy interoperability.
-        // Use fixed-width types instead:
-        //   long          → int32_t or int64_t
-        //   unsigned long → uint32_t or uint64_t
-        //
-        // The same applies to `long long` (always 8 bytes in practice but
-        // not guaranteed by the standard). Use int64_t / uint64_t.
-
-        // — Compile-time diagnostic helper for excluded platform-dependent types —
-        template<typename T>
-        struct is_platform_dependent_integer : std::false_type {};
-        template<> struct is_platform_dependent_integer<long> : std::true_type {};
-        template<> struct is_platform_dependent_integer<unsigned long> : std::true_type {};
-        template<> struct is_platform_dependent_integer<long long> : std::true_type {};
-        template<> struct is_platform_dependent_integer<unsigned long long> : std::true_type {};
-
-        // — LEAF-2: Enums —
-        // Not registered here; enums are checked dynamically in is_safe_type()
-        // via TypeLayout's is_fixed_enum<T>().
-
-        // — LEAF-3/4: XString & XContainers —
-        // Registered via XOFFSET_REGISTER_* unified macros (see end of file).
-        // User-defined types can still specialize is_safe_leaf manually.
-
-        // — LEAF-5: XOffsetPtr<T> — NOT registered by default.
-        //
-        // XOffsetPtr is reference-semantic (points to data it does not own).
-        // All LEAF-1~4 types are value-semantic and self-contained.
-        // XOffsetPtr's validity depends on external state (the target object),
-        // so it is excluded from the default Safe Type Subset.
-        //
-        // User opt-in: specialize is_safe_leaf for your specific use case:
-        //
-        //   template<>
-        //   struct XOffsetDatastructure::detail::is_safe_leaf<XOffsetPtr<MyType>>
-        //       : std::true_type {};
-        //
-        // If you also need compaction support, register a migrate_as strategy.
-        // The library does NOT provide built-in migration for XOffsetPtr.
+        // — XString & XContainers are registered via XOFFSET_REGISTER_* macros —
+        // — XOffsetPtr<T> is NOT registered by default (reference-semantic) —
 
         // ============================================================================
-        // Recursive safety check helpers
+        // XOffset Shared-Memory Safety Policy
+        //
+        // Delegates to TypeLayout's consteval_classify_safety engine with XOffset-
+        // specific constraints:
+        //
+        //   1. type_override: Containers registered in is_safe_leaf are treated as
+        //      opaque wrappers — skip their internal allocator structure but recurse
+        //      into value_type / key_type+mapped_type.
+        //
+        //   2. check: Warning→Risk escalation.  The TypeLayout engine classifies
+        //      polymorphic types, unions, and virtual bases as Warning; XOffset
+        //      categorically rejects all of these for SHM safety.
         // ============================================================================
 
-        // ── has_virtual_bases<T>() ──
-        // Recursively checks whether T or any of its bases use virtual
-        // inheritance.  Virtual inheritance inserts hidden vbase offset
-        // pointers that are ABI-specific and not valid across processes.
-        // Non-virtual inheritance (single or multiple) is safe because
-        // the layout is fully deterministic under all standard ABIs, and
-        // TypeLayout signatures capture exact byte offsets for detection
-        // of any cross-platform differences.
+        // Import the consteval safety engine types
+        using boost::typelayout::compat::SafetyLevel;
+        using boost::typelayout::compat::consteval_classify_safety;
 
-        template<typename T>
-        consteval bool has_virtual_bases();  // forward declaration
-
-        template<typename T, std::size_t N>
-        consteval bool has_virtual_base_at() {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            if (is_virtual(base_info)) return true;
-            using BaseType = [:type_of(base_info):];
-            if constexpr (std::is_class_v<BaseType>) {
-                return has_virtual_bases<BaseType>();
+        struct XOffsetShmPolicy {
+            /// Escalate Warning→Risk: XOffset does not allow polymorphic types,
+            /// unions, or virtual bases in shared memory.
+            static consteval SafetyLevel check(SafetyLevel level) {
+                if (level == SafetyLevel::Warning) return SafetyLevel::Risk;
+                return level;
             }
-            return false;
-        }
 
-        template<typename T, std::size_t... Is>
-        consteval bool check_any_virtual_base_impl(std::index_sequence<Is...>) {
-            return (has_virtual_base_at<T, Is>() || ...);
-        }
-
-        template<typename T>
-        consteval bool has_virtual_bases() {
-            using namespace std::meta;
-            constexpr std::size_t bc = bases_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc == 0) return false;
-            else return check_any_virtual_base_impl<T>(std::make_index_sequence<bc>{});
-        }
-
-        template<typename T>
-        consteval bool is_safe_type();
-
-        // ── Base safety checks (index-based expansion) ──
-        template<typename T, std::size_t N>
-        consteval bool is_base_safe_at() {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            using BaseType = [:type_of(base_info):];
-            return is_safe_type<BaseType>();
-        }
-
-        template<typename T, std::size_t... Is>
-        consteval bool check_all_bases_impl(std::index_sequence<Is...>) {
-            return (is_base_safe_at<T, Is>() && ...);
-        }
-
-        template<typename T>
-        consteval bool are_all_bases_safe() {
-            using namespace std::meta;
-            constexpr std::size_t bc = bases_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc == 0) return true;
-            else return check_all_bases_impl<T>(std::make_index_sequence<bc>{});
-        }
-
-        // ── Member safety checks (index-based expansion, unchanged) ──
-        template<typename T, std::size_t Index>
-        consteval bool is_member_safe_at() {
-            using namespace std::meta;
-            constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[Index];
-            using MemberType = [:type_of(member):];
-            return is_safe_type<MemberType>();
-        }
-        
-        template<typename T, std::size_t... Indices>
-        consteval bool check_all_members_impl(std::index_sequence<Indices...>) {
-            return (is_member_safe_at<T, Indices>() && ...);
-        }
-        
-        template<typename T>
-        consteval bool are_all_members_safe() {
-            using namespace std::meta;
-            
-            if constexpr (!std::is_class_v<T>) return false;
-            if constexpr (std::is_polymorphic_v<T>) return false;
-            if constexpr (has_virtual_bases<T>()) return false;
-            if constexpr (std::is_union_v<T>) return false;
-            
-            // Check all base classes are safe (recursive)
-            if constexpr (!are_all_bases_safe<T>()) return false;
-            
-            // Check direct members
-            constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-            if constexpr (member_count == 0) {
-                return true;
-            } else {
-                return check_all_members_impl<T>(std::make_index_sequence<member_count>{});
+            /// Container override: Containers registered via is_safe_leaf are
+            /// treated as opaque wrappers. We skip their internal structure
+            /// (which contains Boost.Interprocess allocators with pointers)
+            /// and instead recurse into their element types.
+            ///
+            /// For non-container is_safe_leaf types (primitives), we return
+            /// Safe directly — the engine would also classify them as Safe,
+            /// but this short-circuits the check.
+            template<typename T>
+            static consteval int type_override() {
+                using CleanT = std::remove_cv_t<T>;
+                if constexpr (is_safe_leaf<CleanT>::value) {
+                    // Map-like container: check both key and value types
+                    if constexpr (requires { typename CleanT::key_type;
+                                             typename CleanT::mapped_type; }) {
+                        constexpr auto k = consteval_classify_safety<
+                            typename CleanT::key_type, XOffsetShmPolicy>();
+                        constexpr auto v = consteval_classify_safety<
+                            typename CleanT::mapped_type, XOffsetShmPolicy>();
+                        return static_cast<int>(
+                            static_cast<int>(k) >= static_cast<int>(v) ? k : v);
+                    }
+                    // Sequence container: check value_type
+                    else if constexpr (requires { typename CleanT::value_type; }) {
+                        return static_cast<int>(
+                            consteval_classify_safety<
+                                typename CleanT::value_type, XOffsetShmPolicy>());
+                    }
+                    // Primitive or non-container leaf
+                    else {
+                        return static_cast<int>(SafetyLevel::Safe);
+                    }
+                } else {
+                    return -1;  // no override — let the engine decide
+                }
             }
-        }
+        };
 
         // ============================================================================
-        // is_safe_type<T>() — unified safety check using whitelist
+        // is_safe_type<T>() — delegates to TypeLayout consteval engine
+        //
+        // The entire recursive type-tree crawl (bases, members, arrays, enums,
+        // platform-dependent integers, pointers, etc.) is now handled by the
+        // TypeLayout consteval_classify_safety<T, Policy> engine.
+        //
+        // XOffset's is_safe_type simply checks: engine result == Safe.
         // ============================================================================
         template<typename T>
         consteval bool is_safe_type() {
-            using CleanT = std::remove_cv_t<T>;
-
-            // IMPORTANT: This MUST be an if / else-if chain, NOT separate
-            // if-constexpr blocks.  Independent if-constexpr statements all get
-            // instantiated even when an earlier branch already returns, which
-            // causes spurious static_assert failures and unwanted recursion
-            // into library-internal types (e.g. boost::container::vector_alloc_holder).
-
-            // 1. Leaf types: check whitelist (XVector, XMap, XSet, XString,
-            //    int32_t, float, etc.)  This MUST be checked first so that
-            //    containers are never entered via the class-type branch below.
-            if constexpr (is_safe_leaf<CleanT>::value) {
-                // Containers need recursive element check
-                if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
-                    return is_safe_type<typename CleanT::key_type>() &&
-                           is_safe_type<typename CleanT::mapped_type>();
-                } else if constexpr (requires { typename CleanT::value_type; }) {
-                    return is_safe_type<typename CleanT::value_type>();
-                } else {
-                    return true;
-                }
-            }
-
-            // 1.5 Platform-dependent integers: reject with clear diagnostic
-            else if constexpr (is_platform_dependent_integer<CleanT>::value) {
-                static_assert(!is_platform_dependent_integer<CleanT>::value,
-                    "XBuffer safety error: 'long' / 'unsigned long' / 'long long' types are "
-                    "excluded because sizeof(long) differs between LP64 (8 bytes) and LLP64 "
-                    "(4 bytes). Use fixed-width types instead: int32_t, int64_t, uint32_t, "
-                    "uint64_t. See is_safe_leaf documentation for details.");
-                return false;
-            }
-
-            // 2. Enums: delegate to TypeLayout
-            else if constexpr (std::is_enum_v<CleanT>) {
-                return boost::typelayout::is_fixed_enum<CleanT>();
-            }
-
-            // 3. Bounded arrays: recursively check element type
-            else if constexpr (std::is_bounded_array_v<CleanT>) {
-                return is_safe_type<std::remove_extent_t<CleanT>>();
-            }
-
-            // 4. Composite types: recursive member check
-            else if constexpr (std::is_class_v<CleanT>) {
-                return are_all_members_safe<CleanT>();
-            }
-
-            // 5. Everything else: rejected (pointers, references, etc.)
-            else {
-                return false;
-            }
+            return consteval_classify_safety<T, XOffsetShmPolicy>() == SafetyLevel::Safe;
         }
         
         template<typename T>
         consteval const char* get_safety_error_message() {
             using CleanT = std::remove_cv_t<T>;
-            
+
             if constexpr (is_safe_type<CleanT>()) {
                 return "Type is SAFE for XBufferCore";
             }
+            // Detailed diagnostics for common failure modes
             else if constexpr (std::is_polymorphic_v<CleanT>) {
                 return "UNSAFE: Type has virtual functions (polymorphic)";
-            }
-            else if constexpr (has_virtual_bases<CleanT>()) {
-                return "UNSAFE: virtual inheritance not allowed (use non-virtual inheritance)";
             }
             else if constexpr (std::is_union_v<CleanT>) {
                 return "UNSAFE: Union type not allowed";
@@ -1168,8 +1050,11 @@ namespace XOffsetDatastructure {
             else if constexpr (requires { typename CleanT::allocator_type; }) {
                 return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
             }
-            else if constexpr (is_platform_dependent_integer<CleanT>::value) {
-                return "UNSAFE: 'long'/'unsigned long'/'long long' excluded — sizeof varies "
+            // Platform-dependent integers (long, unsigned long)
+            // Note: long long / unsigned long long are allowed (always 8 bytes).
+            else if constexpr (std::is_same_v<CleanT, long> ||
+                               std::is_same_v<CleanT, unsigned long>) {
+                return "UNSAFE: 'long'/'unsigned long' excluded — sizeof varies "
                        "across platforms (LP64 vs LLP64). Use int32_t/int64_t/uint32_t/uint64_t";
             }
             else if constexpr (std::is_class_v<CleanT>) {

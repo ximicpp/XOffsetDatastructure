@@ -110,6 +110,7 @@ set(REFLECTION_TESTS
     test_complex_nesting
     test_inheritance
     test_adaptive_reservation
+    test_consteval_safety
 )
 
 # Count for summary
