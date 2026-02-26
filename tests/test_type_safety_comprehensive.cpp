@@ -165,6 +165,34 @@ struct UnsafeNested {
 static_assert(!is_xbuffer_safe<UnsafeNested>::value, 
     "UnsafeNested should NOT be safe (contains unsafe member)");
 
+// 6.6: Platform-dependent integer — long
+// On LP64 (Linux), long == int64_t → safe.  On macOS/LLP64, long ≠ int64_t → unsafe.
+struct HasLong {
+    int32_t ok;
+    long    platformDependent;
+};
+
+static_assert(is_xbuffer_safe<HasLong>::value == std::is_same_v<long, int64_t>,
+    "HasLong: safe iff long IS int64_t on this platform");
+
+// 6.7: Platform-dependent integer — unsigned long
+struct HasUnsignedLong {
+    uint32_t ok;
+    unsigned long platformDependent;
+};
+
+static_assert(is_xbuffer_safe<HasUnsignedLong>::value == std::is_same_v<unsigned long, uint64_t>,
+    "HasUnsignedLong: safe iff unsigned long IS uint64_t on this platform");
+
+// 6.8: uint64_t is ALWAYS safe regardless of platform (LP64 or LLP64)
+struct HasUint64 {
+    uint64_t alwaysSafe;
+    int64_t  alsoSafe;
+};
+
+static_assert(is_xbuffer_safe<HasUint64>::value,
+    "HasUint64 should ALWAYS be safe (fixed-width integers)");
+
 // ============================================================================
 // Runtime Tests
 // ============================================================================
@@ -304,6 +332,13 @@ void print_type_safety_info() {
     std::cout << "  - WithStdString:     " << (is_xbuffer_safe<WithStdString>::value ? "SAFE" : "UNSAFE") << "\n";
     std::cout << "  - WithStdVector:     " << (is_xbuffer_safe<WithStdVector>::value ? "SAFE" : "UNSAFE") << "\n";
     std::cout << "  - UnsafeNested:      " << (is_xbuffer_safe<UnsafeNested>::value ? "SAFE" : "UNSAFE") << "\n";
+
+    std::cout << "\n⚖️  PLATFORM-DEPENDENT TYPES:\n";
+    std::cout << "  - HasLong:           " << (is_xbuffer_safe<HasLong>::value ? "SAFE" : "UNSAFE")
+              << (std::is_same_v<long, int64_t> ? " (long==int64_t on this platform)" : " (long≠int64_t on this platform)") << "\n";
+    std::cout << "  - HasUnsignedLong:   " << (is_xbuffer_safe<HasUnsignedLong>::value ? "SAFE" : "UNSAFE")
+              << (std::is_same_v<unsigned long, uint64_t> ? " (ulong==uint64_t)" : " (ulong≠uint64_t)") << "\n";
+    std::cout << "  - HasUint64:         " << (is_xbuffer_safe<HasUint64>::value ? "SAFE" : "UNSAFE") << " (always safe)\n";
     
     std::cout << "\n========================================" << std::endl;
 }
