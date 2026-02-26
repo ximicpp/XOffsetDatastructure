@@ -130,6 +130,7 @@ namespace XOffsetDatastructure {
 // ============================================================================
 // Platform validation: current compiler environment ∈ TargetArchitecture
 // ============================================================================
+#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == XOffsetDatastructure::TargetArchitecture.pointer_size,
     "Platform pointer size does not match TargetArchitecture");
 static_assert(IS_LITTLE_ENDIAN == XOffsetDatastructure::TargetArchitecture.little_endian,
@@ -151,6 +152,7 @@ static_assert(alignof(float)   == XOffsetDatastructure::TargetArchitecture.align
     "Platform alignof(float) does not match TargetArchitecture");
 static_assert(alignof(double)  == XOffsetDatastructure::TargetArchitecture.alignof_double,
     "Platform alignof(double) does not match TargetArchitecture");
+#endif // XOFFSET_DISABLE_PLATFORM_CHECKS
 
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/offset_ptr.hpp>
@@ -325,6 +327,20 @@ public:
         if (!base_t::open_impl(addr, size))
         {
             throw interprocess_exception("Could not initialize m_buffer in constructor");
+        }
+    }
+
+    /// Construct by moving an existing std::vector<char> (avoids copy).
+    XManagedMemory(std::vector<char> &&externalBuffer)
+        : m_buffer(std::move(externalBuffer))
+    {
+        m_buffer.reserve(compute_reservation(m_buffer.size()));
+        void *addr = m_buffer.data();
+        size_type size = m_buffer.size();
+        BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
+        if (!base_t::open_impl(addr, size))
+        {
+            throw interprocess_exception("Could not initialize m_buffer in move constructor");
         }
     }
 
@@ -917,6 +933,29 @@ namespace XOffsetDatastructure {
         template<> struct is_safe_leaf<bool>     : std::true_type {};
         template<> struct is_safe_leaf<char>     : std::true_type {};
 
+        // — NOTE: `long` and `unsigned long` are intentionally EXCLUDED —
+        //
+        // sizeof(long) varies across data models:
+        //   • LP64  (Linux/macOS 64-bit): sizeof(long) == 8
+        //   • LLP64 (Windows 64-bit):     sizeof(long) == 4
+        //
+        // This means a struct containing `long` would have different binary
+        // layouts on different platforms, breaking zero-copy interoperability.
+        // Use fixed-width types instead:
+        //   long          → int32_t or int64_t
+        //   unsigned long → uint32_t or uint64_t
+        //
+        // The same applies to `long long` (always 8 bytes in practice but
+        // not guaranteed by the standard). Use int64_t / uint64_t.
+
+        // — Compile-time diagnostic helper for excluded platform-dependent types —
+        template<typename T>
+        struct is_platform_dependent_integer : std::false_type {};
+        template<> struct is_platform_dependent_integer<long> : std::true_type {};
+        template<> struct is_platform_dependent_integer<unsigned long> : std::true_type {};
+        template<> struct is_platform_dependent_integer<long long> : std::true_type {};
+        template<> struct is_platform_dependent_integer<unsigned long long> : std::true_type {};
+
         // — LEAF-2: Enums —
         // Not registered here; enums are checked dynamically in is_safe_type()
         // via TypeLayout's is_fixed_enum<T>().
@@ -1049,7 +1088,15 @@ namespace XOffsetDatastructure {
         consteval bool is_safe_type() {
             using CleanT = std::remove_cv_t<T>;
 
-            // 1. Leaf types: check whitelist
+            // IMPORTANT: This MUST be an if / else-if chain, NOT separate
+            // if-constexpr blocks.  Independent if-constexpr statements all get
+            // instantiated even when an earlier branch already returns, which
+            // causes spurious static_assert failures and unwanted recursion
+            // into library-internal types (e.g. boost::container::vector_alloc_holder).
+
+            // 1. Leaf types: check whitelist (XVector, XMap, XSet, XString,
+            //    int32_t, float, etc.)  This MUST be checked first so that
+            //    containers are never entered via the class-type branch below.
             if constexpr (is_safe_leaf<CleanT>::value) {
                 // Containers need recursive element check
                 if constexpr (requires { typename CleanT::key_type; typename CleanT::mapped_type; }) {
@@ -1057,22 +1104,40 @@ namespace XOffsetDatastructure {
                            is_safe_type<typename CleanT::mapped_type>();
                 } else if constexpr (requires { typename CleanT::value_type; }) {
                     return is_safe_type<typename CleanT::value_type>();
+                } else {
+                    return true;
                 }
-                return true;
+            }
+
+            // 1.5 Platform-dependent integers: reject with clear diagnostic
+            else if constexpr (is_platform_dependent_integer<CleanT>::value) {
+                static_assert(!is_platform_dependent_integer<CleanT>::value,
+                    "XBuffer safety error: 'long' / 'unsigned long' / 'long long' types are "
+                    "excluded because sizeof(long) differs between LP64 (8 bytes) and LLP64 "
+                    "(4 bytes). Use fixed-width types instead: int32_t, int64_t, uint32_t, "
+                    "uint64_t. See is_safe_leaf documentation for details.");
+                return false;
             }
 
             // 2. Enums: delegate to TypeLayout
-            if constexpr (std::is_enum_v<CleanT>) {
+            else if constexpr (std::is_enum_v<CleanT>) {
                 return boost::typelayout::is_fixed_enum<CleanT>();
             }
 
-            // 3. Composite types: recursive member check
-            if constexpr (std::is_class_v<CleanT>) {
+            // 3. Bounded arrays: recursively check element type
+            else if constexpr (std::is_bounded_array_v<CleanT>) {
+                return is_safe_type<std::remove_extent_t<CleanT>>();
+            }
+
+            // 4. Composite types: recursive member check
+            else if constexpr (std::is_class_v<CleanT>) {
                 return are_all_members_safe<CleanT>();
             }
 
-            // 4. Everything else: rejected (pointers, references, etc.)
-            return false;
+            // 5. Everything else: rejected (pointers, references, etc.)
+            else {
+                return false;
+            }
         }
         
         template<typename T>
@@ -1102,6 +1167,10 @@ namespace XOffsetDatastructure {
             }
             else if constexpr (requires { typename CleanT::allocator_type; }) {
                 return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
+            }
+            else if constexpr (is_platform_dependent_integer<CleanT>::value) {
+                return "UNSAFE: 'long'/'unsigned long'/'long long' excluded — sizeof varies "
+                       "across platforms (LP64 vs LLP64). Use int32_t/int64_t/uint32_t/uint64_t";
             }
             else if constexpr (std::is_class_v<CleanT>) {
                 return "UNSAFE: Struct/class contains unsafe members";
@@ -1699,13 +1768,13 @@ namespace XOffsetDatastructure {
         /// Load from serialized data and return a typed buffer.
         static TypedXBuffer load(const std::string& data) {
             std::vector<char> buffer(data.begin(), data.end());
-            TypedXBuffer xbuf(buffer);
+            TypedXBuffer xbuf(std::move(buffer));
             return xbuf;
         }
 
         static TypedXBuffer load(const std::vector<char>& data) {
             std::vector<char> buffer(data);
-            TypedXBuffer xbuf(buffer);
+            TypedXBuffer xbuf(std::move(buffer));
             return xbuf;
         }
 
@@ -1783,6 +1852,14 @@ namespace XOffsetDatastructure {
     private:
 
         // Resolve migration strategy: user-registered > auto-detect
+        //
+        // Detection order:
+        //   1. Explicit registration via migrate_as<T> (highest priority)
+        //   2. Trivially copyable types → TrivialCopy
+        //   3. Safety gate: types with allocator_type that are NOT registered
+        //      are likely containers/allocator-aware types that need special
+        //      migration — fall through to Composite would be incorrect.
+        //   4. Everything else → Composite (reflection-based member migration)
         template<typename T>
         static consteval MigrateStrategy resolve_strategy() {
             using CleanT = std::remove_cv_t<T>;
@@ -1790,6 +1867,37 @@ namespace XOffsetDatastructure {
                 return migrate_as<CleanT>::value;
             } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
                 return MigrateStrategy::TrivialCopy;
+            } else if constexpr (requires { typename CleanT::allocator_type; }) {
+                // F7 safety gate — distinguishes two categories:
+                //
+                //  (a) Containers (has iterator + begin/end): these directly manage
+                //      allocated memory via their internal allocator. Composite
+                //      (reflection) migration would NOT swap the allocator, leading
+                //      to dangling references. These MUST be registered.
+                //
+                //  (b) User-defined allocator-aware composites (e.g., a struct
+                //      containing XString): these merely propagate their allocator
+                //      to sub-objects. Composite migration IS correct here because
+                //      each member is individually resolved & migrated.
+                //
+                if constexpr (requires(const CleanT& c) {
+                    typename CleanT::iterator;
+                    { c.begin() };
+                    { c.end()   };
+                }) {
+                    // Category (a): unregistered container — reject.
+                    static_assert(
+                        migrate_as<CleanT>::value != MigrateStrategy::NotRegistered,
+                        "XCompactor: container type has allocator_type but no migrate_as "
+                        "registration. Register it via "
+                        "XOFFSET_REGISTER_TYPE(YourType, AllocatorAware) or "
+                        "XOFFSET_REGISTER_TYPE(YourType, Container). See docs.");
+                    return MigrateStrategy::Composite; // unreachable
+                } else {
+                    // Category (b): allocator-aware composite struct — safe for
+                    // reflection-based Composite migration.
+                    return MigrateStrategy::Composite;
+                }
             } else {
                 return MigrateStrategy::Composite;
             }
@@ -1809,14 +1917,14 @@ namespace XOffsetDatastructure {
                 // Traditional path: type has allocator constructor
                 ElementType new_elem(new_xbuf.get_segment_manager());
                 migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
-                return new_elem;
+                return std::move(new_elem);
             } else {
                 // Zero-boilerplate path: pure aggregate, use reflection
                 alignas(ElementType) unsigned char buf[sizeof(ElementType)];
                 detail::reflect_init_all<ElementType>(buf, new_xbuf.get_segment_manager());
                 ElementType& new_elem = *std::launder(reinterpret_cast<ElementType*>(buf));
                 migrate_members(old_elem, new_elem, old_xbuf, new_xbuf);
-                return new_elem;
+                return std::move(new_elem);
             }
         }
         
@@ -1912,14 +2020,16 @@ namespace XOffsetDatastructure {
         template<typename T>
         static void migrate_members(const T& old_obj, T& new_obj, 
                                    XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
+            using namespace std::meta;
             // Migrate base class members first (recursive)
-            constexpr std::size_t base_count = boost::typelayout::get_base_count<T>();
+            // Use P2996 for iteration bounds — same source as migrate_base_at/migrate_member_at
+            constexpr std::size_t base_count = bases_of(^^T, access_context::unchecked()).size();
             if constexpr (base_count > 0) {
                 migrate_bases_impl(old_obj, new_obj, old_xbuf, new_xbuf,
                                   std::make_index_sequence<base_count>{});
             }
             // Then migrate direct members
-            constexpr std::size_t member_count = boost::typelayout::get_member_count<T>();
+            constexpr std::size_t member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
             if constexpr (member_count > 0) {
                 migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf,
                                     std::make_index_sequence<member_count>{});
@@ -1949,9 +2059,26 @@ namespace XOffsetDatastructure {
 // Strategy options: TrivialCopy, AllocatorAware, Container, Composite
 // ============================================================================
 
+// F9: Global namespace sentinel — used by XOFFSET_REGISTER_* macros to detect
+// if the user accidentally placed the macro inside a namespace block.
+// The trick: we define this struct at global scope. Inside each macro we check
+// std::is_same_v<::_XOffset_NS_Sentinel, _XOffset_NS_Sentinel>.
+// At global scope both resolve to the same type → true.
+// Inside any namespace, unqualified lookup fails or finds a different type → compile error.
+struct _XOffset_NS_Sentinel {};
+
+// Helper macro: emits a static_assert that fires when called inside a namespace.
+#define XOFFSET_CHECK_GLOBAL_NAMESPACE_(macro_name)                            \
+    static_assert(                                                             \
+        ::std::is_same_v<::_XOffset_NS_Sentinel, _XOffset_NS_Sentinel>,       \
+        macro_name " must be used at global namespace scope, "                 \
+        "not inside any namespace { } block. "                                 \
+        "Move the macro call outside all namespace declarations.");
+
 // --- XOFFSET_REGISTER_TYPE(Type, name, strategy) ---
 // For non-template types (e.g., XString).
 #define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_TYPE")                   \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_TYPE_AUTO(XOffsetDatastructure::Type, name)           \
     }}                                                                         \
@@ -1966,6 +2093,7 @@ namespace XOffsetDatastructure {
 // --- XOFFSET_REGISTER_CONTAINER(Template, name, strategy) ---
 // For single-type-parameter templates (e.g., XVector<T>, XSet<T>).
 #define XOFFSET_REGISTER_CONTAINER(Template, name, strategy)                   \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_CONTAINER")              \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_CONTAINER_AUTO(XOffsetDatastructure::Template, name)  \
     }}                                                                         \
@@ -1980,6 +2108,7 @@ namespace XOffsetDatastructure {
 // --- XOFFSET_REGISTER_MAP(Template, name, strategy) ---
 // For two-type-parameter templates (e.g., XMap<K,V>).
 #define XOFFSET_REGISTER_MAP(Template, name, strategy)                         \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MAP")                    \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_MAP_AUTO(XOffsetDatastructure::Template, name)        \
     }}                                                                         \
