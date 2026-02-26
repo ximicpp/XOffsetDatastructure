@@ -54,7 +54,7 @@
 //   - boost::typelayout::definition_signatures_match<T1, T2>()
 //   - boost::typelayout::layout_signatures_match<T1, T2>()
 #include <boost/typelayout.hpp>
-#include <boost/typelayout/tools/consteval_safety.hpp>
+#include <boost/typelayout/tools/classify_safety.hpp>
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
@@ -946,10 +946,10 @@ namespace XOffsetDatastructure {
         // — XOffsetPtr<T> is NOT registered by default (reference-semantic) —
 
         // ============================================================================
-        // XOffset Shared-Memory Safety Policy
+        // XOffset Zero-Encoding Safety Policy
         //
-        // Delegates to TypeLayout's consteval_classify_safety engine with XOffset-
-        // specific constraints:
+        // Delegates to TypeLayout's classify_safety<T, Policy> engine with
+        // XOffset-specific constraints for zero-encoding/decoding transfer:
         //
         //   1. type_override: Containers registered in is_safe_leaf are treated as
         //      opaque wrappers — skip their internal allocator structure but recurse
@@ -957,16 +957,16 @@ namespace XOffsetDatastructure {
         //
         //   2. check: Warning→Risk escalation.  The TypeLayout engine classifies
         //      polymorphic types, unions, and virtual bases as Warning; XOffset
-        //      categorically rejects all of these for SHM safety.
+        //      categorically rejects all of these for zero-encoding safety.
         // ============================================================================
 
-        // Import the consteval safety engine types
+        // Import the compile-time safety engine types
         using boost::typelayout::compat::SafetyLevel;
-        using boost::typelayout::compat::consteval_classify_safety;
+        using boost::typelayout::compat::classify_safety;
 
-        struct XOffsetShmPolicy {
+        struct XOffsetZeroEncodingPolicy {
             /// Escalate Warning→Risk: XOffset does not allow polymorphic types,
-            /// unions, or virtual bases in shared memory.
+            /// unions, or virtual bases in zero-encoding transfer.
             static consteval SafetyLevel check(SafetyLevel level) {
                 if (level == SafetyLevel::Warning) return SafetyLevel::Risk;
                 return level;
@@ -987,18 +987,18 @@ namespace XOffsetDatastructure {
                     // Map-like container: check both key and value types
                     if constexpr (requires { typename CleanT::key_type;
                                              typename CleanT::mapped_type; }) {
-                        constexpr auto k = consteval_classify_safety<
-                            typename CleanT::key_type, XOffsetShmPolicy>();
-                        constexpr auto v = consteval_classify_safety<
-                            typename CleanT::mapped_type, XOffsetShmPolicy>();
+                        constexpr auto k = classify_safety<
+                            typename CleanT::key_type, XOffsetZeroEncodingPolicy>();
+                        constexpr auto v = classify_safety<
+                            typename CleanT::mapped_type, XOffsetZeroEncodingPolicy>();
                         return static_cast<int>(
                             static_cast<int>(k) >= static_cast<int>(v) ? k : v);
                     }
                     // Sequence container: check value_type
                     else if constexpr (requires { typename CleanT::value_type; }) {
                         return static_cast<int>(
-                            consteval_classify_safety<
-                                typename CleanT::value_type, XOffsetShmPolicy>());
+                            classify_safety<
+                                typename CleanT::value_type, XOffsetZeroEncodingPolicy>());
                     }
                     // Primitive or non-container leaf
                     else {
@@ -1011,17 +1011,17 @@ namespace XOffsetDatastructure {
         };
 
         // ============================================================================
-        // is_safe_type<T>() — delegates to TypeLayout consteval engine
+        // is_safe_type<T>() — delegates to TypeLayout classify_safety engine
         //
         // The entire recursive type-tree crawl (bases, members, arrays, enums,
         // platform-dependent integers, pointers, etc.) is now handled by the
-        // TypeLayout consteval_classify_safety<T, Policy> engine.
+        // TypeLayout classify_safety<T, Policy> engine.
         //
         // XOffset's is_safe_type simply checks: engine result == Safe.
         // ============================================================================
         template<typename T>
         consteval bool is_safe_type() {
-            return consteval_classify_safety<T, XOffsetShmPolicy>() == SafetyLevel::Safe;
+            return classify_safety<T, XOffsetZeroEncodingPolicy>() == SafetyLevel::Safe;
         }
         
         template<typename T>
