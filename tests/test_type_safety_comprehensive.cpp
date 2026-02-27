@@ -162,8 +162,11 @@ struct UnsafeNested {
     PolymorphicType bad;  // NOT SAFE - contains polymorphic type
 };
 
-static_assert(!is_xbuffer_safe<UnsafeNested>::value, 
-    "UnsafeNested should NOT be safe (contains unsafe member)");
+// C1 FIX: TypeLayout's signature generator now propagates vptr markers
+// through nested records.  A struct that embeds a polymorphic member is
+// correctly classified as Warning (contains vptr) → rejected by XOffset.
+static_assert(!is_xbuffer_safe<UnsafeNested>::value,
+    "UnsafeNested: must be rejected — embedded polymorphic member carries vptr");
 
 // 6.6: Platform-dependent integer — long
 // On LP64 (Linux), long == int64_t → safe.  On macOS/LLP64, long ≠ int64_t → unsafe.
