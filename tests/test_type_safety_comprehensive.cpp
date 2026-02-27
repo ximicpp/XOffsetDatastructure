@@ -1,6 +1,7 @@
 #include "../xoffsetdatastructure.hpp"
 #include <iostream>
 #include <cassert>
+#include <cstddef>   // std::byte, std::nullptr_t
 
 using namespace XOffsetDatastructure;
 
@@ -162,26 +163,12 @@ struct UnsafeNested {
     PolymorphicType bad;  // NOT SAFE - contains polymorphic type
 };
 
-// KNOWN LIMITATION: TypeLayout's classify_safety scans the signature string
-// for ",vptr]", but on P2996 Clang the consteval sig.contains() does not
-// find the marker in nested record signatures.  Therefore, UnsafeNested
-// currently passes classify_safety (Safe) even though its signature
-// textually contains a nested record with ",vptr]".
-//
-// Direct polymorphic types (PolymorphicType itself) ARE correctly rejected
-// because their top-level record signature starts with "record[...,vptr]{".
-//
-// For production safety, rely on:
-//   1. std::is_polymorphic_v<T> to catch directly polymorphic types, and
-//   2. Cross-platform CI signature comparison (TYPELAYOUT_ASSERT_COMPAT)
-//      which catches ANY layout difference including embedded vptrs.
-//
-// TODO: Fix TypeLayout's consteval signature search to detect nested vptr.
-//       Once fixed, change this assertion back to:
-//         static_assert(!is_xbuffer_safe<UnsafeNested>::value, ...);
-static_assert(is_xbuffer_safe<UnsafeNested>::value,
-    "UnsafeNested: currently accepted (TypeLayout nested-vptr limitation). "
-    "See TODO: once TypeLayout propagates vptr detection, flip this assertion.");
+// TypeLayout now synthesizes a ptr[s:N,a:N] field for every type that
+// introduces a vptr.  When PolymorphicType is flattened into UnsafeNested's
+// layout signature, the synthesized ptr[ marker causes classify_safety to
+// return Warning, which XOffset escalates to Risk → is_xbuffer_safe = false.
+static_assert(!is_xbuffer_safe<UnsafeNested>::value,
+    "UnsafeNested should NOT be safe (contains nested polymorphic type with vptr)");
 
 // 6.6: Platform-dependent integer — long
 // On LP64 (Linux), long == int64_t → safe.  On macOS/LLP64, long ≠ int64_t → unsafe.
@@ -210,6 +197,60 @@ struct HasUint64 {
 
 static_assert(is_xbuffer_safe<HasUint64>::value,
     "HasUint64 should ALWAYS be safe (fixed-width integers)");
+
+// ============================================================================
+// Test 7: Boundary Types (Audit P5)
+// Purpose: Validate safety classification for edge-case types:
+//   - std::nullptr_t  (Accept: cross-platform binary identical, all zeros)
+//   - std::byte       (Safe: alias for unsigned char)
+//   - T C::*          (Unsafe: member pointer, encoded as memptr[...])
+// ============================================================================
+
+// 7.1: std::nullptr_t — Accepted as safe (P2 decision)
+// TypeLayout encodes as nullptr[s:8,a:8], which does NOT contain "ptr["
+// so classify_safety returns Safe.  This is intentional: nullptr_t's
+// binary representation is all-zeros and cross-platform identical.
+struct HasNullptr {
+    int32_t x;
+    std::nullptr_t n;
+};
+
+static_assert(is_xbuffer_safe<HasNullptr>::value,
+    "HasNullptr should be safe (nullptr_t is accepted, cross-platform all-zeros)");
+
+// 7.2: std::byte — Safe scalar type
+// TypeLayout encodes as byte[s:1,a:1], a safe fundamental type.
+struct HasByte {
+    std::byte b1;
+    std::byte b2;
+    int32_t x;
+};
+
+static_assert(is_xbuffer_safe<HasByte>::value,
+    "HasByte should be safe (std::byte is a safe scalar)");
+
+// 7.3: Member pointer (T C::*) — Should be REJECTED
+// TypeLayout encodes as memptr[s:N,a:N], which triggers Warning → Risk.
+// Member pointers are implementation-defined and not safe for serialization.
+struct Foo { int x; double y; };
+
+struct HasMemberPointer {
+    int Foo::* mp;
+    int32_t data;
+};
+
+static_assert(!is_xbuffer_safe<HasMemberPointer>::value,
+    "HasMemberPointer should NOT be safe (member pointer is process-local)");
+
+// 7.4: Member function pointer — Should also be REJECTED
+// TypeLayout encodes as memptr[...] or fnptr[...], both trigger Warning → Risk.
+struct HasMemberFuncPointer {
+    void (Foo::* mfp)();
+    int32_t data;
+};
+
+static_assert(!is_xbuffer_safe<HasMemberFuncPointer>::value,
+    "HasMemberFuncPointer should NOT be safe (member function pointer)");
 
 // ============================================================================
 // Runtime Tests
@@ -350,7 +391,7 @@ void print_type_safety_info() {
     std::cout << "  - WithStdString:     " << (is_xbuffer_safe<WithStdString>::value ? "SAFE" : "UNSAFE") << "\n";
     std::cout << "  - WithStdVector:     " << (is_xbuffer_safe<WithStdVector>::value ? "SAFE" : "UNSAFE") << "\n";
     std::cout << "  - UnsafeNested:      " << (is_xbuffer_safe<UnsafeNested>::value ? "SAFE" : "UNSAFE")
-              << " (TypeLayout nested-vptr limitation — see TODO)" << "\n";
+              << " (nested polymorphic type correctly detected)" << "\n";
 
     std::cout << "\n⚖️  PLATFORM-DEPENDENT TYPES:\n";
     std::cout << "  - HasLong:           " << (is_xbuffer_safe<HasLong>::value ? "SAFE" : "UNSAFE")
@@ -358,7 +399,17 @@ void print_type_safety_info() {
     std::cout << "  - HasUnsignedLong:   " << (is_xbuffer_safe<HasUnsignedLong>::value ? "SAFE" : "UNSAFE")
               << (std::is_same_v<unsigned long, uint64_t> ? " (ulong==uint64_t)" : " (ulong≠uint64_t)") << "\n";
     std::cout << "  - HasUint64:         " << (is_xbuffer_safe<HasUint64>::value ? "SAFE" : "UNSAFE") << " (always safe)\n";
-    
+
+    std::cout << "\n🔬 BOUNDARY TYPES (Audit P5):\n";
+    std::cout << "  - HasNullptr:        " << (is_xbuffer_safe<HasNullptr>::value ? "SAFE" : "UNSAFE")
+              << " (nullptr_t accepted: all-zeros cross-platform)\n";
+    std::cout << "  - HasByte:           " << (is_xbuffer_safe<HasByte>::value ? "SAFE" : "UNSAFE")
+              << " (std::byte is safe scalar)\n";
+    std::cout << "  - HasMemberPointer:  " << (is_xbuffer_safe<HasMemberPointer>::value ? "SAFE" : "UNSAFE")
+              << " (member pointer rejected)\n";
+    std::cout << "  - HasMemberFuncPtr:  " << (is_xbuffer_safe<HasMemberFuncPointer>::value ? "SAFE" : "UNSAFE")
+              << " (member function pointer rejected)\n";
+
     std::cout << "\n========================================" << std::endl;
 }
 
