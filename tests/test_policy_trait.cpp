@@ -210,12 +210,12 @@ bool test_backward_compat() {
     static_assert(is_xbuffer_safe<HasWchar>::value == is_xbuffer_compatible<HasWchar>(),
                   "is_xbuffer_safe must match is_xbuffer_compatible for HasWchar");
 
-    // is_safe_type must also agree
-    static_assert(is_safe_type<int32_t>() == true, "int32_t is safe");
-    static_assert(is_safe_type<HasPointer>() == false, "HasPointer is not safe");
+    // is_xbuffer_compatible (default policy) must also agree
+    static_assert(is_xbuffer_compatible<int32_t>() == true, "int32_t is safe");
+    static_assert(is_xbuffer_compatible<HasPointer>() == false, "HasPointer is not safe");
 
     std::cout << "  is_xbuffer_safe<T> matches is_xbuffer_compatible<T>... [OK]\n";
-    std::cout << "  is_safe_type<T>() matches... [OK]\n";
+    std::cout << "  is_xbuffer_compatible<T>() matches... [OK]\n";
 
     // reason() still works
     constexpr const char* reason = is_xbuffer_safe<HasPointer>::reason();
