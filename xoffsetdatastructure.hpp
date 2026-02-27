@@ -946,82 +946,206 @@ namespace XOffsetDatastructure {
         // — XOffsetPtr<T> is NOT registered by default (reference-semantic) —
 
         // ============================================================================
-        // XOffset Zero-Encoding Safety Policy
+        // Signature-Based Safety & Layout Verification
         //
-        // Delegates to TypeLayout's classify_safety<T, Policy> engine with
-        // XOffset-specific constraints for zero-encoding/decoding transfer:
+        // Architecture: single source of truth = layout signature.
         //
-        //   1. type_override: Containers registered in is_safe_leaf are treated as
-        //      opaque wrappers — skip their internal allocator structure but recurse
-        //      into value_type / key_type+mapped_type.
+        // TypeLayout's get_layout_signature<T>() produces a compile-time string
+        // encoding architecture prefix, every member offset, size, alignment, and
+        // type marker.  Two checks derive from this one artifact:
         //
-        //   2. check: Warning→Risk escalation.  The TypeLayout engine classifies
-        //      polymorphic types, unions, and virtual bases as Warning; XOffset
-        //      categorically rejects all of these for zero-encoding safety.
+        //   1. Safety  — classify_safety<T>() scans the signature for risk markers
+        //      (ptr, bits, wchar, f80, union, vptr, etc.).
+        //
+        //   2. Layout identity — comparing the signature against a preset "gold"
+        //      string guarantees byte-for-byte layout equivalence.
+        //
+        // XOffset layers a Policy Trait on top to let users choose the desired
+        // strictness level, and preserves is_safe_leaf for container-skip logic.
         // ============================================================================
 
         // Import the compile-time safety engine types
         using boost::typelayout::compat::SafetyLevel;
         using boost::typelayout::compat::classify_safety;
+        using boost::typelayout::get_layout_signature;
 
-        struct XOffsetZeroEncodingPolicy {
-            /// Escalate Warning→Risk: XOffset does not allow polymorphic types,
-            /// unions, or virtual bases in zero-encoding transfer.
-            static consteval SafetyLevel check(SafetyLevel level) {
-                if (level == SafetyLevel::Warning) return SafetyLevel::Risk;
-                return level;
+        // ---- Container element safety (internal helpers) ------------------------
+        // Forward-declarations — real bodies follow after classify_for_xoffset
+        // and classify_raw.
+        //
+        // classify_container_elements<T>():
+        //   Recurses via classify_for_xoffset → Warning is escalated to Risk.
+        //   Used by DefaultPolicy (strict zero-encoding).
+        //
+        // classify_container_elements_raw<T>():
+        //   Recurses via classify_raw → Warning is preserved.
+        //   Used by RelaxedPolicy (allows Warning, only rejects Risk).
+        template<typename T>
+        consteval SafetyLevel classify_container_elements();
+        template<typename T>
+        consteval SafetyLevel classify_container_elements_raw();
+
+        // ---- Core: classify a type for XOffset zero-encoding --------------------
+        // Handles the is_safe_leaf container-skip, then delegates to TypeLayout.
+        // Warning is escalated to Risk for zero-encoding (no pointers/unions/vptr).
+        //
+        // Additionally, long / unsigned long are explicitly rejected as Risk
+        // because sizeof(long) varies across platforms (LP64=8, LLP64=4).
+        template<typename T>
+        consteval SafetyLevel classify_for_xoffset() {
+            using CleanT = std::remove_cv_t<T>;
+
+            // Platform-variable integers: reject long / unsigned long
+            // ONLY when they are NOT equivalent to the fixed-width types.
+            // On LP64 (Linux/macOS-64), long == int64_t — safe (same binary).
+            // On LLP64 (Windows), long is 4 bytes ≠ int64_t — reject.
+            // NB: int64_t is often a typedef for long on LP64, so we must NOT
+            //     unconditionally reject long or we'd also reject int64_t.
+            if constexpr ((std::is_same_v<CleanT, long> && !std::is_same_v<long, int64_t>) ||
+                          (std::is_same_v<CleanT, unsigned long> && !std::is_same_v<unsigned long, uint64_t>)) {
+                return SafetyLevel::Risk;
             }
+            // Container bypass: skip allocator internals, check element types
+            else if constexpr (is_safe_leaf<CleanT>::value) {
+                return classify_container_elements<CleanT>();
+            } else {
+                constexpr auto level = classify_safety<CleanT>();
+                // Escalate Warning→Risk: XOffset zero-encoding rejects
+                // pointers, unions, vptr, etc. categorically.
+                if constexpr (level == SafetyLevel::Warning)
+                    return SafetyLevel::Risk;
+                else
+                    return level;
+            }
+        }
 
-            /// Container override: Containers registered via is_safe_leaf are
-            /// treated as opaque wrappers. We skip their internal structure
-            /// (which contains Boost.Interprocess allocators with pointers)
-            /// and instead recurse into their element types.
-            ///
-            /// For non-container is_safe_leaf types (primitives), we return
-            /// Safe directly — the engine would also classify them as Safe,
-            /// but this short-circuits the check.
+        // ---- classify_raw: like classify_for_xoffset but does NOT escalate -----
+        // Warning→Risk.  Returns the original SafetyLevel from TypeLayout.
+        // Still rejects long/unsigned long as Risk.
+        // Used by RelaxedPolicy which tolerates Warning but rejects Risk.
+        template<typename T>
+        consteval SafetyLevel classify_raw() {
+            using CleanT = std::remove_cv_t<T>;
+            // Platform-variable integers: reject only when NOT equivalent to fixed-width.
+            if constexpr ((std::is_same_v<CleanT, long> && !std::is_same_v<long, int64_t>) ||
+                          (std::is_same_v<CleanT, unsigned long> && !std::is_same_v<unsigned long, uint64_t>)) {
+                return SafetyLevel::Risk;
+            }
+            // Container bypass
+            else if constexpr (is_safe_leaf<CleanT>::value) {
+                return classify_container_elements_raw<CleanT>();
+            } else {
+                return classify_safety<CleanT>();
+            }
+        }
+
+        // ---- classify_container_elements (definition, after classify_for_xoffset) --
+        // Calls classify_for_xoffset<>() recursively (Warning escalated to Risk).
+        template<typename T>
+        consteval SafetyLevel classify_container_elements() {
+            using CleanT = std::remove_cv_t<T>;
+            // Map-like container: worst-of key and value
+            if constexpr (requires { typename CleanT::key_type;
+                                     typename CleanT::mapped_type; }) {
+                constexpr auto k = classify_for_xoffset<typename CleanT::key_type>();
+                constexpr auto v = classify_for_xoffset<typename CleanT::mapped_type>();
+                return static_cast<int>(k) >= static_cast<int>(v) ? k : v;
+            }
+            // Sequence / set container: check value_type
+            else if constexpr (requires { typename CleanT::value_type; }) {
+                return classify_for_xoffset<typename CleanT::value_type>();
+            }
+            // Primitive or non-container leaf
+            else {
+                return SafetyLevel::Safe;
+            }
+        }
+
+        // ---- classify_container_elements_raw (no Warning escalation) -----------
+        // Calls classify_raw<>() recursively (Warning preserved).
+        template<typename T>
+        consteval SafetyLevel classify_container_elements_raw() {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (requires { typename CleanT::key_type;
+                                     typename CleanT::mapped_type; }) {
+                constexpr auto k = classify_raw<typename CleanT::key_type>();
+                constexpr auto v = classify_raw<typename CleanT::mapped_type>();
+                return static_cast<int>(k) >= static_cast<int>(v) ? k : v;
+            }
+            else if constexpr (requires { typename CleanT::value_type; }) {
+                return classify_raw<typename CleanT::value_type>();
+            }
+            else {
+                return SafetyLevel::Safe;
+            }
+        }
+
+        // ====================================================================
+        // Policy Traits — compile-time hooks for safety / layout verification
+        //
+        // Each Policy is a struct with:
+        //   template<typename T>
+        //   static consteval bool accept();
+        //
+        // Users can define custom policies; XOffset ships three built-in ones.
+        // ====================================================================
+
+        /// DefaultPolicy — type must be Safe under XOffset zero-encoding rules.
+        /// (Warning-level types like pointers/unions are rejected.)
+        struct DefaultPolicy {
             template<typename T>
-            static consteval int type_override() {
-                using CleanT = std::remove_cv_t<T>;
-                if constexpr (is_safe_leaf<CleanT>::value) {
-                    // Map-like container: check both key and value types
-                    if constexpr (requires { typename CleanT::key_type;
-                                             typename CleanT::mapped_type; }) {
-                        constexpr auto k = classify_safety<
-                            typename CleanT::key_type, XOffsetZeroEncodingPolicy>();
-                        constexpr auto v = classify_safety<
-                            typename CleanT::mapped_type, XOffsetZeroEncodingPolicy>();
-                        return static_cast<int>(
-                            static_cast<int>(k) >= static_cast<int>(v) ? k : v);
-                    }
-                    // Sequence container: check value_type
-                    else if constexpr (requires { typename CleanT::value_type; }) {
-                        return static_cast<int>(
-                            classify_safety<
-                                typename CleanT::value_type, XOffsetZeroEncodingPolicy>());
-                    }
-                    // Primitive or non-container leaf
-                    else {
-                        return static_cast<int>(SafetyLevel::Safe);
-                    }
-                } else {
-                    return -1;  // no override — let the engine decide
-                }
+            static consteval bool accept() {
+                return classify_for_xoffset<T>() == SafetyLevel::Safe;
             }
         };
 
-        // ============================================================================
-        // is_safe_type<T>() — delegates to TypeLayout classify_safety engine
+        /// StrictPolicy<GoldSignature> — the type's layout signature must match
+        /// a preset "gold" signature at compile time, AND be Safe.
+        /// Usage:
+        ///   constexpr auto GOLD = FixedString{"[64-le]record[s:24,a:8]{...}"};
+        ///   static_assert(is_xbuffer_compatible<MyStruct, StrictPolicy<GOLD>>());
+        template<auto GoldSignature>
+        struct StrictPolicy {
+            template<typename T>
+            static consteval bool accept() {
+                return get_layout_signature<T>() == GoldSignature
+                    && classify_for_xoffset<T>() == SafetyLevel::Safe;
+            }
+        };
+
+        /// RelaxedPolicy — allows Warning-level types (e.g. pointers), only
+        /// rejects Risk-level types (bit-fields, wchar_t, long double).
+        /// Useful for local-only shared memory where pointer size is known.
+        ///
+        /// Uses classify_raw<T>() which preserves Warning (no escalation),
+        /// but still categorically rejects long/unsigned long as Risk.
+        /// For containers, recursion uses classify_container_elements_raw.
+        struct RelaxedPolicy {
+            template<typename T>
+            static consteval bool accept() {
+                return classify_raw<T>() != SafetyLevel::Risk;
+            }
+        };
+
+        // ====================================================================
+        // is_xbuffer_compatible<T, Policy>() — unified compile-time entry point
         //
-        // The entire recursive type-tree crawl (bases, members, arrays, enums,
-        // platform-dependent integers, pointers, etc.) is now handled by the
-        // TypeLayout classify_safety<T, Policy> engine.
+        // The single gate for all XBuffer type admission decisions.
+        // Delegates entirely to Policy::accept<T>().
+        // ====================================================================
+        template<typename T, typename Policy = DefaultPolicy>
+        consteval bool is_xbuffer_compatible() {
+            return Policy::template accept<T>();
+        }
+
+        // ====================================================================
+        // is_safe_type<T>() — backward-compatible convenience
         //
-        // XOffset's is_safe_type simply checks: engine result == Safe.
-        // ============================================================================
+        // Equivalent to is_xbuffer_compatible<T, DefaultPolicy>().
+        // ====================================================================
         template<typename T>
         consteval bool is_safe_type() {
-            return classify_safety<T, XOffsetZeroEncodingPolicy>() == SafetyLevel::Safe;
+            return is_xbuffer_compatible<T, DefaultPolicy>();
         }
         
         template<typename T>
@@ -1077,24 +1201,57 @@ namespace XOffsetDatastructure {
     
     // Per-member diagnostic helper: triggers a static_assert for each unsafe member,
     // so the compiler error points to the exact field name.
-    template<typename T>
+    //
+    // Accepts an optional Policy template parameter (defaults to DefaultPolicy).
+    // This ensures diagnose_unsafe_members uses the same admission criteria as
+    // the policy that rejected the type, giving consistent diagnostics.
+    //
+    // Uses index-based expansion (not `template for`) to avoid P2996 compiler
+    // limitations with const vector iterators in consteval context.
+    namespace detail {
+        template<typename T, typename Policy, std::size_t N>
+        consteval void diagnose_base_at() {
+            constexpr auto base_info =
+                std::meta::bases_of(^^T, std::meta::access_context::unchecked())[N];
+            using BaseT = [:std::meta::type_of(base_info):];
+            static_assert(
+                is_xbuffer_compatible<BaseT, Policy>(),
+                "Unsafe base class detected in XBufferCore type");
+        }
+
+        template<typename T, typename Policy, std::size_t N>
+        consteval void diagnose_member_at() {
+            constexpr auto member_info =
+                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[N];
+            using MemberT = [:std::meta::type_of(member_info):];
+            static_assert(
+                is_xbuffer_compatible<MemberT, Policy>(),
+                "Unsafe member detected in XBufferCore type (see compiler note for field name and type)");
+        }
+
+        template<typename T, typename Policy, std::size_t... Bs>
+        consteval void diagnose_bases_impl(std::index_sequence<Bs...>) {
+            (diagnose_base_at<T, Policy, Bs>(), ...);
+        }
+
+        template<typename T, typename Policy, std::size_t... Ms>
+        consteval void diagnose_members_impl(std::index_sequence<Ms...>) {
+            (diagnose_member_at<T, Policy, Ms>(), ...);
+        }
+    } // namespace detail
+
+    template<typename T, typename Policy = detail::DefaultPolicy>
     consteval void diagnose_unsafe_members() {
         if constexpr (std::is_class_v<T> && !std::is_polymorphic_v<T> && !std::is_union_v<T>) {
-            // Diagnose base classes
-            template for (constexpr auto base :
-                std::meta::bases_of(^^T, std::meta::access_context::unchecked())) {
-                using BaseT = [:std::meta::type_of(base):];
-                static_assert(
-                    detail::is_safe_type<BaseT>(),
-                    "Unsafe base class detected in XBufferCore type");
+            constexpr std::size_t base_count =
+                std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
+            if constexpr (base_count > 0) {
+                detail::diagnose_bases_impl<T, Policy>(std::make_index_sequence<base_count>{});
             }
-            // Diagnose direct members
-            template for (constexpr auto member :
-                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())) {
-                using MemberT = [:std::meta::type_of(member):];
-                static_assert(
-                    detail::is_safe_type<MemberT>(),
-                    "Unsafe member detected in XBufferCore type (see compiler note for field name and type)");
+            constexpr std::size_t member_count =
+                std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
+            if constexpr (member_count > 0) {
+                detail::diagnose_members_impl<T, Policy>(std::make_index_sequence<member_count>{});
             }
         }
     }

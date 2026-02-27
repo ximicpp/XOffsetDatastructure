@@ -111,6 +111,8 @@ set(REFLECTION_TESTS
     test_inheritance
     test_adaptive_reservation
     test_classify_safety
+    test_policy_trait
+    test_remediation_fixes
 )
 
 # Count for summary
