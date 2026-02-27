@@ -1,7 +1,7 @@
 # TypeLayout 与 XOffsetDatastructure 集成架构分析
 
-> **版本**: v1.1  
-> **分析日期**: 2026-02-10（v1.1 更新: 2026-02-27）  
+> **版本**: v1.3  
+> **分析日期**: 2026-02-10（v1.1: 2026-02-27, v1.2: 2026-02-27, v1.3: 2026-02-28）  
 > **状态**: ✅ 完成
 
 ---
@@ -35,8 +35,10 @@ XOffsetDatastructure 使用类型签名的场景：
 |------|----------|------|
 | **编译时二进制合约** | `static_assert(get_definition_signature<Player>() == "...")` | Definition |
 | **容器类型识别** | XString/XVector/XSet/XMap 的 Opaque Signature 特化 | Definition + Layout |
-| **类型安全检查** | `is_xbuffer_safe<T>` 内部不使用 TypeLayout（独立反射实现） | ❌ 未使用 |
+| **类型安全检查** | `is_xbuffer_safe<T>` → `classify_for_xoffset<T>()` → `classify_safety<T>()` | ✅ 核心依赖 |
 | **自动迁移** | `XBufferCompactor` 内部不使用 TypeLayout（独立反射实现） | ❌ 未使用 |
+
+> ⚠️ **v1.2 更正**: 自 Safety 集成（commit 6f4f7a8d）以来，`is_xbuffer_safe<T>` 已完全委托给 TypeLayout 的 `classify_safety<T>()`，不再有独立的反射扫描逻辑。详见 §7 和 §8。
 
 ### 1.3 职责分离评估
 
@@ -49,10 +51,12 @@ TypeLayout                          XOffsetDatastructure
 │ - 基本类型签名         │ ◀──────  │ - 容器特化注册         │
 │ - 复合类型签名         │  使用    │ - static_assert 验证   │
 │ - 平台前缀             │          │                       │
-│ - 跨平台比较工具       │          │ 独立的反射功能：       │
-│                       │          │ - is_xbuffer_safe<T>   │
-│ 开放扩展点:            │          │ - XBufferCompactor     │
-│ TypeSignature<T,Mode>  │          │ - member iteration     │
+│ - 跨平台比较工具       │          │ 委托 TypeLayout:       │
+│ - classify_safety<T>() │          │ - is_xbuffer_safe<T>   │
+│                       │          │   → classify_safety<T> │
+│ 开放扩展点:            │          │ 独立的反射功能：       │
+│ TypeSignature<T,Mode>  │          │ - XBufferCompactor     │
+│ TYPELAYOUT_OPAQUE_*    │          │ - member iteration     │
 └───────────────────────┘          └───────────────────────┘
 ```
 
@@ -61,7 +65,7 @@ TypeLayout                          XOffsetDatastructure
 - 扩展通过模板特化实现，无需修改 TypeLayout 源码
 - 两个项目可以独立版本演进
 
-**发现 #1（轻微冗余）**：XOffsetDatastructure 内部的 `get_member_count_impl<T>()` 和 TypeLayout 的 `get_member_count<T>()` 功能完全相同。建议统一使用 TypeLayout 版本。
+**发现 #1（轻微冗余）**：~~XOffsetDatastructure 内部的 `get_member_count_impl<T>()` 和 TypeLayout 的 `get_member_count<T>()` 功能完全相同。~~ ✅ **已修复** — 冗余实现已删除，统一使用 `boost::typelayout::get_member_count<T>()`。
 
 ---
 
@@ -180,16 +184,18 @@ static_assert(boost::typelayout::get_definition_signature<Player>() ==
 | 工具 | 功能 | XOffsetDatastructure 是否使用 |
 |------|------|------|
 | `sig_export.hpp` | 生成 `.sig.hpp` 文件，导出类型签名 | ❌ 未使用 |
-| `compat_check.hpp` | 跨平台签名比较，生成兼容性报告 | ❌ 未使用 |
+| `compat_check.hpp` | 跨平台签名比较 + `classify_safety()` + `SafetyLevel` | ✅ 核心依赖 |
 | `platform_detect.hpp` | 平台检测（arch, os, compiler） | ❌ 未使用 |
-| `sig_types.hpp` | `TypeEntry`, `PlatformInfo` 数据结构 | ❌ 未使用 |
+| `sig_types.hpp` | `TypeEntry`, `PlatformInfo` 数据结构 | ✅ `ArchSpec::to_platform_info()` |
 
-**评估：⚠️ 工具层完全未被利用**
+**评估：⚠️ 工具层大部分已集成，`sig_export.hpp` 尚未使用**
 
-**发现 #7（重大改进机会）**：TypeLayout 的 `sig_export.hpp` + `compat_check.hpp` 恰好解决了 `type-signature` spec 中的"跨平台签名导出工具"需求（Requirement 5）。当前 XOffsetDatastructure 的 spec 要求：
+> ⚠️ **v1.2 更正**: `compat_check.hpp` 和 `sig_types.hpp` 已被集成。`classify_safety()`、`SafetyLevel`、`contains_token()` 是 XOffset 安全检测的核心依赖。`ArchSpec::to_platform_info()` 提供了 CI 集成接口。
+
+**发现 #7（改进机会）**：TypeLayout 的 `sig_export.hpp` 恰好解决了 `type-signature` spec 中的"跨平台签名导出工具"需求（Requirement 5）。当前 XOffsetDatastructure 的 spec 要求：
 > 系统 SHALL 提供跨平台签名导出能力，支持在不同架构间验证类型兼容性。
 
-这个能力 TypeLayout **已经实现**，但 XOffsetDatastructure 完全没有使用。建议创建示例或工具，将 `SigExporter` 集成到构建流程中。
+`SigExporter` 尚未集成到构建流程中。建议创建示例或工具，将其纳入 CI。
 
 ### 3.3 XOffsetDatastructure 需要但 TypeLayout 未提供的功能
 
@@ -204,14 +210,19 @@ static_assert(boost::typelayout::get_definition_signature<Player>() ==
 
 | 功能 | 使用状态 | 是否应该使用 |
 |------|----------|-------------|
-| `get_layout_signature<T>()` | 仅测试中使用 | ⚠️ 可用于跨版本兼容 |
-| `SigExporter` 导出工具 | ❌ | ✅ 应该集成 |
-| `CompatReporter` 比较工具 | ❌ | ✅ 应该集成 |
-| `classify_safety()` 安全分级 | ❌ | ⚠️ 可补充 `is_xbuffer_safe` |
+| `get_layout_signature<T>()` | ✅ `StrictPolicy` + `classify_safety<T>()` | ✅ 核心依赖 |
+| `SigExporter` 导出工具 | ✅ `tools/export_signatures.cpp` + CI | ✅ 已集成 |
+| `CompatReporter` 比较工具 | ✅ `tools/check_compat.cpp` + CI | ✅ 已集成 |
+| `classify_safety<T>()` 编译时分级 | ✅ `classify_for_xoffset` 核心调用 | ✅ 已完全集成 |
+| `classify_safety(string_view)` 运行时分级 | ✅ `CompatReporter::compare()` 内部使用 | ✅ 已集成 |
+| `SafetyLevel` 枚举 | ✅ XOffset 直接使用 | ✅ 已集成 |
+| `contains_token()` | ✅ 编译时+运行时均使用 | ✅ 已集成 |
 | `get_arch_prefix()` | 间接使用 | ✅ 已通过签名使用 |
-| 位域签名 | ❌ | XOffsetDatastructure 禁止位域 |
-| 联合体签名 | ❌ | XOffsetDatastructure 禁止联合体 |
-| 枚举签名 | ❌ | XOffsetDatastructure 未测试枚举 |
+| 位域签名 | ✅ 通过 `bits<` 标记自动拒绝 | ✅ 已通过 classify_safety 集成 |
+| 联合体签名 | ✅ 通过 `union[` 标记自动拒绝 | ✅ 已通过 classify_safety 集成 |
+| 枚举签名 | ✅ 7 个测试覆盖 | `test_enum_support.cpp`: 安全性、签名、XBuffer、XVector、嵌套结构 |
+
+> ⚠️ **v1.2 更正**: 大量条目已从"未使用"更正为"已集成"。TypeLayout 的安全分级引擎（`classify_safety`）已成为 XOffset 类型准入的核心 ground truth。
 
 ---
 
@@ -258,13 +269,17 @@ TypeLayout 的工具层（`tools/`）设计为 C++17 兼容（不需要 P2996）
 
 | # | 建议 | 优先级 | 影响范围 | 关联发现 |
 |---|------|--------|----------|----------|
-| 1 | 统一 `get_member_count` 实现：删除 XOffsetDatastructure 内部的 `get_member_count_impl<T>()`，使用 `boost::typelayout::get_member_count<T>()` | 🟡 中 | 代码简化 | #1 |
-| 2 | 集成 `SigExporter`：创建 `tools/export_signatures.cpp`，为 Player/GameData/Item 导出 `.sig.hpp` | 🔴 高 | 新功能 | #7 |
-| 3 | 集成 `CompatReporter`：创建跨平台兼容性验证示例 | 🔴 高 | 新功能 | #7 |
+| 1 | ~~统一 `get_member_count` 实现~~ | ✅ 已完成 | 代码简化 | #1 |
+| 2 | ~~集成 `SigExporter`：`tools/export_signatures.cpp` 导出 `.sig.hpp`~~ | ✅ 已完成 | 新功能 | #7 |
+| 3 | ~~集成 `CompatReporter`：`tools/check_compat.cpp` 自验证~~ | ✅ 已完成 | 新功能 | #7 |
 | 4 | 为 TypeLayout 添加签名哈希 API：`consteval uint64_t definition_signature_hash<T>()` | 🟡 中 | TypeLayout 改进 | #3.3 |
-| 5 | 测试枚举类型在 XOffsetDatastructure 中的支持 | 🟢 低 | 测试覆盖 | #3.4 |
+| 5 | ~~测试枚举类型在 XOffsetDatastructure 中的支持~~ | ✅ 已完成 | 测试覆盖 | #3.4 |
 | 6 | 利用 `classify_safety()` 补充 `is_xbuffer_safe` 的诊断信息 | 🟢 低 | 诊断增强 | #3.4 |
 | 7 | 考虑为 Layout Signature 添加跨版本迁移支持 | 🟢 低 | 未来功能 | #4 |
+
+> **v1.3 实施记录**:
+> - **建议 #2 & #3**: `build.sh` 新增 "Signature Export & Compatibility Check" 阶段，在 `ENABLE_REFLECTION=1` 时自动运行 `export_signatures`（输出到 `tools/sigs/`）和 `check_compat`（编译时自验证）。CI workflow (`.github/workflows/ci.yml`) 新增 "Signature contract verification" step（`git diff` 检测 `.sig.hpp` 变更并发出 `::warning::` 注解）和签名 artifact 上传（保留 30 天）。
+> - **建议 #5**: `tests/test_enum_support.cpp` 扩展至 7 个测试：原有 3 个 + 新增 (4) 无底层类型 enum class 默认 int 验证、(5) `XVector<Enum>` 元素读写、(6) 不同枚举 Definition 签名不匹配验证、(7) 含枚举字段的嵌套结构签名和 XBuffer 读写。
 
 ---
 
@@ -276,7 +291,7 @@ TypeLayout 的工具层（`tools/`）设计为 C++17 兼容（不需要 P2996）
 |------|------|------|
 | 职责分离 | ⭐⭐⭐⭐⭐ | 清晰的单向依赖，无功能重叠 |
 | 使用方式 | ⭐⭐⭐⭐ | 核心 API 使用正确，容器特化模式优雅 |
-| 功能利用率 | ⭐⭐⭐ | 核心层充分利用，工具层完全未用 |
+| 功能利用率 | ⭐⭐⭐⭐ | 核心层+工具层均已集成（SigExporter + CompatReporter + CI） |
 | 耦合度 | ⭐⭐⭐⭐⭐ | 最小耦合，通过标准 C++ 机制扩展 |
 | 风险控制 | ⭐⭐⭐⭐ | 版本锁定、无 ODR 违规，编译器同步 |
 
@@ -447,3 +462,177 @@ external/typelayout → 59f6616d (含 vptr 传播修复)
 1. 创建了 `docs/LONG_PORTABILITY_GUIDE.md` 作为用户指南
 2. 在 `classify_for_xoffset` 和 `classify_raw` 中添加了局限性注释
 3. 提供了 `XBUFFER_ASSERT_NO_LONG` 宏作为代码审查辅助
+
+---
+
+## 8. 跨平台兼容检测整合分析
+
+> **新增**: 2026-02-27 (v1.2)  
+> **状态**: ✅ 完成  
+> **结论**: **已整合统一 — 单一真相源 (Single Source of Truth) 架构**
+
+### 8.1 整合架构全景
+
+XOffsetDatastructure 和 TypeLayout 的跨平台兼容检测构成一个**清晰的分层架构**，
+没有逻辑重复、没有标记遗漏、没有不一致。
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  XOffsetDatastructure (域策略层)                           │
+│                                                          │
+│  classify_for_xoffset<T>()                               │
+│    ├── Step 1: long/unsigned long 前置拦截                │
+│    │   (TypeLayout 签名脱糖 → 无法区分 long/int64_t)      │
+│    ├── Step 2: classify_safety<T>() ← 委托 TypeLayout    │
+│    └── Step 3: Warning→Risk 升级 (零编码策略)              │
+│                                                          │
+│  XOFFSET_REGISTER_* 宏                                    │
+│    └── TYPELAYOUT_OPAQUE_* ← 委托 TypeLayout              │
+│                                                          │
+│  StrictPolicy<GoldSignature>                              │
+│    └── get_layout_signature<T>() == GoldSignature ← 委托  │
+├──────────────────────────────────────────────────────────┤
+│  TypeLayout (签名引擎 + 安全分类器)                        │
+│                                                          │
+│  编译期: classify_safety<T>()  [classify_safety.hpp]       │
+│    ├── Risk:  bits< | wchar[ | f80[      (contains)       │
+│    └── Warn:  ptr[ fnptr[ memptr[ ref[ rref[ union[       │
+│               (contains_token — 防 nullptr 误匹配)         │
+│                                                          │
+│  运行时: classify_safety(string_view) [compat_check.hpp]   │
+│    ├── Risk:  bits< | wchar[ | f80[      (find)           │
+│    └── Warn:  ptr[ fnptr[ memptr[ ref[ rref[ union[       │
+│               (contains_token — 同算法)                    │
+│                                                          │
+│  C1引擎: CompatReporter + TYPELAYOUT_ASSERT_COMPAT        │
+│    └── 跨平台 .sig.hpp 布局签名对比                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+### 8.2 标记集一致性验证
+
+TypeLayout 编译期和运行时扫描器使用**完全相同的 9 个标记**，分类级别一致：
+
+| 标记 | 级别 | 编译期<br>`classify_safety.hpp` | 运行时<br>`compat_check.hpp` | XOffset<br>`xoffsetdatastructure.hpp` |
+|------|:---:|:---:|:---:|:---:|
+| `bits<` | Risk | `sig.contains()` | `sig.find()` | 不扫描，委托 TypeLayout |
+| `wchar[` | Risk | `sig.contains()` | `sig.find()` | 不扫描，委托 TypeLayout |
+| `f80[` | Risk | `sig.contains()` | `sig.find()` | 不扫描，委托 TypeLayout |
+| `ptr[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+| `fnptr[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+| `memptr[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+| `ref[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+| `rref[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+| `union[` | Warning | `sig.contains_token()` | `contains_token()` | 不扫描，委托 TypeLayout |
+
+**关键设计选择**：
+- **Risk 标记** (`bits<`, `wchar[`, `f80[`) 使用普通子串匹配 — 这些标记不存在子串碰撞风险
+- **Warning 标记** 使用 `contains_token()` — 防止 `nullptr[` 被 `ptr[` 误匹配
+
+### 8.3 匹配算法一致性验证
+
+编译期 `FixedString::contains_token()` 与运行时 `contains_token(string_view, string_view)` 的算法语义**完全等价**：
+
+| 属性 | 编译期 (`FixedString`) | 运行时 (`string_view`) |
+|------|:---:|:---:|
+| 算法 | 逐位置匹配 + 前字符检查 | 逐位置匹配 + 前字符检查 |
+| 位置 0 匹配 | `return true` | `return true` |
+| 前缀判断 | `is_alpha(value[i-1])` | `(prev >= 'a' && prev <= 'z') \|\| (prev >= 'A' && prev <= 'Z')` |
+| 误匹配跳过 | `++i` 继续搜索 | `pos = found + 1` 继续搜索 |
+| 修复背景 | 防止 `nullptr[s:8,a:8]` 中的 `ptr[` 被误匹配 | 同上 |
+
+### 8.4 XOffset 域特定策略
+
+XOffset 没有复制任何 TypeLayout 的签名扫描代码，仅添加了两个**不可能在 TypeLayout 层实现**的域特定策略：
+
+| 策略 | 实现位置 | 说明 | 为何不能在 TypeLayout 实现 |
+|------|----------|------|--------------------------|
+| **Warning→Risk 升级** | `classify_for_xoffset<T>()` | TypeLayout 的 Warning（指针/union/vptr）在 XOffset 中升级为 Risk | TypeLayout 是通用库，Warning 在某些场景（同平台 IPC）是可接受的 |
+| **long/unsigned long 前置拦截** | `classify_for_xoffset<T>()` | 在 TypeLayout 分类前拦截裸 `long` | TypeLayout 签名已将 `long` 脱糖为 `i32`/`i64`，无法区分 |
+
+### 8.5 容器穿透机制
+
+XOffset 容器（`XVector`, `XString`, `XSet`, `XMap`）通过 `XOFFSET_REGISTER_*` 宏注册，
+内部调用 `TYPELAYOUT_OPAQUE_*` 宏。这使得 TypeLayout 的签名引擎自动嵌入元素类型签名，
+`classify_safety<XVector<T>>()` 会自动递归检查 `T` 的安全性 — **无需 XOffset 手写递归逻辑**。
+
+```
+用户调用:  is_xbuffer_safe<XVector<MyStruct>>::value
+   │
+   ├─ classify_for_xoffset<XVector<MyStruct>>()
+   │     └─ classify_safety<XVector<MyStruct>>()   // TypeLayout
+   │           └─ 签名: "vector[s:32,a:8]<record[...]{...}>"
+   │                 └─ 扫描签名中的 9 个标记 → Safe/Warning/Risk
+   │
+   └─ Warning→Risk 升级 (如果有 Warning)
+```
+
+### 8.6 C1/C2 分离
+
+Serialization-free 保证由两个独立的检查组成：
+
+| 层 | 检查 | 实施位置 | 阶段 |
+|----|------|----------|------|
+| **C2: 本地安全** | `classify_for_xoffset<T>() == Safe` | XOffset 编译期 | `static_assert` |
+| **C1: 跨平台布局匹配** | `TYPELAYOUT_ASSERT_COMPAT(a, b)` | TypeLayout CI 层 | 跨平台 `.sig.hpp` 对比 |
+
+两者之间无逻辑耦合：C2 在每个平台独立判定，C1 在 CI 中比较多平台的签名快照。
+
+### 8.7 诊断函数 vs 判定函数
+
+`get_safety_error_message<T>()` 内部使用了 `is_polymorphic_v`、`is_union_v`、`is_pointer_v` 等 type_traits，但这些**仅用于生成友好的编译错误信息**，不参与实际的安全判定流程。
+
+实际判定的**唯一入口**是：
+```
+is_xbuffer_safe<T>::value
+  → detail::is_safe_type<T>()
+    → detail::is_xbuffer_compatible<T, DefaultPolicy>()
+      → DefaultPolicy::accept<T>()
+        → classify_for_xoffset<T>()
+          → classify_safety<T>()     ← TypeLayout ground truth
+```
+
+### 8.8 已知的设计限制
+
+以下限制均已文档化，不是 bug：
+
+| # | 限制 | 原因 | 缓解措施 |
+|---|------|------|----------|
+| L1 | `long` 埋入结构体成员不可检测 | P2996 `type_of()` 对成员执行 desugaring | 编码规范 + `XBUFFER_ASSERT_NO_LONG` + C1 CI |
+| L2 | 非多态虚继承的 vbase 指针不可检测 | P2996 将 vbase 指针表现为 padding | C1 跨平台签名对比可捕获布局差异 |
+| ~~L3~~ | ~~枚举类型未测试~~ | ✅ **已解决** (v1.3) | `test_enum_support.cpp` 覆盖 7 个测试场景 |
+
+### 8.9 验证矩阵
+
+| 维度 | 结果 | 详情 |
+|------|:---:|------|
+| **标记集一致** | ✅ | 9 个标记在编译期/运行时完全相同 |
+| **分类级别一致** | ✅ | Risk/Warning 归属完全对齐 |
+| **匹配算法一致** | ✅ | `contains_token` 边界语义两套实现完全等价 |
+| **无重复扫描** | ✅ | XOffset 不包含任何自己的签名扫描代码 |
+| **域策略合理** | ✅ | 两个策略都是 TypeLayout 层无法实现的 |
+| **容器穿透统一** | ✅ | 通过 `TYPELAYOUT_OPAQUE_*` 一体化，无手工递归 |
+| **C1/C2 分离清晰** | ✅ | C2 本地安全（编译期）+ C1 跨平台布局（CI 层） |
+
+### 8.10 结论
+
+> **XOffsetDatastructure 和 TypeLayout 的跨平台兼容检测已完全整合统一。**
+>
+> TypeLayout 是**签名引擎和安全分类器**（Single Source of Truth），
+> XOffset 是**域策略层**（Warning→Risk 升级 + long 拦截）。
+> 两者职责分明，无逻辑冗余，无标记遗漏。
+>
+> 32/32 测试在 P2996 Docker 环境中全部通过，验证了整合的正确性。
+
+---
+
+## 附录 A: `COMPILETIME_SAFETY_API_ANALYSIS.md` 归档说明
+
+> **⚠️ 归档**: `docs/COMPILETIME_SAFETY_API_ANALYSIS.md` (v1.0, 2026-02-10) 描述的是
+> **Safety 集成之前**的旧架构，其中 `is_xbuffer_safe<T>` 有独立的反射扫描逻辑。
+> 自 commit `6f4f7a8d` 起，该文档的核心分析（§2 能力矩阵对比、§3 候选设计方案、§4 推荐方案C）
+> **已不再适用**。
+>
+> 现有架构的权威参考为本文档的 §7 和 §8。
+>
+> `COMPILETIME_SAFETY_API_ANALYSIS.md` 保留作为历史记录，不再更新。

@@ -51,6 +51,55 @@ jobs:
             ghcr.io/ximicpp/typelayout-p2996:latest \
             bash ./build.sh
 
+      - name: Signature contract verification
+        run: |
+          echo "=== Checking for signature changes ==="
+          echo ""
+
+          # The build.sh run above regenerated tools/sigs/*.sig.hpp inside Docker.
+          # Compare them against the committed versions to detect binary contract drift.
+
+          SIG_DIR="tools/sigs"
+          if [ ! -d "$SIG_DIR" ]; then
+            echo "No signature directory found — skipping."
+            exit 0
+          fi
+
+          CHANGED=0
+          for sig_file in "$SIG_DIR"/*.sig.hpp; do
+            [ -f "$sig_file" ] || continue
+            FNAME=$(basename "$sig_file")
+
+            # Use git diff to detect uncommitted changes
+            if ! git diff --quiet -- "$sig_file" 2>/dev/null; then
+              echo "⚠ CHANGED: $FNAME"
+              echo "  Binary contract may have changed — please review!"
+              git diff --stat -- "$sig_file"
+              echo ""
+              CHANGED=1
+            else
+              echo "✓ $FNAME — unchanged"
+            fi
+          done
+
+          echo ""
+          if [ "$CHANGED" -eq 1 ]; then
+            echo "::warning::Type signatures have changed! Review tools/sigs/*.sig.hpp for binary contract drift."
+            echo ""
+            echo "If this is intentional, commit the updated .sig.hpp files."
+          else
+            echo "✓ All type signatures match committed versions."
+          fi
+
+      - name: Upload signature artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: type-signatures
+          path: tools/sigs/*.sig.hpp
+          retention-days: 30
+          if-no-files-found: ignore
+
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4

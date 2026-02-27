@@ -381,6 +381,64 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_adaptive_reservation" 32 $TOTAL_TESTS
 fi
 
+# ============================================================================
+# Signature Export & Compatibility Check
+# ============================================================================
+if [ $ENABLE_REFLECTION -eq 1 ]; then
+    echo ""
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${CYAN}Signature Export & Compatibility Check${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+    echo ""
+
+    SIG_EXPORT_PATH="bin/export_signatures"
+    if [ ! -f "$SIG_EXPORT_PATH" ]; then
+        SIG_EXPORT_PATH="bin/$BUILD_TYPE/export_signatures"
+    fi
+
+    SIG_CHECK_PATH="bin/check_compat"
+    if [ ! -f "$SIG_CHECK_PATH" ]; then
+        SIG_CHECK_PATH="bin/$BUILD_TYPE/check_compat"
+    fi
+
+    # Step 1: Export signatures for current platform
+    if [ -f "$SIG_EXPORT_PATH" ]; then
+        echo -e "${BLUE}Exporting type signatures...${NC}"
+        SIG_OUTPUT_DIR="../tools/sigs"
+        mkdir -p "$SIG_OUTPUT_DIR"
+
+        if ./$SIG_EXPORT_PATH "$SIG_OUTPUT_DIR/"; then
+            echo -e "${GREEN}✓ Signatures exported to tools/sigs/${NC}"
+
+            # Show which files were generated
+            for sig_file in "$SIG_OUTPUT_DIR"/*.sig.hpp; do
+                if [ -f "$sig_file" ]; then
+                    echo -e "  ${CYAN}$(basename "$sig_file")${NC}"
+                fi
+            done
+        else
+            echo -e "${YELLOW}⚠ Signature export failed (non-fatal)${NC}"
+        fi
+        echo ""
+    else
+        echo -e "${YELLOW}export_signatures not found (skipped)${NC}"
+    fi
+
+    # Step 2: Run compatibility self-check
+    if [ -f "$SIG_CHECK_PATH" ]; then
+        echo -e "${BLUE}Running compatibility self-check...${NC}"
+
+        if ./$SIG_CHECK_PATH; then
+            echo -e "${GREEN}✓ Compatibility check passed${NC}"
+        else
+            echo -e "${YELLOW}⚠ Compatibility check failed (non-fatal)${NC}"
+        fi
+        echo ""
+    else
+        echo -e "${YELLOW}check_compat not found (skipped)${NC}"
+    fi
+fi
+
 # Run demo
 echo -e "${CYAN}======================================================================${NC}"
 echo -e "${CYAN}Running XOffsetDatastructure Demo v2${NC}"

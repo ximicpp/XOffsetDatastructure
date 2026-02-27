@@ -111,12 +111,17 @@ namespace boost::typelayout {
 
 ### 3.1 编译时 Safety 分级 API
 
-此项需要更深入的分析才能确定方案，已创建独立提案 `analyze-compiletime-safety-api` 进行专项研究。
+> **⚠️ v1.2 更新 (2026-02-27)**: 此缺口**已完全弥补**。TypeLayout 现在提供了
+> `classify_safety<T>()` 编译时版本（`classify_safety.hpp`），XOffsetDatastructure
+> 的 `is_xbuffer_safe<T>` 已完全委托给 TypeLayout。
+> 详见 [`TYPELAYOUT_INTEGRATION_ANALYSIS.md`](./TYPELAYOUT_INTEGRATION_ANALYSIS.md) §7 + §8。
 
-**核心问题**：
-- TypeLayout 的 `classify_safety()` 是运行时 API（基于签名字符串扫描），不能用于 `static_assert`
-- XOffsetDatastructure 的 `is_xbuffer_safe<T>` 有 ~260 行独立实现
-- 两者的职责边界需要仔细界定
+~~此项需要更深入的分析才能确定方案，已创建独立提案 `analyze-compiletime-safety-api` 进行专项研究。~~
+
+~~**核心问题**~~：
+- ~~TypeLayout 的 `classify_safety()` 是运行时 API（基于签名字符串扫描），不能用于 `static_assert`~~ → **已解决**: TypeLayout 现提供 `consteval classify_safety<T>()`
+- ~~XOffsetDatastructure 的 `is_xbuffer_safe<T>` 有 ~260 行独立实现~~ → **已解决**: 已重构为委托架构
+- ~~两者的职责边界需要仔细界定~~ → **已解决**: TypeLayout 为引擎层，XOffset 为策略层
 
 ---
 
