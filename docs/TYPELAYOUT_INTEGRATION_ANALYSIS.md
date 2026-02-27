@@ -1,7 +1,7 @@
 # TypeLayout 与 XOffsetDatastructure 集成架构分析
 
-> **版本**: v1.0  
-> **分析日期**: 2026-02-10  
+> **版本**: v1.1  
+> **分析日期**: 2026-02-10（v1.1 更新: 2026-02-27）  
 > **状态**: ✅ 完成
 
 ---
@@ -283,3 +283,86 @@ TypeLayout 的工具层（`tools/`）设计为 C++17 兼容（不需要 P2996）
 ### 一句话结论
 
 **TypeLayout 的核心功能设计合理且完整，XOffsetDatastructure 对核心层的使用方式正确。最大的改进机会在于利用 TypeLayout 已有的工具层（`sig_export` + `compat_check`）来实现跨平台签名导出需求，这是 spec 中已定义但未实现的功能。**
+
+---
+
+## 7. Safety 集成：TypeLayout `classify_safety` × XOffset Policy Trait
+
+> **新增**: 2026-02-27  
+> **状态**: ✅ 已实施（commit 6f4f7a8d）
+
+### 7.1 集成架构
+
+XOffsetDatastructure 的 **Policy Trait 安全系统** 建立在 TypeLayout 的 `classify_safety<T>()` 之上。
+两层之间的分工如下：
+
+```
+TypeLayout (classify_safety)                XOffsetDatastructure (Policy Trait)
+┌─────────────────────────────────┐        ┌─────────────────────────────────────┐
+│ 输入: 任意类型 T                 │        │ 输入: T + Policy (Default/Relaxed)  │
+│ 输出: SafetyLevel               │        │                                     │
+│   - Safe    (0): 固定布局基本类型│        │ classify_for_xoffset<T>():          │
+│   - Warning (1): 含指针/vptr/    │ ─────▶ │   1. long/ulong 平台特判 → Risk     │
+│                   联合体等       │ 调用   │   2. is_safe_leaf → 递归检查元素     │
+│   - Risk    (2): 不安全类型      │        │   3. classify_safety<T>()           │
+│                   (wchar_t 等)   │        │      Warning → Risk (严格升级)      │
+│                                 │        │                                     │
+│ 签名引擎: get_layout_signature  │        │ classify_raw<T>():                  │
+│   - vptr 标记传播到嵌套成员       │        │   同上但 Warning 保持原值 (Relaxed) │
+│   - 多态类型 → 签名含 [vptr]    │        │                                     │
+└─────────────────────────────────┘        │ Policy::accept<T>():                │
+                                           │   - DefaultPolicy: Safe only        │
+                                           │   - RelaxedPolicy: Safe + Warning   │
+                                           └─────────────────────────────────────┘
+```
+
+### 7.2 版本耦合关系
+
+| 依赖方向 | 说明 |
+|----------|------|
+| XOffset → TypeLayout | XOffset 调用 `classify_safety<T>()` 和 `get_layout_signature<T>()` |
+| TypeLayout → XOffset | ❌ 无反向依赖 |
+
+**关键耦合点**：
+
+1. **`SafetyLevel` 枚举值**: XOffset 假设 `Safe=0, Warning=1, Risk=2`。如果 TypeLayout
+   修改枚举值定义，XOffset 的 `classify_for_xoffset` 逻辑需同步更新。
+
+2. **`classify_safety` 分类语义**: XOffset 依赖以下分类行为：
+   - 含 `vptr` 的类型 → `Warning`（多态标记）
+   - 含指针成员的类型 → `Warning`
+   - `wchar_t` / `long double` → `Risk`
+   - 固定宽度基本类型（`int32_t`, `float`, ...） → `Safe`
+
+3. **签名中的 vptr 传播** (C1 修复): TypeLayout commit `59f6616` 修复了嵌套多态成员的
+   vptr 标记传播。XOffset 的安全检查依赖此行为——如果 TypeLayout 回滚此修复，
+   `EmbedsPoly` 等类型将不再被正确拒绝。
+
+### 7.3 版本锁定策略
+
+TypeLayout 通过 Git 子模块锁定在特定 commit：
+
+```
+external/typelayout → 59f6616d (含 vptr 传播修复)
+```
+
+**升级 TypeLayout 时的检查清单**：
+
+- [ ] 确认 `SafetyLevel` 枚举值未变更
+- [ ] 运行 `test_classify_safety` 验证分类语义一致性
+- [ ] 运行 `test_remediation_fixes` 验证 C1 (vptr 传播) 和 C2 (递归容器) 行为
+- [ ] 运行 `test_policy_trait` 验证 Policy Trait 集成
+- [ ] 检查 `classify_safety` 对 `long` / `unsigned long` 的处理是否有变化
+
+### 7.4 平台注意事项
+
+`long` / `unsigned long` 的安全性取决于平台 ABI：
+
+| 平台 | `sizeof(long)` | `long == int64_t` ? | `classify_for_xoffset<long>()` |
+|------|----------------|---------------------|-------------------------------|
+| LP64 (Linux x86_64, glibc) | 8 | ✅ `true` | `Safe` |
+| LP64 (Linux x86_64, musl/libc++) | 8 | ⚠️ 取决于 `<stdint.h>` 来源 | 通常 `Safe` |
+| LLP64 (Windows x64) | 4 | ❌ `false` | `Risk` |
+| ILP32 (32-bit) | 4 | ❌ `false` | `Risk` |
+
+这是**编译时**决定的——同一份源码在不同平台上会产生不同的安全判定，确保零编码序列化的二进制兼容性。
