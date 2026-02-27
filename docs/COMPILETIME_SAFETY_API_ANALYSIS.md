@@ -2,7 +2,12 @@
 
 > **版本**: v1.0  
 > **分析日期**: 2026-02-10  
-> **状态**: ✅ 完成
+> **状态**: 📦 **已归档** — 本文档描述的是 Safety 集成之前的旧架构  
+> **替代文档**: [`TYPELAYOUT_INTEGRATION_ANALYSIS.md`](./TYPELAYOUT_INTEGRATION_ANALYSIS.md) §7 + §8
+>
+> ⚠️ 自 commit `6f4f7a8d`（Safety 集成）以来，`is_xbuffer_safe<T>` 已完全委托给
+> TypeLayout 的 `classify_safety<T>()`，本文档中的能力矩阵对比（§2）、候选设计方案（§3）
+> 和推荐方案（§4）**已不再适用**。保留作为历史参考。
 
 ---
 
