@@ -1,18 +1,6 @@
 #ifndef X_OFFSET_DATA_STRUCTURE_HPP
 #define X_OFFSET_DATA_STRUCTURE_HPP
 
-#if defined(_MSC_VER)
-    #define TYPESIG_PLATFORM_WINDOWS 1
-    #define IS_LITTLE_ENDIAN 1
-    #define FUNCTION_SIGNATURE __FUNCSIG__
-#elif defined(__clang__) || defined(__GNUC__)
-    #define TYPESIG_PLATFORM_WINDOWS 0
-    #define FUNCTION_SIGNATURE __PRETTY_FUNCTION__
-    #define IS_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#else
-    #error "Unsupported compiler"
-#endif
-
 #if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
     #define XOFFSET_ARCH_64BIT 1
 #else
@@ -36,12 +24,10 @@
     #endif
 #endif
 
-
 #include <experimental/meta>
 #include <type_traits>
 #include <iostream>
 #include <iomanip>
-#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -59,37 +45,18 @@
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
-// Target Architecture Definition
+// Target Architecture Specification
 //
-// XOffset builds on TypeLayout's "Serialization-free" concept:
+// XOffset Serialization-free model:
+//   C1: layout_match(T, A)  — binary layout identical across platforms (CI)
+//   C2: safe(T)             — no pointers, bitfields, wchar_t, etc. (compile-time)
 //
-//   Serialization-free(A, S) = ∀ T ∈ S:
-//     C1: layout_match(T, A)  — binary layout identical across platforms in A
-//     C2: safe(T)             — no pointers, bitfields, wchar_t, etc.
-//
-// Where:
-//   A = Architecture Set (what platforms the data must be portable across)
-//   S = Safe Type Subset (base types + XOffset containers as hooks + user structs)
-//
-// Architecture:
-//   ArchSpec = XOffset's gate-keeper (static_assert: "this platform ∈ A")
-//              Thin wrapper over TypeLayout's PlatformInfo for CI integration.
-//   TypeLayout classify_safety<T>()   = C2 engine (signature-based, handles opaque containers)
-//   TypeLayout TYPELAYOUT_ASSERT_COMPAT = C1 engine (cross-platform .sig.hpp comparison)
-//
-// XOffset adds only two domain-specific policies on top of TypeLayout:
-//   - Warning→Risk escalation (zero-encoding rejects all pointers)
-//   - long/unsigned long first-line rejection (platform-variable size)
+// ArchSpec validates the current platform matches the target.
+// TypeLayout provides the C1 (signatures) and C2 (classify_safety) engines.
 // ============================================================================
 namespace XOffsetDatastructure {
 
-    /// Architecture specification descriptor.
-    ///
-    /// Serves as a "gate-keeper": static_assert verifies that the current
-    /// compilation platform matches the declared target architecture.
-    ///
-    /// Integrates with TypeLayout's PlatformInfo via to_platform_info()
-    /// for use in cross-platform CI comparison tooling.
+    /// Architecture specification — validates current platform matches target.
     struct ArchSpec {
         std::size_t pointer_size;
         bool        little_endian;
@@ -130,38 +97,12 @@ namespace XOffsetDatastructure {
     };
 
     // Architecture Presets.
-    // Currently only Arch64LE is actively supported and tested.
-    // The other presets are defined for forward-compatibility and
-    // cross-platform migration tooling (see §6.2 in CORE_FORMAL_MODEL.md).
+    // Only Arch64LE is supported (64-bit little-endian).
     inline constexpr ArchSpec Arch64LE = {
         .pointer_size = 8, .little_endian = true,
         .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
         .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
         .pointer_align = 8,
-        .alignof_int32 = 4, .alignof_int64 = 8,
-        .alignof_float = 4, .alignof_double = 8,
-    };
-    inline constexpr ArchSpec Arch64BE = {
-        .pointer_size = 8, .little_endian = false,
-        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
-        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
-        .pointer_align = 8,
-        .alignof_int32 = 4, .alignof_int64 = 8,
-        .alignof_float = 4, .alignof_double = 8,
-    };
-    inline constexpr ArchSpec Arch32LE = {
-        .pointer_size = 4, .little_endian = true,
-        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
-        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
-        .pointer_align = 4,
-        .alignof_int32 = 4, .alignof_int64 = 8,
-        .alignof_float = 4, .alignof_double = 8,
-    };
-    inline constexpr ArchSpec Arch32BE = {
-        .pointer_size = 4, .little_endian = false,
-        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
-        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
-        .pointer_align = 4,
         .alignof_int32 = 4, .alignof_int64 = 8,
         .alignof_float = 4, .alignof_double = 8,
     };
@@ -177,7 +118,7 @@ namespace XOffsetDatastructure {
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == XOffsetDatastructure::TargetArchitecture.pointer_size,
     "Platform pointer size does not match TargetArchitecture");
-static_assert(IS_LITTLE_ENDIAN == XOffsetDatastructure::TargetArchitecture.little_endian,
+static_assert(XOFFSET_LITTLE_ENDIAN == XOffsetDatastructure::TargetArchitecture.little_endian,
     "Platform endianness does not match TargetArchitecture");
 static_assert(sizeof(int8_t)  == XOffsetDatastructure::TargetArchitecture.sizeof_int8);
 static_assert(sizeof(int16_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int16);
@@ -217,7 +158,6 @@ static_assert(alignof(double)  == XOffsetDatastructure::TargetArchitecture.align
 namespace boost {
 namespace interprocess {
 
-
 template <class MutexFamily, class VoidPointer = offset_ptr<void>, std::size_t MemAlignment = 0>
 class x_best_fit : public rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment>
 {
@@ -249,24 +189,9 @@ public:
 // ============================================================================
 // XManagedMemory — Managed memory segment backed by std::vector<char>
 //
-// Strategy D: std::vector + reserve() + address-change detection + re-reserve.
-//
-// Principle:
-//   - vector::reserve(N) pre-allocates N bytes of virtual address space via
-//     malloc.  Modern OSes use lazy allocation, so untouched pages consume
-//     zero physical RAM (same as mmap PROT_NONE).
-//   - grow() calls vector::resize().  If size <= capacity, the C++ standard
-//     guarantees data() does not change → fast path (O(1), no epoch bump).
-//   - If resize exceeds capacity, vector relocates → slow path: close_impl,
-//     open_impl at the new address, epoch++.  After relocation, we re-reserve
-//     (size * GROWTH_HEADROOM) to restore address stability for future grows.
-//
-// Benefits over the previous mmap backend:
-//   - Zero platform dependencies (pure C++ standard library)
-//   - Byte-exact memory usage (no page-alignment waste)
-//   - ~15 lines vs ~200 lines of code
-//   - Same physical memory efficiency (lazy allocation)
-//   - Same address stability within reserve range
+// Uses vector::reserve() for virtual address pre-allocation (lazy-commit by OS).
+// grow() stays on a fast path while size <= capacity; vector relocation triggers
+// close_impl/open_impl + epoch bump + re-reserve for address stability.
 // ============================================================================
 template <
     class CharType,
@@ -401,16 +326,8 @@ public:
     }
 
     // Grows the buffer by extra_bytes.
-    //
-    // Fast path (within vector capacity): data() does NOT change.
-    //   Existing pointers, references, and iterators remain valid.
-    //   Epoch is NOT incremented.  C++ standard guarantees this.
-    //
-    // Slow path (exceeds capacity): vector relocates.
-    //   Base address CHANGES.  Epoch is incremented.
-    //   After relocation, re-reserves (size * 16) to restore stability.
-    //   XHandle<T> automatically re-finds the root on next access.
-    //   Internal offset_ptr-based data remains valid after relocation.
+    // Fast path (within capacity): address stable, no epoch bump.
+    // Slow path (relocation): close/open + epoch++ + re-reserve.
     bool grow(size_type extra_bytes)
     {
         size_type old_size = m_buffer.size();
@@ -451,20 +368,12 @@ public:
         std::swap(m_epoch, other.m_epoch);
     }
 
-    // Shrinks the managed segment's logical size (reclaims trailing free space
-    // in the rbtree allocator).  Does NOT shrink the vector — this preserves
-    // the base address and avoids epoch invalidation.
-    //
-    // The vector capacity remains at its high-water mark, which means:
-    //   - Future grow() calls are more likely to stay on the fast path
-    //   - base address and all pointers/XHandles remain valid
-    //   - Physical RAM for untouched pages is reclaimable by the OS (lazy alloc)
+    // Shrinks the managed segment's logical size.  Does NOT shrink the vector
+    // — preserves base address, avoids epoch invalidation.
     void shrink_to_fit()
     {
         base_t::shrink_to_fit();
-        // Intentionally NOT shrinking the vector.
-        // The vector's excess capacity acts as pre-reserved space for future
-        // grows, and the OS can reclaim untouched physical pages anyway.
+        // Intentionally NOT shrinking the vector (excess capacity = future headroom).
     }
 
     /// Returns a pointer to the underlying std::vector<char> buffer.
@@ -507,7 +416,6 @@ private:
 
 } // namespace interprocess
 } // namespace boost
-
 
 namespace XOffsetDatastructure {
     using namespace boost::interprocess;
@@ -712,16 +620,8 @@ namespace XOffsetDatastructure {
     // ========================================================================
     // Public Container Wrapper Classes
     //
-    // Two layers of allocator convenience:
-    //   Layer 1: scoped_allocator_adaptor — auto-injects allocator in all
-    //            emplace/emplace_back/emplace_hint paths (via construct()).
-    //   Layer 2: Wrapper overloads below — cover push_back, insert, operator[],
-    //            erase, resize, assign where the base API signature requires
-    //            a fully-constructed T or key_type.
-    //
-    // Detection logic (requires constraints):
-    //   "If args can't directly construct T, but (args..., SM*) can → inject SM*"
-    //   "If key arg isn't convertible to K → use find + emplace"
+    // scoped_allocator_adaptor handles emplace paths; wrapper overloads cover
+    // push_back/insert/operator[]/resize where the base API needs a full T.
     // ========================================================================
 
     /// Managed vector with 1.1x growth factor and automatic allocator propagation.
@@ -940,10 +840,7 @@ namespace XOffsetDatastructure {
         }
     };
 
-    // Forward declaration for safety gate in XCompactor
-    namespace detail {
-        template<typename T> consteval bool is_safe_type();
-    }
+    // Forward declarations for safety gate and validation
     template<typename T> constexpr void validate_xbuffer_type();
 
     // Internal constant for the single root object name.
@@ -953,37 +850,17 @@ namespace XOffsetDatastructure {
     namespace detail {
 
         // ============================================================================
-        // Type Safety Architecture — Unified on TypeLayout's Serialization-free
+        // Type Safety Architecture — Unified on TypeLayout's classify_safety<T>()
         //
-        // All type safety decisions are grounded in TypeLayout's classify_safety<T>(),
-        // which scans the layout SIGNATURE for risk/warning markers. The signature
-        // is the single source of truth — it covers primitives, structs (via P2996
-        // reflection), AND containers (via TYPELAYOUT_OPAQUE_* registration).
+        // TypeLayout's layout signature is the single source of truth for safety.
+        // XOffset containers are registered via TYPELAYOUT_OPAQUE_* macros so
+        // classify_safety recurses into element types automatically.
         //
-        // XOffset containers (XVector, XString, XSet, XMap) act as "Type Set
-        // Extension Hooks": they are registered via TYPELAYOUT_OPAQUE_* macros,
-        // which tell the signature engine to skip the container shell (which
-        // contains Boost allocator pointers) and embed the element signature
-        // instead. This means classify_safety<XVector<T>>() automatically
-        // recurses into T's signature — no manual container-element recursion
-        // needed in XOffset.
+        // XOffset adds two domain-specific policies on top:
+        //   1. Warning→Risk escalation (zero-encoding forbids pointers/unions)
+        //   2. long/unsigned long rejection when size ≠ fixed-width (LP64 vs LLP64)
         //
-        // XOffset adds exactly two domain-specific policies:
-        //
-        //   1. Warning→Risk Escalation:
-        //      TypeLayout classifies pointers/unions as "Warning" (might be ok
-        //      for same-platform use). XOffset escalates them to "Risk" because
-        //      zero-encoding requires pointer-free data.
-        //
-        //   2. Platform-variable Type Rejection (first-line defense):
-        //      long / unsigned long are rejected when their size differs from
-        //      the fixed-width types (LP64 vs LLP64). This cannot catch long
-        //      buried inside struct members (P2996 desugars them). Rely on
-        //      cross-platform CI (TYPELAYOUT_ASSERT_COMPAT) for full coverage.
-        //
-        // Full Serialization-free guarantee requires:
-        //   C1: TYPELAYOUT_ASSERT_COMPAT (cross-platform layout signature match)
-        //   C2: classify_for_xoffset<T>() == Safe (local safety, checked here)
+        // Full guarantee: C1 (TYPELAYOUT_ASSERT_COMPAT) + C2 (classify_for_xoffset)
         // ============================================================================
 
         // Import the compile-time safety engine from TypeLayout
@@ -1003,17 +880,9 @@ namespace XOffsetDatastructure {
         //      (handles primitives, structs via reflection, containers via opaque)
         //   3. Warning→Risk escalation (XOffset zero-encoding policy)
         //
-        // ⚠ IMPORTANT LIMITATION (see docs/LONG_PORTABILITY_GUIDE.md):
-        // Step 1 ONLY catches "naked" usage of long/unsigned long as the
-        // top-level type T. It CANNOT detect long buried inside a struct's
-        // members, because:
-        //   1. TypeLayout signatures encode long as its fixed-width alias
-        //      (i32 on Windows, i64 on Linux), losing the original type name.
-        //   2. P2996 reflection's type_of() "desugars" member types — on LP64,
-        //      both `int64_t b` and `long c` resolve to the same canonical
-        //      type, making them indistinguishable at compile time.
-        // Therefore, users MUST avoid long in struct members by convention,
-        // or rely on cross-platform CI (TYPELAYOUT_ASSERT_COMPAT) to catch it.
+        // ⚠ LIMITATION: Only catches naked long/unsigned long at top-level T.
+        // Struct members are desugared by P2996 — rely on TYPELAYOUT_ASSERT_COMPAT.
+        // See docs/LONG_PORTABILITY_GUIDE.md.
         template<typename T>
         consteval SafetyLevel classify_for_xoffset() {
             using CleanT = std::remove_cv_t<T>;
@@ -1106,21 +975,11 @@ namespace XOffsetDatastructure {
             return Policy::template accept<T>();
         }
 
-        // ====================================================================
-        // is_safe_type<T>() — backward-compatible convenience
-        //
-        // Equivalent to is_xbuffer_compatible<T, DefaultPolicy>().
-        // ====================================================================
-        template<typename T>
-        consteval bool is_safe_type() {
-            return is_xbuffer_compatible<T, DefaultPolicy>();
-        }
-        
         template<typename T>
         consteval const char* get_safety_error_message() {
             using CleanT = std::remove_cv_t<T>;
 
-            if constexpr (is_safe_type<CleanT>()) {
+            if constexpr (is_xbuffer_compatible<CleanT>()) {
                 return "Type is SAFE for XBufferCore";
             }
             // Detailed diagnostics for common failure modes
@@ -1158,24 +1017,11 @@ namespace XOffsetDatastructure {
         }
     }
     
-    /// is_xbuffer_safe<T> — the public type admission gate.
-    ///
-    /// Conceptually:
-    ///   is_xbuffer_safe<T>::value == true
-    ///   ⟺ T is "XOffset Serialization-free" on this platform:
-    ///        - For leaf types: classify_safety<T>() == SafetyLevel::Safe
-    ///        - For XOffset containers (XVector, XString, etc.): their opaque
-    ///          signature embeds the element signature, so classify_safety
-    ///          automatically recurses into element types.
-    ///        - For structs: all members individually satisfy the above.
-    ///        - Warning→Risk escalation: pointers are rejected (zero-encoding
-    ///          requires cross-address-space safety).
-    ///
-    /// For the full cross-platform Serialization-free guarantee, additionally
-    /// use TYPELAYOUT_ASSERT_COMPAT in CI (Layer 3) to verify layout match.
+    /// Public type admission gate: is_xbuffer_safe<T>::value == true iff T is
+    /// XOffset Serialization-free on this platform. Use reason() for diagnostics.
     template<typename T>
     struct is_xbuffer_safe {
-        static constexpr bool value = detail::is_safe_type<T>();
+        static constexpr bool value = detail::is_xbuffer_compatible<T>();
         
         static constexpr const char* reason() {
             return detail::get_safety_error_message<T>();
@@ -1996,7 +1842,6 @@ namespace XOffsetDatastructure {
                 migrate_members(old_member, new_member, old_xbuf, new_xbuf);
             }
         }
-        
         
         template<typename T, std::size_t Index>
         static consteval auto get_member_at() {
