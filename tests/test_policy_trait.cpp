@@ -1,14 +1,17 @@
 // ============================================================================
 // Test: Policy Trait & is_xbuffer_compatible
-// Purpose: Validates the new signature-based Policy Trait safety architecture.
+// Purpose: Validates the unified signature-based safety architecture.
 //
 // Tests:
 //   1. DefaultPolicy — Safe types pass, Warning/Risk types rejected
 //   2. StrictPolicy<GoldSig> — compile-time signature comparison
-//   3. RelaxedPolicy — Warning allowed, Risk rejected
-//   4. Custom Hook — user-defined policy
-//   5. Backward compatibility — is_xbuffer_safe<T>::value
-//   6. Container skip — is_safe_leaf containers with safe/unsafe elements
+//   3. Custom Hook — user-defined policy
+//   4. Backward compatibility — is_xbuffer_safe<T>::value
+//   5. classify_for_xoffset levels
+//
+// Note: RelaxedPolicy was removed in the Serialization-free unification.
+//       XOffset's zero-encoding model categorically rejects all pointers
+//       (Warning→Risk escalation), so a "relaxed" mode is not meaningful.
 // ============================================================================
 
 #include <iostream>
@@ -150,36 +153,7 @@ bool test_strict_policy() {
 }
 
 // ============================================================================
-// Test 3: RelaxedPolicy — Warning allowed, Risk rejected
-// ============================================================================
-bool test_relaxed_policy() {
-    std::cout << "\n[TEST] RelaxedPolicy\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    // Safe types → pass
-    static_assert(is_xbuffer_compatible<int32_t, RelaxedPolicy>(),
-                  "int32_t must pass Relaxed");
-    static_assert(is_xbuffer_compatible<SafeRecord, RelaxedPolicy>(),
-                  "SafeRecord must pass Relaxed");
-    std::cout << "  Safe types pass... [OK]\n";
-
-    // Warning types → allowed under Relaxed
-    static_assert(is_xbuffer_compatible<HasPointer, RelaxedPolicy>(),
-                  "HasPointer must pass Relaxed (Warning allowed)");
-    std::cout << "  Warning types allowed... [OK]\n";
-
-    // Risk types → still rejected
-    static_assert(!is_xbuffer_compatible<HasWchar, RelaxedPolicy>(),
-                  "HasWchar must be rejected even under Relaxed");
-    static_assert(!is_xbuffer_compatible<HasLongDouble, RelaxedPolicy>(),
-                  "HasLongDouble must be rejected even under Relaxed");
-    std::cout << "  Risk types rejected... [OK]\n";
-
-    return true;
-}
-
-// ============================================================================
-// Test 4: Custom Hook
+// Test 3: Custom Hook
 // ============================================================================
 
 /// A user-defined policy that only accepts types smaller than 24 bytes
@@ -291,7 +265,6 @@ int main() {
 
     all_passed &= test_default_policy();
     all_passed &= test_strict_policy();
-    all_passed &= test_relaxed_policy();
     all_passed &= test_custom_hook();
     all_passed &= test_backward_compat();
     all_passed &= test_classify_levels();

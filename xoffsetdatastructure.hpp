@@ -47,27 +47,49 @@
 #include <vector>
 #include <cstring>
 
-// TypeLayout library — the authoritative type-signature engine
-// Use boost::typelayout directly for all type signature operations:
-//   - boost::typelayout::get_definition_signature<T>()
-//   - boost::typelayout::get_layout_signature<T>()
-//   - boost::typelayout::definition_signatures_match<T1, T2>()
-//   - boost::typelayout::layout_signatures_match<T1, T2>()
+// TypeLayout library — the authoritative type-signature engine.
+// XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
+//   - boost::typelayout::get_layout_signature<T>()        — binary layout signature
+//   - boost::typelayout::compat::classify_safety<T>()     — C2: local safety
+//   - boost::typelayout::compat::is_serialization_free_local<T>() — C2 predicate
+//   - TYPELAYOUT_ASSERT_COMPAT(a, b)                      — C1: cross-platform match
 #include <boost/typelayout.hpp>
 #include <boost/typelayout/tools/classify_safety.hpp>
+#include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
 // Target Architecture Definition
 //
-// XOffset defines two explicit sets:
-//   A (Architecture Set) — what platform the data lives on
-//   S (Safe Type Subset) — what types can be stored
-// Zero-copy safety = Platform ∈ A ∧ Type ∈ S
+// XOffset builds on TypeLayout's "Serialization-free" concept:
+//
+//   Serialization-free(A, S) = ∀ T ∈ S:
+//     C1: layout_match(T, A)  — binary layout identical across platforms in A
+//     C2: safe(T)             — no pointers, bitfields, wchar_t, etc.
+//
+// Where:
+//   A = Architecture Set (what platforms the data must be portable across)
+//   S = Safe Type Subset (base types + XOffset containers as hooks + user structs)
+//
+// Architecture:
+//   ArchSpec = XOffset's gate-keeper (static_assert: "this platform ∈ A")
+//              Thin wrapper over TypeLayout's PlatformInfo for CI integration.
+//   TypeLayout classify_safety<T>()   = C2 engine (signature-based, handles opaque containers)
+//   TypeLayout TYPELAYOUT_ASSERT_COMPAT = C1 engine (cross-platform .sig.hpp comparison)
+//
+// XOffset adds only two domain-specific policies on top of TypeLayout:
+//   - Warning→Risk escalation (zero-encoding rejects all pointers)
+//   - long/unsigned long first-line rejection (platform-variable size)
 // ============================================================================
 namespace XOffsetDatastructure {
 
-    /// Architecture specification descriptor (pure data, no logic)
+    /// Architecture specification descriptor.
+    ///
+    /// Serves as a "gate-keeper": static_assert verifies that the current
+    /// compilation platform matches the declared target architecture.
+    ///
+    /// Integrates with TypeLayout's PlatformInfo via to_platform_info()
+    /// for use in cross-platform CI comparison tooling.
     struct ArchSpec {
         std::size_t pointer_size;
         bool        little_endian;
@@ -84,6 +106,27 @@ namespace XOffsetDatastructure {
         std::size_t alignof_int64;
         std::size_t alignof_float;
         std::size_t alignof_double;
+
+        /// Convert to TypeLayout's PlatformInfo for cross-platform comparison.
+        /// Fields not present in PlatformInfo (sizeof_int8, etc.) are validated
+        /// by the static_asserts below and are implicitly covered by TypeLayout's
+        /// layout signature encoding.
+        constexpr boost::typelayout::PlatformInfo to_platform_info(
+            const char* name = "xoffset-target",
+            const char* arch_prefix = "[64-le]") const
+        {
+            return boost::typelayout::PlatformInfo{
+                .platform_name    = name,
+                .arch_prefix      = arch_prefix,
+                .types            = nullptr,
+                .type_count       = 0,
+                .pointer_size     = pointer_size,
+                .sizeof_long      = sizeof(long),
+                .sizeof_wchar_t   = sizeof(wchar_t),
+                .sizeof_long_double = sizeof(long double),
+                .max_align        = alignof(std::max_align_t),
+            };
+        }
     };
 
     // Architecture Presets.
@@ -910,92 +953,72 @@ namespace XOffsetDatastructure {
     namespace detail {
 
         // ============================================================================
-        // Safe Type Subset — Container Whitelist (is_safe_leaf)
+        // Type Safety Architecture — Unified on TypeLayout's Serialization-free
         //
-        // is_safe_leaf<T> marks types as "known safe leaves" — primarily used for
-        // XOffset containers (XVector, XString, XMap, XSet) whose internals contain
-        // Boost.Interprocess allocators (pointers, etc.) that would fail the generic
-        // safety engine. Containers registered here are treated as opaque safe
-        // wrappers; the engine recurses into their value_type instead.
+        // All type safety decisions are grounded in TypeLayout's classify_safety<T>(),
+        // which scans the layout SIGNATURE for risk/warning markers. The signature
+        // is the single source of truth — it covers primitives, structs (via P2996
+        // reflection), AND containers (via TYPELAYOUT_OPAQUE_* registration).
         //
-        // Primitive types (int32_t, float, etc.) no longer need is_safe_leaf
-        // registration — they are classified directly by the TypeLayout consteval
-        // safety engine. The specializations below are kept for backward
-        // compatibility with user code that may check is_safe_leaf<int32_t>.
+        // XOffset containers (XVector, XString, XSet, XMap) act as "Type Set
+        // Extension Hooks": they are registered via TYPELAYOUT_OPAQUE_* macros,
+        // which tell the signature engine to skip the container shell (which
+        // contains Boost allocator pointers) and embed the element signature
+        // instead. This means classify_safety<XVector<T>>() automatically
+        // recurses into T's signature — no manual container-element recursion
+        // needed in XOffset.
         //
-        // Registered via XOFFSET_REGISTER_* unified macros (see end of file).
+        // XOffset adds exactly two domain-specific policies:
+        //
+        //   1. Warning→Risk Escalation:
+        //      TypeLayout classifies pointers/unions as "Warning" (might be ok
+        //      for same-platform use). XOffset escalates them to "Risk" because
+        //      zero-encoding requires pointer-free data.
+        //
+        //   2. Platform-variable Type Rejection (first-line defense):
+        //      long / unsigned long are rejected when their size differs from
+        //      the fixed-width types (LP64 vs LLP64). This cannot catch long
+        //      buried inside struct members (P2996 desugars them). Rely on
+        //      cross-platform CI (TYPELAYOUT_ASSERT_COMPAT) for full coverage.
+        //
+        // Full Serialization-free guarantee requires:
+        //   C1: TYPELAYOUT_ASSERT_COMPAT (cross-platform layout signature match)
+        //   C2: classify_for_xoffset<T>() == Safe (local safety, checked here)
         // ============================================================================
 
-        template<typename T> struct is_safe_leaf : std::false_type {};
-
-        // — Primitives (backward compatibility; engine classifies these directly) —
-        template<> struct is_safe_leaf<int8_t>   : std::true_type {};
-        template<> struct is_safe_leaf<int16_t>  : std::true_type {};
-        template<> struct is_safe_leaf<int32_t>  : std::true_type {};
-        template<> struct is_safe_leaf<int64_t>  : std::true_type {};
-        template<> struct is_safe_leaf<uint8_t>  : std::true_type {};
-        template<> struct is_safe_leaf<uint16_t> : std::true_type {};
-        template<> struct is_safe_leaf<uint32_t> : std::true_type {};
-        template<> struct is_safe_leaf<uint64_t> : std::true_type {};
-        template<> struct is_safe_leaf<float>    : std::true_type {};
-        template<> struct is_safe_leaf<double>   : std::true_type {};
-        template<> struct is_safe_leaf<bool>     : std::true_type {};
-        template<> struct is_safe_leaf<char>     : std::true_type {};
-
-        // — XString & XContainers are registered via XOFFSET_REGISTER_* macros —
-        // — XOffsetPtr<T> is NOT registered by default (reference-semantic) —
-
-        // ============================================================================
-        // Signature-Based Safety & Layout Verification
-        //
-        // Architecture: single source of truth = layout signature.
-        //
-        // TypeLayout's get_layout_signature<T>() produces a compile-time string
-        // encoding architecture prefix, every member offset, size, alignment, and
-        // type marker.  Two checks derive from this one artifact:
-        //
-        //   1. Safety  — classify_safety<T>() scans the signature for risk markers
-        //      (ptr, bits, wchar, f80, union, vptr, etc.).
-        //
-        //   2. Layout identity — comparing the signature against a preset "gold"
-        //      string guarantees byte-for-byte layout equivalence.
-        //
-        // XOffset layers a Policy Trait on top to let users choose the desired
-        // strictness level, and preserves is_safe_leaf for container-skip logic.
-        // ============================================================================
-
-        // Import the compile-time safety engine types
+        // Import the compile-time safety engine from TypeLayout
         using boost::typelayout::compat::SafetyLevel;
         using boost::typelayout::compat::classify_safety;
+        using boost::typelayout::compat::is_serialization_free_local;
         using boost::typelayout::get_layout_signature;
 
-        // ---- Container element safety (internal helpers) ------------------------
-        // Forward-declarations — real bodies follow after classify_for_xoffset
-        // and classify_raw.
-        //
-        // classify_container_elements<T>():
-        //   Recurses via classify_for_xoffset → Warning is escalated to Risk.
-        //   Used by DefaultPolicy (strict zero-encoding).
-        //
-        // classify_container_elements_raw<T>():
-        //   Recurses via classify_raw → Warning is preserved.
-        //   Used by RelaxedPolicy (allows Warning, only rejects Risk).
-        template<typename T>
-        consteval SafetyLevel classify_container_elements();
-        template<typename T>
-        consteval SafetyLevel classify_container_elements_raw();
-
         // ---- Core: classify a type for XOffset zero-encoding --------------------
-        // Handles the is_safe_leaf container-skip, then delegates to TypeLayout.
-        // Warning is escalated to Risk for zero-encoding (no pointers/unions/vptr).
         //
-        // Additionally, long / unsigned long are explicitly rejected as Risk
-        // because sizeof(long) varies across platforms (LP64=8, LLP64=4).
+        // The ONLY classification entry point. No manual container recursion —
+        // TypeLayout's opaque signature mechanism handles that automatically.
+        //
+        // Flow:
+        //   1. long/unsigned long first-line rejection (platform-variable size)
+        //   2. classify_safety<T>() — TypeLayout's signature-based ground truth
+        //      (handles primitives, structs via reflection, containers via opaque)
+        //   3. Warning→Risk escalation (XOffset zero-encoding policy)
+        //
+        // ⚠ IMPORTANT LIMITATION (see docs/LONG_PORTABILITY_GUIDE.md):
+        // Step 1 ONLY catches "naked" usage of long/unsigned long as the
+        // top-level type T. It CANNOT detect long buried inside a struct's
+        // members, because:
+        //   1. TypeLayout signatures encode long as its fixed-width alias
+        //      (i32 on Windows, i64 on Linux), losing the original type name.
+        //   2. P2996 reflection's type_of() "desugars" member types — on LP64,
+        //      both `int64_t b` and `long c` resolve to the same canonical
+        //      type, making them indistinguishable at compile time.
+        // Therefore, users MUST avoid long in struct members by convention,
+        // or rely on cross-platform CI (TYPELAYOUT_ASSERT_COMPAT) to catch it.
         template<typename T>
         consteval SafetyLevel classify_for_xoffset() {
             using CleanT = std::remove_cv_t<T>;
 
-            // Platform-variable integers: reject long / unsigned long
+            // Step 1: Platform-variable integers — reject long / unsigned long
             // ONLY when they are NOT equivalent to the fixed-width types.
             // On LP64 (Linux/macOS-64), long == int64_t — safe (same binary).
             // On LLP64 (Windows), long is 4 bytes ≠ int64_t — reject.
@@ -1005,78 +1028,21 @@ namespace XOffsetDatastructure {
                           (std::is_same_v<CleanT, unsigned long> && !std::is_same_v<unsigned long, uint64_t>)) {
                 return SafetyLevel::Risk;
             }
-            // Container bypass: skip allocator internals, check element types
-            else if constexpr (is_safe_leaf<CleanT>::value) {
-                return classify_container_elements<CleanT>();
-            } else {
+            // Step 2 + 3: TypeLayout ground truth + XOffset escalation
+            else {
+                // classify_safety<T>() scans the layout signature for markers.
+                // For opaque-registered containers (XVector, XString, etc.),
+                // the signature already embeds element signatures — so this
+                // single call handles both leaf types AND containers.
                 constexpr auto level = classify_safety<CleanT>();
-                // Escalate Warning→Risk: XOffset zero-encoding rejects
-                // pointers, unions, vptr, etc. categorically.
+
+                // XOffset zero-encoding policy: escalate Warning→Risk.
+                // Pointers, unions, vptr are "Warning" in TypeLayout (ok for
+                // same-platform), but XOffset categorically rejects them.
                 if constexpr (level == SafetyLevel::Warning)
                     return SafetyLevel::Risk;
                 else
                     return level;
-            }
-        }
-
-        // ---- classify_raw: like classify_for_xoffset but does NOT escalate -----
-        // Warning→Risk.  Returns the original SafetyLevel from TypeLayout.
-        // Still rejects long/unsigned long as Risk.
-        // Used by RelaxedPolicy which tolerates Warning but rejects Risk.
-        template<typename T>
-        consteval SafetyLevel classify_raw() {
-            using CleanT = std::remove_cv_t<T>;
-            // Platform-variable integers: reject only when NOT equivalent to fixed-width.
-            if constexpr ((std::is_same_v<CleanT, long> && !std::is_same_v<long, int64_t>) ||
-                          (std::is_same_v<CleanT, unsigned long> && !std::is_same_v<unsigned long, uint64_t>)) {
-                return SafetyLevel::Risk;
-            }
-            // Container bypass
-            else if constexpr (is_safe_leaf<CleanT>::value) {
-                return classify_container_elements_raw<CleanT>();
-            } else {
-                return classify_safety<CleanT>();
-            }
-        }
-
-        // ---- classify_container_elements (definition, after classify_for_xoffset) --
-        // Calls classify_for_xoffset<>() recursively (Warning escalated to Risk).
-        template<typename T>
-        consteval SafetyLevel classify_container_elements() {
-            using CleanT = std::remove_cv_t<T>;
-            // Map-like container: worst-of key and value
-            if constexpr (requires { typename CleanT::key_type;
-                                     typename CleanT::mapped_type; }) {
-                constexpr auto k = classify_for_xoffset<typename CleanT::key_type>();
-                constexpr auto v = classify_for_xoffset<typename CleanT::mapped_type>();
-                return static_cast<int>(k) >= static_cast<int>(v) ? k : v;
-            }
-            // Sequence / set container: check value_type
-            else if constexpr (requires { typename CleanT::value_type; }) {
-                return classify_for_xoffset<typename CleanT::value_type>();
-            }
-            // Primitive or non-container leaf
-            else {
-                return SafetyLevel::Safe;
-            }
-        }
-
-        // ---- classify_container_elements_raw (no Warning escalation) -----------
-        // Calls classify_raw<>() recursively (Warning preserved).
-        template<typename T>
-        consteval SafetyLevel classify_container_elements_raw() {
-            using CleanT = std::remove_cv_t<T>;
-            if constexpr (requires { typename CleanT::key_type;
-                                     typename CleanT::mapped_type; }) {
-                constexpr auto k = classify_raw<typename CleanT::key_type>();
-                constexpr auto v = classify_raw<typename CleanT::mapped_type>();
-                return static_cast<int>(k) >= static_cast<int>(v) ? k : v;
-            }
-            else if constexpr (requires { typename CleanT::value_type; }) {
-                return classify_raw<typename CleanT::value_type>();
-            }
-            else {
-                return SafetyLevel::Safe;
             }
         }
 
@@ -1087,11 +1053,18 @@ namespace XOffsetDatastructure {
         //   template<typename T>
         //   static consteval bool accept();
         //
-        // Users can define custom policies; XOffset ships three built-in ones.
+        // Users can define custom policies; XOffset ships two built-in ones.
         // ====================================================================
 
-        /// DefaultPolicy — type must be Safe under XOffset zero-encoding rules.
-        /// (Warning-level types like pointers/unions are rejected.)
+        /// DefaultPolicy — Single-platform Serialization-free check (C2).
+        ///
+        /// Ensures the type passes TypeLayout's safety engine with XOffset's
+        /// domain-specific escalation. A type accepted by this policy is
+        /// "locally serialization-free" — it has no pointers, bitfields,
+        /// wchar_t, or other binary-unstable constructs.
+        ///
+        /// For the full cross-platform guarantee (C1+C2), combine with
+        /// TYPELAYOUT_ASSERT_COMPAT in CI.
         struct DefaultPolicy {
             template<typename T>
             static consteval bool accept() {
@@ -1099,8 +1072,13 @@ namespace XOffsetDatastructure {
             }
         };
 
-        /// StrictPolicy<GoldSignature> — the type's layout signature must match
-        /// a preset "gold" signature at compile time, AND be Safe.
+        /// StrictPolicy<GoldSignature> — Full Serialization-free with layout lock.
+        ///
+        /// Combines DefaultPolicy (C2) with a compile-time layout signature
+        /// match against a "gold" reference string (effectively enforcing C1
+        /// at compile time for a single known target layout).
+        /// This is the strongest single-compilation guarantee available.
+        ///
         /// Usage:
         ///   constexpr auto GOLD = FixedString{"[64-le]record[s:24,a:8]{...}"};
         ///   static_assert(is_xbuffer_compatible<MyStruct, StrictPolicy<GOLD>>());
@@ -1113,25 +1091,15 @@ namespace XOffsetDatastructure {
             }
         };
 
-        /// RelaxedPolicy — allows Warning-level types (e.g. pointers), only
-        /// rejects Risk-level types (bit-fields, wchar_t, long double).
-        /// Useful for local-only shared memory where pointer size is known.
-        ///
-        /// Uses classify_raw<T>() which preserves Warning (no escalation),
-        /// but still categorically rejects long/unsigned long as Risk.
-        /// For containers, recursion uses classify_container_elements_raw.
-        struct RelaxedPolicy {
-            template<typename T>
-            static consteval bool accept() {
-                return classify_raw<T>() != SafetyLevel::Risk;
-            }
-        };
-
         // ====================================================================
         // is_xbuffer_compatible<T, Policy>() — unified compile-time entry point
         //
         // The single gate for all XBuffer type admission decisions.
         // Delegates entirely to Policy::accept<T>().
+        //
+        // With DefaultPolicy, this is equivalent to asking:
+        //   "Is T XOffset-Serialization-free on this platform?"
+        // For the full cross-platform guarantee, combine with Layer 3 (CI).
         // ====================================================================
         template<typename T, typename Policy = DefaultPolicy>
         consteval bool is_xbuffer_compatible() {
@@ -1190,6 +1158,21 @@ namespace XOffsetDatastructure {
         }
     }
     
+    /// is_xbuffer_safe<T> — the public type admission gate.
+    ///
+    /// Conceptually:
+    ///   is_xbuffer_safe<T>::value == true
+    ///   ⟺ T is "XOffset Serialization-free" on this platform:
+    ///        - For leaf types: classify_safety<T>() == SafetyLevel::Safe
+    ///        - For XOffset containers (XVector, XString, etc.): their opaque
+    ///          signature embeds the element signature, so classify_safety
+    ///          automatically recurses into element types.
+    ///        - For structs: all members individually satisfy the above.
+    ///        - Warning→Risk escalation: pointers are rejected (zero-encoding
+    ///          requires cross-address-space safety).
+    ///
+    /// For the full cross-platform Serialization-free guarantee, additionally
+    /// use TYPELAYOUT_ASSERT_COMPAT in CI (Layer 3) to verify layout match.
     template<typename T>
     struct is_xbuffer_safe {
         static constexpr bool value = detail::is_safe_type<T>();
@@ -1946,7 +1929,7 @@ namespace XOffsetDatastructure {
         }
 
         // ================================================================
-        // Migration dispatch (uses is_safe_leaf + migrate_as)
+        // Migration dispatch (uses migrate_as)
         // ================================================================
         template<typename ElementType>
         static auto migrate_element(const ElementType& old_elem, XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
@@ -2083,10 +2066,14 @@ namespace XOffsetDatastructure {
 // ============================================================================
 // Unified Registration Macros — XOFFSET_REGISTER_*
 //
-// Each macro performs THREE registrations in one call:
+// Each macro performs TWO registrations in one call:
 //   1. TypeLayout opaque signature  (boost::typelayout namespace)
-//   2. Safety whitelist entry       (is_safe_leaf specialization)
-//   3. Migration strategy           (migrate_as specialization)
+//      — This is the "Type Set Extension Hook": it tells the TypeLayout
+//        signature engine to skip the container shell and embed the element
+//        signature instead. classify_safety<Container<T>>() then automatically
+//        recurses into T's signature for safety classification.
+//   2. Migration strategy           (migrate_as specialization)
+//      — Used by XCompactor for runtime data migration between buffers.
 //
 // sizeof/alignof are auto-deduced — no manual size/align parameters needed.
 //
@@ -2119,13 +2106,13 @@ struct _XOffset_NS_Sentinel {};
 
 // --- XOFFSET_REGISTER_TYPE(Type, name, strategy) ---
 // For non-template types (e.g., XString).
+// Hook 1: TypeLayout opaque signature — extends the safe type set S
+// Hook 2: Migration strategy — runtime data migration
 #define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_TYPE")                   \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_TYPE_AUTO(XOffsetDatastructure::Type, name)           \
     }}                                                                         \
-    template<> struct XOffsetDatastructure::detail::is_safe_leaf<               \
-        XOffsetDatastructure::Type> : std::true_type {};                       \
     template<> struct XOffsetDatastructure::XCompactor::migrate_as<            \
         XOffsetDatastructure::Type> {                                          \
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
@@ -2134,13 +2121,13 @@ struct _XOffset_NS_Sentinel {};
 
 // --- XOFFSET_REGISTER_CONTAINER(Template, name, strategy) ---
 // For single-type-parameter templates (e.g., XVector<T>, XSet<T>).
+// Hook 1: TypeLayout opaque signature — embeds element signature (recursive safety)
+// Hook 2: Migration strategy — runtime data migration
 #define XOFFSET_REGISTER_CONTAINER(Template, name, strategy)                   \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_CONTAINER")              \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_CONTAINER_AUTO(XOffsetDatastructure::Template, name)  \
     }}                                                                         \
-    template<typename T_> struct XOffsetDatastructure::detail::is_safe_leaf<    \
-        XOffsetDatastructure::Template<T_>> : std::true_type {};               \
     template<typename T_> struct XOffsetDatastructure::XCompactor::migrate_as< \
         XOffsetDatastructure::Template<T_>> {                                  \
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
@@ -2149,14 +2136,13 @@ struct _XOffset_NS_Sentinel {};
 
 // --- XOFFSET_REGISTER_MAP(Template, name, strategy) ---
 // For two-type-parameter templates (e.g., XMap<K,V>).
+// Hook 1: TypeLayout opaque signature — embeds key+value signatures
+// Hook 2: Migration strategy — runtime data migration
 #define XOFFSET_REGISTER_MAP(Template, name, strategy)                         \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MAP")                    \
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_MAP_AUTO(XOffsetDatastructure::Template, name)        \
     }}                                                                         \
-    template<typename K_, typename V_>                                          \
-    struct XOffsetDatastructure::detail::is_safe_leaf<                          \
-        XOffsetDatastructure::Template<K_, V_>> : std::true_type {};           \
     template<typename K_, typename V_>                                          \
     struct XOffsetDatastructure::XCompactor::migrate_as<                        \
         XOffsetDatastructure::Template<K_, V_>> {                              \
