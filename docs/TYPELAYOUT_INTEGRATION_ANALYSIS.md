@@ -366,3 +366,84 @@ external/typelayout → 59f6616d (含 vptr 传播修复)
 | ILP32 (32-bit) | 4 | ❌ `false` | `Risk` |
 
 这是**编译时**决定的——同一份源码在不同平台上会产生不同的安全判定，确保零编码序列化的二进制兼容性。
+
+### 7.5 深度分析：`long` 类型在结构体成员中的不可检测性
+
+> **详细指南**: 参见 `docs/LONG_PORTABILITY_GUIDE.md`
+
+#### 问题核心
+
+`classify_for_xoffset<T>()` 只能检测 **裸 `long` 类型**（即 `T = long`）。当 `long` 嵌入在结构体成员中时，TypeLayout 签名已经将其编码为 `i32`（Windows）或 `i64`（Linux），丢失了原始类型名。
+
+#### P2996 反射探针实验
+
+我们编写了 `tests/test_long_reflection_probe.cpp` 来验证 P2996 能否区分结构体成员中的 `long` 和 `int64_t`。
+
+**运行环境**: Linux x86_64 (LP64), Bloomberg Clang P2996
+
+**完整输出**:
+
+```
+=== P2996 Long Reflection Probe ===
+
+[1] Platform Info:
+  sizeof(long)          = 8
+  sizeof(long long)     = 8
+  sizeof(int32_t)       = 4
+  sizeof(int64_t)       = 8
+  long == int32_t?      0
+  long == int64_t?      1
+  long long == int64_t? 0
+
+[2] Direct Type display_string_of:
+  int32_t:       int32_t
+  int64_t:       int64_t
+  long:          long
+  unsigned long: ulong_t
+  long long:     llong_t
+  int:           int
+
+[3] Reflection Identity (^^type == ^^type):
+  ^^long == ^^int32_t?             0
+  ^^long == ^^int64_t?             0
+  ^^(long long) == ^^int64_t?      0
+  ^^(unsigned long) == ^^uint32_t?  0
+  ^^(unsigned long) == ^^uint64_t?  0
+
+[4] Struct Member Type Inspection (ProbeStruct):
+  a: int
+  b: long
+  c: long
+  d: unsigned long
+  e: long long
+  f: int
+
+[5] Detection Feasibility:
+  Can detect 'long' via display_string_of? 1
+  type_of('long c') == type_of('int64_t b')? 1
+
+[RESULT] Plan B IS FEASIBLE: P2996 display_string_of can distinguish
+         'long' from fixed-width types!
+```
+
+#### 结果解读
+
+| 测试项 | 结果 | 含义 |
+|--------|------|------|
+| `^^long != ^^int64_t` | ✅ 不同 | 直接反射可区分类型 |
+| `display_string_of(^^long)` = `"long"` | ✅ 保留名称 | 直接反射保留源码类型名 |
+| `type_of(int64_t成员)` = `"long"` | ❌ 被 desugar | 成员级别丢失 int64_t 名 |
+| `type_of(long成员)` = `"long"` | — | 与 int64_t 成员结果相同 |
+| `type_of(成员0) == type_of(成员1)` | ✅ 相等 | **无法区分 int64_t 和 long** |
+
+#### 结论
+
+**方案B（P2996 反射检测）不可行**：虽然 `^^long != ^^int64_t`（直接反射可区分），但 `type_of()` 对结构体成员执行了 "desugaring"——在 LP64 上 `int64_t` 是 `long` 的 typedef，编译器将二者归一化为相同的底层类型 `long`。因此：
+
+- ❌ 无法通过反射扫描结构体成员来区分"用户写的 `long`"和"用户写的 `int64_t`"
+- ✅ 只能通过**编码规范**（方案C）约束用户不使用 `long`
+
+**已实施方案C**：
+1. 创建了 `docs/LONG_PORTABILITY_GUIDE.md` 作为用户指南
+2. 在 `classify_for_xoffset` 和 `classify_raw` 中添加了局限性注释
+3. 提供了 `XBUFFER_ASSERT_NO_LONG` 宏作为代码审查辅助
