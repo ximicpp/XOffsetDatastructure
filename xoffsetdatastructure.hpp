@@ -1525,8 +1525,7 @@ namespace XOffsetDatastructure {
         /// Creates the root object and returns an epoch-cached XHandle<T>.
         template<typename T>
         XHandle<T> make_handle() {
-            validate_xbuffer_type<T>();
-            detail::construct_root<T>(*this);
+            make<T>();
             return XHandle<T>(*this);
         }
 
@@ -1638,15 +1637,11 @@ namespace XOffsetDatastructure {
 
         /// Load from serialized data and return a typed buffer.
         static TypedXBuffer load(const std::string& data) {
-            std::vector<char> buffer(data.begin(), data.end());
-            TypedXBuffer xbuf(std::move(buffer));
-            return xbuf;
+            return TypedXBuffer(XBuffer::load(data));
         }
 
         static TypedXBuffer load(const std::vector<char>& data) {
-            std::vector<char> buffer(data);
-            TypedXBuffer xbuf(std::move(buffer));
-            return xbuf;
+            return TypedXBuffer(XBuffer::load(data));
         }
 
         /// Construct from an existing XBuffer (e.g., after compaction).
