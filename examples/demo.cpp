@@ -268,11 +268,11 @@ void demo_type_signatures() {
     print_subsection("Type Signature Display (via boost::typelayout)");
     
     // Display Item definition signature
-    constexpr auto item_sig = boost::typelayout::get_definition_signature<Item>();
+    constexpr auto item_sig = boost::typelayout::get_layout_signature<Item>();
     std::cout << "  Item (definition):\n    " << item_sig.value << "\n\n";
     
     // Display GameData definition signature
-    constexpr auto game_sig = boost::typelayout::get_definition_signature<GameData>();
+    constexpr auto game_sig = boost::typelayout::get_layout_signature<GameData>();
     std::cout << "  GameData (definition):\n    " << game_sig.value << "\n";
     
     print_subsection("Key Advantages over Boost.PFR (next_practical)");
