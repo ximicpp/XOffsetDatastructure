@@ -24,7 +24,7 @@
 
 #### Scenario: Test count matches expectation
 - **WHEN** 构建完成后检查测试数量
-- **THEN** 总测试数为 27（7 个基础测试 + 20 个反射测试）
+- **THEN** 总测试数为 23（7 个基础测试 + 16 个反射测试）
 
 ### Requirement: Merged files stay within size limit
 

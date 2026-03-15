@@ -31,7 +31,7 @@
 ### 测试矩阵
 
 ```
-总测试数: 27
+总测试数: 23
 ├── 基础测试 (7个)
 │   ├── test_basic_types       - 基本类型序列化
 │   ├── test_vector            - 动态数组
@@ -40,15 +40,12 @@
 │   ├── test_compaction        - 内存压缩
 │   ├── test_modify            - 修改操作
 │   └── test_xbuffer_api      - XBuffer API
-└── 反射测试 (20个) - 需要Clang P2996
+└── 反射测试 (16个) - 需要Clang P2996
     ├── test_reflection_core
     ├── test_reflection_advanced
     ├── test_type_signatures
-    ├── test_type_introspection
-    ├── test_reflection_compaction
     ├── test_field_limit_fix
     ├── test_type_safety
-    ├── test_typelayout_integration
     ├── test_enum_support
     ├── test_xstring_direct_assign
     ├── test_xhandle
@@ -59,8 +56,7 @@
     ├── test_complex_nesting
     ├── test_inheritance
     ├── test_adaptive_reservation
-    ├── test_policy_trait
-    └── test_remediation_fixes
+    └── test_policy_trait
 ```
 
 ---
@@ -96,8 +92,8 @@ docker run --rm \
 
 # 3. 验证结果
 # 应该看到:
-#   - Tests Run: 27
-#   - Tests Passed: 27
+#   - Tests Run: 23
+#   - Tests Passed: 23
 #   - Status: ✓ SUCCESS
 ```
 
@@ -151,7 +147,7 @@ docker-compose run --rm xoffset-dev bash -c "cd build && ./bin/Release/test_basi
 3. 测试执行 (5-10分钟)
    - 挂载代码到 /workspace
    - 执行 bash ./build.sh
-   - 运行27个测试
+   - 运行23个测试
 ```
 
 #### 关键配置
@@ -346,10 +342,10 @@ find_clang_p2996() {
     # 验证是否支持 -freflection
 }
 
-# 运行27个测试
-run_test "test_basic_types" 1 27
+# 运行23个测试
+run_test "test_basic_types" 1 23
 # ... (省略)
-run_test "test_remediation_fixes" 27 27
+run_test "test_policy_trait" 23 23
 ```
 
 ### 4. GitHub Actions Workflow
@@ -377,7 +373,7 @@ run_test "test_remediation_fixes" 27 27
 
 ### 开发阶段
 - [ ] 本地先用Docker测试: `docker-compose run --rm xoffset-dev ./build.sh`
-- [ ] 确保27个测试全部通过
+- [ ] 确保23个测试全部通过
 - [ ] 检查代码是否符合AGENTS.md规范
 - [ ] 提交前运行: `git diff` 检查修改
 
