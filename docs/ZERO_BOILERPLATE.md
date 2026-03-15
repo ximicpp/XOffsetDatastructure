@@ -254,7 +254,7 @@ During move (reallocation), each member uses:
 
 ## Test Coverage
 
-30 tests total, including:
+27 tests total, including:
 
 | Test | Scenarios |
 |---|---|

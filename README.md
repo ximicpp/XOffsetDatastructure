@@ -263,10 +263,10 @@ See `docs/MIGRATION_TYPELAYOUT.md` for the full API reference and migration guid
 docker-compose build
 
 # Run tests in container
-docker run -it -v $(pwd):/workspace xoffset-clang-p2996:latest ./build.sh
+docker run -it -v $(pwd):/workspace xoffset-clang-p2996:latest bash ./build.sh
 
 # Or with docker-compose
-docker-compose run --rm xoffset-dev ./build.sh
+docker-compose run --rm xoffset-dev bash ./build.sh
 
 # Interactive development
 docker-compose run --rm xoffset-dev bash

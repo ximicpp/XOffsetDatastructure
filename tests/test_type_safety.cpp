@@ -257,183 +257,34 @@ static_assert(!is_xbuffer_safe<HasMemberFuncPointer>::value,
     "HasMemberFuncPointer should NOT be safe (member function pointer)");
 
 // ============================================================================
-// Runtime Tests
+// Runtime Verification — print static_assert results summary
+// (Runtime tests for basic/container/nested types removed: covered by
+//  test_basic_types, test_vector, test_map_set, test_nested respectively)
 // ============================================================================
-
-void test_basic_types() {
-    std::cout << "\n[Test] Basic Types..." << std::endl;
-    
-    XBuffer xbuf(1024 * 1024);
-    auto* data = xbuf.make<BasicTypes>();
-    
-    data->i32 = -123;
-    data->i64 = -9876543210LL;
-    data->u32 = 456;
-    data->u64 = 9876543210ULL;
-    data->f32 = 3.14f;
-    data->f64 = 2.718281828;
-    data->flag = true;
-    data->ch = 'X';
-    
-    // Verify
-    assert(data->i32 == -123);
-    assert(data->u64 == 9876543210ULL);
-    assert(data->flag == true);
-    assert(data->ch == 'X');
-    
-    std::cout << "  ✓ All basic types work correctly" << std::endl;
-}
-
-void test_container_types() {
-    std::cout << "\n[Test] Container Types..." << std::endl;
-    
-    XBuffer xbuf(1024 * 1024);
-    auto* data = xbuf.make<ContainerTypes>();
-    
-    // Test XString
-    data->name = "TestName";
-    
-    // Test XVector
-    data->numbers.push_back(10);
-    data->numbers.push_back(20);
-    data->numbers.push_back(30);
-    
-    // Test XSet
-    data->unique_ids.insert(100);
-    data->unique_ids.insert(200);
-    data->unique_ids.insert(100);  // Duplicate, should be ignored
-    
-    // Test XMap - use emplace like in demo
-    data->id_to_name.emplace(1, "Alice");
-    data->id_to_name.emplace(2, "Bob");
-    
-    // Verify
-    assert(data->name == "TestName");
-    assert(data->numbers.size() == 3);
-    assert(data->numbers[0] == 10);
-    assert(data->unique_ids.size() == 2);  // Only unique values
-    assert(data->id_to_name.size() == 2);
-    assert(data->id_to_name[1] == "Alice");
-    
-    std::cout << "  ✓ All container types work correctly" << std::endl;
-}
-
-void test_nested_types() {
-    std::cout << "\n[Test] Nested User Types..." << std::endl;
-    
-    XBuffer xbuf(1024 * 1024);
-    auto* player = xbuf.make<Player>();
-    
-    player->name = "Hero";
-    player->level = 99;
-    player->position.x = 10.5f;
-    player->position.y = 20.3f;
-    player->position.z = -5.7f;
-    player->inventory.push_back(1001);
-    player->inventory.push_back(2002);
-    
-    // Verify
-    assert(player->name == "Hero");
-    assert(player->level == 99);
-    assert(player->position.x == 10.5f);
-    assert(player->inventory.size() == 2);
-    assert(player->inventory[1] == 2002);
-    
-    std::cout << "  ✓ Nested user types work correctly" << std::endl;
-}
-
-void test_complex_structure() {
-    std::cout << "\n[Test] Complex Nested Structure..." << std::endl;
-    
-    XBuffer xbuf(1024 * 1024);
-    auto* game = xbuf.make<GameState>();
-    
-    // Setup player
-    game->player.name = "Alice";
-    game->player.level = 50;
-    game->player.position = {1.0f, 2.0f, 3.0f};
-    
-    // Setup inventory
-    Item sword{1, XString("Sword", xbuf.get_segment_manager()), 5.5f};
-    Item shield{2, XString("Shield", xbuf.get_segment_manager()), 8.2f};
-    
-    game->inventory.items.push_back(sword);
-    game->inventory.items.push_back(shield);
-    game->inventory.quick_access.emplace(1, sword);
-    
-    // Setup waypoints
-    game->waypoints.push_back({0.0f, 0.0f, 0.0f});
-    game->waypoints.push_back({10.0f, 20.0f, 30.0f});
-    
-    // Verify
-    assert(game->player.name == "Alice");
-    assert(game->inventory.items.size() == 2);
-    assert(game->inventory.items[0].id == 1);
-    assert(game->inventory.quick_access[1].name == "Sword");
-    assert(game->waypoints.size() == 2);
-    assert(game->waypoints[1].x == 10.0f);
-    
-    std::cout << "  ✓ Complex structure works correctly" << std::endl;
-}
-
-void print_type_safety_info() {
-    std::cout << "\n========================================" << std::endl;
-    std::cout << "Type Safety Validation Results" << std::endl;
-    std::cout << "========================================" << std::endl;
-    
-    std::cout << "\n✅ SAFE TYPES (Allowed):\n";
-    std::cout << "  - BasicTypes:        " << (is_xbuffer_safe<BasicTypes>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - ContainerTypes:    " << (is_xbuffer_safe<ContainerTypes>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - NestedContainers:  " << (is_xbuffer_safe<NestedContainers>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - Point:             " << (is_xbuffer_safe<Point>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - Player:            " << (is_xbuffer_safe<Player>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - GameState:         " << (is_xbuffer_safe<GameState>::value ? "SAFE" : "UNSAFE") << "\n";
-    
-    std::cout << "\n❌ UNSAFE TYPES (Forbidden):\n";
-    std::cout << "  - PolymorphicType:   " << (is_xbuffer_safe<PolymorphicType>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - WithRawPointer:    " << (is_xbuffer_safe<WithRawPointer>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - WithStdString:     " << (is_xbuffer_safe<WithStdString>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - WithStdVector:     " << (is_xbuffer_safe<WithStdVector>::value ? "SAFE" : "UNSAFE") << "\n";
-    std::cout << "  - UnsafeNested:      " << (is_xbuffer_safe<UnsafeNested>::value ? "SAFE" : "UNSAFE")
-              << " (nested polymorphic type correctly detected)" << "\n";
-
-    std::cout << "\n⚖️  PLATFORM-DEPENDENT TYPES (locally safe on all platforms):\n";
-    std::cout << "  - HasLong:           " << (is_xbuffer_safe<HasLong>::value ? "SAFE" : "UNSAFE")
-              << " (long: sizeof=" << sizeof(long) << ", locally safe)\n";
-    std::cout << "  - HasUnsignedLong:   " << (is_xbuffer_safe<HasUnsignedLong>::value ? "SAFE" : "UNSAFE")
-              << " (unsigned long: sizeof=" << sizeof(unsigned long) << ", locally safe)\n";
-    std::cout << "  - HasUint64:         " << (is_xbuffer_safe<HasUint64>::value ? "SAFE" : "UNSAFE") << " (always safe)\n";
-
-    std::cout << "\n🔬 BOUNDARY TYPES (Audit P5):\n";
-    std::cout << "  - HasNullptr:        " << (is_xbuffer_safe<HasNullptr>::value ? "SAFE" : "UNSAFE")
-              << " (nullptr_t accepted: all-zeros cross-platform)\n";
-    std::cout << "  - HasByte:           " << (is_xbuffer_safe<HasByte>::value ? "SAFE" : "UNSAFE")
-              << " (std::byte is safe scalar)\n";
-    std::cout << "  - HasMemberPointer:  " << (is_xbuffer_safe<HasMemberPointer>::value ? "SAFE" : "UNSAFE")
-              << " (member pointer rejected)\n";
-    std::cout << "  - HasMemberFuncPtr:  " << (is_xbuffer_safe<HasMemberFuncPointer>::value ? "SAFE" : "UNSAFE")
-              << " (member function pointer rejected)\n";
-
-    std::cout << "\n========================================" << std::endl;
-}
 
 int main() {
     std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║  XBuffer Type Safety Comprehensive Test  ║" << std::endl;
+    std::cout << "║  XBuffer Type Safety Compile-Time Test   ║" << std::endl;
     std::cout << "╚══════════════════════════════════════════╝" << std::endl;
-    
-    // Compile-time validation summary
-    print_type_safety_info();
-    
-    // Runtime tests
-    test_basic_types();
-    test_container_types();
-    test_nested_types();
-    test_complex_structure();
-    
+
+    std::cout << "\n✅ SAFE TYPES (static_assert passed):\n";
+    std::cout << "  - BasicTypes\n";
+    std::cout << "  - ContainerTypes\n";
+    std::cout << "  - NestedContainers\n";
+    std::cout << "  - Point / Player / GameState\n";
+    std::cout << "  - HasLong / HasUnsignedLong / HasUint64\n";
+    std::cout << "  - HasNullptr / HasByte\n";
+
+    std::cout << "\n❌ UNSAFE TYPES (static_assert passed):\n";
+    std::cout << "  - PolymorphicType (virtual function)\n";
+    std::cout << "  - WithRawPointer (raw pointer)\n";
+    std::cout << "  - WithStdString / WithStdVector (std containers)\n";
+    std::cout << "  - UnsafeNested (nested polymorphic)\n";
+    std::cout << "  - HasMemberPointer / HasMemberFuncPointer\n";
+
     std::cout << "\n╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║        ✓ ALL TESTS PASSED!               ║" << std::endl;
+    std::cout << "║    ✓ ALL COMPILE-TIME CHECKS PASSED!     ║" << std::endl;
     std::cout << "╚══════════════════════════════════════════╝" << std::endl;
-    
+
     return 0;
 }

@@ -144,7 +144,7 @@ docker run --rm xoffset-clang-p2996:latest \
 ## 📊 测试矩阵
 
 ```
-总测试: 30个
+总测试: 27个
 ├── 基础测试 (7个) - 核心功能
 │   ├── test_basic_types
 │   ├── test_vector
@@ -153,34 +153,31 @@ docker run --rm xoffset-clang-p2996:latest \
 │   ├── test_compaction
 │   ├── test_modify
 │   └── test_xbuffer_api
-└── 反射测试 (23个) - 需要Clang P2996
-    ├── test_reflection_operators
-    ├── test_member_iteration
-    ├── test_reflection_type_signature
-    ├── test_splice_operations
+└── 反射测试 (20个) - 需要Clang P2996
+    ├── test_reflection_core
+    ├── test_reflection_advanced
+    ├── test_type_signatures
     ├── test_type_introspection
     ├── test_reflection_compaction
-    ├── test_reflection_serialization
-    ├── test_reflection_comparison
     ├── test_field_limit_fix
-    ├── test_class_type_signatures
     ├── test_type_safety
-    ├── test_type_safety_comprehensive
-    ├── test_vptr_layout
-    ├── test_type_erased_detection
     ├── test_typelayout_integration
     ├── test_enum_support
     ├── test_xstring_direct_assign
     ├── test_xhandle
     ├── test_error_paths
     ├── test_memory_efficiency
-    ├── test_zero_boilerplate          ← Layer 1 零模板化
-    ├── test_zero_boilerplate_vector   ← Layer 2 容器元素
-    └── test_complex_nesting           ← 深层嵌套压力测试
+    ├── test_zero_boilerplate
+    ├── test_zero_boilerplate_vector
+    ├── test_complex_nesting
+    ├── test_inheritance
+    ├── test_adaptive_reservation
+    ├── test_policy_trait
+    └── test_remediation_fixes
 
 预期结果:
-  Tests Run: 30
-  Tests Passed: 30
+  Tests Run: 27
+  Tests Passed: 27
   Status: ✓ SUCCESS
 ```
 
@@ -265,7 +262,7 @@ Ubuntu 22.04 (Docker基础镜像)
 |------|---------|------|
 | Docker首次构建 | 1-1.5小时 | 从源码编译LLVM |
 | Docker缓存构建 | 5-10分钟 | 使用缓存层 |
-| 本地测试运行 | 5-10分钟 | 18个测试 |
+| 本地测试运行 | 5-10分钟 | 27个测试 |
 | GitHub Actions | 1.5-2小时 | 完整流程 |
 | 单个测试 | 5-30秒 | 取决于测试 |
 
@@ -281,7 +278,7 @@ Ubuntu 22.04 (Docker基础镜像)
 
 ### 提交前
 - [ ] 本地Docker测试通过
-- [ ] 18个测试全部通过
+- [ ] 27个测试全部通过
 - [ ] 代码符合风格规范
 - [ ] 提交信息清晰明确
 

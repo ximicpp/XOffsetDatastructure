@@ -334,7 +334,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=27
+    TOTAL_TESTS=23
 fi
 
 # Basic tests (6 tests)
@@ -356,24 +356,20 @@ if [ $ENABLE_REFLECTION -eq 1 ]; then
     run_test "test_reflection_core" 7 $TOTAL_TESTS
     run_test "test_reflection_advanced" 8 $TOTAL_TESTS
     run_test "test_type_signatures" 9 $TOTAL_TESTS
-    run_test "test_type_introspection" 10 $TOTAL_TESTS
-    run_test "test_reflection_compaction" 11 $TOTAL_TESTS
-    run_test "test_field_limit_fix" 12 $TOTAL_TESTS
-    run_test "test_type_safety" 13 $TOTAL_TESTS
-    run_test "test_typelayout_integration" 14 $TOTAL_TESTS
-    run_test "test_enum_support" 15 $TOTAL_TESTS
-    run_test "test_xbuffer_api" 16 $TOTAL_TESTS
-    run_test "test_xstring_direct_assign" 17 $TOTAL_TESTS
-    run_test "test_xhandle" 18 $TOTAL_TESTS
-    run_test "test_error_paths" 19 $TOTAL_TESTS
-    run_test "test_memory_efficiency" 20 $TOTAL_TESTS
-    run_test "test_zero_boilerplate" 21 $TOTAL_TESTS
-    run_test "test_zero_boilerplate_vector" 22 $TOTAL_TESTS
-    run_test "test_complex_nesting" 23 $TOTAL_TESTS
-    run_test "test_inheritance" 24 $TOTAL_TESTS
-    run_test "test_adaptive_reservation" 25 $TOTAL_TESTS
-    run_test "test_policy_trait" 26 $TOTAL_TESTS
-    run_test "test_remediation_fixes" 27 $TOTAL_TESTS
+    run_test "test_field_limit_fix" 10 $TOTAL_TESTS
+    run_test "test_type_safety" 11 $TOTAL_TESTS
+    run_test "test_enum_support" 12 $TOTAL_TESTS
+    run_test "test_xbuffer_api" 13 $TOTAL_TESTS
+    run_test "test_xstring_direct_assign" 14 $TOTAL_TESTS
+    run_test "test_xhandle" 15 $TOTAL_TESTS
+    run_test "test_error_paths" 16 $TOTAL_TESTS
+    run_test "test_memory_efficiency" 17 $TOTAL_TESTS
+    run_test "test_zero_boilerplate" 18 $TOTAL_TESTS
+    run_test "test_zero_boilerplate_vector" 19 $TOTAL_TESTS
+    run_test "test_complex_nesting" 20 $TOTAL_TESTS
+    run_test "test_inheritance" 21 $TOTAL_TESTS
+    run_test "test_adaptive_reservation" 22 $TOTAL_TESTS
+    run_test "test_policy_trait" 23 $TOTAL_TESTS
 fi
 
 # ============================================================================

@@ -171,62 +171,8 @@ bool test_game_state_zero_boilerplate() {
     return true;
 }
 
-bool test_has_root_and_handle() {
-    fprintf(stderr, "\n[TEST] has_root<T>() and XHandle<T> with zero-boilerplate\n");
-    
-    XBuffer xbuf(4096);
-    
-    assert(!xbuf.has_root<SimplePlayer>());
-    
-    auto* p = xbuf.make<SimplePlayer>();
-    assert(xbuf.has_root<SimplePlayer>());
-    
-    auto& ref = xbuf.root<SimplePlayer>();
-    ref.id = 42;
-    assert(p->id == 42);
-    
-    // XHandle
-    auto h = xbuf.handle<SimplePlayer>();
-    assert(h.get() != nullptr);
-    assert(h->id == 42);
-    
-    fprintf(stderr, "  [PASS] has_root and XHandle work!\n");
-    return true;
-}
-
-bool test_make_handle() {
-    fprintf(stderr, "\n[TEST] make_handle<T>() with zero-boilerplate\n");
-    
-    XBuffer xbuf(4096);
-    auto h = xbuf.make_handle<SimplePlayer>();
-    
-    h->id = 99;
-    h->name = "Bob";
-    
-    assert(h->id == 99);
-    assert(h->name == "Bob");
-    
-    fprintf(stderr, "  [PASS] make_handle works!\n");
-    return true;
-}
-
-bool test_duplicate_make_throws() {
-    fprintf(stderr, "\n[TEST] Duplicate make<T>() throws\n");
-    
-    XBuffer xbuf(4096);
-    xbuf.make<SimplePlayer>();
-    
-    bool caught = false;
-    try {
-        xbuf.make<SimplePlayer>();
-    } catch (const boost::interprocess::interprocess_exception&) {
-        caught = true;
-    }
-    assert(caught);
-    
-    fprintf(stderr, "  [PASS] Duplicate make correctly throws!\n");
-    return true;
-}
+// test_has_root_and_handle, test_make_handle, test_duplicate_make_throws
+// removed: covered by test_xhandle.cpp and test_error_paths.cpp
 
 bool test_backward_compat_legacy() {
     fprintf(stderr, "\n[TEST] Backward compatibility with legacy constructor types\n");
@@ -296,9 +242,6 @@ int main() {
     run("POD", test_pod_zero_boilerplate);
     run("SimplePlayer", test_simple_player_zero_boilerplate);
     run("GameState", test_game_state_zero_boilerplate);
-    run("has_root+XHandle", test_has_root_and_handle);
-    run("make_handle", test_make_handle);
-    run("duplicate_make", test_duplicate_make_throws);
     run("backward_compat", test_backward_compat_legacy);
     run("grow_after_make", test_grow_after_make);
     

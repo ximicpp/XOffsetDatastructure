@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include <iostream>
+#include <iomanip>
 #include "../xoffsetdatastructure.hpp"
 #include "player.hpp"
 

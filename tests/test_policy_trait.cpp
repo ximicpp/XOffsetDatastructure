@@ -265,11 +265,80 @@ bool test_classify_levels() {
 }
 
 // ============================================================================
+// Test 6: C2 — Nested container recursive safety
+// (Merged from test_remediation_fixes.cpp)
+// ============================================================================
+
+struct SafeFlat {
+    int32_t  x;
+    float    y;
+    double   z;
+};
+
+bool test_c2_nested_container_recursion() {
+    std::cout << "\n[TEST] C2: Nested container recursive safety\n";
+    std::cout << std::string(55, '-') << "\n";
+
+    // Single-level safe/unsafe container
+    static_assert(is_xbuffer_compatible<XVector<int32_t>>(), "XVector<int32_t> must pass");
+    static_assert(is_xbuffer_compatible<XVector<SafeFlat>>(), "XVector<SafeFlat> must pass");
+    static_assert(!is_xbuffer_compatible<XVector<HasPointer>>(), "XVector<HasPointer> must be rejected");
+    std::cout << "  Single-level containers... [OK]\n";
+
+    // Nested safe/unsafe container — THE KEY C2 FIX
+    static_assert(is_xbuffer_compatible<XVector<XVector<int32_t>>>(), "nested safe must pass");
+    static_assert(!is_xbuffer_compatible<XVector<XVector<HasPointer>>>(), "nested unsafe must fail");
+    std::cout << "  Nested containers (C2 fix)... [OK]\n";
+
+    // Triple-nested
+    static_assert(!is_xbuffer_compatible<XVector<XVector<XVector<HasPointer>>>>(), "triple-nested unsafe must fail");
+    static_assert(is_xbuffer_compatible<XVector<XVector<XVector<int32_t>>>>(), "triple-nested safe must pass");
+    std::cout << "  Triple-nested containers... [OK]\n";
+
+    // Map containers
+    static_assert(is_xbuffer_compatible<XMap<int32_t, SafeFlat>>(), "safe map must pass");
+    static_assert(!is_xbuffer_compatible<XMap<int32_t, HasPointer>>(), "unsafe map value must fail");
+    static_assert(!is_xbuffer_compatible<XMap<HasPointer, int32_t>>(), "unsafe map key must fail");
+    std::cout << "  Map containers... [OK]\n";
+
+    // Container holding polymorphic type — C1+C2 interaction
+    static_assert(!is_xbuffer_compatible<XVector<Polymorphic>>(), "XVector<Polymorphic> must fail");
+    static_assert(!is_xbuffer_compatible<XMap<int32_t, Polymorphic>>(), "XMap with poly value must fail");
+    std::cout << "  Container with polymorphic element rejected... [OK]\n";
+
+    return true;
+}
+
+// ============================================================================
+// Test 7: diagnose_unsafe_members with Policy parameter
+// (Merged from test_remediation_fixes.cpp — L2 fix)
+// ============================================================================
+
+// Custom policy: accepts all types (for testing diagnose API)
+struct AcceptAllPolicy {
+    template<typename T>
+    static consteval bool accept() { return true; }
+};
+
+bool test_diagnose_with_policy() {
+    std::cout << "\n[TEST] diagnose_unsafe_members accepts Policy\n";
+    std::cout << std::string(55, '-') << "\n";
+
+    diagnose_unsafe_members<SafeFlat, DefaultPolicy>();
+    std::cout << "  diagnose<SafeFlat, Default> compiles... [OK]\n";
+
+    diagnose_unsafe_members<HasPointer, AcceptAllPolicy>();
+    std::cout << "  diagnose<HasPointer, AcceptAllPolicy> compiles... [OK]\n";
+
+    return true;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 int main() {
     std::cout << "\n========================================\n";
-    std::cout << "  Policy Trait & is_xbuffer_compatible\n";
+    std::cout << "  Policy Trait & Safety Tests\n";
     std::cout << "========================================\n";
 
     bool all_passed = true;
@@ -279,10 +348,12 @@ int main() {
     all_passed &= test_custom_hook();
     all_passed &= test_backward_compat();
     all_passed &= test_classify_levels();
+    all_passed &= test_c2_nested_container_recursion();
+    all_passed &= test_diagnose_with_policy();
 
     std::cout << "\n========================================\n";
     if (all_passed) {
-        std::cout << "  [PASS] All Policy Trait tests passed!\n";
+        std::cout << "  [PASS] All Policy & Safety tests passed!\n";
     } else {
         std::cout << "  [FAIL] Some tests failed.\n";
     }

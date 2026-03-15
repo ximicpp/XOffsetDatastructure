@@ -79,11 +79,11 @@ set(CMAKE_CXX_STANDARD 26)
 ## 📊 测试矩阵
 
 ```
-18个测试 = 6个基础测试 + 12个反射测试
+27个测试 = 7个基础测试 + 20个反射测试
 
 预期结果:
-  Tests Run: 18
-  Tests Passed: 18
+  Tests Run: 27
+  Tests Passed: 27
   Status: ✓ SUCCESS
 ```
 

@@ -26,10 +26,7 @@
 
 #include <experimental/meta>
 #include <type_traits>
-#include <iostream>
-#include <iomanip>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <cstring>
 
@@ -61,10 +58,6 @@
 // field recursively, so platform validation is implicit in the signature system.
 // Only 64-bit little-endian is supported (enforced by preprocessor checks below).
 // ============================================================================
-namespace XOffsetDatastructure {
-
-} // namespace XOffsetDatastructure
-
 // ============================================================================
 // Platform validation: 64-bit little-endian only
 // All other layout properties (sizeof, alignof for each type) are captured
@@ -369,50 +362,31 @@ namespace XOffsetDatastructure {
     using XBufferCoreSeqFit = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
 
     template<typename T>
-    concept HasIterator = requires(T t) {
+    concept SequentialContainer = requires(T t) {
         { t.begin() } -> std::input_or_output_iterator;
         { t.end() } -> std::input_or_output_iterator;
-    };
-    
-    template<typename T>
-    concept HasValueType = requires {
         typename T::value_type;
+        { t.emplace_back(std::move(std::declval<typename T::value_type>())) };
     };
-    
-    template<typename T>
-    concept HasMappedType = requires {
-        typename T::mapped_type;
-    };
-    
-    template<typename T>
-    concept HasKeyType = requires {
-        typename T::key_type;
-    };
-    
-    template<typename T>
-    concept SequentialContainer = HasIterator<T> && HasValueType<T> && 
-        requires(T t, typename T::value_type v) {
-            { t.emplace_back(std::move(v)) };
-        };
-    
-    template<typename T>
-    concept SetLikeContainer = HasIterator<T> && HasValueType<T> && HasKeyType<T> && 
-        !HasMappedType<T> &&
-        requires(T t, typename T::value_type v) {
-            { t.emplace(std::move(v)) };
-        };
-    
-    template<typename T>
-    concept MapLikeContainer = HasIterator<T> && HasKeyType<T> && HasMappedType<T> &&
-        requires(T t, typename T::key_type k, typename T::mapped_type v) {
-            { t.emplace(std::move(k), std::move(v)) };
-        };
-    
-    template<typename T>
-    concept SupportedContainer = SequentialContainer<T> || SetLikeContainer<T> || MapLikeContainer<T>;
 
-    template <typename T>
-    using XOffsetPtr = boost::interprocess::offset_ptr<T>;
+    template<typename T>
+    concept SetLikeContainer = requires(T t) {
+        { t.begin() } -> std::input_or_output_iterator;
+        { t.end() } -> std::input_or_output_iterator;
+        typename T::value_type;
+        typename T::key_type;
+        { t.emplace(std::move(std::declval<typename T::value_type>())) };
+    } && !requires { typename T::mapped_type; };
+
+    template<typename T>
+    concept MapLikeContainer = requires(T t) {
+        { t.begin() } -> std::input_or_output_iterator;
+        { t.end() } -> std::input_or_output_iterator;
+        typename T::key_type;
+        typename T::mapped_type;
+        { t.emplace(std::move(std::declval<typename T::key_type>()),
+                     std::move(std::declval<typename T::mapped_type>())) };
+    };
 
     // ========================================================================
     // Container Implementation Details (detail namespace)
@@ -770,12 +744,6 @@ namespace XOffsetDatastructure {
             return stats;
         }
 
-        static void print(XBufferCore& xbuf) {
-            MemoryStats stats = memory_stats(xbuf);
-            std::cout << "XBufferCore: " << stats.used_size << "/" << stats.total_size
-                      << " bytes (" << std::fixed << std::setprecision(1) 
-                      << stats.usage_percent() << "% used)" << std::endl;
-        }
     };
 
     // Forward declarations for safety gate and validation
@@ -972,7 +940,7 @@ namespace XOffsetDatastructure {
                 return "UNSAFE: Type has virtual functions (polymorphic) — contains vtable pointer";
             }
             else if constexpr (std::is_pointer_v<CleanT>) {
-                return "UNSAFE: Raw pointer (use XOffsetPtr<T> with opt-in, see docs)";
+                return "UNSAFE: Raw pointer (use offset_ptr<T> with opt-in, see docs)";
             }
             else if constexpr (std::is_reference_v<CleanT>) {
                 return "UNSAFE: Reference type not allowed";
