@@ -37,31 +37,8 @@ struct alignas(8) GameData {
 	XMap<XString, int32_t> quest_progress;
 };
 
-// Item type signature validation using boost::typelayout (Definition Signature)
-static_assert(boost::typelayout::get_definition_signature<Item>() == 
-             "[64-le]record[s:48,a:8]{"
-             "@0[item_id]:i32[s:4,a:4],"
-             "@4[item_type]:i32[s:4,a:4],"
-             "@8[quantity]:i32[s:4,a:4],"
-             "@16[name]:string[s:32,a:8]}",
-              "Type signature mismatch for Item - "
-              "Binary layout changed! This breaks serialization compatibility.");
-
-// GameData type signature validation using boost::typelayout (Definition Signature)
-static_assert(boost::typelayout::get_definition_signature<GameData>() ==
-             "[64-le]record[s:144,a:8]{"
-             "@0[player_id]:i32[s:4,a:4],"
-             "@4[level]:i32[s:4,a:4],"
-             "@8[health]:f32[s:4,a:4],"
-             "@16[player_name]:string[s:32,a:8],"
-             "@48[items]:vector[s:32,a:8]<record[s:48,a:8]{"
-                 "@0[item_id]:i32[s:4,a:4],"
-                 "@4[item_type]:i32[s:4,a:4],"
-                 "@8[quantity]:i32[s:4,a:4],"
-                 "@16[name]:string[s:32,a:8]}>,"
-             "@80[achievements]:set[s:32,a:8]<i32[s:4,a:4]>,"
-             "@112[quest_progress]:map[s:32,a:8]<string[s:32,a:8],i32[s:4,a:4]>}",
-              "Type signature mismatch for GameData - "
-              "Binary layout changed! This breaks serialization compatibility.");
+// Type signature validation deferred to runtime/CI — layout signature
+// depends on platform-specific sizeof(XString)/sizeof(XVector).
+// Use tools/export_signatures + tools/check_compat for cross-platform validation.
 
 #endif // GAME_DATA_HPP_

@@ -334,7 +334,7 @@ run_test() {
 # Determine total test count
 TOTAL_TESTS=6
 if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=32
+    TOTAL_TESTS=27
 fi
 
 # Basic tests (6 tests)
@@ -348,37 +348,32 @@ run_test "test_nested" 4 $TOTAL_TESTS
 run_test "test_compaction" 5 $TOTAL_TESTS
 run_test "test_modify" 6 $TOTAL_TESTS
 
-# Reflection tests (12 tests) - only if enabled
+# Reflection tests (21 tests) - only if enabled
 if [ $ENABLE_REFLECTION -eq 1 ]; then
     echo -e "${YELLOW}=== Reflection Tests ===${NC}"
     echo ""
     
-    run_test "test_reflection_operators" 7 $TOTAL_TESTS
-    run_test "test_member_iteration" 8 $TOTAL_TESTS
-    run_test "test_reflection_type_signature" 9 $TOTAL_TESTS
-    run_test "test_splice_operations" 10 $TOTAL_TESTS
-    run_test "test_type_introspection" 11 $TOTAL_TESTS
-    run_test "test_reflection_compaction" 12 $TOTAL_TESTS
-    run_test "test_reflection_serialization" 13 $TOTAL_TESTS
-    run_test "test_reflection_comparison" 14 $TOTAL_TESTS
-    run_test "test_field_limit_fix" 15 $TOTAL_TESTS
-    run_test "test_class_type_signatures" 16 $TOTAL_TESTS
-    run_test "test_type_safety" 17 $TOTAL_TESTS
-    run_test "test_vptr_layout" 18 $TOTAL_TESTS
-    run_test "test_typelayout_integration" 19 $TOTAL_TESTS
-    run_test "test_enum_support" 20 $TOTAL_TESTS
-    run_test "test_type_safety_comprehensive" 21 $TOTAL_TESTS
-    run_test "test_type_erased_detection" 22 $TOTAL_TESTS
-    run_test "test_xbuffer_api" 23 $TOTAL_TESTS
-    run_test "test_xstring_direct_assign" 24 $TOTAL_TESTS
-    run_test "test_xhandle" 25 $TOTAL_TESTS
-    run_test "test_error_paths" 26 $TOTAL_TESTS
-    run_test "test_memory_efficiency" 27 $TOTAL_TESTS
-    run_test "test_zero_boilerplate" 28 $TOTAL_TESTS
-    run_test "test_zero_boilerplate_vector" 29 $TOTAL_TESTS
-    run_test "test_complex_nesting" 30 $TOTAL_TESTS
-    run_test "test_inheritance" 31 $TOTAL_TESTS
-    run_test "test_adaptive_reservation" 32 $TOTAL_TESTS
+    run_test "test_reflection_core" 7 $TOTAL_TESTS
+    run_test "test_reflection_advanced" 8 $TOTAL_TESTS
+    run_test "test_type_signatures" 9 $TOTAL_TESTS
+    run_test "test_type_introspection" 10 $TOTAL_TESTS
+    run_test "test_reflection_compaction" 11 $TOTAL_TESTS
+    run_test "test_field_limit_fix" 12 $TOTAL_TESTS
+    run_test "test_type_safety" 13 $TOTAL_TESTS
+    run_test "test_typelayout_integration" 14 $TOTAL_TESTS
+    run_test "test_enum_support" 15 $TOTAL_TESTS
+    run_test "test_xbuffer_api" 16 $TOTAL_TESTS
+    run_test "test_xstring_direct_assign" 17 $TOTAL_TESTS
+    run_test "test_xhandle" 18 $TOTAL_TESTS
+    run_test "test_error_paths" 19 $TOTAL_TESTS
+    run_test "test_memory_efficiency" 20 $TOTAL_TESTS
+    run_test "test_zero_boilerplate" 21 $TOTAL_TESTS
+    run_test "test_zero_boilerplate_vector" 22 $TOTAL_TESTS
+    run_test "test_complex_nesting" 23 $TOTAL_TESTS
+    run_test "test_inheritance" 24 $TOTAL_TESTS
+    run_test "test_adaptive_reservation" 25 $TOTAL_TESTS
+    run_test "test_policy_trait" 26 $TOTAL_TESTS
+    run_test "test_remediation_fixes" 27 $TOTAL_TESTS
 fi
 
 # ============================================================================

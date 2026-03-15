@@ -114,7 +114,7 @@ int main() {
     // 9. Show type signature (compile-time calculated via boost::typelayout)
     std::cout << "\n9. Type Signature (compile-time, zero runtime cost):\n";
     std::cout << "   Player definition signature:\n   ";
-    constexpr auto sig = boost::typelayout::get_definition_signature<Player>();
+    constexpr auto sig = boost::typelayout::get_layout_signature<Player>();
     std::cout << sig.value;
     std::cout << "\n\n   Explanation:\n";
     std::cout << "   - [64-le]: 64-bit little-endian platform\n";
