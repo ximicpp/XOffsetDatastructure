@@ -54,6 +54,6 @@ docker run --rm -v $(pwd):/workspace -w /workspace xoffset-clang-p2996:latest ba
 ## Expected Output
 ```
 [BUILD] All tests passed!
-[BUILD] 32/32 tests PASSED
+[BUILD] 27/27 tests PASSED
 [SIG] Signature export complete
 ```

@@ -346,3 +346,122 @@ for (auto member : members) {
 - **Memory alignment issues**: Check `is_xbuffer_safe<T>::value` validation
 - **Platform compatibility**: Ensure 64-bit little-endian architecture
 - **Docker permission issues**: Add user to docker group: `sudo usermod -aG docker $USER`
+
+## Agent Roles
+
+This repository supports multi-agent development. Each agent session can be assigned
+a role that defines its file scope, behavioral rules, and coordination protocol.
+
+**How to use**: Start a new session with a role prompt like:
+> "你是 test agent，读 AGENTS.md 的 `Role: tests` 分区，检查 openspec/changes 中标有 `[needs-tests]` 的变更。"
+
+### Role: core
+
+**核心代码开发 — 库的架构、API、和安全模型。**
+
+**Scope (primary files):**
+- `xoffsetdatastructure.hpp` — 主库头文件
+- `external/typelayout` — TypeLayout 子模块集成
+- `examples/*.hpp` — 数据结构定义（`player.hpp`, `game_data.hpp`）
+
+**Rules:**
+- API 变更必须创建 `openspec change`，在 tasks.md 中标注 `[needs-tests]` `[needs-docs]`
+- 每次修改核心代码后必须 Docker 构建验证（27/27 测试通过）
+- TypeLayout 子模块升级需先 `git fetch origin` 检查 main 分支最新
+- 不直接修改 `tests/*.cpp`（除非是修复因 API 变更导致的编译错误）
+- 不直接修改 `docs/` 或 `README.md`（由 docs agent 负责）
+
+**Coordination output:**
+- `openspec/changes/<name>/proposal.md` — 描述变更内容
+- `openspec/changes/<name>/tasks.md` — 标注 `[needs-tests]` `[needs-docs]` 任务
+
+### Role: tests
+
+**测试用例开发 — 验证库功能、类型安全、和反射能力。**
+
+**Scope (primary files):**
+- `tests/*.cpp` — 所有测试源文件
+- `tests/CMakeLists.txt` — 测试注册
+- `tests/README.md` — 测试文档
+- `build.sh` — 仅测试列表部分（`run_test` 调用）
+
+**Rules:**
+- 启动时检查 `openspec/changes/*/tasks.md` 中标有 `[needs-tests]` 的未完成任务
+- 新测试文件必须注册到 `tests/CMakeLists.txt` 的 `REFLECTION_TESTS` 列表
+- 新测试必须同步更新 `build.sh` 中的 `run_test` 调用
+- 合并后的测试文件不超过 300 行
+- 每个测试文件 header 注释说明 Purpose
+- 修改后必须 Docker 构建验证（全部测试通过）
+- 不修改 `xoffsetdatastructure.hpp`（如发现 bug，创建 openspec change 交给 core agent）
+
+**Coordination input:**
+```bash
+# 查找待处理的测试任务
+grep -r "\[needs-tests\]" openspec/changes/*/tasks.md 2>/dev/null
+```
+
+**Test suite summary (27 tests):**
+- Basic tests: 7 (test_basic_types, test_vector, test_map_set, test_nested, test_compaction, test_modify, test_xbuffer_api)
+- Reflection tests: 20 (see tests/README.md for full list)
+
+### Role: docs
+
+**文档维护 — 保持文档与代码实现一致。**
+
+**Scope (primary files):**
+- `docs/` — 技术文档目录
+- `README.md` — 项目根 README
+- `tests/README.md` — 测试列表文档
+- `examples/*.cpp` — 示例代码（`demo.cpp`, `helloworld.cpp`）
+- `AGENTS.md` — 本文件（Agent 指南更新）
+
+**Rules:**
+- 启动时检查 `openspec/changes/*/tasks.md` 中标有 `[needs-docs]` 的未完成任务
+- 保持 `tests/README.md` 中的测试列表与 `tests/CMakeLists.txt` 一致
+- 保持 `docs/technical_overview.md` 与实际架构一致
+- 示例代码必须可编译（但不需要 Docker 构建验证全套测试）
+- 不修改 `xoffsetdatastructure.hpp` 或 `tests/*.cpp`
+
+**Coordination input:**
+```bash
+# 查找待处理的文档任务
+grep -r "\[needs-docs\]" openspec/changes/*/tasks.md 2>/dev/null
+```
+
+### Cross-Agent Coordination
+
+**标签约定** — 在 `openspec/changes/<name>/tasks.md` 中使用：
+
+| 标签 | 含义 | 谁处理 |
+|------|------|--------|
+| `[core]` | 核心代码任务 | core agent |
+| `[tests]` | 测试开发任务 | tests agent |
+| `[docs]` | 文档更新任务 | docs agent |
+| `[needs-tests]` | 此核心变更需要测试跟进 | tests agent 认领 |
+| `[needs-docs]` | 此变更需要文档跟进 | docs agent 认领 |
+
+**协作流程:**
+
+```
+1. core agent 完成 API 变更
+   → commit + push
+   → tasks.md 标注 [needs-tests] [needs-docs]
+
+2. tests agent 启动（新会话）
+   → git pull
+   → grep "[needs-tests]" openspec/changes/*/tasks.md
+   → 创建/更新测试
+   → Docker 验证
+   → commit + push
+   → 标记 [needs-tests] 任务为 [x]
+
+3. docs agent 启动（新会话）
+   → git pull
+   → grep "[needs-docs]" openspec/changes/*/tasks.md
+   → 更新文档
+   → commit + push
+   → 标记 [needs-docs] 任务为 [x]
+```
+
+**冲突解决**: 如果多个 Agent 同时修改同一文件，由人类（你）仲裁。
+Agent 不应自行解决 git merge 冲突。
