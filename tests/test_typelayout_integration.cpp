@@ -1,7 +1,7 @@
 // ============================================================================
 // Test: TypeLayout Integration
 // Purpose: Verify boost::typelayout works correctly with XOffsetDatastructure
-//          Tests both Definition and Layout signature layers.
+//          Tests layout signatures, platform prefix, containers, and classify.
 // ============================================================================
 
 #include "../xoffsetdatastructure.hpp"
@@ -59,65 +59,64 @@ struct Derived : public Base {
 };
 
 // ============================================================================
-// Test 1: Definition Signatures
+// Test 1: Layout Signature Basics
 // ============================================================================
 
-bool test_definition_signatures() {
-    std::cout << "\n[Test 1] Definition Signatures\n";
+bool test_layout_signature_basics() {
+    std::cout << "\n[Test 1] Layout Signature Basics\n";
     std::cout << std::string(50, '-') << "\n";
 
-    constexpr auto sig_point = get_definition_signature<Point>();
-    constexpr auto sig_coord = get_definition_signature<Coord>();
-    constexpr auto sig_point3d = get_definition_signature<Point3D>();
+    constexpr auto sig_point = get_layout_signature<Point>();
+    constexpr auto sig_coord = get_layout_signature<Coord>();
+    constexpr auto sig_point3d = get_layout_signature<Point3D>();
 
     std::cout << "  Point:   " << sig_point << "\n";
     std::cout << "  Coord:   " << sig_coord << "\n";
     std::cout << "  Point3D: " << sig_point3d << "\n";
 
-    // Point and Coord have same layout but different names → different definition sigs
-    constexpr bool def_match = definition_signatures_match<Point, Coord>();
-    static_assert(!def_match, "Point and Coord should NOT match on definition signature");
-    std::cout << "  Point == Coord (definition): " << (def_match ? "YES" : "NO") << " [OK - expected NO]\n";
+    // Point and Coord have identical byte layout → layout sigs match
+    // (Layout signatures are ABI-only; field names are not encoded.)
+    constexpr bool layout_match_pc = layout_signatures_match<Point, Coord>();
+    static_assert(layout_match_pc, "Point and Coord SHOULD match on layout signature (same ABI)");
+    std::cout << "  Point == Coord (layout): " << (layout_match_pc ? "YES" : "NO") << " [OK - expected YES]\n";
 
     // Point and Point should match
-    constexpr bool self_match = definition_signatures_match<Point, Point>();
+    constexpr bool self_match = layout_signatures_match<Point, Point>();
     static_assert(self_match, "Point should match itself");
-    std::cout << "  Point == Point (definition): " << (self_match ? "YES" : "NO") << " [OK]\n";
+    std::cout << "  Point == Point (layout): " << (self_match ? "YES" : "NO") << " [OK]\n";
 
-    // Point and Point3D should NOT match
-    constexpr bool size_mismatch = definition_signatures_match<Point, Point3D>();
+    // Point and Point3D should NOT match (different sizes)
+    constexpr bool size_mismatch = layout_signatures_match<Point, Point3D>();
     static_assert(!size_mismatch, "Point and Point3D should NOT match");
-    std::cout << "  Point == Point3D (definition): " << (size_mismatch ? "YES" : "NO") << " [OK - expected NO]\n";
+    std::cout << "  Point == Point3D (layout): " << (size_mismatch ? "YES" : "NO") << " [OK - expected NO]\n";
 
-    std::cout << "  [PASS] Definition signatures\n";
+    std::cout << "  [PASS] Layout signature basics\n";
     return true;
 }
 
 // ============================================================================
-// Test 2: Layout Signatures
+// Test 2: Safety Classification
 // ============================================================================
 
-bool test_layout_signatures() {
-    std::cout << "\n[Test 2] Layout Signatures\n";
+bool test_safety_classification() {
+    std::cout << "\n[Test 2] Safety Classification (classify_v)\n";
     std::cout << std::string(50, '-') << "\n";
 
-    constexpr auto layout_point = get_layout_signature<Point>();
-    constexpr auto layout_coord = get_layout_signature<Coord>();
+    // Point: trivially copyable, no pointers, no padding → TrivialSafe
+    constexpr auto lvl_point = classify_v<Point>;
+    std::cout << "  Point: " << safety_level_name(lvl_point) << "\n";
+    static_assert(lvl_point == SafetyLevel::TrivialSafe || lvl_point == SafetyLevel::PaddingRisk,
+                  "Point should be TrivialSafe or PaddingRisk");
 
-    std::cout << "  Point (layout):  " << layout_point << "\n";
-    std::cout << "  Coord (layout):  " << layout_coord << "\n";
+    // WithString has opaque member → Opaque
+    constexpr auto lvl_ws = classify_v<WithString>;
+    std::cout << "  WithString: " << safety_level_name(lvl_ws) << "\n";
 
-    // Point and Coord have identical byte layout → layout sigs should match
-    constexpr bool layout_match = layout_signatures_match<Point, Coord>();
-    static_assert(layout_match, "Point and Coord SHOULD match on layout signature");
-    std::cout << "  Point == Coord (layout): " << (layout_match ? "YES" : "NO") << " [OK - expected YES]\n";
+    // Derived (non-virtual inheritance from Base): safe
+    constexpr auto lvl_derived = classify_v<Derived>;
+    std::cout << "  Derived: " << safety_level_name(lvl_derived) << "\n";
 
-    // Point and Point3D have different layout
-    constexpr bool layout_mismatch = layout_signatures_match<Point, Point3D>();
-    static_assert(!layout_mismatch, "Point and Point3D should NOT match on layout");
-    std::cout << "  Point == Point3D (layout): " << (layout_mismatch ? "YES" : "NO") << " [OK - expected NO]\n";
-
-    std::cout << "  [PASS] Layout signatures\n";
+    std::cout << "  [PASS] Safety classification\n";
     return true;
 }
 
@@ -129,7 +128,7 @@ bool test_platform_prefix() {
     std::cout << "\n[Test 3] Platform Prefix\n";
     std::cout << std::string(50, '-') << "\n";
 
-    constexpr auto sig = get_definition_signature<Point>();
+    constexpr auto sig = get_layout_signature<Point>();
     std::string sig_str = sig.value;
 
     // On 64-bit little-endian, should start with [64-le]
@@ -149,8 +148,8 @@ bool test_container_signatures() {
     std::cout << "\n[Test 4] XOffsetDatastructure Container Signatures\n";
     std::cout << std::string(50, '-') << "\n";
 
-    constexpr auto sig_string = get_definition_signature<WithString>();
-    constexpr auto sig_vector = get_definition_signature<WithVector>();
+    constexpr auto sig_string = get_layout_signature<WithString>();
+    constexpr auto sig_vector = get_layout_signature<WithVector>();
 
     std::cout << "  WithString: " << sig_string << "\n";
     std::cout << "  WithVector: " << sig_vector << "\n";
@@ -176,8 +175,8 @@ bool test_inheritance_signatures() {
     std::cout << "\n[Test 5] Inheritance Signatures\n";
     std::cout << std::string(50, '-') << "\n";
 
-    constexpr auto sig_base = get_definition_signature<Base>();
-    constexpr auto sig_derived = get_definition_signature<Derived>();
+    constexpr auto sig_base = get_layout_signature<Base>();
+    constexpr auto sig_derived = get_layout_signature<Derived>();
 
     std::cout << "  Base:    " << sig_base << "\n";
     std::cout << "  Derived: " << sig_derived << "\n";
@@ -189,7 +188,7 @@ bool test_inheritance_signatures() {
     std::cout << "  Derived includes ~base<Base>: " << (has_base_ref ? "YES" : "NO") << " [OK]\n";
 
     // Base and Derived should NOT match
-    constexpr bool def_match = definition_signatures_match<Base, Derived>();
+    constexpr bool def_match = layout_signatures_match<Base, Derived>();
     static_assert(!def_match, "Base and Derived should not match");
     std::cout << "  Base == Derived (definition): " << (def_match ? "YES" : "NO") << " [OK - expected NO]\n";
 
@@ -206,9 +205,9 @@ bool test_primitive_signatures() {
     std::cout << std::string(50, '-') << "\n";
 
     // Verify primitive type signatures match expected values
-    constexpr auto sig_i32 = TypeSignature<int32_t, SignatureMode::Definition>::calculate();
-    constexpr auto sig_f64 = TypeSignature<double, SignatureMode::Definition>::calculate();
-    constexpr auto sig_bool = TypeSignature<bool, SignatureMode::Definition>::calculate();
+    constexpr auto sig_i32 = TypeSignature<int32_t>::calculate();
+    constexpr auto sig_f64 = TypeSignature<double>::calculate();
+    constexpr auto sig_bool = TypeSignature<bool>::calculate();
 
     static_assert(sig_i32 == "i32[s:4,a:4]", "int32_t signature mismatch");
     static_assert(sig_f64 == "f64[s:8,a:8]", "double signature mismatch");
@@ -233,8 +232,8 @@ int main() {
 
     bool all_passed = true;
 
-    all_passed &= test_definition_signatures();
-    all_passed &= test_layout_signatures();
+    all_passed &= test_layout_signature_basics();
+    all_passed &= test_safety_classification();
     all_passed &= test_platform_prefix();
     all_passed &= test_container_signatures();
     all_passed &= test_inheritance_signatures();

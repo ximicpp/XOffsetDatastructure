@@ -115,24 +115,24 @@ bool test_enum_signatures() {
     std::cout << std::string(50, '-') << "\n";
 
     // Verify is_fixed_enum works correctly
-    static_assert(boost::typelayout::is_fixed_enum<WeaponType>(),
+    static_assert(std::is_enum_v<WeaponType>,
         "WeaponType should be a fixed enum");
-    static_assert(boost::typelayout::is_fixed_enum<QuestStatus>(),
+    static_assert(std::is_enum_v<QuestStatus>,
         "QuestStatus should be a fixed enum");
-    static_assert(boost::typelayout::is_fixed_enum<Color>(),
+    static_assert(std::is_enum_v<Color>,
         "Color should be a fixed enum");
 
     // Print signatures for inspection
-    constexpr auto weapon_sig = boost::typelayout::get_definition_signature<WeaponType>();
-    constexpr auto quest_sig = boost::typelayout::get_definition_signature<QuestStatus>();
-    constexpr auto color_sig = boost::typelayout::get_definition_signature<Color>();
+    constexpr auto weapon_sig = boost::typelayout::get_layout_signature<WeaponType>();
+    constexpr auto quest_sig = boost::typelayout::get_layout_signature<QuestStatus>();
+    constexpr auto color_sig = boost::typelayout::get_layout_signature<Color>();
 
     std::cout << "  WeaponType:  " << weapon_sig << "\n";
     std::cout << "  QuestStatus: " << quest_sig << "\n";
     std::cout << "  Color:       " << color_sig << "\n";
 
     // Verify struct with enums has correct signature
-    constexpr auto stats_sig = boost::typelayout::get_definition_signature<PlayerStats>();
+    constexpr auto stats_sig = boost::typelayout::get_layout_signature<PlayerStats>();
     std::cout << "  PlayerStats: " << stats_sig << "\n";
 
     return true;
@@ -186,7 +186,7 @@ bool test_enum_default_underlying() {
     std::cout << "  Direction underlying type = int ... [OK]\n";
 
     // is_fixed_enum should still report true (all enums have an underlying type)
-    static_assert(boost::typelayout::is_fixed_enum<Direction>(),
+    static_assert(std::is_enum_v<Direction>,
         "Direction should be detected as fixed enum");
     std::cout << "  Direction is_fixed_enum = true ... [OK]\n";
 
@@ -196,7 +196,7 @@ bool test_enum_default_underlying() {
     std::cout << "  Direction is_xbuffer_safe = true ... [OK]\n";
 
     // Signature should exist and contain enum marker
-    constexpr auto dir_sig = boost::typelayout::get_definition_signature<Direction>();
+    constexpr auto dir_sig = boost::typelayout::get_layout_signature<Direction>();
     std::cout << "  Direction sig: " << dir_sig << "\n";
 
     return true;
@@ -252,16 +252,16 @@ bool test_enum_signature_identity() {
 
     // Different enum types should produce different Definition signatures
     // (even if they share the same underlying type and size)
-    constexpr auto weapon_def = boost::typelayout::get_definition_signature<WeaponType>();
-    constexpr auto quest_def = boost::typelayout::get_definition_signature<QuestStatus>();
-    constexpr auto dir_def = boost::typelayout::get_definition_signature<Direction>();
+    constexpr auto weapon_def = boost::typelayout::get_layout_signature<WeaponType>();
+    constexpr auto quest_def = boost::typelayout::get_layout_signature<QuestStatus>();
+    constexpr auto dir_def = boost::typelayout::get_layout_signature<Direction>();
 
     // Definition signatures embed type names — they must differ
-    static_assert(!boost::typelayout::definition_signatures_match<WeaponType, QuestStatus>(),
+    static_assert(!boost::typelayout::layout_signatures_match<WeaponType, QuestStatus>(),
         "Different enums should have different definition signatures");
     std::cout << "  WeaponType != QuestStatus (definition) ... [OK]\n";
 
-    static_assert(!boost::typelayout::definition_signatures_match<WeaponType, Direction>(),
+    static_assert(!boost::typelayout::layout_signatures_match<WeaponType, Direction>(),
         "Different enums should have different definition signatures");
     std::cout << "  WeaponType != Direction (definition) ... [OK]\n";
 
@@ -287,7 +287,7 @@ bool test_enum_nested_signature() {
         "EquipmentSlot (struct with enum member) should be safe");
     std::cout << "  EquipmentSlot is_xbuffer_safe ... [OK]\n";
 
-    constexpr auto slot_def = boost::typelayout::get_definition_signature<EquipmentSlot>();
+    constexpr auto slot_def = boost::typelayout::get_layout_signature<EquipmentSlot>();
     constexpr auto slot_layout = boost::typelayout::get_layout_signature<EquipmentSlot>();
 
     std::cout << "  EquipmentSlot definition: " << slot_def << "\n";

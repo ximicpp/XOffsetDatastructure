@@ -74,7 +74,7 @@ void test_type_signature_generation() {
     
     // Test 15-field struct
     std::cout << "\n  LargeStruct (15 fields):\n";
-    constexpr auto sig15 = boost::typelayout::get_definition_signature<LargeStruct>();
+    constexpr auto sig15 = boost::typelayout::get_layout_signature<LargeStruct>();
     std::cout << "    Signature: " << sig15 << "\n";
     
     // Verify it's not the error message
@@ -84,13 +84,13 @@ void test_type_signature_generation() {
     
     // Test 10-field struct (boundary)
     std::cout << "\n  BoundaryStruct (10 fields):\n";
-    constexpr auto sig10 = boost::typelayout::get_definition_signature<BoundaryStruct>();
+    constexpr auto sig10 = boost::typelayout::get_layout_signature<BoundaryStruct>();
     std::cout << "    Signature: " << sig10 << "\n";
     std::cout << "    [OK] Boundary case works\n";
     
     // Test 20-field struct
     std::cout << "\n  VeryLargeStruct (20 fields):\n";
-    constexpr auto sig20 = boost::typelayout::get_definition_signature<VeryLargeStruct>();
+    constexpr auto sig20 = boost::typelayout::get_layout_signature<VeryLargeStruct>();
     std::cout << "    Signature: " << sig20 << "\n";
     
     constexpr bool has_error20 = sig20 == "TOO_MANY_FIELDS";
