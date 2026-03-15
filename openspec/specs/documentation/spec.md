@@ -6,7 +6,7 @@ All documentation files SHALL display test counts and test names consistent with
 
 #### Scenario: Test count accuracy
 - **WHEN** a user reads any documentation file (`docs/QUICK_REFERENCE.md`, `docs/README.md`, `docs/ZERO_BOILERPLATE.md`)
-- **THEN** the stated total test count SHALL be 27 (7 basic + 20 reflection), matching `tests/CMakeLists.txt`
+- **THEN** the stated total test count SHALL be 23 (7 basic + 16 reflection), matching `tests/CMakeLists.txt`
 
 #### Scenario: Test name accuracy
 - **WHEN** a user reads `docs/QUICK_REFERENCE.md` test matrix

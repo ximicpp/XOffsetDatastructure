@@ -332,12 +332,12 @@ run_test() {
 }
 
 # Determine total test count
-TOTAL_TESTS=6
+TOTAL_TESTS=7
 if [ $ENABLE_REFLECTION -eq 1 ]; then
     TOTAL_TESTS=23
 fi
 
-# Basic tests (6 tests)
+# Basic tests (7 tests)
 echo -e "${YELLOW}=== Basic Tests ===${NC}"
 echo ""
 
@@ -347,19 +347,19 @@ run_test "test_map_set" 3 $TOTAL_TESTS
 run_test "test_nested" 4 $TOTAL_TESTS
 run_test "test_compaction" 5 $TOTAL_TESTS
 run_test "test_modify" 6 $TOTAL_TESTS
+run_test "test_xbuffer_api" 7 $TOTAL_TESTS
 
-# Reflection tests (21 tests) - only if enabled
+# Reflection tests (16 tests) - only if enabled
 if [ $ENABLE_REFLECTION -eq 1 ]; then
     echo -e "${YELLOW}=== Reflection Tests ===${NC}"
     echo ""
     
-    run_test "test_reflection_core" 7 $TOTAL_TESTS
-    run_test "test_reflection_advanced" 8 $TOTAL_TESTS
-    run_test "test_type_signatures" 9 $TOTAL_TESTS
-    run_test "test_field_limit_fix" 10 $TOTAL_TESTS
-    run_test "test_type_safety" 11 $TOTAL_TESTS
-    run_test "test_enum_support" 12 $TOTAL_TESTS
-    run_test "test_xbuffer_api" 13 $TOTAL_TESTS
+    run_test "test_reflection_core" 8 $TOTAL_TESTS
+    run_test "test_reflection_advanced" 9 $TOTAL_TESTS
+    run_test "test_type_signatures" 10 $TOTAL_TESTS
+    run_test "test_field_limit_fix" 11 $TOTAL_TESTS
+    run_test "test_type_safety" 12 $TOTAL_TESTS
+    run_test "test_enum_support" 13 $TOTAL_TESTS
     run_test "test_xstring_direct_assign" 14 $TOTAL_TESTS
     run_test "test_xhandle" 15 $TOTAL_TESTS
     run_test "test_error_paths" 16 $TOTAL_TESTS

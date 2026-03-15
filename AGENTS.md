@@ -366,7 +366,7 @@ a role that defines its file scope, behavioral rules, and coordination protocol.
 
 **Rules:**
 - API 变更必须创建 `openspec change`，在 tasks.md 中标注 `[needs-tests]` `[needs-docs]`
-- 每次修改核心代码后必须 Docker 构建验证（27/27 测试通过）
+- 每次修改核心代码后必须 Docker 构建验证（23/23 测试通过）
 - TypeLayout 子模块升级需先 `git fetch origin` 检查 main 分支最新
 - 不直接修改 `tests/*.cpp`（除非是修复因 API 变更导致的编译错误）
 - 不直接修改 `docs/` 或 `README.md`（由 docs agent 负责）
@@ -400,9 +400,9 @@ a role that defines its file scope, behavioral rules, and coordination protocol.
 grep -r "\[needs-tests\]" openspec/changes/*/tasks.md 2>/dev/null
 ```
 
-**Test suite summary (27 tests):**
+**Test suite summary (23 tests):**
 - Basic tests: 7 (test_basic_types, test_vector, test_map_set, test_nested, test_compaction, test_modify, test_xbuffer_api)
-- Reflection tests: 20 (see tests/README.md for full list)
+- Reflection tests: 16 (see tests/README.md for full list)
 
 ### Role: docs
 

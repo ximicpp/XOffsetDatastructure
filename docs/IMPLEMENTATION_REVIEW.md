@@ -165,9 +165,9 @@ hard-coded counts from documentation (prefer `ctest --test-dir build -N | tail -
 
 ---
 
-### [L3] `test_reflection_compaction.cpp` has duplicate `#include <experimental/meta>` — LOW
+### [L3] `test_reflection_compaction.cpp` has duplicate `#include <experimental/meta>` — RESOLVED
 
-**Location:** `tests/test_reflection_compaction.cpp` lines 9–10, and also line 207 (inside `main()`).
+**Resolution:** `test_reflection_compaction.cpp` was deleted in the test suite cleanup (merged into `test_compaction.cpp` + `test_reflection_core.cpp`).
 
 ```cpp
 #include <experimental/meta>

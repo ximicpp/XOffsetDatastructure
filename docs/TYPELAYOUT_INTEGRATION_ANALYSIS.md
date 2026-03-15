@@ -117,9 +117,9 @@ C++ 标准要求模板特化必须在原始模板声明的命名空间中。这�
 | API | 使用位置 | 使用次数 |
 |-----|----------|----------|
 | `get_definition_signature<T>()` | `player.hpp`, `game_data.hpp`, tests | 5+ |
-| `definition_signatures_match<T1,T2>()` | `test_typelayout_integration.cpp` | 2 |
-| `get_layout_signature<T>()` | `test_typelayout_integration.cpp` | 2 |
-| `layout_signatures_match<T1,T2>()` | `test_typelayout_integration.cpp` | 2 |
+| `definition_signatures_match<T1,T2>()` | `test_type_signatures.cpp` | 2 |
+| `get_layout_signature<T>()` | `test_type_signatures.cpp` | 2 |
+| `layout_signatures_match<T1,T2>()` | `test_type_signatures.cpp` | 2 |
 
 **评估：✅ 策略合理**
 
@@ -365,7 +365,7 @@ external/typelayout → 59f6616d (含 vptr 传播修复)
 
 - [ ] 确认 `SafetyLevel` 枚举值未变更
 - [ ] 运行 `test_classify_safety` 验证分类语义一致性
-- [ ] 运行 `test_remediation_fixes` 验证 C1 (vptr 传播) 和 C2 (递归容器) 行为
+- [ ] 运行 `test_policy_trait` 验证 C1 (vptr 传播) 和 C2 (递归容器) 行为
 - [ ] 运行 `test_policy_trait` 验证 Policy Trait 集成
 - [ ] 检查 `classify_safety` 对 `long` / `unsigned long` 的处理是否有变化
 
