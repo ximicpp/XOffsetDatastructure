@@ -88,11 +88,8 @@ set(REFLECTION_TESTS
     test_reflection_core
     test_reflection_advanced
     test_type_signatures
-    test_type_introspection
-    test_reflection_compaction
     test_field_limit_fix
     test_type_safety
-    test_typelayout_integration
     test_enum_support
     test_xstring_direct_assign
     test_xhandle
@@ -104,7 +101,6 @@ set(REFLECTION_TESTS
     test_inheritance
     test_adaptive_reservation
     test_policy_trait
-    test_remediation_fixes
 )
 
 # Count for summary

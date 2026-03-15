@@ -205,6 +205,44 @@ void test_reflection_with_xbuffer() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 5: Member Property Queries (is_public, is_nonstatic_data_member)
+// Merged from test_type_introspection.cpp
+// ---------------------------------------------------------------------------
+
+void test_member_properties() {
+    std::cout << "[Test 5] Member Property Queries\n";
+    std::cout << std::string(40, '-') << "\n";
+
+    // is_public
+    constexpr bool x_pub = is_public(^^SimpleStruct::x);
+    constexpr bool y_pub = is_public(^^SimpleStruct::y);
+    static_assert(x_pub, "SimpleStruct::x should be public");
+    static_assert(y_pub, "SimpleStruct::y should be public");
+    std::cout << "  SimpleStruct::x is_public: " << x_pub << " [OK]\n";
+
+    // is_nonstatic_data_member
+    constexpr bool x_nsdm = is_nonstatic_data_member(^^SimpleStruct::x);
+    constexpr bool y_nsdm = is_nonstatic_data_member(^^SimpleStruct::y);
+    static_assert(x_nsdm, "SimpleStruct::x should be nonstatic data member");
+    static_assert(y_nsdm, "SimpleStruct::y should be nonstatic data member");
+    std::cout << "  SimpleStruct::x is_nonstatic_data_member: " << x_nsdm << " [OK]\n";
+
+    // is_static_member (should be false for data members)
+    constexpr bool x_static = is_static_member(^^SimpleStruct::x);
+    static_assert(!x_static, "SimpleStruct::x should not be static");
+    std::cout << "  SimpleStruct::x is_static_member: " << x_static << " [OK]\n";
+
+    // GameItem member properties
+    constexpr bool id_pub = is_public(^^GameItem::item_id);
+    constexpr bool name_nsdm = is_nonstatic_data_member(^^GameItem::name);
+    static_assert(id_pub && name_nsdm);
+    std::cout << "  GameItem::item_id is_public: " << id_pub << " [OK]\n";
+    std::cout << "  GameItem::name is_nonstatic_data_member: " << name_nsdm << " [OK]\n";
+
+    std::cout << "[PASS]\n\n";
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -217,6 +255,7 @@ int main() {
     test_member_iteration();
     test_splice_operations();
     test_reflection_with_xbuffer();
+    test_member_properties();
 
     std::cout << "========================================\n";
     std::cout << "[SUCCESS] All reflection core tests passed!\n";

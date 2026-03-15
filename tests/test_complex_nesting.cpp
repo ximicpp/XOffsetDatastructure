@@ -340,37 +340,7 @@ bool test_pod_only_struct() {
     return true;
 }
 
-bool test_many_fields() {
-    fprintf(stderr, "\n[TEST] Struct with 14 fields (many-field stress)\n");
-
-    XBuffer xbuf(8192);
-    auto* m = xbuf.make<ManyFields>();
-    m->f1 = 1; m->f2 = 2; m->f3 = 3; m->f4 = 4;
-    m->f5 = 5; m->f6 = 6; m->f7 = 7; m->f8 = 8;
-    m->s1 = "StringOne";
-    m->s2 = "StringTwo";
-    m->v1.push_back(10);
-    m->v1.push_back(20);
-    m->v2.push_back(30);
-    m->set1.insert(100);
-    m->set1.insert(200);
-    m->map1[1] = 111;
-    m->map1[2] = 222;
-
-    auto saved = xbuf.save();
-    auto loaded = XBuffer::load(saved);
-    auto& l = loaded.root<ManyFields>();
-    assert(l.f1 == 1 && l.f8 == 8);
-    assert(l.s1 == "StringOne");
-    assert(l.s2 == "StringTwo");
-    assert(l.v1.size() == 2 && l.v1[1] == 20);
-    assert(l.v2.size() == 1 && l.v2[0] == 30);
-    assert(l.set1.size() == 2);
-    assert(l.map1.size() == 2 && l.map1[2] == 222);
-
-    fprintf(stderr, "  14 fields (8 POD + 2 string + 2 vector + 1 set + 1 map) [OK]\n");
-    return true;
-}
+// test_many_fields removed: covered by test_field_limit_fix.cpp
 
 bool test_vector_of_container_only() {
     fprintf(stderr, "\n[TEST] XVector<ContainerOnly> — struct with no POD as element\n");
@@ -461,7 +431,6 @@ int main() {
     run("compaction_deep", test_compaction_deep);
     run("container_only", test_container_only_struct);
     run("pod_only", test_pod_only_struct);
-    run("many_fields", test_many_fields);
     run("vector_of_container_only", test_vector_of_container_only);
     run("xhandle_deep", test_xhandle_deep_nesting);
 

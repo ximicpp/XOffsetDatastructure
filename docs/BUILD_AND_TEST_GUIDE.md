@@ -31,27 +31,36 @@
 ### 测试矩阵
 
 ```
-总测试数: 18
-├── 基础测试 (6个)
+总测试数: 27
+├── 基础测试 (7个)
 │   ├── test_basic_types       - 基本类型序列化
 │   ├── test_vector            - 动态数组
 │   ├── test_map_set           - 关联容器
 │   ├── test_nested            - 嵌套结构
 │   ├── test_compaction        - 内存压缩
-│   └── test_modify            - 修改操作
-└── 反射测试 (12个) - 需要Clang P2996
-    ├── test_reflection_operators
-    ├── test_member_iteration
-    ├── test_reflection_type_signature
-    ├── test_splice_operations
+│   ├── test_modify            - 修改操作
+│   └── test_xbuffer_api      - XBuffer API
+└── 反射测试 (20个) - 需要Clang P2996
+    ├── test_reflection_core
+    ├── test_reflection_advanced
+    ├── test_type_signatures
     ├── test_type_introspection
     ├── test_reflection_compaction
-    ├── test_reflection_serialization
-    ├── test_reflection_comparison
     ├── test_field_limit_fix
-    ├── test_class_type_signatures
     ├── test_type_safety
-    └── test_vptr_layout
+    ├── test_typelayout_integration
+    ├── test_enum_support
+    ├── test_xstring_direct_assign
+    ├── test_xhandle
+    ├── test_error_paths
+    ├── test_memory_efficiency
+    ├── test_zero_boilerplate
+    ├── test_zero_boilerplate_vector
+    ├── test_complex_nesting
+    ├── test_inheritance
+    ├── test_adaptive_reservation
+    ├── test_policy_trait
+    └── test_remediation_fixes
 ```
 
 ---
@@ -87,8 +96,8 @@ docker run --rm \
 
 # 3. 验证结果
 # 应该看到:
-#   - Tests Run: 18
-#   - Tests Passed: 18
+#   - Tests Run: 27
+#   - Tests Passed: 27
 #   - Status: ✓ SUCCESS
 ```
 
@@ -142,7 +151,7 @@ docker-compose run --rm xoffset-dev bash -c "cd build && ./bin/Release/test_basi
 3. 测试执行 (5-10分钟)
    - 挂载代码到 /workspace
    - 执行 bash ./build.sh
-   - 运行18个测试
+   - 运行27个测试
 ```
 
 #### 关键配置
@@ -317,7 +326,7 @@ add_compile_options(
 
 # 条件编译反射测试
 if(ENABLE_REFLECTION_TESTS)
-    add_executable(test_reflection_operators tests/test_reflection_operators.cpp)
+    add_executable(test_reflection_core tests/test_reflection_core.cpp)
 endif()
 ```
 
@@ -337,10 +346,10 @@ find_clang_p2996() {
     # 验证是否支持 -freflection
 }
 
-# 运行18个测试
-run_test "test_basic_types" 1 18
+# 运行27个测试
+run_test "test_basic_types" 1 27
 # ... (省略)
-run_test "test_vptr_layout" 18 18
+run_test "test_remediation_fixes" 27 27
 ```
 
 ### 4. GitHub Actions Workflow
@@ -368,7 +377,7 @@ run_test "test_vptr_layout" 18 18
 
 ### 开发阶段
 - [ ] 本地先用Docker测试: `docker-compose run --rm xoffset-dev ./build.sh`
-- [ ] 确保18个测试全部通过
+- [ ] 确保27个测试全部通过
 - [ ] 检查代码是否符合AGENTS.md规范
 - [ ] 提交前运行: `git diff` 检查修改
 

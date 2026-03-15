@@ -210,6 +210,113 @@ void test_reflection_signature_consistency() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 6: Platform Prefix (merged from test_typelayout_integration.cpp)
+// ---------------------------------------------------------------------------
+
+void test_platform_prefix() {
+    std::cout << "[Test 6] Platform Prefix\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    constexpr auto sig = get_layout_signature<SimpleStruct>();
+    std::string sig_str = sig.value;
+
+    // On 64-bit little-endian, should start with [64-le]
+    bool has_prefix = sig_str.find("[64-le]") == 0;
+    assert(has_prefix && "Signature should start with [64-le] on this platform");
+    std::cout << "  Platform prefix: [64-le] [OK]\n";
+    std::cout << "[PASS]\n\n";
+}
+
+// ---------------------------------------------------------------------------
+// Test 7: Safety Classification (merged from test_typelayout_integration.cpp)
+// ---------------------------------------------------------------------------
+
+void test_safety_classification() {
+    std::cout << "[Test 7] Safety Classification (classify_v)\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    // SimpleStruct: trivially copyable, no pointers
+    constexpr auto lvl_simple = classify_v<SimpleStruct>;
+    std::cout << "  SimpleStruct: " << safety_level_name(lvl_simple) << "\n";
+    static_assert(lvl_simple == SafetyLevel::TrivialSafe || lvl_simple == SafetyLevel::PaddingRisk,
+                  "SimpleStruct should be TrivialSafe or PaddingRisk");
+
+    // DerivedClass (non-virtual inheritance): safe
+    constexpr auto lvl_derived = classify_v<DerivedClass>;
+    std::cout << "  DerivedClass: " << safety_level_name(lvl_derived) << "\n";
+
+    // PolymorphicClass: not safe
+    constexpr auto lvl_poly = classify_v<PolymorphicClass>;
+    std::cout << "  PolymorphicClass: " << safety_level_name(lvl_poly) << "\n";
+
+    std::cout << "[PASS]\n\n";
+}
+
+// ---------------------------------------------------------------------------
+// Test 8: Container Signatures (merged from test_typelayout_integration.cpp)
+// ---------------------------------------------------------------------------
+
+// Container signature test types (must be at file scope for template ctors)
+struct WithStringTest {
+    int32_t id;
+    XString name;
+    template <typename Allocator>
+    WithStringTest(Allocator alloc) : id(0), name(alloc) {}
+};
+
+struct WithVectorTest {
+    int32_t count;
+    XVector<int32_t> values;
+    template <typename Allocator>
+    WithVectorTest(Allocator alloc) : count(0), values(alloc) {}
+};
+
+void test_container_signatures() {
+    std::cout << "[Test 8] XOffsetDatastructure Container Signatures\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    constexpr auto sig_string = get_layout_signature<WithStringTest>();
+    constexpr auto sig_vector = get_layout_signature<WithVectorTest>();
+
+    std::cout << "  WithString: " << sig_string << "\n";
+    std::cout << "  WithVector: " << sig_vector << "\n";
+
+    // Verify container types are correctly resolved
+    std::string str_sig = sig_string.value;
+    assert(str_sig.find("string[s:32,a:8]") != std::string::npos && "XString should appear as string[s:32,a:8]");
+    std::cout << "  XString resolved: string[s:32,a:8] [OK]\n";
+
+    std::string vec_sig = sig_vector.value;
+    assert(vec_sig.find("vector[s:32,a:8]") != std::string::npos && "XVector should appear as vector[s:32,a:8]");
+    std::cout << "  XVector resolved: vector[s:32,a:8] [OK]\n";
+
+    std::cout << "[PASS]\n\n";
+}
+
+// ---------------------------------------------------------------------------
+// Test 9: Primitive Type Signatures (merged from test_typelayout_integration.cpp)
+// ---------------------------------------------------------------------------
+
+void test_primitive_signatures() {
+    std::cout << "[Test 9] Primitive Type Signatures\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    constexpr auto sig_i32 = TypeSignature<int32_t>::calculate();
+    constexpr auto sig_f64 = TypeSignature<double>::calculate();
+    constexpr auto sig_bool = TypeSignature<bool>::calculate();
+
+    static_assert(sig_i32 == "i32[s:4,a:4]", "int32_t signature mismatch");
+    static_assert(sig_f64 == "f64[s:8,a:8]", "double signature mismatch");
+    static_assert(sig_bool == "bool[s:1,a:1]", "bool signature mismatch");
+
+    std::cout << "  int32_t: " << sig_i32 << " [OK]\n";
+    std::cout << "  double:  " << sig_f64 << " [OK]\n";
+    std::cout << "  bool:    " << sig_bool << " [OK]\n";
+
+    std::cout << "[PASS]\n\n";
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -223,6 +330,10 @@ int main() {
     test_special_signatures();
     test_composition_signature();
     test_reflection_signature_consistency();
+    test_platform_prefix();
+    test_safety_classification();
+    test_container_signatures();
+    test_primitive_signatures();
 
     std::cout << "========================================\n";
     std::cout << "[SUCCESS] All type signature tests passed!\n";
