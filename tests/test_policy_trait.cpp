@@ -162,7 +162,7 @@ struct SmallTypePolicy {
     template<typename T>
     static consteval bool accept() {
         return sizeof(T) <= 24
-            && classify_for_xoffset<T>() == SafetyLevel::Safe;
+            && is_layout_safe<std::remove_cv_t<T>>();
     }
 };
 
@@ -225,30 +225,40 @@ bool test_backward_compat() {
 }
 
 // ============================================================================
-// Test 6: classify_for_xoffset levels
+// Test 6: TypeLayout classify_safety + is_layout_safe
 // ============================================================================
 bool test_classify_levels() {
-    std::cout << "\n[TEST] classify_for_xoffset Levels\n";
-    std::cout << std::string(50, '-') << "\n";
+    std::cout << "\n[TEST] TypeLayout classify_safety + is_layout_safe\n";
+    std::cout << std::string(55, '-') << "\n";
 
-    // Safe
-    static_assert(classify_for_xoffset<int32_t>() == SafetyLevel::Safe,
+    // Safe types → is_layout_safe == true
+    static_assert(classify_safety<int32_t>() == SafetyLevel::Safe,
                   "int32_t must be Safe");
-    static_assert(classify_for_xoffset<SafeRecord>() == SafetyLevel::Safe,
+    static_assert(is_layout_safe<int32_t>(),
+                  "int32_t must be layout safe");
+    static_assert(classify_safety<SafeRecord>() == SafetyLevel::Safe,
                   "SafeRecord must be Safe");
+    static_assert(is_layout_safe<SafeRecord>(),
+                  "SafeRecord must be layout safe");
     std::cout << "  Safe classification... [OK]\n";
 
-    // Warning → escalated to Risk
-    static_assert(classify_for_xoffset<HasPointer>() == SafetyLevel::Risk,
-                  "HasPointer Warning must be escalated to Risk");
-    std::cout << "  Warning→Risk escalation... [OK]\n";
+    // Warning types → is_layout_safe == false
+    static_assert(classify_safety<HasPointer>() == SafetyLevel::Warning,
+                  "HasPointer must be Warning (contains pointer)");
+    static_assert(!is_layout_safe<HasPointer>(),
+                  "HasPointer must NOT be layout safe");
+    std::cout << "  Warning types rejected by is_layout_safe... [OK]\n";
 
-    // Native Risk
-    static_assert(classify_for_xoffset<HasWchar>() == SafetyLevel::Risk,
+    // Risk types → is_layout_safe == false
+    static_assert(classify_safety<HasWchar>() == SafetyLevel::Risk,
                   "HasWchar must be Risk");
-    static_assert(classify_for_xoffset<HasLongDouble>() == SafetyLevel::Risk,
+    static_assert(!is_layout_safe<HasWchar>(),
+                  "HasWchar must NOT be layout safe");
+    static_assert(classify_safety<HasLongDouble>() == SafetyLevel::Risk,
                   "HasLongDouble must be Risk");
-    std::cout << "  Risk classification... [OK]\n";
+    static_assert(!is_layout_safe<HasLongDouble>(),
+                  "HasLongDouble must NOT be layout safe");
+    std::cout << "  Risk types rejected by is_layout_safe... [OK]\n";
 
     return true;
 }

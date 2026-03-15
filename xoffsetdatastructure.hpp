@@ -35,10 +35,10 @@
 
 // TypeLayout library — the authoritative type-signature engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
+//   - boost::typelayout::compat::is_layout_safe<T>()      — C2: local safety (consteval)
+//   - boost::typelayout::compat::classify_safety<T>()     — C2: safety level (consteval)
 //   - boost::typelayout::get_layout_signature<T>()        — binary layout signature
-//   - boost::typelayout::compat::classify_safety<T>()     — C2: local safety
-//   - boost::typelayout::compat::is_serialization_free_local<T>() — C2 predicate
-//   - TYPELAYOUT_ASSERT_COMPAT(a, b)                      — C1: cross-platform match
+//   - TYPELAYOUT_ASSERT_SERIALIZATION_FREE(a, b)          — C1+C2: cross-platform ZST
 #include <boost/typelayout.hpp>
 #include <boost/typelayout/tools/classify_safety.hpp>
 #include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
@@ -47,96 +47,28 @@
 // ============================================================================
 // Target Architecture Specification
 //
-// XOffset Serialization-free model:
-//   C1: layout_match(T, A)  — binary layout identical across platforms (CI)
-//   C2: safe(T)             — no pointers, bitfields, wchar_t, etc. (compile-time)
+// XOffset Serialization-free model (delegated to TypeLayout):
+//   C2: is_layout_safe<T>() — no pointers, bitfields, wchar_t, etc. (compile-time)
+//   C1: TYPELAYOUT_ASSERT_SERIALIZATION_FREE — layout identical across platforms (CI)
 //
-// ArchSpec validates the current platform matches the target.
-// TypeLayout provides the C1 (signatures) and C2 (classify_safety) engines.
+// TypeLayout's layout signature encodes sizeof, alignof, and offset for every
+// field recursively, so platform validation is implicit in the signature system.
+// Only 64-bit little-endian is supported (enforced by preprocessor checks above).
 // ============================================================================
 namespace XOffsetDatastructure {
-
-    /// Architecture specification — validates current platform matches target.
-    struct ArchSpec {
-        std::size_t pointer_size;
-        bool        little_endian;
-        std::size_t sizeof_int8;
-        std::size_t sizeof_int16;
-        std::size_t sizeof_int32;
-        std::size_t sizeof_int64;
-        std::size_t sizeof_float;
-        std::size_t sizeof_double;
-        std::size_t sizeof_bool;
-        std::size_t sizeof_char;
-        std::size_t pointer_align;
-        std::size_t alignof_int32;
-        std::size_t alignof_int64;
-        std::size_t alignof_float;
-        std::size_t alignof_double;
-
-        /// Convert to TypeLayout's PlatformInfo for cross-platform comparison.
-        /// Fields not present in PlatformInfo (sizeof_int8, etc.) are validated
-        /// by the static_asserts below and are implicitly covered by TypeLayout's
-        /// layout signature encoding.
-        constexpr boost::typelayout::PlatformInfo to_platform_info(
-            const char* name = "xoffset-target",
-            const char* arch_prefix = "[64-le]") const
-        {
-            return boost::typelayout::PlatformInfo{
-                .platform_name    = name,
-                .arch_prefix      = arch_prefix,
-                .types            = nullptr,
-                .type_count       = 0,
-                .pointer_size     = pointer_size,
-                .sizeof_long      = sizeof(long),
-                .sizeof_wchar_t   = sizeof(wchar_t),
-                .sizeof_long_double = sizeof(long double),
-                .max_align        = alignof(std::max_align_t),
-            };
-        }
-    };
-
-    // Architecture Presets.
-    // Only Arch64LE is supported (64-bit little-endian).
-    inline constexpr ArchSpec Arch64LE = {
-        .pointer_size = 8, .little_endian = true,
-        .sizeof_int8 = 1, .sizeof_int16 = 2, .sizeof_int32 = 4, .sizeof_int64 = 8,
-        .sizeof_float = 4, .sizeof_double = 8, .sizeof_bool = 1, .sizeof_char = 1,
-        .pointer_align = 8,
-        .alignof_int32 = 4, .alignof_int64 = 8,
-        .alignof_float = 4, .alignof_double = 8,
-    };
-
-    /// Active target architecture. Change this line to switch presets.
-    inline constexpr ArchSpec TargetArchitecture = Arch64LE;
 
 } // namespace XOffsetDatastructure
 
 // ============================================================================
-// Platform validation: current compiler environment ∈ TargetArchitecture
+// Platform validation: 64-bit little-endian only
+// All other layout properties (sizeof, alignof for each type) are captured
+// by TypeLayout's layout signature and verified by TYPELAYOUT_ASSERT_SERIALIZATION_FREE.
 // ============================================================================
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
-static_assert(sizeof(void*) == XOffsetDatastructure::TargetArchitecture.pointer_size,
-    "Platform pointer size does not match TargetArchitecture");
-static_assert(XOFFSET_LITTLE_ENDIAN == XOffsetDatastructure::TargetArchitecture.little_endian,
-    "Platform endianness does not match TargetArchitecture");
-static_assert(sizeof(int8_t)  == XOffsetDatastructure::TargetArchitecture.sizeof_int8);
-static_assert(sizeof(int16_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int16);
-static_assert(sizeof(int32_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int32);
-static_assert(sizeof(int64_t) == XOffsetDatastructure::TargetArchitecture.sizeof_int64);
-static_assert(sizeof(float)   == XOffsetDatastructure::TargetArchitecture.sizeof_float);
-static_assert(sizeof(double)  == XOffsetDatastructure::TargetArchitecture.sizeof_double);
-static_assert(sizeof(bool)    == XOffsetDatastructure::TargetArchitecture.sizeof_bool);
-static_assert(sizeof(char)    == XOffsetDatastructure::TargetArchitecture.sizeof_char);
-static_assert(alignof(void*)  == XOffsetDatastructure::TargetArchitecture.pointer_align);
-static_assert(alignof(int32_t) == XOffsetDatastructure::TargetArchitecture.alignof_int32,
-    "Platform alignof(int32_t) does not match TargetArchitecture");
-static_assert(alignof(int64_t) == XOffsetDatastructure::TargetArchitecture.alignof_int64,
-    "Platform alignof(int64_t) does not match TargetArchitecture");
-static_assert(alignof(float)   == XOffsetDatastructure::TargetArchitecture.alignof_float,
-    "Platform alignof(float) does not match TargetArchitecture");
-static_assert(alignof(double)  == XOffsetDatastructure::TargetArchitecture.alignof_double,
-    "Platform alignof(double) does not match TargetArchitecture");
+static_assert(sizeof(void*) == 8,
+    "XOffsetDatastructure requires 64-bit platform (sizeof(void*) must be 8)");
+static_assert(XOFFSET_LITTLE_ENDIAN,
+    "XOffsetDatastructure requires little-endian platform");
 #endif // XOFFSET_DISABLE_PLATFORM_CHECKS
 
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -850,70 +782,25 @@ namespace XOffsetDatastructure {
     namespace detail {
 
         // ============================================================================
-        // Type Safety Architecture — Unified on TypeLayout's classify_safety<T>()
+        // Type Safety Architecture — Delegated to TypeLayout
         //
         // TypeLayout's layout signature is the single source of truth for safety.
         // XOffset containers are registered via TYPELAYOUT_OPAQUE_* macros so
         // classify_safety recurses into element types automatically.
         //
-        // XOffset adds two domain-specific policies on top:
-        //   1. Warning→Risk escalation (zero-encoding forbids pointers/unions)
-        //   2. long/unsigned long rejection when size ≠ fixed-width (LP64 vs LLP64)
+        // C2 (local safety):   is_layout_safe<T>()   — TypeLayout consteval API
+        // C1 (cross-platform): TYPELAYOUT_ASSERT_SERIALIZATION_FREE — TypeLayout
+        //                      Phase 2 static_assert (C1+C2 combined, CI)
         //
-        // Full guarantee: C1 (TYPELAYOUT_ASSERT_COMPAT) + C2 (classify_for_xoffset)
+        // XOffset adds only domain-specific policy wrappers and diagnostics.
+        // The core serialization-free judgment is 100% provided by TypeLayout.
         // ============================================================================
 
         // Import the compile-time safety engine from TypeLayout
         using boost::typelayout::compat::SafetyLevel;
         using boost::typelayout::compat::classify_safety;
-        using boost::typelayout::compat::is_serialization_free_local;
+        using boost::typelayout::compat::is_layout_safe;
         using boost::typelayout::get_layout_signature;
-
-        // ---- Core: classify a type for XOffset zero-encoding --------------------
-        //
-        // The ONLY classification entry point. No manual container recursion —
-        // TypeLayout's opaque signature mechanism handles that automatically.
-        //
-        // Flow:
-        //   1. long/unsigned long first-line rejection (platform-variable size)
-        //   2. classify_safety<T>() — TypeLayout's signature-based ground truth
-        //      (handles primitives, structs via reflection, containers via opaque)
-        //   3. Warning→Risk escalation (XOffset zero-encoding policy)
-        //
-        // ⚠ LIMITATION: Only catches naked long/unsigned long at top-level T.
-        // Struct members are desugared by P2996 — rely on TYPELAYOUT_ASSERT_COMPAT.
-        // See docs/LONG_PORTABILITY_GUIDE.md.
-        template<typename T>
-        consteval SafetyLevel classify_for_xoffset() {
-            using CleanT = std::remove_cv_t<T>;
-
-            // Step 1: Platform-variable integers — reject long / unsigned long
-            // ONLY when they are NOT equivalent to the fixed-width types.
-            // On LP64 (Linux/macOS-64), long == int64_t — safe (same binary).
-            // On LLP64 (Windows), long is 4 bytes ≠ int64_t — reject.
-            // NB: int64_t is often a typedef for long on LP64, so we must NOT
-            //     unconditionally reject long or we'd also reject int64_t.
-            if constexpr ((std::is_same_v<CleanT, long> && !std::is_same_v<long, int64_t>) ||
-                          (std::is_same_v<CleanT, unsigned long> && !std::is_same_v<unsigned long, uint64_t>)) {
-                return SafetyLevel::Risk;
-            }
-            // Step 2 + 3: TypeLayout ground truth + XOffset escalation
-            else {
-                // classify_safety<T>() scans the layout signature for markers.
-                // For opaque-registered containers (XVector, XString, etc.),
-                // the signature already embeds element signatures — so this
-                // single call handles both leaf types AND containers.
-                constexpr auto level = classify_safety<CleanT>();
-
-                // XOffset zero-encoding policy: escalate Warning→Risk.
-                // Pointers, unions, vptr are "Warning" in TypeLayout (ok for
-                // same-platform), but XOffset categorically rejects them.
-                if constexpr (level == SafetyLevel::Warning)
-                    return SafetyLevel::Risk;
-                else
-                    return level;
-            }
-        }
 
         // ====================================================================
         // Policy Traits — compile-time hooks for safety / layout verification
@@ -927,23 +814,24 @@ namespace XOffsetDatastructure {
 
         /// DefaultPolicy — Single-platform Serialization-free check (C2).
         ///
-        /// Ensures the type passes TypeLayout's safety engine with XOffset's
-        /// domain-specific escalation. A type accepted by this policy is
-        /// "locally serialization-free" — it has no pointers, bitfields,
-        /// wchar_t, or other binary-unstable constructs.
+        /// Delegates directly to TypeLayout's is_layout_safe<T>(), which
+        /// returns true iff classify_safety<T>() == SafetyLevel::Safe.
+        /// A type accepted by this policy has no pointers, bitfields,
+        /// wchar_t, long double, unions, vptr, or other binary-unstable
+        /// constructs in its layout signature.
         ///
         /// For the full cross-platform guarantee (C1+C2), combine with
-        /// TYPELAYOUT_ASSERT_COMPAT in CI.
+        /// TYPELAYOUT_ASSERT_SERIALIZATION_FREE in CI.
         struct DefaultPolicy {
             template<typename T>
             static consteval bool accept() {
-                return classify_for_xoffset<T>() == SafetyLevel::Safe;
+                return is_layout_safe<std::remove_cv_t<T>>();
             }
         };
 
         /// StrictPolicy<GoldSignature> — Full Serialization-free with layout lock.
         ///
-        /// Combines DefaultPolicy (C2) with a compile-time layout signature
+        /// Combines C2 (is_layout_safe) with a compile-time layout signature
         /// match against a "gold" reference string (effectively enforcing C1
         /// at compile time for a single known target layout).
         /// This is the strongest single-compilation guarantee available.
@@ -956,7 +844,7 @@ namespace XOffsetDatastructure {
             template<typename T>
             static consteval bool accept() {
                 return get_layout_signature<T>() == GoldSignature
-                    && classify_for_xoffset<T>() == SafetyLevel::Safe;
+                    && is_layout_safe<std::remove_cv_t<T>>();
             }
         };
 
@@ -1000,13 +888,6 @@ namespace XOffsetDatastructure {
             }
             else if constexpr (requires { typename CleanT::allocator_type; }) {
                 return "UNSAFE: std container (use XVector/XMap/XSet/XString instead)";
-            }
-            // Platform-dependent integers (long, unsigned long)
-            // Note: long long / unsigned long long are allowed (always 8 bytes).
-            else if constexpr (std::is_same_v<CleanT, long> ||
-                               std::is_same_v<CleanT, unsigned long>) {
-                return "UNSAFE: 'long'/'unsigned long' excluded — sizeof varies "
-                       "across platforms (LP64 vs LLP64). Use int32_t/int64_t/uint32_t/uint64_t";
             }
             else if constexpr (std::is_class_v<CleanT>) {
                 return "UNSAFE: Struct/class contains unsafe members";
