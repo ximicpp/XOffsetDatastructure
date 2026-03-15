@@ -131,10 +131,10 @@ bool test_c1_polymorphic() {
                   "PolyBase should be Warning (has vptr)");
     std::cout << "  classify_safety<PolyBase> == Warning... [OK]\n";
 
-    // XOffset escalates Warning→Risk for zero-encoding safety
-    static_assert(classify_for_xoffset<PolyBase>() == SafetyLevel::Risk,
-                  "PolyBase Warning escalated to Risk by XOffset");
-    std::cout << "  classify_for_xoffset<PolyBase> == Risk (Warning→Risk)... [OK]\n";
+    // is_layout_safe rejects Warning types (classify_safety != Safe → false)
+    static_assert(!is_layout_safe<PolyBase>(),
+                  "PolyBase must NOT be layout safe (Warning → rejected)");
+    std::cout << "  is_layout_safe<PolyBase> == false (Warning → rejected)... [OK]\n";
 
     // Print signatures for diagnostic
     constexpr auto sig_poly = get_layout_signature<PolyBase>();
@@ -217,71 +217,59 @@ bool test_c2_nested_container_recursion() {
                   "XVector<PolyBase> must be rejected");
     std::cout << "  Container with polymorphic element rejected... [OK]\n";
 
-    // Nested container with long element — C2+M2 interaction
-    // On LP64 (Linux), long == int64_t, so HasLong is safe (same binary layout).
-    // On LLP64/macOS, HasLong is unsafe.
-    static_assert(is_xbuffer_compatible<XVector<XVector<HasLong>>>() == long_is_int64,
-                  "XVector<XVector<HasLong>> depends on platform long size");
-    std::cout << "  Nested container with long: platform-aware check... [OK]\n";
+    // Nested container with long element — locally safe on all platforms (C2).
+    // Cross-platform mismatch (LP64 vs LLP64) caught by C1 in CI.
+    static_assert(is_xbuffer_compatible<XVector<XVector<HasLong>>>(),
+                  "XVector<XVector<HasLong>> is locally safe (C2)");
+    std::cout << "  Nested container with long: locally safe (C2)... [OK]\n";
 
     return true;
 }
 
 // ============================================================================
-// Test 3: M2 — long / unsigned long explicit rejection
+// Test 3: long / unsigned long — C2 local safety + C1 cross-platform
 // ============================================================================
-bool test_m2_long_rejection() {
-    std::cout << "\n[TEST] M2: long/unsigned long rejection\n";
+bool test_long_portability() {
+    std::cout << "\n[TEST] long portability (TypeLayout C2 + C1)\n";
     std::cout << std::string(55, '-') << "\n";
 
-    // long and unsigned long:
-    // On LP64 (Linux), long == int64_t → classify_for_xoffset returns Safe.
-    // On LLP64 (Windows), long != int64_t → classify_for_xoffset returns Risk.
-    //
-    // NOTE: We cannot use if constexpr branches with static_assert in a
-    // non-template function — the discarded branch's static_assert is still
-    // evaluated by the compiler.  Use implication-style assertions instead:
-    //   long_is_int64 → Safe, and !long_is_int64 → Risk.
-    static_assert(!long_is_int64 || classify_for_xoffset<long>() == SafetyLevel::Safe,
-                  "long == int64_t on LP64, so classify_for_xoffset must return Safe");
-    static_assert(long_is_int64 || classify_for_xoffset<long>() == SafetyLevel::Risk,
-                  "long != int64_t on LLP64, so classify_for_xoffset must return Risk");
-    static_assert(!long_is_int64 || classify_for_xoffset<unsigned long>() == SafetyLevel::Safe,
-                  "unsigned long == uint64_t on LP64, so classify_for_xoffset must return Safe");
-    static_assert(long_is_int64 || classify_for_xoffset<unsigned long>() == SafetyLevel::Risk,
-                  "unsigned long != uint64_t on LLP64, so classify_for_xoffset must return Risk");
+    // TypeLayout's is_layout_safe treats long as locally safe on ALL platforms.
+    // long maps to i32 or i64 depending on platform, both are Safe signatures.
+    // Cross-platform mismatch (LP64 i64 vs LLP64 i32) is caught by C1 in CI.
+    static_assert(classify_safety<long>() == SafetyLevel::Safe,
+                  "long is locally safe (maps to i32 or i64)");
+    static_assert(is_layout_safe<long>(),
+                  "long passes is_layout_safe (C2 local check)");
+    static_assert(is_layout_safe<unsigned long>(),
+                  "unsigned long passes is_layout_safe (C2 local check)");
+    std::cout << "  long/unsigned long: locally safe (C2)... [OK]\n";
+
+    // TypeLayout signatures differ across platforms for long:
+    // LP64:  long → i64[s:8,a:8]
+    // LLP64: long → i32[s:4,a:4]
+    // This mismatch is caught by TYPELAYOUT_ASSERT_SERIALIZATION_FREE in CI.
+    constexpr auto long_sig = get_layout_signature<long>();
     if constexpr (long_is_int64) {
-        std::cout << "  classify_for_xoffset: long==int64_t on LP64, Safe... [OK]\n";
+        std::cout << "  long signature (LP64): " << long_sig << " (i64)... [OK]\n";
     } else {
-        std::cout << "  classify_for_xoffset: long!=int64_t on LLP64, Risk... [OK]\n";
+        std::cout << "  long signature (LLP64): " << long_sig << " (i32)... [OK]\n";
     }
 
-    // Struct containing long:
-    // On LP64 (Linux/macOS-64), long == int64_t, so classify_for_xoffset<long>()
-    // is Safe (not rejected) and classify_safety<HasLong>() is also Safe.
-    // On LLP64 (Windows), long is 4 bytes and NOT equivalent, so it's Risk.
-    static_assert(is_xbuffer_compatible<HasLong>() == long_is_int64,
-                  "HasLong: safe iff long == int64_t on this platform");
-    static_assert(is_xbuffer_compatible<HasUnsignedLong>() == long_is_int64,
-                  "HasUnsignedLong: safe iff unsigned long == uint64_t");
-    std::cout << "  Structs with long/ulong: platform-aware check... [OK]\n";
+    // Structs containing long are safe locally (C2 passes on any platform)
+    static_assert(is_xbuffer_compatible<HasLong>(),
+                  "HasLong is locally safe (C2) — cross-platform checked by C1");
+    static_assert(is_xbuffer_compatible<HasUnsignedLong>(),
+                  "HasUnsignedLong is locally safe (C2)");
+    std::cout << "  Structs with long: locally safe (C2)... [OK]\n";
 
-    // Nested struct containing long → same platform logic
-    static_assert(is_xbuffer_compatible<HasLongInNested>() == long_is_int64,
-                  "HasLongInNested: safe iff long == int64_t");
-    std::cout << "  Nested struct with long: platform-aware check... [OK]\n";
+    // Nested and container cases — also locally safe
+    static_assert(is_xbuffer_compatible<HasLongInNested>(),
+                  "HasLongInNested is locally safe (C2)");
+    static_assert(is_xbuffer_compatible<XVector<HasLong>>(),
+                  "XVector<HasLong> is locally safe (C2)");
+    std::cout << "  Nested/container with long: locally safe (C2)... [OK]\n";
 
-    // Container with long element → same platform logic
-    static_assert(is_xbuffer_compatible<XVector<HasLong>>() == long_is_int64,
-                  "XVector<HasLong>: safe iff long == int64_t");
-    std::cout << "  XVector<HasLong>: platform-aware check... [OK]\n";
-
-    // DefaultPolicy
-    static_assert(DefaultPolicy::accept<HasLong>() == long_is_int64,
-                  "DefaultPolicy on HasLong: platform-dependent");
-    std::cout << "  DefaultPolicy on HasLong: platform-aware check... [OK]\n";
-
-    // Contrast: int64_t is fine (fixed-width)
+    // Contrast: int64_t is fine (fixed-width, same signature everywhere)
     static_assert(is_xbuffer_compatible<int64_t>(),
                   "int64_t must pass (fixed width)");
     std::cout << "  int64_t passes (fixed width contrast)... [OK]\n";
@@ -316,10 +304,10 @@ bool test_combined_interactions() {
     std::cout << "\n[TEST] Combined: Fix interactions\n";
     std::cout << std::string(55, '-') << "\n";
 
-    // C2+M2: Container nesting long type — platform-dependent
-    static_assert(is_xbuffer_compatible<XVector<XVector<HasLong>>>() == long_is_int64,
-                  "Nested XVector<HasLong>: platform-dependent (C2+M2)");
-    std::cout << "  C2+M2: nested container + long type: platform-aware... [OK]\n";
+    // Container nesting long type — locally safe (C2), cross-platform by C1
+    static_assert(is_xbuffer_compatible<XVector<XVector<HasLong>>>(),
+                  "Nested XVector<HasLong> is locally safe (C2)");
+    std::cout << "  Nested container + long type: locally safe (C2)... [OK]\n";
 
     // Map with polymorphic value — C1+C2
     static_assert(!is_xbuffer_compatible<XMap<int32_t, PolyBase>>(),
@@ -353,7 +341,7 @@ int main() {
 
     all_passed &= test_c1_polymorphic();
     all_passed &= test_c2_nested_container_recursion();
-    all_passed &= test_m2_long_rejection();
+    all_passed &= test_long_portability();
     all_passed &= test_l2_diagnose_with_policy();
     all_passed &= test_combined_interactions();
 
