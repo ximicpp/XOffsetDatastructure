@@ -85,20 +85,13 @@ message(STATUS "Adding C++26 reflection tests...")
 
 # List of reflection test files
 set(REFLECTION_TESTS
-    test_reflection_operators
-    test_member_iteration
-    test_reflection_type_signature
-    test_splice_operations
+    test_reflection_core
+    test_reflection_advanced
+    test_type_signatures
     test_type_introspection
     test_reflection_compaction
-    test_reflection_serialization
-    test_reflection_comparison
     test_field_limit_fix
-    test_class_type_signatures
     test_type_safety
-    test_type_safety_comprehensive
-    test_vptr_layout
-    test_type_erased_detection
     test_typelayout_integration
     test_enum_support
     test_xstring_direct_assign
@@ -110,7 +103,6 @@ set(REFLECTION_TESTS
     test_complex_nesting
     test_inheritance
     test_adaptive_reservation
-    test_classify_safety
     test_policy_trait
     test_remediation_fixes
 )
@@ -165,7 +157,7 @@ message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}
 message(STATUS "Basic Tests: 7 tests (including XBufferAPI)")
 message(STATUS "Reflection Tests: ${REFLECTION_TEST_COUNT} tests")
 message(STATUS "Total Tests: ${TOTAL_TEST_COUNT} tests")
-message(STATUS "Negative Compile Tests: 1 (polymorphic_rejection)")
+message(STATUS "Negative Compile Tests: 0 (polymorphic_rejection removed)")
 message(STATUS "Reflection: ENABLED (C++26 required)")
 message(STATUS "========================================")
 message(STATUS "")

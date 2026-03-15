@@ -6,13 +6,13 @@
 // Tests:
 //   1. C1: Polymorphic type direct rejection (vptr in TypeLayout signatures)
 //   2. C2: Nested container recursive safety (XVector<XVector<...>>)
-//   3. M2: long / unsigned long explicit rejection
+//   3. M2: long / unsigned long — locally safe (TypeLayout classify)
 //   4. L2: diagnose_unsafe_members with Policy parameter
 //   5. Combined: interaction between fixes
 //
 // Note: RelaxedPolicy (M1) was removed in the Serialization-free unification.
 //       XOffset's zero-encoding model categorically rejects all pointers
-//       (Warning→Risk escalation), so a "relaxed" mode is not meaningful.
+//       (PointerRisk escalation), so a "relaxed" mode is not meaningful.
 // ============================================================================
 
 #include <iostream>
@@ -24,7 +24,6 @@
 using namespace XOffsetDatastructure;
 using namespace XOffsetDatastructure::detail;
 using namespace boost::typelayout;
-using namespace boost::typelayout::compat;
 
 // ============================================================================
 // Test Types
@@ -99,9 +98,8 @@ struct HasLongInNested {
     HasLong   unsafe;
 };
 
-// On LP64 (Linux), long == int64_t, so both classify_for_xoffset<long>() and
-// classify_safety<HasLong>() return Safe (identical binary layout).
-// On LLP64 (Windows), long != int64_t, so long is Risk (platform-variable size).
+// On LP64 (Linux/macOS), long == int64_t, so classify_v<long> == TrivialSafe.
+// On LLP64 (Windows), long != int64_t, so long is PlatformVariant (size differs).
 constexpr bool long_is_int64 = std::is_same_v<long, int64_t>;
 
 // Custom policy that accepts all types — used for testing diagnose_unsafe_members.
@@ -125,16 +123,17 @@ bool test_c1_polymorphic() {
                   "PolyDerived (polymorphic) must be rejected");
     std::cout << "  Direct polymorphic types rejected... [OK]\n";
 
-    // TypeLayout correctly marks direct polymorphic types as Warning
-    constexpr auto lvl_poly = classify_safety<PolyBase>();
-    static_assert(lvl_poly == SafetyLevel::Warning,
-                  "PolyBase should be Warning (has vptr)");
-    std::cout << "  classify_safety<PolyBase> == Warning... [OK]\n";
+    // TypeLayout correctly marks direct polymorphic types as PointerRisk
+    // (vptr is a pointer → has_pointer == true → not trivially serializable)
+    constexpr auto lvl_poly = classify_v<PolyBase>;
+    static_assert(lvl_poly == SafetyLevel::PointerRisk,
+                  "PolyBase should be PointerRisk (has vptr)");
+    std::cout << "  classify_v<PolyBase> == PointerRisk... [OK]\n";
 
-    // is_layout_safe rejects Warning types (classify_safety != Safe → false)
-    static_assert(!is_layout_safe<PolyBase>(),
-                  "PolyBase must NOT be layout safe (Warning → rejected)");
-    std::cout << "  is_layout_safe<PolyBase> == false (Warning → rejected)... [OK]\n";
+    // is_local_serialization_free rejects types with pointers
+    static_assert(!is_local_serialization_free_v<PolyBase>,
+                  "PolyBase must NOT be locally serialization-free (has vptr)");
+    std::cout << "  is_local_serialization_free_v<PolyBase> == false... [OK]\n";
 
     // Print signatures for diagnostic
     constexpr auto sig_poly = get_layout_signature<PolyBase>();
@@ -143,23 +142,24 @@ bool test_c1_polymorphic() {
     std::cout << "  EmbedsPoly signature: " << sig_embed << "\n";
 
     // NOTE: TypeLayout propagates vptr marker through nested record signatures.
-    // EmbedsPoly's signature contains PolyBase's record with ",vptr]" marker,
-    // so classify_safety<EmbedsPoly>() correctly detects it.
+    // EmbedsPoly's signature contains PolyBase's record with vptr marker,
+    // so classify_v<EmbedsPoly> correctly detects it via has_pointer.
     // The test for embedded polymorphic detection is verified by the signature
-    // output above — if ",vptr]" appears in EmbedsPoly's sig, it's caught.
-    constexpr auto lvl_embed = classify_safety<EmbedsPoly>();
-    // Whether Warning or Safe depends on TypeLayout's signature scan depth.
+    // output above — if vptr/ptr markers appear in EmbedsPoly's sig, it's caught.
+    constexpr auto lvl_embed = classify_v<EmbedsPoly>;
+    // Whether PointerRisk or other depends on TypeLayout's signature scan depth.
     // Print the actual level for diagnostic purposes.
-    if constexpr (lvl_embed == SafetyLevel::Warning) {
-        std::cout << "  classify_safety<EmbedsPoly> == Warning (vptr propagated)... [OK]\n";
-    } else if constexpr (lvl_embed == SafetyLevel::Safe) {
+    if constexpr (lvl_embed == SafetyLevel::PointerRisk) {
+        std::cout << "  classify_v<EmbedsPoly> == PointerRisk (vptr propagated)... [OK]\n";
+    } else if constexpr (lvl_embed == SafetyLevel::TrivialSafe ||
+                         lvl_embed == SafetyLevel::PaddingRisk) {
         // This would indicate TypeLayout's signature doesn't propagate vptr
         // through nested records at the sig.contains() level — a known
         // limitation that should be addressed in TypeLayout.
-        std::cout << "  classify_safety<EmbedsPoly> == Safe (vptr NOT propagated — TypeLayout limitation)\n";
+        std::cout << "  classify_v<EmbedsPoly> == Safe/Padding (vptr NOT propagated — TypeLayout limitation)\n";
         std::cout << "  NOTE: Embedded polymorphic detection requires TypeLayout vptr propagation fix.\n";
     } else {
-        std::cout << "  classify_safety<EmbedsPoly> == Risk\n";
+        std::cout << "  classify_v<EmbedsPoly> == " << safety_level_name(lvl_embed) << "\n";
     }
 
     return true;
@@ -233,15 +233,15 @@ bool test_long_portability() {
     std::cout << "\n[TEST] long portability (TypeLayout C2 + C1)\n";
     std::cout << std::string(55, '-') << "\n";
 
-    // TypeLayout's is_layout_safe treats long as locally safe on ALL platforms.
-    // long maps to i32 or i64 depending on platform, both are Safe signatures.
+    // TypeLayout's classify_v treats long as locally safe on ALL platforms.
+    // long maps to i32 or i64 depending on platform, both are TrivialSafe.
     // Cross-platform mismatch (LP64 i64 vs LLP64 i32) is caught by C1 in CI.
-    static_assert(classify_safety<long>() == SafetyLevel::Safe,
-                  "long is locally safe (maps to i32 or i64)");
-    static_assert(is_layout_safe<long>(),
-                  "long passes is_layout_safe (C2 local check)");
-    static_assert(is_layout_safe<unsigned long>(),
-                  "unsigned long passes is_layout_safe (C2 local check)");
+    static_assert(classify_v<long> == SafetyLevel::TrivialSafe,
+                  "long is locally TrivialSafe (maps to i32 or i64)");
+    static_assert(is_local_serialization_free_v<long>,
+                  "long passes is_local_serialization_free (C2 local check)");
+    static_assert(is_local_serialization_free_v<unsigned long>,
+                  "unsigned long passes is_local_serialization_free (C2 local check)");
     std::cout << "  long/unsigned long: locally safe (C2)... [OK]\n";
 
     // TypeLayout signatures differ across platforms for long:
@@ -321,10 +321,17 @@ bool test_combined_interactions() {
                   "Map<int, XVector<SafeFlat>> must pass");
     std::cout << "  All safe nested paths still pass... [OK]\n";
 
-    // Risk types always rejected regardless of nesting
-    static_assert(!is_xbuffer_compatible<XVector<XVector<HasWchar>>>(),
-                  "Nested XVector<HasWchar> must be rejected");
-    std::cout << "  Nested container with Risk elements rejected... [OK]\n";
+    // wchar_t is locally safe (trivially copyable, no pointers) — its
+    // cross-platform size variation (2 on Windows, 4 on Linux) is caught
+    // by C1 signature comparison in CI, not by C2 local policy.
+    static_assert(is_xbuffer_compatible<XVector<XVector<HasWchar>>>(),
+                  "Nested XVector<HasWchar> is locally safe (C2)");
+    std::cout << "  Nested container with wchar_t: locally safe (C2)... [OK]\n";
+
+    // Pointer types are always rejected regardless of nesting
+    static_assert(!is_xbuffer_compatible<XVector<XVector<HasPointer>>>(),
+                  "Nested XVector<HasPointer> must be rejected");
+    std::cout << "  Nested container with pointer elements rejected... [OK]\n";
 
     return true;
 }

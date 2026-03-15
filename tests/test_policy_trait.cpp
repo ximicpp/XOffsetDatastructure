@@ -23,7 +23,6 @@
 using namespace XOffsetDatastructure;
 using namespace XOffsetDatastructure::detail;
 using namespace boost::typelayout;
-using namespace boost::typelayout::compat;
 
 // ============================================================================
 // Test types
@@ -112,12 +111,12 @@ bool test_default_policy() {
                   "Polymorphic must be rejected (Warning→Risk)");
     std::cout << "  Warning types rejected... [OK]\n";
 
-    // Risk types → rejected
-    static_assert(!is_xbuffer_compatible<HasWchar>(),
-                  "HasWchar must be rejected (Risk)");
-    static_assert(!is_xbuffer_compatible<HasLongDouble>(),
-                  "HasLongDouble must be rejected (Risk)");
-    std::cout << "  Risk types rejected... [OK]\n";
+    // Platform variant types → now accepted by DefaultPolicy (locally serialization-free)
+    static_assert(is_xbuffer_compatible<HasWchar>(),
+                  "HasWchar is locally safe (trivially_copyable + no pointer)");
+    static_assert(is_xbuffer_compatible<HasLongDouble>(),
+                  "HasLongDouble is locally safe");
+    std::cout << "  Platform variant types accepted locally... [OK]\n";
 
     return true;
 }
@@ -162,7 +161,7 @@ struct SmallTypePolicy {
     template<typename T>
     static consteval bool accept() {
         return sizeof(T) <= 24
-            && is_layout_safe<std::remove_cv_t<T>>();
+            && XOffsetDatastructure::detail::DefaultPolicy::template accept<std::remove_cv_t<T>>();
     }
 };
 
@@ -225,40 +224,42 @@ bool test_backward_compat() {
 }
 
 // ============================================================================
-// Test 6: TypeLayout classify_safety + is_layout_safe
+// Test 6: TypeLayout classify_v + is_local_serialization_free_v
 // ============================================================================
 bool test_classify_levels() {
-    std::cout << "\n[TEST] TypeLayout classify_safety + is_layout_safe\n";
+    using boost::typelayout::classify_v;
+    using boost::typelayout::SafetyLevel;
+    using boost::typelayout::is_local_serialization_free_v;
+
+    std::cout << "\n[TEST] TypeLayout classify_v + is_local_serialization_free_v\n";
     std::cout << std::string(55, '-') << "\n";
 
-    // Safe types → is_layout_safe == true
-    static_assert(classify_safety<int32_t>() == SafetyLevel::Safe,
-                  "int32_t must be Safe");
-    static_assert(is_layout_safe<int32_t>(),
-                  "int32_t must be layout safe");
-    static_assert(classify_safety<SafeRecord>() == SafetyLevel::Safe,
-                  "SafeRecord must be Safe");
-    static_assert(is_layout_safe<SafeRecord>(),
-                  "SafeRecord must be layout safe");
+    // Safe types → is_local_serialization_free_v == true
+    static_assert(classify_v<int32_t> == SafetyLevel::TrivialSafe,
+                  "int32_t must be TrivialSafe");
+    static_assert(is_local_serialization_free_v<int32_t>,
+                  "int32_t must be serialization free");
+    static_assert(is_local_serialization_free_v<SafeRecord>,
+                  "SafeRecord must be serialization free");
     std::cout << "  Safe classification... [OK]\n";
 
-    // Warning types → is_layout_safe == false
-    static_assert(classify_safety<HasPointer>() == SafetyLevel::Warning,
-                  "HasPointer must be Warning (contains pointer)");
-    static_assert(!is_layout_safe<HasPointer>(),
-                  "HasPointer must NOT be layout safe");
-    std::cout << "  Warning types rejected by is_layout_safe... [OK]\n";
+    // Pointer types → PointerRisk
+    static_assert(classify_v<HasPointer> == SafetyLevel::PointerRisk,
+                  "HasPointer must be PointerRisk");
+    static_assert(!is_local_serialization_free_v<HasPointer>,
+                  "HasPointer must NOT be serialization free");
+    std::cout << "  PointerRisk types rejected... [OK]\n";
 
-    // Risk types → is_layout_safe == false
-    static_assert(classify_safety<HasWchar>() == SafetyLevel::Risk,
-                  "HasWchar must be Risk");
-    static_assert(!is_layout_safe<HasWchar>(),
-                  "HasWchar must NOT be layout safe");
-    static_assert(classify_safety<HasLongDouble>() == SafetyLevel::Risk,
-                  "HasLongDouble must be Risk");
-    static_assert(!is_layout_safe<HasLongDouble>(),
-                  "HasLongDouble must NOT be layout safe");
-    std::cout << "  Risk types rejected by is_layout_safe... [OK]\n";
+    // Platform variant types → PlatformVariant (but locally serialization-free)
+    static_assert(classify_v<HasWchar> == SafetyLevel::PlatformVariant,
+                  "HasWchar must be PlatformVariant");
+    static_assert(is_local_serialization_free_v<HasWchar>,
+                  "HasWchar is locally serialization free (trivially_copyable + no pointer)");
+    static_assert(classify_v<HasLongDouble> == SafetyLevel::PlatformVariant,
+                  "HasLongDouble must be PlatformVariant");
+    static_assert(is_local_serialization_free_v<HasLongDouble>,
+                  "HasLongDouble is locally serialization free");
+    std::cout << "  PlatformVariant types classified correctly... [OK]\n";
 
     return true;
 }
