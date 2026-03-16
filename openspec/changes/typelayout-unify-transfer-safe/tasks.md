@@ -23,5 +23,5 @@
 
 ## 5. XOffset 侧跟进
 
-- [ ] 5.1 [needs-xoffset] TypeLayout 变更完成后，更新 XOffset 的 TypeLayout 子模块
-- [ ] 5.2 [needs-xoffset] 更新 XOffset 的 spec 和文档，说明跨平台验证现在可用
+- [x] 5.1 [needs-xoffset] TypeLayout 变更完成后，更新 XOffset 的 TypeLayout 子模块
+- [x] 5.2 [needs-xoffset] 更新 XOffset 的 spec 和文档，说明跨平台验证现在可用

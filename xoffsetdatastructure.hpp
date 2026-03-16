@@ -33,8 +33,8 @@
 // TypeLayout library — the authoritative type-signature and type-safety engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
 //   - is_byte_copy_safe_v<T>            — recursive domain admission predicate
-//   - is_local_serialization_free_v<T>  — C2: local safety (trivially_copyable + !has_pointer)
-//   - is_transfer_safe<T>(remote_sig)   — C1+C2: cross-platform serialization-free
+//   - is_transfer_safe<T>(remote_sig)   — byte-copy safe + layout signature match
+//   - is_local_serialization_free_v<T>  — strict C++ POD safety (trivially_copyable + !has_pointer)
 //   - classify_v<T>                     — 5-tier SafetyLevel (diagnostics)
 //   - get_layout_signature<T>()         — binary layout signature
 #include <boost/typelayout.hpp>
