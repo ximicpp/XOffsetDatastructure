@@ -660,25 +660,19 @@ namespace XOffsetDatastructure {
         // ============================================================================
 
         using boost::typelayout::is_byte_copy_safe_v;
-        using boost::typelayout::is_local_serialization_free_v;
-        using boost::typelayout::is_transfer_safe;
-        using boost::typelayout::classify_v;
-        using boost::typelayout::SafetyLevel;
-        using boost::typelayout::get_layout_signature;
-        using boost::typelayout::has_opaque_signature;
-        using boost::typelayout::layout_traits;
 
         template<typename T>
-        consteval const char* get_safety_error_message() {
+        consteval const char* safety_level_name() {
+            using boost::typelayout::classify_v;
+            using boost::typelayout::SafetyLevel;
             using CleanT = std::remove_cv_t<T>;
-            if constexpr (is_byte_copy_safe_v<CleanT>)              return "Type is SAFE for XBufferCore";
-            else if constexpr (std::is_polymorphic_v<CleanT>)       return "UNSAFE: polymorphic type (vtable pointer)";
-            else if constexpr (std::is_pointer_v<CleanT>)           return "UNSAFE: raw pointer";
-            else if constexpr (std::is_reference_v<CleanT>)         return "UNSAFE: reference type";
-            else if constexpr (requires { typename CleanT::allocator_type; })
-                                                                    return "UNSAFE: std container (use XVector/XMap/XSet/XString)";
-            else if constexpr (std::is_class_v<CleanT>)             return "UNSAFE: struct contains unsafe members";
-            else                                                    return "UNSAFE: type not allowed in XBufferCore";
+            constexpr auto level = classify_v<CleanT>;
+            if constexpr (level == SafetyLevel::TrivialSafe)      return "TrivialSafe";
+            else if constexpr (level == SafetyLevel::PaddingRisk) return "PaddingRisk";
+            else if constexpr (level == SafetyLevel::PlatformVariant) return "PlatformVariant";
+            else if constexpr (level == SafetyLevel::PointerRisk) return "PointerRisk";
+            else if constexpr (level == SafetyLevel::Opaque)      return "Opaque";
+            else                                                  return "Unknown";
         }
     }
 
@@ -688,7 +682,7 @@ namespace XOffsetDatastructure {
         static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
 
         static constexpr const char* reason() {
-            return detail::get_safety_error_message<T>();
+            return detail::safety_level_name<T>();
         }
     };
 
@@ -1136,6 +1130,8 @@ namespace XOffsetDatastructure {
         template<typename T>
         static consteval MigrateStrategy resolve_strategy() {
             using CleanT = std::remove_cv_t<T>;
+            static_assert(boost::typelayout::is_byte_copy_safe_v<CleanT>,
+                "XCompactor: type is not byte-copy safe and cannot be migrated.");
             if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
                 return migrate_as<CleanT>::value;
             } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
