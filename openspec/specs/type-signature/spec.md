@@ -2,9 +2,7 @@
 
 ## Purpose
 提供类型签名生成、比较和跨平台验证能力，确保 XOffsetDatastructure 的数据结构在不同编译环境、架构和进程间保持二进制兼容性。
-
 ## Requirements
-
 ### Requirement: TypeLayout 依赖集成
 
 系统 SHALL 通过 Git Submodule 方式集成 [TypeLayout](https://github.com/ximicpp/TypeLayout) 库作为类型签名的**唯一**实现，并在内部代码中优先使用 TypeLayout 提供的工具函数，避免重复实现。不再保留任何遗留兼容层。
@@ -15,6 +13,8 @@
 - 头文件路径: `external/typelayout/include`
 - 内部代码应使用 `boost::typelayout::get_member_count<T>()` 而非自行实现
 - 不再存在 `XTypeSignature` 命名空间
+- 子模块 SHALL 指向 `origin/main` 的最新 commit，确保 `layout_traits.hpp`、`serialization_free.hpp`、`classify.hpp`、`safety_level.hpp` 和 `TYPELAYOUT_OPAQUE_*_RELOCATABLE` 宏全部可用
+- `xoffsetdatastructure.hpp` 中的注释 SHALL 仅引用 TypeLayout 实际暴露的 API 名称，不引用不存在的宏或函数名
 
 #### Scenario: 初始化项目时自动拉取依赖
 - **WHEN** 用户执行 `git clone --recursive` 或 `git submodule update --init`
@@ -36,7 +36,24 @@
 - **THEN** 使用 `boost::typelayout::get_member_count<T>()`
 - **AND** 不存在功能重复的内部实现
 
----
+#### Scenario: 子模块包含完整的安全分类 API
+- **WHEN** 项目 `#include <boost/typelayout/tools/classify.hpp>`
+- **THEN** `boost::typelayout::classify_v<T>` 可用
+- **AND** `boost::typelayout::SafetyLevel` 包含 5 级分类（TrivialSafe, PaddingRisk, PlatformVariant, PointerRisk, Opaque）
+
+#### Scenario: 子模块包含 serialization-free 检查 API
+- **WHEN** 项目 `#include <boost/typelayout/tools/serialization_free.hpp>`
+- **THEN** `boost::typelayout::is_local_serialization_free_v<T>` 可用
+- **AND** `boost::typelayout::is_transfer_safe<T>(remote_sig)` 可用
+
+#### Scenario: 子模块包含 relocatable opaque 宏
+- **WHEN** 项目 `#include <boost/typelayout/opaque.hpp>`
+- **THEN** `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE`、`TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE`、`TYPELAYOUT_OPAQUE_MAP_RELOCATABLE` 宏可用
+
+#### Scenario: 注释中不引用不存在的 API
+- **WHEN** 审查 `xoffsetdatastructure.hpp` 中的注释
+- **THEN** 不存在对 `TYPELAYOUT_ASSERT_SERIALIZATION_FREE` 的引用
+- **AND** 所有注释中引用的 TypeLayout API 名称在 `external/typelayout/include` 中均可找到对应声明
 
 ### Requirement: Definition Signature API 暴露
 
@@ -138,3 +155,4 @@ namespace boost::typelayout {
 - **WHEN** 开发者需要了解 TypeLayout 与 XOffsetDatastructure 的关系
 - **THEN** 可在 `docs/TYPELAYOUT_INTEGRATION_ANALYSIS.md` 找到完整分析
 - **AND** 报告包含职责边界、使用合理性评估和改进建议
+
