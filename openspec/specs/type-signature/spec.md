@@ -15,6 +15,7 @@
 - 不再存在 `XTypeSignature` 命名空间
 - 子模块 SHALL 指向 `origin/main` 的最新 commit，确保 `layout_traits.hpp`、`serialization_free.hpp`、`classify.hpp`、`safety_level.hpp` 和 `TYPELAYOUT_OPAQUE_*_RELOCATABLE` 宏全部可用
 - `xoffsetdatastructure.hpp` 中的注释 SHALL 仅引用 TypeLayout 实际暴露的 API 名称，不引用不存在的宏或函数名
+- 跨平台传输验证 API SHALL 使用 `is_byte_copy_portable<T>(remote_sig)` 名称（不再使用 `is_transfer_safe`）
 
 #### Scenario: 初始化项目时自动拉取依赖
 - **WHEN** 用户执行 `git clone --recursive` 或 `git submodule update --init`
@@ -53,7 +54,13 @@
 #### Scenario: 注释中不引用不存在的 API
 - **WHEN** 审查 `xoffsetdatastructure.hpp` 中的注释
 - **THEN** 不存在对 `TYPELAYOUT_ASSERT_SERIALIZATION_FREE` 的引用
+- **AND** 不存在对 `is_transfer_safe` 的引用（使用 `is_byte_copy_portable` 替代）
 - **AND** 所有注释中引用的 TypeLayout API 名称在 `external/typelayout/include` 中均可找到对应声明
+
+#### Scenario: 旧 API 名称触发 deprecation warning
+- **WHEN** 用户代码调用 `boost::typelayout::is_transfer_safe<T>(sig)`
+- **THEN** 编译成功但产生 `[[deprecated]]` 警告
+- **AND** 警告提示使用 `is_byte_copy_portable` 替代
 
 ### Requirement: Layout Signature API 暴露
 
