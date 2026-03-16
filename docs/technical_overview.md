@@ -217,7 +217,7 @@ This is one of the features that was **impossible** without C++26 reflection —
 
 - **Type signatures** — `get_definition_signature<T>()`, `get_layout_signature<T>()`
 - **Safety classification** — `is_local_serialization_free_v<T>`, `classify_v<T>`
-- **Cross-platform verification** — `is_transfer_safe<T>(remote_sig)`
+- **Cross-platform verification** — `is_byte_copy_portable<T>(remote_sig)`
 - **Opaque type registration** — `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE` macros
 
 XOffset does **not** implement its own type introspection — all type safety and signature decisions are delegated to TypeLayout.
