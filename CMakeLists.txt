@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
+
+# XOffsetDatastructure: A zero-encoding/zero-decoding high-performance serialization library.
+# Requires C++20, Boost (interprocess, container, PFR), and Python 3 + PyYAML for schema codegen.
 project(XOffsetDatastructure)
 
 # Set C++ standard to C++20

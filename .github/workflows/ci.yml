@@ -1,3 +1,7 @@
+# Cross-Platform CI Workflow
+# Builds and tests XOffsetDatastructure on macOS (Clang) and Windows (MSVC).
+# Triggered on push/PR to main, develop, next_practical, and release branches.
+
 name: Cross-Platform CI
 
 on:

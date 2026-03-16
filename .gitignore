@@ -31,7 +31,9 @@ CTestTestfile.cmake
 *.swp
 *.swo
 *~
+*.user
 .DS_Store
+.cache/
 
 # Temporary files
 temp_*
@@ -42,3 +44,6 @@ temp_*
 # Test outputs
 *.out
 test_output/
+
+# OpenSpec working directory
+openspec/
