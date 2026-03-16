@@ -40,7 +40,7 @@ XOffset 的 `is_xbuffer_safe<T>::value` SHALL 直接等价于 `boost::typelayout
 `XOFFSET_REGISTER_CONTAINER(Template, name, strategy)` 和 `XOFFSET_REGISTER_MAP(Template, name, strategy)` SHALL 调用 TypeLayout 的 `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE` / `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE` 宏，后者自动生成 `opaque_elements_safe<Template<...>>` 特化。XOffset 不再生成任何自有的元素安全检查特化。
 
 #### Scenario: XOFFSET_REGISTER_CONTAINER 委托 TypeLayout
-- **WHEN** `XOFFSET_REGISTER_CONTAINER(XVector, "vector", AllocatorAware)` 展开
+- **WHEN** `XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)` 展开
 - **THEN** `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE(XVector, "vector")` 被调用
 - **AND** TypeLayout 自动生成 `opaque_elements_safe<XVector<T_>> : bool_constant<is_byte_copy_safe_v<T_>>`
 
