@@ -16,8 +16,9 @@
 | 文档 | 描述 |
 |------|------|
 | **[CORE_FORMAL_MODEL.md](CORE_FORMAL_MODEL.md)** | 🔬 核心形式化模型 — 零编码正确性的理论基础（C1+C2定理与证明） |
-| `technical_overview.md` | 技术架构概览 |
-| `MIGRATION_TYPELAYOUT.md` | TypeLayout 迁移指南与 API 参考 |
+| **[technical_overview.md](technical_overview.md)** | 🏗️ 技术架构概览 — Type Safety 四分支模型、Domain S、Registration Macros、反射构造/迁移、内存架构 |
+| **[ZERO_BOILERPLATE.md](ZERO_BOILERPLATE.md)** | ✨ 零样板 API — 纯聚合体自动分配器注入的架构与示例 |
+| **[MIGRATION_TYPELAYOUT.md](MIGRATION_TYPELAYOUT.md)** | 🔄 TypeLayout 迁移指南 — 从旧 XTypeSignature API 迁移到 boost::typelayout |
 | `README.md` | (本文件) 文档索引 |
 
 ## 🎯 使用建议
