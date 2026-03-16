@@ -55,50 +55,28 @@
 - **THEN** 不存在对 `TYPELAYOUT_ASSERT_SERIALIZATION_FREE` 的引用
 - **AND** 所有注释中引用的 TypeLayout API 名称在 `external/typelayout/include` 中均可找到对应声明
 
-### Requirement: Definition Signature API 暴露
-
-系统 SHALL 暴露 TypeLayout 的 Definition Signature API 作为推荐的类型签名接口。
-
-**核心函数**:
-```cpp
-namespace boost::typelayout {
-    template<class T> consteval auto get_definition_signature();
-    template<class T, class U> consteval bool definition_signatures_match();
-}
-```
-
-#### Scenario: 生成单一类型的 Definition Signature
-- **WHEN** 用户调用 `boost::typelayout::get_definition_signature<MyStruct>()`
-- **THEN** 返回包含字段名、类型、偏移量、继承结构的完整签名字符串
-- **AND** 签名格式为 `[64-le]record[s:N,a:M]{@offset[name]:type...}`
-
-#### Scenario: 比较两个类型的结构兼容性
-- **WHEN** 用户调用 `definition_signatures_match<TypeA, TypeB>()`
-- **THEN** 若两类型结构完全相同返回 `true`
-- **AND** 若字段名/类型/偏移/继承任一不同返回 `false`
-
----
-
 ### Requirement: Layout Signature API 暴露
 
-系统 SHALL 同时暴露 TypeLayout 的 Layout Signature API 用于纯字节布局比较场景。
+系统 SHALL 暴露 TypeLayout 的 Layout Signature API 作为推荐的类型签名接口。XOffset 使用 Layout Signature（不含字段名的纯字节布局签名）作为跨平台比较的基础。
 
 **核心函数**:
 ```cpp
 namespace boost::typelayout {
     template<class T> consteval auto get_layout_signature();
-    template<class T, class U> consteval bool layout_signatures_match();
+    template<class T, class U> inline constexpr bool signature_compare_v;
 }
 ```
 
-#### Scenario: 生成纯字节布局签名
+#### Scenario: 生成类型的 Layout Signature
 - **WHEN** 用户调用 `boost::typelayout::get_layout_signature<MyStruct>()`
 - **THEN** 返回不含字段名的纯布局签名
+- **AND** 签名格式为 `[64-le]record[s:N,a:M]{@offset:type...}`
 - **AND** 继承结构被扁平化处理
 
-#### Scenario: 共享内存/IPC 场景的布局比较
-- **WHEN** 用户调用 `layout_signatures_match<SenderType, ReceiverType>()`
+#### Scenario: 比较两个类型的布局兼容性
+- **WHEN** 用户使用 `signature_compare_v<TypeA, TypeB>`
 - **THEN** 仅比较字节布局（偏移、大小、对齐）
+- **AND** 若布局完全相同返回 `true`
 - **AND** 忽略字段名差异
 
 ---
