@@ -43,9 +43,9 @@
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
-// Target Architecture Specification
+// Target Architecture & Serialization-free Model
 //
-// XOffset Serialization-free model (fully delegated to TypeLayout):
+// XOffset delegates ALL type safety and layout portability to TypeLayout:
 //   C2 (local safety):     is_local_serialization_free_v<T>
 //                           = trivially_copyable(T) && !has_pointer(T)
 //   C1 (cross-platform):   is_transfer_safe<T>(remote_sig)
@@ -55,13 +55,8 @@
 //                           ∪ { registered opaque types (XVector, XString, ...) }
 //
 // TypeLayout's layout signature encodes sizeof, alignof, and offset for every
-// field recursively, so platform validation is implicit in the signature system.
-// Only 64-bit little-endian is supported (enforced by preprocessor checks below).
-// ============================================================================
-// ============================================================================
-// Platform validation: 64-bit little-endian only
-// All other layout properties (sizeof, alignof for each type) are captured
-// by TypeLayout's layout signature and verified by TYPELAYOUT_ASSERT_SERIALIZATION_FREE.
+// field recursively. Only 64-bit little-endian is supported (enforced by
+// preprocessor #error above and static_assert below).
 // ============================================================================
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == 8,
