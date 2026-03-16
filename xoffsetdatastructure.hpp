@@ -32,6 +32,7 @@
 
 // TypeLayout library — the authoritative type-signature and type-safety engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
+//   - is_byte_copy_safe_v<T>            — recursive domain admission predicate
 //   - is_local_serialization_free_v<T>  — C2: local safety (trivially_copyable + !has_pointer)
 //   - is_transfer_safe<T>(remote_sig)   — C1+C2: cross-platform serialization-free
 //   - classify_v<T>                     — 5-tier SafetyLevel (diagnostics)
@@ -43,20 +44,20 @@
 #include <boost/container/scoped_allocator.hpp>
 
 // ============================================================================
-// Target Architecture & Serialization-free Model
+// Target Architecture & Domain Admission
 //
-// XOffset delegates ALL type safety and layout portability to TypeLayout:
-//   C2 (local safety):     is_local_serialization_free_v<T>
-//                           = trivially_copyable(T) && !has_pointer(T)
-//   C1 (cross-platform):   is_transfer_safe<T>(remote_sig)
-//                           = C2 + layout signature match
+// Domain admission is fully delegated to TypeLayout:
+//   is_byte_copy_safe_v<T> — recursive compile-time predicate:
+//     1. Opaque types: !has_pointer && opaque_elements_safe<T>
+//     2. Leaf types: trivially_copyable && !has_pointer
+//     3. Struct/class (non-union, non-polymorphic): recurse bases + members
+//     4. Otherwise: false
 //
-// Domain S (safe type set) = { T | is_local_serialization_free_v<T> }
-//                           ∪ { registered opaque types (XVector, XString, ...) }
+// Cross-platform transfer adds layout signature matching:
+//   is_transfer_safe<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
 //
-// TypeLayout's layout signature encodes sizeof, alignof, and offset for every
-// field recursively. Only 64-bit little-endian is supported (enforced by
-// preprocessor #error above and static_assert below).
+// Only 64-bit little-endian is supported (enforced by preprocessor #error
+// above and static_assert below).
 // ============================================================================
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == 8,
@@ -654,10 +655,11 @@ namespace XOffsetDatastructure {
     namespace detail {
 
         // ============================================================================
-        // Type Safety — Domain S admission via TypeLayout + Policy wrappers
-        // Domain S = { is_local_serialization_free_v<T> } ∪ { registered opaque types }
+        // Type Safety — Domain admission fully delegated to TypeLayout
+        // is_byte_copy_safe_v<T> replaces all previous policy-based admission logic.
         // ============================================================================
 
+        using boost::typelayout::is_byte_copy_safe_v;
         using boost::typelayout::is_local_serialization_free_v;
         using boost::typelayout::is_transfer_safe;
         using boost::typelayout::classify_v;
@@ -666,99 +668,10 @@ namespace XOffsetDatastructure {
         using boost::typelayout::has_opaque_signature;
         using boost::typelayout::layout_traits;
 
-        // Policy: struct with static consteval bool accept<T>().
-        template<typename Policy, typename T, std::size_t I, std::size_t N>
-        consteval bool accept_all_members_impl() {
-            if constexpr (I >= N) {
-                return true;
-            } else {
-                using namespace std::meta;
-                constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[I];
-                using MemberT = [:type_of(member):];
-                if constexpr (!Policy::template accept<MemberT>()) {
-                    return false;
-                } else {
-                    return accept_all_members_impl<Policy, T, I + 1, N>();
-                }
-            }
-        }
-
-        template<typename Policy, typename T, std::size_t I, std::size_t N>
-        consteval bool accept_all_bases_impl() {
-            if constexpr (I >= N) {
-                return true;
-            } else {
-                using namespace std::meta;
-                constexpr auto base_info = bases_of(^^T, access_context::unchecked())[I];
-                using BaseT = [:type_of(base_info):];
-                if constexpr (!Policy::template accept<BaseT>()) {
-                    return false;
-                } else {
-                    return accept_all_bases_impl<Policy, T, I + 1, N>();
-                }
-            }
-        }
-
-        // Specialized by XOFFSET_REGISTER_* macros per container template.
-        template<typename T> struct opaque_element_types {
-            static consteval bool all_elements_safe() { return true; }
-        };
-
-        /// DefaultPolicy — C2 (local serialization-free) admission.
-        /// Shell safety = user guarantees (RELOCATABLE macro).
-        /// Element safety = TypeLayout + XOffset recursive check.
-        /// Leaf safety = TypeLayout (is_local_serialization_free_v).
-        struct DefaultPolicy {
-            template<typename T>
-            static consteval bool accept() {
-                using Clean = std::remove_cv_t<T>;
-
-                // Branch 1: Opaque types — shell safety by user, element safety verified here.
-                if constexpr (has_opaque_signature<Clean>) {
-                    return !layout_traits<Clean>::has_pointer &&
-                           opaque_element_types<Clean>::all_elements_safe();
-
-                // Branch 2: Leaf types — fully verified by TypeLayout.
-                } else if constexpr (is_local_serialization_free_v<Clean>) {
-                    return true;
-
-                // Branch 3: Struct with opaque members — recursive P2996 check.
-                } else if constexpr (std::is_class_v<Clean> && !std::is_union_v<Clean>
-                                     && !std::is_polymorphic_v<Clean>) {
-                    constexpr std::size_t bc = std::meta::bases_of(^^Clean, std::meta::access_context::unchecked()).size();
-                    constexpr std::size_t fc = std::meta::nonstatic_data_members_of(^^Clean, std::meta::access_context::unchecked()).size();
-                    return accept_all_bases_impl<DefaultPolicy, Clean, 0, bc>() &&
-                           accept_all_members_impl<DefaultPolicy, Clean, 0, fc>();
-
-                // Branch 4: Everything else → rejected.
-                } else {
-                    return false;
-                }
-            }
-        };
-
-        /// StrictPolicy<GoldSignature> — C2 + compile-time layout signature lock (C1+C2).
-        template<auto GoldSignature>
-        struct StrictPolicy {
-            template<typename T>
-            static consteval bool accept() {
-                using Clean = std::remove_cv_t<T>;
-                if constexpr (!DefaultPolicy::template accept<Clean>()) return false;
-                constexpr auto local_sig = get_layout_signature<Clean>();
-                return std::string_view(local_sig) == std::string_view(GoldSignature);
-            }
-        };
-
-        // Unified compile-time admission gate.
-        template<typename T, typename Policy = DefaultPolicy>
-        consteval bool is_xbuffer_compatible() {
-            return Policy::template accept<T>();
-        }
-
         template<typename T>
         consteval const char* get_safety_error_message() {
             using CleanT = std::remove_cv_t<T>;
-            if constexpr (is_xbuffer_compatible<CleanT>())          return "Type is SAFE for XBufferCore";
+            if constexpr (is_byte_copy_safe_v<CleanT>)              return "Type is SAFE for XBufferCore";
             else if constexpr (std::is_polymorphic_v<CleanT>)       return "UNSAFE: polymorphic type (vtable pointer)";
             else if constexpr (std::is_pointer_v<CleanT>)           return "UNSAFE: raw pointer";
             else if constexpr (std::is_reference_v<CleanT>)         return "UNSAFE: reference type";
@@ -768,58 +681,24 @@ namespace XOffsetDatastructure {
             else                                                    return "UNSAFE: type not allowed in XBufferCore";
         }
     }
-    
-    /// Public admission gate. Use reason() for diagnostics.
+
+    /// Public admission gate. Uses TypeLayout's is_byte_copy_safe_v<T> directly.
     template<typename T>
     struct is_xbuffer_safe {
-        static constexpr bool value = detail::is_xbuffer_compatible<T>();
-        
+        static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
+
         static constexpr const char* reason() {
             return detail::get_safety_error_message<T>();
         }
     };
-    
-    // Per-member diagnostic: fires static_assert per unsafe member/base for precise error location.
-    namespace detail {
-        template<typename T, typename Policy, std::size_t N>
-        consteval void diagnose_base_at() {
-            constexpr auto base_info = std::meta::bases_of(^^T, std::meta::access_context::unchecked())[N];
-            using BaseT = [:std::meta::type_of(base_info):];
-            static_assert(is_xbuffer_compatible<BaseT, Policy>(), "Unsafe base class in XBufferCore type");
-        }
-
-        template<typename T, typename Policy, std::size_t N>
-        consteval void diagnose_member_at() {
-            constexpr auto m = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[N];
-            using MemberT = [:std::meta::type_of(m):];
-            static_assert(is_xbuffer_compatible<MemberT, Policy>(), "Unsafe member in XBufferCore type");
-        }
-    } // namespace detail
-
-    template<typename T, typename Policy = detail::DefaultPolicy>
-    consteval void diagnose_unsafe_members() {
-        if constexpr (std::is_class_v<T> && !std::is_polymorphic_v<T> && !std::is_union_v<T>) {
-            constexpr std::size_t bc = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
-            constexpr std::size_t mc = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
-            [&]<std::size_t... Bs>(std::index_sequence<Bs...>) {
-                (detail::diagnose_base_at<T, Policy, Bs>(), ...);
-            }(std::make_index_sequence<bc>{});
-            [&]<std::size_t... Ms>(std::index_sequence<Ms...>) {
-                (detail::diagnose_member_at<T, Policy, Ms>(), ...);
-            }(std::make_index_sequence<mc>{});
-        }
-    }
 
     template<typename T>
     constexpr void validate_xbuffer_type() {
         static_assert(is_xbuffer_safe<T>::value,
-            "XBuffer Type Safety Error: type is not serialization-free. "
+            "XBuffer Type Safety Error: type is not byte-copy safe. "
             "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
             "or structs composed of these. "
             "Not allowed: pointers, references, virtual types, std containers.");
-        if constexpr (!is_xbuffer_safe<T>::value) {
-            diagnose_unsafe_members<T>();
-        }
     }
 
     // ========================================================================
@@ -1433,13 +1312,6 @@ struct _XOffset_NS_Sentinel {};
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE(XOffsetDatastructure::Template, name) \
     }}                                                                         \
-    template<typename T_>                                                       \
-    struct XOffsetDatastructure::detail::opaque_element_types<                  \
-        XOffsetDatastructure::Template<T_>> {                                  \
-        static consteval bool all_elements_safe() {                            \
-            return XOffsetDatastructure::detail::DefaultPolicy::template accept<T_>(); \
-        }                                                                      \
-    };                                                                         \
     template<typename T_> struct XOffsetDatastructure::XCompactor::migrate_as< \
         XOffsetDatastructure::Template<T_>> {                                  \
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
@@ -1451,14 +1323,6 @@ struct _XOffset_NS_Sentinel {};
     namespace boost { namespace typelayout {                                    \
         TYPELAYOUT_OPAQUE_MAP_RELOCATABLE(XOffsetDatastructure::Template, name) \
     }}                                                                         \
-    template<typename K_, typename V_>                                          \
-    struct XOffsetDatastructure::detail::opaque_element_types<                  \
-        XOffsetDatastructure::Template<K_, V_>> {                              \
-        static consteval bool all_elements_safe() {                            \
-            return XOffsetDatastructure::detail::DefaultPolicy::template accept<K_>() && \
-                   XOffsetDatastructure::detail::DefaultPolicy::template accept<V_>(); \
-        }                                                                      \
-    };                                                                         \
     template<typename K_, typename V_>                                          \
     struct XOffsetDatastructure::XCompactor::migrate_as<                        \
         XOffsetDatastructure::Template<K_, V_>> {                              \

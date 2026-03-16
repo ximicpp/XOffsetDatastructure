@@ -180,7 +180,7 @@ struct HasLong {
 };
 
 // long is always locally serialization-free: it's a trivially copyable
-// scalar with no pointers.  DefaultPolicy::accept<HasLong>() == true.
+// scalar with no pointers.  is_byte_copy_safe_v<HasLong> == true.
 static_assert(is_xbuffer_safe<HasLong>::value,
     "HasLong: locally safe on all platforms (C2)");
 

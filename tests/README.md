@@ -47,7 +47,7 @@ docker run --rm --platform linux/amd64 \
 | 20 | `test_complex_nesting.cpp` | 深层嵌套、多容器组合 |
 | 21 | `test_inheritance.cpp` | 继承、多重继承、组合 |
 | 22 | `test_adaptive_reservation.cpp` | 自适应缓冲区预留 |
-| 23 | `test_policy_trait.cpp` | DefaultPolicy/StrictPolicy/自定义策略、C2 嵌套安全 |
+| 23 | `test_policy_trait.cpp` | is_byte_copy_safe_v 统一准入、签名比较、C2 嵌套安全 |
 
 ### 精简记录
 
