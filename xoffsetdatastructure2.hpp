@@ -518,7 +518,6 @@ namespace XOffsetDatastructure2 {
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename T>
 	using XSet = boost::container::flat_set<T, std::less<T>, allocator<T, XBufferBase::segment_manager>>;
-	// using XSet = boost::container::set<T, std::less<T>, allocator<T, XBufferBase::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatset = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename T>
@@ -530,7 +529,6 @@ namespace XOffsetDatastructure2 {
 #if OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 0
 	template <typename K, typename V>
 	using XMap = boost::container::flat_map<K, V, std::less<K>, allocator<std::pair<K, V>, XBufferBase::segment_manager>>;
-	// using XMap = boost::container::map<K, V, std::less<K>, allocator<std::pair<const K, V>, XBufferBase::segment_manager>>;
 #elif OFFSET_DATA_STRUCTURE_2_CUSTOM_CONTAINER_GROWTH_FACTOR == 1
 	using vector_option_flatmap = boost::container::vector_options_t<boost::container::growth_factor<growth_factor_custom>>;
 	template <typename K, typename V>
@@ -731,7 +729,7 @@ namespace XOffsetDatastructure2 {
 		}
 	};
 
-	// XBufferExt: Extended XBuffer
+	// XBuffer: Extended buffer with high-level API
 	
 	// Type trait for XString
 	template<typename T>
@@ -769,11 +767,11 @@ namespace XOffsetDatastructure2 {
 	public:
 		using XBufferBase::XBufferBase;
 
-	// Object Creation API - Root Objects (named, persistent, findable)
-	template<typename T>
-	T* make_root(const char* name) {
-		return this->construct<T>(name)(this->get_segment_manager());
-	}
+		// Object Creation API - Root Objects (named, persistent, findable)
+		template<typename T>
+		T* make_root(const char* name) {
+			return this->construct<T>(name)(this->get_segment_manager());
+		}
 		
 		// Allocator access methods (unified naming)
 		template<typename T>
@@ -862,7 +860,7 @@ namespace XOffsetDatastructure2 {
 			return XBufferBase();
 		}
 	};
-}
+} // namespace XOffsetDatastructure2
 
 // Type Signature Support for XOffsetDatastructure2 Containers
 namespace XTypeSignature {
