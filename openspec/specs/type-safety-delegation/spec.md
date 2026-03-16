@@ -48,15 +48,15 @@ XOffset 的 `is_xbuffer_safe<T>::value` SHALL 直接等价于 `boost::typelayout
 
 ### Requirement: 跨平台传输验证
 
-`is_transfer_safe<T>(remote_sig)` SHALL 使用 `is_byte_copy_safe_v<T>` 作为本地安全前提（而非 `is_local_serialization_free_v<T>`），使所有 byte-copy safe 的类型（包括 relocatable opaque 类型）都可进行跨平台签名验证。
+`is_byte_copy_portable<T>(remote_sig)` SHALL 使用 `is_byte_copy_safe_v<T>` 作为本地安全前提（而非 `is_local_serialization_free_v<T>`），使所有 byte-copy safe 的类型（包括 relocatable opaque 类型）都可进行跨平台签名验证。
 
 #### Scenario: 含 opaque 成员的 struct 跨平台验证
-- **WHEN** `is_transfer_safe<Player>(remote_sig)` 且 Player 包含 XString + XVector<int32_t>
+- **WHEN** `is_byte_copy_portable<Player>(remote_sig)` 且 Player 包含 XString + XVector<int32_t>
 - **THEN** 若本地签名与 remote_sig 匹配，返回 true
 - **AND** 若签名不匹配，返回 false
 
 #### Scenario: 不安全类型被拒绝
-- **WHEN** `is_transfer_safe<HasPointer>(remote_sig)` 且 HasPointer 包含原生指针
+- **WHEN** `is_byte_copy_portable<HasPointer>(remote_sig)` 且 HasPointer 包含原生指针
 - **THEN** 返回 false（`is_byte_copy_safe_v<HasPointer>` 为 false，无论签名是否匹配）
 
 ---

@@ -33,7 +33,7 @@
 // TypeLayout library — the authoritative type-signature and type-safety engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
 //   - is_byte_copy_safe_v<T>            — recursive domain admission predicate
-//   - is_transfer_safe<T>(remote_sig)   — byte-copy safe + layout signature match
+//   - is_byte_copy_portable<T>(remote_sig) — byte-copy safe + layout signature match
 //   - is_local_serialization_free_v<T>  — strict C++ POD safety (trivially_copyable + !has_pointer)
 //   - classify_v<T>                     — 5-tier SafetyLevel (diagnostics)
 //   - get_layout_signature<T>()         — binary layout signature
@@ -54,7 +54,7 @@
 //     4. Otherwise: false
 //
 // Cross-platform transfer adds layout signature matching:
-//   is_transfer_safe<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
+//   is_byte_copy_portable<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
 //
 // Only 64-bit little-endian is supported (enforced by preprocessor #error
 // above and static_assert below).

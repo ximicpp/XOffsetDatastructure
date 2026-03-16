@@ -44,7 +44,7 @@
 #### Scenario: 子模块包含 serialization-free 检查 API
 - **WHEN** 项目 `#include <boost/typelayout/tools/serialization_free.hpp>`
 - **THEN** `boost::typelayout::is_local_serialization_free_v<T>` 可用
-- **AND** `boost::typelayout::is_transfer_safe<T>(remote_sig)` 可用
+- **AND** `boost::typelayout::is_byte_copy_portable<T>(remote_sig)` 可用
 
 #### Scenario: 子模块包含 relocatable opaque 宏
 - **WHEN** 项目 `#include <boost/typelayout/opaque.hpp>`
