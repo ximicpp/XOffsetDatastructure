@@ -35,6 +35,32 @@ XOffset 的 `is_xbuffer_safe<T>::value` SHALL 直接等价于 `boost::typelayout
 
 ---
 
+### Requirement: 验证时机分层模型
+
+类型安全验证 SHALL 分三层完成，运行时不执行任何签名校验：
+
+| 层 | 时机 | 验证内容 | 机制 |
+|---|---|---|---|
+| 编译期 | `make<T>()` / `compact<T>()` 实例化 | 类型是否 byte-copy safe | `is_byte_copy_safe_v<T>` (consteval) |
+| 构建期 | CI / `tools/check_compat` | 目标架构集合的布局是否一致 | `static_assert(layout_match(...))` |
+| 运行时 | `save()` / `load()` | 无 — 只做字节搬运 | 零开销 |
+
+**设计前提**：架构集合和类型集合在使用前已确定（编译时已知所有参与类型，CI 覆盖所有目标架构）。在此前提下，运行时签名校验是冗余开销。
+
+**与 TypeLayout `is_transfer_safe<T>(remote_sig)` 的关系**：该 API 为动态发现对端的场景设计（如两个独立进程运行时握手交换签名）。XOffset 的预定义场景不需要运行时握手，因此 `save()`/`load()` 不调用此 API。
+
+#### Scenario: save/load 不包含签名数据
+- **WHEN** 用户调用 `buf.save()` 序列化
+- **THEN** 输出仅包含原始 managed_external_buffer 字节
+- **AND** 不包含类型签名头、版本号或其他元数据
+
+#### Scenario: 跨架构安全由构建期保证
+- **WHEN** CI 在目标架构 A 和 B 上分别运行 `export_signatures` 并执行 `check_compat`
+- **THEN** `static_assert(layout_match(A_sig, B_sig))` 在编译期通过
+- **AND** 运行时 `load()` 无需重复验证
+
+---
+
 ### Requirement: Opaque 容器注册宏
 
 `XOFFSET_REGISTER_CONTAINER(Template, name, strategy)` 和 `XOFFSET_REGISTER_MAP(Template, name, strategy)` SHALL 调用 TypeLayout 的 `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE` / `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE` 宏，后者自动生成 `opaque_elements_safe<Template<...>>` 特化。XOffset 不再生成任何自有的元素安全检查特化。
