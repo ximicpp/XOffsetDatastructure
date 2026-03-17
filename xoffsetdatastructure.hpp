@@ -56,6 +56,11 @@
 // Cross-platform transfer adds layout signature matching:
 //   is_byte_copy_portable<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
 //
+// Verification timing (architecture & type sets are pre-defined):
+//   Compile-time: is_byte_copy_safe_v<T>           — type admission gate
+//   Build-time:   tools/check_compat static_assert  — cross-arch layout match
+//   Runtime:      save()/load() do raw byte I/O     — zero overhead, no sig check
+//
 // Only 64-bit little-endian is supported (enforced by preprocessor #error
 // above and static_assert below).
 // ============================================================================
