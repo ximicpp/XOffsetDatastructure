@@ -256,14 +256,10 @@ bool test_enum_signature_identity() {
     constexpr auto quest_def = boost::typelayout::get_layout_signature<QuestStatus>();
     constexpr auto dir_def = boost::typelayout::get_layout_signature<Direction>();
 
-    // Definition signatures embed type names — they must differ
-    static_assert(!boost::typelayout::layout_signatures_match<WeaponType, QuestStatus>(),
-        "Different enums should have different definition signatures");
-    std::cout << "  WeaponType != QuestStatus (definition) ... [OK]\n";
-
-    static_assert(!boost::typelayout::layout_signatures_match<WeaponType, Direction>(),
-        "Different enums should have different definition signatures");
-    std::cout << "  WeaponType != Direction (definition) ... [OK]\n";
+    // Layout signatures: enums with different underlying types should differ
+    static_assert(!(weapon_def == dir_def),
+        "WeaponType (uint8_t) and Direction (int32_t) should have different layout signatures");
+    std::cout << "  WeaponType != Direction (layout) ... [OK]\n";
 
     // Layout signatures may match if underlying types have same size/alignment
     // (this is expected — layout only cares about binary representation)

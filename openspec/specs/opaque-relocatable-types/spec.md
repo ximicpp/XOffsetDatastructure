@@ -15,7 +15,7 @@ TypeLayout SHALL 提供 `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE`、`TYPELAYOUT_OPAQU
 - **WHEN** 用户使用 `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE(MyString, "string")` 注册一个不满足 `trivially_copyable` 但使用 offset_ptr 的容器类型
 - **THEN** 编译成功，不触发任何 `static_assert`
 - **AND** `has_opaque_signature<MyString>` 返回 true
-- **AND** `layout_traits<MyString>::has_pointer` 返回 false
+- **AND** `detail::layout_traits<MyString>::has_pointer` 返回 false
 
 #### Scenario: 容器模板注册
 - **WHEN** 用户使用 `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE(MyVector, "vector")` 注册容器模板
@@ -32,7 +32,7 @@ TypeLayout SHALL 提供 `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE`、`TYPELAYOUT_OPAQU
 
 TypeLayout 的 `SigExporter` 类 SHALL 提供 `add_relocatable<T>(name)` 方法，用于导出包含 relocatable opaque 成员的类型签名。
 
-该方法 SHALL 使用 `static_assert(!layout_traits<T>::has_pointer)` 替代 `static_assert(std::is_trivially_copyable_v<T>)` 作为准入检查。
+该方法 SHALL 使用 `static_assert(!detail::layout_traits<T>::has_pointer)` 替代 `static_assert(std::is_trivially_copyable_v<T>)` 作为准入检查。
 
 **约束**:
 - 方法定义位置: `external/typelayout/include/boost/typelayout/tools/sig_export.hpp`

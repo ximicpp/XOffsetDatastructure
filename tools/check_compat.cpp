@@ -2,7 +2,7 @@
 // XOffsetDatastructure Cross-Platform Compatibility Check
 //
 // Compares exported .sig.hpp files across platforms.
-// This file can be compiled with any C++17 compiler — P2996 is NOT required.
+// This file can be compiled with any C++26 compiler — P2996 is NOT required.
 //
 // Usage: ./check_compat
 // ============================================================================
@@ -14,7 +14,6 @@
 namespace linux_plat = boost::typelayout::platform::x86_64_linux_clang;
 
 using boost::typelayout::compat::layout_match;
-using boost::typelayout::compat::definition_match;
 
 // ============================================================================
 // Compile-time self-verification (same platform → must match)
@@ -22,18 +21,12 @@ using boost::typelayout::compat::definition_match;
 
 static_assert(layout_match(linux_plat::Player_layout, linux_plat::Player_layout),
     "Player: self layout mismatch!");
-static_assert(definition_match(linux_plat::Player_definition, linux_plat::Player_definition),
-    "Player: self definition mismatch!");
 
 static_assert(layout_match(linux_plat::Item_layout, linux_plat::Item_layout),
     "Item: self layout mismatch!");
-static_assert(definition_match(linux_plat::Item_definition, linux_plat::Item_definition),
-    "Item: self definition mismatch!");
 
 static_assert(layout_match(linux_plat::GameData_layout, linux_plat::GameData_layout),
     "GameData: self layout mismatch!");
-static_assert(definition_match(linux_plat::GameData_definition, linux_plat::GameData_definition),
-    "GameData: self definition mismatch!");
 
 // ============================================================================
 // Runtime report

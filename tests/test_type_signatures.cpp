@@ -109,7 +109,7 @@ void test_basic_signatures() {
     print_sig<ClassWithMethods>("ClassWithMethods");
 
     // struct and class with same layout should match
-    constexpr bool match = layout_signatures_match<SimpleStruct, SimpleClass>();
+    constexpr bool match = (get_layout_signature<SimpleStruct>() == get_layout_signature<SimpleClass>());
     static_assert(match, "SimpleStruct and SimpleClass have identical ABI");
     std::cout << "  struct==class layout: " << match << " [OK]\n";
     std::cout << "[PASS]\n\n";
@@ -232,21 +232,27 @@ void test_platform_prefix() {
 // ---------------------------------------------------------------------------
 
 void test_safety_classification() {
-    std::cout << "[Test 7] Safety Classification (classify_v)\n";
+    using boost::typelayout::detail::SafetyLevel;
+    using boost::typelayout::detail::classify_signature;
+    using boost::typelayout::detail::safety_level_name;
+
+    std::cout << "[Test 7] Safety Classification (classify_signature)\n";
     std::cout << std::string(50, '-') << "\n";
 
     // SimpleStruct: trivially copyable, no pointers
-    constexpr auto lvl_simple = classify_v<SimpleStruct>;
+    constexpr auto sig_simple = get_layout_signature<SimpleStruct>();
+    auto lvl_simple = classify_signature(std::string_view(sig_simple.value, sig_simple.size));
     std::cout << "  SimpleStruct: " << safety_level_name(lvl_simple) << "\n";
-    static_assert(lvl_simple == SafetyLevel::TrivialSafe || lvl_simple == SafetyLevel::PaddingRisk,
-                  "SimpleStruct should be TrivialSafe or PaddingRisk");
+    assert(lvl_simple == SafetyLevel::TrivialSafe || lvl_simple == SafetyLevel::PaddingRisk);
 
     // DerivedClass (non-virtual inheritance): safe
-    constexpr auto lvl_derived = classify_v<DerivedClass>;
+    constexpr auto sig_derived = get_layout_signature<DerivedClass>();
+    auto lvl_derived = classify_signature(std::string_view(sig_derived.value, sig_derived.size));
     std::cout << "  DerivedClass: " << safety_level_name(lvl_derived) << "\n";
 
-    // PolymorphicClass: not safe
-    constexpr auto lvl_poly = classify_v<PolymorphicClass>;
+    // PolymorphicClass: not safe — has pointer (vtable), classified as PointerRisk
+    constexpr auto sig_poly = get_layout_signature<PolymorphicClass>();
+    auto lvl_poly = classify_signature(std::string_view(sig_poly.value, sig_poly.size));
     std::cout << "  PolymorphicClass: " << safety_level_name(lvl_poly) << "\n";
 
     std::cout << "[PASS]\n\n";

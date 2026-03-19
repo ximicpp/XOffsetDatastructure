@@ -22,7 +22,7 @@ When the TypeLayout submodule (`external/typelayout`) is updated, XOffset may ne
    - `include/boost/typelayout/` — renamed/removed/added headers
    - Public API changes: function renames, signature changes, new/removed type traits
    - Macro renames in `opaque.hpp` (e.g., `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE`)
-   - `tools/` headers: `sig_export.hpp`, `compat_auto.hpp`, `classify.hpp`, `sig_types.hpp`
+   - `tools/` headers: `sig_export.hpp`, `compat_auto.hpp`, `sig_types.hpp`
    - Namespace changes
 
 4. Summarize the upstream diff to the user as a change list before proceeding.
@@ -50,7 +50,7 @@ The header has these TypeLayout integration zones (search to locate):
 - **Domain admission comment block** (lines ~46-60): starting with `// Target Architecture & Domain Admission` — update if admission API changed
 - **using declarations** (search `using boost::typelayout::`): update renamed symbols
 - **Registration macros** (search `TYPELAYOUT_OPAQUE_`): update if macro names changed in TypeLayout
-- **Any direct API calls**: `is_byte_copy_safe_v`, `classify_v`, `SafetyLevel`, `is_local_serialization_free_v`, `get_layout_signature`, `is_byte_copy_portable`
+- **Any direct API calls**: `is_byte_copy_safe_v`, `SafetyLevel`, `get_layout_signature`, `is_transfer_safe`, `detail::classify_signature()`
 
 ### 3.2 Tools: `tools/export_signatures.cpp`
 
