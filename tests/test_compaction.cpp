@@ -41,7 +41,7 @@ bool test_memory_compaction() {
     
     // Test 2: Check memory stats before compaction
     std::cout << "Test 2: Memory stats before compaction... ";
-    auto stats_before = XBufferStats::memory_stats(xbuf);
+    auto stats_before = memory_stats(xbuf);
     std::cout << "\n  Total size: " << stats_before.total_size << " bytes\n";
     std::cout << "  Used:       " << stats_before.used_size << " bytes\n";
     std::cout << "  Free:       " << stats_before.free_size << " bytes\n";
@@ -56,7 +56,7 @@ bool test_memory_compaction() {
     
     // Test 4: Check memory stats after compaction
     std::cout << "Test 4: Memory stats after compaction... ";
-    auto stats_after = XBufferStats::memory_stats(compact_buf);
+    auto stats_after = memory_stats(compact_buf);
     std::cout << "\n  Total size: " << stats_after.total_size << " bytes\n";
     std::cout << "  Used:       " << stats_after.used_size << " bytes\n";
     std::cout << "  Free:       " << stats_after.free_size << " bytes\n";

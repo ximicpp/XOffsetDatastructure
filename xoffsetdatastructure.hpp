@@ -39,27 +39,8 @@
 #include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
 
-// ============================================================================
-// Target Architecture & Domain Admission
-//
-// Domain admission is fully delegated to TypeLayout:
-//   is_byte_copy_safe_v<T> — recursive compile-time predicate:
-//     1. Opaque types: !has_pointer && opaque_elements_safe<T>
-//     2. Leaf types: trivially_copyable && !has_pointer
-//     3. Struct/class (non-union, non-polymorphic): recurse bases + members
-//     4. Otherwise: false
-//
-// Cross-platform transfer adds layout signature matching:
-//   is_transfer_safe<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
-//
-// Verification timing (architecture & type sets are pre-defined):
-//   Compile-time: is_byte_copy_safe_v<T>           — type admission gate
-//   Build-time:   tools/check_compat static_assert  — cross-arch layout match
-//   Runtime:      save()/load() do raw byte I/O     — zero overhead, no sig check
-//
-// Only 64-bit little-endian is supported (enforced by preprocessor #error
-// above and static_assert below).
-// ============================================================================
+// Platform: 64-bit little-endian only.
+// Type safety: delegated to TypeLayout (see boost::typelayout::is_byte_copy_safe_v<T>).
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == 8,
     "XOffsetDatastructure requires 64-bit platform (sizeof(void*) must be 8)");
@@ -72,7 +53,6 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
 #include <boost/interprocess/detail/managed_memory_impl.hpp>
 #include <boost/interprocess/indexes/iset_index.hpp>
 #include <boost/interprocess/exceptions.hpp>
-#include <boost/interprocess/mem_algo/simple_seq_fit.hpp>
 #include <boost/interprocess/mem_algo/rbtree_best_fit.hpp>
 #include <boost/interprocess/sync/mutex_family.hpp>
 #include <boost/container/vector.hpp>
@@ -96,20 +76,6 @@ public:
 
     x_best_fit(typename supertype::size_type size, typename supertype::size_type extra_hdr_bytes)
         : supertype(size, extra_hdr_bytes)
-    {
-    }
-};
-
-template <class MutexFamily, class VoidPointer = offset_ptr<void>>
-class x_seq_fit : public simple_seq_fit<MutexFamily, VoidPointer>
-{
-    typedef simple_seq_fit<MutexFamily, VoidPointer> supertype;
-
-public:
-    typedef typename supertype::size_type size_type;
-
-    x_seq_fit(typename supertype::size_type segment_size, typename supertype::size_type extra_hdr_bytes)
-        : supertype(segment_size, extra_hdr_bytes)
     {
     }
 };
@@ -324,14 +290,7 @@ namespace XOffsetDatastructure {
     using namespace boost::interprocess;
 
     // rbtree_best_fit: O(log n) allocation with automatic free-block coalescing.
-    // Reduces fragmentation compared to simple_seq_fit, at the cost of slightly
-    // larger per-allocation headers (~32-64 bytes vs ~16 bytes).
-    // This is the right choice for XOffset's workload pattern (frequent
-    // alloc+dealloc cycles from container growth and string reassignment).
     using XBufferCore = XManagedMemory<char, x_best_fit<null_mutex_family>, iset_index>;
-    // Alternative allocator policy (sequential fit). Faster allocation O(n)
-    // but no free-block coalescing — only suitable for append-only workloads.
-    using XBufferCoreSeqFit = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
 
     // ========================================================================
     // Container implementation details.
@@ -621,34 +580,17 @@ namespace XOffsetDatastructure {
     static_assert(sizeof(XSet<int>) == sizeof(detail::x_set_impl<int>),
         "XSet wrapper must be zero-overhead");
 
-    class XBufferStats {
-    public:
-        struct MemoryStats {
-            std::size_t total_size;
-            std::size_t free_size;
-            std::size_t used_size;
-            
-            double usage_percent() const {
-                return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0;
-            }
-            
-            double free_percent() const {
-                return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0;
-            }
-        };
-
-        static MemoryStats memory_stats(XBufferCore& xbuf) {
-            MemoryStats stats = {};
-            stats.total_size = xbuf.get_size();
-            stats.free_size = xbuf.get_free_memory();
-            stats.used_size = stats.total_size - stats.free_size;
-            return stats;
-        }
-
+    struct MemoryStats {
+        std::size_t total_size;
+        std::size_t free_size;
+        std::size_t used_size;
+        double usage_percent() const { return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0; }
+        double free_percent() const  { return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0; }
     };
 
-    // Forward declarations for safety gate and validation
-    template<typename T> constexpr void validate_xbuffer_type();
+    inline MemoryStats memory_stats(XBufferCore& xbuf) {
+        return { xbuf.get_size(), xbuf.get_free_memory(), xbuf.get_size() - xbuf.get_free_memory() };
+    }
 
     // Internal constant for the single root object name.
     // Users never see this — all public APIs hide the naming layer.
@@ -656,15 +598,9 @@ namespace XOffsetDatastructure {
 
     namespace detail {
 
-        // ============================================================================
-        // Type Safety — Domain admission fully delegated to TypeLayout
-        // is_byte_copy_safe_v<T> replaces all previous policy-based admission logic.
-        // ============================================================================
-
+        // Type Safety — domain admission delegated to TypeLayout.
         using boost::typelayout::is_byte_copy_safe_v;
 
-        /// Compile-time diagnostic: why is a type safe or unsafe?
-        /// Uses only public TypeLayout API + standard type_traits.
         template<typename T>
         consteval const char* describe_safety() {
             using CleanT = std::remove_cv_t<T>;
@@ -678,17 +614,14 @@ namespace XOffsetDatastructure {
                 return "rejected: contains pointer, reference, or unsafe member";
             }
         }
-    }
+    } // namespace detail
 
     /// Public admission gate — alias for TypeLayout's is_byte_copy_safe_v<T>.
     /// Prefer using boost::typelayout::is_byte_copy_safe_v<T> directly in new code.
     template<typename T>
     struct is_xbuffer_safe {
         static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
-
-        static constexpr const char* reason() {
-            return detail::describe_safety<T>();
-        }
+        static constexpr const char* reason() { return detail::describe_safety<T>(); }
     };
 
     template<typename T>
@@ -702,7 +635,6 @@ namespace XOffsetDatastructure {
 
     // ========================================================================
     // Reflection-based construction and transfer (C++26 P2996).
-    // Enables zero-boilerplate: pure aggregates work with make<T>() automatically.
     // ========================================================================
     namespace detail {
 
@@ -1019,8 +951,8 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
-        XBufferStats::MemoryStats stats() {
-            return XBufferStats::memory_stats(*this);
+        MemoryStats stats() {
+            return memory_stats(*this);
         }
 
         // Estimates a suitable buffer size for the given user data payload.
@@ -1101,7 +1033,7 @@ namespace XOffsetDatastructure {
         template<typename T>
         static XBuffer compact(XBufferCore& old_xbuf) {
             validate_xbuffer_type<T>();
-            auto stats = XBufferStats::memory_stats(old_xbuf);
+            auto stats = memory_stats(old_xbuf);
             auto* old_obj = detail::find_root<T>(old_xbuf);
 
             // Progressive multipliers: try smaller first, fall back to larger
