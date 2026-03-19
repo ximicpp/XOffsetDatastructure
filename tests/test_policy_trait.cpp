@@ -19,6 +19,7 @@
 #include <cassert>
 
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout/tools/safety_level.hpp>  // detail::classify_signature, SafetyLevel
 
 using namespace XOffsetDatastructure;
 using namespace XOffsetDatastructure::detail;
