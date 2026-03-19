@@ -218,7 +218,7 @@ bool test_inheritance_compaction() {
         w->skills.push_back(XString(skill_name.c_str(), xbuf.get_segment_manager()));
     }
 
-    auto stats_before = XBufferStats::memory_stats(xbuf);
+    auto stats_before = memory_stats(xbuf);
     std::cout << "  Before compact: used=" << stats_before.used_size
               << " total=" << stats_before.total_size << "\n";
 
@@ -226,7 +226,7 @@ bool test_inheritance_compaction() {
     auto compacted = XCompactor::compact<Warrior>(xbuf);
     auto& w2 = compacted.root<Warrior>();
 
-    auto stats_after = XBufferStats::memory_stats(compacted);
+    auto stats_after = memory_stats(compacted);
     std::cout << "  After compact:  used=" << stats_after.used_size
               << " total=" << stats_after.total_size << "\n";
 
