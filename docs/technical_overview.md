@@ -37,11 +37,11 @@ The single header is organized into these major sections (approximate line range
 The library defines a **Safe Type Set S** — only types in S can be stored in the buffer:
 
 ```
-Domain S = { T | is_local_serialization_free_v<T> }
+Domain S = { T | is_byte_copy_safe_v<T> }
          ∪ { registered opaque types (XVector, XString, XSet, XMap, ...) }
 ```
 
-Where `is_local_serialization_free_v<T>` (from TypeLayout) means:
+Where `is_byte_copy_safe_v<T>` (from TypeLayout) means for leaf types:
 - `std::is_trivially_copyable_v<T> == true`
 - `!has_pointer<T>` (no raw pointers in the transitive closure of T's members)
 
@@ -52,7 +52,7 @@ Where `is_local_serialization_free_v<T>` (from TypeLayout) means:
 | Branch | Condition | Meaning |
 |--------|-----------|---------|
 | **1: Opaque** | `has_opaque_signature<T>` | Registered container types (XString, XVector, etc.). Shell safety guaranteed by the user via `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE` macro. Element safety is recursively verified via `opaque_element_types<T>::all_elements_safe()`. |
-| **2: Leaf** | `is_local_serialization_free_v<T>` | Primitive and trivially-copyable pointer-free types. Fully verified by TypeLayout — no recursion needed. |
+| **2: Leaf** | `is_byte_copy_safe_v<T>` (trivially copyable + pointer-free) | Primitive and trivially-copyable pointer-free types. Fully verified by TypeLayout — no recursion needed. |
 | **3: Composite** | `std::is_class_v<T> && !is_union_v && !is_polymorphic_v` | User-defined structs with opaque or mixed members. Uses C++26 P2996 reflection (`nonstatic_data_members_of`, `bases_of`) to recursively check each member and base class. |
 | **4: Rejected** | Everything else | Raw pointers, references, polymorphic types (vtable), unions — rejected. |
 
@@ -216,8 +216,8 @@ This is one of the features that was **impossible** without C++26 reflection —
 [TypeLayout](https://github.com/ximicpp/TypeLayout) is integrated as a Git submodule at `external/typelayout`. It serves as the authoritative engine for:
 
 - **Type signatures** — `get_definition_signature<T>()`, `get_layout_signature<T>()`
-- **Safety classification** — `is_local_serialization_free_v<T>`, `classify_v<T>`
-- **Cross-platform verification** — `is_byte_copy_portable<T>(remote_sig)`
+- **Safety classification** — `is_byte_copy_safe_v<T>`, `detail::classify_signature()` (runtime)
+- **Cross-platform verification** — `is_transfer_safe<T>(remote_sig)`
 - **Opaque type registration** — `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE` macros
 
 XOffset does **not** implement its own type introspection — all type safety and signature decisions are delegated to TypeLayout.

@@ -25,7 +25,7 @@ TypeLayout 是一个**通用的编译时类型签名库**，与序列化无关�
 **关键设计原则**：
 - TypeLayout **不知道**任何 XOffsetDatastructure 的类型
 - TypeLayout 对用户定义类型是开放的（通过 `TypeSignature<T, Mode>` 模板特化）
-- TypeLayout 的工具层（`tools/`）不需要 P2996，可在 C++17 编译器上运行
+- TypeLayout 的工具层（`tools/`）不需要 P2996，可在 C++26 编译器上运行
 
 ### 1.2 XOffsetDatastructure 的类型签名需求
 
@@ -261,7 +261,7 @@ XOffsetDatastructure 在 `boost::typelayout` 命名空间中注册了 4 个模�
 
 **评估：✅ 同步，但有潜在分化风险**
 
-TypeLayout 的工具层（`tools/`）设计为 C++17 兼容（不需要 P2996）。如果 TypeLayout 未来支持非 P2996 编译器（通过手动类型注册），而 XOffsetDatastructure 继续强制要求 P2996，可能出现功能集不对称。
+TypeLayout 的工具层（`tools/`）设计为 C++26 兼容（不需要 P2996）。如果 TypeLayout 未来支持非 P2996 编译器（通过手动类型注册），而 XOffsetDatastructure 继续强制要求 P2996，可能出现功能集不对称。
 
 ---
 

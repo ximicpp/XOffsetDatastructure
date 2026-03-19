@@ -63,7 +63,7 @@ When adding a test: register in `tests/CMakeLists.txt` (add to `REFLECTION_TESTS
 The entire library lives in one header, organized as:
 
 1. **Platform guards** — enforces 64-bit little-endian only
-2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`, `classify_v<T>`)
+2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`, `is_transfer_safe<T>(sig)`)
 3. **Memory allocator** — `x_best_fit` (rbtree-based), backing `XBufferCore` (managed_external_buffer with `offset_ptr`)
 4. **Container types** — `XString`, `XVector<T>`, `XSet<T>`, `XMap<K,V>` — all Boost.Container types using offset_ptr allocators
 5. **Type safety (Domain S)** — `DefaultPolicy::accept<T>()` is a consteval 4-branch admission gate: Opaque -> Leaf -> Composite (P2996 reflection) -> Rejected. `StrictPolicy` adds layout-signature matching.

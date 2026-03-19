@@ -34,7 +34,7 @@ docker run --rm --platform linux/amd64 \
 |---|------|------|
 | 8 | `test_reflection_core.cpp` | `^^` 反射、`members_of` 迭代、`[: :]` splice、成员属性查询 |
 | 9 | `test_reflection_advanced.cpp` | 反射序列化、比较、版本兼容性 |
-| 10 | `test_type_signatures.cpp` | TypeLayout 签名生成、platform prefix、classify_v、容器签名 |
+| 10 | `test_type_signatures.cpp` | TypeLayout 签名生成、platform prefix、签名分类、容器签名 |
 | 11 | `test_field_limit_fix.cpp` | 大字段数结构体签名 |
 | 12 | `test_type_safety.cpp` | 编译时类型安全验证（static_assert 全覆盖） |
 | 13 | `test_enum_support.cpp` | 枚举类型安全和签名 |

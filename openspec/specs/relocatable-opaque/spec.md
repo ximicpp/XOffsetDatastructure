@@ -12,7 +12,7 @@ TypeLayout SHALL 提供 `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE(Type, name)` 宏，�
 - **WHEN** `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE(MyString, "string")` 展开
 - **THEN** 编译成功
 - **AND** `has_opaque_signature<MyString>` 为 true
-- **AND** `layout_traits<MyString>::has_pointer` 为 false
+- **AND** `detail::layout_traits<MyString>::has_pointer` 为 false
 
 ---
 
@@ -52,7 +52,7 @@ TypeLayout SHALL 提供 `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE(Template, name)` 宏�
 
 `SigExporter` SHALL 提供 `add_relocatable<T>(name)` 方法。
 
-- SHALL 使用 `static_assert(!layout_traits<T>::has_pointer)` 替代 `trivially_copyable` 检查
+- SHALL 使用 `static_assert(!detail::layout_traits<T>::has_pointer)` 替代 `trivially_copyable` 检查
 - 其余行为与 `add<T>()` 完全一致
 
 #### Scenario: 导出包含 opaque 成员的类型
@@ -69,8 +69,8 @@ TypeLayout SHALL 提供 `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE(Template, name)` 宏�
 
 ### Requirement: layout_traits cross-validation
 
-`layout_traits<T>` 的 padding cross-validation static_assert SHALL 跳过 opaque 类型（`has_opaque_signature<T>`）和包含 opaque 成员的类型（`has_opaque`）。
+`detail::layout_traits<T>` 的 padding cross-validation static_assert SHALL 跳过 opaque 类型（`has_opaque_signature<T>`）和包含 opaque 成员的类型（`has_opaque`）。
 
 #### Scenario: opaque 容器不触发 cross-validation 失败
-- **WHEN** `layout_traits<MyVector<Item>>` 被实例化
+- **WHEN** `detail::layout_traits<MyVector<Item>>` 被实例化
 - **THEN** cross-validation static_assert 不触发（被跳过）

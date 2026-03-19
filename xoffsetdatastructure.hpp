@@ -32,14 +32,12 @@
 
 // TypeLayout library — the authoritative type-signature and type-safety engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
-//   - is_byte_copy_safe_v<T>            — recursive domain admission predicate
-//   - is_byte_copy_portable<T>(remote_sig) — byte-copy safe + layout signature match
-//   - is_local_serialization_free_v<T>  — strict C++ POD safety (trivially_copyable + !has_pointer)
-//   - classify_v<T>                     — 5-tier SafetyLevel (diagnostics)
-//   - get_layout_signature<T>()         — binary layout signature
+//   - is_byte_copy_safe_v<T>              — recursive domain admission predicate
+//   - is_transfer_safe<T>(remote_sig)     — byte-copy safe + layout signature match
+//   - get_layout_signature<T>()           — binary layout signature
+//   - detail::classify_signature(sig)     — 5-tier SafetyLevel (diagnostics, runtime)
 #include <boost/typelayout.hpp>
-#include <boost/typelayout/tools/serialization_free.hpp>
-#include <boost/typelayout/tools/classify.hpp>
+#include <boost/typelayout/tools/safety_level.hpp>
 #include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
 
@@ -54,7 +52,7 @@
 //     4. Otherwise: false
 //
 // Cross-platform transfer adds layout signature matching:
-//   is_byte_copy_portable<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
+//   is_transfer_safe<T>(remote_sig) = is_byte_copy_safe_v<T> + sig match
 //
 // Verification timing (architecture & type sets are pre-defined):
 //   Compile-time: is_byte_copy_safe_v<T>           — type admission gate
@@ -667,17 +665,12 @@ namespace XOffsetDatastructure {
         using boost::typelayout::is_byte_copy_safe_v;
 
         template<typename T>
-        consteval const char* safety_level_name() {
-            using boost::typelayout::classify_v;
-            using boost::typelayout::SafetyLevel;
+        inline const char* safety_level_name() {
             using CleanT = std::remove_cv_t<T>;
-            constexpr auto level = classify_v<CleanT>;
-            if constexpr (level == SafetyLevel::TrivialSafe)      return "TrivialSafe";
-            else if constexpr (level == SafetyLevel::PaddingRisk) return "PaddingRisk";
-            else if constexpr (level == SafetyLevel::PlatformVariant) return "PlatformVariant";
-            else if constexpr (level == SafetyLevel::PointerRisk) return "PointerRisk";
-            else if constexpr (level == SafetyLevel::Opaque)      return "Opaque";
-            else                                                  return "Unknown";
+            constexpr auto sig = boost::typelayout::get_layout_signature<CleanT>();
+            auto level = boost::typelayout::detail::classify_signature(
+                std::string_view(sig.value, sig.size));
+            return boost::typelayout::detail::safety_level_name(level);
         }
     }
 
@@ -686,7 +679,7 @@ namespace XOffsetDatastructure {
     struct is_xbuffer_safe {
         static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
 
-        static constexpr const char* reason() {
+        static const char* reason() {
             return detail::safety_level_name<T>();
         }
     };

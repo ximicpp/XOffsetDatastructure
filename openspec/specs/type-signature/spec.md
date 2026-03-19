@@ -13,9 +13,9 @@
 - 头文件路径: `external/typelayout/include`
 - 内部代码应使用 `boost::typelayout::get_member_count<T>()` 而非自行实现
 - 不再存在 `XTypeSignature` 命名空间
-- 子模块 SHALL 指向 `origin/main` 的最新 commit，确保 `layout_traits.hpp`、`serialization_free.hpp`、`classify.hpp`、`safety_level.hpp` 和 `TYPELAYOUT_OPAQUE_*_RELOCATABLE` 宏全部可用
+- 子模块 SHALL 指向 `origin/main` 的最新 commit，确保 `layout_traits.hpp`、`transfer.hpp`、`safety_level.hpp` 和 `TYPELAYOUT_OPAQUE_*_RELOCATABLE` 宏全部可用
 - `xoffsetdatastructure.hpp` 中的注释 SHALL 仅引用 TypeLayout 实际暴露的 API 名称，不引用不存在的宏或函数名
-- 跨平台传输验证 API SHALL 使用 `is_byte_copy_portable<T>(remote_sig)` 名称（不再使用 `is_transfer_safe`）
+- 跨平台传输验证 API SHALL 使用 `is_transfer_safe<T>(remote_sig)` 名称（不再使用 `is_byte_copy_portable`）
 
 #### Scenario: 初始化项目时自动拉取依赖
 - **WHEN** 用户执行 `git clone --recursive` 或 `git submodule update --init`
@@ -37,15 +37,10 @@
 - **THEN** 使用 `boost::typelayout::get_member_count<T>()`
 - **AND** 不存在功能重复的内部实现
 
-#### Scenario: 子模块包含完整的安全分类 API
-- **WHEN** 项目 `#include <boost/typelayout/tools/classify.hpp>`
-- **THEN** `boost::typelayout::classify_v<T>` 可用
-- **AND** `boost::typelayout::SafetyLevel` 包含 5 级分类（TrivialSafe, PaddingRisk, PlatformVariant, PointerRisk, Opaque）
-
-#### Scenario: 子模块包含 serialization-free 检查 API
-- **WHEN** 项目 `#include <boost/typelayout/tools/serialization_free.hpp>`
-- **THEN** `boost::typelayout::is_local_serialization_free_v<T>` 可用
-- **AND** `boost::typelayout::is_byte_copy_portable<T>(remote_sig)` 可用
+#### Scenario: 子模块包含传输安全检查 API
+- **WHEN** 项目 `#include <boost/typelayout/transfer.hpp>`
+- **THEN** `boost::typelayout::is_transfer_safe<T>(remote_sig)` 可用
+- **AND** 运行时分类通过 `detail::classify_signature()` 完成
 
 #### Scenario: 子模块包含 relocatable opaque 宏
 - **WHEN** 项目 `#include <boost/typelayout/opaque.hpp>`
@@ -54,13 +49,16 @@
 #### Scenario: 注释中不引用不存在的 API
 - **WHEN** 审查 `xoffsetdatastructure.hpp` 中的注释
 - **THEN** 不存在对 `TYPELAYOUT_ASSERT_SERIALIZATION_FREE` 的引用
-- **AND** 不存在对 `is_transfer_safe` 的引用（使用 `is_byte_copy_portable` 替代）
+- **AND** 不存在对 `is_byte_copy_portable` 的引用（使用 `is_transfer_safe` 替代）
+- **AND** 不存在对 `classify_v` 的引用（已移除；运行时分类使用 `detail::classify_signature()`）
+- **AND** 不存在对 `is_local_serialization_free_v` 或 `is_local_serialization_free` 的引用（已移除）
+- **AND** 不存在对 `SignatureRegistry` 的引用（已移除）
 - **AND** 所有注释中引用的 TypeLayout API 名称在 `external/typelayout/include` 中均可找到对应声明
 
 #### Scenario: 旧 API 名称触发 deprecation warning
-- **WHEN** 用户代码调用 `boost::typelayout::is_transfer_safe<T>(sig)`
+- **WHEN** 用户代码调用 `boost::typelayout::is_byte_copy_portable<T>(sig)`
 - **THEN** 编译成功但产生 `[[deprecated]]` 警告
-- **AND** 警告提示使用 `is_byte_copy_portable` 替代
+- **AND** 警告提示使用 `is_transfer_safe` 替代
 
 ### Requirement: Layout Signature API 暴露
 
@@ -94,15 +92,15 @@ namespace boost::typelayout {
 
 **实现方式**：
 - 使用 `TYPELAYOUT_EXPORT_TYPES` 宏自动生成导出程序
-- 导出的 `.sig.hpp` 文件可在任何 C++17 编译器上 include
+- 导出的 `.sig.hpp` 文件可在任何 C++26 编译器上 include
 
 #### Scenario: 导出签名到头文件
 - **WHEN** 用户编译并运行 `tools/export_signatures` 工具
 - **THEN** 在指定目录生成包含签名常量的 `.sig.hpp` 文件
 - **AND** 文件包含 Player, Item, GameData 的 Layout 和 Definition 签名
-- **AND** 该文件可在任何 C++17 编译器上 include 并比较
+- **AND** 该文件可在任何 C++26 编译器上 include 并比较
 
-#### Scenario: 跨平台签名比较 (C++17 兼容)
+#### Scenario: 跨平台签名比较 (C++26 兼容)
 - **WHEN** 用户在 Platform B 上编译包含 Platform A 导出签名的代码
 - **THEN** 使用 TypeLayout 的 `compat::layout_match()` 进行比较
 - **AND** 不需要 P2996 编译器
@@ -117,7 +115,7 @@ namespace boost::typelayout {
 **实现方式**：
 - 使用 `TYPELAYOUT_CHECK_COMPAT` 宏自动生成比较程序
 - 编译时 `static_assert` 验证 + 运行时报告输出
-- 仅需 C++17 编译器（不需要 P2996）
+- 仅需 C++26 编译器（不需要 P2996）
 
 #### Scenario: 运行时兼容性报告
 - **WHEN** 用户运行 `tools/check_compat` 工具
