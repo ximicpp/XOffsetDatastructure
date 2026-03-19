@@ -35,9 +35,7 @@
 //   - is_byte_copy_safe_v<T>              — recursive domain admission predicate
 //   - is_transfer_safe<T>(remote_sig)     — byte-copy safe + layout signature match
 //   - get_layout_signature<T>()           — binary layout signature
-//   - detail::classify_signature(sig)     — 5-tier SafetyLevel (diagnostics, runtime)
 #include <boost/typelayout.hpp>
-#include <boost/typelayout/tools/safety_level.hpp>
 #include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
 
@@ -335,37 +333,38 @@ namespace XOffsetDatastructure {
     // but no free-block coalescing — only suitable for append-only workloads.
     using XBufferCoreSeqFit = XManagedMemory<char, x_seq_fit<null_mutex_family>, iset_index>;
 
-    template<typename T>
-    concept SequentialContainer = requires(T t) {
-        { t.begin() } -> std::input_or_output_iterator;
-        { t.end() } -> std::input_or_output_iterator;
-        typename T::value_type;
-        { t.emplace_back(std::move(std::declval<typename T::value_type>())) };
-    };
-
-    template<typename T>
-    concept SetLikeContainer = requires(T t) {
-        { t.begin() } -> std::input_or_output_iterator;
-        { t.end() } -> std::input_or_output_iterator;
-        typename T::value_type;
-        typename T::key_type;
-        { t.emplace(std::move(std::declval<typename T::value_type>())) };
-    } && !requires { typename T::mapped_type; };
-
-    template<typename T>
-    concept MapLikeContainer = requires(T t) {
-        { t.begin() } -> std::input_or_output_iterator;
-        { t.end() } -> std::input_or_output_iterator;
-        typename T::key_type;
-        typename T::mapped_type;
-        { t.emplace(std::move(std::declval<typename T::key_type>()),
-                     std::move(std::declval<typename T::mapped_type>())) };
-    };
-
     // ========================================================================
     // Container implementation details.
     // ========================================================================
     namespace detail {
+
+        // Container concepts — used only by XCompactor for migration dispatch.
+        template<typename T>
+        concept SequentialContainer = requires(T t) {
+            { t.begin() } -> std::input_or_output_iterator;
+            { t.end() } -> std::input_or_output_iterator;
+            typename T::value_type;
+            { t.emplace_back(std::move(std::declval<typename T::value_type>())) };
+        };
+
+        template<typename T>
+        concept SetLikeContainer = requires(T t) {
+            { t.begin() } -> std::input_or_output_iterator;
+            { t.end() } -> std::input_or_output_iterator;
+            typename T::value_type;
+            typename T::key_type;
+            { t.emplace(std::move(std::declval<typename T::value_type>())) };
+        } && !requires { typename T::mapped_type; };
+
+        template<typename T>
+        concept MapLikeContainer = requires(T t) {
+            { t.begin() } -> std::input_or_output_iterator;
+            { t.end() } -> std::input_or_output_iterator;
+            typename T::key_type;
+            typename T::mapped_type;
+            { t.emplace(std::move(std::declval<typename T::key_type>()),
+                         std::move(std::declval<typename T::mapped_type>())) };
+        };
         /// Growth factor: 1.1x (11/10)
         struct growth_factor_custom
             : boost::container::dtl::grow_factor_ratio<0, 11, 10> {};
@@ -664,23 +663,31 @@ namespace XOffsetDatastructure {
 
         using boost::typelayout::is_byte_copy_safe_v;
 
+        /// Compile-time diagnostic: why is a type safe or unsafe?
+        /// Uses only public TypeLayout API + standard type_traits.
         template<typename T>
-        inline const char* safety_level_name() {
+        consteval const char* describe_safety() {
             using CleanT = std::remove_cv_t<T>;
-            constexpr auto sig = boost::typelayout::get_layout_signature<CleanT>();
-            auto level = boost::typelayout::detail::classify_signature(
-                std::string_view(sig.value, sig.size));
-            return boost::typelayout::detail::safety_level_name(level);
+            if constexpr (boost::typelayout::is_byte_copy_safe_v<CleanT>) {
+                return "byte-copy safe";
+            } else if constexpr (std::is_polymorphic_v<CleanT>) {
+                return "rejected: polymorphic type (has vtable pointer)";
+            } else if constexpr (std::is_union_v<CleanT>) {
+                return "rejected: union type";
+            } else {
+                return "rejected: contains pointer, reference, or unsafe member";
+            }
         }
     }
 
-    /// Public admission gate. Uses TypeLayout's is_byte_copy_safe_v<T> directly.
+    /// Public admission gate — alias for TypeLayout's is_byte_copy_safe_v<T>.
+    /// Prefer using boost::typelayout::is_byte_copy_safe_v<T> directly in new code.
     template<typename T>
     struct is_xbuffer_safe {
         static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
 
-        static const char* reason() {
-            return detail::safety_level_name<T>();
+        static constexpr const char* reason() {
+            return detail::describe_safety<T>();
         }
     };
 
@@ -1079,7 +1086,7 @@ namespace XOffsetDatastructure {
     class XCompactor {
     public:
         enum class MigrateStrategy {
-            TrivialCopy,      // direct assignment (primitives, enums, POD)
+            Bitwise,          // direct assignment (primitives, enums, POD)
             AllocatorAware,   // reconstruct with new allocator (XString-like)
             Container,        // iterate elements, recurse (XVector/XSet/XMap)
             Composite,        // reflect members, recurse (user structs)
@@ -1133,9 +1140,12 @@ namespace XOffsetDatastructure {
             if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
                 return migrate_as<CleanT>::value;
             } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
-                return MigrateStrategy::TrivialCopy;
+                return MigrateStrategy::Bitwise;
             } else if constexpr (requires { typename CleanT::allocator_type; }) {
-                // Containers with iterator must be registered; composites are safe for reflection.
+                // Unregistered container trap: if type has allocator_type + iterator
+                // but was not registered via XOFFSET_REGISTER_*, this static_assert
+                // fires at compile time. (The assert condition is always false here
+                // because registered types already returned in the first branch above.)
                 if constexpr (requires(const CleanT& c) {
                     typename CleanT::iterator;
                     { c.begin() };
@@ -1147,7 +1157,7 @@ namespace XOffsetDatastructure {
                         "registration. Register it via "
                         "XOFFSET_REGISTER_TYPE(YourType, AllocatorAware) or "
                         "XOFFSET_REGISTER_TYPE(YourType, Container). See docs.");
-                    return MigrateStrategy::Composite;
+                    return MigrateStrategy::Composite;  // unreachable; satisfies return requirement
                 } else {
                     return MigrateStrategy::Composite;
                 }
@@ -1159,7 +1169,7 @@ namespace XOffsetDatastructure {
         template<typename ElementType>
         static auto migrate_element(const ElementType& old_elem, XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             constexpr auto strategy = resolve_strategy<ElementType>();
-            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
+            if constexpr (strategy == MigrateStrategy::Bitwise) {
                 return old_elem;
             } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
                 return ElementType(old_elem, new_xbuf.get_segment_manager());
@@ -1187,7 +1197,7 @@ namespace XOffsetDatastructure {
                 return;
             }
             
-            if constexpr (MapLikeContainer<ContainerType>) {
+            if constexpr (detail::MapLikeContainer<ContainerType>) {
                 for (const auto& [key, value] : old_container) {
                     auto new_key = migrate_element(key, old_xbuf, new_xbuf);
                     auto new_value = migrate_element(value, old_xbuf, new_xbuf);
@@ -1196,7 +1206,7 @@ namespace XOffsetDatastructure {
             } else {
                 for (const auto& elem : old_container) {
                     auto migrated_elem = migrate_element(elem, old_xbuf, new_xbuf);
-                    if constexpr (SetLikeContainer<ContainerType>) {
+                    if constexpr (detail::SetLikeContainer<ContainerType>) {
                         new_container.emplace(std::move(migrated_elem));
                     } else {
                         new_container.emplace_back(std::move(migrated_elem));
@@ -1209,7 +1219,7 @@ namespace XOffsetDatastructure {
         static void migrate_member(const MemberType& old_member, MemberType& new_member, 
                                   XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             constexpr auto strategy = resolve_strategy<MemberType>();
-            if constexpr (strategy == MigrateStrategy::TrivialCopy) {
+            if constexpr (strategy == MigrateStrategy::Bitwise) {
                 new_member = old_member;
             } else if constexpr (strategy == MigrateStrategy::AllocatorAware) {
                 new_member = MemberType(old_member, new_xbuf.get_segment_manager());

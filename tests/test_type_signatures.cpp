@@ -10,6 +10,7 @@
 // ============================================================================
 
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout/tools/safety_level.hpp>  // detail::classify_signature, SafetyLevel
 #include <iostream>
 #include <cassert>
 #include <experimental/meta>
