@@ -16,14 +16,16 @@ When the TypeLayout submodule (`external/typelayout`) is updated, XOffset may ne
    cd external/typelayout && git rev-parse HEAD
    ```
 
-2. If `$ARGUMENTS` is provided, fetch and diff against that commit/branch. Otherwise, diff the submodule's staged change (`git diff --submodule=diff external/typelayout`), or ask the user which TypeLayout commit/branch to sync to.
+2. If `$ARGUMENTS` is provided, fetch and diff against that commit/branch. Otherwise, fetch origin first (`git fetch origin`), then compare HEAD against `origin/main`. If there are no new commits, ask the user which TypeLayout commit/branch to sync to.
 
 3. Identify **all API-visible changes** in TypeLayout by diffing the old vs new commit. Focus on:
    - `include/boost/typelayout/` — renamed/removed/added headers
    - Public API changes: function renames, signature changes, new/removed type traits
    - Macro renames in `opaque.hpp` (e.g., `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE`)
-   - `tools/` headers: `sig_export.hpp`, `compat_auto.hpp`, `sig_types.hpp`
-   - Namespace changes
+   - `tools/` headers: `sig_export.hpp`, `compat_check.hpp`, `sig_types.hpp`, `safety_level.hpp`
+   - Namespace changes (e.g., `detail::` → `compat::`)
+   - Signature format changes (e.g., type tag renames like `fld` → `fld64/fld80/fld128`)
+   - Struct field additions (e.g., `TypeEntry`, `ExportEntry` gaining new fields)
 
 4. Summarize the upstream diff to the user as a change list before proceeding.
 
@@ -45,12 +47,12 @@ Check and update **each** of the following files. Only modify what the upstream 
 
 The header has these TypeLayout integration zones (search to locate):
 
-- **Includes** (lines ~40-43): `#include <boost/typelayout/...>` — add/remove/rename includes to match new TypeLayout header structure
-- **Header comments** (lines ~33-39): API summary block starting with `// TypeLayout library —` — update function names, descriptions
-- **Domain admission comment block** (lines ~46-60): starting with `// Target Architecture & Domain Admission` — update if admission API changed
+- **Includes** (lines ~38-39): `#include <boost/typelayout.hpp>` and `#include <boost/typelayout/tools/sig_types.hpp>` — add/remove/rename includes to match new TypeLayout header structure
+- **Header comments** (lines ~33-37): API summary block starting with `// TypeLayout library —` — update function names, descriptions
+- **Domain admission comment block** (lines ~42-43): starting with `// Platform:` and `// Type safety:` — update if admission API changed
 - **using declarations** (search `using boost::typelayout::`): update renamed symbols
 - **Registration macros** (search `TYPELAYOUT_OPAQUE_`): update if macro names changed in TypeLayout
-- **Any direct API calls**: `is_byte_copy_safe_v`, `SafetyLevel`, `get_layout_signature`, `is_transfer_safe`, `detail::classify_signature()`
+- **Any direct API calls**: `is_byte_copy_safe_v`, `get_layout_signature`, `is_transfer_safe`
 
 ### 3.2 Tools: `tools/export_signatures.cpp`
 
@@ -59,32 +61,42 @@ The header has these TypeLayout integration zones (search to locate):
 
 ### 3.3 Tools: `tools/check_compat.cpp`
 
-- Uses `<boost/typelayout/tools/compat_auto.hpp>` and `compat::layout_match`, `compat::definition_match`
-- Uses `TYPELAYOUT_CHECK_COMPAT` macro
-- Check if any of these are renamed or have signature changes
+- Uses `<boost/typelayout/tools/compat_check.hpp>` and `compat::layout_match`, `compat::CompatReporter`
+- Inlines `TYPELAYOUT_CHECK_COMPAT` logic (creates CompatReporter, adds platforms, prints report)
+- Check if `compat::layout_match`, `compat::CompatReporter`, `add_platform()`, `print_report()` are renamed
 
 ### 3.4 Signature files: `tools/sigs/*.sig.hpp`
 
-- These are generated files — if the signature format changed in TypeLayout, they need regeneration
-- Regeneration happens via Docker build (`bash ./build.sh`) — note for Phase 5
+- These are generated files — if the signature format or `TypeEntry` struct changed in TypeLayout, they need manual update or regeneration
+- `TypeEntry` struct fields (as of 44b6e0f): `name`, `layout_sig`, `byte_copy_safe`
+- Each type needs: `<Name>_layout[]` (signature string), `<Name>_byte_copy_safe` (bool), and the registry entry `{"<Name>", <Name>_layout, <Name>_byte_copy_safe}`
+- Full regeneration happens via Docker build (`bash ./build.sh`) — note for Phase 5
 
-### 3.5 Specs: `openspec/specs/`
+### 3.5 Test files: `tests/*.cpp`
+
+Search for TypeLayout API usage in test files. Key patterns:
+- `using boost::typelayout::compat::SafetyLevel` (was `detail::SafetyLevel` before 44b6e0f)
+- `using boost::typelayout::compat::classify_signature` (was `detail::classify_signature`)
+- `using boost::typelayout::compat::safety_level_name` (was `detail::safety_level_name`)
+- Include comments mentioning old namespace (e.g., `// detail::classify_signature`)
+
+Files known to use these:
+- `tests/test_type_signatures.cpp`
+- `tests/test_policy_trait.cpp`
+
+### 3.6 Specs: `openspec/specs/`
 
 Search for old API names in these spec files and update:
-- `openspec/specs/type-safety-delegation/spec.md` — references TypeLayout predicates
-- `openspec/specs/type-signature/spec.md` — references signature API
-- `openspec/specs/relocatable-opaque/spec.md` — references opaque macros
-- `openspec/specs/opaque-relocatable-types/spec.md`
+- `openspec/specs/type-safety-delegation/spec.md` — references `opaque_copy_safe` (was `opaque_elements_safe`), TypeLayout predicates
+- `openspec/specs/type-signature/spec.md` — references `compat::classify_signature` (was `detail::classify_signature`), signature API
 
-### 3.6 Docs: `docs/`
+### 3.7 Docs: `docs/`
 
 Search for old API names in docs and update:
-- `docs/technical_overview.md`
-- `docs/TYPELAYOUT_INTEGRATION_ANALYSIS.md`
-- `docs/MIGRATION_TYPELAYOUT.md`
+- `docs/technical_overview.md` — references `compat::classify_signature` (was `detail::classify_signature`)
 - Other docs that reference changed API names (use grep to find)
 
-### 3.7 CLAUDE.md
+### 3.8 CLAUDE.md
 
 If any API names listed in CLAUDE.md are changed, update them.
 
@@ -125,3 +137,23 @@ Use the existing archived changes as reference for format (e.g., `openspec/chang
 - **Minimal changes** — only update what the upstream diff actually affects
 - **Grep before editing** — always search for old API names across the entire repo to catch all references
 - **Preserve deprecated aliases** — if TypeLayout added deprecated aliases, XOffset should use the NEW names but note the aliases exist
+
+## Current TypeLayout API Reference (as of 44b6e0f)
+
+| API | Header | Namespace | Notes |
+|-----|--------|-----------|-------|
+| `is_byte_copy_safe_v<T>` | `admission.hpp` | `boost::typelayout` | Recursive domain admission |
+| `opaque_copy_safe<T>` | `fwd.hpp` | `boost::typelayout` | Was `opaque_elements_safe` |
+| `get_layout_signature<T>()` | `signature.hpp` | `boost::typelayout` | Binary layout signature |
+| `is_transfer_safe<T>(sig)` | `transfer.hpp` (core) | `boost::typelayout` | Moved from `tools/transfer.hpp` |
+| `has_pointer_v<T>` | `layout_traits.hpp` | `boost::typelayout` | New public predicate |
+| `has_padding_v<T>` | `layout_traits.hpp` | `boost::typelayout` | New public predicate |
+| `has_opaque_v<T>` | `layout_traits.hpp` | `boost::typelayout` | New public predicate |
+| `SafetyLevel` | `tools/safety_level.hpp` | `boost::typelayout::compat` | Was `detail::` |
+| `classify_signature()` | `tools/safety_level.hpp` | `boost::typelayout::compat` | Was `detail::` |
+| `safety_level_name()` | `tools/safety_level.hpp` | `boost::typelayout::compat` | Was `detail::` |
+| `layout_match()` | `tools/compat_check.hpp` | `boost::typelayout::compat` | Unchanged |
+| `CompatReporter` | `tools/compat_check.hpp` | `boost::typelayout::compat` | `TypeResult` now has `byte_copy_safe` field |
+| `SigExporter` | `tools/sig_export.hpp` | `boost::typelayout` | `ExportEntry` now has `byte_copy_safe` field |
+| `TypeEntry` | `tools/sig_types.hpp` | `boost::typelayout` | Now has `byte_copy_safe` field |
+| `long double` sig tag | `config.hpp` / `type_map.hpp` | — | `fld64`/`fld80`/`fld106`/`fld128` (was `fld`) |

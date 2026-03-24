@@ -19,7 +19,7 @@
 #include <cassert>
 
 #include "../xoffsetdatastructure.hpp"
-#include <boost/typelayout/tools/safety_level.hpp>  // detail::classify_signature, SafetyLevel
+#include <boost/typelayout/tools/safety_level.hpp>  // compat::classify_signature, SafetyLevel
 
 using namespace XOffsetDatastructure;
 using namespace XOffsetDatastructure::detail;
@@ -215,9 +215,9 @@ bool test_backward_compat() {
 // Test 5: TypeLayout classify_signature (runtime safety classification)
 // ============================================================================
 bool test_classify_levels() {
-    using boost::typelayout::detail::SafetyLevel;
-    using boost::typelayout::detail::classify_signature;
-    using boost::typelayout::detail::safety_level_name;
+    using boost::typelayout::compat::SafetyLevel;
+    using boost::typelayout::compat::classify_signature;
+    using boost::typelayout::compat::safety_level_name;
 
     std::cout << "\n[TEST] TypeLayout classify_signature (runtime safety classification)\n";
     std::cout << std::string(55, '-') << "\n";

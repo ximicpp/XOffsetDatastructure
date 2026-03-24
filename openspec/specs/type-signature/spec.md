@@ -40,7 +40,7 @@
 #### Scenario: 子模块包含传输安全检查 API
 - **WHEN** 项目 `#include <boost/typelayout/transfer.hpp>`
 - **THEN** `boost::typelayout::is_transfer_safe<T>(remote_sig)` 可用
-- **AND** 运行时分类通过 `detail::classify_signature()` 完成
+- **AND** 运行时分类通过 `compat::classify_signature()` 完成
 
 #### Scenario: 子模块包含 relocatable opaque 宏
 - **WHEN** 项目 `#include <boost/typelayout/opaque.hpp>`
@@ -50,7 +50,7 @@
 - **WHEN** 审查 `xoffsetdatastructure.hpp` 中的注释
 - **THEN** 不存在对 `TYPELAYOUT_ASSERT_SERIALIZATION_FREE` 的引用
 - **AND** 不存在对 `is_byte_copy_portable` 的引用（使用 `is_transfer_safe` 替代）
-- **AND** 不存在对 `classify_v` 的引用（已移除；运行时分类使用 `detail::classify_signature()`）
+- **AND** 不存在对 `classify_v` 的引用（已移除；运行时分类使用 `compat::classify_signature()`）
 - **AND** 不存在对 `is_local_serialization_free_v` 或 `is_local_serialization_free` 的引用（已移除）
 - **AND** 不存在对 `SignatureRegistry` 的引用（已移除）
 - **AND** 所有注释中引用的 TypeLayout API 名称在 `external/typelayout/include` 中均可找到对应声明

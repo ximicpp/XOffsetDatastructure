@@ -10,7 +10,7 @@
 // ============================================================================
 
 #include "../xoffsetdatastructure.hpp"
-#include <boost/typelayout/tools/safety_level.hpp>  // detail::classify_signature, SafetyLevel
+#include <boost/typelayout/tools/safety_level.hpp>  // compat::classify_signature, SafetyLevel
 #include <iostream>
 #include <cassert>
 #include <experimental/meta>
@@ -233,9 +233,9 @@ void test_platform_prefix() {
 // ---------------------------------------------------------------------------
 
 void test_safety_classification() {
-    using boost::typelayout::detail::SafetyLevel;
-    using boost::typelayout::detail::classify_signature;
-    using boost::typelayout::detail::safety_level_name;
+    using boost::typelayout::compat::SafetyLevel;
+    using boost::typelayout::compat::classify_signature;
+    using boost::typelayout::compat::safety_level_name;
 
     std::cout << "[Test 7] Safety Classification (classify_signature)\n";
     std::cout << std::string(50, '-') << "\n";
