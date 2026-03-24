@@ -216,7 +216,7 @@ This is one of the features that was **impossible** without C++26 reflection —
 [TypeLayout](https://github.com/ximicpp/TypeLayout) is integrated as a Git submodule at `external/typelayout`. It serves as the authoritative engine for:
 
 - **Type signatures** — `get_definition_signature<T>()`, `get_layout_signature<T>()`
-- **Safety classification** — `is_byte_copy_safe_v<T>`, `detail::classify_signature()` (runtime)
+- **Safety classification** — `is_byte_copy_safe_v<T>`, `compat::classify_signature()` (runtime)
 - **Cross-platform verification** — `is_transfer_safe<T>(remote_sig)`
 - **Opaque type registration** — `TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE` macros
 

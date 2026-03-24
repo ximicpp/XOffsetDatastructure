@@ -6,7 +6,7 @@
 
 `is_byte_copy_safe_v<T>` 使用四层分支判定：
 
-1. **Opaque 类型** (`has_opaque_signature<T>`): `!detail::layout_traits<T>::has_pointer && opaque_elements_safe<T>::value`
+1. **Opaque 类型** (`has_opaque_signature<T>`): `!detail::layout_traits<T>::has_pointer && opaque_copy_safe<T>::value`
 2. **标准叶子类型**: `trivially_copyable && !has_pointer`（即 `is_byte_copy_safe_v<T>` 对基本类型的判定）
 3. **包含 opaque 成员的 struct/class** (`is_class && !is_union && !is_polymorphic`): 递归检查所有基类和成员
 4. **其他**: false
@@ -19,7 +19,7 @@ XOffset 的 `is_xbuffer_safe<T>::value` SHALL 直接等价于 `boost::typelayout
 
 #### Scenario: XVector<PolyBase> 被拒绝
 - **WHEN** `is_byte_copy_safe_v<XVector<PolyBase>>` 且 PolyBase 有 virtual 函数
-- **THEN** 返回 false（`opaque_elements_safe` 递归到 PolyBase → PolyBase 是 polymorphic → false）
+- **THEN** 返回 false（`opaque_copy_safe` 递归到 PolyBase → PolyBase 是 polymorphic → false）
 
 #### Scenario: Player struct 通过准入
 - **WHEN** `is_byte_copy_safe_v<Player>` 且 Player 包含 XString + XVector<int32_t>
@@ -63,12 +63,12 @@ XOffset 的 `is_xbuffer_safe<T>::value` SHALL 直接等价于 `boost::typelayout
 
 ### Requirement: Opaque 容器注册宏
 
-`XOFFSET_REGISTER_CONTAINER(Template, name, strategy)` 和 `XOFFSET_REGISTER_MAP(Template, name, strategy)` SHALL 调用 TypeLayout 的 `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE` / `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE` 宏，后者自动生成 `opaque_elements_safe<Template<...>>` 特化。XOffset 不再生成任何自有的元素安全检查特化。
+`XOFFSET_REGISTER_CONTAINER(Template, name, strategy)` 和 `XOFFSET_REGISTER_MAP(Template, name, strategy)` SHALL 调用 TypeLayout 的 `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE` / `TYPELAYOUT_OPAQUE_MAP_RELOCATABLE` 宏，后者自动生成 `opaque_copy_safe<Template<...>>` 特化。XOffset 不再生成任何自有的元素安全检查特化。
 
 #### Scenario: XOFFSET_REGISTER_CONTAINER 委托 TypeLayout
 - **WHEN** `XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)` 展开
 - **THEN** `TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE(XVector, "vector")` 被调用
-- **AND** TypeLayout 自动生成 `opaque_elements_safe<XVector<T_>> : bool_constant<is_byte_copy_safe_v<T_>>`
+- **AND** TypeLayout 自动生成 `opaque_copy_safe<XVector<T_>> : bool_constant<is_byte_copy_safe_v<T_>>`
 
 ---
 
@@ -95,7 +95,7 @@ XOffset 所有源文件 SHALL 使用 TypeLayout main 分支的当前 API：
 |--------|--------|
 | `DefaultPolicy::accept<T>()` | `boost::typelayout::is_byte_copy_safe_v<T>` |
 | `StrictPolicy<Gold>::accept<T>()` | `is_byte_copy_safe_v<T> && sig == gold` (inline) |
-| `opaque_element_types<T>::all_elements_safe()` | `opaque_elements_safe<T>::value` (TypeLayout auto-generated) |
+| `opaque_element_types<T>::all_elements_safe()` | `opaque_copy_safe<T>::value` (TypeLayout auto-generated) |
 | `diagnose_unsafe_members<T>()` | 已删除（无替代） |
 | `is_xbuffer_compatible<T, Policy>()` | `is_byte_copy_safe_v<T>` |
 

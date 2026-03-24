@@ -9,7 +9,7 @@
 
 #include "sigs/x86_64_linux_clang.sig.hpp"
 
-#include <boost/typelayout/tools/compat_auto.hpp>
+#include <boost/typelayout/tools/compat_check.hpp>
 
 namespace linux_plat = boost::typelayout::platform::x86_64_linux_clang;
 
@@ -33,4 +33,9 @@ static_assert(layout_match(linux_plat::GameData_layout, linux_plat::GameData_lay
 // When more platforms are added, include their .sig.hpp and add them below.
 // ============================================================================
 
-TYPELAYOUT_CHECK_COMPAT(x86_64_linux_clang)
+int main() {
+    ::boost::typelayout::compat::CompatReporter reporter;
+    reporter.add_platform(linux_plat::get_platform_info());
+    reporter.print_report();
+    return 0;
+}
