@@ -10,7 +10,7 @@ Serializing a complex game state at zero cost — no encoding, no decoding, just
 
 Before C++26, a real library worked around this with a ~600-line Python code generator that produced allocator constructors from YAML schemas, aggregate-only mirror types that enabled Boost.PFR-based reflection, and 150 lines of hand-written concepts that verified member safety. Each layer compensated for the same language-level gap.
 
-C++26 static reflection (P2996) closes that gap. This talk traces how one primitive — `nonstatic_data_members_of` — cascades through the library. It intercepts allocator `construct()` and reflects over members to inject allocators automatically, eliminating hand-written constructors. `access_context::unchecked()` sees private members; `bases_of` traverses inheritance — together they eliminate mirror types and lift the aggregate-only restriction. The code generator is deleted entirely, and ~80 lines of library-specific boilerplate per type drop to zero — users write plain C++ structs with no library artifacts. The same primitive then enables automatic memory compaction — previously requiring hand-written per-type migration code.
+C++26 static reflection (P2996) closes that gap. This talk traces how one primitive — `nonstatic_data_members_of` — cascades through the library. The library intercepts allocator `construct()` and reflects over members to inject allocators automatically, eliminating hand-written constructors. `access_context::unchecked()` sees private members; `bases_of` traverses inheritance — together they eliminate mirror types and lift the aggregate-only restriction. The code generator is deleted entirely, and ~80 lines of library-specific boilerplate per type drop to zero — users write plain C++ structs with no library artifacts. The same primitive then enables automatic memory compaction — previously requiring hand-written per-type migration code.
 
 Attendees will understand the conditions that make zero-encoding serialization sound, see the architectural tension it creates and how C++26 reflection resolves it, and take away a design principle — reflect at decision points, not definition sites — demonstrated through a real library rewrite.
 
@@ -27,7 +27,7 @@ Zero-encoding means `save()` returns raw buffer bytes, `load()` maps them back �
 
 Together: every container member must be constructed with the allocator that owns the buffer's memory pool — called a *segment manager*. This is a structural requirement of zero-encoding, not a design choice.
 
-**The tension:** user burden scales linearly with type richness. Every container member adds a line to the allocator-propagating constructor. Every type adds a constructor to maintain. Inheritance and nesting multiply the cost:
+**The tension:** user burden scales linearly with type richness. Every container member adds a line to the allocator-propagating constructor. Every type adds a constructor to maintain:
 
 ```cpp
 struct GameData {
@@ -62,10 +62,11 @@ The constructor is only the beginning. The library also needs to **reflect** ove
 
 - **Construction:** Library can't see which members are containers → users write allocator-propagating constructors (shown above).
 - **Reflection:** Boost.PFR (a library providing field-by-field access to aggregate types) offers partial introspection but only for aggregates → users create **mirror types** (aggregate copies of their types, stripped of private members and inheritance) to enable PFR.
-- **Automation:** Constructors + mirror types are error-prone at scale → a ~600-line Python code generator automates both from YAML schemas.
 - **Admission:** Member safety must be verified at compile time → 150 lines of hand-written concepts recursively check each member.
 
-Construction and reflection are parallel needs; the code generator automates both; admission is a third parallel need with its own workaround. Shared root cause: the library cannot see the user's type at compile time.
+These three are parallel needs, each with its own workaround. At scale, constructors and mirror types become error-prone → a ~600-line Python code generator automates both from YAML schemas.
+
+Shared root cause: the library cannot see the user's type at compile time.
 
 ### Part 3: One Primitive Eliminates the Stack (25 min)
 
@@ -86,6 +87,8 @@ Result: users write plain structs with no constructor, no `allocator_type`, no m
 
 *What gets unlocked:*
 - `bases_of` traverses inheritance → single, multi-level, and mixin inheritance with container members at every level now work.
+
+*What gets safer:*
 - Polymorphic types (virtual functions, virtual inheritance) are statically rejected via `static_assert` — turning a potential runtime bug (corrupted vtable in serialized data) into a compile error.
 
 ~80 lines of library-specific boilerplate per type → zero. Users write plain C++ structs.
