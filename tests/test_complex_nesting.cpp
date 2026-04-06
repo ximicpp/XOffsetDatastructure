@@ -408,6 +408,127 @@ bool test_xhandle_deep_nesting() {
 }
 
 // ============================================================================
+// Direct composite member (not inside a container) — exercises the composite
+// recursion branch in reflect_init_nth / reflect_transfer_init_nth.
+// ============================================================================
+
+struct Address {
+    XString city;
+    XString street;
+};
+
+struct ContactInfo {
+    Address home;       // composite member with containers — NOT in XVector
+    Address work;       // second composite member
+    int32_t zip_code;
+};
+
+struct PersonRecord {
+    int32_t id;
+    XString name;
+    ContactInfo contact;   // nested two levels deep
+    XVector<int32_t> tags;
+};
+
+bool test_direct_composite_member() {
+    fprintf(stderr, "\n[TEST] Direct composite struct member (Address inside ContactInfo inside PersonRecord)\n");
+
+    XBuffer xbuf(16384);
+    auto* p = xbuf.make<PersonRecord>();
+
+    // Write through nested composite members
+    p->id = 1;
+    p->name = "Alice";
+    p->contact.home.city = "Seattle";
+    p->contact.home.street = "1st Ave";
+    p->contact.work.city = "Portland";
+    p->contact.work.street = "2nd Blvd";
+    p->contact.zip_code = 98101;
+    p->tags.push_back(10);
+    p->tags.push_back(20);
+
+    // Verify
+    assert(p->id == 1);
+    assert(p->name == "Alice");
+    assert(p->contact.home.city == "Seattle");
+    assert(p->contact.home.street == "1st Ave");
+    assert(p->contact.work.city == "Portland");
+    assert(p->contact.work.street == "2nd Blvd");
+    assert(p->contact.zip_code == 98101);
+    assert(p->tags.size() == 2);
+
+    fprintf(stderr, "  Direct composite make + write [OK]\n");
+
+    // Persistence round-trip
+    auto saved = xbuf.save();
+    auto loaded = XBuffer::load(saved);
+    auto& l = loaded.root<PersonRecord>();
+
+    assert(l.id == 1);
+    assert(l.name == "Alice");
+    assert(l.contact.home.city == "Seattle");
+    assert(l.contact.home.street == "1st Ave");
+    assert(l.contact.work.city == "Portland");
+    assert(l.contact.work.street == "2nd Blvd");
+    assert(l.contact.zip_code == 98101);
+    assert(l.tags.size() == 2);
+
+    fprintf(stderr, "  Persistence round-trip [OK]\n");
+
+    // Compaction
+    XBuffer compacted = XCompactor::compact<PersonRecord>(xbuf);
+    auto& c = compacted.root<PersonRecord>();
+
+    assert(c.name == "Alice");
+    assert(c.contact.home.city == "Seattle");
+    assert(c.contact.work.street == "2nd Blvd");
+    assert(c.tags.size() == 2);
+
+    fprintf(stderr, "  Compaction [OK]\n");
+    return true;
+}
+
+bool test_vector_of_direct_composite() {
+    fprintf(stderr, "\n[TEST] XVector<PersonRecord> — composite member inside container element\n");
+
+    XBuffer xbuf(65536);
+
+    struct Directory {
+        XVector<PersonRecord> people;
+    };
+
+    auto* dir = xbuf.make<Directory>();
+
+    for (int i = 0; i < 20; i++) {
+        dir->people.emplace_back();
+        auto& p = dir->people.back();
+        p.id = i;
+        std::string n = "Person_" + std::to_string(i);
+        p.name = n.c_str();
+        p.contact.home.city = "City";
+        p.contact.home.street = "Street";
+        p.contact.work.city = "WorkCity";
+        p.contact.work.street = "WorkStreet";
+        p.contact.zip_code = 10000 + i;
+        p.tags.push_back(i);
+    }
+
+    // Verify all survived reallocation
+    assert(dir->people.size() == 20);
+    for (int i = 0; i < 20; i++) {
+        std::string expected = "Person_" + std::to_string(i);
+        assert(dir->people[i].name == expected.c_str());
+        assert(dir->people[i].contact.home.city == "City");
+        assert(dir->people[i].contact.work.street == "WorkStreet");
+        assert(dir->people[i].contact.zip_code == 10000 + i);
+        assert(dir->people[i].tags.size() == 1);
+    }
+
+    fprintf(stderr, "  20 PersonRecord elements with realloc [OK]\n");
+    return true;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -433,6 +554,8 @@ int main() {
     run("pod_only", test_pod_only_struct);
     run("vector_of_container_only", test_vector_of_container_only);
     run("xhandle_deep", test_xhandle_deep_nesting);
+    run("direct_composite_member", test_direct_composite_member);
+    run("vector_of_direct_composite", test_vector_of_direct_composite);
 
     fprintf(stderr, "\n===================================================\n");
     if (all_pass) {
