@@ -105,7 +105,7 @@ The same `nonstatic_data_members_of` applied at a different decision point — m
 
 ### Part 5: Practicalities and Takeaway (5 min)
 
-Compiler status: requires a Clang fork with P2996 support; CI runs in Docker with the fork pre-built. The Docker image and all source code are publicly available — attendees can reproduce every example without building the compiler fork. Architectural constraint: 64-bit little-endian only. Limitations: no schema evolution (adding a field changes the layout), `constexpr` step limits on very large types. Runtime overhead: zero — all reflection is `consteval` and produces no runtime code on the serialization path.
+Compiler status: requires a Clang fork with P2996 support; CI runs in Docker with the fork pre-built. The Docker image and all source code are publicly available — attendees can reproduce every example without building the compiler fork. Architectural constraint: 64-bit little-endian only. Limitations: no schema evolution (adding a field changes the layout), `constexpr` step limits on very large types. Runtime overhead: zero — all reflection dispatch is resolved at compile time and produces no runtime code on the serialization path.
 
 Zero-encoding serialization's architectural tension — performance vs. usability — existed because the language could not inspect type members at compile time. C++26 `nonstatic_data_members_of` is the first language primitive that resolves it: not by making the workarounds easier, but by making them unnecessary.
 

@@ -646,6 +646,9 @@ namespace XOffsetDatastructure {
             T(sm);
         };
 
+        template <typename T, typename Alloc>
+        void reflect_init_all_impl(void* raw, Alloc alloc);
+
         template <typename T, std::size_t N, typename Alloc>
         void reflect_init_nth(void* raw, Alloc alloc) {
             using namespace std::meta;
@@ -655,6 +658,8 @@ namespace XOffsetDatastructure {
             T& obj = *reinterpret_cast<T*>(raw);
             if constexpr (has_allocator_type_member<M>) {
                 std::construct_at(&(obj.[:member:]), alloc);
+            } else if constexpr (!std::is_trivially_copyable_v<M> && std::is_class_v<M>) {
+                reflect_init_all_impl<M>(reinterpret_cast<void*>(&(obj.[:member:])), alloc);
             } else {
                 std::construct_at(&(obj.[:member:]));  // value-init (zero)
             }
@@ -664,9 +669,6 @@ namespace XOffsetDatastructure {
         void reflect_init_expand(void* raw, Alloc alloc, std::index_sequence<Is...>) {
             (reflect_init_nth<T, Is>(raw, alloc), ...);
         }
-
-        template <typename T, typename Alloc>
-        void reflect_init_all_impl(void* raw, Alloc alloc);
 
         template <typename T, std::size_t N, typename Alloc>
         void reflect_init_base_nth(void* raw, Alloc alloc) {
@@ -699,6 +701,10 @@ namespace XOffsetDatastructure {
 
         // ── Reflection Transfer (move/copy with allocator injection) ──
 
+        template <typename T, typename Src>
+        void reflect_transfer_init_all_impl(void* dst, Src&& src,
+                                            XBufferCore::segment_manager* sm);
+
         template <typename T, std::size_t N, typename Src>
         void reflect_transfer_init_nth(void* dst, Src&& src,
                                        XBufferCore::segment_manager* sm) {
@@ -709,6 +715,10 @@ namespace XOffsetDatastructure {
             T& d = *reinterpret_cast<T*>(dst);
             if constexpr (has_allocator_type_member<M>) {
                 std::construct_at(&(d.[:member:]),
+                    std::forward<Src>(src).[:member:], sm);
+            } else if constexpr (!std::is_trivially_copyable_v<M> && std::is_class_v<M>) {
+                reflect_transfer_init_all_impl<M>(
+                    reinterpret_cast<void*>(&(d.[:member:])),
                     std::forward<Src>(src).[:member:], sm);
             } else {
                 std::construct_at(&(d.[:member:]),
@@ -722,10 +732,6 @@ namespace XOffsetDatastructure {
                                           std::index_sequence<Is...>) {
             (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
         }
-
-        template <typename T, typename Src>
-        void reflect_transfer_init_all_impl(void* dst, Src&& src,
-                                            XBufferCore::segment_manager* sm);
 
         template <typename T, std::size_t N, typename Src>
         void reflect_transfer_base_nth(void* dst, Src&& src,
