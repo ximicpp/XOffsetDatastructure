@@ -147,9 +147,9 @@ void test_field_count_detection() {
     std::cout << "-------------------------------\n";
     
     // Use reflection to count fields at compile-time
-    constexpr size_t count_boundary = boost::typelayout::get_member_count<BoundaryStruct>();
-    constexpr size_t count_large = boost::typelayout::get_member_count<LargeStruct>();
-    constexpr size_t count_very_large = boost::typelayout::get_member_count<VeryLargeStruct>();
+    constexpr size_t count_boundary = boost::typelayout::detail::get_member_count<BoundaryStruct>();
+    constexpr size_t count_large = boost::typelayout::detail::get_member_count<LargeStruct>();
+    constexpr size_t count_very_large = boost::typelayout::detail::get_member_count<VeryLargeStruct>();
     
     std::cout << "  BoundaryStruct: " << count_boundary << " fields\n";
     std::cout << "  LargeStruct: " << count_large << " fields\n";
