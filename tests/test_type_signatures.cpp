@@ -233,9 +233,9 @@ void test_platform_prefix() {
 // ---------------------------------------------------------------------------
 
 void test_safety_classification() {
-    using boost::typelayout::compat::SafetyLevel;
-    using boost::typelayout::compat::classify_signature;
-    using boost::typelayout::compat::safety_level_name;
+    using boost::typelayout::compat::detail::SafetyLevel;
+    using boost::typelayout::compat::detail::classify_signature;
+    using boost::typelayout::compat::detail::safety_level_name;
 
     std::cout << "[Test 7] Safety Classification (classify_signature)\n";
     std::cout << std::string(50, '-') << "\n";

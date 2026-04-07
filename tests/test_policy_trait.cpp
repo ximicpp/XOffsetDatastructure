@@ -215,9 +215,9 @@ bool test_backward_compat() {
 // Test 5: TypeLayout classify_signature (runtime safety classification)
 // ============================================================================
 bool test_classify_levels() {
-    using boost::typelayout::compat::SafetyLevel;
-    using boost::typelayout::compat::classify_signature;
-    using boost::typelayout::compat::safety_level_name;
+    using boost::typelayout::compat::detail::SafetyLevel;
+    using boost::typelayout::compat::detail::classify_signature;
+    using boost::typelayout::compat::detail::safety_level_name;
 
     std::cout << "\n[TEST] TypeLayout classify_signature (runtime safety classification)\n";
     std::cout << std::string(55, '-') << "\n";
