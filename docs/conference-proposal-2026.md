@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Serializing a complex game state at zero cost — no encoding, no decoding, just raw bytes — sounds ideal until you discover that every container member demands a hand-written allocator constructor. That is the architectural tension at the heart of zero-encoding serialization: the offset_ptr-based containers that make it possible require a memory-pool handle at construction time, and without compile-time member introspection, only the user can wire that up.
+Serializing a complex game state at zero cost — no encoding, no decoding, just raw bytes — sounds ideal until you discover that every container member demands a hand-written allocator constructor. That is the architectural tension at the heart of zero-encoding serialization: the buffer-aware containers that make it possible require the buffer's allocator at construction time, and without compile-time member introspection, only the user can wire that up.
 
 Before C++26, a real library worked around this with a ~600-line Python code generator that produced allocator constructors from YAML schemas, aggregate-only mirror types that enabled Boost.PFR-based reflection, and 150 lines of hand-written concepts that verified member safety. Each layer compensated for the same language-level gap.
 
@@ -23,9 +23,9 @@ Attendees will understand the conditions that make zero-encoding serialization s
 Zero-encoding means `save()` returns raw buffer bytes, `load()` maps them back — no per-field processing. Two structural requirements make this sound:
 
 - **All data in one buffer.** Containers must allocate internal storage from the buffer, not the heap — otherwise byte-copying loses the data. This rules out `std::string` and `std::vector`, whose internal storage lives on the heap.
-- **Position-independent references.** A regular pointer stores an absolute address; when the buffer is loaded at a different address, the pointer is invalid. `offset_ptr` stores `target - this` (a relative offset) instead, so every reference self-adjusts on byte-copy.
+- **Position-independent references.** A regular pointer stores an absolute address; when the buffer is loaded at a different address, the pointer is invalid. A relative pointer stores `target - this` instead, so every reference self-adjusts on byte-copy.
 
-Together: every container member must be constructed with the allocator that owns the buffer's memory pool — called a *segment manager*. This is a structural requirement of zero-encoding, not a design choice.
+Together: every container member must be constructed with the buffer's allocator. This is a structural requirement of zero-encoding, not a design choice.
 
 **The tension:** user burden scales linearly with type richness. Every container member adds a line to the allocator-propagating constructor. Every type adds a constructor to maintain:
 
@@ -72,7 +72,7 @@ Shared root cause: the library cannot see the user's type at compile time.
 
 C++26 P2996 provides `nonstatic_data_members_of(^^T, access_context::unchecked())` — compile-time iteration over any type's members, including private and inherited. Combined with `bases_of` (base class traversal), `type_of` (member type inspection), and splice syntax (injecting a reflected member back into code as an expression), the library gains complete vision into user types.
 
-**The allocator interceptor (12 min).** Instead of generating a constructor for each type, the library intercepts the allocator's `construct()` call — the decision point — and uses reflection to handle each member: primitives are value-initialized, containers receive the segment manager, composites recurse, base classes are traversed via `bases_of`. One mechanism handles every type — no per-type code, no registration.
+**The allocator interceptor (12 min).** Instead of generating a constructor for each type, the library intercepts the allocator's `construct()` call — the decision point — and uses reflection to handle each member: primitives are value-initialized, containers receive the buffer's allocator, composites recurse, base classes are traversed via `bases_of`. One mechanism handles every type — no per-type code, no registration.
 
 Nesting is handled by recursion: `XVector<XVector<Item>>` where `Item` has an `XString` — each level triggers the interceptor, each level reflects over its members. Move and reallocation use `reflect_transfer_init_all<T>()` with the same member-iteration logic — one mechanism, two code paths.
 
@@ -97,9 +97,9 @@ Result: users write plain structs with no constructor, no `allocator_type`, no m
 
 ### Part 4: Reflection-Driven Compaction (10 min)
 
-Arena-style buffers fragment as objects are created and destroyed. Before C++26, compacting an offset_ptr-based object graph required hand-written per-type migration code.
+Arena-style buffers fragment as objects are created and destroyed. Before C++26, compacting such an object graph required hand-written per-type migration code.
 
-`compact<T>()` deep-migrates the entire object graph to a minimal new buffer. Each member kind has a different relationship to the buffer's address space — a plain int can be bit-copied, but an offset_ptr-based container must be reconstructed through the new buffer's allocator to update its internal offsets. A `consteval` function reflects over members and selects the per-member strategy at compile time: bitwise copy, allocator-aware move, container element migration, or composite recursion.
+`compact<T>()` deep-migrates the entire object graph to a minimal new buffer. Each member kind has a different relationship to the buffer's address space — a plain int can be bit-copied, but a buffer-aware container must be reconstructed through the new buffer's allocator to update its internal references. A `consteval` function reflects over members and selects the per-member strategy at compile time: bitwise copy, allocator-aware move, container element migration, or composite recursion.
 
 The same `nonstatic_data_members_of` applied at a different decision point — migration instead of construction. The audience sees the same mechanism solve a fundamentally different problem, confirming the design principle through reuse rather than assertion.
 
