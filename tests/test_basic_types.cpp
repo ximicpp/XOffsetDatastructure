@@ -21,7 +21,7 @@ struct BasicTypes {
 };
 
 // Type safety validation
-static_assert(is_xbuffer_safe<BasicTypes>::value, 
+static_assert(is_byte_copy_safe_v<BasicTypes>,
               "BasicTypes must be safe for XBuffer");
 
 bool test_basic_types() {

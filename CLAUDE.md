@@ -63,13 +63,13 @@ When adding a test: register in `tests/CMakeLists.txt` (add to `REFLECTION_TESTS
 The entire library lives in one header, organized as:
 
 1. **Platform guards** — enforces 64-bit little-endian only
-2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`, `is_transfer_safe<T>(sig)`)
-3. **Memory allocator** — `x_best_fit` (rbtree-based), backing `XBufferCore` (managed_external_buffer with `offset_ptr`)
+2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`)
+3. **Memory allocator** — `rbtree_best_fit` (aliased as `x_best_fit`), backing `XBufferCore` (managed_external_buffer with `offset_ptr`)
 4. **Container types** — `XString`, `XVector<T>`, `XSet<T>`, `XMap<K,V>` — all Boost.Container types using offset_ptr allocators
-5. **Type safety (Domain S)** — `DefaultPolicy::accept<T>()` is a consteval 4-branch admission gate: Opaque -> Leaf -> Composite (P2996 reflection) -> Rejected. `StrictPolicy` adds layout-signature matching.
-6. **Reflect construct/transfer** — P2996-based zero-boilerplate: `reflect_construct<T>()` auto-injects allocators, `reflect_transfer<T>()` deep-copies
+5. **Type safety** — `static_assert(is_byte_copy_safe_v<T>)` at entry points (`make<T>()`, `allocator<T>()`, `compact<T>()`). Admission delegated entirely to TypeLayout.
+6. **Reflect construct/transfer** — P2996-based zero-boilerplate: `reflect_init_all<T>()` auto-injects allocators, `reflect_transfer_init_all<T>()` deep-copies
 7. **XBuffer** — user-facing API: `make<T>()`, `root<T>()`, `save()`/`load()`, `grow()`, `compact<T>()`
-8. **XCompactor** — reflection-based deep migration using per-type strategies (TrivialCopy, AllocatorAware, Container, Composite)
+8. **XCompactor** — reflection-based deep migration using per-type strategies (Bitwise, AllocatorAware, Container, Composite)
 9. **Registration macros** — `XOFFSET_REGISTER_TYPE`, `XOFFSET_REGISTER_CONTAINER`, `XOFFSET_REGISTER_MAP` — register types into both TypeLayout and XCompactor
 
 ### Key dependency: TypeLayout (`external/typelayout`)

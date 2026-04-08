@@ -15,15 +15,6 @@
     #define XOFFSET_LITTLE_ENDIAN 0
 #endif
 
-#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
-    #if !XOFFSET_ARCH_64BIT
-        #error "XOffsetDatastructure requires 64-bit architecture"
-    #endif
-    #if !XOFFSET_LITTLE_ENDIAN
-        #error "XOffsetDatastructure requires little-endian architecture"
-    #endif
-#endif
-
 #include <experimental/meta>
 #include <type_traits>
 #include <string>
@@ -32,9 +23,8 @@
 
 // TypeLayout library — the authoritative type-signature and type-safety engine.
 // XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
-//   - is_byte_copy_safe_v<T>              — recursive domain admission predicate
-//   - is_transfer_safe<T>(remote_sig)     — byte-copy safe + layout signature match
-//   - get_layout_signature<T>()           — binary layout signature
+//   - is_byte_copy_safe_v<T>    — recursive domain admission predicate
+//   - get_layout_signature<T>() — binary layout signature
 #include <boost/typelayout.hpp>
 #include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
@@ -67,18 +57,7 @@ namespace boost {
 namespace interprocess {
 
 template <class MutexFamily, class VoidPointer = offset_ptr<void>, std::size_t MemAlignment = 0>
-class x_best_fit : public rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment>
-{
-    typedef rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment> supertype;
-
-public:
-    typedef typename supertype::size_type size_type;
-
-    x_best_fit(typename supertype::size_type size, typename supertype::size_type extra_hdr_bytes)
-        : supertype(size, extra_hdr_bytes)
-    {
-    }
-};
+using x_best_fit = rbtree_best_fit<MutexFamily, VoidPointer, MemAlignment>;
 
 // ============================================================================
 // XManagedMemory — Managed memory segment backed by std::vector<char>
@@ -162,20 +141,6 @@ public:
     {
         m_buffer.reserve(compute_reservation(size));
         void *addr = m_buffer.data();
-        BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
-        if (!base_t::open_impl(addr, size))
-        {
-            throw interprocess_exception("Could not initialize m_buffer in constructor");
-        }
-    }
-
-    /// Construct from existing vector (legacy).
-    XManagedMemory(std::vector<char> &externalBuffer)
-        : m_buffer(externalBuffer)
-    {
-        m_buffer.reserve(compute_reservation(m_buffer.size()));
-        void *addr = m_buffer.data();
-        size_type size = m_buffer.size();
         BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
         if (!base_t::open_impl(addr, size))
         {
@@ -297,15 +262,7 @@ namespace XOffsetDatastructure {
     // ========================================================================
     namespace detail {
 
-        // Container concepts — used only by XCompactor for migration dispatch.
-        template<typename T>
-        concept SequentialContainer = requires(T t) {
-            { t.begin() } -> std::input_or_output_iterator;
-            { t.end() } -> std::input_or_output_iterator;
-            typename T::value_type;
-            { t.emplace_back(std::move(std::declval<typename T::value_type>())) };
-        };
-
+        // Container concepts — used by XCompactor for migration dispatch.
         template<typename T>
         concept SetLikeContainer = requires(T t) {
             { t.begin() } -> std::input_or_output_iterator;
@@ -585,7 +542,6 @@ namespace XOffsetDatastructure {
         std::size_t free_size;
         std::size_t used_size;
         double usage_percent() const { return total_size > 0 ? (used_size * 100.0 / total_size) : 0.0; }
-        double free_percent() const  { return total_size > 0 ? (free_size * 100.0 / total_size) : 0.0; }
     };
 
     inline MemoryStats memory_stats(XBufferCore& xbuf) {
@@ -596,42 +552,8 @@ namespace XOffsetDatastructure {
     // Users never see this — all public APIs hide the naming layer.
     inline constexpr const char* XBUFFER_ROOT_NAME = "__root__";
 
-    namespace detail {
-
-        // Type Safety — domain admission delegated to TypeLayout.
-        using boost::typelayout::is_byte_copy_safe_v;
-
-        template<typename T>
-        consteval const char* describe_safety() {
-            using CleanT = std::remove_cv_t<T>;
-            if constexpr (boost::typelayout::is_byte_copy_safe_v<CleanT>) {
-                return "byte-copy safe";
-            } else if constexpr (std::is_polymorphic_v<CleanT>) {
-                return "rejected: polymorphic type (has vtable pointer)";
-            } else if constexpr (std::is_union_v<CleanT>) {
-                return "rejected: union type";
-            } else {
-                return "rejected: contains pointer, reference, or unsafe member";
-            }
-        }
-    } // namespace detail
-
-    /// Public admission gate — alias for TypeLayout's is_byte_copy_safe_v<T>.
-    /// Prefer using boost::typelayout::is_byte_copy_safe_v<T> directly in new code.
-    template<typename T>
-    struct is_xbuffer_safe {
-        static constexpr bool value = boost::typelayout::is_byte_copy_safe_v<T>;
-        static constexpr const char* reason() { return detail::describe_safety<T>(); }
-    };
-
-    template<typename T>
-    constexpr void validate_xbuffer_type() {
-        static_assert(is_xbuffer_safe<T>::value,
-            "XBuffer Type Safety Error: type is not byte-copy safe. "
-            "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
-            "or structs composed of these. "
-            "Not allowed: pointers, references, virtual types, std containers.");
-    }
+    // Type admission — delegated to TypeLayout.
+    using boost::typelayout::is_byte_copy_safe_v;
 
     // ========================================================================
     // Reflection-based construction and transfer (C++26 P2996).
@@ -879,7 +801,10 @@ namespace XOffsetDatastructure {
         /// Create the root object. Returned pointer may dangle after grow/compact.
         template<typename T>
         T* make() {
-            validate_xbuffer_type<T>();
+            static_assert(is_byte_copy_safe_v<T>,
+                "Type is not byte-copy safe. "
+                "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
+                "or structs composed of these.");
             if (detail::find_root<T>(*this) != nullptr) {
                 throw boost::interprocess::interprocess_exception(
                     "make<T>(): root object already exists. "
@@ -917,12 +842,9 @@ namespace XOffsetDatastructure {
 
         template<typename T>
         boost::interprocess::allocator<T, XBufferCore::segment_manager> allocator() {
-            validate_xbuffer_type<T>();
+            static_assert(is_byte_copy_safe_v<T>,
+                "Type is not byte-copy safe.");
             return boost::interprocess::allocator<T, XBufferCore::segment_manager>(this->get_segment_manager());
-        }
-
-        std::size_t used_size() {
-            return stats().used_size;
         }
 
         // Serialize to string (shrinks first, byte-exact).
@@ -931,20 +853,6 @@ namespace XOffsetDatastructure {
             const char* base = static_cast<const char*>(this->get_address());
             std::size_t exact_size = this->segment_size();
             return std::string(base, exact_size);
-        }
-
-        // Serialize without shrinking (faster).
-        std::string save_raw() {
-            const char* base = static_cast<const char*>(this->get_address());
-            std::size_t exact_size = this->segment_size();
-            return std::string(base, exact_size);
-        }
-
-        std::vector<char> save_bytes() {
-            this->shrink_to_fit();
-            const char* base = static_cast<const char*>(this->get_address());
-            std::size_t exact_size = this->segment_size();
-            return std::vector<char>(base, base + exact_size);
         }
 
         static XBuffer load(const std::string& data) {
@@ -959,15 +867,6 @@ namespace XOffsetDatastructure {
 
         MemoryStats stats() {
             return memory_stats(*this);
-        }
-
-        // Estimates a suitable buffer size for the given user data payload.
-        // Accounts for segment_manager overhead + 20% headroom for container growth.
-        static std::size_t estimate_buffer_size(std::size_t user_data_bytes) {
-            std::size_t min_overhead = XBufferCore::segment_manager::get_min_size();
-            std::size_t estimated = min_overhead + user_data_bytes;
-            estimated += estimated / 5;  // +20% headroom
-            return std::max(estimated, (std::size_t)512);
         }
     };
 
@@ -1038,7 +937,8 @@ namespace XOffsetDatastructure {
         // Progressive allocation: tries 2x, 2.5x, 3x, 4x multipliers.
         template<typename T>
         static XBuffer compact(XBufferCore& old_xbuf) {
-            validate_xbuffer_type<T>();
+            static_assert(is_byte_copy_safe_v<T>,
+                "Type is not byte-copy safe.");
             auto stats = memory_stats(old_xbuf);
             auto* old_obj = detail::find_root<T>(old_xbuf);
 

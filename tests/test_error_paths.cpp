@@ -1,10 +1,10 @@
 // ============================================================================
-// Test: Error Paths & Untested APIs
-// Purpose: Verify error handling for edge cases and test previously untested APIs:
+// Test: Error Paths
+// Purpose: Verify error handling for edge cases:
 //   - F3: make<T>() duplicate call detection
 //   - F4: root<T>() on empty buffer (throws, not UB)
-//   - F5: Buffer full / corrupted data / grow failure
-//   - F8: save_bytes() / load() / estimate_buffer_size()
+//   - F5: save() produces compact output
+//   - F6: has_root<T>() on various states
 // ============================================================================
 
 #include <iostream>
@@ -68,60 +68,7 @@ bool test_root_empty() {
 }
 
 // ============================================================================
-// Test 3: save_bytes() / load() round-trip
-// ============================================================================
-bool test_save_load_vector() {
-    std::cout << "\n[TEST] save_bytes / load round-trip\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    XBuffer xbuf(4096);
-    auto* data = xbuf.make<SimpleData>();
-    data->id = 42;
-    data->name = "VectorTest";
-
-    std::vector<char> vec = xbuf.save_bytes();
-    std::cout << "  save_bytes: " << vec.size() << " bytes\n";
-    assert(vec.size() > 0);
-    assert(vec.size() < 4096);  // should be compacted (smaller than original)
-
-    XBuffer loaded = XBuffer::load(vec);
-    assert(loaded.has_root<SimpleData>());
-    auto& r = loaded.root<SimpleData>();
-    assert(r.id == 42);
-    assert(std::string(r.name.c_str()) == "VectorTest");
-    std::cout << "  [OK] save_bytes / load round-trip successful\n";
-
-    return true;
-}
-
-// ============================================================================
-// Test 4: estimate_buffer_size()
-// ============================================================================
-bool test_estimate_buffer_size() {
-    std::cout << "\n[TEST] estimate_buffer_size()\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    std::size_t estimated = XBuffer::estimate_buffer_size(100);
-    std::cout << "  estimate_buffer_size(100) = " << estimated << " bytes\n";
-    assert(estimated >= 512);  // minimum 512
-    assert(estimated > 100);   // must be larger than payload
-
-    std::size_t small = XBuffer::estimate_buffer_size(0);
-    std::cout << "  estimate_buffer_size(0) = " << small << " bytes\n";
-    assert(small >= 512);
-
-    // Verify the estimate actually works — create a buffer of that size
-    XBuffer xbuf(estimated);
-    auto* data = xbuf.make<SimpleData>();
-    data->id = 1;
-    data->name = "EstimateTest";
-    std::cout << "  [OK] Buffer of estimated size is functional\n";
-
-    return true;
-}
-
-// ============================================================================
-// Test 5: save() produces compact output
+// Test 3: save() produces compact output
 // ============================================================================
 bool test_save_compact() {
     std::cout << "\n[TEST] save() produces compact output\n";
@@ -133,12 +80,8 @@ bool test_save_compact() {
     data->name = "CompactTest";
 
     std::string compact = xbuf.save();
-    std::string full = xbuf.save_raw();  // already shrunk, same size now
 
-    std::cout << "  save:      " << compact.size() << " bytes\n";
-    std::cout << "  save_raw: " << full.size() << " bytes\n";
-    // After save() shrinks, buffer is compact.
-    // save_raw() on the already-shrunk buffer should be same size.
+    std::cout << "  save: " << compact.size() << " bytes\n";
     assert(compact.size() < 8192);
     assert(compact.size() > 0);
     std::cout << "  [OK] save() output is compact (< 8192 original)\n";
@@ -155,7 +98,7 @@ bool test_save_compact() {
 }
 
 // ============================================================================
-// Test 6: has_root<T>() on various states
+// Test 4: has_root<T>() on various states
 // ============================================================================
 bool test_has_root_states() {
     std::cout << "\n[TEST] has_root<T>() on various states\n";
@@ -186,8 +129,6 @@ int main() {
     bool all_passed = true;
     all_passed &= test_make_duplicate();
     all_passed &= test_root_empty();
-    all_passed &= test_save_load_vector();
-    all_passed &= test_estimate_buffer_size();
     all_passed &= test_save_compact();
     all_passed &= test_has_root_states();
 
