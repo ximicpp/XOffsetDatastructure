@@ -26,7 +26,6 @@
 //   - is_byte_copy_safe_v<T>    — recursive domain admission predicate
 //   - get_layout_signature<T>() — binary layout signature
 #include <boost/typelayout.hpp>
-#include <boost/typelayout/tools/sig_types.hpp>  // PlatformInfo
 #include <boost/container/scoped_allocator.hpp>
 
 // Platform: 64-bit little-endian only.
@@ -145,20 +144,6 @@ public:
         if (!base_t::open_impl(addr, size))
         {
             throw interprocess_exception("Could not initialize m_buffer in constructor");
-        }
-    }
-
-    /// Construct by moving existing vector.
-    XManagedMemory(std::vector<char> &&externalBuffer)
-        : m_buffer(std::move(externalBuffer))
-    {
-        m_buffer.reserve(compute_reservation(m_buffer.size()));
-        void *addr = m_buffer.data();
-        size_type size = m_buffer.size();
-        BOOST_ASSERT((0 == (((std::size_t)addr) & (AllocationAlgorithm::Alignment - size_type(1u)))));
-        if (!base_t::open_impl(addr, size))
-        {
-            throw interprocess_exception("Could not initialize m_buffer in move constructor");
         }
     }
 
@@ -383,7 +368,6 @@ namespace XOffsetDatastructure {
     template <typename T>
     class XVector : public detail::x_vector_impl<T> {
         using Base = detail::x_vector_impl<T>;
-        using SM = XBufferCore::segment_manager;
         auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
 
     public:
@@ -438,8 +422,6 @@ namespace XOffsetDatastructure {
     template <typename K, typename V>
     class XMap : public detail::x_map_impl<K, V> {
         using Base = detail::x_map_impl<K, V>;
-        using SM = XBufferCore::segment_manager;
-        auto* sm() { return this->get_stored_allocator().get_segment_manager(); }
 
     public:
         using Base::Base;
@@ -500,7 +482,6 @@ namespace XOffsetDatastructure {
     template <typename T>
     class XSet : public detail::x_set_impl<T> {
         using Base = detail::x_set_impl<T>;
-        using SM = XBufferCore::segment_manager;
 
     public:
         using Base::Base;
@@ -860,11 +841,6 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
-        static XBuffer load(const std::vector<char>& data) {
-            XBuffer xbuf(data.data(), data.size());
-            return xbuf;
-        }
-
         MemoryStats stats() {
             return memory_stats(*this);
         }
@@ -905,10 +881,6 @@ namespace XOffsetDatastructure {
 
         /// Load from serialized data and return a typed buffer.
         static TypedXBuffer load(const std::string& data) {
-            return TypedXBuffer(XBuffer::load(data));
-        }
-
-        static TypedXBuffer load(const std::vector<char>& data) {
             return TypedXBuffer(XBuffer::load(data));
         }
 
