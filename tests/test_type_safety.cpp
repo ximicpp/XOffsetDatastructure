@@ -4,6 +4,7 @@
 #include <cstddef>   // std::byte, std::nullptr_t
 
 using namespace XOffsetDatastructure;
+using namespace boost::typelayout;
 
 // ============================================================================
 // Test 1: Basic Types (Should PASS)
@@ -23,7 +24,7 @@ struct BasicTypes {
     BasicTypes(Allocator) : i32(0), i64(0), u32(0), u64(0), f32(0.0f), f64(0.0), flag(false), ch('\0') {}
 };
 
-static_assert(is_xbuffer_safe<BasicTypes>::value, "BasicTypes should be safe");
+static_assert(is_byte_copy_safe_v<BasicTypes>, "BasicTypes should be safe");
 
 // ============================================================================
 // Test 2: Container Types (Should PASS)
@@ -40,7 +41,7 @@ struct ContainerTypes {
         : name(alloc), numbers(alloc), unique_ids(alloc), id_to_name(alloc) {}
 };
 
-static_assert(is_xbuffer_safe<ContainerTypes>::value, "ContainerTypes should be safe");
+static_assert(is_byte_copy_safe_v<ContainerTypes>, "ContainerTypes should be safe");
 
 // ============================================================================
 // Test 3: Nested Containers (Should PASS)
@@ -56,7 +57,7 @@ struct NestedContainers {
         : matrix(alloc), name_to_numbers(alloc), strings(alloc) {}
 };
 
-static_assert(is_xbuffer_safe<NestedContainers>::value, "NestedContainers should be safe");
+static_assert(is_byte_copy_safe_v<NestedContainers>, "NestedContainers should be safe");
 
 // ============================================================================
 // Test 4: User-Defined Nested Types (Should PASS)
@@ -79,8 +80,8 @@ struct Player {
         : name(alloc), level(0), position{}, inventory(alloc) {}
 };
 
-static_assert(is_xbuffer_safe<Point>::value, "Point should be safe");
-static_assert(is_xbuffer_safe<Player>::value, "Player should be safe");
+static_assert(is_byte_copy_safe_v<Point>, "Point should be safe");
+static_assert(is_byte_copy_safe_v<Player>, "Player should be safe");
 
 // ============================================================================
 // Test 5: Complex Nested Structure (Should PASS)
@@ -114,9 +115,9 @@ struct GameState {
         : player(alloc), inventory(alloc), waypoints(alloc) {}
 };
 
-static_assert(is_xbuffer_safe<Item>::value, "Item should be safe");
-static_assert(is_xbuffer_safe<Inventory>::value, "Inventory should be safe");
-static_assert(is_xbuffer_safe<GameState>::value, "GameState should be safe");
+static_assert(is_byte_copy_safe_v<Item>, "Item should be safe");
+static_assert(is_byte_copy_safe_v<Inventory>, "Inventory should be safe");
+static_assert(is_byte_copy_safe_v<GameState>, "GameState should be safe");
 
 // ============================================================================
 // Test 6: Types that SHOULD FAIL
@@ -128,7 +129,7 @@ struct PolymorphicType {
     int32_t data;
 };
 
-static_assert(!is_xbuffer_safe<PolymorphicType>::value, 
+static_assert(!is_byte_copy_safe_v<PolymorphicType>, 
     "PolymorphicType should NOT be safe (has virtual function)");
 
 // 6.2: Contains raw pointer
@@ -137,7 +138,7 @@ struct WithRawPointer {
     int32_t data;
 };
 
-static_assert(!is_xbuffer_safe<WithRawPointer>::value, 
+static_assert(!is_byte_copy_safe_v<WithRawPointer>, 
     "WithRawPointer should NOT be safe (has raw pointer)");
 
 // 6.3: Contains std::string
@@ -146,7 +147,7 @@ struct WithStdString {
     int32_t id;
 };
 
-static_assert(!is_xbuffer_safe<WithStdString>::value, 
+static_assert(!is_byte_copy_safe_v<WithStdString>, 
     "WithStdString should NOT be safe (uses std::string)");
 
 // 6.4: Contains std::vector
@@ -154,7 +155,7 @@ struct WithStdVector {
     std::vector<int32_t> data;  // std::vector = NOT ALLOWED
 };
 
-static_assert(!is_xbuffer_safe<WithStdVector>::value, 
+static_assert(!is_byte_copy_safe_v<WithStdVector>, 
     "WithStdVector should NOT be safe (uses std::vector)");
 
 // 6.5: Nested unsafe type
@@ -166,8 +167,8 @@ struct UnsafeNested {
 // TypeLayout now synthesizes a ptr[s:N,a:N] field for every type that
 // introduces a vptr.  When PolymorphicType is flattened into UnsafeNested's
 // layout signature, the synthesized ptr[ marker causes classify_safety to
-// return Warning, which XOffset escalates to Risk → is_xbuffer_safe = false.
-static_assert(!is_xbuffer_safe<UnsafeNested>::value,
+// return Warning, which XOffset escalates to Risk → is_byte_copy_safe_v = false.
+static_assert(!is_byte_copy_safe_v<UnsafeNested>,
     "UnsafeNested should NOT be safe (contains nested polymorphic type with vptr)");
 
 // 6.6: long / unsigned long — locally safe on ALL platforms (C2).
@@ -181,7 +182,7 @@ struct HasLong {
 
 // long is always locally serialization-free: it's a trivially copyable
 // scalar with no pointers.  is_byte_copy_safe_v<HasLong> == true.
-static_assert(is_xbuffer_safe<HasLong>::value,
+static_assert(is_byte_copy_safe_v<HasLong>,
     "HasLong: locally safe on all platforms (C2)");
 
 // 6.7: unsigned long — same reasoning as long
@@ -190,7 +191,7 @@ struct HasUnsignedLong {
     unsigned long platformDependent;
 };
 
-static_assert(is_xbuffer_safe<HasUnsignedLong>::value,
+static_assert(is_byte_copy_safe_v<HasUnsignedLong>,
     "HasUnsignedLong: locally safe on all platforms (C2)");
 
 // 6.8: uint64_t is ALWAYS safe regardless of platform (LP64 or LLP64)
@@ -199,7 +200,7 @@ struct HasUint64 {
     int64_t  alsoSafe;
 };
 
-static_assert(is_xbuffer_safe<HasUint64>::value,
+static_assert(is_byte_copy_safe_v<HasUint64>,
     "HasUint64 should ALWAYS be safe (fixed-width integers)");
 
 // ============================================================================
@@ -219,7 +220,7 @@ struct HasNullptr {
     std::nullptr_t n;
 };
 
-static_assert(is_xbuffer_safe<HasNullptr>::value,
+static_assert(is_byte_copy_safe_v<HasNullptr>,
     "HasNullptr should be safe (nullptr_t is accepted, cross-platform all-zeros)");
 
 // 7.2: std::byte — Safe scalar type
@@ -230,7 +231,7 @@ struct HasByte {
     int32_t x;
 };
 
-static_assert(is_xbuffer_safe<HasByte>::value,
+static_assert(is_byte_copy_safe_v<HasByte>,
     "HasByte should be safe (std::byte is a safe scalar)");
 
 // 7.3: Member pointer (T C::*) — Should be REJECTED
@@ -243,7 +244,7 @@ struct HasMemberPointer {
     int32_t data;
 };
 
-static_assert(!is_xbuffer_safe<HasMemberPointer>::value,
+static_assert(!is_byte_copy_safe_v<HasMemberPointer>,
     "HasMemberPointer should NOT be safe (member pointer is process-local)");
 
 // 7.4: Member function pointer — Should also be REJECTED
@@ -253,7 +254,7 @@ struct HasMemberFuncPointer {
     int32_t data;
 };
 
-static_assert(!is_xbuffer_safe<HasMemberFuncPointer>::value,
+static_assert(!is_byte_copy_safe_v<HasMemberFuncPointer>,
     "HasMemberFuncPointer should NOT be safe (member function pointer)");
 
 // ============================================================================

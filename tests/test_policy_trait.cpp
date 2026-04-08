@@ -4,14 +4,13 @@
 //
 // Tests:
 //   1. is_byte_copy_safe_v — Safe types pass, unsafe types rejected
-//   2. Backward compatibility — is_xbuffer_safe<T>::value
-//   3. TypeLayout classify_signature (runtime safety classification)
-//   4. C2 — Nested container recursive safety
-//   5. Inline strict/size checks (replaces StrictPolicy/SmallTypePolicy)
+//   2. Inline strict check (signature comparison)
+//   3. Inline size-limited check
+//   4. TypeLayout classify_signature (runtime safety classification)
+//   5. C2 — Nested container recursive safety
 //
-// Note: DefaultPolicy, StrictPolicy, SmallTypePolicy were removed.
-//       Domain admission is now fully delegated to TypeLayout's
-//       is_byte_copy_safe_v<T> recursive predicate.
+// Domain admission is fully delegated to TypeLayout's
+// is_byte_copy_safe_v<T> recursive predicate.
 // ============================================================================
 
 #include <iostream>
@@ -182,37 +181,7 @@ bool test_inline_size_check() {
 }
 
 // ============================================================================
-// Test 4: Backward compatibility — is_xbuffer_safe<T>::value
-// ============================================================================
-bool test_backward_compat() {
-    std::cout << "\n[TEST] Backward Compatibility\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    // is_xbuffer_safe<T>::value should be identical to is_byte_copy_safe_v<T>
-    static_assert(is_xbuffer_safe<int32_t>::value == is_byte_copy_safe_v<int32_t>,
-                  "is_xbuffer_safe must match is_byte_copy_safe_v for int32_t");
-    static_assert(is_xbuffer_safe<SafeRecord>::value == is_byte_copy_safe_v<SafeRecord>,
-                  "is_xbuffer_safe must match is_byte_copy_safe_v for SafeRecord");
-    static_assert(is_xbuffer_safe<HasPointer>::value == is_byte_copy_safe_v<HasPointer>,
-                  "is_xbuffer_safe must match is_byte_copy_safe_v for HasPointer");
-    static_assert(is_xbuffer_safe<HasWchar>::value == is_byte_copy_safe_v<HasWchar>,
-                  "is_xbuffer_safe must match is_byte_copy_safe_v for HasWchar");
-
-    // Direct checks
-    static_assert(is_xbuffer_safe<int32_t>::value == true, "int32_t is safe");
-    static_assert(is_xbuffer_safe<HasPointer>::value == false, "HasPointer is not safe");
-
-    std::cout << "  is_xbuffer_safe<T> matches is_byte_copy_safe_v<T>... [OK]\n";
-
-    // reason() still works
-    const char* reason = is_xbuffer_safe<HasPointer>::reason();
-    std::cout << "  HasPointer reason: " << reason << "... [OK]\n";
-
-    return true;
-}
-
-// ============================================================================
-// Test 5: TypeLayout classify_signature (runtime safety classification)
+// Test 4: TypeLayout classify_signature (runtime safety classification)
 // ============================================================================
 bool test_classify_levels() {
     using boost::typelayout::compat::detail::SafetyLevel;
@@ -260,7 +229,7 @@ bool test_classify_levels() {
 }
 
 // ============================================================================
-// Test 6: C2 — Nested container recursive safety
+// Test 5: C2 — Nested container recursive safety
 // ============================================================================
 
 struct SafeFlat {
@@ -316,7 +285,6 @@ int main() {
     all_passed &= test_byte_copy_safe();
     all_passed &= test_inline_strict_check();
     all_passed &= test_inline_size_check();
-    all_passed &= test_backward_compat();
     all_passed &= test_classify_levels();
     all_passed &= test_c2_nested_container_recursion();
 
