@@ -244,93 +244,124 @@
 #### 6.1.1 标题
 
 - **位置**：标题
-- **原句**：`Reflect at the Control Point: Removing Boilerplate from Zero-Encoding Serialization`
-- **句子功能**：方法论命名 + 应用场景定位 + 结果承诺
+- **原句**：`From Hand-Written Allocator Constructors to Plain Structs: C++26 Reflection at the Control Point`
+- **句子功能**：具体 before/after 钩子 + 技术手段提示 + 方法论副标题
 - **代码/实现正确性**：部分支持
-- **证据**：`construct()` control point 可直接对应 [`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)；“removing boilerplate” 对纯聚合类型成立，对旧 allocator-aware 类型则是兼容并存，不是完全消失：[`xoffsetdatastructure.hpp#L263`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L263), [`tests/test_zero_boilerplate.cpp#L177`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L177)
-- **逻辑作用**：先给出最强的设计原则，再落到具体问题场景
-- **概念问题**：`control point` 与 `zero-encoding serialization` 都需要摘要第一段快速解释，否则首屏门槛较高
-- **措辞问题**：方法论很强，但“Removing Boilerplate”更偏表层结果，不足以完整表达更深的架构贡献
-- **改写建议**：`Reflect at the Control Point: Centralizing Construction and Migration in Zero-Encoding Serialization`
+- **证据**：零样板 plain-struct 结果由 README 与测试直接支撑：[`README.md#L123`](/Users/fanchensu/XOffsetDatastructure/README.md#L123), [`tests/test_zero_boilerplate.cpp#L95`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L95)；control point 对应 allocator `construct()` 拦截：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)
+- **逻辑作用**：先给一个人人都能看懂的 before/after，再用副标题保住真正的方法论
+- **概念问题**：`control point` 仍需要在摘要里立刻落到 allocator `construct()` 这种具体入口
+- **措辞问题**：比纯方法论标题更亲和，但“Plain Structs”仍然只代表最显眼的结果，不代表全部深层贡献
+- **改写建议**：可保留
 
 ### 6.2 摘要
 
 #### 6.2.1 摘要句 1
 
 - **位置**：摘要第 1 句
-- **原句**：`Zero-encoding serialization can make save() and load() almost as cheap as moving raw bytes, but it often pushes allocator plumbing, custom construction paths, and careful move logic into every user-defined type.`
+- **原句**：`Some high-performance serialization libraries get their speed by making save() and load() behave more like moving a memory buffer than encoding fields one by one.`
 - **句子功能**：问题定义 + 价值/代价对照
 - **代码/实现正确性**：部分支持
-- **证据**：`save()/load()` 的 byte snapshot / restore 机制可直接看到：[`xoffsetdatastructure.hpp#L795`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L795)；用户类型负担由旧 allocator-aware protocol 与 legacy compatibility 可间接说明：[`examples/README.md#L56`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L56), [`tests/test_zero_boilerplate.cpp#L48`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L48)
-- **逻辑作用**：全稿最重要的“收益 vs 代价”开场句
-- **概念问题**：`zero-encoding serialization` 在第一句出现，必须承担定义责任；现在虽然加了 `save()/load()`，但仍略术语化
-- **措辞问题**：`almost as cheap as moving raw bytes` 偏性能承诺；`every user-defined type` 边界过宽
-- **改写建议**：`Zero-encoding serialization can make save() and load() look much more like moving raw bytes than traditional per-field encoding, but that speed often comes with allocator plumbing and custom construction logic leaking into user-defined types.`
+- **证据**：`save()/load()` 的 byte snapshot / restore 机制可直接看到：[`xoffsetdatastructure.hpp#L795`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L795), [`xoffsetdatastructure.hpp#L802`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L802)
+- **逻辑作用**：用“为什么它快”作为最容易理解的开场，而不先压入术语
+- **概念问题**：`high-performance serialization libraries` 是宽泛类别，真正案例要靠下一句以后迅速收窄
+- **措辞问题**：`get their speed` 仍是工程化概括，不是 benchmark 证明，但已经比 “almost as cheap as raw bytes” 保守很多
+- **改写建议**：可保留
 
 #### 6.2.2 摘要句 2
 
 - **位置**：摘要第 2 句
-- **原句**：`This session shows a practical C++26 reflection pattern for pulling that complexity back into the library: reflect at the control point where the library must act, not in every user type.`
-- **句子功能**：方法论主张
-- **代码/实现正确性**：间接支持
-- **证据**：具体 control point 可由 `x_reflect_scoped_alloc::construct()` 证明：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)
-- **逻辑作用**：把问题从“序列化技巧”升级成“库设计模式”
-- **概念问题**：`control point` 是整稿中心概念，但仍未立即给出具体实例；需要后文迅速落地
-- **措辞问题**：`pulling that complexity back into the library` 属于正确但抽象的架构总括
-- **改写建议**：`This session shows a practical C++26 reflection pattern for moving those decisions back into the library itself: reflect at the point where the library constructs and relocates objects, not in every user-defined type.`
+- **原句**：`The cost shows up in user code: otherwise ordinary structs grow hand-written allocator constructors and move paths just so the library can build and relocate them correctly.`
+- **句子功能**：代价落地 + before 状态刻画
+- **代码/实现正确性**：部分支持
+- **证据**：旧 allocator-aware protocol 在示例文档中仍可见：[`examples/README.md#L56`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L56)；legacy allocator-aware 类型兼容测试也说明这类类型真实存在：[`tests/test_zero_boilerplate.cpp#L48`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L48), [`tests/test_zero_boilerplate.cpp#L177`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L177)
+- **逻辑作用**：把上一句的性能收益立即换算成用户侧的可见痛点
+- **概念问题**：`move paths` 不是标准术语，但和当前 transfer/reallocation 路径的工程含义是一致的
+- **措辞问题**：`ordinary structs grow ...` 很有画面，但仍是概括性表述；不是每个用户类型都会变成这样
+- **改写建议**：`The cost shows up in user code: otherwise ordinary structs can turn into allocator-aware types with hand-written constructors and move paths just so the library can build and relocate them correctly.`
 
 #### 6.2.3 摘要句 3
 
 - **位置**：摘要第 3 句
-- **原句**：`In a real library redesign, the key move was to reflect at the allocator's construct() boundary instead of generating constructors per type.`
-- **句子功能**：核心机制揭示
-- **代码/实现正确性**：直接支持
-- **证据**：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)
-- **逻辑作用**：把上一句的抽象 `control point` 绑定到一个具体现实入口
-- **概念问题**：无明显概念错误
-- **措辞问题**：`instead of generating constructors per type` 更像历史语境，若没有更多上下文会让人误解当前仓库还保留 generator 系统
-- **改写建议**：`In a real library redesign, the key move was to reflect at the allocator's construct() boundary instead of relying on per-type construction boilerplate.`
+- **原句**：`This session shows a practical C++26 reflection pattern for moving those type-dependent construction and migration decisions back into the library.`
+- **句子功能**：方法论主张
+- **代码/实现正确性**：间接支持
+- **证据**：`construct()` 拦截与反射式 transfer / migration 路径共同支撑“决策集中回库内部”的说法：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283), [`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621), [`xoffsetdatastructure.hpp#L1008`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L1008)
+- **逻辑作用**：把痛点从“用户代码变丑”提升成“库设计应该如何放置决策”
+- **概念问题**：`type-dependent construction and migration decisions` 是准确但密度较高的架构语言，需要下一句立刻落到 `construct()` 边界
+- **措辞问题**：比 “remove boilerplate” 更深，但也更抽象
+- **改写建议**：`This session shows a practical C++26 reflection pattern for moving those type-dependent construction and relocation decisions back into the library.`
 
 #### 6.2.4 摘要句 4
 
 - **位置**：摘要第 4 句
-- **原句**：`That single decision point lets the library inspect members, initialize buffer-aware subobjects, recurse into composites, and keep many pure aggregate types as plain structs while remaining compatible with existing allocator-aware ones.`
-- **句子功能**：机制效果总括
-- **代码/实现正确性**：直接支持
-- **证据**：
-  - member inspection / recursion：[`xoffsetdatastructure.hpp#L528`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L528), [`xoffsetdatastructure.hpp#L552`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L552)
-  - allocator-aware compatibility：[`xoffsetdatastructure.hpp#L266`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L266), [`tests/test_zero_boilerplate.cpp#L177`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L177)
-  - zero-boilerplate plain structs：[`tests/test_zero_boilerplate.cpp#L94`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L94), [`README.md#L123`](/Users/fanchensu/XOffsetDatastructure/README.md#L123)
-- **逻辑作用**：把“control point”从原则变成具体收益列表
-- **概念问题**：`pure aggregate` 仍是工程化表达，不是标准法理论证
-- **措辞问题**：整体已经比较准确；`plain structs` 范围已经收得较好
-- **改写建议**：`That single decision point lets the library inspect members, initialize buffer-aware subobjects, recurse into composites, and keep many pure aggregate types as plain structs without breaking existing allocator-aware ones.`
+- **原句**：`In a real redesign of a zero-encoding serialization library, the key move was to reflect at the allocator's construct() boundary instead of depending on per-type construction boilerplate.`
+- **句子功能**：核心机制揭示
+- **代码/实现正确性**：部分支持
+- **证据**：allocator `construct()` 拦截是直接实现事实：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)；“real redesign” 是历史语境，不是当前仓库能完整重演的证据
+- **逻辑作用**：把上一句的抽象方法论绑定到一个具体入口，防止 `control point` 继续飘在空中
+- **概念问题**：无明显概念问题
+- **措辞问题**：当前写法已经比 “generated constructors per type” 更稳；唯一需要知道的是 `real redesign` 属于经验来源，不是代码事实本身
+- **改写建议**：可保留
 
 #### 6.2.5 摘要句 5
 
 - **位置**：摘要第 5 句
-- **原句**：`The talk focuses on construction, then uses transfer and compaction as short follow-on cases that show the same reflected member model at work.`
-- **句子功能**：scope 管理 + 复用证明
-- **代码/实现正确性**：直接支持
-- **证据**：construction/transfer/compaction 三条路径都存在：[`xoffsetdatastructure.hpp#L552`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L552), [`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621), [`xoffsetdatastructure.hpp#L871`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L871)
-- **逻辑作用**：尝试压低 scope 失控风险
-- **概念问题**：`reflected member model` 仍是抽象命名，但在这里已经不太影响理解
-- **措辞问题**：已经比旧版好；唯一风险是评委依然可能把 `transfer and compaction` 看成额外两场小 talk
-- **改写建议**：`The talk stays centered on construction, then briefly uses transfer and compaction to show that the same member-level reflection strategy can be reused.`
+- **原句**：`The visible result is simpler user code: the same type goes from a hand-written allocator constructor to a plain struct.`
+- **句子功能**：表层结果承诺
+- **代码/实现正确性**：部分支持
+- **证据**：plain-struct / zero-boilerplate 路径由 README 与测试直接支撑：[`README.md#L123`](/Users/fanchensu/XOffsetDatastructure/README.md#L123), [`tests/test_zero_boilerplate.cpp#L95`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L95)；但这种 before/after 主要覆盖 many pure aggregate types，而非所有类型
+- **逻辑作用**：把抽象设计变化换成观众一眼能懂的收益
+- **概念问题**：无
+- **措辞问题**：非常适合作为首屏 payoff；唯一边界是它描述的是“可见结果”，不是全部技术贡献
+- **改写建议**：`The visible result is simpler user code: many types go from hand-written allocator constructors to plain structs.`
 
 #### 6.2.6 摘要句 6
 
 - **位置**：摘要第 6 句
-- **原句**：`Attendees will leave with a reusable rule for modern C++ library design, plus the limits of the approach: toolchain maturity, portability constraints, and when a conventional serialization design is the better choice.`
+- **原句**：`The deeper change is architectural: one reflection-driven member model now handles buffer-aware construction, transfer, and migration while staying compatible with existing allocator-aware types.`
+- **句子功能**：深层技术贡献总括
+- **代码/实现正确性**：直接支持
+- **证据**：construction/transfer/migration 共享 member-level reflection 路径：[`xoffsetdatastructure.hpp#L553`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L553), [`xoffsetdatastructure.hpp#L622`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L622), [`xoffsetdatastructure.hpp#L1008`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L1008)；legacy allocator-aware compatibility 由构造分支与测试支撑：[`xoffsetdatastructure.hpp#L285`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L285), [`tests/test_zero_boilerplate.cpp#L177`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L177)
+- **逻辑作用**：把整场 talk 从“移除构造函数样板代码”提升到真正的架构重组层
+- **概念问题**：`reflection-driven member model` 是抽象命名，但和当前代码结构是对得上的
+- **措辞问题**：这是当前摘要里技术上最准确的一句之一
+- **改写建议**：可保留
+
+#### 6.2.7 摘要句 7
+
+- **位置**：摘要第 7 句
+- **原句**：`The talk stays centered on construction.`
+- **句子功能**：scope 管理
+- **代码/实现正确性**：直接支持
+- **证据**：construction 是当前设计里最集中、最直观的 control point：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283), [`xoffsetdatastructure.hpp#L553`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L553)
+- **逻辑作用**：主动回应“内容会不会太多”的评审担心
+- **概念问题**：无
+- **措辞问题**：短、稳、必要
+- **改写建议**：可保留
+
+#### 6.2.8 摘要句 8
+
+- **位置**：摘要第 8 句
+- **原句**：`Transfer and compaction appear only as brief follow-on examples that confirm the same reflection-driven mechanism can be reused without pushing migration logic back into user types.`
+- **句子功能**：scope 限定 + 机制复用证明
+- **代码/实现正确性**：直接支持
+- **证据**：transfer / reallocation 与 compaction 路径都存在：[`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621), [`xoffsetdatastructure.hpp#L871`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L871)
+- **逻辑作用**：用一句话同时保住 secondary evidence，又尽量不把它们写成并列主线
+- **概念问题**：`reflection-driven mechanism` 仍抽象，但在这里已由前文充分铺垫
+- **措辞问题**：整体稳；如果还想继续降 scope 感，可以把 `transfer and compaction` 再写得更像短 coda
+- **改写建议**：`Transfer and compaction appear only as short follow-on examples that confirm the same mechanism can be reused without pushing migration logic back into user types.`
+
+#### 6.2.9 摘要句 9
+
+- **位置**：摘要第 9 句
+- **原句**：`Attendees will leave with a reusable rule for modern C++ library design, plus the limits of the approach: toolchain maturity, portability constraints, and when a conventional serialization design is still the better fit.`
 - **句子功能**：受众收益 + tradeoffs 承诺
 - **代码/实现正确性**：部分支持
-- **证据**：
-  - toolchain/platform constraints：[`README.md#L234`](/Users/fanchensu/XOffsetDatastructure/README.md#L234)
-  - “reusable rule” 属于抽象提炼，不是代码事实
-- **逻辑作用**：把 talk 从具体案例抬升成 attendee takeaway
+- **证据**：toolchain/platform constraints 可由 README 直接支持：[`README.md#L238`](/Users/fanchensu/XOffsetDatastructure/README.md#L238)；`reusable rule` 属于从当前案例抽象出的设计经验
+- **逻辑作用**：把 talk 从具体案例抬升成 attendee takeaway，并避免变成 evangelism
 - **概念问题**：无明显问题
-- **措辞问题**：`modern C++ library design` 范围略大，但作为 attendee-facing promise 合理
-- **改写建议**：`Attendees will leave with a reusable rule for modern C++ library design, along with a clear view of the limits: toolchain maturity, portability constraints, and when a conventional serialization design is still the better fit.`
+- **措辞问题**：`modern C++ library design` 范围略大，但 attendee-facing 表达合理
+- **改写建议**：可保留
 
 ### 6.3 Format / Audience / Learn
 
@@ -361,10 +392,10 @@
 #### 6.3.3 Learn 1
 
 - **位置**：What Attendees Will Learn 1
-- **原句**：`Why zero-encoding serialization tends to leak allocator and construction complexity into user-defined types.`
+- **原句**：`Why zero-encoding serialization tends to leak construction and movement logic into user-defined types.`
 - **句子功能**：学习目标
 - **代码/实现正确性**：间接支持
-- **证据**：旧 allocator-aware protocol 与兼容测试：[`examples/README.md#L56`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L56), [`tests/test_zero_boilerplate.cpp#L48`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L48)
+- **证据**：旧 allocator-aware protocol 与兼容测试、以及 transfer 路径共同支撑：[`examples/README.md#L56`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L56), [`tests/test_zero_boilerplate.cpp#L48`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate.cpp#L48), [`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621)
 - **逻辑作用**：把“问题是什么”明确成可学内容
 - **概念问题**：无
 - **措辞问题**：`tends to leak` 很稳，优于“always”
@@ -373,13 +404,13 @@
 #### 6.3.4 Learn 2
 
 - **位置**：What Attendees Will Learn 2
-- **原句**：`How to use C++26 reflection at a library control point instead of depending on per-type allocator constructors and other type-local customization.`
+- **原句**：`How to use C++26 reflection at a library control point to centralize construction and migration decisions instead of depending on type-local customization.`
 - **句子功能**：方法学习目标
 - **代码/实现正确性**：直接支持
 - **证据**：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283), [`xoffsetdatastructure.hpp#L552`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L552)
 - **逻辑作用**：明确最关键 takeaway
 - **概念问题**：`control point` 依然需要 talk 中尽早解释
-- **措辞问题**：准确
+- **措辞问题**：准确，而且比“only remove constructors”更接近深层贡献
 - **改写建议**：可保留
 
 #### 6.3.5 Learn 3
@@ -411,38 +442,38 @@
 #### 6.4.1 Outline 标题
 
 - **位置**：Outline 1 标题
-- **原句**：`Why Zero-Encoding Pushes Complexity into Types`
+- **原句**：`The Before/After Problem`
 - **句子功能**：问题段命名
 - **代码/实现正确性**：间接支持
 - **证据**：旧 allocator-aware protocol / zero-boilerplate 对照：[`examples/README.md#L56`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L56), [`README.md#L123`](/Users/fanchensu/XOffsetDatastructure/README.md#L123)
-- **逻辑作用**：从性能技巧切入到用户成本
-- **概念问题**：`pushes complexity into types` 是高度概括的架构叙述
-- **措辞问题**：总体成立
+- **逻辑作用**：先把观众拉进一个最容易理解的 before/after，而不是直接进入抽象术语
+- **概念问题**：标题本身不定义技术对象，需要 bullet 1 和 bullet 3 快速补上
+- **措辞问题**：比旧标题更亲和，但信息密度也更低
 - **改写建议**：可保留
 
 #### 6.4.2 Outline 1-1
 
 - **位置**：Outline 1 / bullet 1
-- **原句**：`What zero-encoding serialization is and why save() / load() can be so fast.`
+- **原句**：`What this style of serialization is and why save() / load() can approach copying a buffer.`
 - **句子功能**：问题背景定义
 - **代码/实现正确性**：部分支持
 - **证据**：[`xoffsetdatastructure.hpp#L795`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L795)
 - **逻辑作用**：给术语降门槛
-- **概念问题**：需要在 talk 里解释“fast”是结构原因，不是 benchmark 口号
-- **措辞问题**：`so fast` 偏口语化，且没有直接性能证据
-- **改写建议**：`What zero-encoding serialization is and why save() / load() can be close to byte-level save/restore.`
+- **概念问题**：`this style of serialization` 比直接说专有名词更平易，但也让具体术语出现得略晚
+- **措辞问题**：`approach copying a buffer` 比 `so fast` 更克制，也更接近当前实现能支撑的强度
+- **改写建议**：可保留
 
 #### 6.4.3 Outline 1-2
 
 - **位置**：Outline 1 / bullet 2
-- **原句**：`Why arena-resident containers and position-independent references push allocator and move logic into user code.`
+- **原句**：`Why arena-resident containers and position-independent references tend to push construction and migration logic into user code.`
 - **句子功能**：结构约束说明
 - **代码/实现正确性**：间接支持
 - **证据**：XOffset 容器使用 segment manager / allocator，`save/load` 是位置无关前提下的字节恢复；文档提及 relocation invalidation：[`examples/README.md#L120`](/Users/fanchensu/XOffsetDatastructure/examples/README.md#L120)
 - **逻辑作用**：从“为什么快”转到“为什么麻烦”
 - **概念问题**：`position-independent references` 在主稿正文里没显式展开，属于需要讲者现场补定义的概念
-- **措辞问题**：正确但略抽象
-- **改写建议**：`Why arena-resident containers and relative-style references force allocator injection and careful movement logic into user code.`
+- **措辞问题**：`construction and migration logic` 比 `allocator and move logic` 更接近当前 talk 主轴
+- **改写建议**：可保留
 
 #### 6.4.4 Outline 1-3
 
@@ -464,32 +495,32 @@
 - **代码/实现正确性**：直接支持
 - **证据**：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)
 - **逻辑作用**：承前启后
-- **概念问题**：`decision point` 与 `control point` 在全文中是同构概念，建议保持术语一致
-- **措辞问题**：`decision point` / `control point` 混用会让概念树稍微发散
+- **概念问题**：`decision point` 与标题中的 `control point` 实际指向同一概念，最好在 talk 中主动说明它们同构
+- **措辞问题**：仍有轻微术语混用
 - **改写建议**：`The key tension and preview of the core move: solve the problem at the allocator's control point, not in every type.`
 
 #### 6.4.6 Outline 2 标题
 
 - **位置**：Outline 2 标题
-- **原句**：`Why the Old Workarounds Pile Up`
+- **原句**：`The Short Workaround History`
 - **句子功能**：历史背景段命名
 - **代码/实现正确性**：历史叙述
 - **证据**：当前仓库只能间接支持，不可直接逐项验证
 - **逻辑作用**：解释为什么需要 redesign
 - **概念问题**：无
-- **措辞问题**：合理，但这段天然不是最强 payoff
+- **措辞问题**：`Short` 是一个重要的 scope 缓冲词，能降低评委对“又要讲一段历史”的警惕
 - **改写建议**：可保留
 
 #### 6.4.7 Outline 2-1
 
 - **位置**：Outline 2 / bullet 1
-- **原句**：`Historical workaround examples: generated constructors, aggregate-only reflection substitutes, and mirror-type maintenance.`
+- **原句**：`Brief historical examples: generated constructors, aggregate-only reflection substitutes, and mirror-type maintenance.`
 - **句子功能**：历史背景举例
 - **代码/实现正确性**：历史叙述
 - **证据**：当前仓库不直接保留旧 generator / mirror system
 - **逻辑作用**：说明 redesign 之前的问题不是单点，而是一整串 workaround
 - **概念问题**：无
-- **措辞问题**：因为已经显式标 `Historical`，准确性风险显著降低
+- **措辞问题**：因为已经显式标 `Brief historical`，准确性和 scope 风险都比旧版更低
 - **改写建议**：可保留
 
 #### 6.4.8 Outline 2-2
@@ -519,14 +550,14 @@
 #### 6.4.10 Outline 3-1
 
 - **位置**：Outline 3 / bullet 1
-- **原句**：`The core design move: intercept allocator construction instead of generating type-local constructors.`
+- **原句**：`The core design move: intercept allocator construction and centralize type-dependent decisions inside the library.`
 - **句子功能**：核心机制句
 - **代码/实现正确性**：直接支持
 - **证据**：[`xoffsetdatastructure.hpp#L283`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L283)
 - **逻辑作用**：将原则翻译成具体工程动作
-- **概念问题**：`generating type-local constructors` 仍带一点历史特定语境
-- **措辞问题**：基本准确，但“generate” 不如 “depend on” 稳
-- **改写建议**：`The core design move: intercept allocator construction instead of depending on type-local constructors.`
+- **概念问题**：无明显问题；现在已经更准确地点出了“centralize decisions”这一深层贡献
+- **措辞问题**：比旧版更准确，也更能和摘要里的架构层表述对齐
+- **改写建议**：可保留
 
 #### 6.4.11 Outline 3-2
 
@@ -555,25 +586,25 @@
 #### 6.4.13 Outline 3-4
 
 - **位置**：Outline 3 / bullet 4
-- **原句**：`Why this design composes better than registration-heavy or generator-heavy approaches.`
+- **原句**：`Why this design avoids much of the per-type registration and generation pressure older approaches created.`
 - **句子功能**：方案对比
 - **代码/实现正确性**：间接支持
 - **证据**：当前仓库直接展示的是“无需 per-type constructors for many aggregates”和 registration macro 主要面向 opaque/migration strategy 的另一层问题：[`README.md#L175`](/Users/fanchensu/XOffsetDatastructure/README.md#L175)
 - **逻辑作用**：说明方案的优越性来源
 - **概念问题**：`registration-heavy` 和 `generator-heavy` 在当前仓库里都不是完整可见现状
-- **措辞问题**：作为对比句略宽，需讲者小心不要说过头
-- **改写建议**：`Why this design avoids much of the per-type registration and generation pressure that older approaches created.`
+- **措辞问题**：新版已经明显收边界，更像“经验总结”而不是“绝对碾压判断”
+- **改写建议**：可保留
 
 #### 6.4.14 Outline 4 标题
 
 - **位置**：Outline 4 标题
-- **原句**：`One Member Model Beyond Construction`
+- **原句**：`Brief Reuse Beyond Construction`
 - **句子功能**：复用段命名
 - **代码/实现正确性**：直接支持
 - **证据**：construction/transfer/compaction 共享 base/member 反射展开：[`xoffsetdatastructure.hpp#L552`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L552), [`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621), [`xoffsetdatastructure.hpp#L1007`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L1007)
 - **逻辑作用**：说明不是一处巧合，而是一套可复用模型
-- **概念问题**：`Member Model` 抽象度高但可接受
-- **措辞问题**：可保留
+- **概念问题**：比 `One Member Model` 更直观，但会把“统一模型”这层抽象放到 bullet 里而不是标题里
+- **措辞问题**：`Brief` 是很有价值的 scope 管理词
 - **改写建议**：可保留
 
 #### 6.4.15 Outline 4-1
@@ -591,7 +622,7 @@
 #### 6.4.16 Outline 4-2
 
 - **位置**：Outline 4 / bullet 2
-- **原句**：`How the same reflected member model supports transfer without reintroducing type-local boilerplate.`
+- **原句**：`How the same reflected member model supports transfer without reintroducing type-local migration boilerplate.`
 - **句子功能**：transfer 复用说明
 - **代码/实现正确性**：直接支持
 - **证据**：[`xoffsetdatastructure.hpp#L621`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L621), [`tests/test_zero_boilerplate_vector.cpp#L93`](/Users/fanchensu/XOffsetDatastructure/tests/test_zero_boilerplate_vector.cpp#L93)
@@ -603,28 +634,16 @@
 #### 6.4.17 Outline 4-3
 
 - **位置**：Outline 4 / bullet 3
-- **原句**：`How the strategy extends to compaction as a brief second case study.`
-- **句子功能**：scope 限定 + 第二用例引入
+- **原句**：`How compaction appears only as a brief second example that confirms the same approach still scales to nested types and deep object graphs.`
+- **句子功能**：scope 限定 + 第二用例引入 + 泛化能力说明
 - **代码/实现正确性**：直接支持
-- **证据**：[`xoffsetdatastructure.hpp#L871`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L871), [`tests/test_compaction.cpp#L22`](/Users/fanchensu/XOffsetDatastructure/tests/test_compaction.cpp#L22)
-- **逻辑作用**：在不过度扩 scope 的前提下保留强证明点
-- **概念问题**：无
-- **措辞问题**：`brief` 是重要的 scope 缓冲词，应保留
+- **证据**：compaction 路径与深层嵌套测试共同支撑：[`xoffsetdatastructure.hpp#L871`](/Users/fanchensu/XOffsetDatastructure/xoffsetdatastructure.hpp#L871), [`tests/test_compaction.cpp#L22`](/Users/fanchensu/XOffsetDatastructure/tests/test_compaction.cpp#L22), [`tests/test_complex_nesting.cpp#L102`](/Users/fanchensu/XOffsetDatastructure/tests/test_complex_nesting.cpp#L102), [`tests/test_complex_nesting.cpp#L433`](/Users/fanchensu/XOffsetDatastructure/tests/test_complex_nesting.cpp#L433)
+- **逻辑作用**：把原来的两个 supporting points 合并成一个，显式降低 scope 感
+- **概念问题**：句子有点长，但语义集中在“compaction 只是 brief proof, not another main topic”
+- **措辞问题**：这是一个明确的 scope 优化
 - **改写建议**：可保留
 
-#### 6.4.18 Outline 4-4
-
-- **位置**：Outline 4 / bullet 4
-- **原句**：`Why the same approach still scales to nested types and deep object graphs.`
-- **句子功能**：复杂度与泛化能力说明
-- **代码/实现正确性**：直接支持
-- **证据**：深层嵌套和 composite member 测试：[`tests/test_complex_nesting.cpp#L102`](/Users/fanchensu/XOffsetDatastructure/tests/test_complex_nesting.cpp#L102), [`tests/test_complex_nesting.cpp#L433`](/Users/fanchensu/XOffsetDatastructure/tests/test_complex_nesting.cpp#L433)
-- **逻辑作用**：证明不是只有浅层 struct 才成立
-- **概念问题**：无
-- **措辞问题**：准确
-- **改写建议**：可保留
-
-#### 6.4.19 Outline 5 标题
+#### 6.4.18 Outline 5 标题
 
 - **位置**：Outline 5 标题
 - **原句**：`Limits, Tradeoffs, and the General Rule`
@@ -636,7 +655,7 @@
 - **措辞问题**：准确
 - **改写建议**：可保留
 
-#### 6.4.20 Outline 5-1
+#### 6.4.19 Outline 5-1
 
 - **位置**：Outline 5 / bullet 1
 - **原句**：`Toolchain reality: C++26 reflection support is still emerging.`
@@ -648,7 +667,7 @@
 - **措辞问题**：准确
 - **改写建议**：可保留
 
-#### 6.4.21 Outline 5-2
+#### 6.4.20 Outline 5-2
 
 - **位置**：Outline 5 / bullet 2
 - **原句**：`Portability constraints of zero-encoding designs.`
@@ -660,7 +679,7 @@
 - **措辞问题**：准确
 - **改写建议**：可保留
 
-#### 6.4.22 Outline 5-3
+#### 6.4.21 Outline 5-3
 
 - **位置**：Outline 5 / bullet 3
 - **原句**：`Schema-evolution limitations versus traditional serialization systems.`
@@ -672,7 +691,7 @@
 - **措辞问题**：合理
 - **改写建议**：可保留
 
-#### 6.4.23 Outline 5-4
+#### 6.4.22 Outline 5-4
 
 - **位置**：Outline 5 / bullet 4
 - **原句**：`When this design is the right tool, and when it is not.`
@@ -684,7 +703,7 @@
 - **措辞问题**：准确
 - **改写建议**：可保留
 
-#### 6.4.24 Outline 5-5
+#### 6.4.23 Outline 5-5
 
 - **位置**：Outline 5 / bullet 5
 - **原句**：`The takeaway: reflect where the library must make a decision, not where users define their types.`
@@ -749,41 +768,42 @@
 #### 6.5.5 Why This Fits 5
 
 - **位置**：Why This Fits / bullet 5
-- **原句**：`It offers a reusable pattern that attendees can apply outside serialization.`
+- **原句**：`It offers a pattern that many attendees can likely reuse in other library code that has to make type-dependent construction or migration decisions.`
 - **句子功能**：最终收益承诺
 - **代码/实现正确性**：间接支持
 - **证据**：这是抽象提炼，不是代码事实；代码只证明该 pattern 在本案例内复用良好
 - **逻辑作用**：最大化 broad appeal
 - **概念问题**：无
-- **措辞问题**：合理，但属于“设计经验外推”，不是可直接证明
-- **改写建议**：`It offers a reusable pattern that many attendees should be able to apply outside serialization-heavy libraries.`
+- **措辞问题**：新版已经明显收边界，从“所有场景都能用”改成“在类似需要类型相关决策的库代码里可能复用”
+- **改写建议**：可保留
 
 ## 7. 汇总结论与重写优先级
 
 ### 7.1 最值得优先改的句子
 
 1. **摘要第 1 句**  
-   原因：它同时承担术语定义、性能钩子、问题设置三件事，但目前性能措辞略宽，且 `every user-defined type` 边界偏大。
+   原因：它同时承担性能钩子和问题定义两件事，虽然已经比旧版更稳，但 `get their speed` 仍然是工程化概括，需要靠后文尽快接住。
 
 2. **标题**  
-   原因：方法论很强，但 `control point + zero-encoding serialization` 双术语门槛仍然存在。
+   原因：当前标题已经比纯方法论版本更亲和，但 `control point` 仍然需要摘要尽快落到具体入口。
 
 3. **摘要第 2 句**  
-   原因：主张正确，但过于抽象，仍可再更 outcome-driven 一点。
+   原因：before/after 抓手已经很好，但 `ordinary structs grow...` 仍然是概括句，可以再轻微收边界。
 
 4. **Outline 1 / bullet 1**  
-   原因：`so fast` 不够技术中性，容易被读成 marketing tone。
+   原因：这是降低术语门槛的关键句，既要说清楚“这类序列化是什么”，又不能让 `approach copying a buffer` 显得像性能口号。
 
 5. **Outline 3 / bullet 4**  
-   原因：`registration-heavy or generator-heavy approaches` 属于对比性判断，当前代码对其支撑不如其他句子直接。
+   原因：虽然已经明显收边界，但它仍然是全文里最依赖历史语境的一句对比性判断。
 
 6. **Why This Fits / bullet 5**  
-   原因：是合理外推，但不是代码直接证明，需要轻微收边界。
+   原因：它依然属于合理外推，而不是当前代码可直接证明的事实，只是现在边界已经更稳。
 
 ### 7.2 当前最强的句子
 
+- `From Hand-Written Allocator Constructors to Plain Structs: C++26 Reflection at the Control Point`
 - `The takeaway: reflect where the library must make a decision, not where users define their types.`
-- `In a real library redesign, the key move was to reflect at the allocator's construct() boundary instead of generating constructors per type.`
+- `The deeper change is architectural: one reflection-driven member model now handles buffer-aware construction, transfer, and migration while staying compatible with existing allocator-aware types.`
 - `A concrete before/after sketch: from a hand-written allocator-aware aggregate to a plain zero-boilerplate struct.`
 
 这些句子强在三点：
