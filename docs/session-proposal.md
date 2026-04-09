@@ -2,11 +2,11 @@
 
 ## Title
 
-Reflect at the Control Point: Removing Boilerplate from Zero-Encoding Serialization
+From Hand-Written Allocator Constructors to Plain Structs: C++26 Reflection at the Control Point
 
 ## Abstract
 
-Some high-performance serialization libraries make `save()` and `load()` look much more like copying a memory buffer than encoding fields one by one. The visible cost is simpler to spot in user code: otherwise ordinary structs turn into allocator-aware types with hand-written constructors and move paths.
+Some high-performance serialization libraries get their speed by making `save()` and `load()` behave more like moving a memory buffer than encoding fields one by one. The cost shows up in user code: otherwise ordinary structs grow hand-written allocator constructors and move paths just so the library can build and relocate them correctly.
 
 This session shows a practical C++26 reflection pattern for moving those type-dependent construction and migration decisions back into the library. In a real redesign of a zero-encoding serialization library, the key move was to reflect at the allocator's `construct()` boundary instead of depending on per-type construction boilerplate. The visible result is simpler user code: the same type goes from a hand-written allocator constructor to a plain struct. The deeper change is architectural: one reflection-driven member model now handles buffer-aware construction, transfer, and migration while staying compatible with existing allocator-aware types.
 
@@ -52,8 +52,7 @@ Experienced C++ programmers, library authors, and engineers interested in C++26 
 
 - Why construction alone is not enough once containers move and reallocate.
 - How the same reflected member model supports transfer without reintroducing type-local migration boilerplate.
-- How the strategy extends to compaction as a brief second case study.
-- Why the same approach still scales to nested types and deep object graphs.
+- How compaction appears only as a brief second example that confirms the same approach still scales to nested types and deep object graphs.
 
 ### 5. Limits, Tradeoffs, and the General Rule
 
