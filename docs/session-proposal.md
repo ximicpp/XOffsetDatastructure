@@ -2,15 +2,15 @@
 
 ## Title
 
-How C++26 Reflection Removes Boilerplate from Zero-Encoding Serialization
+Reflect at the Control Point: Removing Boilerplate from Zero-Encoding Serialization
 
 ## Abstract
 
-C++26 reflection can remove an entire class of boilerplate from performance-critical libraries. In zero-encoding serialization, `save()` and `load()` can get close to moving raw bytes, but the price is often allocator plumbing, custom construction paths, and careful move logic inside user-defined types.
+Some high-performance serialization libraries make `save()` and `load()` look much more like copying a memory buffer than encoding fields one by one. The visible cost is simpler to spot in user code: otherwise ordinary structs turn into allocator-aware types with hand-written constructors and move paths.
 
-This session shows how C++26 static reflection can move that work out of user types and into library control points. In a real serialization library redesign, the key move was to reflect at the allocator's `construct()` boundary instead of generating constructors per type. That single decision point let the library inspect members, inject allocators where needed, recurse into composites, and remain compatible with existing allocator-aware types.
+This session shows a practical C++26 reflection pattern for moving those type-dependent construction and migration decisions back into the library. In a real redesign of a zero-encoding serialization library, the key move was to reflect at the allocator's `construct()` boundary instead of depending on per-type construction boilerplate. The visible result is simpler user code: the same type goes from a hand-written allocator constructor to a plain struct. The deeper change is architectural: one reflection-driven member model now handles buffer-aware construction, transfer, and migration while staying compatible with existing allocator-aware types.
 
-The main narrative focuses on construction, with transfer as the natural follow-up and compaction as a brief second use case rather than a full design tour. Attendees will leave with a practical design rule they can reuse beyond serialization: reflect where the library must decide what to do, not where users define their types. The session also covers the limits of the approach, including toolchain maturity, portability constraints, and when a conventional serialization design is the better choice.
+The talk stays centered on construction. Transfer and compaction appear only as brief follow-on examples that confirm the same reflection-driven mechanism can be reused without pushing migration logic back into user types. Attendees will leave with a reusable rule for modern C++ library design, plus the limits of the approach: toolchain maturity, portability constraints, and when a conventional serialization design is still the better fit.
 
 ## Format
 
@@ -22,40 +22,38 @@ Experienced C++ programmers, library authors, and engineers interested in C++26 
 
 ## What Attendees Will Learn
 
-- Why zero-encoding serialization tends to leak allocator and construction complexity into user-defined types.
-- How to use C++26 reflection at a library control point instead of requiring per-type boilerplate, macros, or code generation.
+- Why zero-encoding serialization tends to leak construction and movement logic into user-defined types.
+- How to use C++26 reflection at a library control point to centralize construction and migration decisions instead of depending on type-local customization.
 - How one reflected member model can support construction, transfer, reallocation, and compaction.
 - How to judge the tradeoffs: toolchain maturity, portability limits, and when reflection is not the right answer.
 
 ## Outline
 
-### 1. Why Zero-Encoding Creates Boilerplate
+### 1. The Before/After Problem
 
-- What zero-encoding serialization is and why it is attractive.
-- Why arena-resident containers and position-independent references are required.
-- Why these requirements usually force allocator constructors and custom move paths into user code.
-- The key tension: excellent runtime behavior, poor type authoring experience.
-- Preview of the core move: solve the problem at the allocator's decision point, not in every type.
+- What this style of serialization is and why `save()` / `load()` can approach copying a buffer.
+- Why arena-resident containers and position-independent references tend to push construction and migration logic into user code.
+- A concrete before/after sketch: from a hand-written allocator-aware aggregate to a plain zero-boilerplate struct.
+- The key tension and preview of the core move: solve the problem at the allocator's decision point, not in every type.
 
-### 2. The Workaround Stack Before Reflection
+### 2. The Short Workaround History
 
-- Generated constructors and schema-driven code generation.
-- Aggregate-only reflection substitutes and mirror-type maintenance.
-- The architectural smell: multiple workarounds for the same missing capability.
+- Brief historical examples: generated constructors, aggregate-only reflection substitutes, and mirror-type maintenance.
+- The architectural smell: multiple workarounds all compensating for the same missing capability.
 
 ### 3. Reflect at the Control Point
 
-- The core design move: intercept allocator construction instead of generating type-local constructors.
+- The core design move: intercept allocator construction and centralize type-dependent decisions inside the library.
 - Using C++26 reflection to inspect members, detect buffer-aware subobjects, and recurse into composites.
 - Supporting existing allocator-aware types instead of breaking them.
-- Why this design composes better than registration-heavy or generator-heavy approaches.
+- Why this design avoids much of the per-type registration and generation pressure older approaches created.
 
-### 4. One Member Model, Several Jobs
+### 4. Brief Reuse Beyond Construction
 
 - Why construction alone is not enough once containers move and reallocate.
-- How the same reflected member model supports transfer without reintroducing type-local boilerplate.
+- How the same reflected member model supports transfer without reintroducing type-local migration boilerplate.
 - How the strategy extends to compaction as a brief second case study.
-- How one reflection model still scales to nested types and deep object graphs.
+- Why the same approach still scales to nested types and deep object graphs.
 
 ### 5. Limits, Tradeoffs, and the General Rule
 
@@ -71,4 +69,4 @@ Experienced C++ programmers, library authors, and engineers interested in C++26 
 - It turns a concrete serialization case study into a reusable library design pattern.
 - It is relevant to library design, serialization, generic programming, and software design.
 - It is grounded in real engineering tradeoffs rather than novelty alone.
-- It offers a reusable pattern that attendees can apply outside serialization.
+- It offers a pattern that many attendees can likely reuse in other library code that has to make type-dependent construction or migration decisions.
