@@ -348,10 +348,17 @@ void demo_automatic_compaction() {
     XBuffer compacted = XCompactor::compact<GameData>(xbuf);
     
     auto stats_after = compacted.stats();
+    long long size_delta =
+        static_cast<long long>(stats_before.total_size) -
+        static_cast<long long>(stats_after.total_size);
     print_info("Compacted Size", std::to_string(stats_after.total_size) + " bytes");
     print_info("Used Size", std::to_string(stats_after.used_size) + " bytes");
     print_info("Efficiency", std::to_string(static_cast<int>(stats_after.usage_percent())) + "%");
-    print_info("Saved Memory", std::to_string(stats_before.total_size - stats_after.total_size) + " bytes");
+    if (size_delta >= 0) {
+        print_info("Saved Memory", std::to_string(size_delta) + " bytes");
+    } else {
+        print_info("Size Change", "+" + std::to_string(-size_delta) + " bytes");
+    }
     print_check("Memory compacted successfully!");
     
     print_subsection("Data Integrity Verification");

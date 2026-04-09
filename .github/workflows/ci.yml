@@ -44,12 +44,15 @@ jobs:
           docker images ghcr.io/ximicpp/typelayout-p2996:latest
 
       - name: Build & run all tests
+        shell: bash
         run: |
+          mkdir -p build
+          set -o pipefail
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/ximicpp/typelayout-p2996:latest \
-            bash ./build.sh
+            bash ./build.sh 2>&1 | tee build/ci-build.log
 
       - name: Signature contract verification
         run: |
@@ -106,6 +109,8 @@ jobs:
         with:
           name: build-failure-log
           path: |
+            build/ci-build.log
             build/CMakeFiles/CMakeOutput.log
             build/CMakeFiles/CMakeError.log
           retention-days: 7
+          if-no-files-found: ignore

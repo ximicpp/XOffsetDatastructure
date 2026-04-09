@@ -88,11 +88,17 @@ int main() {
     
     // Show stats after compaction
     auto stats_after = compacted.stats();
+    long long size_delta =
+        static_cast<long long>(stats_before.total_size) -
+        static_cast<long long>(stats_after.total_size);
     std::cout << "   After compaction:\n";
     std::cout << "   - Total size: " << stats_after.total_size << " bytes\n";
     std::cout << "   - Used size: " << stats_after.used_size << " bytes\n";
-    std::cout << "   - Saved: " << (stats_before.total_size - stats_after.total_size) 
-              << " bytes\n";
+    if (size_delta >= 0) {
+        std::cout << "   - Saved: " << size_delta << " bytes\n";
+    } else {
+        std::cout << "   - Size change: +" << -size_delta << " bytes\n";
+    }
     std::cout << "   - Efficiency: " << std::setprecision(1) 
               << stats_after.usage_percent() << "%\n";
     
