@@ -384,9 +384,9 @@ bool test_modify_mixed_operations() {
     
     // Test 5: Serialize and verify
     std::cout << "Test 5: Serialize to memory... ";
-    std::vector<char> buffer(*xbuf.get_buffer());
-    
-    XBuffer new_xbuf(buffer);
+    std::string buffer = xbuf.save();
+
+    XBuffer new_xbuf = XBuffer::load(buffer);
     auto& new_data = new_xbuf.root<ModifyTestData>(); bool new_found = new_xbuf.has_root<ModifyTestData>();
     assert(new_found);
     assert(new_data.counter == 100);

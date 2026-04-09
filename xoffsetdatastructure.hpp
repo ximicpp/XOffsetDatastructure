@@ -96,14 +96,8 @@ public:
         return r;
     }
 
-    XManagedMemory() noexcept
-    {
-    }
-
-    ~XManagedMemory()
-    {
-        this->priv_close();
-    }
+    XManagedMemory() noexcept {}
+    ~XManagedMemory() { this->priv_close(); }
 
     // Bumped on base-address change (vector relocation). XHandle uses this for O(1) caching.
     uint64_t epoch() const noexcept { return m_epoch; }
@@ -194,32 +188,11 @@ public:
         std::swap(m_epoch, other.m_epoch);
     }
 
-    // Shrinks segment logical size (does NOT shrink the vector — preserves base address).
-    void shrink_to_fit()
-    {
-        base_t::shrink_to_fit();
-    }
-
-    std::vector<char> *get_buffer()
-    {
-        return &m_buffer;
-    }
-
-    const void* get_address() const
-    {
-        return m_buffer.data();
-    }
-
-    size_type get_size() const
-    {
-        return m_buffer.size();
-    }
-
-    /// Segment logical size (byte-exact, for serialization).
-    size_type segment_size() const
-    {
-        return base_t::get_size();
-    }
+    void shrink_to_fit() { base_t::shrink_to_fit(); }
+    std::vector<char>* get_buffer() { return &m_buffer; }
+    const void* get_address() const { return m_buffer.data(); }
+    size_type get_size() const { return m_buffer.size(); }
+    size_type segment_size() const { return base_t::get_size(); }
 
 private:
     void priv_close()
@@ -361,6 +334,12 @@ namespace XOffsetDatastructure {
 
     using XAllocator = boost::interprocess::allocator<char, XBufferCore::segment_manager>;
 
+    // Constraint: Elem has allocator_type AND Arg is not Elem itself.
+    template <typename Elem, typename Arg>
+    concept alloc_aware_convertible =
+        requires { typename Elem::allocator_type; } &&
+        !std::is_same_v<std::decay_t<Arg>, Elem>;
+
     // ========================================================================
     // Public container wrappers (overloads for allocator-aware element types).
     // ========================================================================
@@ -377,25 +356,20 @@ namespace XOffsetDatastructure {
         using Base::resize;
         using Base::assign;
 
-        // Overloads forwarding to emplace for allocator-aware element types.
-        // Constraint: T has allocator_type AND Arg is not T itself.
         template<typename Arg>
-            requires (requires { typename T::allocator_type; } &&
-                      !std::is_same_v<std::decay_t<Arg>, T>)
+            requires alloc_aware_convertible<T, Arg>
         void push_back(Arg&& arg) {
             Base::emplace_back(std::forward<Arg>(arg));
         }
 
         template<typename Arg>
-            requires (requires { typename T::allocator_type; } &&
-                      !std::is_same_v<std::decay_t<Arg>, T>)
+            requires alloc_aware_convertible<T, Arg>
         typename Base::iterator insert(typename Base::const_iterator pos, Arg&& arg) {
             return Base::emplace(pos, std::forward<Arg>(arg));
         }
 
         template<typename Arg>
-            requires (requires { typename T::allocator_type; } &&
-                      !std::is_same_v<std::decay_t<Arg>, T>)
+            requires alloc_aware_convertible<T, Arg>
         typename Base::iterator insert(typename Base::const_iterator pos,
                                        typename Base::size_type n, Arg&& arg) {
             T tmp(std::forward<Arg>(arg), sm());
@@ -403,16 +377,14 @@ namespace XOffsetDatastructure {
         }
 
         template<typename Arg>
-            requires (requires { typename T::allocator_type; } &&
-                      !std::is_same_v<std::decay_t<Arg>, T>)
+            requires alloc_aware_convertible<T, Arg>
         void resize(typename Base::size_type n, Arg&& arg) {
             T tmp(std::forward<Arg>(arg), sm());
             Base::resize(n, tmp);
         }
 
         template<typename Arg>
-            requires (requires { typename T::allocator_type; } &&
-                      !std::is_same_v<std::decay_t<Arg>, T>)
+            requires alloc_aware_convertible<T, Arg>
         void assign(typename Base::size_type n, Arg&& arg) {
             T tmp(std::forward<Arg>(arg), sm());
             Base::assign(n, tmp);
@@ -568,32 +540,30 @@ namespace XOffsetDatastructure {
             }
         }
 
-        template <typename T, typename Alloc, std::size_t... Is>
-        void reflect_init_expand(void* raw, Alloc alloc, std::index_sequence<Is...>) {
-            (reflect_init_nth<T, Is>(raw, alloc), ...);
-        }
-
         template <typename T, std::size_t N, typename Alloc>
         void reflect_init_base_nth(void* raw, Alloc alloc) {
             using namespace std::meta;
             constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
             using BaseType = [:type_of(base_info):];
             T* obj = reinterpret_cast<T*>(raw);
-            BaseType* base_ptr = static_cast<BaseType*>(obj);
-            reflect_init_all_impl<BaseType>(static_cast<void*>(base_ptr), alloc);
-        }
-
-        template <typename T, typename Alloc, std::size_t... Is>
-        void reflect_init_bases_expand(void* raw, Alloc alloc, std::index_sequence<Is...>) {
-            (reflect_init_base_nth<T, Is>(raw, alloc), ...);
+            reflect_init_all_impl<BaseType>(static_cast<void*>(static_cast<BaseType*>(obj)), alloc);
         }
 
         template <typename T, typename Alloc>
         void reflect_init_all_impl(void* raw, Alloc alloc) {
-            constexpr auto bc = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
-            constexpr auto mc = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
-            if constexpr (bc > 0) reflect_init_bases_expand<T>(raw, alloc, std::make_index_sequence<bc>{});
-            if constexpr (mc > 0) reflect_init_expand<T>(raw, alloc, std::make_index_sequence<mc>{});
+            using namespace std::meta;
+            constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
+            constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+            if constexpr (bc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (reflect_init_base_nth<T, Is>(raw, alloc), ...);
+                }(std::make_index_sequence<bc>{});
+            }
+            if constexpr (mc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (reflect_init_nth<T, Is>(raw, alloc), ...);
+                }(std::make_index_sequence<mc>{});
+            }
         }
 
         template <typename T, typename Alloc>
@@ -629,23 +599,14 @@ namespace XOffsetDatastructure {
             }
         }
 
-        template <typename T, typename Src, std::size_t... Is>
-        void reflect_transfer_init_expand(void* dst, Src&& src,
-                                          XBufferCore::segment_manager* sm,
-                                          std::index_sequence<Is...>) {
-            (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
-        }
-
         template <typename T, std::size_t N, typename Src>
         void reflect_transfer_base_nth(void* dst, Src&& src,
                                        XBufferCore::segment_manager* sm) {
             using namespace std::meta;
             constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
             using BaseType = [:type_of(base_info):];
-
             T* dst_obj = reinterpret_cast<T*>(dst);
             BaseType* dst_base = static_cast<BaseType*>(dst_obj);
-
             if constexpr (std::is_lvalue_reference_v<Src&&>) {
                 reflect_transfer_init_all_impl<BaseType>(
                     static_cast<void*>(dst_base),
@@ -657,20 +618,22 @@ namespace XOffsetDatastructure {
             }
         }
 
-        template <typename T, typename Src, std::size_t... Is>
-        void reflect_transfer_bases_expand(void* dst, Src&& src,
-                                           XBufferCore::segment_manager* sm,
-                                           std::index_sequence<Is...>) {
-            (reflect_transfer_base_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
-        }
-
         template <typename T, typename Src>
         void reflect_transfer_init_all_impl(void* dst, Src&& src,
                                             XBufferCore::segment_manager* sm) {
-            constexpr auto bc = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
-            constexpr auto mc = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
-            if constexpr (bc > 0) reflect_transfer_bases_expand<T>(dst, std::forward<Src>(src), sm, std::make_index_sequence<bc>{});
-            if constexpr (mc > 0) reflect_transfer_init_expand<T>(dst, std::forward<Src>(src), sm, std::make_index_sequence<mc>{});
+            using namespace std::meta;
+            constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
+            constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+            if constexpr (bc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (reflect_transfer_base_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
+                }(std::make_index_sequence<bc>{});
+            }
+            if constexpr (mc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
+                }(std::make_index_sequence<mc>{});
+            }
         }
 
         template <typename T, typename Src>
@@ -951,26 +914,6 @@ namespace XOffsetDatastructure {
                 return migrate_as<CleanT>::value;
             } else if constexpr (std::is_trivially_copyable_v<CleanT>) {
                 return MigrateStrategy::Bitwise;
-            } else if constexpr (requires { typename CleanT::allocator_type; }) {
-                // Unregistered container trap: if type has allocator_type + iterator
-                // but was not registered via XOFFSET_REGISTER_*, this static_assert
-                // fires at compile time. (The assert condition is always false here
-                // because registered types already returned in the first branch above.)
-                if constexpr (requires(const CleanT& c) {
-                    typename CleanT::iterator;
-                    { c.begin() };
-                    { c.end()   };
-                }) {
-                    static_assert(
-                        migrate_as<CleanT>::value != MigrateStrategy::NotRegistered,
-                        "XCompactor: container type has allocator_type but no migrate_as "
-                        "registration. Register it via "
-                        "XOFFSET_REGISTER_TYPE(YourType, AllocatorAware) or "
-                        "XOFFSET_REGISTER_TYPE(YourType, Container). See docs.");
-                    return MigrateStrategy::Composite;  // unreachable; satisfies return requirement
-                } else {
-                    return MigrateStrategy::Composite;
-                }
             } else {
                 return MigrateStrategy::Composite;
             }
@@ -1040,57 +983,43 @@ namespace XOffsetDatastructure {
             }
         }
         
-        template<typename T, std::size_t Index>
-        static consteval auto get_member_at() {
-            using namespace std::meta;
-            auto members = nonstatic_data_members_of(^^T, access_context::unchecked());
-            return members[Index];
-        }
-        
-        template<typename T, std::size_t Index>
-        static void migrate_member_at(const T& old_obj, T& new_obj,
-                                      XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
-            using namespace std::meta;
-            constexpr auto member = get_member_at<T, Index>();
-            using MemberType = [:type_of(member):];
-            const auto& old_member = old_obj.[:member:];
-            auto& new_member = new_obj.[:member:];
-            migrate_member<MemberType>(old_member, new_member, old_xbuf, new_xbuf);
-        }
-        
-        template<typename T, std::size_t... Is>
-        static void migrate_members_impl(const T& old_obj, T& new_obj,
-                                         XBufferCore& old_xbuf, XBufferCore& new_xbuf,
-                                         std::index_sequence<Is...>) {
-            (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
-        }
-
         template<typename T, std::size_t N>
         static void migrate_base_at(const T& old_obj, T& new_obj,
                                     XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             using namespace std::meta;
             constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
             using BaseType = [:type_of(base_info):];
-            const BaseType& old_base = static_cast<const BaseType&>(old_obj);
-            BaseType& new_base = static_cast<BaseType&>(new_obj);
-            migrate_members(old_base, new_base, old_xbuf, new_xbuf);
+            migrate_members(static_cast<const BaseType&>(old_obj),
+                            static_cast<BaseType&>(new_obj), old_xbuf, new_xbuf);
         }
 
-        template<typename T, std::size_t... Is>
-        static void migrate_bases_impl(const T& old_obj, T& new_obj,
-                                       XBufferCore& old_xbuf, XBufferCore& new_xbuf,
-                                       std::index_sequence<Is...>) {
-            (migrate_base_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+        template<typename T, std::size_t N>
+        static void migrate_member_at(const T& old_obj, T& new_obj,
+                                      XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
+            using namespace std::meta;
+            constexpr auto member =
+                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+            using MemberType = [:type_of(member):];
+            migrate_member<MemberType>(old_obj.[:member:], new_obj.[:member:],
+                                       old_xbuf, new_xbuf);
         }
-        
+
         template<typename T>
-        static void migrate_members(const T& old_obj, T& new_obj, 
+        static void migrate_members(const T& old_obj, T& new_obj,
                                    XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
             using namespace std::meta;
             constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
             constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc > 0) migrate_bases_impl(old_obj, new_obj, old_xbuf, new_xbuf, std::make_index_sequence<bc>{});
-            if constexpr (mc > 0) migrate_members_impl(old_obj, new_obj, old_xbuf, new_xbuf, std::make_index_sequence<mc>{});
+            if constexpr (bc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (migrate_base_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+                }(std::make_index_sequence<bc>{});
+            }
+            if constexpr (mc > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
+                }(std::make_index_sequence<mc>{});
+            }
         }
     };
 }
