@@ -10,7 +10,7 @@ Zero-encoding save/restore systems — systems that save and restore whole in-me
 
 This session shows a practical C++26 reflection pattern for moving type-dependent construction and migration logic into the library. In a zero-encoding serialization library, the key move is to reflect at the allocator's `construct()` boundary, where the library already has to decide how an object should be built. From that control point, the library can initialize allocator-aware members, recurse into composites, and keep existing allocator-aware types working. The visible result is less type-local boilerplate: many aggregate types can remain zero-boilerplate, while older allocator-aware types continue to work.
 
-The main story is construction. Transfer during reallocation appears only as a short follow-on example, with compaction mentioned as a brief second example that shows the same member-level reflection strategy extends beyond a single path. Attendees will leave with a practical design rule for C++ libraries: put reflection at the point where the library must make a type-dependent decision, and keep the limits in view: toolchain maturity, portability constraints, and where this design is not the right fit.
+The main story is construction. Transfer during reallocation appears only as a short follow-on example, with compaction mentioned as a brief second example that shows the same member-level reflection strategy extends beyond a single path. Attendees will leave with a practical design rule for C++ libraries: put reflection at the point where the library must make a type-dependent decision, and keep the limits in view: toolchain maturity and where this design is not the right fit.
 
 ## Format
 
@@ -25,7 +25,7 @@ Experienced C++ programmers, library authors, and engineers interested in C++26 
 - Why zero-encoding save/restore designs tend to leak buffer management, construction, and relocation concerns into user-defined types.
 - How allocator `construct()` becomes the practical control point for reflection-driven construction and transfer.
 - How one member-level reflection strategy can support construction, transfer during reallocation, and compaction.
-- How to judge the limits: toolchain maturity, portability, schema evolution, and when not to use this design.
+- How to judge the limits: toolchain maturity and when not to use this design.
 
 ## Outline
 
