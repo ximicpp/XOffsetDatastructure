@@ -1,41 +1,27 @@
-// ============================================================================
-// XOffsetDatastructure Cross-Platform Compatibility Check
-//
-// Compares exported .sig.hpp files across platforms.
-// This file can be compiled with any C++26 compiler — P2996 is NOT required.
-//
-// Usage: ./check_compat
-// ============================================================================
+// Verifies that every baseline under tools/sigs remains transfer-safe.
 
-#include "sigs/x86_64_linux_clang.sig.hpp"
+#include "check_compat_baselines.hpp"
+#include "signature_type_names.hpp"
 
-#include <boost/typelayout/tools/compat_check.hpp>
-
-namespace linux_plat = boost::typelayout::platform::x86_64_linux_clang;
-
-using boost::typelayout::compat::layout_match;
-
-// ============================================================================
-// Compile-time self-verification (same platform → must match)
-// ============================================================================
-
-static_assert(layout_match(linux_plat::Player_layout, linux_plat::Player_layout),
-    "Player: self layout mismatch!");
-
-static_assert(layout_match(linux_plat::Item_layout, linux_plat::Item_layout),
-    "Item: self layout mismatch!");
-
-static_assert(layout_match(linux_plat::GameData_layout, linux_plat::GameData_layout),
-    "GameData: self layout mismatch!");
-
-// ============================================================================
-// Runtime report
-// When more platforms are added, include their .sig.hpp and add them below.
-// ============================================================================
+#include <iostream>
 
 int main() {
     ::boost::typelayout::compat::CompatReporter reporter;
-    reporter.add_platform(linux_plat::get_platform_info());
+    xoffset::signature::add_baseline_platforms(reporter);
+
+    if constexpr (xoffset::signature::baseline_platform_count == 0) {
+        std::cerr << "No signature baselines found under tools/sigs.\n";
+        return 1;
+    }
+
+    const auto type_names = xoffset::signature::exported_type_names();
+    const auto platform_names = xoffset::signature::baseline_platform_names();
+
+    if (!reporter.are_transfer_safe(type_names, platform_names)) {
+        reporter.print_diff_report(std::cerr);
+        return 1;
+    }
+
     reporter.print_report();
     return 0;
 }

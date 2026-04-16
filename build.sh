@@ -1,32 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# XOffsetDatastructure Build Script (with Reflection Support)
-# For Linux/WSL environments
+set -euo pipefail
 
-set -e  # Exit on error
-
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Platform detection
+BUILD_DIR="build"
+BUILD_TYPE="Release"
+VERBOSE=0
+USER_COMPILER="${CXX:-}"
+
 detect_platform() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "linux"
-    else
-        echo "unknown"
-    fi
+    case "${OSTYPE:-unknown}" in
+        darwin*) echo "macos" ;;
+        linux-gnu*) echo "linux" ;;
+        *) echo "unknown" ;;
+    esac
 }
 
-PLATFORM=$(detect_platform)
+PLATFORM="$(detect_platform)"
 
-# Get CPU count (cross-platform)
 get_cpu_count() {
     if [[ "$PLATFORM" == "macos" ]]; then
         sysctl -n hw.ncpu 2>/dev/null || echo 4
@@ -35,47 +32,133 @@ get_cpu_count() {
     fi
 }
 
-# Find Clang P2996 compiler
-find_clang_p2996() {
-    # Search paths in order of preference
-    local search_paths=(
+NUM_JOBS="$(get_cpu_count)"
+
+print_help() {
+    cat <<'EOF'
+Usage: ./build.sh [OPTIONS]
+
+Options:
+  --compiler PATH   Use a specific Clang P2996 compiler
+  --debug           Configure a Debug build
+  --verbose, -v     Print invoked commands and verbose CTest output
+  -j N              Use N parallel build jobs
+  --help, -h        Show this help
+
+The script configures the project with CMake, builds it, runs CTest,
+exports signatures into tools/sigs/, and runs the compatibility self-check.
+EOF
+}
+
+run_cmd() {
+    if [[ "$VERBOSE" -eq 1 ]]; then
+        printf '+'
+        printf ' %q' "$@"
+        printf '\n'
+    fi
+    "$@"
+}
+
+die() {
+    echo -e "${RED}Error:${NC} $*" >&2
+    exit 1
+}
+
+section() {
+    echo
+    echo -e "${CYAN}======================================================================${NC}"
+    echo -e "${CYAN}$1${NC}"
+    echo -e "${CYAN}======================================================================${NC}"
+}
+
+supports_reflection() {
+    local compiler="$1"
+    "$compiler" -freflection -x c++ -E - < /dev/null > /dev/null 2>&1
+}
+
+find_compiler() {
+    local seen=""
+    local candidate=""
+    local candidates=(
+        "$USER_COMPILER"
+        "$(command -v clang++ 2>/dev/null || true)"
         "/usr/local/bin/clang++"
         "$HOME/clang-p2996-install/bin/clang++"
         "/opt/clang-p2996/bin/clang++"
         "/opt/p2996-toolchain/bin/clang++"
     )
-    
-    for path in "${search_paths[@]}"; do
-        if [[ -f "$path" ]]; then
-            # Verify it supports reflection
-            if "$path" --help 2>&1 | grep -q "freflection" || "$path" -freflection -x c++ -E - < /dev/null 2>&1 | head -1 > /dev/null; then
-                echo "$path"
-                return 0
-            fi
+
+    for candidate in "${candidates[@]}"; do
+        [[ -n "$candidate" ]] || continue
+        [[ -x "$candidate" ]] || continue
+        case " $seen " in
+            *" $candidate "*) continue ;;
+        esac
+        seen="$seen $candidate"
+        if supports_reflection "$candidate"; then
+            echo "$candidate"
+            return 0
         fi
     done
-    
+
     return 1
 }
 
-# Default configuration
-USE_CLANG_P2996=1
-ENABLE_REFLECTION=1
-BUILD_TYPE="Release"
-SHOW_HELP=0
-VERBOSE=0
-NUM_JOBS=$(get_cpu_count)
+ensure_submodule() {
+    local path="$1"
+    local probe="$2"
+    shift 2
 
-# Parse command line arguments
+    if [[ -e "$probe" ]]; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}Initializing missing submodule content for ${path}...${NC}"
+    if [[ $# -gt 0 ]]; then
+        run_cmd git submodule update --init "$@" "$path"
+    else
+        run_cmd git submodule update --init "$path"
+    fi
+}
+
+find_binary() {
+    local name="$1"
+    local path=""
+    local candidates=(
+        "$BUILD_DIR/bin/$BUILD_TYPE/$name"
+        "$BUILD_DIR/bin/$name"
+    )
+
+    for path in "${candidates[@]}"; do
+        if [[ -x "$path" ]]; then
+            echo "$path"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+reset_stale_cmake_cache() {
+    local cache_file="$BUILD_DIR/CMakeCache.txt"
+    local cached_source=""
+
+    [[ -f "$cache_file" ]] || return 0
+
+    cached_source="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$cache_file")"
+    if [[ -n "$cached_source" && "$cached_source" != "$PWD" ]]; then
+        echo -e "${YELLOW}Resetting stale CMake cache from ${cached_source}.${NC}"
+        rm -f "$BUILD_DIR/CMakeCache.txt"
+        rm -rf "$BUILD_DIR/CMakeFiles"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --no-p2996)
-            USE_CLANG_P2996=0
-            shift
-            ;;
-        --no-reflection)
-            ENABLE_REFLECTION=0
-            shift
+    case "$1" in
+        --compiler)
+            [[ $# -ge 2 ]] || die "--compiler requires a path"
+            USER_COMPILER="$2"
+            shift 2
             ;;
         --debug)
             BUILD_TYPE="Debug"
@@ -86,450 +169,104 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -j)
+            [[ $# -ge 2 ]] || die "-j requires a job count"
             NUM_JOBS="$2"
             shift 2
             ;;
         --help|-h)
-            SHOW_HELP=1
-            shift
+            print_help
+            exit 0
             ;;
         *)
-            echo -e "${RED}Unknown option: $1${NC}"
-            SHOW_HELP=1
-            shift
+            die "unknown option: $1"
             ;;
     esac
 done
 
-# Show help
-if [ $SHOW_HELP -eq 1 ]; then
-    echo ""
-    echo "Usage: ./build.sh [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  --no-p2996          Use system Clang/GCC instead of Clang P2996"
-    echo "  --no-reflection     Disable C++26 reflection tests"
-    echo "  --debug             Build in Debug mode instead of Release"
-    echo "  --verbose, -v       Show verbose build output"
-    echo "  -j N                Use N parallel jobs (default: auto-detected)"
-    echo "  --help, -h          Show this help message"
-    echo ""
-    echo "Default: Use Clang P2996 with reflection enabled in Release mode"
-    echo ""
-    echo "Examples:"
-    echo "  ./build.sh                      - Build with Clang P2996 and reflection"
-    echo "  ./build.sh --no-p2996           - Build with system compiler"
-    echo "  ./build.sh --no-reflection      - Build without reflection tests"
-    echo "  ./build.sh --debug              - Build in Debug mode"
-    echo "  ./build.sh -j 8                 - Build with 8 parallel jobs"
-    echo ""
-    exit 0
+section "XOffsetDatastructure Build"
+
+ensure_submodule "external/typelayout" "external/typelayout/include/boost/typelayout.hpp" --recursive
+ensure_submodule "external/boost" "external/boost/CMakeLists.txt"
+
+CXX_COMPILER="$(find_compiler)" || die "could not find a Clang compiler with -freflection support"
+C_COMPILER=""
+if [[ -x "$(dirname "$CXX_COMPILER")/clang" ]]; then
+    C_COMPILER="$(dirname "$CXX_COMPILER")/clang"
 fi
 
-# Print header
-echo ""
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}  XOffsetDatastructure Build Script (with Reflection Support)${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
+echo -e "${BLUE}Compiler:${NC} ${GREEN}${CXX_COMPILER}${NC}"
+echo -e "${BLUE}Build type:${NC} ${GREEN}${BUILD_TYPE}${NC}"
+echo -e "${BLUE}Jobs:${NC} ${GREEN}${NUM_JOBS}${NC}"
 
-# Check submodules
-echo -e "${BLUE}Checking submodules...${NC}"
+CMAKE_OSX_SYSROOT_VALUE=""
 
-if [ ! -f "external/typelayout/include/boost/typelayout.hpp" ]; then
-    echo -e "${YELLOW}TypeLayout submodule not initialized. Initializing...${NC}"
-    git submodule update --init --recursive external/typelayout
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to initialize TypeLayout submodule${NC}"
-        echo -e "${YELLOW}Try: git submodule update --init --recursive${NC}"
-        exit 1
+if [[ "$PLATFORM" == "macos" ]]; then
+    MACOS_SDK="$(xcrun --show-sdk-path 2>/dev/null || true)"
+    if [[ -n "$MACOS_SDK" ]]; then
+        CMAKE_OSX_SYSROOT_VALUE="$MACOS_SDK"
     fi
 fi
 
-if [ ! -d "external/boost" ]; then
-    echo -e "${YELLOW}Boost submodule not initialized. Initializing...${NC}"
-    git submodule update --init external/boost
+section "Configure"
+
+reset_stale_cmake_cache
+
+cmake_args=(
+    -S .
+    -B "$BUILD_DIR"
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+    -DCMAKE_CXX_COMPILER="$CXX_COMPILER"
+    -DCMAKE_CXX_FLAGS=
+    -DCMAKE_EXE_LINKER_FLAGS=
+)
+
+if [[ -n "$C_COMPILER" ]]; then
+    cmake_args+=("-DCMAKE_C_COMPILER=$C_COMPILER")
+fi
+if [[ -n "$CMAKE_OSX_SYSROOT_VALUE" ]]; then
+    cmake_args+=("-DCMAKE_OSX_SYSROOT=$CMAKE_OSX_SYSROOT_VALUE")
 fi
 
-echo -e "${GREEN}Submodules OK${NC}"
-echo ""
+run_cmd cmake "${cmake_args[@]}"
 
-# Display configuration
-echo -e "${BLUE}Configuration:${NC}"
-if [ $USE_CLANG_P2996 -eq 1 ]; then
-    echo -e "  Compiler: ${GREEN}Clang P2996 (~/clang-p2996-install/bin/clang++)${NC}"
-else
-    echo -e "  Compiler: ${YELLOW}System default (clang++ or g++)${NC}"
-fi
+section "Build"
+run_cmd cmake --build "$BUILD_DIR" --config "$BUILD_TYPE" -j "$NUM_JOBS"
 
-if [ $ENABLE_REFLECTION -eq 1 ]; then
-    echo -e "  Reflection: ${GREEN}ENABLED${NC}"
-else
-    echo -e "  Reflection: ${YELLOW}DISABLED${NC}"
-fi
-
-echo -e "  Build Type: ${GREEN}$BUILD_TYPE${NC}"
-echo -e "  Parallel Jobs: ${GREEN}$NUM_JOBS${NC}"
-echo ""
-
-# Set up compiler
-CMAKE_CXX_COMPILER=""
-CMAKE_C_COMPILER=""
-CMAKE_CXX_FLAGS=""
-CMAKE_EXE_LINKER_FLAGS=""
-
-if [ $USE_CLANG_P2996 -eq 1 ]; then
-    # Use dynamic compiler discovery
-    CLANG_P2996_PATH=$(find_clang_p2996)
-    
-    if [ -z "$CLANG_P2996_PATH" ]; then
-        echo -e "${RED}Error: Clang P2996 not found in standard locations${NC}"
-        echo -e "${YELLOW}Searched: /usr/local/bin, ~/clang-p2996-install, /opt/clang-p2996${NC}"
-        echo -e "${YELLOW}Please install Clang P2996 or use --no-p2996 flag${NC}"
-        exit 1
-    fi
-    
-    echo -e "${GREEN}Found Clang P2996 at: $CLANG_P2996_PATH${NC}"
-    
-    CLANG_P2996_DIR=$(dirname "$CLANG_P2996_PATH")
-    CLANG_INSTALL_DIR=$(dirname "$CLANG_P2996_DIR")
-    
-    CMAKE_CXX_COMPILER="$CLANG_P2996_PATH"
-    CMAKE_C_COMPILER="${CLANG_P2996_DIR}/clang"
-    CMAKE_CXX_FLAGS="-stdlib=libc++"
-    
-    # macOS specific: add SDK path
-    if [[ "$PLATFORM" == "macos" ]]; then
-        MACOS_SDK=$(xcrun --show-sdk-path 2>/dev/null)
-        if [ -n "$MACOS_SDK" ]; then
-            CMAKE_CXX_FLAGS="$CMAKE_CXX_FLAGS -isysroot $MACOS_SDK"
-            echo -e "${GREEN}Using macOS SDK: $MACOS_SDK${NC}"
-        fi
-        CMAKE_EXE_LINKER_FLAGS="-L${CLANG_INSTALL_DIR}/lib -Wl,-rpath,${CLANG_INSTALL_DIR}/lib -Wl,-rpath,/usr/lib"
-    else
-        CMAKE_EXE_LINKER_FLAGS="-L${CLANG_INSTALL_DIR}/lib -Wl,-rpath,${CLANG_INSTALL_DIR}/lib"
-    fi
-fi
-
-# Create build directory
-mkdir -p build
-cd build
-
-# Configure with CMake
-echo -e "${BLUE}Configuring CMake...${NC}"
-echo ""
-
-CMAKE_CMD="cmake .."
-CMAKE_CMD="$CMAKE_CMD -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
-
-if [ -n "$CMAKE_CXX_COMPILER" ]; then
-    CMAKE_CMD="$CMAKE_CMD -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER"
-fi
-
-if [ -n "$CMAKE_C_COMPILER" ]; then
-    CMAKE_CMD="$CMAKE_CMD -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER"
-fi
-
-if [ $ENABLE_REFLECTION -eq 1 ]; then
-    CMAKE_CMD="$CMAKE_CMD -DENABLE_REFLECTION_TESTS=ON"
-else
-    CMAKE_CMD="$CMAKE_CMD -DENABLE_REFLECTION_TESTS=OFF"
-fi
-
-if [ -n "$CMAKE_CXX_FLAGS" ]; then
-    CMAKE_CMD="$CMAKE_CMD -DCMAKE_CXX_FLAGS='$CMAKE_CXX_FLAGS'"
-fi
-
-if [ -n "$CMAKE_EXE_LINKER_FLAGS" ]; then
-    CMAKE_CMD="$CMAKE_CMD -DCMAKE_EXE_LINKER_FLAGS='$CMAKE_EXE_LINKER_FLAGS'"
-fi
-
-if [ $VERBOSE -eq 1 ]; then
-    echo -e "${CYAN}Running: $CMAKE_CMD${NC}"
-fi
-
-eval $CMAKE_CMD
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}CMake configuration failed${NC}"
-    cd ..
-    exit 1
-fi
-
-# Build
-echo ""
-echo -e "${BLUE}Building project...${NC}"
-echo ""
-
-BUILD_CMD="cmake --build . --config $BUILD_TYPE -j$NUM_JOBS"
-
-if [ $VERBOSE -eq 1 ]; then
-    BUILD_CMD="$BUILD_CMD --verbose"
-    echo -e "${CYAN}Running: $BUILD_CMD${NC}"
-fi
-
-eval $BUILD_CMD
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Build failed${NC}"
-    cd ..
-    exit 1
-fi
-
-# Ensure libc++ can be found at runtime (needed in Docker with P2996 Clang)
-if [ -d "/opt/clang-p2996/lib/x86_64-unknown-linux-gnu" ]; then
+if [[ -d "/opt/clang-p2996/lib/x86_64-unknown-linux-gnu" ]]; then
     export LD_LIBRARY_PATH="/opt/clang-p2996/lib/x86_64-unknown-linux-gnu:${LD_LIBRARY_PATH:-}"
-elif [ -d "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu" ]; then
+elif [[ -d "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu" ]]; then
     export LD_LIBRARY_PATH="/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:${LD_LIBRARY_PATH:-}"
 fi
 
-# Run tests
-echo ""
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}Running Tests${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
+section "CTest"
 
-TEST_FAILED=0
-TEST_COUNT=0
-PASSED_COUNT=0
-SKIPPED_COUNT=0
-
-# Helper function to run a test
-run_test() {
-    local test_name=$1
-    local test_num=$2
-    local total_tests=$3
-    
-    TEST_COUNT=$test_num
-    
-    local test_path="bin/$BUILD_TYPE/$test_name"
-    
-    if [ -f "$test_path" ]; then
-        echo -e "${CYAN}[$test_num/$total_tests]${NC} Running ${BLUE}$test_name${NC}..."
-        
-        if [ $VERBOSE -eq 1 ]; then
-            ./$test_path
-        else
-            ./$test_path > /dev/null 2>&1
-        fi
-        
-        local result=$?
-        
-        if [ $result -eq 0 ]; then
-            echo -e "${GREEN}✓ PASSED${NC}"
-            PASSED_COUNT=$((PASSED_COUNT + 1))
-        else
-            echo -e "${RED}✗ FAILED${NC}"
-            TEST_FAILED=1
-        fi
-    else
-        echo -e "${CYAN}[$test_num/$total_tests]${NC} ${YELLOW}$test_name not found (skipped)${NC}"
-        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-    fi
-    
-    echo ""
-}
-
-# Determine total test count
-TOTAL_TESTS=7
-if [ $ENABLE_REFLECTION -eq 1 ]; then
-    TOTAL_TESTS=23
+ctest_args=(
+    --test-dir "$BUILD_DIR"
+    --output-on-failure
+    -C "$BUILD_TYPE"
+)
+if ctest --help 2>&1 | grep -q -- "--no-tests"; then
+    ctest_args+=(--no-tests=error)
+fi
+if [[ "$VERBOSE" -eq 1 ]]; then
+    ctest_args+=(-V)
 fi
 
-# Basic tests (7 tests)
-echo -e "${YELLOW}=== Basic Tests ===${NC}"
-echo ""
+run_cmd ctest "${ctest_args[@]}"
 
-run_test "test_basic_types" 1 $TOTAL_TESTS
-run_test "test_vector" 2 $TOTAL_TESTS
-run_test "test_map_set" 3 $TOTAL_TESTS
-run_test "test_nested" 4 $TOTAL_TESTS
-run_test "test_compaction" 5 $TOTAL_TESTS
-run_test "test_modify" 6 $TOTAL_TESTS
-run_test "test_xbuffer_api" 7 $TOTAL_TESTS
+section "Signature Tools"
 
-# Reflection tests (16 tests) - only if enabled
-if [ $ENABLE_REFLECTION -eq 1 ]; then
-    echo -e "${YELLOW}=== Reflection Tests ===${NC}"
-    echo ""
-    
-    run_test "test_reflection_core" 8 $TOTAL_TESTS
-    run_test "test_reflection_advanced" 9 $TOTAL_TESTS
-    run_test "test_type_signatures" 10 $TOTAL_TESTS
-    run_test "test_field_limit_fix" 11 $TOTAL_TESTS
-    run_test "test_type_safety" 12 $TOTAL_TESTS
-    run_test "test_enum_support" 13 $TOTAL_TESTS
-    run_test "test_xstring_direct_assign" 14 $TOTAL_TESTS
-    run_test "test_xhandle" 15 $TOTAL_TESTS
-    run_test "test_error_paths" 16 $TOTAL_TESTS
-    run_test "test_memory_efficiency" 17 $TOTAL_TESTS
-    run_test "test_zero_boilerplate" 18 $TOTAL_TESTS
-    run_test "test_zero_boilerplate_vector" 19 $TOTAL_TESTS
-    run_test "test_complex_nesting" 20 $TOTAL_TESTS
-    run_test "test_inheritance" 21 $TOTAL_TESTS
-    run_test "test_adaptive_reservation" 22 $TOTAL_TESTS
-    run_test "test_policy_trait" 23 $TOTAL_TESTS
-fi
-
-# ============================================================================
-# Signature Export & Compatibility Check
-# ============================================================================
-if [ $ENABLE_REFLECTION -eq 1 ]; then
-    echo ""
-    echo -e "${CYAN}======================================================================${NC}"
-    echo -e "${CYAN}Signature Export & Compatibility Check${NC}"
-    echo -e "${CYAN}======================================================================${NC}"
-    echo ""
-
-    SIG_EXPORT_PATH="bin/export_signatures"
-    if [ ! -f "$SIG_EXPORT_PATH" ]; then
-        SIG_EXPORT_PATH="bin/$BUILD_TYPE/export_signatures"
-    fi
-
-    SIG_CHECK_PATH="bin/check_compat"
-    if [ ! -f "$SIG_CHECK_PATH" ]; then
-        SIG_CHECK_PATH="bin/$BUILD_TYPE/check_compat"
-    fi
-
-    # Step 1: Export signatures for current platform
-    if [ -f "$SIG_EXPORT_PATH" ]; then
-        echo -e "${BLUE}Exporting type signatures...${NC}"
-        SIG_OUTPUT_DIR="../tools/sigs"
-        mkdir -p "$SIG_OUTPUT_DIR"
-
-        if ./$SIG_EXPORT_PATH "$SIG_OUTPUT_DIR/"; then
-            echo -e "${GREEN}✓ Signatures exported to tools/sigs/${NC}"
-
-            # Show which files were generated
-            for sig_file in "$SIG_OUTPUT_DIR"/*.sig.hpp; do
-                if [ -f "$sig_file" ]; then
-                    echo -e "  ${CYAN}$(basename "$sig_file")${NC}"
-                fi
-            done
-        else
-            echo -e "${YELLOW}⚠ Signature export failed (non-fatal)${NC}"
-        fi
-        echo ""
-    else
-        echo -e "${YELLOW}export_signatures not found (skipped)${NC}"
-    fi
-
-    # Step 2: Run compatibility self-check
-    if [ -f "$SIG_CHECK_PATH" ]; then
-        echo -e "${BLUE}Running compatibility self-check...${NC}"
-
-        if ./$SIG_CHECK_PATH; then
-            echo -e "${GREEN}✓ Compatibility check passed${NC}"
-        else
-            echo -e "${YELLOW}⚠ Compatibility check failed (non-fatal)${NC}"
-        fi
-        echo ""
-    else
-        echo -e "${YELLOW}check_compat not found (skipped)${NC}"
-    fi
-fi
-
-# Run demo
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}Running XOffsetDatastructure Demo v2${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
-
-# Try both possible paths
-DEMO_PATH="bin/xoffsetdatastructure_demo"
-if [ ! -f "$DEMO_PATH" ]; then
-    DEMO_PATH="bin/$BUILD_TYPE/xoffsetdatastructure_demo"
-fi
-
-if [ -f "$DEMO_PATH" ]; then
-    ./$DEMO_PATH
-    
-    if [ $? -eq 0 ]; then
-        echo ""
-        echo -e "${GREEN}✓ Demo completed successfully!${NC}"
-    else
-        echo ""
-        echo -e "${RED}✗ Demo failed!${NC}"
-        TEST_FAILED=1
-    fi
+if export_bin="$(find_binary export_signatures)"; then
+    run_cmd "$export_bin" tools/sigs
 else
-    echo -e "${YELLOW}Demo executable not found (skipped)${NC}"
-    echo -e "${YELLOW}Checked paths: bin/xoffsetdatastructure_demo and bin/$BUILD_TYPE/xoffsetdatastructure_demo${NC}"
+    echo -e "${YELLOW}export_signatures not found; skipping.${NC}"
 fi
 
-echo ""
-
-# Run HelloWorld Example
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}Running HelloWorld Example (with Type Signature Validation)${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
-
-# Try both possible paths
-HELLOWORLD_PATH="bin/helloworld"
-if [ ! -f "$HELLOWORLD_PATH" ]; then
-    HELLOWORLD_PATH="bin/$BUILD_TYPE/helloworld"
-fi
-
-if [ -f "$HELLOWORLD_PATH" ]; then
-    ./$HELLOWORLD_PATH
-    
-    if [ $? -eq 0 ]; then
-        echo ""
-        echo -e "${GREEN}✓ HelloWorld example completed successfully!${NC}"
-    else
-        echo ""
-        echo -e "${RED}✗ HelloWorld example failed!${NC}"
-        TEST_FAILED=1
-    fi
+if compat_bin="$(find_binary check_compat)"; then
+    run_cmd "$compat_bin"
 else
-    echo -e "${YELLOW}HelloWorld executable not found (skipped)${NC}"
-    echo -e "${YELLOW}Checked paths: bin/helloworld and bin/$BUILD_TYPE/helloworld${NC}"
+    echo -e "${YELLOW}check_compat not found; skipping.${NC}"
 fi
 
-# Return to original directory
-cd ..
-
-# Final summary
-echo ""
-echo -e "${CYAN}======================================================================${NC}"
-echo -e "${CYAN}  Build Summary${NC}"
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
-
-echo -e "  Tests Run:    ${CYAN}$TEST_COUNT${NC}"
-echo -e "  Tests Passed: ${GREEN}$PASSED_COUNT${NC}"
-
-if [ $SKIPPED_COUNT -gt 0 ]; then
-    echo -e "  Tests Skipped: ${YELLOW}$SKIPPED_COUNT${NC}"
-fi
-
-if [ $TEST_FAILED -eq 0 ]; then
-    FAILED_COUNT=0
-    echo -e "  Tests Failed: ${GREEN}$FAILED_COUNT${NC}"
-    echo ""
-    echo -e "  Result: ${GREEN}ALL TESTS PASSED${NC}"
-    echo ""
-    echo -e "  Status: ${GREEN}✓ SUCCESS${NC}"
-else
-    FAILED_COUNT=$((TEST_COUNT - PASSED_COUNT))
-    echo -e "  Tests Failed: ${RED}$FAILED_COUNT${NC}"
-    echo ""
-    echo -e "  Result: ${RED}SOME TESTS FAILED${NC}"
-    echo ""
-    echo -e "  Status: ${RED}✗ FAILED${NC}"
-fi
-
-echo -e "${CYAN}======================================================================${NC}"
-echo ""
-
-if [ $TEST_FAILED -eq 0 ]; then
-    echo -e "${GREEN}Build, demo, and tests completed successfully!${NC}"
-else
-    echo -e "${YELLOW}Build and demo completed, but some tests FAILED${NC}"
-fi
-
-echo ""
-
-exit $TEST_FAILED
+section "Done"
+echo -e "${GREEN}Build and verification completed successfully.${NC}"

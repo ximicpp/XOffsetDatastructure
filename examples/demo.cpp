@@ -520,7 +520,7 @@ int main() {
         std::cout << "  * All demonstrations completed successfully!\n";
         std::cout << "\n";
         std::cout << "  For more information:\n";
-        std::cout << "     - Documentation: docs/\n";
+        std::cout << "     - Overview: README.md\n";
         std::cout << "     - Examples: examples/\n";
         std::cout << "     - Tests: tests/\n";
         std::cout << "\n";

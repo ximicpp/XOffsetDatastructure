@@ -43,10 +43,9 @@ jobs:
           echo "=== Image info ==="
           docker images ghcr.io/ximicpp/typelayout-p2996:latest
 
-      - name: Build & run all tests
+      - name: Build, CTest, and signature self-check
         shell: bash
         run: |
-          mkdir -p build
           set -o pipefail
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
@@ -59,40 +58,24 @@ jobs:
           echo "=== Checking for signature changes ==="
           echo ""
 
-          # The build.sh run above regenerated tools/sigs/*.sig.hpp inside Docker.
-          # Compare them against the committed versions to detect binary contract drift.
-
           SIG_DIR="tools/sigs"
           if [ ! -d "$SIG_DIR" ]; then
-            echo "No signature directory found — skipping."
+            echo "::error::Missing signature baseline directory: $SIG_DIR"
+            exit 1
+          fi
+
+          SIG_STATUS="$(git status --short --untracked-files=all -- "$SIG_DIR")"
+          if [ -z "$SIG_STATUS" ]; then
+            echo "✓ All type signatures match committed versions."
             exit 0
           fi
 
-          CHANGED=0
-          for sig_file in "$SIG_DIR"/*.sig.hpp; do
-            [ -f "$sig_file" ] || continue
-            FNAME=$(basename "$sig_file")
-
-            # Use git diff to detect uncommitted changes
-            if ! git diff --quiet -- "$sig_file" 2>/dev/null; then
-              echo "⚠ CHANGED: $FNAME"
-              echo "  Binary contract may have changed — please review!"
-              git diff --stat -- "$sig_file"
-              echo ""
-              CHANGED=1
-            else
-              echo "✓ $FNAME — unchanged"
-            fi
-          done
-
+          echo "$SIG_STATUS"
           echo ""
-          if [ "$CHANGED" -eq 1 ]; then
-            echo "::warning::Type signatures have changed! Review tools/sigs/*.sig.hpp for binary contract drift."
-            echo ""
-            echo "If this is intentional, commit the updated .sig.hpp files."
-          else
-            echo "✓ All type signatures match committed versions."
-          fi
+          git diff --stat -- "$SIG_DIR" || true
+          echo ""
+          echo "::error::Type signatures changed. Review tools/sigs/*.sig.hpp and commit intentional baseline updates."
+          exit 1
 
       - name: Upload signature artifacts
         if: always()
