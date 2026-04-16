@@ -1,0 +1,27 @@
+#ifndef XOFFSET_CHECK_COMPAT_BASELINES_HPP
+#define XOFFSET_CHECK_COMPAT_BASELINES_HPP
+
+#include <boost/typelayout/tools/compat_check.hpp>
+
+#include <cstddef>
+#include <string>
+#include <vector>
+
+@XOFFSET_CHECK_COMPAT_INCLUDES@
+
+namespace xoffset::signature {
+
+inline void add_baseline_platforms(::boost::typelayout::compat::CompatReporter& reporter) {
+@XOFFSET_CHECK_COMPAT_ADD_PLATFORMS@
+}
+
+inline std::vector<std::string> baseline_platform_names() {
+    return {
+@XOFFSET_CHECK_COMPAT_PLATFORM_NAMES@    };
+}
+
+inline constexpr std::size_t baseline_platform_count = @XOFFSET_CHECK_COMPAT_PLATFORM_COUNT@;
+
+} // namespace xoffset::signature
+
+#endif // XOFFSET_CHECK_COMPAT_BASELINES_HPP

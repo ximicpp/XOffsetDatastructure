@@ -18,6 +18,7 @@
 #include <experimental/meta>
 #include <type_traits>
 #include <string>
+#include <utility>
 #include <vector>
 #include <cstring>
 
@@ -257,6 +258,37 @@ namespace XOffsetDatastructure {
         template <typename T, typename Src>
         void reflect_transfer_init_all(void* dst, Src&& src,
             XBufferCore::segment_manager* sm);
+
+        template <std::size_t Count, typename Fn>
+        void static_for(Fn&& fn) {
+            if constexpr (Count > 0) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (fn(std::integral_constant<std::size_t, Is>{}), ...);
+                }(std::make_index_sequence<Count>{});
+            }
+        }
+
+        template <typename T>
+        consteval std::size_t reflected_base_count() {
+            using namespace std::meta;
+            return bases_of(^^T, access_context::unchecked()).size();
+        }
+
+        template <typename T>
+        consteval std::size_t reflected_member_count() {
+            using namespace std::meta;
+            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+        }
+
+        template <typename T, typename BaseFn, typename MemberFn>
+        void for_each_reflected_subobject(BaseFn&& on_base, MemberFn&& on_member) {
+            static_for<reflected_base_count<T>()>([&](auto index) {
+                on_base(index);
+            });
+            static_for<reflected_member_count<T>()>([&](auto index) {
+                on_member(index);
+            });
+        }
 
         // True for pure aggregates needing reflection-based construction.
         template <typename T>
@@ -551,19 +583,13 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void reflect_init_all_impl(void* raw, Alloc alloc) {
-            using namespace std::meta;
-            constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
-            constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (reflect_init_base_nth<T, Is>(raw, alloc), ...);
-                }(std::make_index_sequence<bc>{});
-            }
-            if constexpr (mc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (reflect_init_nth<T, Is>(raw, alloc), ...);
-                }(std::make_index_sequence<mc>{});
-            }
+            for_each_reflected_subobject<T>(
+                [&](auto index) {
+                    reflect_init_base_nth<T, decltype(index)::value>(raw, alloc);
+                },
+                [&](auto index) {
+                    reflect_init_nth<T, decltype(index)::value>(raw, alloc);
+                });
         }
 
         template <typename T, typename Alloc>
@@ -621,19 +647,15 @@ namespace XOffsetDatastructure {
         template <typename T, typename Src>
         void reflect_transfer_init_all_impl(void* dst, Src&& src,
                                             XBufferCore::segment_manager* sm) {
-            using namespace std::meta;
-            constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
-            constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (reflect_transfer_base_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
-                }(std::make_index_sequence<bc>{});
-            }
-            if constexpr (mc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (reflect_transfer_init_nth<T, Is>(dst, std::forward<Src>(src), sm), ...);
-                }(std::make_index_sequence<mc>{});
-            }
+            for_each_reflected_subobject<T>(
+                [&](auto index) {
+                    reflect_transfer_base_nth<T, decltype(index)::value>(
+                        dst, std::forward<Src>(src), sm);
+                },
+                [&](auto index) {
+                    reflect_transfer_init_nth<T, decltype(index)::value>(
+                        dst, std::forward<Src>(src), sm);
+                });
         }
 
         template <typename T, typename Src>
@@ -1007,19 +1029,15 @@ namespace XOffsetDatastructure {
         template<typename T>
         static void migrate_members(const T& old_obj, T& new_obj,
                                    XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
-            using namespace std::meta;
-            constexpr auto bc = bases_of(^^T, access_context::unchecked()).size();
-            constexpr auto mc = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-            if constexpr (bc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (migrate_base_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
-                }(std::make_index_sequence<bc>{});
-            }
-            if constexpr (mc > 0) {
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    (migrate_member_at<T, Is>(old_obj, new_obj, old_xbuf, new_xbuf), ...);
-                }(std::make_index_sequence<mc>{});
-            }
+            detail::for_each_reflected_subobject<T>(
+                [&](auto index) {
+                    migrate_base_at<T, decltype(index)::value>(
+                        old_obj, new_obj, old_xbuf, new_xbuf);
+                },
+                [&](auto index) {
+                    migrate_member_at<T, decltype(index)::value>(
+                        old_obj, new_obj, old_xbuf, new_xbuf);
+                });
         }
     };
 }

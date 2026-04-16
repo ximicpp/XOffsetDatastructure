@@ -1,50 +1,5 @@
-# Main demo executable
 add_executable(xoffsetdatastructure_demo demo.cpp)
+configure_xoffset_target(xoffsetdatastructure_demo)
 
-# Add include directories
-target_include_directories(xoffsetdatastructure_demo PRIVATE 
-    ${CMAKE_SOURCE_DIR}
-    ${BOOST_INCLUDE_DIRS}
-    ${TYPELAYOUT_INCLUDE_DIRS}
-)
-
-# Set output directory
-set_target_properties(xoffsetdatastructure_demo
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
-
-# macOS specific: disable RPATH and use system libraries
-if(APPLE)
-    set_target_properties(xoffsetdatastructure_demo PROPERTIES
-        SKIP_BUILD_RPATH TRUE
-        BUILD_WITH_INSTALL_RPATH FALSE
-        INSTALL_RPATH ""
-    )
-    target_link_options(xoffsetdatastructure_demo PRIVATE
-        -Wl,-rpath,/usr/lib
-        -Wl,-rpath,/usr/local/lib
-    )
-endif()
-
-# Hello World example
 add_executable(helloworld helloworld.cpp)
-target_include_directories(helloworld PRIVATE 
-    ${CMAKE_SOURCE_DIR}
-    ${BOOST_INCLUDE_DIRS}
-    ${TYPELAYOUT_INCLUDE_DIRS}
-)
-set_target_properties(helloworld PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
-if(APPLE)
-    set_target_properties(helloworld PROPERTIES
-        SKIP_BUILD_RPATH TRUE
-        BUILD_WITH_INSTALL_RPATH FALSE
-        INSTALL_RPATH ""
-    )
-    target_link_options(helloworld PRIVATE
-        -Wl,-rpath,/usr/lib
-        -Wl,-rpath,/usr/local/lib
-    )
-endif()
+configure_xoffset_target(helloworld)
