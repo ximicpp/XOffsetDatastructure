@@ -35,3 +35,6 @@ dist/
 scratch/
 temp/
 tmp/
+
+# Local agent/app configuration
+.claude/
