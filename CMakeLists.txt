@@ -36,14 +36,11 @@ set(TYPELAYOUT_INCLUDE_DIRS
 # is larger, but the build only exposes the subset required by xoffsetdatastructure.hpp.
 set(BOOST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/external/boost/libs/container/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/interprocess/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/core/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/config/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/throw_exception/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/assert/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/static_assert/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/container_hash/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/move/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/type_traits/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/winapi/include
     ${CMAKE_SOURCE_DIR}/external/boost/libs/intrusive/include

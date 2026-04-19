@@ -70,8 +70,7 @@ bool test_memory_compaction() {
     
     // Test 5: Verify data integrity after compaction
     std::cout << "Test 5: Verify data integrity... ";
-    auto* compact_obj = compact_buf.find<CompactTestType>(XBUFFER_ROOT_NAME).first;
-    assert(compact_obj != nullptr);
+    auto* compact_obj = &compact_buf.unsafe_root<CompactTestType>();
     assert(compact_obj->value == 999);
     assert(compact_obj->data.size() == 100);
     assert(compact_obj->strings.size() == 20);

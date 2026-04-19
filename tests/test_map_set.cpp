@@ -27,7 +27,9 @@ bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";
     std::cout << std::string(50, '-') << "\n";
     
-    XBuffer xbuf(4096);
+    // Fixed-schema buffers now carry allocator state plus frozen container
+    // metadata, so this legacy map/set scenario needs a slightly larger arena.
+    XBuffer xbuf(8192);
     auto* obj = xbuf.make<MapSetTest>();
     
     // Test 1: Set insertion
@@ -102,7 +104,7 @@ bool test_map_set_operations() {
     std::cout << "Test 8: Persistence test... ";
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto& loaded_obj = loaded_buf.root<MapSetTest>();
+    auto& loaded_obj = loaded_buf.unsafe_root<MapSetTest>();
     assert(loaded_obj.intSet.size() == 50);
     assert(loaded_obj.intMap.size() == 20);
     assert(loaded_obj.stringMap.size() == 15);

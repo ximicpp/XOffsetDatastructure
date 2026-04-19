@@ -1,21 +1,19 @@
 // ============================================================================
 // Test: XString Direct Assignment
 // Purpose: Verify that XString::operator=(const char*) correctly allocates
-//          string data in the segment (not on the heap), and that the data
+//          string data in the XOffset buffer arena (not on the heap), and that
+//          the data
 //          survives serialization/deserialization.
 //
-// Background: boost::container::basic_string already provides
-//   operator=(const CharT* s) which calls assign(s, s + len).
-//   assign() uses this->alloc() — the internally stored allocator —
-//   to allocate new char data. Since XString's allocator is
-//   allocator<char, segment_manager> with an offset_ptr<segment_manager>,
-//   all allocations go through the segment manager into the segment.
+// Background: XString stores a bound arena allocator and uses it for
+//   operator=(const char*) / assign() growth. The resulting char payload
+//   must stay inside the XOffset buffer arena instead of escaping to the heap.
 //
 // This test proves:
 //   1. operator=(const char*) compiles and works
-//   2. Char data is allocated inside the segment (address in range)
+//   2. Char data is allocated inside the buffer arena (address in range)
 //   3. Data survives serialization + deserialization (C1 + C2)
-//   4. Reassignment correctly deallocates old data in segment
+//   4. Reassignment correctly deallocates old data in the buffer arena
 //   5. Works with XVector<XString> elements
 // ============================================================================
 
@@ -51,14 +49,14 @@ bool test_basic_assign() {
     assert(data->name.size() == 5);
     std::cout << "[OK]\n";
 
-    // Test 2: Verify data is in segment (not on heap)
-    std::cout << "Test 2: Char data is in segment... ";
+    // Test 2: Verify data is in the buffer arena (not on heap)
+    std::cout << "Test 2: Char data is in the buffer arena... ";
     const void* buf_start = xbuf.get_address();
     const void* buf_end = static_cast<const char*>(buf_start) + xbuf.get_size();
     const void* name_data = data->name.c_str();
-    // For short strings, data may be in SSO buffer (which is part of the
-    // XString object itself, which IS in the segment). For long strings,
-    // data is allocated via segment allocator. Either way, data is in segment.
+    // For short strings, data may be inline inside XString, which still lives
+    // inside the arena-backed buffer. For long strings, data is allocated from
+    // the arena. Either way, data remains inside the buffer.
     assert(name_data >= buf_start && name_data < buf_end);
     std::cout << "[OK]\n";
 
@@ -68,7 +66,7 @@ bool test_basic_assign() {
     assert(std::string(data->name.c_str()) == "Bob");
     data->name = "A much longer string that exceeds SSO buffer size for sure";
     assert(std::string(data->name.c_str()) == "A much longer string that exceeds SSO buffer size for sure");
-    // Verify long string is also in segment
+    // Verify long string is also in the buffer arena
     const void* long_data = data->name.c_str();
     assert(long_data >= buf_start && long_data < buf_end);
     std::cout << "[OK]\n";
@@ -96,8 +94,8 @@ bool test_serialization_roundtrip() {
     data->title = "ArchMage";
 
     std::string binary = xbuf.save();
-    XBuffer loaded = XBuffer::load(binary);
-    assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
+    XBuffer loaded = XBuffer::load_unverified(binary);
+    assert(loaded.unsafe_has_root<StringTestData>()); auto& loaded_data = loaded.unsafe_root<StringTestData>();
     assert(std::string(loaded_data.name.c_str()) == "SerializedAlice");
     assert(std::string(loaded_data.title.c_str()) == "ArchMage");
     std::cout << "[OK]\n";
@@ -111,8 +109,8 @@ bool test_serialization_roundtrip() {
     // Test 7: Re-serialize and verify
     std::cout << "Test 7: Re-serialize and verify... ";
     std::string binary2 = loaded.save();
-    XBuffer loaded2 = XBuffer::load(binary2);
-    assert(loaded2.has_root<StringTestData>()); auto& loaded_data2 = loaded2.root<StringTestData>();
+    XBuffer loaded2 = XBuffer::load_unverified(binary2);
+    assert(loaded2.unsafe_has_root<StringTestData>()); auto& loaded_data2 = loaded2.unsafe_root<StringTestData>();
     assert(std::string(loaded_data2.name.c_str()) == "ModifiedBob");
     assert(std::string(loaded_data2.title.c_str()) == "ArchMage");
     std::cout << "[OK]\n";
@@ -148,8 +146,8 @@ bool test_vector_of_strings() {
     // Test 10: Verify through serialization
     std::cout << "Test 10: Serialize vector of strings... ";
     std::string binary = xbuf.save();
-    XBuffer loaded = XBuffer::load(binary);
-    assert(loaded.has_root<StringTestData>()); auto& loaded_data = loaded.root<StringTestData>();
+    XBuffer loaded = XBuffer::load_unverified(binary);
+    assert(loaded.unsafe_has_root<StringTestData>()); auto& loaded_data = loaded.unsafe_root<StringTestData>();
     assert(loaded_data.names.size() == 3);
     assert(std::string(loaded_data.names[0].c_str()) == "Modified1");
     assert(std::string(loaded_data.names[1].c_str()) == "Modified2");
@@ -182,8 +180,8 @@ bool test_player_direct_assign() {
     // Test 12: Verify serialization
     std::cout << "Test 12: Serialize Player... ";
     std::string binary = xbuf.save();
-    XBuffer loaded = XBuffer::load(binary);
-    assert(loaded.has_root<Player>()); auto& loaded_player = loaded.root<Player>();
+    XBuffer loaded = XBuffer::load_unverified(binary);
+    assert(loaded.unsafe_has_root<Player>()); auto& loaded_player = loaded.unsafe_root<Player>();
     assert(std::string(loaded_player.name.c_str()) == "Alice");
     assert(loaded_player.id == 1);
     assert(loaded_player.level == 10);
@@ -194,8 +192,8 @@ bool test_player_direct_assign() {
     player = &xbuf.root<Player>();  // re-acquire after save shrink
     player->name = "Bob";
     binary = xbuf.save();
-    XBuffer loaded2 = XBuffer::load(binary);
-    assert(loaded2.has_root<Player>()); auto& loaded_player2 = loaded2.root<Player>();
+    XBuffer loaded2 = XBuffer::load_unverified(binary);
+    assert(loaded2.unsafe_has_root<Player>()); auto& loaded_player2 = loaded2.unsafe_root<Player>();
     assert(std::string(loaded_player2.name.c_str()) == "Bob");
     std::cout << "[OK]\n";
 
@@ -217,8 +215,8 @@ int main() {
     if (all_passed) {
         std::cout << "[PASS] All XString direct assignment tests passed!\n";
         std::cout << "\nSummary:\n";
-        std::cout << "  - operator=(const char*) works natively via Boost.Container\n";
-        std::cout << "  - Char data is allocated in segment via internal allocator\n";
+        std::cout << "  - operator=(const char*) works natively via XOffset fixed containers\n";
+        std::cout << "  - Char data is allocated in the buffer arena via the internal allocator\n";
         std::cout << "  - Data survives serialization/deserialization\n";
         std::cout << "  - Works with XVector<XString> elements\n";
         std::cout << "  - Replaces verbose XString(\"...\", allocator) pattern\n";

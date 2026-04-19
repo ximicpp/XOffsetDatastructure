@@ -2,7 +2,7 @@ function(add_xoffset_test test_name test_label)
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
-    set_tests_properties(${test_name} PROPERTIES LABELS ${test_label})
+    set_tests_properties(${test_name} PROPERTIES LABELS "${test_label}")
 endfunction()
 
 # Basic tests (no reflection required)
@@ -27,15 +27,19 @@ set(REFLECTION_TESTS
     test_type_signatures
     test_field_limit_fix
     test_type_safety
+    test_wire_admission
     test_enum_support
     test_xstring_direct_assign
     test_xhandle
+    test_schema_envelope
+    test_fixed_layout_containers
     test_error_paths
     test_memory_efficiency
     test_zero_boilerplate
     test_complex_nesting
     test_inheritance
     test_adaptive_reservation
+    test_main_containers
 )
 
 foreach(test_name ${REFLECTION_TESTS})

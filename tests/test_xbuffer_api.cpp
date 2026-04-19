@@ -22,6 +22,8 @@ struct TestData {
     XVector<int32_t> items;
 };
 
+XOFFSET_REGISTER_SCHEMA_NAME(TestData, "test.TestData")
+
 // ============================================================================
 // Test 1: make<T>() + root<T>() + has_root<T>()
 // ============================================================================
@@ -56,7 +58,7 @@ bool test_make_and_root() {
 // Test 2: Serialization round-trip
 // ============================================================================
 bool test_serialization() {
-    std::cout << "\n[TEST] save / load\n";
+    std::cout << "\n[TEST] save / load_unverified\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(4096);
@@ -70,9 +72,9 @@ bool test_serialization() {
     std::string data = xbuf.save();
     std::cout << "  Serialized: " << data.size() << " bytes ... [OK]\n";
 
-    XBuffer loaded = XBuffer::load(data);
-    assert(loaded.has_root<TestData>());
-    auto& r = loaded.root<TestData>();
+    XBuffer loaded = XBuffer::load_unverified(data);
+    assert(loaded.unsafe_has_root<TestData>());
+    auto& r = loaded.unsafe_root<TestData>();
     assert(r.id == 99);
     assert(r.score == 1000);
     assert(std::string(r.name.c_str()) == "Serialized");
@@ -109,19 +111,19 @@ bool test_stats() {
 }
 
 // ============================================================================
-// Test 4: allocator<T>()
+// Test 4: arena_allocator<T>()
 // ============================================================================
 bool test_allocator() {
-    std::cout << "\n[TEST] allocator<T>()\n";
+    std::cout << "\n[TEST] arena_allocator<T>()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(4096);
     auto* obj = xbuf.make<TestData>();
 
-    auto alloc = xbuf.allocator<int32_t>();
+    auto alloc = xbuf.arena_allocator<int32_t>();
     // Allocator should be valid (no crash)
     (void)alloc;
-    std::cout << "  allocator<int32_t>() created ... [OK]\n";
+    std::cout << "  arena_allocator<int32_t>() created ... [OK]\n";
 
     return true;
 }
@@ -148,6 +150,33 @@ bool test_grow_root() {
     return true;
 }
 
+// ============================================================================
+// Test 6: create<T>()
+// ============================================================================
+bool test_create_api() {
+    std::cout << "\n[TEST] create<T>()\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    XBuffer xbuf = XBuffer::create<TestData>(4096);
+    assert(xbuf.has_root<TestData>());
+
+    auto& root = xbuf.root<TestData>();
+    root.id = 77;
+    root.name = "Created";
+
+    auto typed = TypedXBuffer<TestData>::create(4096);
+    typed.root().id = 88;
+    typed.root().name = "TypedCreated";
+
+    std::string verified = typed.save_verified();
+    auto loaded = TypedXBuffer<TestData>::load(verified);
+    assert(loaded.root().id == 88);
+    assert(std::string(loaded.root().name.c_str()) == "TypedCreated");
+
+    std::cout << "  XBuffer::create / TypedXBuffer::create ... [OK]\n";
+    return true;
+}
+
 int main() {
     std::cout << "=== XBuffer API Tests (Single-Object Model) ===\n";
 
@@ -157,6 +186,7 @@ int main() {
     all_passed &= test_stats();
     all_passed &= test_allocator();
     all_passed &= test_grow_root();
+    all_passed &= test_create_api();
 
     std::cout << "\n";
     if (all_passed) {

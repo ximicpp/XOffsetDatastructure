@@ -278,10 +278,10 @@ void populate_midgame(CharacterMidGame& c) {
     c.guild_name = "Knights of Dawn";
     c.title = "The Dragonslayer";
 
-    auto* sm = c.inventory.get_stored_allocator().get_segment_manager();
+    auto alloc = c.inventory.get_stored_allocator();
     // 30 inventory items
     for (int i = 0; i < 30; i++) {
-        c.inventory.emplace_back(sm);
+        c.inventory.emplace_back(alloc);
         auto& item = c.inventory.back();
         item.item_id = 1000 + i; item.quantity = 1 + (i % 5); item.slot = i;
         item.name = ("Item_" + std::to_string(i)).c_str();
@@ -291,20 +291,20 @@ void populate_midgame(CharacterMidGame& c) {
                            "Flaming Sword +5", "Oak Shield +3", "Ring of Power",
                            "Amulet of Speed", "Cloak of Shadows"};
     for (int i = 0; i < 8; i++) {
-        c.equipment.emplace_back(sm);
+        c.equipment.emplace_back(alloc);
         auto& eq = c.equipment.back();
         eq.item_id = 2000 + i; eq.enchant_level = i % 4; eq.name = slots[i];
     }
     // 15 skills
     for (int i = 0; i < 15; i++) {
-        c.skills.emplace_back(sm);
+        c.skills.emplace_back(alloc);
         auto& sk = c.skills.back();
         sk.skill_id = 3000 + i; sk.level = 1 + (i % 10); sk.cooldown = 0.5f * i;
         sk.name = ("Skill_" + std::to_string(i)).c_str();
     }
     // 5 quests with objectives
     for (int i = 0; i < 5; i++) {
-        c.quests.emplace_back(sm);
+        c.quests.emplace_back(alloc);
         auto& q = c.quests.back();
         q.quest_id = 4000 + i; q.stage = i % 3; q.completed = 0;
         q.title = ("Quest: The Lost " + std::to_string(i)).c_str();
@@ -312,7 +312,7 @@ void populate_midgame(CharacterMidGame& c) {
     }
     // 20 friends
     for (int i = 0; i < 20; i++) {
-        c.friends.emplace_back(sm);
+        c.friends.emplace_back(alloc);
         auto& f = c.friends.back();
         f.player_id = 10000 + i; f.friendship_level = 1 + (i % 5);
         f.name = ("Friend_" + std::to_string(i)).c_str();
@@ -340,31 +340,31 @@ void populate_endgame(CharacterEndGame& c) {
     c.title = "Grand Marshal, Defender of the Realm";
     c.bio = "A veteran warrior who has conquered every dungeon and slain every boss. Known across all servers for unmatched skill.";
 
-    auto* sm = c.inventory.get_stored_allocator().get_segment_manager();
+    auto alloc = c.inventory.get_stored_allocator();
     // 200 inventory items
     for (int i = 0; i < 200; i++) {
-        c.inventory.emplace_back(sm);
+        c.inventory.emplace_back(alloc);
         auto& item = c.inventory.back();
         item.item_id = 1000+i; item.quantity = 1+(i%99); item.slot = i%60;
         item.name = ("Item_" + std::to_string(i)).c_str();
     }
     // 12 equipment slots
     for (int i = 0; i < 12; i++) {
-        c.equipment.emplace_back(sm);
+        c.equipment.emplace_back(alloc);
         auto& eq = c.equipment.back();
         eq.item_id = 5000+i; eq.enchant_level = 5+(i%3);
         eq.name = ("Mythic_Gear_Slot_" + std::to_string(i)).c_str();
     }
     // 40 skills
     for (int i = 0; i < 40; i++) {
-        c.skills.emplace_back(sm);
+        c.skills.emplace_back(alloc);
         auto& sk = c.skills.back();
         sk.skill_id = 3000+i; sk.level = 10; sk.cooldown = 1.0f+0.5f*i;
         sk.name = ("MasterSkill_" + std::to_string(i)).c_str();
     }
     // 10 active quests
     for (int i = 0; i < 10; i++) {
-        c.quests.emplace_back(sm);
+        c.quests.emplace_back(alloc);
         auto& q = c.quests.back();
         q.quest_id = 9000+i; q.stage = i%5; q.completed = 0;
         q.title = ("Epic Quest Chain Part " + std::to_string(i+1)).c_str();
@@ -374,7 +374,7 @@ void populate_endgame(CharacterEndGame& c) {
     for (int i = 0; i < 500; i++) c.completed_quests.push_back(i);
     // 100 friends
     for (int i = 0; i < 100; i++) {
-        c.friends.emplace_back(sm);
+        c.friends.emplace_back(alloc);
         auto& f = c.friends.back();
         f.player_id = 10000+i; f.friendship_level = 1+(i%10);
         f.name = ("Player_" + std::to_string(10000+i)).c_str();
@@ -383,7 +383,7 @@ void populate_endgame(CharacterEndGame& c) {
     for (int i = 0; i < 20; i++) c.blocked.push_back(90000 + i);
     // 150 achievements
     for (int i = 0; i < 150; i++) {
-        c.achievements.emplace_back(sm);
+        c.achievements.emplace_back(alloc);
         auto& a = c.achievements.back();
         a.ach_id = 7000+i; a.progress = 100; a.unlocked = 1;
         a.name = ("Achievement_" + std::to_string(i)).c_str();
@@ -470,7 +470,7 @@ bool test_profile_minimal() {
     r.print();
 
     std::cout << "\n  Breakdown:\n";
-    std::cout << "    segment_manager overhead:  112 bytes (fixed)\n";
+    std::cout << "    arena header overhead:     112 bytes (fixed)\n";
     std::cout << "    root object index:         ~48 bytes (fixed)\n";
     std::cout << "    struct sizeof:             " << sizeof(CharacterMinimal) << " bytes\n";
     std::cout << "    block_ctrl per alloc:      16 bytes × ~2 allocs\n";
@@ -581,8 +581,8 @@ bool test_profile_endgame() {
               << (double)serialized.size() / est_proto(logical) << "x\n";
 
     // Verify
-    auto loaded = XBuffer::load(serialized);
-    auto& v = loaded.root<CharacterEndGame>();
+    auto loaded = XBuffer::load_unverified(serialized);
+    auto& v = loaded.unsafe_root<CharacterEndGame>();
     assert(v.player_id == 7);
     assert(v.level == 100);
     assert(std::string(v.name.c_str()) == "Legendary_Hero_XYZ");
@@ -605,7 +605,7 @@ bool test_profile_endgame() {
 bool test_sizeof_game_types() {
     std::cout << "\n[sizeof Summary] Game Data Types\n";
     std::cout << std::string(70, '-') << "\n";
-    std::cout << "  offset_ptr<T>:       " << sizeof(boost::interprocess::offset_ptr<void>) << "B  (same as raw pointer)\n";
+    std::cout << "  native pointer:      " << sizeof(void*) << "B\n";
     std::cout << "  XString:             " << sizeof(XString) << "B  (std::string=" << sizeof(std::string) << "B)\n";
     std::cout << "  XVector<int>:        " << sizeof(XVector<int>) << "B  (std::vector=" << sizeof(std::vector<int>) << "B)\n\n";
 

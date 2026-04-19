@@ -104,7 +104,7 @@ bool test_nested_structures() {
     std::cout << "Test 5: Persistence of nested structures... ";
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto& loaded = loaded_buf.root<OuterObject>();
+    auto& loaded = loaded_buf.unsafe_root<OuterObject>();
     
     assert(loaded.title == "OuterTitle");
     assert(loaded.middle.name == "MiddleName");

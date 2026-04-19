@@ -4,7 +4,7 @@
 
 XOffsetDatastructure is a C++26/P2996 serialization library built around one idea: keep data in a byte-stable in-memory layout so save/load becomes direct byte transfer instead of encode/decode work.
 
-The library stores a single reflected root object inside a relocatable buffer backed by Boost.Interprocess and uses TypeLayout for compile-time layout signatures and byte-copy safety checks.
+The library stores a single reflected root object inside a relocatable buffer backed by an XOffset-owned arena runtime and uses TypeLayout for compile-time layout signatures and byte-copy safety checks.
 
 ## Requirements
 
@@ -28,19 +28,20 @@ struct Player {
     XVector<int32_t> items;
 };
 
-int main() {
-    XBuffer xbuf(4096);
+XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
-    auto* player = xbuf.make<Player>();
+int main() {
+    TypedXBuffer<Player> xbuf(4096);
+    auto* player = xbuf.make();
     player->id = 1;
     player->level = 10;
     player->name = "Alice";
     player->items.push_back(101);
 
-    std::string bytes = xbuf.save();
+    std::string bytes = xbuf.save_verified();
 
-    XBuffer loaded = XBuffer::load(bytes);
-    auto& restored = loaded.root<Player>();
+    auto loaded = TypedXBuffer<Player>::load(bytes);
+    auto& restored = loaded.root();
     return restored.level == 10 ? 0 : 1;
 }
 ```
@@ -53,10 +54,12 @@ More complete examples live in:
 ## Safety Rules
 
 - Only store types that satisfy `boost::typelayout::is_byte_copy_safe_v<T>`.
+- For the fixed-schema verified path, root types should also satisfy `is_v1_wire_admitted_v<T>`.
 - Pointers obtained from the buffer are invalid after `grow()`, `shrink_to_fit()`, or `XCompactor::compact<T>()`.
 - There is no per-object delete. The buffer owns all contained objects.
 - Writes are not thread-safe. Synchronize externally.
 - Prefer `XHandle<T>` if you need a stable reference across buffer relocations.
+- Prefer `TypedXBuffer<T>::load(...)` or `XBuffer::load_verified<T>(...)`; use `load_unverified()` only for trusted raw payloads.
 
 ## Build And Test
 
@@ -80,7 +83,7 @@ Useful options:
 - `./build.sh --compiler /path/to/clang++`
 - `./build.sh --verbose`
 
-`build.sh` performs configure, build, `ctest`, signature export, and compatibility self-check.
+`build.sh` performs configure, build, `ctest`, exact target-matrix signature export, matrix inventory validation, and compatibility self-check.
 
 Manual CMake path:
 
@@ -89,6 +92,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=/path/to/cla
 cmake --build build -j
 ctest --test-dir build --output-on-failure -C Release
 build/bin/Release/export_signatures tools/sigs
+build/bin/Release/check_signature_matrix tools/sigs
 build/bin/Release/check_compat
 ```
 
@@ -108,14 +112,25 @@ docker run --rm \
 
 ## Signature Tools
 
-- `tools/export_signatures.cpp` exports the current platform signature into `tools/sigs/`
-- `tools/check_compat.cpp` auto-discovers every `.sig.hpp` under `tools/sigs/` and fails if any exported type stops matching across those baselines
+- `tools/export_signatures.cpp` exports the exact repository target matrix into `tools/sigs/`
+- `tools/check_signature_matrix.cpp` enforces that `tools/sigs/` contains exactly the required target-set baselines
+- `tools/check_compat.cpp` compares the committed baselines and fails if any exported type stops matching across the matrix
 
-Each `.sig.hpp` file in `tools/sigs/` is a platform baseline. The committed headers use a stable generated line, so rerunning the exporter only diffs on real contract drift. Adding a new local platform baseline is just exporting the file, reviewing it, and committing it; CI then treats any baseline drift as a failure.
+The default `ctest` run now includes the inventory and compatibility checks, so
+the baseline contract is exercised as part of the normal test suite.
+
+The exact target matrix is:
+
+- `x86_64_windows_clang`
+- `x86_64_linux_clang`
+- `arm64_ios_clang`
+- `arm64_android_clang`
+
+Each `.sig.hpp` file in `tools/sigs/` is a committed matrix baseline. The exporter rewrites the exact set and removes stale files, so rerunning it only diffs on real contract drift.
 
 ## Dependency Surface
 
-The vendored Boost checkout is still the full superproject, but the active build only exposes the current header subset needed by XOffsetDatastructure: `container`, `interprocess`, `intrusive`, `move`, `assert`, `config`, `core`, `static_assert`, `throw_exception`, `type_traits`, `container_hash`, `predef`, and `winapi`.
+The vendored Boost checkout is still the full superproject, but the active build only exposes the current header subset needed by XOffsetDatastructure and TypeLayout. The runtime buffer backend no longer depends on Boost.Interprocess.
 
 ## Repository Layout
 
