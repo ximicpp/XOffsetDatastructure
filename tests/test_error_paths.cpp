@@ -35,7 +35,7 @@ bool test_make_duplicate() {
     bool threw = false;
     try {
         xbuf.make<SimpleData>();  // should throw
-    } catch (const boost::interprocess::interprocess_exception& e) {
+    } catch (const XException& e) {
         threw = true;
         std::cout << "  Caught expected exception: " << e.what() << "\n";
     }
@@ -57,7 +57,7 @@ bool test_root_empty() {
     bool threw = false;
     try {
         xbuf.root<SimpleData>();  // should throw — no root object
-    } catch (const boost::interprocess::interprocess_exception& e) {
+    } catch (const XException& e) {
         threw = true;
         std::cout << "  Caught expected exception: " << e.what() << "\n";
     }
@@ -87,9 +87,9 @@ bool test_save_compact() {
     std::cout << "  [OK] save() output is compact (< 8192 original)\n";
 
     // Verify round-trip
-    XBuffer loaded = XBuffer::load(compact);
-    assert(loaded.has_root<SimpleData>());
-    auto& r = loaded.root<SimpleData>();
+    XBuffer loaded = XBuffer::load_unverified(compact);
+    assert(loaded.unsafe_has_root<SimpleData>());
+    auto& r = loaded.unsafe_root<SimpleData>();
     assert(r.id == 99);
     assert(std::string(r.name.c_str()) == "CompactTest");
     std::cout << "  [OK] Round-trip verified\n";

@@ -46,7 +46,8 @@ Options:
   --help, -h        Show this help
 
 The script configures the project with CMake, builds it, runs CTest,
-exports signatures into tools/sigs/, and runs the compatibility self-check.
+exports the exact signature target matrix into tools/sigs/, validates the
+matrix inventory, and runs the compatibility self-check.
 EOF
 }
 
@@ -260,6 +261,12 @@ if export_bin="$(find_binary export_signatures)"; then
     run_cmd "$export_bin" tools/sigs
 else
     echo -e "${YELLOW}export_signatures not found; skipping.${NC}"
+fi
+
+if matrix_bin="$(find_binary check_signature_matrix)"; then
+    run_cmd "$matrix_bin" tools/sigs
+else
+    echo -e "${YELLOW}check_signature_matrix not found; skipping.${NC}"
 fi
 
 if compat_bin="$(find_binary check_compat)"; then

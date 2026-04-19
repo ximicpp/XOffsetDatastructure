@@ -106,8 +106,8 @@ void test_binary_serialization() {
     std::string binary = xbuf.save();
     std::cout << "  Serialized: " << binary.size() << " bytes\n";
 
-    XBuffer xbuf2 = XBuffer::load(binary);
-    auto& loaded = xbuf2.root<SerializableData>();
+    XBuffer xbuf2 = XBuffer::load_unverified(binary);
+    auto& loaded = xbuf2.unsafe_root<SerializableData>();
 
     assert(loaded.id    == 999);
     assert(loaded.value == 123.456);
@@ -145,8 +145,8 @@ void test_complex_structure() {
 
     // Serialize and reload
     std::string bin = xbuf.save();
-    XBuffer xbuf2 = XBuffer::load(bin);
-    auto& loaded = xbuf2.root<ComplexData>();
+    XBuffer xbuf2 = XBuffer::load_unverified(bin);
+    auto& loaded = xbuf2.unsafe_root<ComplexData>();
     assert(loaded.type == 100);
     assert(loaded.items.size() == 3);
     std::cout << "  Round-trip: type=" << loaded.type

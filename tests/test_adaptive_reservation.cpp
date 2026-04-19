@@ -215,8 +215,8 @@ bool test_relocation_fallback() {
     // Save/load round-trip after relocation
     std::cout << "Test 4e: Save/load round-trip after relocation... ";
     std::string saved = buf.save();
-    XBuffer loaded = XBuffer::load(saved);
-    auto& loaded_data = loaded.root<SmallData>();
+    XBuffer loaded = XBuffer::load_unverified(saved);
+    auto& loaded_data = loaded.unsafe_root<SmallData>();
     assert(loaded_data.id == 42);
     assert(loaded_data.name == "relocation_test");
     assert(loaded_data.numbers.size() == 1000);

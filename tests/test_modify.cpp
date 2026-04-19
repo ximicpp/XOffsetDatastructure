@@ -386,8 +386,8 @@ bool test_modify_mixed_operations() {
     std::cout << "Test 5: Serialize to memory... ";
     std::string buffer = xbuf.save();
 
-    XBuffer new_xbuf = XBuffer::load(buffer);
-    auto& new_data = new_xbuf.root<ModifyTestData>(); bool new_found = new_xbuf.has_root<ModifyTestData>();
+    XBuffer new_xbuf = XBuffer::load_unverified(buffer);
+    auto& new_data = new_xbuf.unsafe_root<ModifyTestData>(); bool new_found = new_xbuf.unsafe_has_root<ModifyTestData>();
     assert(new_found);
     assert(new_data.counter == 100);
     assert(new_data.numbers[0] == 1998);

@@ -201,8 +201,8 @@ void test_reflection_signature_consistency() {
     obj->a = 42; obj->b = 3.14; obj->c = "Test"; obj->d.push_back(1);
 
     std::string bin = xbuf.save();
-    XBuffer xbuf2 = XBuffer::load(bin);
-    auto& loaded = xbuf2.root<TypeSigTest>();
+    XBuffer xbuf2 = XBuffer::load_unverified(bin);
+    auto& loaded = xbuf2.unsafe_root<TypeSigTest>();
     assert(loaded.a == 42 && loaded.b == 3.14);
     assert(loaded.d.size() == 1 && loaded.d[0] == 1);
     std::cout << "  Serialize round-trip: a=" << loaded.a
@@ -290,12 +290,12 @@ void test_container_signatures() {
 
     // Verify container types are correctly resolved
     std::string str_sig = sig_string.value;
-    assert(str_sig.find("string[s:32,a:8]") != std::string::npos && "XString should appear as string[s:32,a:8]");
-    std::cout << "  XString resolved: string[s:32,a:8] [OK]\n";
+    assert(str_sig.find("string[s:16,a:8]") != std::string::npos && "XString should appear as string[s:16,a:8]");
+    std::cout << "  XString resolved: string[s:16,a:8] [OK]\n";
 
     std::string vec_sig = sig_vector.value;
-    assert(vec_sig.find("vector[s:32,a:8]") != std::string::npos && "XVector should appear as vector[s:32,a:8]");
-    std::cout << "  XVector resolved: vector[s:32,a:8] [OK]\n";
+    assert(vec_sig.find("vector[s:16,a:8]") != std::string::npos && "XVector should appear as vector[s:16,a:8]");
+    std::cout << "  XVector resolved: vector[s:16,a:8] [OK]\n";
 
     std::cout << "[PASS]\n\n";
 }

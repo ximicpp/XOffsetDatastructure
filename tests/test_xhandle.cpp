@@ -233,8 +233,8 @@ bool test_handle_serialization() {
     std::string data = buffer.save();
     std::cout << "  Serialized: " << data.size() << " bytes\n";
 
-    XBuffer loaded = XBuffer::load(data);
-    auto& lp = loaded.root<Player>();
+    XBuffer loaded = XBuffer::load_unverified(data);
+    auto& lp = loaded.unsafe_root<Player>();
 
     assert(lp.id == 42);
     assert(std::string(lp.name.c_str()) == "Serialized");

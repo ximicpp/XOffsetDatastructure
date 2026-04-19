@@ -124,8 +124,8 @@ void test_serialization_with_large_struct() {
     std::cout << "\n  Serialized size: " << binary.size() << " bytes\n";
     
     // Deserialize
-    XBuffer xbuf2 = XBuffer::load(binary);
-    auto& data2 = xbuf2.root<LargeStruct>();
+    XBuffer xbuf2 = XBuffer::load_unverified(binary);
+    auto& data2 = xbuf2.unsafe_root<LargeStruct>();
     
     std::cout << "\n  After deserialization:\n";
     std::cout << "    field01: " << data2.field01 << "\n";

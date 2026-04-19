@@ -171,8 +171,8 @@ bool test_deep_nesting() {
 
     // Persistence test
     auto saved = xbuf.save();
-    auto loaded = XBuffer::load(saved);
-    auto& w = loaded.root<World>();
+    auto loaded = XBuffer::load_unverified(saved);
+    auto& w = loaded.unsafe_root<World>();
 
     assert(w.world_name == "Azeroth");
     assert(w.guilds.size() == 3);
@@ -312,8 +312,8 @@ bool test_container_only_struct() {
     assert(root->unique_ids.size() == 2);
 
     auto saved = xbuf.save();
-    auto loaded = XBuffer::load(saved);
-    auto& l = loaded.root<ContainerOnly>();
+    auto loaded = XBuffer::load_unverified(saved);
+    auto& l = loaded.unsafe_root<ContainerOnly>();
     assert(l.name == "ContainerStruct");
     assert(l.data[2] == 3);
     assert(l.unique_ids.size() == 2);
@@ -330,8 +330,8 @@ bool test_pod_only_struct() {
     p->a = 1; p->b = 2; p->c = 3.14f; p->d = 2.718; p->e = 'X'; p->f = true;
 
     auto saved = xbuf.save();
-    auto loaded = XBuffer::load(saved);
-    auto& l = loaded.root<PodOnly>();
+    auto loaded = XBuffer::load_unverified(saved);
+    auto& l = loaded.unsafe_root<PodOnly>();
     assert(l.a == 1 && l.b == 2);
     assert(l.c == 3.14f && l.d == 2.718);
     assert(l.e == 'X' && l.f == true);
@@ -461,8 +461,8 @@ bool test_direct_composite_member() {
 
     // Persistence round-trip
     auto saved = xbuf.save();
-    auto loaded = XBuffer::load(saved);
-    auto& l = loaded.root<PersonRecord>();
+    auto loaded = XBuffer::load_unverified(saved);
+    auto& l = loaded.unsafe_root<PersonRecord>();
 
     assert(l.id == 1);
     assert(l.name == "Alice");

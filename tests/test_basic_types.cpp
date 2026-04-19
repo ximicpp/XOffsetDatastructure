@@ -49,7 +49,7 @@ bool test_basic_types() {
     // Test persistence
     auto* buffer = xbuf.get_buffer();
     XBuffer loaded_buf(buffer->data(), buffer->size());
-    auto& loaded_obj = loaded_buf.root<BasicTypes>();
+    auto& loaded_obj = loaded_buf.unsafe_root<BasicTypes>();
     
     assert(loaded_obj.mInt == 42);
     assert(loaded_obj.mFloat == 3.14f);

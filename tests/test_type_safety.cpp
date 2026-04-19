@@ -1,291 +1,205 @@
-#include "../xoffsetdatastructure.hpp"
+// ============================================================================
+// Test: Type Safety & is_byte_copy_safe_v
+// Validates compile-time admission and runtime safety classification.
+// ============================================================================
+
 #include <iostream>
+#include <cstdint>
+#include <cstddef>
 #include <cassert>
-#include <cstddef>   // std::byte, std::nullptr_t
+
+#include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout/tools/safety_level.hpp>
 
 using namespace XOffsetDatastructure;
 using namespace boost::typelayout;
 
 // ============================================================================
-// Test 1: Basic Types (Should PASS)
+// Test types — safe
 // ============================================================================
 
-struct BasicTypes {
-    int32_t i32;
-    int64_t i64;
-    uint32_t u32;
-    uint64_t u64;
-    float f32;
-    double f64;
-    bool flag;
-    char ch;
-    
-    template<typename Allocator>
-    BasicTypes(Allocator) : i32(0), i64(0), u32(0), u64(0), f32(0.0f), f64(0.0), flag(false), ch('\0') {}
-};
-
-static_assert(is_byte_copy_safe_v<BasicTypes>, "BasicTypes should be safe");
-
-// ============================================================================
-// Test 2: Container Types (Should PASS)
-// ============================================================================
+struct SafeRecord { int32_t x; float y; double z; uint16_t w; };
+struct NestedSafe { SafeRecord inner; int64_t tag; };
+struct HasEnum { enum FixedEnum : uint32_t { A, B }; FixedEnum e; int32_t x; };
+struct HasArray { int32_t arr[4]; double val; };
 
 struct ContainerTypes {
-    XString name;
-    XVector<int32_t> numbers;
-    XSet<int32_t> unique_ids;
-    XMap<int32_t, XString> id_to_name;
-    
-    template<typename Allocator>
-    ContainerTypes(Allocator alloc) 
-        : name(alloc), numbers(alloc), unique_ids(alloc), id_to_name(alloc) {}
+    XString name; XVector<int32_t> numbers;
+    XSet<int32_t> ids; XMap<int32_t, XString> id_to_name;
+    template<typename A> ContainerTypes(A a) : name(a), numbers(a), ids(a), id_to_name(a) {}
 };
-
-static_assert(is_byte_copy_safe_v<ContainerTypes>, "ContainerTypes should be safe");
-
-// ============================================================================
-// Test 3: Nested Containers (Should PASS)
-// ============================================================================
 
 struct NestedContainers {
-    XVector<XVector<int32_t>> matrix;
-    XMap<XString, XVector<int32_t>> name_to_numbers;
-    XVector<XString> strings;
-    
-    template<typename Allocator>
-    NestedContainers(Allocator alloc) 
-        : matrix(alloc), name_to_numbers(alloc), strings(alloc) {}
+    XVector<XVector<int32_t>> matrix; XVector<XString> strings;
+    template<typename A> NestedContainers(A a) : matrix(a), strings(a) {}
 };
 
-static_assert(is_byte_copy_safe_v<NestedContainers>, "NestedContainers should be safe");
-
-// ============================================================================
-// Test 4: User-Defined Nested Types (Should PASS)
-// ============================================================================
-
-struct Point {
-    float x;
-    float y;
-    float z;
-};
+struct Point { float x, y, z; };
 
 struct Player {
-    XString name;
-    int32_t level;
-    Point position;
-    XVector<int32_t> inventory;
-    
-    template<typename Allocator>
-    Player(Allocator alloc) 
-        : name(alloc), level(0), position{}, inventory(alloc) {}
+    XString name; int32_t level; Point position; XVector<int32_t> inventory;
+    template<typename A> Player(A a) : name(a), level(0), position{}, inventory(a) {}
 };
-
-static_assert(is_byte_copy_safe_v<Point>, "Point should be safe");
-static_assert(is_byte_copy_safe_v<Player>, "Player should be safe");
 
 // ============================================================================
-// Test 5: Complex Nested Structure (Should PASS)
+// Test types — unsafe
 // ============================================================================
 
-struct Item {
-    int32_t id;
-    XString name;
-    float weight;
-    
-    Item() = default;
-    Item(int32_t i, XString n, float w) : id(i), name(n), weight(w) {}
-};
-
-struct Inventory {
-    XVector<Item> items;
-    XMap<int32_t, Item> quick_access;
-    
-    template<typename Allocator>
-    Inventory(Allocator alloc) 
-        : items(alloc), quick_access(alloc) {}
-};
-
-struct GameState {
-    Player player;
-    Inventory inventory;
-    XVector<Point> waypoints;
-    
-    template<typename Allocator>
-    GameState(Allocator alloc) 
-        : player(alloc), inventory(alloc), waypoints(alloc) {}
-};
-
-static_assert(is_byte_copy_safe_v<Item>, "Item should be safe");
-static_assert(is_byte_copy_safe_v<Inventory>, "Inventory should be safe");
-static_assert(is_byte_copy_safe_v<GameState>, "GameState should be safe");
+struct HasPointer    { int32_t* ptr; int32_t val; };
+struct Polymorphic   { virtual ~Polymorphic() = default; int32_t x; };
+struct WithStdString { std::string name; int32_t id; };
+struct WithStdVector { std::vector<int32_t> data; };
+struct UnsafeNested  { Point position; Polymorphic bad; };
 
 // ============================================================================
-// Test 6: Types that SHOULD FAIL
+// Test types — platform variant (locally safe)
 // ============================================================================
 
-// 6.1: Polymorphic type (has virtual function)
-struct PolymorphicType {
-    virtual void foo() {}  // Virtual function = NOT ALLOWED
-    int32_t data;
-};
-
-static_assert(!is_byte_copy_safe_v<PolymorphicType>, 
-    "PolymorphicType should NOT be safe (has virtual function)");
-
-// 6.2: Contains raw pointer
-struct WithRawPointer {
-    int32_t* ptr;  // Raw pointer = NOT ALLOWED
-    int32_t data;
-};
-
-static_assert(!is_byte_copy_safe_v<WithRawPointer>, 
-    "WithRawPointer should NOT be safe (has raw pointer)");
-
-// 6.3: Contains std::string
-struct WithStdString {
-    std::string name;  // std::string = NOT ALLOWED
-    int32_t id;
-};
-
-static_assert(!is_byte_copy_safe_v<WithStdString>, 
-    "WithStdString should NOT be safe (uses std::string)");
-
-// 6.4: Contains std::vector
-struct WithStdVector {
-    std::vector<int32_t> data;  // std::vector = NOT ALLOWED
-};
-
-static_assert(!is_byte_copy_safe_v<WithStdVector>, 
-    "WithStdVector should NOT be safe (uses std::vector)");
-
-// 6.5: Nested unsafe type
-struct UnsafeNested {
-    Point position;  // Safe
-    PolymorphicType bad;  // NOT SAFE - contains polymorphic type
-};
-
-// TypeLayout now synthesizes a ptr[s:N,a:N] field for every type that
-// introduces a vptr.  When PolymorphicType is flattened into UnsafeNested's
-// layout signature, the synthesized ptr[ marker causes classify_safety to
-// return Warning, which XOffset escalates to Risk → is_byte_copy_safe_v = false.
-static_assert(!is_byte_copy_safe_v<UnsafeNested>,
-    "UnsafeNested should NOT be safe (contains nested polymorphic type with vptr)");
-
-// 6.6: long / unsigned long — locally safe on ALL platforms (C2).
-// TypeLayout classifies long as i32 or i64 depending on platform — both are
-// TrivialSafe locally.  Cross-platform mismatch (LP64 vs LLP64) is caught
-// by signature comparison in CI (C1 layer).
-struct HasLong {
-    int32_t ok;
-    long    platformDependent;
-};
-
-// long is always locally serialization-free: it's a trivially copyable
-// scalar with no pointers.  is_byte_copy_safe_v<HasLong> == true.
-static_assert(is_byte_copy_safe_v<HasLong>,
-    "HasLong: locally safe on all platforms (C2)");
-
-// 6.7: unsigned long — same reasoning as long
-struct HasUnsignedLong {
-    uint32_t ok;
-    unsigned long platformDependent;
-};
-
-static_assert(is_byte_copy_safe_v<HasUnsignedLong>,
-    "HasUnsignedLong: locally safe on all platforms (C2)");
-
-// 6.8: uint64_t is ALWAYS safe regardless of platform (LP64 or LLP64)
-struct HasUint64 {
-    uint64_t alwaysSafe;
-    int64_t  alsoSafe;
-};
-
-static_assert(is_byte_copy_safe_v<HasUint64>,
-    "HasUint64 should ALWAYS be safe (fixed-width integers)");
+struct HasLong        { long val; int32_t x; };
+struct HasUnsignedLong{ unsigned long val; int32_t x; };
+struct HasWchar       { wchar_t ch; int32_t x; };
+struct HasLongDouble  { long double ld; int32_t x; };
 
 // ============================================================================
-// Test 7: Boundary Types (Audit P5)
-// Purpose: Validate safety classification for edge-case types:
-//   - std::nullptr_t  (Accept: cross-platform binary identical, all zeros)
-//   - std::byte       (Safe: alias for unsigned char)
-//   - T C::*          (Unsafe: member pointer, encoded as memptr[...])
+// Test types — boundary (Audit P5)
 // ============================================================================
 
-// 7.1: std::nullptr_t — Accepted as safe (P2 decision)
-// TypeLayout encodes as nullptr[s:8,a:8], which does NOT contain "ptr["
-// so classify_safety returns Safe.  This is intentional: nullptr_t's
-// binary representation is all-zeros and cross-platform identical.
-struct HasNullptr {
-    int32_t x;
-    std::nullptr_t n;
-};
+struct HasNullptr  { int32_t x; std::nullptr_t n; };
+struct HasByte     { std::byte b1; std::byte b2; int32_t x; };
 
-static_assert(is_byte_copy_safe_v<HasNullptr>,
-    "HasNullptr should be safe (nullptr_t is accepted, cross-platform all-zeros)");
-
-// 7.2: std::byte — Safe scalar type
-// TypeLayout encodes as byte[s:1,a:1], a safe fundamental type.
-struct HasByte {
-    std::byte b1;
-    std::byte b2;
-    int32_t x;
-};
-
-static_assert(is_byte_copy_safe_v<HasByte>,
-    "HasByte should be safe (std::byte is a safe scalar)");
-
-// 7.3: Member pointer (T C::*) — Should be REJECTED
-// TypeLayout encodes as memptr[s:N,a:N], which triggers Warning → Risk.
-// Member pointers are implementation-defined and not safe for serialization.
 struct Foo { int x; double y; };
-
-struct HasMemberPointer {
-    int Foo::* mp;
-    int32_t data;
-};
-
-static_assert(!is_byte_copy_safe_v<HasMemberPointer>,
-    "HasMemberPointer should NOT be safe (member pointer is process-local)");
-
-// 7.4: Member function pointer — Should also be REJECTED
-// TypeLayout encodes as memptr[...] or fnptr[...], both trigger Warning → Risk.
-struct HasMemberFuncPointer {
-    void (Foo::* mfp)();
-    int32_t data;
-};
-
-static_assert(!is_byte_copy_safe_v<HasMemberFuncPointer>,
-    "HasMemberFuncPointer should NOT be safe (member function pointer)");
+struct HasMemberPointer     { int Foo::* mp; int32_t data; };
+struct HasMemberFuncPointer { void (Foo::* mfp)(); int32_t data; };
 
 // ============================================================================
-// Runtime Verification — print static_assert results summary
-// (Runtime tests for basic/container/nested types removed: covered by
-//  test_basic_types, test_vector, test_map_set, test_nested respectively)
+// Compile-time static_asserts
 // ============================================================================
 
+// Safe
+static_assert( is_byte_copy_safe_v<int32_t>);
+static_assert( is_byte_copy_safe_v<double>);
+static_assert( is_byte_copy_safe_v<SafeRecord>);
+static_assert( is_byte_copy_safe_v<NestedSafe>);
+static_assert( is_byte_copy_safe_v<HasEnum>);
+static_assert( is_byte_copy_safe_v<HasArray>);
+static_assert( is_byte_copy_safe_v<ContainerTypes>);
+static_assert( is_byte_copy_safe_v<NestedContainers>);
+static_assert( is_byte_copy_safe_v<Point>);
+static_assert( is_byte_copy_safe_v<Player>);
+
+// Unsafe
+static_assert(!is_byte_copy_safe_v<HasPointer>);
+static_assert(!is_byte_copy_safe_v<Polymorphic>);
+static_assert(!is_byte_copy_safe_v<WithStdString>);
+static_assert(!is_byte_copy_safe_v<WithStdVector>);
+static_assert(!is_byte_copy_safe_v<UnsafeNested>);
+static_assert(!is_byte_copy_safe_v<HasMemberPointer>);
+static_assert(!is_byte_copy_safe_v<HasMemberFuncPointer>);
+
+// Platform variant — locally safe
+static_assert( is_byte_copy_safe_v<HasLong>);
+static_assert( is_byte_copy_safe_v<HasUnsignedLong>);
+static_assert( is_byte_copy_safe_v<HasWchar>);
+static_assert( is_byte_copy_safe_v<HasLongDouble>);
+
+// Boundary
+static_assert( is_byte_copy_safe_v<HasNullptr>);
+static_assert( is_byte_copy_safe_v<HasByte>);
+
+// ============================================================================
+// Test 1: Signature comparison (strict check)
+// ============================================================================
+bool test_signature_comparison() {
+    std::cout << "\n[TEST] Signature comparison\n";
+
+    constexpr auto gold = get_layout_signature<SafeRecord>();
+    static_assert(std::string_view(get_layout_signature<SafeRecord>()) == std::string_view(gold));
+    static_assert(!(std::string_view(get_layout_signature<NestedSafe>()) == std::string_view(gold)));
+    static_assert(!is_byte_copy_safe_v<HasPointer>);
+
+    std::cout << "  [OK]\n";
+    return true;
+}
+
+// ============================================================================
+// Test 2: classify_signature (runtime safety levels)
+// ============================================================================
+bool test_classify_levels() {
+    using boost::typelayout::compat::detail::SafetyLevel;
+    using boost::typelayout::compat::detail::classify_signature;
+
+    std::cout << "\n[TEST] classify_signature\n";
+
+    {
+        constexpr auto sig = get_layout_signature<int32_t>();
+        assert(classify_signature(std::string_view(sig.value, sig.size)) == SafetyLevel::TrivialSafe);
+    }
+    {
+        constexpr auto sig = get_layout_signature<SafeRecord>();
+        auto lvl = classify_signature(std::string_view(sig.value, sig.size));
+        assert(lvl == SafetyLevel::TrivialSafe || lvl == SafetyLevel::PaddingRisk);
+    }
+    {
+        constexpr auto sig = get_layout_signature<HasPointer>();
+        assert(classify_signature(std::string_view(sig.value, sig.size)) == SafetyLevel::PointerRisk);
+    }
+    {
+        constexpr auto sig = get_layout_signature<HasWchar>();
+        assert(classify_signature(std::string_view(sig.value, sig.size)) == SafetyLevel::PlatformVariant);
+    }
+    {
+        constexpr auto sig = get_layout_signature<HasLongDouble>();
+        assert(classify_signature(std::string_view(sig.value, sig.size)) == SafetyLevel::PlatformVariant);
+    }
+
+    std::cout << "  [OK]\n";
+    return true;
+}
+
+// ============================================================================
+// Test 3: Nested container recursive safety (C2)
+// ============================================================================
+struct SafeFlat { int32_t x; float y; double z; };
+
+bool test_nested_container_recursion() {
+    std::cout << "\n[TEST] Nested container recursive safety\n";
+
+    // Single-level
+    static_assert( is_byte_copy_safe_v<XVector<int32_t>>);
+    static_assert( is_byte_copy_safe_v<XVector<SafeFlat>>);
+    static_assert(!is_byte_copy_safe_v<XVector<HasPointer>>);
+
+    // Double-nested
+    static_assert( is_byte_copy_safe_v<XVector<XVector<int32_t>>>);
+    static_assert(!is_byte_copy_safe_v<XVector<XVector<HasPointer>>>);
+
+    // Triple-nested
+    static_assert( is_byte_copy_safe_v<XVector<XVector<XVector<int32_t>>>>);
+    static_assert(!is_byte_copy_safe_v<XVector<XVector<XVector<HasPointer>>>>);
+
+    // Map containers
+    static_assert( is_byte_copy_safe_v<XMap<int32_t, SafeFlat>>);
+    static_assert(!is_byte_copy_safe_v<XMap<int32_t, HasPointer>>);
+    static_assert(!is_byte_copy_safe_v<XMap<HasPointer, int32_t>>);
+
+    // Polymorphic in container
+    static_assert(!is_byte_copy_safe_v<XVector<Polymorphic>>);
+
+    std::cout << "  [OK]\n";
+    return true;
+}
+
+// ============================================================================
+// Main
+// ============================================================================
 int main() {
-    std::cout << "╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║  XBuffer Type Safety Compile-Time Test   ║" << std::endl;
-    std::cout << "╚══════════════════════════════════════════╝" << std::endl;
+    std::cout << "\n=== Type Safety Tests ===\n";
 
-    std::cout << "\n✅ SAFE TYPES (static_assert passed):\n";
-    std::cout << "  - BasicTypes\n";
-    std::cout << "  - ContainerTypes\n";
-    std::cout << "  - NestedContainers\n";
-    std::cout << "  - Point / Player / GameState\n";
-    std::cout << "  - HasLong / HasUnsignedLong / HasUint64\n";
-    std::cout << "  - HasNullptr / HasByte\n";
+    bool all = true;
+    all &= test_signature_comparison();
+    all &= test_classify_levels();
+    all &= test_nested_container_recursion();
 
-    std::cout << "\n❌ UNSAFE TYPES (static_assert passed):\n";
-    std::cout << "  - PolymorphicType (virtual function)\n";
-    std::cout << "  - WithRawPointer (raw pointer)\n";
-    std::cout << "  - WithStdString / WithStdVector (std containers)\n";
-    std::cout << "  - UnsafeNested (nested polymorphic)\n";
-    std::cout << "  - HasMemberPointer / HasMemberFuncPointer\n";
-
-    std::cout << "\n╔══════════════════════════════════════════╗" << std::endl;
-    std::cout << "║    ✓ ALL COMPILE-TIME CHECKS PASSED!     ║" << std::endl;
-    std::cout << "╚══════════════════════════════════════════╝" << std::endl;
-
-    return 0;
+    std::cout << "\n" << (all ? "[PASS] All type safety tests passed" : "[FAIL] Some tests failed") << "\n";
+    return all ? 0 : 1;
 }
