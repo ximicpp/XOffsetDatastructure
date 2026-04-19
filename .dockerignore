@@ -29,17 +29,8 @@ tests/test_*
 .gitmodules
 .gitattributes
 
-# Documentation (not needed in container)
-docs/
-
 # CI/CD files (not needed in container)
 .github/
-
-# OpenSpec files (not needed for building)
-openspec/
-
-# Scripts that are only for host
-scripts/build_clang_p2996_wsl.sh
 
 # Temporary files
 *.tmp
