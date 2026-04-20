@@ -50,6 +50,18 @@ configure_file(
 add_executable(export_signatures export_signatures.cpp)
 configure_xoffset_target(export_signatures)
 
+add_executable(bench_compare bench_compare.cpp)
+configure_xoffset_target(bench_compare)
+
+add_test(
+    NAME check_signature_regeneration
+    COMMAND ${CMAKE_COMMAND}
+        -DEXPORTER=$<TARGET_FILE:export_signatures>
+        -DSOURCE_SIG_DIR=${CMAKE_SOURCE_DIR}/tools/sigs
+        -DGENERATED_SIG_DIR=${CMAKE_BINARY_DIR}/generated_sigs
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/check_signature_regeneration.cmake)
+set_tests_properties(check_signature_regeneration PROPERTIES LABELS "tooling")
+
 # Exact target-matrix inventory verifier.
 add_executable(check_signature_matrix check_signature_matrix.cpp)
 target_compile_features(check_signature_matrix PRIVATE cxx_std_17)
