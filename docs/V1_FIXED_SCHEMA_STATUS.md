@@ -20,6 +20,7 @@ design and what remains outside the current local codebase closure.
 - explicit root schema naming via `XOFFSET_REGISTER_SCHEMA_NAME`
 - compile-time `wire_root_type_id_v<T>()`
 - compile-time `wire_schema_hash_v<T>()`
+- XOffset-owned `wire_abi_signature<T>()` for verified-wire schema identity
 - little-endian marker and header integrity checks
 
 ### Type admission
@@ -53,6 +54,9 @@ design and what remains outside the current local codebase closure.
 - typed access gating after verified load
 - `load_unverified()` remains as the explicit raw escape hatch
 - `TypedXBuffer<T>::load(...)` now defaults to verified load
+- the public wire path currently uses normalized transport semantics:
+  it preserves the admitted object graph and continued mutation, but it does not
+  preserve identical post-load spare capacity or allocator fragmentation topology
 
 ### Structural verification
 
@@ -75,16 +79,17 @@ The repository currently passes:
 
 - `ctest --test-dir build --output-on-failure`
 - exact target-matrix baseline inventory under `tools/sigs/`
+- regenerated-baseline equality via `check_signature_regeneration`
 - cross-target signature comparison via `check_compat`
 
-The normal `ctest` suite now includes the matrix inventory and compatibility
-checks as tooling tests.
+The normal `ctest` suite includes committed-baseline inventory, regeneration,
+and compatibility checks as tooling tests.
 
 Current local result at the time of this status update:
 
-- `27/27` tests passing
+- `28/28` tests passing
 
-## Target Matrix Closure
+## Repository Matrix Baselines
 
 The repository now commits and validates the exact `v1` target matrix baselines:
 
@@ -97,12 +102,23 @@ Closure mechanics now implemented in-repo:
 
 - `tools/export_signatures.cpp` rewrites the exact matrix baseline set
 - `tools/check_signature_matrix.cpp` rejects missing or unexpected baseline files
+- `check_signature_regeneration` fails if regenerated baselines drift from the committed set
 - `tools/check_compat.cpp` compares the committed target baselines
 - CI treats any `tools/sigs/*.sig.hpp` drift as a failure
 
-For the current admitted fixed-schema catalog, these baselines are generated from the
-exact target-matrix ABI metadata plus the exported type closure. This closes the
-repository-level protocol support evidence path for the declared target set.
+Current evidence boundary:
+
+- these baselines are repository-managed synthetic baselines generated from the
+  exact target-matrix ABI metadata plus the explicit wire catalog
+- they are not yet independently harvested from native target toolchains
+- the current catalog is a deliberate coverage catalog, not a proof over every
+  possible user-defined admitted aggregate
+
+This closes the repository-level baseline-management path for the declared target
+set, but it is not yet the strongest possible cross-target protocol proof.
+
+See [V1_REMEDIATION_PLAN.md](/Users/fanchensu/XOffsetDatastructure/docs/V1_REMEDIATION_PLAN.md)
+for the remaining closure work.
 
 ## Runtime TODO
 
@@ -143,3 +159,9 @@ The following remain intentionally out of scope for `v1`:
 - hash containers
 - polymorphic wire objects
 - public mixed-version compatibility
+
+## Remaining Closure Gaps
+
+- native per-target baseline harvesting is still outstanding
+- the committed wire catalog is broader and explicit, but it is still a finite
+  coverage set rather than a proof over every possible admitted user schema

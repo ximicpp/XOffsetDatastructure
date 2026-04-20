@@ -43,6 +43,13 @@ struct DerivedRecord : BaseRecord { int32_t extra; };
 XOFFSET_REGISTER_SCHEMA_NAME(WireRoot, "test.WireRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(WireOther, "test.WireOther")
 
+constexpr auto xstring_wire_sig = wire_abi_signature<XString>();
+constexpr auto fixed_string_wire_sig = wire_abi_signature<XFixedString>();
+constexpr auto xvector_wire_sig = wire_abi_signature<XVector<uint32_t>>();
+constexpr auto fixed_vector_wire_sig = wire_abi_signature<XFixedVector<uint32_t>>();
+constexpr auto xmap_wire_sig = wire_abi_signature<XMap<int32_t, XString>>();
+constexpr auto xset_wire_sig = wire_abi_signature<XSet<int32_t>>();
+
 static_assert(is_v1_wire_admitted_v<XBlob>);
 static_assert(std::is_same_v<XFlatSet<int32_t>, XSet<int32_t>>);
 static_assert(std::is_same_v<XFlatMap<int32_t, XString>, XMap<int32_t, XString>>);
@@ -53,6 +60,13 @@ static_assert(!is_v1_wire_admitted_v<HasWchar>);
 static_assert(!is_v1_wire_admitted_v<HasLongDouble>);
 static_assert(!is_v1_wire_admitted_v<HasPointer>);
 static_assert(!is_v1_wire_admitted_v<DerivedRecord>);
+static_assert(std::string_view(xstring_wire_sig) == std::string_view(fixed_string_wire_sig));
+static_assert(std::string_view(xvector_wire_sig) == std::string_view(fixed_vector_wire_sig));
+static_assert(std::string_view(xstring_wire_sig).find("arena:rel32") != std::string_view::npos);
+static_assert(std::string_view(xvector_wire_sig).find("xvector") != std::string_view::npos);
+static_assert(std::string_view(xmap_wire_sig).find("xflatmap") != std::string_view::npos);
+static_assert(std::string_view(xset_wire_sig).find("xflatset") != std::string_view::npos);
+static_assert(wire_schema_hash_v<WireRoot>() != wire_schema_hash_v<WireOther>());
 
 bool test_v1_admission_round_trip() {
     std::cout << "\n[TEST] v1 admission round-trip\n";
