@@ -33,10 +33,10 @@
 #include <new>
 #include <stdexcept>
 
-// TypeLayout library — the authoritative type-signature and type-safety engine.
-// XOffset delegates ALL type safety and layout portability decisions to TypeLayout.
+// TypeLayout library — the authoritative byte-copy-safety engine.
+// XOffset uses TypeLayout for recursive admission and safety checks.
+// Verified-wire schema hashing and frozen-container ABI signatures are owned by XOffset.
 //   - is_byte_copy_safe_v<T>    — recursive domain admission predicate
-//   - get_layout_signature<T>() — binary layout signature
 #include <boost/typelayout.hpp>
 
 // Platform: 64-bit little-endian only.
@@ -1051,6 +1051,8 @@ namespace XOffsetDatastructure {
 
     template <typename K, typename V>
     struct XKeyValue {
+        using first_type = K;
+        using second_type = V;
         K first{};
         V second{};
     };
@@ -2402,7 +2404,9 @@ namespace XOffsetDatastructure {
         return std::memcmp(magic, XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1)) == 0;
     }
 
-    // Type admission — delegated to TypeLayout.
+    // Type admission — delegated to TypeLayout. XOffset's frozen containers
+    // provide direct safety specializations and no longer rely on opaque
+    // registration.
     using boost::typelayout::is_byte_copy_safe_v;
 
     template <typename T>
@@ -2412,6 +2416,7 @@ namespace XOffsetDatastructure {
     // Reflection-based construction and transfer (C++26 P2996).
     // ========================================================================
     namespace detail {
+        namespace tl = ::boost::typelayout;
 
         consteval std::uint64_t fnv1a_append(std::uint64_t seed, std::string_view sv) {
             constexpr std::uint64_t prime = 1099511628211ull;
@@ -2435,8 +2440,170 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
+        struct is_xkeyvalue : std::false_type {};
+        template <typename K, typename V>
+        struct is_xkeyvalue<XKeyValue<K, V>> : std::true_type {};
+        template <typename T>
+        inline constexpr bool is_xkeyvalue_v = is_xkeyvalue<std::remove_cv_t<T>>::value;
+
+        template <typename T>
+        consteval auto wire_abi_signature();
+
+        template <typename T>
+        consteval auto wire_scalar_signature() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_same_v<U, bool>) {
+                return tl::FixedString{"bool"};
+            } else if constexpr (std::is_same_v<U, char>) {
+                return tl::FixedString{"char"};
+            } else if constexpr (std::is_same_v<U, signed char>) {
+                return tl::FixedString{"i8char"};
+            } else if constexpr (std::is_same_v<U, unsigned char>) {
+                return tl::FixedString{"u8char"};
+            } else if constexpr (std::is_same_v<U, std::byte>) {
+                return tl::FixedString{"byte"};
+            } else if constexpr (std::is_same_v<U, int8_t>) {
+                return tl::FixedString{"i8"};
+            } else if constexpr (std::is_same_v<U, uint8_t>) {
+                return tl::FixedString{"u8"};
+            } else if constexpr (std::is_same_v<U, int16_t>) {
+                return tl::FixedString{"i16"};
+            } else if constexpr (std::is_same_v<U, uint16_t>) {
+                return tl::FixedString{"u16"};
+            } else if constexpr (std::is_same_v<U, int32_t>) {
+                return tl::FixedString{"i32"};
+            } else if constexpr (std::is_same_v<U, uint32_t>) {
+                return tl::FixedString{"u32"};
+            } else if constexpr (std::is_same_v<U, int64_t>) {
+                return tl::FixedString{"i64"};
+            } else if constexpr (std::is_same_v<U, uint64_t>) {
+                return tl::FixedString{"u64"};
+            } else if constexpr (std::is_same_v<U, float>) {
+                return tl::FixedString{"f32"};
+            } else if constexpr (std::is_same_v<U, double>) {
+                return tl::FixedString{"f64"};
+            } else {
+                static_assert(sizeof(U) == 0, "unsupported v1 scalar in wire_abi_signature()");
+            }
+        }
+
+        template <typename T, std::size_t N>
+        consteval auto fixed_sequence_header_signature(const tl::FixedString<N>& tag) {
+            return tag +
+                   tl::FixedString{"[s:"} +
+                   tl::to_fixed_string<sizeof(std::remove_cv_t<T>)>() +
+                   tl::FixedString{",a:"} +
+                   tl::to_fixed_string<alignof(std::remove_cv_t<T>)>() +
+                   tl::FixedString{"]{arena:rel32,data:rel32,size:u32,capacity:u32}"};
+        }
+
+        template <typename T, std::size_t Index>
+        consteval auto wire_record_field_signature() {
+            using namespace std::meta;
+            using U = std::remove_cv_t<T>;
+            constexpr auto member =
+                nonstatic_data_members_of(^^U, access_context::unchecked())[Index];
+            static_assert(!is_bit_field(member),
+                "wire_abi_signature() does not support bit-fields in v1");
+            using FieldType = [:type_of(member):];
+            return tl::FixedString{"@"} +
+                   tl::to_fixed_string<offset_of(member).bytes>() +
+                   tl::FixedString{":"} +
+                   wire_abi_signature<FieldType>();
+        }
+
+        template <typename T, std::size_t Index>
+        consteval auto wire_record_field_signature_with_sep() {
+            if constexpr (Index == 0) {
+                return wire_record_field_signature<T, Index>();
+            } else {
+                return tl::FixedString{","} + wire_record_field_signature<T, Index>();
+            }
+        }
+
+        template <typename T, std::size_t... Is>
+        consteval auto wire_record_fields(std::index_sequence<Is...>) {
+            if constexpr (sizeof...(Is) == 0) {
+                return tl::FixedString{""};
+            } else {
+                return (wire_record_field_signature_with_sep<T, Is>() + ...);
+            }
+        }
+
+        template <typename T>
+        consteval auto wire_record_signature() {
+            using U = std::remove_cv_t<T>;
+            static_assert(reflected_base_count<U>() == 0,
+                "wire_abi_signature() does not support base classes in v1");
+            constexpr std::size_t field_count = reflected_member_count<U>();
+            return tl::FixedString{"record[s:"} +
+                   tl::to_fixed_string<sizeof(U)>() +
+                   tl::FixedString{",a:"} +
+                   tl::to_fixed_string<alignof(U)>() +
+                   tl::FixedString{"]{"} +
+                   wire_record_fields<U>(std::make_index_sequence<field_count>{}) +
+                   tl::FixedString{"}"};
+        }
+
+        template <typename T>
+        consteval auto wire_abi_signature() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (detail::fixed_size_scalar<U>) {
+                return wire_scalar_signature<U>();
+            } else if constexpr (std::is_enum_v<U>) {
+                return tl::FixedString{"enum<"} +
+                       wire_abi_signature<std::underlying_type_t<U>>() +
+                       tl::FixedString{">"};
+            } else if constexpr (std::is_array_v<U>) {
+                return tl::FixedString{"array["} +
+                       tl::to_fixed_string<std::extent_v<U>>() +
+                       tl::FixedString{"]<"} +
+                       wire_abi_signature<std::remove_extent_t<U>>() +
+                       tl::FixedString{">"};
+            } else if constexpr (is_fixed_string_v<U>) {
+                return fixed_sequence_header_signature<U>(tl::FixedString{"xstring"});
+            } else if constexpr (is_fixed_flat_map_v<U>) {
+                return fixed_sequence_header_signature<U>(tl::FixedString{"xflatmap"}) +
+                       tl::FixedString{"<"} +
+                       wire_abi_signature<typename U::key_type>() +
+                       tl::FixedString{","} +
+                       wire_abi_signature<typename U::mapped_type>() +
+                       tl::FixedString{">"};
+            } else if constexpr (is_fixed_flat_set_v<U>) {
+                return fixed_sequence_header_signature<U>(tl::FixedString{"xflatset"}) +
+                       tl::FixedString{"<"} +
+                       wire_abi_signature<typename U::value_type>() +
+                       tl::FixedString{">"};
+            } else if constexpr (is_fixed_vector_v<U>) {
+                if constexpr (std::is_same_v<typename U::value_type, std::byte>) {
+                    return fixed_sequence_header_signature<U>(tl::FixedString{"xblob"});
+                } else {
+                    return fixed_sequence_header_signature<U>(tl::FixedString{"xvector"}) +
+                           tl::FixedString{"<"} +
+                           wire_abi_signature<typename U::value_type>() +
+                           tl::FixedString{">"};
+                }
+            } else if constexpr (is_xkeyvalue_v<U>) {
+                return tl::FixedString{"xkv[s:"} +
+                       tl::to_fixed_string<sizeof(U)>() +
+                       tl::FixedString{",a:"} +
+                       tl::to_fixed_string<alignof(U)>() +
+                       tl::FixedString{"]<"} +
+                       wire_abi_signature<typename U::first_type>() +
+                       tl::FixedString{","} +
+                       wire_abi_signature<typename U::second_type>() +
+                       tl::FixedString{">"};
+            } else if constexpr (std::is_class_v<U>) {
+                return wire_record_signature<U>();
+            } else {
+                static_assert(sizeof(U) == 0,
+                    "wire_abi_signature() encountered a non-admitted v1 type");
+            }
+        }
+
+        template <typename T>
         consteval std::uint64_t wire_schema_hash() {
-            constexpr auto sig = boost::typelayout::get_layout_signature<T>();
+            constexpr auto sig = wire_abi_signature<T>();
             std::uint64_t hash = fnv1a(schema_name<T>::value);
             hash = fnv1a_append(hash, std::string_view(sig));
             return hash;
@@ -2619,6 +2786,11 @@ namespace XOffsetDatastructure {
     template <typename T>
     consteval std::uint64_t wire_root_type_id_v() {
         return detail::wire_root_type_id<T>();
+    }
+
+    template <typename T>
+    consteval auto wire_abi_signature() {
+        return detail::wire_abi_signature<T>();
     }
 
     template <typename T>
@@ -2817,7 +2989,8 @@ namespace XOffsetDatastructure {
             return const_cast<XBuffer*>(this)->allocator_state();
         }
 
-        // Serialize to string (shrinks first, byte-exact).
+        // Serialize with normalized transport semantics: preserve the live object graph,
+        // but compact away spare tail capacity before emitting bytes.
         std::string save() {
             this->shrink_to_fit();
             const char* base = static_cast<const char*>(this->get_address());
@@ -2829,6 +3002,8 @@ namespace XOffsetDatastructure {
         std::string save_verified() {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires a v1-admitted fixed-schema wire type.");
+            // Verified wire currently uses the same normalized transport semantics as save():
+            // payload bytes are preserved, allocator slack is not.
             this->shrink_to_fit();
             auto* root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) {
@@ -3300,8 +3475,38 @@ namespace XOffsetDatastructure {
     };
 }
 
+namespace boost::typelayout {
+inline namespace v1 {
+
+template <typename T>
+struct is_byte_copy_safe<XOffsetDatastructure::XFixedVector<T>>
+    : std::bool_constant<is_byte_copy_safe_v<T>> {};
+
+template <typename T>
+struct is_byte_copy_safe<XOffsetDatastructure::XVector<T>>
+    : std::bool_constant<is_byte_copy_safe_v<T>> {};
+
+template <typename T>
+struct is_byte_copy_safe<XOffsetDatastructure::XFixedFlatSet<T>>
+    : std::bool_constant<is_byte_copy_safe_v<T>> {};
+
+template <typename T>
+struct is_byte_copy_safe<XOffsetDatastructure::XSet<T>>
+    : std::bool_constant<is_byte_copy_safe_v<T>> {};
+
+template <typename K, typename V>
+struct is_byte_copy_safe<XOffsetDatastructure::XFixedFlatMap<K, V>>
+    : std::bool_constant<is_byte_copy_safe_v<K> && is_byte_copy_safe_v<V>> {};
+
+template <typename K, typename V>
+struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
+    : std::bool_constant<is_byte_copy_safe_v<K> && is_byte_copy_safe_v<V>> {};
+
+} // inline namespace v1
+} // namespace boost::typelayout
+
 // ============================================================================
-// Registration macros: TypeLayout opaque signature + XCompactor migration strategy.
+// Registration macros: XCompactor migration strategy registration.
 // Must be placed at global namespace scope.
 // ============================================================================
 
@@ -3321,33 +3526,24 @@ struct _XOffset_NS_Sentinel {};
         static constexpr std::string_view value = literal;                     \
     };
 
-#define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
-    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_TYPE")                   \
-    namespace boost { namespace typelayout {                                    \
-        TYPELAYOUT_OPAQUE_TYPE_RELOCATABLE(XOffsetDatastructure::Type, name)    \
-    }}                                                                         \
+#define XOFFSET_REGISTER_MIGRATION_TYPE(Type, strategy)                        \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MIGRATION_TYPE")         \
     template<> struct XOffsetDatastructure::XCompactor::migrate_as<            \
         XOffsetDatastructure::Type> {                                          \
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
-#define XOFFSET_REGISTER_CONTAINER(Template, name, strategy)                   \
-    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_CONTAINER")              \
-    namespace boost { namespace typelayout {                                    \
-        TYPELAYOUT_OPAQUE_CONTAINER_RELOCATABLE(XOffsetDatastructure::Template, name) \
-    }}                                                                         \
+#define XOFFSET_REGISTER_MIGRATION_CONTAINER(Template, strategy)               \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MIGRATION_CONTAINER")    \
     template<typename T_> struct XOffsetDatastructure::XCompactor::migrate_as< \
         XOffsetDatastructure::Template<T_>> {                                  \
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
-#define XOFFSET_REGISTER_MAP(Template, name, strategy)                         \
-    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MAP")                    \
-    namespace boost { namespace typelayout {                                    \
-        TYPELAYOUT_OPAQUE_MAP_RELOCATABLE(XOffsetDatastructure::Template, name) \
-    }}                                                                         \
+#define XOFFSET_REGISTER_MIGRATION_MAP(Template, strategy)                     \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MIGRATION_MAP")          \
     template<typename K_, typename V_>                                          \
     struct XOffsetDatastructure::XCompactor::migrate_as<                        \
         XOffsetDatastructure::Template<K_, V_>> {                              \
@@ -3355,14 +3551,25 @@ struct _XOffset_NS_Sentinel {};
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
 
+// Compatibility wrappers. `name` is ignored now that XOffset no longer registers
+// its own containers through TypeLayout's opaque mechanism.
+#define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
+    XOFFSET_REGISTER_MIGRATION_TYPE(Type, strategy)
+
+#define XOFFSET_REGISTER_CONTAINER(Template, name, strategy)                   \
+    XOFFSET_REGISTER_MIGRATION_CONTAINER(Template, strategy)
+
+#define XOFFSET_REGISTER_MAP(Template, name, strategy)                         \
+    XOFFSET_REGISTER_MIGRATION_MAP(Template, strategy)
+
 // Built-in registrations
-XOFFSET_REGISTER_TYPE(XString, "string", AllocatorAware)
-XOFFSET_REGISTER_CONTAINER(XVector, "vector", Container)
-XOFFSET_REGISTER_CONTAINER(XSet, "set", Container)
-XOFFSET_REGISTER_MAP(XMap, "map", Container)
-XOFFSET_REGISTER_TYPE(XFixedString, "fixed_string", AllocatorAware)
-XOFFSET_REGISTER_CONTAINER(XFixedVector, "fixed_vector", Container)
-XOFFSET_REGISTER_CONTAINER(XFixedFlatSet, "fixed_flat_set", Container)
-XOFFSET_REGISTER_MAP(XFixedFlatMap, "fixed_flat_map", Container)
+XOFFSET_REGISTER_MIGRATION_TYPE(XString, AllocatorAware)
+XOFFSET_REGISTER_MIGRATION_CONTAINER(XVector, Container)
+XOFFSET_REGISTER_MIGRATION_CONTAINER(XSet, Container)
+XOFFSET_REGISTER_MIGRATION_MAP(XMap, Container)
+XOFFSET_REGISTER_MIGRATION_TYPE(XFixedString, AllocatorAware)
+XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedVector, Container)
+XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedFlatSet, Container)
+XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
 
 #endif
