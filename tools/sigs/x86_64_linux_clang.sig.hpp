@@ -2,7 +2,7 @@
 // Platform: x86_64_linux_clang (x86-64 Linux (Clang))
 // Generated: committed baseline
 //
-// This file contains constexpr signature data for the v1 admitted catalog.
+// This file contains constexpr wire-ABI signature data for the v1 admitted catalog.
 // Target ABI metadata comes from tools/signature_target_matrix.hpp.
 
 #ifndef BOOST_TYPELAYOUT_SIG_X86_64_LINUX_CLANG_HPP
@@ -26,27 +26,27 @@ inline constexpr const char data_model[]        = "LP64";
 
 // ---- Type Signatures ----
 
-// --- Player ---
-inline constexpr const char Player_layout[] =
-    "[64-le]record[s:40,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:O(string|16|8),@24:O(vector|16|8)<i32[s:4,a:4]>}";
-inline constexpr bool Player_byte_copy_safe = true;
+// --- catalog.ScalarRecord ---
+inline constexpr const char catalog_ScalarRecord_layout[] =
+    "record[s:24,a:8]{@0:i32,@8:u64,@16:f64}";
+inline constexpr bool catalog_ScalarRecord_byte_copy_safe = true;
 
-// --- Item ---
-inline constexpr const char Item_layout[] =
-    "[64-le]record[s:32,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@16:O(string|16|8)}";
-inline constexpr bool Item_byte_copy_safe = true;
+// --- catalog.NestedValue ---
+inline constexpr const char catalog_NestedValue_layout[] =
+    "record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}";
+inline constexpr bool catalog_NestedValue_byte_copy_safe = true;
 
-// --- GameData ---
-inline constexpr const char GameData_layout[] =
-    "[64-le]record[s:80,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:f32[s:4,a:4],@16:O(string|16|8),@32:O(vector|16|8)<record[s:32,a:8]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@16:O(string|16|8)}>,@48:O(set|16|8)<i32[s:4,a:4]>,@64:O(map|16|8)<O(string|16|8),i32[s:4,a:4]>}";
-inline constexpr bool GameData_byte_copy_safe = true;
+// --- catalog.WireCatalogRoot ---
+inline constexpr const char catalog_WireCatalogRoot_layout[] =
+    "record[s:144,a:8]{@0:enum<u32>,@4:array[2]<array[3]<i32>>,@32:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@48:xblob[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@64:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>,@80:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}>,@96:xflatset[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>,@112:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32,record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}>,@128:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},i32>}";
+inline constexpr bool catalog_WireCatalogRoot_byte_copy_safe = true;
 
 // ---- Type Registry ----
 
 inline constexpr ::boost::typelayout::TypeEntry types[] = {
-    {"Player", Player_layout, Player_byte_copy_safe},
-    {"Item", Item_layout, Item_byte_copy_safe},
-    {"GameData", GameData_layout, GameData_byte_copy_safe},
+    {"catalog.ScalarRecord", catalog_ScalarRecord_layout, catalog_ScalarRecord_byte_copy_safe},
+    {"catalog.NestedValue", catalog_NestedValue_layout, catalog_NestedValue_byte_copy_safe},
+    {"catalog.WireCatalogRoot", catalog_WireCatalogRoot_layout, catalog_WireCatalogRoot_byte_copy_safe},
 };
 
 inline constexpr std::size_t type_count = 3;

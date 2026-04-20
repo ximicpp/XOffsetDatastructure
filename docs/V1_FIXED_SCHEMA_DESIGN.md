@@ -174,6 +174,13 @@ There is no partial load and no best-effort compatibility path in `v1`.
 
 This means `v1` load is not just header validation. It is a bounded structural verification pass over the admitted type graph.
 
+Default `v1` save/load semantics are **normalized transport semantics**, not a
+full allocator snapshot:
+
+- admitted object graphs must survive save/load intact
+- loaded buffers must remain mutable
+- identical post-load spare capacity and fragmentation state are not guaranteed
+
 ## 7. Buffer Format
 
 The buffer is a single relocatable byte region:
@@ -224,6 +231,7 @@ Notes:
 - `schema_hash` is the canonical hash of the reflected root type closure, not just the root record.
 - `reserved_bytes` is local runtime capacity and does not affect wire compatibility.
 - `used_bytes` is the exact serialized byte count.
+- normalized `v1` save paths may legally reduce spare tail capacity before transport.
 
 ### 7.2 Allocator state
 
@@ -487,7 +495,7 @@ Even though `v1` has no field evolution, it still needs strong schema identity.
 Recommended schema identity inputs:
 
 - canonical schema type name
-- reflected layout signature of every reachable admitted type
+- XOffset-owned wire ABI signature of every reachable admitted type
 - container ABI version tags
 - root type id
 
@@ -607,6 +615,10 @@ Repository implementation note:
   collection of ad hoc local exports
 - `tools/export_signatures.cpp` rewrites the exact target set baselines
 - `tools/check_signature_matrix.cpp` rejects missing or unexpected baseline files
+- current repository baselines are still repository-managed synthetic baselines,
+  not yet independently harvested native target observations
+- the strongest target-matrix claim therefore still requires native target export
+  evidence or another proven-equivalent generation path
 
 ## 19. Toolchain Reality
 

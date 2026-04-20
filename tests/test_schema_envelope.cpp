@@ -222,6 +222,46 @@ bool test_typed_load_defaults_to_verified() {
     return true;
 }
 
+bool test_verified_save_is_normalized_transport() {
+    std::cout << "\n[TEST] verified save normalizes buffer slack but preserves mutation\n";
+
+    TypedXBuffer<EnvelopeData> xbuf(4096);
+    auto* obj = xbuf.make();
+    obj->id = 777;
+    obj->name = "Normalized";
+    obj->items.reserve(8);
+    obj->items.push_back(1);
+    obj->items.push_back(2);
+
+    auto before = xbuf.stats();
+    assert(before.total_size == 4096);
+    assert(before.free_size > 0);
+    assert(obj->items.capacity() == 8);
+
+    std::string data = xbuf.save_verified();
+    XWireHeaderV1 header{};
+    std::memcpy(&header, data.data(), sizeof(header));
+
+    auto loaded = TypedXBuffer<EnvelopeData>::load_verified(data);
+    auto after = loaded.stats();
+    auto& root = loaded.root();
+
+    assert(after.total_size == header.used_bytes);
+    assert(after.total_size < before.total_size);
+    assert(root.id == 777);
+    assert(root.name == "Normalized");
+    assert(root.items.capacity() == 8);
+
+    while (root.items.size() < root.items.capacity()) {
+        root.items.push_back(static_cast<int32_t>(root.items.size() + 1));
+    }
+
+    assert(root.items.size() == 8);
+    assert(root.items.back() == 8);
+    std::cout << "  [OK]\n";
+    return true;
+}
+
 int main() {
     std::cout << "=== Schema Wire Header Tests ===\n";
 
@@ -234,6 +274,7 @@ int main() {
     all_passed &= test_typed_buffer_verified_api();
     all_passed &= test_verified_span_api();
     all_passed &= test_typed_load_defaults_to_verified();
+    all_passed &= test_verified_save_is_normalized_transport();
 
     std::cout << "\n";
     if (all_passed) {

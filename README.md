@@ -60,6 +60,7 @@ More complete examples live in:
 - Writes are not thread-safe. Synchronize externally.
 - Prefer `XHandle<T>` if you need a stable reference across buffer relocations.
 - Prefer `TypedXBuffer<T>::load(...)` or `XBuffer::load_verified<T>(...)`; use `load_unverified()` only for trusted raw payloads.
+- `save()` and `save_verified()` use normalized transport semantics: they preserve the admitted object graph and continued mutation, but they do not promise identical post-load spare capacity or allocator fragmentation state.
 
 ## Build And Test
 
@@ -114,10 +115,12 @@ docker run --rm \
 
 - `tools/export_signatures.cpp` exports the exact repository target matrix into `tools/sigs/`
 - `tools/check_signature_matrix.cpp` enforces that `tools/sigs/` contains exactly the required target-set baselines
+- `tools/check_signature_regeneration.cmake` re-exports into a temp directory and fails on drift
 - `tools/check_compat.cpp` compares the committed baselines and fails if any exported type stops matching across the matrix
 
-The default `ctest` run now includes the inventory and compatibility checks, so
-the baseline contract is exercised as part of the normal test suite.
+The default `ctest` run includes inventory checking, baseline regeneration
+checking, and compatibility checking. `build.sh` and CI run the same flow as the
+full contract check.
 
 The exact target matrix is:
 
@@ -126,7 +129,10 @@ The exact target matrix is:
 - `arm64_ios_clang`
 - `arm64_android_clang`
 
-Each `.sig.hpp` file in `tools/sigs/` is a committed matrix baseline. The exporter rewrites the exact set and removes stale files, so rerunning it only diffs on real contract drift.
+Each `.sig.hpp` file in `tools/sigs/` is a committed repository-managed matrix
+baseline. The current exporter rewrites the exact set from the explicit wire
+catalog plus target ABI metadata and removes stale files. Strong native
+per-target evidence still requires target-native export jobs.
 
 ## Dependency Surface
 

@@ -1,4 +1,4 @@
-// Exports the exact v1 target-matrix signature baselines under tools/sigs/.
+// Exports the exact v1 target-matrix wire-ABI baselines under tools/sigs/.
 
 #include "signature_catalog.hpp"
 #include "signature_target_matrix.hpp"
@@ -23,7 +23,7 @@ using XOffsetDatastructure::is_v1_wire_admitted_v;
 struct ExportedTypeEntry {
     std::string name;
     std::string guard_name;
-    std::string layout;
+    std::string wire_abi_signature;
     bool byte_copy_safe{};
 };
 
@@ -69,11 +69,12 @@ std::vector<ExportedTypeEntry> collect_exported_type_entries() {
     xoffset::signature::visit_exported_types([&]<typename T>(const char* name) {
         static_assert(is_v1_wire_admitted_v<T>,
             "target-matrix signature export only supports v1-admitted root/data types");
+        constexpr auto wire_sig = XOffsetDatastructure::wire_abi_signature<T>();
         entries.push_back({
             .name = name,
             .guard_name = make_identifier(name),
-            .layout = std::string(::boost::typelayout::get_layout_signature<T>()),
-            .byte_copy_safe = ::boost::typelayout::is_byte_copy_safe_v<T>,
+            .wire_abi_signature = std::string(std::string_view(wire_sig)),
+            .byte_copy_safe = is_v1_wire_admitted_v<T>,
         });
     });
     return entries;
@@ -96,7 +97,7 @@ int write_target_signature_file(
     os << "// Platform: " << target.platform_name << " (" << target.display_name << ")\n";
     os << "// Generated: committed baseline\n";
     os << "//\n";
-    os << "// This file contains constexpr signature data for the v1 admitted catalog.\n";
+    os << "// This file contains constexpr wire-ABI signature data for the v1 admitted catalog.\n";
     os << "// Target ABI metadata comes from tools/signature_target_matrix.hpp.\n\n";
 
     os << "#ifndef " << guard << '\n';
@@ -126,7 +127,7 @@ int write_target_signature_file(
     for (const auto& entry : entries) {
         os << "// --- " << entry.name << " ---\n";
         os << "inline constexpr const char " << entry.guard_name << "_layout[] =\n";
-        os << "    \"" << cxx_escape(entry.layout) << "\";\n";
+        os << "    \"" << cxx_escape(entry.wire_abi_signature) << "\";\n";
         os << "inline constexpr bool " << entry.guard_name << "_byte_copy_safe = "
            << (entry.byte_copy_safe ? "true" : "false") << ";\n\n";
     }
