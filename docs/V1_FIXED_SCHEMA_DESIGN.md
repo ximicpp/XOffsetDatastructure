@@ -417,6 +417,31 @@ Element relocation depends on the type category:
 
 This is where C++26 reflection remains important. It is the mechanism that allows user-defined nested records to remain usable without hand-written allocators or serializers.
 
+### 10.4 Whole-buffer exhaustion
+
+`v1` does **not** make whole-buffer auto-growth an implicit side effect of an
+ordinary container write.
+
+When a local container reallocation cannot be satisfied from the current arena:
+
+- the container may throw `XBadAlloc`
+- the caller may explicitly invoke `XBuffer::grow()`
+- the caller must then reacquire `root<T>()` or continue through `XHandle<T>`
+  before retrying the mutation
+
+This rule is intentional. Whole-buffer growth is a global relocation event, not
+just a local container capacity change. Hiding it inside `push_back()` or
+`insert()` would silently widen invalidation from "this container payload" to
+"any raw pointer or reference into the buffer".
+
+The recommended recovery pattern is therefore explicit:
+
+1. attempt the mutation
+2. catch `XBadAlloc`
+3. call `grow()`
+4. reacquire `root<T>()` or use `XHandle<T>`
+5. retry the mutation
+
 ## 11. Allocation Model
 
 The allocator is not a general-purpose heap. It is a mutation-oriented arena with reuse.

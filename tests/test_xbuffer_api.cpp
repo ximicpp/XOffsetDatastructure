@@ -177,6 +177,52 @@ bool test_create_api() {
     return true;
 }
 
+// ============================================================================
+// Test 7: Explicit grow retry contract
+// ============================================================================
+bool test_explicit_grow_retry_contract() {
+    std::cout << "\n[TEST] explicit grow() retry contract\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    XBuffer xbuf(512, XBuffer::max_capacity(512));
+    auto* obj = xbuf.make<TestData>();
+    obj->id = 7;
+    obj->name = "RetryTest";
+    auto handle = xbuf.handle<TestData>();
+
+    bool saw_bad_alloc = false;
+    int attempted = 0;
+    for (; attempted < 4096; ++attempted) {
+        try {
+            obj->items.push_back(attempted);
+        } catch (const XBadAlloc&) {
+            saw_bad_alloc = true;
+            break;
+        }
+    }
+
+    assert(saw_bad_alloc);
+    std::size_t size_before_retry = handle->items.size();
+    std::cout << "  mutation hit XBadAlloc at size=" << size_before_retry << " ... [OK]\n";
+
+    bool grew = xbuf.grow(4096);
+    assert(grew);
+
+    auto& reacquired = xbuf.root<TestData>();
+    for (int i = 0; i < 32; ++i) {
+        reacquired.items.push_back(100000 + i);
+    }
+
+    assert(reacquired.id == 7);
+    assert(std::string(reacquired.name.c_str()) == "RetryTest");
+    assert(reacquired.items.size() == size_before_retry + 32);
+    assert(handle->items.size() == size_before_retry + 32);
+    assert(handle->items.back() == 100031);
+    std::cout << "  grow() + root()/XHandle retry ... [OK]\n";
+
+    return true;
+}
+
 int main() {
     std::cout << "=== XBuffer API Tests (Single-Object Model) ===\n";
 
@@ -187,6 +233,7 @@ int main() {
     all_passed &= test_allocator();
     all_passed &= test_grow_root();
     all_passed &= test_create_api();
+    all_passed &= test_explicit_grow_retry_contract();
 
     std::cout << "\n";
     if (all_passed) {

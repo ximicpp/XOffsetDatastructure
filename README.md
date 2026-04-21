@@ -59,8 +59,22 @@ More complete examples live in:
 - There is no per-object delete. The buffer owns all contained objects.
 - Writes are not thread-safe. Synchronize externally.
 - Prefer `XHandle<T>` if you need a stable reference across buffer relocations.
+- Fixed containers do not implicitly whole-buffer auto-grow. If the current arena cannot satisfy a mutation, the write path may throw `XBadAlloc`.
+- The recovery pattern is explicit: catch `XBadAlloc`, call `grow()`, then reacquire `root<T>()` or continue through `XHandle<T>` before retrying the mutation.
 - Prefer `TypedXBuffer<T>::load(...)` or `XBuffer::load_verified<T>(...)`; use `load_unverified()` only for trusted raw payloads.
 - `save()` and `save_verified()` use normalized transport semantics: they preserve the admitted object graph and continued mutation, but they do not promise identical post-load spare capacity or allocator fragmentation state.
+
+Example recovery pattern:
+
+```cpp
+try {
+    xbuf.root<GameData>().items.push_back(42);
+} catch (const XBadAlloc&) {
+    if (!xbuf.grow(64 * 1024)) throw;
+    auto& root = xbuf.root<GameData>();
+    root.items.push_back(42);
+}
+```
 
 ## Build And Test
 
