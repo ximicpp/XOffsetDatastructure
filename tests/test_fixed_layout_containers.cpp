@@ -107,6 +107,7 @@ bool test_verified_round_trip() {
     root->values.push_back(2);
 
     std::string data = xbuf.save_verified<FixedRoot>();
+    root = &xbuf.root<FixedRoot>();
     auto loaded = TypedXBuffer<FixedRoot>::load_verified(data);
     auto& restored = loaded.root();
 
@@ -175,6 +176,7 @@ bool test_nested_record_round_trip() {
     }
 
     std::string data = xbuf.save_verified<FixedNestedRoot>();
+    root = &xbuf.root<FixedNestedRoot>();
     auto loaded = TypedXBuffer<FixedNestedRoot>::load_verified(data);
     auto& restored = loaded.root();
 
@@ -224,6 +226,7 @@ bool test_verified_rejects_corrupt_fixed_string() {
     root->values.push_back(1);
 
     std::string data = xbuf.save_verified<FixedRoot>();
+    root = &xbuf.root<FixedRoot>();
     const std::size_t size_offset = sizeof(XWireHeaderV1) +
         payload_offset(xbuf, &root->name.size_);
     std::uint32_t bad_size = root->name.capacity_ + 1;
@@ -254,6 +257,7 @@ bool test_verified_rejects_corrupt_nested_record() {
     }
 
     std::string data = xbuf.save_verified<FixedNestedRoot>();
+    root = &xbuf.root<FixedNestedRoot>();
     auto* nested_size = &root->items[2].label.size_;
     const std::size_t size_offset =
         sizeof(XWireHeaderV1) + payload_offset(xbuf, nested_size);
@@ -370,6 +374,7 @@ bool test_verified_rejects_corrupt_fixed_flat_map() {
     root->by_id.emplace(3, "three");
 
     std::string data = xbuf.save_verified<FixedAssocRoot>();
+    root = &xbuf.root<FixedAssocRoot>();
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
         sizeof(XWireHeaderV1) + payload_offset(xbuf, bad_size);

@@ -1,0 +1,121 @@
+// Purpose: Regressions for allocation bounds, move ownership, and container aliasing.
+#include <cassert>
+#include <iostream>
+#include <limits>
+#include "../xoffsetdatastructure.hpp"
+using namespace XOffsetDatastructure;
+
+struct RuntimeRoot {
+    int32_t id{};
+    XString name;
+    XVector<int32_t> first, guard, second;
+    XVector<XString> strings;
+    XMap<XString, int32_t> map;
+};
+struct OtherRoot { int32_t id{}; };
+XOFFSET_REGISTER_SCHEMA_NAME(RuntimeRoot, "test.RuntimeRoot")
+XOFFSET_REGISTER_SCHEMA_NAME(OtherRoot, "test.OtherRoot")
+
+template <typename F> void must_reject(F&& f) {
+    bool rejected = false;
+    try { f(); } catch (const XException&) { rejected = true; }
+    assert(rejected);
+}
+
+void free_block_sizes() {
+    auto buf = XBuffer::create<RuntimeRoot>(8192);
+    auto& r = buf.root<RuntimeRoot>();
+    r.first.reserve(18); // 72 bytes in the 128-byte class.
+    r.guard.reserve(4);
+    for (int i = 0; i < 4; ++i) r.guard.push_back(42);
+    r.first.reserve(64);
+    r.second.reserve(32);
+    for (int i = 0; i < 32; ++i) r.second.push_back(99);
+    for (auto value : r.guard) assert(value == 42);
+    auto loaded = XBuffer::load_verified<RuntimeRoot>(buf.save_verified<RuntimeRoot>());
+    assert(loaded.root<RuntimeRoot>().guard[0] == 42);
+}
+
+void move_ownership() {
+    auto source = XBuffer::create<RuntimeRoot>(4096);
+    source.root<RuntimeRoot>().id = 7;
+    auto source_handle = source.handle<RuntimeRoot>();
+    XBuffer moved(std::move(source));
+    assert(!source_handle);
+    moved.root<RuntimeRoot>().name = "moved";
+    auto target = XBuffer::create<RuntimeRoot>(4096);
+    auto handle = target.handle<RuntimeRoot>();
+    target = std::move(moved);
+    assert(handle->id == 7);
+    handle->first.push_back(123);
+    assert(target.root<RuntimeRoot>().first[0] == 123);
+    const auto bytes = target.save_verified<RuntimeRoot>();
+    auto loaded = TypedXBuffer<RuntimeRoot>::load(bytes);
+    bool grew = loaded.grow(4096);
+    assert(grew);
+    loaded.root().name = std::string(300, 'x');
+    assert(loaded.root().name.size() == 300);
+}
+
+void strings_and_aliases() {
+    auto buf = XBuffer::create<RuntimeRoot>(65536);
+    auto& r = buf.root<RuntimeRoot>();
+    r.name = "";
+    assert(r.name.empty() && r.name.c_str()[0] == '\0');
+    r.name = "abcdef";
+    r.name.assign(r.name.view().substr(2));
+    assert(r.name == "cdef");
+    r.first.reserve(4);
+    for (int i = 0; i < 4; ++i) r.first.push_back(i + 11);
+    r.first.push_back(r.first[0]);
+    assert(r.first.back() == 11);
+    r.first.insert(r.first.begin(), r.first.back());
+    assert(r.first.front() == 11);
+    r.first.assign(9, r.first[1]);
+    for (auto x : r.first) assert(x == 11);
+    r.strings.reserve(1);
+    r.strings.push_back("hello");
+    r.strings.push_back(r.strings[0]);
+    assert(r.strings[0] == "hello" && r.strings[1] == "hello");
+    r.strings.emplace_back(r.strings.front());
+    r.strings.push_back("");
+    const char* payload_before = r.strings.front().data();
+    r.strings.reserve(64);
+    assert(r.strings.front().data() == payload_before);
+    r.strings.insert(r.strings.begin() + 1, r.strings.back());
+    r.strings.erase(r.strings.begin() + 1);
+    r.map.try_emplace("key", 1);
+    auto compacted = XCompactor::compact<RuntimeRoot>(buf);
+    assert(compacted.root<RuntimeRoot>().strings[2] == "hello");
+    assert(compacted.root<RuntimeRoot>().map.find("key")->second == 1);
+}
+
+void limits_and_schema() {
+    auto buf = XBuffer::create<RuntimeRoot>(4096);
+    auto& r = buf.root<RuntimeRoot>();
+    must_reject([&] { r.first.reserve(1u << 30); });
+    must_reject([&] { r.first.reserve(1ull << 32); });
+    must_reject([&] { r.first.resize(1ull << 32); });
+    must_reject([&] { r.first.assign(1ull << 32, 42); });
+    must_reject([&] { r.name.reserve(UINT32_MAX); });
+    must_reject([&] { r.name.reserve(1ull << 32); });
+    must_reject([&] { (void)buf.arena_allocator<int64_t>().allocate(SIZE_MAX); });
+    assert(r.first.capacity() == 0 && r.name.capacity() == 0);
+    const auto size = buf.get_size();
+    bool grew = buf.grow(SIZE_MAX);
+    assert(!grew && buf.get_size() == size);
+    must_reject([&] { (void)buf.handle<OtherRoot>(); });
+    must_reject([&] { (void)buf.save_verified<OtherRoot>(); });
+    must_reject([&] { (void)buf.make<OtherRoot>(); });
+    assert(buf.matches_schema<RuntimeRoot>());
+    auto raw = XBuffer::load_unverified(buf.save());
+    must_reject([&] { (void)raw.save_verified<RuntimeRoot>(); });
+}
+
+int main() {
+    free_block_sizes();
+    move_ownership();
+    strings_and_aliases();
+    limits_and_schema();
+    std::cout << "Runtime regressions passed\n";
+}

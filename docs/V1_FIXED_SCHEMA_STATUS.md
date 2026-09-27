@@ -65,6 +65,9 @@ design and what remains outside the current local codebase closure.
 - bounded graph walk for admitted fixed-layout objects
 - allocator-state validation
 - free-list overlap and accounting checks
+- allocation-header bounds/alignment/ownership checks, including protected root and allocator storage
+- rejection of free-list cycles, invalid bool representations, and unordered map/set keys
+- see `V1_CORRECTNESS_REPAIR.md` for the review repairs and their executable evidence
 
 ### Convenience API
 

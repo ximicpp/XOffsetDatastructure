@@ -39,6 +39,8 @@ struct HasLongDouble { long double value; };
 struct HasPointer { int32_t* ptr; };
 struct BaseRecord { int32_t base; };
 struct DerivedRecord : BaseRecord { int32_t extra; };
+struct ExtendedString : XString { int32_t extra; };
+struct ExtendedMap : XMap<int32_t, int32_t> { int32_t extra; };
 
 XOFFSET_REGISTER_SCHEMA_NAME(WireRoot, "test.WireRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(WireOther, "test.WireOther")
@@ -60,6 +62,8 @@ static_assert(!is_v1_wire_admitted_v<HasWchar>);
 static_assert(!is_v1_wire_admitted_v<HasLongDouble>);
 static_assert(!is_v1_wire_admitted_v<HasPointer>);
 static_assert(!is_v1_wire_admitted_v<DerivedRecord>);
+static_assert(!is_v1_wire_admitted_v<ExtendedString>);
+static_assert(!is_v1_wire_admitted_v<ExtendedMap>);
 static_assert(std::string_view(xstring_wire_sig) == std::string_view(fixed_string_wire_sig));
 static_assert(std::string_view(xvector_wire_sig) == std::string_view(fixed_vector_wire_sig));
 static_assert(std::string_view(xstring_wire_sig).find("arena:rel32") != std::string_view::npos);

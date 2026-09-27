@@ -68,7 +68,7 @@ static void populate_root(BridgeRoot& root) {
     root.scores.resize(4, 99);
 
     root.tags.push_back("alpha");
-    root.tags.push_back(XString("gamma", root.tags.get_stored_allocator()));
+    root.tags.push_back("gamma");
     root.tags.insert(root.tags.begin() + 1, "beta");
     root.tags.erase(root.tags.begin());
 
@@ -156,8 +156,8 @@ bool test_main_containers_basic() {
     populate_root(*root);
     assert_base_shape(*root);
 
-    constexpr auto sig = boost::typelayout::get_layout_signature<BridgeRoot>();
-    std::string sig_text = sig.value;
+    constexpr auto sig = wire_abi_signature<BridgeRoot>();
+    std::string sig_text{std::string_view(sig)};
     assert(sig_text.find("string[") != std::string::npos);
     assert(sig_text.find("vector[") != std::string::npos);
 
@@ -215,8 +215,8 @@ bool test_main_containers_assoc_basic() {
     populate_assoc_root(*root);
     assert_assoc_shape(*root);
 
-    constexpr auto sig = boost::typelayout::get_layout_signature<BridgeAssocRoot>();
-    std::string sig_text = sig.value;
+    constexpr auto sig = wire_abi_signature<BridgeAssocRoot>();
+    std::string sig_text{std::string_view(sig)};
     assert(sig_text.find("set[") != std::string::npos);
     assert(sig_text.find("map[") != std::string::npos);
 
@@ -250,6 +250,7 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
     populate_assoc_root(*root);
 
     std::string data = xbuf.save_verified<BridgeAssocRoot>();
+    root = &xbuf.root<BridgeAssocRoot>();
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
         sizeof(XWireHeaderV1) + payload_offset(xbuf, bad_size);

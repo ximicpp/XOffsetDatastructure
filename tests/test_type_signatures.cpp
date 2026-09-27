@@ -244,7 +244,7 @@ void test_safety_classification() {
     constexpr auto sig_simple = get_layout_signature<SimpleStruct>();
     auto lvl_simple = classify_signature(std::string_view(sig_simple.value, sig_simple.size));
     std::cout << "  SimpleStruct: " << safety_level_name(lvl_simple) << "\n";
-    assert(lvl_simple == SafetyLevel::TrivialSafe || lvl_simple == SafetyLevel::PaddingRisk);
+    assert(lvl_simple == SafetyLevel::TrivialSafe);
 
     // DerivedClass (non-virtual inheritance): safe
     constexpr auto sig_derived = get_layout_signature<DerivedClass>();
@@ -288,14 +288,14 @@ void test_container_signatures() {
     std::cout << "  WithString: " << sig_string << "\n";
     std::cout << "  WithVector: " << sig_vector << "\n";
 
-    // Verify container types are correctly resolved
+    // TypeLayout reflects the physical fields; semantic container tokens belong
+    // to XOffset's wire ABI signature, not TypeLayout's opaque mechanism.
     std::string str_sig = sig_string.value;
-    assert(str_sig.find("string[s:16,a:8]") != std::string::npos && "XString should appear as string[s:16,a:8]");
-    std::cout << "  XString resolved: string[s:16,a:8] [OK]\n";
-
     std::string vec_sig = sig_vector.value;
-    assert(vec_sig.find("vector[s:16,a:8]") != std::string::npos && "XVector should appear as vector[s:16,a:8]");
-    std::cout << "  XVector resolved: vector[s:16,a:8] [OK]\n";
+    assert(str_sig == vec_sig);
+    assert(str_sig.find("@8:i32[s:4,a:4],@12:i32[s:4,a:4],@16:u32[s:4,a:4],@20:u32[s:4,a:4]") != std::string::npos);
+    assert(std::string_view(wire_abi_signature<XString>()).find("xstring") != std::string_view::npos);
+    assert(std::string_view(wire_abi_signature<XVector<int32_t>>()).find("xvector") != std::string_view::npos);
 
     std::cout << "[PASS]\n\n";
 }
