@@ -442,6 +442,23 @@ The recommended recovery pattern is therefore explicit:
 4. reacquire `root<T>()` or use `XHandle<T>`
 5. retry the mutation
 
+Individual library container operations preserve logical values and ordering on
+allocation failure. Capacity and allocator bookkeeping may change. This guarantee
+does not cover multi-operation callbacks, user record assignment, or external side
+effects in user constructors. Retry only the failed operation.
+
+The implementation stages new owning values in arena storage before committing.
+For recognized container heads and reflected records that support non-throwing
+relocation, reserve/shift/erase transfer ownership and rebase inline `rel32` fields;
+the out-of-line string and nested-container payloads are not deep-copied. The
+fallback builds a replacement range before publishing it. Copy assignment and
+multi-element construction clean up partially constructed members on failure.
+
+Arena-bound container objects must themselves reside in the buffer, not on the
+stack. Public size-taking mutations validate host-width counts before conversion
+to the frozen 32-bit fields. Whole-buffer growth rejects sizes above
+`XBufferCore::MAX_PAYLOAD` rather than wrapping an addition.
+
 ## 11. Allocation Model
 
 The allocator is not a general-purpose heap. It is a mutation-oriented arena with reuse.

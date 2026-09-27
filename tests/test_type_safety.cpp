@@ -137,7 +137,7 @@ bool test_classify_levels() {
     {
         constexpr auto sig = get_layout_signature<SafeRecord>();
         auto lvl = classify_signature(std::string_view(sig.value, sig.size));
-        assert(lvl == SafetyLevel::TrivialSafe || lvl == SafetyLevel::PaddingRisk);
+        assert(lvl == SafetyLevel::TrivialSafe);
     }
     {
         constexpr auto sig = get_layout_signature<HasPointer>();

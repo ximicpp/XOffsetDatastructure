@@ -74,7 +74,7 @@ bool test_handle_survives_grow() {
     std::cout << "  Before grow: ptr=" << (void*)ptr_before
               << " epoch=" << epoch_before << "\n";
 
-    bool grew = buffer.grow(4096);
+    bool grew = buffer.grow(buffer.reserved_capacity() + 4096);
     assert(grew);
 
     uint64_t epoch_after = buffer.epoch();
@@ -163,8 +163,10 @@ bool test_epoch_cache_efficiency() {
     assert(player->level == 999);
     std::cout << "  Test 5.1: 1000 cached accesses (no re-find) ... [OK]\n";
 
-    buffer.grow(1024);
-    assert(buffer.epoch() == epoch + 1);
+    const void* address_before = buffer.get_address();
+    bool grew = buffer.grow(1024);
+    assert(grew);
+    assert(buffer.epoch() == epoch + (buffer.get_address() != address_before));
 
     assert(player->level == 999);
     std::cout << "  Test 5.2: re-find after grow, then cached ... [OK]\n";

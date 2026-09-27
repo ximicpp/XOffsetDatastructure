@@ -120,8 +120,8 @@ bool test_multi_level_inheritance() {
     w->mp = 50;
     // Warrior level
     w->strength = 99;
-    w->skills.push_back(XString("Cleave", w->skills.get_stored_allocator()));
-    w->skills.push_back(XString("Shield Bash", w->skills.get_stored_allocator()));
+    w->skills.push_back("Cleave");
+    w->skills.push_back("Shield Bash");
 
     // Verify all levels
     assert(w->id == 7);
@@ -183,8 +183,8 @@ bool test_mixed_composition_inheritance() {
     fc->stats.attack = 80;
     fc->stats.defense = 60;
     // Container member
-    fc->abilities.push_back(XString("Fireball", fc->abilities.get_stored_allocator()));
-    fc->abilities.push_back(XString("Heal", fc->abilities.get_stored_allocator()));
+    fc->abilities.push_back("Fireball");
+    fc->abilities.push_back("Heal");
 
     assert(fc->id == 999);
     assert(std::string(fc->name.c_str()) == "HybridHero");
@@ -216,7 +216,7 @@ bool test_inheritance_compaction() {
     w->strength = 75;
     for (int i = 0; i < 5; i++) {
         auto skill_name = std::string("Skill_") + std::to_string(i);
-        w->skills.push_back(XString(skill_name.c_str(), w->skills.get_stored_allocator()));
+        w->skills.push_back(skill_name);
     }
 
     auto stats_before = memory_stats(xbuf);

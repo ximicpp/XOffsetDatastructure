@@ -1,6 +1,7 @@
 function(add_xoffset_test test_name test_label)
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
+    target_compile_options(${test_name} PRIVATE -UNDEBUG)
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
     set_tests_properties(${test_name} PROPERTIES LABELS "${test_label}")
 endfunction()
@@ -40,6 +41,9 @@ set(REFLECTION_TESTS
     test_inheritance
     test_adaptive_reservation
     test_main_containers
+    test_runtime_regressions
+    test_mutation_failures
+    test_wire_validation
 )
 
 foreach(test_name ${REFLECTION_TESTS})
