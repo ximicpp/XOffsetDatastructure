@@ -10,6 +10,8 @@
 
 using namespace XOffsetDatastructure;
 
+XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
+
 int main() {
     std::cout << "\n=== XOffsetDatastructure Hello World (C++26) ===\n\n";
     
@@ -42,12 +44,12 @@ int main() {
     
     // 5. Serialize to string (shrinks first for compact output)
     std::cout << "\n5. Serializing...\n";
-    auto data = xbuf.save();
+    auto data = xbuf.save_verified<Player>();
     std::cout << "   Serialized size: " << data.size() << " bytes\n";
     
     // 6. Deserialize from string
     std::cout << "6. Deserializing...\n";
-    XBuffer loaded = XBuffer::load(data);
+    XBuffer loaded = XBuffer::load_verified<Player>(data);
     if (loaded.has_root<Player>()) {
         auto& loaded_player = loaded.root<Player>();
         std::cout << "   Loaded player: " << loaded_player.name 
@@ -71,6 +73,8 @@ int main() {
     
     // Create some fragmentation by adding and removing data
     std::cout << "   Creating fragmentation...\n";
+    // Saving normalized the logical length; expose more bytes before mutation.
+    if (!xbuf.grow(4096)) throw XBadAlloc();
     player->items.push_back(201);
     player->items.push_back(202);
     player->items.push_back(203);

@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "/usr/local/bin/clang++",
+    "--version"
+  ],
+  "finished_monotonic_ns": 347993567998333,
+  "returncode": 0,
+  "started_monotonic_ns": 347993541817250,
+  "timed_out": false,
+  "timeout_seconds": 10
+}

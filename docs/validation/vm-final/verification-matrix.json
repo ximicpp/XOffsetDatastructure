@@ -1,0 +1,1025 @@
+{
+  "schema_version": 1,
+  "status": "final_research_index_complete",
+  "published_at_utc": "2026-10-15T19:27:37.977984+00:00",
+  "owner": "platform_inventory",
+  "evidence_index": "docs/validation/vm-final/evidence-index.json",
+  "authority_document_sha256": {
+    "base_inheritance": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+    "D015_profiles": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+    "platform": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+    "W1_network": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+    "W2_foundation": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "W2_network": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+    "default_AA": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+    "network_AA": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+    "D026_pool": "8fc361d44787aeacf5a7bc7533ddd969a0ae95b399d8d44fab646bb436b94552",
+    "D027_owner": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+    "D028_G3": "43358d0d343837f68fbda165b057b13cc5170e42837e1683b41bebe79e8735a3",
+    "D029_pool_archive": "698b4871ac56a6ccb4ee9b8050daefebf304e386a7d0a3c85cfb683efe043dd0",
+    "D029_owner_archive": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+    "D030_proposal": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+    "D030_approval": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+    "linux_package_profile": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74",
+    "stable_source_staging": "86aead6132c24100e5a05c8f14c28e87fda77d0fb6174e46b94617cba912b806",
+    "D031_approval_copy": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+    "owner_measurement_final": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+    "D032_tool_fix": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+    "W3_owner_final_handoff_metadata": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+    "W3_owner_final_report_metadata": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68"
+  },
+  "classification_policy": {
+    "new_passed": "Actual work already executed/reviewed and parent-accepted in this follow-up round, including scoped functional controls, synthetic/tool checks, read-only integrity and portable audits. Not necessarily executed during G4 index preparation.",
+    "inherited_same_identity": "Parent-accepted relevant-source/profile inheritance within recorded historical limits. No fresh execution or missing binary/compiler/full SDK/runtime seals are claimed.",
+    "failed": "Identify the exact failed axis: statistical qualification or retained historical build/checker/preflight failure. Does not automatically mean current library functional failure.",
+    "prerequisite_unavailable": "Required mechanism, compatible runtime, platform/channel, business definition or interpretable measurement is unavailable; not an experimental rejection.",
+    "not_applicable_with_reason": "Explicitly unselected or out-of-scope claim/conditional task, with reason. Never a substitute for a required pending result."
+  },
+  "counting_rules": [
+    "Rows describe different axes and are not additive test/process counts.",
+    "The8 expected exit2 controls are included in the26 accepted owner functional cases and are not failed cases.",
+    "D029 portable audits do not create new88/26 native executions.",
+    "D033 accepted owner78 is distinct from the separate accepted historical default F/F78.",
+    "Noise rows remain separate from successful execution/integrity rows.",
+    "Historic failures remain visible even when supplementary audit or later final build resolves their relevance.",
+    "No test/compiler/container execution performed by index preparation.",
+    "D03251 normal/optimized tests include prior41 plus10 new regressions; suites are not disjoint.",
+    "Owner qualification is partial:7/24 cells and2/24 comparisons (one self) qualify; all uncertainty remains explicit."
+  ],
+  "rows": [
+    {
+      "id": "mac_full_48_and_configure3",
+      "status": "inherited_same_identity",
+      "axis": "historical_runtime",
+      "authority_ids": [
+        "base_inheritance",
+        "stable_source_staging"
+      ],
+      "claim": "Historical native macOS full profile: 48 CTest plus 3 configure checks.",
+      "counts": {
+        "ctest": 48,
+        "configure": 3
+      },
+      "limits": [
+        "Initial129-record comparison excluded two unused Python auditors; final stable staging also changes README (D024). All3 differences explicitly outside the full C++ build/runtime closure.",
+        "No new current binary/compiler/full SDK seal; parent-accepted historical provenance."
+      ]
+    },
+    {
+      "id": "wire_504",
+      "status": "inherited_same_identity",
+      "axis": "historical_compatibility",
+      "authority_ids": [
+        "base_inheritance",
+        "stable_source_staging"
+      ],
+      "claim": "504 historical operations: 84 saved checks plus 420 cross-version operations.",
+      "counts": {
+        "saved": 84,
+        "cross_version": 420
+      },
+      "limits": [
+        "84 new output full bytes not retained; hash-only limitation.",
+        "Not a new execution or new full-byte audit."
+      ]
+    },
+    {
+      "id": "native_package_full",
+      "status": "inherited_same_identity",
+      "axis": "historical_package",
+      "authority_ids": [
+        "base_inheritance",
+        "stable_source_staging"
+      ],
+      "claim": "Historical native package full: 3 installed and 3 subproject consumer cases.",
+      "counts": {
+        "installed": 3,
+        "subproject": 3
+      },
+      "limits": [
+        "Relevant build/install/consumer/dependency closure accepted."
+      ]
+    },
+    {
+      "id": "native_package_storage",
+      "status": "inherited_same_identity",
+      "axis": "historical_package",
+      "authority_ids": [
+        "base_inheritance",
+        "stable_source_staging"
+      ],
+      "claim": "Historical native package storage: 3 installed and 3 subproject consumer cases.",
+      "counts": {
+        "installed": 3,
+        "subproject": 3
+      },
+      "limits": [
+        "Relevant build/install/consumer/dependency closure accepted.",
+        "Actual storage profile is Apple Clang C++17, not the P2996 profile."
+      ]
+    },
+    {
+      "id": "mac_tsan15_recorded_option",
+      "status": "inherited_same_identity",
+      "axis": "historical_sanitizer",
+      "authority_ids": [
+        "D015_profiles",
+        "stable_source_staging"
+      ],
+      "claim": "15 cases with recorded -mmacosx-version-min=10.15 compiler option; actual runtime macOS26.6.2 arm64.",
+      "counts": {
+        "cases": 15
+      },
+      "limits": [
+        "Not current-default deployment setting validation.",
+        "Not macOS10.15 runtime validation; effective Mach-O minimum not established."
+      ]
+    },
+    {
+      "id": "linux_sanitizer_26_plus2",
+      "status": "inherited_same_identity",
+      "axis": "historical_sanitizer",
+      "authority_ids": [
+        "D015_profiles",
+        "stable_source_staging"
+      ],
+      "claim": "Per-case composite coverage of 26 plus 2 cases across two historical runs/CMake versions.",
+      "counts": {
+        "first_run": 26,
+        "second_run": 2
+      },
+      "limits": [
+        "Not one 28-case run.",
+        "Reviewed active compile/link differences accepted within historical behavior/profile.",
+        "Sanitized allocator2 cannot upgrade ordinary Linux46 to ordinary48."
+      ]
+    },
+    {
+      "id": "linux_package_full",
+      "status": "inherited_same_identity",
+      "axis": "historical_package",
+      "authority_ids": [
+        "D015_profiles",
+        "linux_package_profile",
+        "stable_source_staging"
+      ],
+      "claim": "Recorded Linux amd64 P2996 package profile under ARM64-host emulation; not independent native Linux or performance evidence",
+      "counts": {
+        "installed": 3,
+        "subproject": 3
+      },
+      "profile": {
+        "compiler": "/opt/p2996-toolchain/bin/clang++",
+        "cmake": "4.2.3",
+        "platform": "linux/amd64",
+        "image": "ghcr.io/ximicpp/typelayout-p2996@sha256:fab845dadf9c7171d104cd34f8a3941119809e49baa7d0cd7ce1a7a2d71ad999"
+      },
+      "limits": [
+        "Recorded outer image/platform metadata exists.",
+        "No complete original Docker request/response/per-container daemon identity or contemporaneous binary/runtime/sysroot seal."
+      ]
+    },
+    {
+      "id": "linux_package_storage",
+      "status": "inherited_same_identity",
+      "axis": "historical_package",
+      "authority_ids": [
+        "D015_profiles",
+        "linux_package_profile",
+        "stable_source_staging"
+      ],
+      "claim": "Recorded Linux ARM64 GCC13.3 C++17 container profile; architecture-native within the local virtualized environment, not amd64 P2996 emulation and not independent physical Linux/performance evidence",
+      "counts": {
+        "installed": 3,
+        "subproject": 3
+      },
+      "profile": {
+        "compiler": "/usr/bin/g++",
+        "cmake": "3.28.3",
+        "platform": "linux/arm64",
+        "image": "sha256:5f1715cb4616825e4c9ebdcc7eacd82223f69a40da0d797ad789a15d30e57a8d"
+      },
+      "limits": [
+        "Recorded outer image/platform metadata exists.",
+        "No complete original Docker request/response/per-container daemon identity or contemporaneous binary/runtime/sysroot seal.",
+        "Expected missing-full-rejected configure exit1 is a passing negative control.",
+        "Fixed local image ID is not a pullable registry reference."
+      ]
+    },
+    {
+      "id": "platform_inventory_integrity",
+      "status": "new_passed",
+      "axis": "read_only_integrity",
+      "authority_ids": [
+        "platform"
+      ],
+      "claim": "24 read-only commands and frozen Windows ZIP identity/CRC audit; not platform test execution.",
+      "counts": {
+        "commands": 24,
+        "inventory_files": 38,
+        "zip_members": 126,
+        "zip_source_files": 121
+      },
+      "limits": [
+        "SDK26.5 present; default SDK27.0 does not replace the selected historical SDK.",
+        "Configured SSH attempt timed out exit255; no remote capability established."
+      ]
+    },
+    {
+      "id": "W1_sync_TCP_functionality",
+      "status": "new_passed",
+      "axis": "scoped_runtime",
+      "authority_ids": [
+        "W1_network"
+      ],
+      "claim": "Native macOS synchronous TCP reference and separate lifecycle model accepted.",
+      "counts": {
+        "groups_each_profile": 34,
+        "golden_subcases_each_profile": 182,
+        "python_tests_each_mode": 29,
+        "cli_commands": 16,
+        "byte_equal_processed_outputs": 12
+      },
+      "limits": [
+        "Separate timing/diagnostic profiles; no production async transport or representative business validation.",
+        "Logical admission credits are not physical RAM/RSS."
+      ]
+    },
+    {
+      "id": "W2_fixed_diagnostic_foundation",
+      "status": "new_passed",
+      "axis": "scoped_runtime",
+      "authority_ids": [
+        "W2_foundation"
+      ],
+      "claim": "Fixed-F diagnostic semantics and controls accepted.",
+      "counts": {
+        "cases": 10,
+        "processes": 20,
+        "ordinary_valid_traces": 9,
+        "ordinary_events": 480,
+        "runtime_controls": 3,
+        "python_tests": 57
+      },
+      "coverage": {
+        "asserted_count_ledger_or_partial_snapshot": 29,
+        "structural_only": 11,
+        "invalid_control_only": 1,
+        "not_executed": 22
+      },
+      "limits": [
+        "No completed N3 attribution or formal timing.",
+        "Unexecuted/structural-only event paths are not independently validated."
+      ]
+    },
+    {
+      "id": "W2_network_diagnostics",
+      "status": "new_passed",
+      "axis": "scoped_runtime",
+      "authority_ids": [
+        "W2_network"
+      ],
+      "claim": "Bounded network diagnostic semantics, exact outputs, cost and lifecycle evidence accepted.",
+      "counts": {
+        "processes": 32,
+        "fixture_conditions": 4,
+        "network_conditions": 12,
+        "valid_traces": 16,
+        "dropped_events": 0,
+        "full_byte_output_pairs": 32,
+        "python_tests": 36,
+        "tamper_controls": 11
+      },
+      "limits": [
+        "23 kinds in this batch; new assertions only fixture auto_growth/extent_request. Combined foundation42 ordinary executed,20 unexecuted,1 invalid-control-only; not all kinds exhaustive.",
+        "20-file final-v1 plus1044 referenced original evidence files. Final-v1 alone is not a portable complete archive. Relocation control covers frozeninput+one4KiB warm case, not wholecollection relocation.",
+        "Diagnostic times are perturbed; no latency-savings or total-process-memory claim.",
+        "No multi-owner contention evidence from peakowner1."
+      ]
+    },
+    {
+      "id": "default_FF_execution_audit",
+      "status": "new_passed",
+      "axis": "execution_integrity",
+      "authority_ids": [
+        "default_AA"
+      ],
+      "claim": "One accepted F/F calibration executed all 78 exact invocations, with audited equality and empty cleanup.",
+      "counts": {
+        "processes": 78,
+        "warmup": 6,
+        "measured": 72
+      },
+      "limits": [
+        "Noise qualification recorded separately; no D/F comparison."
+      ]
+    },
+    {
+      "id": "default_FF_noise",
+      "status": "failed",
+      "axis": "noise_qualification",
+      "authority_ids": [
+        "default_AA"
+      ],
+      "claim": "All 4 metric rows and their anchors fail preregistered noise qualification.",
+      "counts": {
+        "failed_metric_rows": 4
+      },
+      "limits": [
+        "Not execution failure or proof of F regression/equivalence.",
+        "No retry; no 2% detection claim."
+      ]
+    },
+    {
+      "id": "network_AA_execution_audit",
+      "status": "new_passed",
+      "axis": "execution_integrity",
+      "authority_ids": [
+        "network_AA"
+      ],
+      "claim": "112 invocations completed with exit0, no timeouts, empty stderr and cleanup; raw/wire audit accepted.",
+      "counts": {
+        "processes": 112
+      },
+      "limits": [
+        "Per-size qualification is separate."
+      ]
+    },
+    {
+      "id": "network_AA_1MiB_noise",
+      "status": "new_passed",
+      "axis": "noise_qualification",
+      "authority_ids": [
+        "network_AA"
+      ],
+      "claim": "1048576-byte stable-window qualification passes.",
+      "nominal_bytes": 1048576,
+      "limits": [
+        "Does not carry qualification into a later window."
+      ]
+    },
+    {
+      "id": "network_AA_other_sizes_noise",
+      "status": "failed",
+      "axis": "noise_qualification",
+      "authority_ids": [
+        "network_AA"
+      ],
+      "claim": "4096,65536,16777216-byte stable windows fail; no retries.",
+      "nominal_bytes": [
+        4096,
+        65536,
+        16777216
+      ],
+      "limits": [
+        "65536 local A/A passes but anchor drift fails.",
+        "16777216 anchor drift passes but local A/A fails."
+      ]
+    },
+    {
+      "id": "D026_pool_execution_audit",
+      "status": "new_passed",
+      "axis": "execution_integrity",
+      "authority_ids": [
+        "D026_pool"
+      ],
+      "claim": "One 1MiB pool-screening window: 88 native processes all exit0, no timeout, empty stderr and cleanup.",
+      "counts": {
+        "processes": 88,
+        "iterations_per_process": 4,
+        "pairs_per_contrast": 8,
+        "wire_files": 352,
+        "wire_bytes": 369222656
+      },
+      "limits": [
+        "Research execution/integrity acceptance does not establish performance gain."
+      ]
+    },
+    {
+      "id": "D026_pool_local_AA",
+      "status": "new_passed",
+      "axis": "noise_component",
+      "authority_ids": [
+        "D026_pool"
+      ],
+      "claim": "Local A/A qualifies for both none-cold and none-warm.",
+      "contrasts": [
+        "none-cold",
+        "none-warm"
+      ],
+      "limits": [
+        "A component pass does not override stable-window failure."
+      ]
+    },
+    {
+      "id": "D026_pool_stable_windows",
+      "status": "failed",
+      "axis": "noise_qualification",
+      "authority_ids": [
+        "D026_pool"
+      ],
+      "claim": "Both none-cold and none-warm fail stable-window/anchor-drift qualification.",
+      "maximum_side_drift_percent": {
+        "none-cold": 6.546726172596351,
+        "none-warm": 2.4762440626253217
+      },
+      "relative_drift_limit": 0.01,
+      "limits": [
+        "No performance superiority/equivalence or experimental candidate rejection.",
+        "No rerun, other sizes, implementation or adoption."
+      ]
+    },
+    {
+      "id": "D027_owner_functional26",
+      "status": "new_passed",
+      "axis": "scoped_runtime",
+      "authority_ids": [
+        "D027_owner"
+      ],
+      "claim": "26 exact owner cases accepted: 18 ordinary successes and 8 asserted expected exit2 controls.",
+      "counts": {
+        "processes": 26,
+        "success": 18,
+        "expected_failure": 8
+      },
+      "case_ids": [
+        "diagnostic-fail_allocate",
+        "diagnostic-fail_create",
+        "diagnostic-fail_verify",
+        "diagnostic-partial_startup",
+        "diagnostic-r256-o256-t1",
+        "diagnostic-r256-o256-t2",
+        "diagnostic-r256-o256-t4",
+        "diagnostic-r256-o256-t8",
+        "diagnostic-r256-o64-t1",
+        "diagnostic-r256-o8-t1",
+        "timing-fail_allocate",
+        "timing-fail_create",
+        "timing-fail_verify",
+        "timing-partial_startup",
+        "timing-r256-o256-t1",
+        "timing-r256-o256-t2",
+        "timing-r256-o256-t4",
+        "timing-r256-o256-t8",
+        "timing-r256-o64-t1",
+        "timing-r256-o8-t1",
+        "timing-r8192-o256-t1",
+        "timing-r8192-o256-t2",
+        "timing-r8192-o256-t4",
+        "timing-r8192-o256-t8",
+        "timing-r8192-o64-t1",
+        "timing-r8192-o8-t1"
+      ],
+      "limits": [
+        "Failure controls cover fail_allocate/fail_create/fail_verify/partial_startup in both profiles, not OS OOM.",
+        "No recompile after D022; original first case not retried.",
+        "No formal timing."
+      ]
+    },
+    {
+      "id": "owner_original_checker_failure",
+      "status": "failed",
+      "axis": "historical_tooling_failure",
+      "authority_ids": [
+        "D027_owner",
+        "D029_owner_archive"
+      ],
+      "claim": "Original group00 collection failed because checker assumed16 bytes; preserve failure and original stdout.",
+      "resolution": "D022 supplemental audit accepts valid original case under corrected exact-profile assumption; not a native rerun and not a current functional failure."
+    },
+    {
+      "id": "owner_group01_preflight_failure",
+      "status": "failed",
+      "axis": "historical_preflight_failure",
+      "authority_ids": [
+        "D027_owner",
+        "D029_owner_archive"
+      ],
+      "claim": "Original group01 preflight failed with zero native processes.",
+      "counts": {
+        "native_processes": 0
+      },
+      "resolution": "Preserved history; groups02..08 execute the remaining25 original cases. No retry of the first case."
+    },
+    {
+      "id": "W2_network_initial_link_failure",
+      "status": "failed",
+      "axis": "historical_build_failure",
+      "authority_ids": [
+        "W2_network"
+      ],
+      "claim": "First compiler-driver link failure retained; no workload ran in that failed build.",
+      "resolution": "Scoped final build/collection accepted separately; historical failure not erased."
+    },
+    {
+      "id": "D029_pool_portable_audit",
+      "status": "new_passed",
+      "axis": "portable_evidence_audit",
+      "authority_ids": [
+        "D029_pool_archive"
+      ],
+      "claim": "Portable pool supplement accepted: key bytes/member manifest and copied frozen audit match.",
+      "counts": {
+        "window_files": 865,
+        "internal_hardlink_groups": 494,
+        "original_shared_inodes": 0
+      },
+      "limits": [
+        "No additional88 native execution or repeated369MB wire/statistics audit."
+      ]
+    },
+    {
+      "id": "D029_owner_portable_audit",
+      "status": "new_passed",
+      "axis": "portable_evidence_audit",
+      "authority_ids": [
+        "D029_owner_archive"
+      ],
+      "claim": "462 unique regular members match manifest; original/archive/relocated final audit equal; independent queue exit0 and cleanup empty.",
+      "counts": {
+        "regular_files": 462,
+        "new_native_processes": 0
+      },
+      "limits": [
+        "Formal timing remains separate.",
+        "Historical failed records retained."
+      ]
+    },
+    {
+      "id": "D028_G3_decision_deliverable",
+      "status": "new_passed",
+      "axis": "reviewed_decision_document",
+      "authority_ids": [
+        "D028_G3"
+      ],
+      "claim": "Current G3 decision deliverable accepted: retain F, all3 candidates prerequisite-unmet.",
+      "counts": {
+        "candidate_directions": 3,
+        "implementations": 0,
+        "experimental_rejections": 0,
+        "adoptions": 0
+      },
+      "limits": [
+        "Document acceptance is not candidate runtime execution or adoption."
+      ]
+    },
+    {
+      "id": "G3_owner-reuse",
+      "status": "prerequisite_unavailable",
+      "axis": "candidate_prerequisite",
+      "authority_ids": [
+        "D028_G3"
+      ],
+      "claim": "prerequisite_unmet_retain_F",
+      "known_cost": "Warm F already reuses mappings, but retains freshowner registration/metadata/load work; no exact removable end-to-end fraction.",
+      "reason": "Choose exact object/reservation/Core reuse, load-only commit/rollback and full active/spare resource accounting; give baseline equal-work pooled load+swap ifoldvalue preserved; obtain interpretable calibrated representative evidence.",
+      "cost_fraction": null
+    },
+    {
+      "id": "G3_new-staging-direct-read",
+      "status": "prerequisite_unavailable",
+      "axis": "candidate_prerequisite",
+      "authority_ids": [
+        "D028_G3"
+      ],
+      "claim": "prerequisite_unmet_retain_F",
+      "known_cost": "Owningreceive string toowner payloadcopy exists; wholeload phase isnot removablecopytime.",
+      "reason": "Select oneendpoint, prezero versus unpublishedfill mechanism, fullV1admission/graphverification beforetypedpublish, partialread/cancelcompletion and futurezeroing; accountresources and measure nettoend benefit against equalwork F.",
+      "cost_fraction": null
+    },
+    {
+      "id": "G3_reduce-output-copy",
+      "status": "prerequisite_unavailable",
+      "axis": "candidate_prerequisite",
+      "authority_ids": [
+        "D028_G3"
+      ],
+      "claim": "prerequisite_unmet_retain_F",
+      "known_cost": "Response owningstring materialization exists; save_verified doesnot fullgraphscan, bothloadscans remain.",
+      "reason": "Define ownedheader, immutableexclusivepayload, shortsend progress, actualcompletion/cancelcompletion, backpressureretention/late release and exactV1bytes; calibrated endtoend comparison including changedlifetimes.",
+      "cost_fraction": null
+    },
+    {
+      "id": "D030_tool_proposal_checks",
+      "status": "new_passed",
+      "axis": "tooling_and_proposal_review",
+      "authority_ids": [
+        "D030_proposal",
+        "D031_approval_copy"
+      ],
+      "claim": "Exact measurement tools/proposal accepted; 41 normal and41 optimized synthetic/mock tests and prepare/relocation receipts reviewed.",
+      "counts": {
+        "normal_synthetic_tests": 41,
+        "optimized_synthetic_tests": 41
+      },
+      "limits": [
+        "Not native measurement evidence.",
+        "Full external content closure remains collector pre/post requirement.",
+        "D032 accepts51-test suite including these41 plus10 new regressions; preserved D031 defect remains separately recorded."
+      ]
+    },
+    {
+      "id": "D030_authorization_document",
+      "status": "not_applicable_with_reason",
+      "axis": "authorization",
+      "authority_ids": [
+        "D030_proposal",
+        "D030_approval"
+      ],
+      "claim": "One-window authorization accepted; not an execution test case.",
+      "reason": "D030 is execution authorization only and is excluded from runtime pass counts; D033 separately accepts the original78 execution and the original/derived offline supplement."
+    },
+    {
+      "id": "owner78_actual_measurement",
+      "status": "new_passed",
+      "axis": "accepted_descriptive_measurement_execution",
+      "authority_ids": [
+        "D030_proposal",
+        "D030_approval",
+        "D031_approval_copy",
+        "D032_tool_fix",
+        "owner_measurement_final"
+      ],
+      "claim": "D033 accepts one exact78-process owner window:6 preruns+72 measured, all exit0, no timeout, cleanup empty; original samples unchanged.",
+      "limits": [
+        "A/free versus C/free is a single-window fixed-request phase observation; owner count changes per-owner workload and metadata.",
+        "All multithread comparisons uncertain; no thread-scaling or registry-lock/hash causal conclusion.",
+        "Clocks include scheduling/barriers/bookkeeping and exclude other lifecycle work; not lookup latency, full application lifetime or production tails.",
+        "No default D/F result, 2 percent regression claim, optimization/adoption or production benefit.",
+        "Native producer timing_evidence=false remains unchanged; authorization and qualification are separate artifacts."
+      ],
+      "counts": {
+        "processes": 78,
+        "preruns": 6,
+        "measured": 72,
+        "conditions": 6,
+        "phases": 4,
+        "cells": 24,
+        "comparisons": 24,
+        "new_native_after_original_window": 0,
+        "rebuilds": 0
+      },
+      "qualification_summary": {
+        "qualified_cells": 7,
+        "uncertain_cells": 17,
+        "qualified_comparisons": 2,
+        "nonself_qualified_comparisons": 1,
+        "uncertain_comparisons": 22,
+        "all_multithread_comparisons_uncertain": true
+      },
+      "final_authority": {
+        "status": "accepted_bound",
+        "id": "owner_measurement_final",
+        "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+        "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+        "bytes": 6870,
+        "schema_version": 1,
+        "decision": "D033",
+        "accepted_status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+        "document_read": true,
+        "scope": "Final bounded owner research, explicit partial qualification and original/derived offline archive accepted. No G4-wide freeze or independent final-review acceptance is fabricated."
+      }
+    },
+    {
+      "id": "W1_network_ASan_runtime",
+      "status": "prerequisite_unavailable",
+      "axis": "sanitizer_prerequisite",
+      "authority_ids": [
+        "W1_network"
+      ],
+      "claim": "Network experimental-source ASan runtime validation not executed.",
+      "reason": "Actual failed link: frozen P2996 compiler requires ___asan_version_mismatch_check_v8; available Apple runtime exports ___asan_version_mismatch_check_apple_clang_2100. No bypass or repeated known failure."
+    },
+    {
+      "id": "native_Windows_storage_consumer",
+      "status": "prerequisite_unavailable",
+      "axis": "platform_prerequisite",
+      "authority_ids": [
+        "platform"
+      ],
+      "claim": "Native Windows storage/consumer execution not established.",
+      "reason": "Needs reachable native Windows x64 execution channel, MSVC C++17, Windows SDK, Python and CMake; frozen ZIP integrity is not runtime evidence."
+    },
+    {
+      "id": "native_Windows_full_P2996",
+      "status": "prerequisite_unavailable",
+      "axis": "platform_prerequisite",
+      "authority_ids": [
+        "platform"
+      ],
+      "claim": "Native Windows full reflected library execution not established.",
+      "reason": "Separate compatible Windows P2996 compiler/library toolchain and native execution channel required; MSVC storage-only availability would not establish this."
+    },
+    {
+      "id": "independent_native_Linux_performance",
+      "status": "prerequisite_unavailable",
+      "axis": "platform_prerequisite",
+      "authority_ids": [
+        "platform",
+        "D015_profiles"
+      ],
+      "claim": "Independent native Linux performance unverified.",
+      "reason": "No reachable independent native Linux performance device/channel established; configured SSH attempt timed out exit255. Local ARM64 VM architecture-native code and amd64 emulation do not establish the independent-host claim."
+    },
+    {
+      "id": "real_business_consumer",
+      "status": "prerequisite_unavailable",
+      "axis": "business_prerequisite",
+      "authority_ids": [
+        "D028_G3",
+        "W1_network"
+      ],
+      "claim": "Actual business consumer remains unevaluated.",
+      "reason": "unevaluated; protocol/library,schema/size distribution,concurrency/completion/failure/resource requirements remain unspecified"
+    },
+    {
+      "id": "default_DF_attribution",
+      "status": "prerequisite_unavailable",
+      "axis": "measurement_prerequisite",
+      "authority_ids": [
+        "default_AA",
+        "W2_foundation"
+      ],
+      "claim": "Default D/F attribution and N3 completion remain open.",
+      "reason": "Accepted default F/F calibration failed noise gates; parent forbids retry/D-F/ablation in this round. No valid comparison currently supports causal cost fractions."
+    },
+    {
+      "id": "conditional_ablation",
+      "status": "not_applicable_with_reason",
+      "axis": "conditional_research",
+      "authority_ids": [
+        "default_AA",
+        "D028_G3"
+      ],
+      "claim": "No ablation claim or execution in this delivery.",
+      "reason": "Conditional follow-up not activated; no default D/F qualification and no further current network execution authorization."
+    },
+    {
+      "id": "blanket_base_rerun",
+      "status": "not_applicable_with_reason",
+      "axis": "unselected_execution",
+      "authority_ids": [
+        "base_inheritance",
+        "D015_profiles"
+      ],
+      "claim": "No blanket base C++ rerun.",
+      "reason": "Parent accepted scoped inheritance and zero unconditional new base C++ jobs; no automatic rerun from missing historical seals."
+    },
+    {
+      "id": "ordinary_Linux48_claim",
+      "status": "not_applicable_with_reason",
+      "axis": "unselected_claim",
+      "authority_ids": [
+        "base_inheritance",
+        "D015_profiles"
+      ],
+      "claim": "No ordinary Linux48 claim.",
+      "reason": "Historical ordinary46 plus sanitized allocator2 is not ordinary48. Only the2 normal allocator cases would be conditional if parent later chooses that additional claim."
+    },
+    {
+      "id": "current_default_TSan_claim",
+      "status": "not_applicable_with_reason",
+      "axis": "unselected_claim",
+      "authority_ids": [
+        "D015_profiles"
+      ],
+      "claim": "No current-default TSan deployment-profile claim.",
+      "reason": "Delivery preserves actual historical -mmacosx-version-min=10.15 compiler-option profile on macOS26.6.2 arm64; no changed/default configuration execution required for that narrower claim."
+    },
+    {
+      "id": "production_async_API_or_candidate_adoption",
+      "status": "not_applicable_with_reason",
+      "axis": "unselected_claim",
+      "authority_ids": [
+        "W1_network",
+        "D028_G3"
+      ],
+      "claim": "No production async transport/API or candidate adoption claim.",
+      "reason": "Accepted synchronous reference and scoped diagnostic research; three candidates remain unimplemented and prerequisite-unmet."
+    },
+    {
+      "id": "stable_source_staging_comparison",
+      "status": "new_passed",
+      "axis": "read_only_source_comparison",
+      "authority_ids": [
+        "stable_source_staging",
+        "base_inheritance",
+        "D015_profiles"
+      ],
+      "claim": "Parent validation queue produced stable-source staging/difference record:225files/2970586bytes;21base candidate inputs same; experimental handoff checked sources same;0new C++ jobs.",
+      "counts": {
+        "files": 225,
+        "source_bytes": 2970586,
+        "same_base_candidate_inputs": 21,
+        "stageIII_records": 129,
+        "nonruntime_differences": 3,
+        "experimental_handoff_sources": 29,
+        "parent_accepted_preserved_items": 9
+      },
+      "limits": [
+        "README documentary difference and2unused offline allocator auditors are outside C++ closure.",
+        "This index reads only that small record; no independent225-file rescan.",
+        "The original stable cut has final_G4_frozen=false; D032/D033 now close its owner metadata deferral. Overall final G4 seal remains a separate parent artifact.",
+        "tools/sigs/.gitkeep is an unchanged110B comment placeholder outside the225-file package;129 is a historical comparison count, not a bundle-membership claim."
+      ]
+    },
+    {
+      "id": "D031_approval_copy_offline_failure",
+      "status": "failed",
+      "axis": "preserved_tooling_offline_failure",
+      "authority_ids": [
+        "D031_approval_copy",
+        "D030_proposal",
+        "D032_tool_fix",
+        "owner_measurement_final"
+      ],
+      "claim": "Frozen collector rewrote approval JSON with sorted keys while receipts pin original approval bytes; frozen auditor correctly rejects copied approval hash.",
+      "resolution": "Original failed offline archive receipt remains preserved. D032 accepted byte-preserving future collector/regressions; D033 accepted explicit original/derived supplement and complete relocation. Sole derived approval.json difference declared; no original window/tool/sample rewrite or native rerun.",
+      "limits": [
+        "Parsed object equality is not byte identity; do not weaken hash/schedule/semantic/statistical checks.",
+        "No library runtime failure or statistical outcome inferred from this tooling failure."
+      ]
+    },
+    {
+      "id": "D032_tool_fix_regressions",
+      "status": "new_passed",
+      "axis": "accepted_tooling_regressions",
+      "authority_ids": [
+        "owner_measurement_final",
+        "D032_tool_fix"
+      ],
+      "claim": "Byte-preserving collector and minimal original/derived supplement accepted with51 normal and51 optimized tests.",
+      "counts": {
+        "normal": 51,
+        "optimized": 51,
+        "existing_included": 41,
+        "new_regressions": 10,
+        "native_processes": 0
+      },
+      "limits": [
+        "51 tests include the earlier41; do not add these suites as disjoint test cases.",
+        "Frozen original tools unchanged; no historical samples or original approval copy rewritten.",
+        "Source/log hashes are copied from D032 accepted authority, not rehashed here."
+      ]
+    },
+    {
+      "id": "D033_owner_qualified_subset",
+      "status": "new_passed",
+      "axis": "noise_qualification_subset",
+      "authority_ids": [
+        "owner_measurement_final"
+      ],
+      "claim": "7/24 cells and2/24 comparisons qualify; comparison C/free is a self-comparison, leaving one qualified nonself A/free versus C/free.",
+      "qualified_cells": [
+        {
+          "condition": "A",
+          "phase": "allocate"
+        },
+        {
+          "condition": "A",
+          "phase": "free"
+        },
+        {
+          "condition": "B",
+          "phase": "create"
+        },
+        {
+          "condition": "B",
+          "phase": "allocate"
+        },
+        {
+          "condition": "B",
+          "phase": "destroy"
+        },
+        {
+          "condition": "C",
+          "phase": "free"
+        },
+        {
+          "condition": "D",
+          "phase": "create"
+        }
+      ],
+      "qualified_comparisons": [
+        {
+          "condition": "A",
+          "phase": "free",
+          "reference_condition": "C",
+          "median": 0.5747111004931337,
+          "min": 0.5621138261206782,
+          "max": 0.5845460436670925,
+          "ratios": [
+            0.566657672171826,
+            0.58179880109027,
+            0.5719407055128228,
+            0.5845460436670925,
+            0.5621138261206782,
+            0.5774814954734445
+          ],
+          "direction": "all_lower"
+        },
+        {
+          "condition": "C",
+          "phase": "free",
+          "reference_condition": "C",
+          "median": 1.0,
+          "min": 1.0,
+          "max": 1.0,
+          "ratios": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "direction": "unresolved"
+        }
+      ],
+      "limits": [
+        "Single-window descriptive phase observations only.",
+        "A/free versus C/free median ratio0.5747111004931337 is not a causal registry gain or general adoption conclusion.",
+        "Native producer timing_evidence=false remains unchanged."
+      ]
+    },
+    {
+      "id": "D033_owner_unqualified_subset",
+      "status": "failed",
+      "axis": "noise_qualification",
+      "authority_ids": [
+        "owner_measurement_final"
+      ],
+      "claim": "17/24 cells and22/24 comparisons do not meet complete preregistered qualification and remain uncertain; all multithread comparisons uncertain.",
+      "counts": {
+        "uncertain_cells": 17,
+        "uncertain_comparisons": 22
+      },
+      "status_reason": "Failed eligibility gates, not failed native execution or rejected data; preserve all24cells/24comparisons.",
+      "limits": [
+        "No thread-scaling or registry-lock/hash causal conclusion.",
+        "No retry, extra samples,2% regression or production-tail claim."
+      ]
+    },
+    {
+      "id": "D033_owner_offline_portable",
+      "status": "new_passed",
+      "axis": "portable_evidence_audit",
+      "authority_ids": [
+        "owner_measurement_final",
+        "D032_tool_fix"
+      ],
+      "claim": "D033 accepts complete original/derived offline package and relocated audit;698 payload files/8891188bytes,0new native.",
+      "counts": {
+        "payload_files": 698,
+        "payload_bytes": 8891188,
+        "new_native_processes": 0
+      },
+      "recorded_result": {
+        "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+        "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7"
+      },
+      "recorded_receipt": {
+        "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+        "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055"
+      },
+      "recorded_payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+      "only_derived_difference": [
+        {
+          "derived_bytes": 688,
+          "derived_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+          "original_bytes": 688,
+          "original_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+          "path": "approval.json"
+        }
+      ],
+      "limits": [
+        "Payload counts exclude result.json and COMPLETE; relocation scope includes both.",
+        "Derived window is not original bytes; only approval.json differs.",
+        "Original failed archive receipt and native window preserved; full inventory was first created during D031 supplement, not a pre-D030 authority pin.",
+        "Digests and audit results copied from accepted D033 authority; no698-file scan or hash by this index writer."
+      ]
+    }
+  ],
+  "further_work_authorized_by_this_index": false,
+  "row_counts_by_classification": {
+    "new_passed": 19,
+    "inherited_same_identity": 8,
+    "failed": 8,
+    "prerequisite_unavailable": 9,
+    "not_applicable_with_reason": 6
+  },
+  "publication_note": "D033 final authority bound; owner78 pending resolved; D031 original failure retained with separately accepted repair and original/derived offline supplement. No new execution or archive scan by index publication.",
+  "completion_authority": {
+    "status": "accepted_bound",
+    "id": "owner_measurement_final",
+    "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+    "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+    "bytes": 6870,
+    "schema_version": 1,
+    "decision": "D033",
+    "accepted_status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+    "document_read": true,
+    "scope": "Final bounded owner research, explicit partial qualification and original/derived offline archive accepted. No G4-wide freeze or independent final-review acceptance is fabricated."
+  },
+  "parent_finalization_boundary": "All research result rows are terminal. Final G4 source sealing and independent final-review acceptance are parent-owned and are not asserted by this index."
+}

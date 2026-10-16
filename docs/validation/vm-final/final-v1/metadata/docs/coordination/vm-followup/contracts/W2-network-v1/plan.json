@@ -1,0 +1,228 @@
+{
+  "anchor_census": "anchor-census.json",
+  "anchor_count": 20,
+  "candidate_evidence_scope": {
+    "direct_staging": "receive logical init+capacity and load explicit payload copies; no malloc/kernel-copy exactness",
+    "owner_reuse": "registration/metadata/OS-event baseline includes F warm; no candidate implemented",
+    "reduce_output_copy": "save explicit payload/header copies plus original send ownership lifetime; no borrowed-send approval"
+  },
+  "cpp_builds_this_turn": 0,
+  "cpp_runs_this_turn": 0,
+  "default_DF_reproduction_dependency": false,
+  "design_handoff_date_local": "2026-10-16",
+  "design_revision": 2,
+  "design_revision_reason": "parent latest instruction: retain the smaller 2048 budget and add explicit hard_events_per_thread_max before any execution",
+  "formal_timing_evidence": false,
+  "future_validation": {
+    "functional": "W1 exact marker/label/count/all values remain checked; per-output bytes/SHA/length equal matching original W1 and acrosspool modes",
+    "negative_design": [
+      "missing/duplicate case or work index",
+      "warmup prefix removed",
+      "wrong copy byte count or owner generation",
+      "wrong domain5 allocation/free",
+      "unexpected Core/growth path in normal run",
+      "unpaired or disallowed retained resource",
+      "raw stdout/input/output/binary mismatch",
+      "dropped/thread/event/label budget violation",
+      "dump before join",
+      "diagnostic promoted to timing evidence"
+    ],
+    "reuse": "existing W4 queue and W2 fixed auditor; do not rerun accepted fixed probes",
+    "warm_byte_oracle": "N3 owning warm observation versus canonical original W1 work0 under the same input, mode and budgets; no claim of an original W1 warm artifact",
+    "warm_lifetime_change": "short owning Sample block archives output and destroys it before work0; longer warm string lifetime and file I/O are diagnostic preparation overhead; no added arena owner or arena moves"
+  },
+  "implementation_authorized_by_this_design": false,
+  "matrix": {
+    "chunk_bytes": 65536,
+    "connection_count": 1,
+    "elements_rule": "nominal_bytes/4",
+    "estimated_new_raw_output_MiB": 257,
+    "fixture_cases_separate": 4,
+    "job_timeout_seconds": 180,
+    "max_inflight_bytes": 134217728,
+    "max_inflight_requests": 1,
+    "max_wire_bytes": 33554432,
+    "maximum_total_new_processes_including_matching_W1_references": 32,
+    "network_cases": 12,
+    "new_evidence_budget_bytes": 536870912,
+    "nominal_bytes": [
+      4096,
+      65536,
+      1048576,
+      16777216
+    ],
+    "one_case_per_process": true,
+    "owner_capacity_bytes": 33554432,
+    "pool_idle_budget_each": 33619968,
+    "pools": [
+      "none",
+      "cold",
+      "warm"
+    ],
+    "timeout_ms": 30000,
+    "warmup_iterations": {
+      "cold": 0,
+      "none": 0,
+      "warm": 1
+    },
+    "work_iterations": 2
+  },
+  "no_mutations": [
+    "production headers",
+    "W1/W3 files",
+    "W1/W2 accepted contracts",
+    "existing frozen implementation/handoff snapshots",
+    "historical evidence"
+  ],
+  "planned_output_only_in_W2": {
+    "generated_consumer": "network-diagnostic/consumer-copy",
+    "n3_trace": "unchanged n3-events-v1 and 63-kind catalog",
+    "raw_w1_stdout": "unchanged W1 revision2 JSON; phase durations archive only",
+    "sidecar_schema_draft": "n3-network-cost-sidecar-v1"
+  },
+  "predictions_not_results": {
+    "E": "2+(pool==warm)",
+    "H": 88,
+    "P_equal": "must assert Pi=Po using original W1 outputs",
+    "Pi": "Wi-H",
+    "Po": "Wo-H",
+    "after_run_teardown": "active registry0, domains1/3/4/5 outstanding0, domain2 exactly one preflight-created retained bucket allocation16 bytes on pinned libc++",
+    "construction_prefix": "match load_payload_copy/OS/pool events before registry_register to the unique later successful register in the same thread, endpoint/cycle/load phase and base; never use the prior ended generation",
+    "domain5_per_verified_load": {
+      "allocation_calls": 4,
+      "assumption": "frozen libc++ vector capacities1/2/4/8 and sizeof(WireValidationRange)=16; reject mismatch",
+      "deallocation_calls": 4,
+      "free_ranges": 0,
+      "owned_ranges": 5,
+      "peak_scope": "domain5 local load peak, and domain5 peak along this strictly synchronous chain; not all-domain or process peak",
+      "requested_bytes": 240,
+      "transient_observation_peak_bytes": 192
+    },
+    "fixture_max_simultaneous_registered_owners": 2,
+    "generic_summarizer_not_sufficient": "requires network-specific phase/copy/count/resource/output assertions",
+    "input_output_label_bytes": 21,
+    "new_kinds_from_separate_fixture": {
+      "auto_growth": 1,
+      "cache_flush": 0,
+      "extent_request": 2,
+      "wire_transfer_attempt": 0
+    },
+    "per_exchange": {
+      "core_or_wire_allocations_or_transfers": 0,
+      "growth_or_element_migration_events": 0,
+      "load_header_copy_bytes": "2H",
+      "load_payload_copy_bytes": "Pi+Po",
+      "save_header_copy_bytes": "H",
+      "save_payload_copy_bytes": "Po",
+      "string_assign_copy_bytes": 21,
+      "string_assign_copy_calls": 1
+    },
+    "pool_after_final_clear": "idle blocks/reserved/accessible all0",
+    "register_and_erase_total": "1+2E each",
+    "run_max_simultaneous_registered_owners": 1,
+    "warm_prefix": "mandatory full trace retained"
+  },
+  "prohibited_inferences": [
+    "phase times sum to end-to-end saving",
+    "byte share is latency saving share",
+    "shared metadata is owner exclusive",
+    "pool idle mappings are simultaneously live owners",
+    "declarations imply paths executed",
+    "network synthetic result is production benefit"
+  ],
+  "recorder_budget": {
+    "dump": "only after run/fixture returned and worker joined; no emitting thread overlaps serialization",
+    "fixture_expected_threads_max": 1,
+    "forecast_exceeded_policy": "planned and hard thresholds are separately named but both 2048; exceeding the forecast is also a hard violation, with no grace range",
+    "hard_events_per_thread_max": 2048,
+    "hard_violation_policy": "over 2048 or other hard validity/thread/label/dropped failure rejects all costs for that condition and stops later conditions pending parent review; preserve raw records; no automatic rerun or expectation editing",
+    "label_utf8_max_bytes": 63,
+    "network_expected_threads_max": 2,
+    "on_overflow_or_budget_violation": "fail and stop; no interpretable costs; changing limits requires explicit new design revision and dispatch",
+    "planned_events_per_thread_max": 2048,
+    "runtime_events_per_thread": 16384,
+    "runtime_max_lifetime_threads": 16,
+    "sample_or_trim_allowed": false
+  },
+  "schema": "n3-network-minimal-design-v1",
+  "sidecar_draft": {
+    "bounded_data": [
+      "two work records and optional one warm record, each server/client IOProgress and receive logical init/header-copy/size/capacity",
+      "preflight, pool init, before-final-clear and final resource checkpoints",
+      "phase+thread+registry-generation cost summaries plus original allocation-subject ledger",
+      "at most one extra owning warm response file per warm case; compare to canonical original W1 work0 oracle; explicit diagnostic archival overhead"
+    ],
+    "diagnostic": true,
+    "identity_fields": [
+      "condition_id",
+      "nominal_bytes",
+      "elements",
+      "pool",
+      "work_iterations",
+      "warm_iterations",
+      "W1_prepared_result_sha256",
+      "W1_contract_revision",
+      "W1_contract_sha256",
+      "W2_snapshot_sha256",
+      "generated_consumer_sha256",
+      "anchor_manifest_sha256",
+      "binary_sha256",
+      "raw_stdout_sha256",
+      "input_sha256",
+      "output_sha256s",
+      "trace_sha256"
+    ],
+    "no_new_N3_kind": true,
+    "not_costs": [
+      "W1 timing fields are archived only",
+      "capacity snapshots are not physical allocation bytes",
+      "logical string init is not actual libc memset",
+      "socket bytes are not memcpy or kernel copy counts"
+    ],
+    "retained_policy": "exact domains and request class/count/bytes/subject origin checked, not generic allow-domain2",
+    "schema": "n3-network-cost-sidecar-v1",
+    "server_string_completion": "checkpoint after Worker result_=serve_one(...) returns and before existing done publication; no guard mutation of returned local ServerResult and no NRVO dependency",
+    "timing_evidence": false,
+    "units_and_checkpoints": {
+      "client_output_capacity": "snapshot after receive assignment while output live",
+      "extra_pool_stats": "label diag.pool.check, retain lock events and separate diagnostic-only query cost",
+      "hash_binding": "native raw observation first; post-exit collector emits final immutable sidecar binding stdout/trace/binary/outputs without changing W1 stdout",
+      "header_assembly": "completed original memcpy calls and 88-byte extent; separate from socket bytes",
+      "receive_capacity": "uint64 char capacity excluding terminator; snapshot while string live, not backend bytes",
+      "receive_size_init_extent": "uint64 wire bytes including the 88-byte header; logical constructor request",
+      "saved_capacity": "snapshot after save while owning saved string live",
+      "server_strings_released": "boolean set in worker after serve_one returns, before done publication; C++ lifetime only"
+    }
+  },
+  "source_bindings": {
+    "build/vm-network/prepared-v2/result.json": "2af642fcd617b1fa193873b46f2892549e8d9dabcd457953bae2b8f7d5ac65fd",
+    "build/vm-network/prepared-v2/source/contract.json": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "build/vm-network/prepared-v2/source/frame_model.hpp": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb",
+    "build/vm-network/prepared-v2/source/frame_model_tests.hpp": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c",
+    "build/vm-network/prepared-v2/source/net_reference.cpp": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+    "build/vm-network/prepared-v2/source/xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "build/vm-network/prepared-v2/source/xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+    "docs/coordination/vm-followup/W2-G1-acceptance.json": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json": "2adf22ec0e4bc94cabc9fa370add79ecd1a7e1218eca628518ba44bf43e52ab2",
+    "docs/coordination/vm-followup/contracts/W1-revision2/contract.json": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+    "docs/validation/vm-observability/frozen-implementation-v1/source/audit_events.py": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+    "docs/validation/vm-observability/frozen-implementation-v1/source/contract.json": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "docs/validation/vm-observability/frozen-implementation-v1/source/event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "docs/validation/vm-observability/frozen-implementation-v1/source/generate.py": "94785b7c11ac7c2dfa0dc5913a59a66a06629caf8522a64cc1701d002ebdc826",
+    "docs/validation/vm-observability/frozen-implementation-v1/source/n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "experiments/vm_network_measurement/network-preregister.json": "d21c5b0ed6547f0657c53cbfb73230729eaece902055c946145f65070198e8e1"
+  },
+  "source_bindings_policy": {
+    "context_meaning": "the W3 file hash identifies the read-only control reference observed while designing; the explicit controls in this plan are fixed independently, and later W3 artifact binding does not block this design",
+    "context_only": [
+      "experiments/vm_network_measurement/network-preregister.json"
+    ],
+    "formal_W3_measurement_dependency": false,
+    "strict_inputs": "W1 prepared-v2 source/result and accepted revision2; accepted W2 frozen foundation/runtime/catalog"
+  },
+  "status": "design_ready_for_review",
+  "w1_contract_gate_revision": 2,
+  "w1_source": "build/vm-network/prepared-v2/source",
+  "w2_snapshot_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d"
+}

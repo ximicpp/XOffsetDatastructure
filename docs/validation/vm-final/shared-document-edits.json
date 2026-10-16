@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "proposal_only_awaiting_exact_shared_file_window",
+  "observed_at": "2026-10-16T01:13:14.080364+08:00",
+  "shared_files_written": false,
+  "public_API_changed": false,
+  "CXX_examples_changed": false,
+  "new_workloads": 0,
+  "basis": "Current working-tree bytes, not Git HEAD; three exact README anchors, no other proposed mutation",
+  "input_files": [
+    {
+      "path": "README.md",
+      "sha256": "cf62faed1f71adf6c77b4a32717c28550c4f66c886c8c1e46eaf8917a7e4f06b",
+      "bytes": 13405
+    },
+    {
+      "path": "docs/STABLE_VM_STORAGE_MIGRATION.md",
+      "sha256": "8d9044b9703713e677712e76d982860c544e2bade2436a3de15b873c3a0950ba",
+      "bytes": 11445
+    },
+    {
+      "path": "examples/stable_storage.cpp",
+      "sha256": "9d2b0747aa0a4afe9a2d9f2444b014b72bf08a484494721a6569e8b0bc33d9bf",
+      "bytes": 2358
+    }
+  ],
+  "edits": [
+    {
+      "id": "README-1",
+      "line_at_observation": 16,
+      "anchor": "Reflection is required. There is no non-reflection fallback mode in this repository.",
+      "replacement": "The reflected public library requires P2996; its API has no non-reflection fallback.\nThe independent `xoffset_virtual_memory.hpp` storage layer requires C++17.",
+      "reason": "Current repository includes an independent C++17 storage target; qualify the reflection requirement to the existing reflected public API.",
+      "file": "README.md"
+    },
+    {
+      "id": "README-2",
+      "line_at_observation": 125,
+      "anchor": "OS-only platform checks and full P2996 support are reported separately.",
+      "replacement": "OS-only platform checks and full P2996 support are reported separately.\nValidation is profile-specific: native Windows execution and independent native\nLinux performance remain unverified. The recorded Linux amd64 full-library\nprofile was emulated on an ARM64 host; ARM64 GNU storage results are separate.",
+      "reason": "Distinguish implemented OS APIs from executed platform validation, and recorded emulation from native performance.",
+      "file": "README.md"
+    },
+    {
+      "id": "README-3",
+      "line_at_observation": 127,
+      "anchor": "package and the current policy decisions.",
+      "replacement": "package and the current policy decisions.\n\nThe [experimental synchronous TCP reference consumer](docs/VM_NETWORK_IMPLEMENTATION.md)\nhas accepted native macOS functionality and lifecycle evidence. See\n[network measurement status](docs/VM_NETWORK_PERFORMANCE.md) for per-size calibration\nand pooled-comparison scope. Production transport and representative business\nintegration remain open; no new public I/O API has been adopted.",
+      "reason": "Add minimal N7 navigation and scope without promoting synchronous loopback evidence to production transport, business validation or an adopted API.",
+      "file": "README.md"
+    }
+  ],
+  "no_change": [
+    {
+      "file": "docs/STABLE_VM_STORAGE_MIGRATION.md",
+      "lines_at_observation": [
+        3,
+        124,
+        131,
+        177,
+        192,
+        198
+      ],
+      "reason": "Current F reservation/failure/VM semantics, owning copies, opt-in idle-only pool, allocator and fresh-load behavior remain accurate. No N7 production API or zero-copy claim requires migration changes."
+    },
+    {
+      "file": "examples/stable_storage.cpp",
+      "lines_at_observation": [
+        1,
+        23,
+        41
+      ],
+      "reason": "Existing public-header, stable-base/save-copy and opt-in Automatic/pool example uses unchanged F API. It contains no network/platform-validation or performance promise; no C++ change or baseline rerun needed."
+    }
+  ],
+  "patch": "docs/validation/vm-final/shared-document-edits.patch",
+  "patch_sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+  "apply_requirement": "Parent grants exact README.md write window; recheck expected input identity/anchors, then apply minimal edits. This task has no shared-file write authority."
+}

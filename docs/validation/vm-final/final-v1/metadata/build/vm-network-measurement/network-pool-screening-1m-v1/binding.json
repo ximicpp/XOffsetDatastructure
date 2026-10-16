@@ -1,0 +1,46 @@
+{
+  "adoption_allowed": false,
+  "approval_digest_environment": "VM_NETWORK_APPROVAL_SHA256",
+  "binder_sha256": "dcf8ea7b103647e1ff8429bfd9999f20ed91dc4f0f7d64d08c79a36fa09b3bef",
+  "binder_test_sha256": "e45f83059745f8c4b7350395b2500259544303e59b507a6202a8bb4724e224d4",
+  "binding_mode": "pool-screening-1m",
+  "fixture_audit": {
+    "adoption_allowed": false,
+    "auditor_protocol_sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+    "collector_runtime_provenance": {
+      "retrospective_identity_inferred": false,
+      "status": "unrecorded_in_functional_v1",
+      "timing_runtime_requirement_waived": false
+    },
+    "execution_protocol_sha256": "c53e484f9459cf0dc4e8d4e33c6b582fd8b4fa316c04023638b238d1dfa6dc59",
+    "fixtures": 4,
+    "functional_queue_identity": {
+      "manifest_sha256": "ac0ca10d5b069a417edaa4bd2212205004bd8937a656cc3c76a4482a9f164a72",
+      "request_sha256": "54988bac7400661305111a5fd236be5987557cf4fdbaea0b70edcdb9a61f1729",
+      "result_sha256": "827164a5b9d0deecf18d8f188726bc8002aaa38182f07cc86f95d5a7e43c48e7"
+    },
+    "functional_queue_verified": true,
+    "original_absolute_paths_accessed": false,
+    "paired_protocol_sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+    "status": "fixture_preparation_audited",
+    "timing_evidence": false
+  },
+  "fixture_execution_protocol_sha256": "c53e484f9459cf0dc4e8d4e33c6b582fd8b4fa316c04023638b238d1dfa6dc59",
+  "jobs": 88,
+  "native_calls_by_binder": 0,
+  "native_execution_authorized": false,
+  "network_sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+  "next_gate": "parent independent review of full source/functionality/data/preregistration; parent writes approval.json only after acceptance",
+  "paired_sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+  "queue_archive": {
+    "copy_relative": "queue",
+    "live_receipt_out": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/queue-network-pool-screening-1m-v1",
+    "only_after_outer_job_terminal": true,
+    "validator": "externally pinned parent gate then exact N.validate_queue before/after exclusive copy"
+  },
+  "retained_output_bytes_expected": 369222656,
+  "schema": "vm-network-window-binding",
+  "schema_version": 1,
+  "status": "ready_for_parent_review",
+  "timing_evidence": false
+}

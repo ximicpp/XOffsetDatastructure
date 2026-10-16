@@ -1,0 +1,35 @@
+{
+  "files": [
+    {
+      "bytes": 3,
+      "path": "events.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "bytes": 4316,
+      "path": "request.json",
+      "sha256": "625e34280e687b3ddedaf22f4e404eb76d3d980cce303764d376f32866a5764c"
+    },
+    {
+      "bytes": 453,
+      "path": "result.json",
+      "sha256": "7b18ef519a2e4709141a391e6b275eeb97b327fd1c6b73a121ca341793c63bd3"
+    },
+    {
+      "bytes": 0,
+      "path": "stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 256,
+      "path": "stdout.log",
+      "sha256": "a7fb3748ced6fd08e72abdbcbb9cd5676f29139b6090610d1e91d08309b4d87e"
+    },
+    {
+      "bytes": 411,
+      "path": "supervisor.log",
+      "sha256": "94d2afbc2e7a8267f3971fb1add5f7ff6b3c121ed37b25d4374920e64953afec"
+    }
+  ],
+  "schema_version": 1
+}

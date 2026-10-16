@@ -1,0 +1,1634 @@
+{
+  "base_runner_sha256": "a1499ef8da25141eac00b25f8bb82446dd4a0a5a49f911cc945b82096b9c4ac9",
+  "checker_sha256": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+  "decision": "recovered_checker_error_not_historical_pass",
+  "executed_runner_sha256": "1e265ba3da04ea3e8cfe94f39a0dcb1c5d88d2f36a8b286678a38eb9761aedf9",
+  "files": {},
+  "finished_at": "2026-10-15T17:20:23.011763+00:00",
+  "historical_queue_status": "failed",
+  "kind": "recover",
+  "native_executions": 0,
+  "proof": {
+    "audit": {
+      "checksum": "8565427578676381477",
+      "condition": {
+        "owners": 8,
+        "per_owner": 32,
+        "requests": 256,
+        "threads": 1
+      },
+      "control": "none",
+      "counts": {
+        "allocated": 256,
+        "created": 8,
+        "destroyed": 8,
+        "freed": 256,
+        "threads_joined": 1,
+        "threads_started": 1,
+        "validated": 256
+      },
+      "profile": "diagnostic",
+      "schema": "owner-scaling-audit-v1",
+      "status": "passed",
+      "timing_evidence": false,
+      "trace_summary": {
+        "allocations": {
+          "allocated_requested_bytes": 8464,
+          "allocation_calls": 59,
+          "current_live_allocations": 1,
+          "current_live_requested_bytes": 88,
+          "deallocated_requested_bytes": 8376,
+          "deallocation_calls": 58,
+          "domains": {
+            "1": {
+              "allocated_requested_bytes": 8064,
+              "allocation_calls": 48,
+              "current_live_allocations": 0,
+              "current_live_requested_bytes": 0,
+              "deallocated_requested_bytes": 8064,
+              "deallocation_calls": 48,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "name": "Core free vector",
+              "peak_live_allocations": 9,
+              "peak_live_requested_bytes": 4352
+            },
+            "2": {
+              "allocated_requested_bytes": 400,
+              "allocation_calls": 11,
+              "current_live_allocations": 1,
+              "current_live_requested_bytes": 88,
+              "deallocated_requested_bytes": 312,
+              "deallocation_calls": 10,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "name": "shared registry nodes/buckets",
+              "peak_live_allocations": 9,
+              "peak_live_requested_bytes": 344
+            },
+            "3": {
+              "allocated_requested_bytes": 0,
+              "allocation_calls": 0,
+              "current_live_allocations": 0,
+              "current_live_requested_bytes": 0,
+              "deallocated_requested_bytes": 0,
+              "deallocation_calls": 0,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "name": "pool cached slots",
+              "peak_live_allocations": 0,
+              "peak_live_requested_bytes": 0
+            },
+            "4": {
+              "allocated_requested_bytes": 0,
+              "allocation_calls": 0,
+              "current_live_allocations": 0,
+              "current_live_requested_bytes": 0,
+              "deallocated_requested_bytes": 0,
+              "deallocation_calls": 0,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "name": "pool state/control block",
+              "peak_live_allocations": 0,
+              "peak_live_requested_bytes": 0
+            },
+            "5": {
+              "allocated_requested_bytes": 0,
+              "allocation_calls": 0,
+              "current_live_allocations": 0,
+              "current_live_requested_bytes": 0,
+              "deallocated_requested_bytes": 0,
+              "deallocation_calls": 0,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "name": "wire-validation range vectors",
+              "peak_live_allocations": 0,
+              "peak_live_requested_bytes": 0
+            }
+          },
+          "failed_allocation_calls": 0,
+          "failed_requested_bytes": 0,
+          "max_single_origin_owner_live_requested_bytes": 888,
+          "max_single_origin_owner_nonshared_live_requested_bytes": 768,
+          "origin_owners": {
+            "4414963712": {
+              "all_domains": {
+                "allocated_requested_bytes": 1056,
+                "allocation_calls": 8,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1056,
+                "deallocation_calls": 8,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 48,
+                "allocation_calls": 2,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 48,
+                "deallocation_calls": 2,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 48
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 48,
+                "allocation_calls": 2,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 48,
+                "deallocation_calls": 2,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 48
+              }
+            },
+            "4415029248": {
+              "all_domains": {
+                "allocated_requested_bytes": 1040,
+                "allocation_calls": 7,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              }
+            },
+            "4415094784": {
+              "all_domains": {
+                "allocated_requested_bytes": 1080,
+                "allocation_calls": 8,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1080,
+                "deallocation_calls": 8,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 72,
+                "allocation_calls": 2,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 72,
+                "deallocation_calls": 2,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 72
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 72,
+                "allocation_calls": 2,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 72,
+                "deallocation_calls": 2,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 72
+              }
+            },
+            "4415160320": {
+              "all_domains": {
+                "allocated_requested_bytes": 1040,
+                "allocation_calls": 7,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              }
+            },
+            "4415225856": {
+              "all_domains": {
+                "allocated_requested_bytes": 1040,
+                "allocation_calls": 7,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              }
+            },
+            "4415684608": {
+              "all_domains": {
+                "allocated_requested_bytes": 1128,
+                "allocation_calls": 8,
+                "current_live_allocations": 1,
+                "current_live_requested_bytes": 88,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 4,
+                "peak_live_requested_bytes": 888
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 120,
+                "allocation_calls": 2,
+                "current_live_allocations": 1,
+                "current_live_requested_bytes": 88,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 120
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 120,
+                "allocation_calls": 2,
+                "current_live_allocations": 1,
+                "current_live_requested_bytes": 88,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 120
+              }
+            },
+            "4415750144": {
+              "all_domains": {
+                "allocated_requested_bytes": 1040,
+                "allocation_calls": 7,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              }
+            },
+            "4415815680": {
+              "all_domains": {
+                "allocated_requested_bytes": 1040,
+                "allocation_calls": 7,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1040,
+                "deallocation_calls": 7,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 3,
+                "peak_live_requested_bytes": 800
+              },
+              "nonshared_domains": {
+                "allocated_requested_bytes": 1008,
+                "allocation_calls": 6,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 1008,
+                "deallocation_calls": 6,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 2,
+                "peak_live_requested_bytes": 768
+              },
+              "shared_metadata_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              },
+              "shared_pool_causal": {
+                "allocated_requested_bytes": 0,
+                "allocation_calls": 0,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 0,
+                "deallocation_calls": 0,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 0,
+                "peak_live_requested_bytes": 0
+              },
+              "shared_registry_causal": {
+                "allocated_requested_bytes": 32,
+                "allocation_calls": 1,
+                "current_live_allocations": 0,
+                "current_live_requested_bytes": 0,
+                "deallocated_requested_bytes": 32,
+                "deallocation_calls": 1,
+                "failed_allocation_calls": 0,
+                "failed_requested_bytes": 0,
+                "peak_live_allocations": 1,
+                "peak_live_requested_bytes": 32
+              }
+            }
+          },
+          "origin_threads": {
+            "0": {
+              "allocated_requested_bytes": 8464,
+              "allocation_calls": 59,
+              "current_live_allocations": 1,
+              "current_live_requested_bytes": 88,
+              "deallocated_requested_bytes": 8376,
+              "deallocation_calls": 58,
+              "failed_allocation_calls": 0,
+              "failed_requested_bytes": 0,
+              "peak_live_allocations": 18,
+              "peak_live_requested_bytes": 4696
+            }
+          },
+          "outstanding": [
+            {
+              "allocation_phase": "create",
+              "allocation_sequence": 43,
+              "bytes": 88,
+              "domain": 2,
+              "origin_owner": 4415684608,
+              "origin_thread": 0,
+              "subject": 4424286416
+            }
+          ],
+          "outstanding_shared_registry": [
+            {
+              "allocation_phase": "create",
+              "allocation_sequence": 43,
+              "bytes": 88,
+              "domain": 2,
+              "origin_owner": 4415684608,
+              "origin_thread": 0,
+              "subject": 4424286416
+            }
+          ],
+          "peak_live_allocations": 18,
+          "peak_live_requested_bytes": 4696
+        },
+        "by_kind": {
+          "core_metadata_capacity": {
+            "bytes": 87424,
+            "count": 264,
+            "value": 6336
+          },
+          "core_new": {
+            "bytes": 2048,
+            "count": 256,
+            "value": 113664
+          },
+          "core_return": {
+            "bytes": 6144,
+            "count": 256,
+            "value": 4224
+          },
+          "grow_zero": {
+            "bytes": 524288,
+            "count": 8,
+            "value": 0
+          },
+          "host_allocate": {
+            "bytes": 8464,
+            "count": 59,
+            "value": 70
+          },
+          "host_deallocate": {
+            "bytes": 8376,
+            "count": 58,
+            "value": 68
+          },
+          "os_enable": {
+            "bytes": 524288,
+            "count": 8,
+            "value": 0
+          },
+          "os_reserve": {
+            "bytes": 524288,
+            "count": 8,
+            "value": 0
+          },
+          "os_unmap": {
+            "bytes": 524288,
+            "count": 8,
+            "value": 0
+          },
+          "registry_erase": {
+            "bytes": 0,
+            "count": 8,
+            "value": 8
+          },
+          "registry_lock": {
+            "bytes": 10088,
+            "count": 528,
+            "value": 65623
+          },
+          "registry_lookup_hit": {
+            "bytes": 0,
+            "count": 512,
+            "value": 0
+          },
+          "registry_register": {
+            "bytes": 0,
+            "count": 8,
+            "value": 0
+          }
+        },
+        "by_owner": {
+          "0": {
+            "by_kind": {
+              "os_enable": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "os_reserve": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              }
+            },
+            "event_count": 16
+          },
+          "4414963712": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1056,
+                "count": 8,
+                "value": 10
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1587,
+                "count": 66,
+                "value": 11458
+              }
+            },
+            "event_count": 180
+          },
+          "4415029248": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1293,
+                "count": 66,
+                "value": 1793
+              }
+            },
+            "event_count": 179
+          },
+          "4415094784": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1080,
+                "count": 8,
+                "value": 10
+              },
+              "host_deallocate": {
+                "bytes": 1056,
+                "count": 8,
+                "value": 10
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1207,
+                "count": 66,
+                "value": 33792
+              }
+            },
+            "event_count": 181
+          },
+          "4415160320": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 959,
+                "count": 66,
+                "value": 10583
+              }
+            },
+            "event_count": 179
+          },
+          "4415225856": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1292,
+                "count": 66,
+                "value": 2496
+              }
+            },
+            "event_count": 179
+          },
+          "4415684608": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1128,
+                "count": 8,
+                "value": 10
+              },
+              "host_deallocate": {
+                "bytes": 1080,
+                "count": 8,
+                "value": 10
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1418,
+                "count": 66,
+                "value": 1709
+              }
+            },
+            "event_count": 181
+          },
+          "4415750144": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1249,
+                "count": 66,
+                "value": 1834
+              }
+            },
+            "event_count": 179
+          },
+          "4415815680": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 10928,
+                "count": 33,
+                "value": 792
+              },
+              "core_new": {
+                "bytes": 256,
+                "count": 32,
+                "value": 14208
+              },
+              "core_return": {
+                "bytes": 768,
+                "count": 32,
+                "value": 528
+              },
+              "grow_zero": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "host_deallocate": {
+                "bytes": 1040,
+                "count": 7,
+                "value": 8
+              },
+              "os_unmap": {
+                "bytes": 65536,
+                "count": 1,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 1083,
+                "count": 66,
+                "value": 1958
+              }
+            },
+            "event_count": 179
+          },
+          "4424277008": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424285472": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424285632": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424285840": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424286032": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424286224": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424286512": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          },
+          "4424286672": {
+            "by_kind": {
+              "registry_erase": {
+                "bytes": 0,
+                "count": 1,
+                "value": 1
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 64,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 1,
+                "value": 0
+              }
+            },
+            "event_count": 66
+          }
+        },
+        "by_phase": {
+          "allocate": {
+            "by_kind": {
+              "core_new": {
+                "bytes": 2048,
+                "count": 256,
+                "value": 113664
+              },
+              "registry_lock": {
+                "bytes": 4584,
+                "count": 256,
+                "value": 6582
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 256,
+                "value": 0
+              }
+            },
+            "event_count": 768
+          },
+          "create": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 0,
+                "count": 8,
+                "value": 192
+              },
+              "grow_zero": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 400,
+                "count": 11,
+                "value": 22
+              },
+              "host_deallocate": {
+                "bytes": 56,
+                "count": 2,
+                "value": 4
+              },
+              "os_enable": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "os_reserve": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "registry_lock": {
+                "bytes": 292,
+                "count": 8,
+                "value": 16000
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 8,
+                "value": 0
+              }
+            },
+            "event_count": 61
+          },
+          "destroy": {
+            "by_kind": {
+              "host_deallocate": {
+                "bytes": 4352,
+                "count": 16,
+                "value": 24
+              },
+              "os_unmap": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "registry_erase": {
+                "bytes": 0,
+                "count": 8,
+                "value": 8
+              },
+              "registry_lock": {
+                "bytes": 167,
+                "count": 8,
+                "value": 11876
+              }
+            },
+            "event_count": 40
+          },
+          "free": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 87424,
+                "count": 256,
+                "value": 6144
+              },
+              "core_return": {
+                "bytes": 6144,
+                "count": 256,
+                "value": 4224
+              },
+              "host_allocate": {
+                "bytes": 8064,
+                "count": 48,
+                "value": 48
+              },
+              "host_deallocate": {
+                "bytes": 3968,
+                "count": 40,
+                "value": 40
+              },
+              "registry_lock": {
+                "bytes": 5045,
+                "count": 256,
+                "value": 31165
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 256,
+                "value": 0
+              }
+            },
+            "event_count": 1112
+          }
+        },
+        "by_thread": {
+          "0": {
+            "by_kind": {
+              "core_metadata_capacity": {
+                "bytes": 87424,
+                "count": 264,
+                "value": 6336
+              },
+              "core_new": {
+                "bytes": 2048,
+                "count": 256,
+                "value": 113664
+              },
+              "core_return": {
+                "bytes": 6144,
+                "count": 256,
+                "value": 4224
+              },
+              "grow_zero": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "host_allocate": {
+                "bytes": 8464,
+                "count": 59,
+                "value": 70
+              },
+              "host_deallocate": {
+                "bytes": 8376,
+                "count": 58,
+                "value": 68
+              },
+              "os_enable": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "os_reserve": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "os_unmap": {
+                "bytes": 524288,
+                "count": 8,
+                "value": 0
+              },
+              "registry_erase": {
+                "bytes": 0,
+                "count": 8,
+                "value": 8
+              },
+              "registry_lock": {
+                "bytes": 10088,
+                "count": 528,
+                "value": 65623
+              },
+              "registry_lookup_hit": {
+                "bytes": 0,
+                "count": 512,
+                "value": 0
+              },
+              "registry_register": {
+                "bytes": 0,
+                "count": 8,
+                "value": 0
+              }
+            },
+            "event_count": 1981
+          }
+        },
+        "event_count": 1981,
+        "interpretation": {
+          "allocation_bytes": "completed/requested backend allocator bytes in instrumented domains; excludes allocator overhead and RSS",
+          "allocation_origin": "owner/thread from allocation observation; deallocation scope may differ",
+          "coverage": "scoped diagnostic observations only; source identity and case-specific expected counts audited separately",
+          "event_owner": "event field identity: registry C++ owner versus arena base/causal owner for other events; 0 is unscoped",
+          "generic_sums": "bytes/value units are event-specific; sums are grouped by kind and must not be combined across kinds",
+          "nonshared_domains": "domains 1/5 only; shared metadata domains 2/3/4 are excluded; raw owner identity is not a lifetime generation",
+          "peak_order": "global event observation order; not physical allocator-internal simultaneity",
+          "registry_generations": "generation is register event sequence; owner intervals begin inclusive and end at rebind/erase observation; null end means still active at collection",
+          "shared_metadata": "domain 2 shared registry, domain 3 shared pool cached slots, domain 4 shared pool state/control block; owner attribution is causal",
+          "shared_registry": "domain 2 is shared registry storage; retained buckets and other live allocations are reported at trace end",
+          "single_origin_owner_peak": "maximum nonzero raw origin-owner identity bucket peak; excludes owner 0 and may merge reused arena generations; domains 2/3/4 are causal attribution, not exclusive ownership"
+        },
+        "registry": {
+          "active": {},
+          "active_count": 0,
+          "generations": [
+            {
+              "base": 4414963712,
+              "begin_sequence": 6,
+              "end_sequence": 1943,
+              "final_owner": 4424277008,
+              "generation": 6,
+              "initial_owner": 4424277008,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 6,
+                  "end_sequence": 1943,
+                  "owner": 4424277008
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415029248,
+              "begin_sequence": 13,
+              "end_sequence": 1948,
+              "final_owner": 4424285472,
+              "generation": 13,
+              "initial_owner": 4424285472,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 13,
+                  "end_sequence": 1948,
+                  "owner": 4424285472
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415094784,
+              "begin_sequence": 22,
+              "end_sequence": 1953,
+              "final_owner": 4424285632,
+              "generation": 22,
+              "initial_owner": 4424285632,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 22,
+                  "end_sequence": 1953,
+                  "owner": 4424285632
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415160320,
+              "begin_sequence": 29,
+              "end_sequence": 1958,
+              "final_owner": 4424285840,
+              "generation": 29,
+              "initial_owner": 4424285840,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 29,
+                  "end_sequence": 1958,
+                  "owner": 4424285840
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415225856,
+              "begin_sequence": 36,
+              "end_sequence": 1963,
+              "final_owner": 4424286032,
+              "generation": 36,
+              "initial_owner": 4424286032,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 36,
+                  "end_sequence": 1963,
+                  "owner": 4424286032
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415684608,
+              "begin_sequence": 45,
+              "end_sequence": 1968,
+              "final_owner": 4424286224,
+              "generation": 45,
+              "initial_owner": 4424286224,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 45,
+                  "end_sequence": 1968,
+                  "owner": 4424286224
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415750144,
+              "begin_sequence": 52,
+              "end_sequence": 1973,
+              "final_owner": 4424286512,
+              "generation": 52,
+              "initial_owner": 4424286512,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 52,
+                  "end_sequence": 1973,
+                  "owner": 4424286512
+                }
+              ],
+              "rebinds": []
+            },
+            {
+              "base": 4415815680,
+              "begin_sequence": 59,
+              "end_sequence": 1978,
+              "final_owner": 4424286672,
+              "generation": 59,
+              "initial_owner": 4424286672,
+              "owner_intervals": [
+                {
+                  "begin_sequence": 59,
+                  "end_sequence": 1978,
+                  "owner": 4424286672
+                }
+              ],
+              "rebinds": []
+            }
+          ],
+          "peak_active_count": 8
+        },
+        "schema": "n3-trace-summary-v1",
+        "thread_count": 1
+      }
+    },
+    "child_returncode": 0,
+    "claim_sha256": "40986bf01d53a470815965b6635ccd1c40aa312d86bdd7585ffa0287a2bbfd91",
+    "group_files": {
+      "diagnostic-r256-o8-t1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "diagnostic-r256-o8-t1.stdout": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+      "result.json": "206566d3698e691bee20b143538b577b7bc160774e8dee0e0e61a57e5485be66"
+    },
+    "original_collector_returncode": 1,
+    "queue_files": {
+      "events.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "manifest.json": "5bd2f9864b4b9aa0d265b7a6af9edb1e8b03e71560b496f851f86d69609017c1",
+      "request.json": "969e0f231228bbf0243b4de7d189d7bc97aef2eb3c6b37861bed63c8e06e79a1",
+      "result.json": "15bbc947de3e0d07574df8849297b21a88278cfe272e56397bc10cd66456efb0",
+      "stderr.log": "4cc6f4b6eb47d31747334489f51a2a0df84a34d18f0f2641e0d48903308baa82",
+      "stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "supervisor.log": "687136ba0b64bc691d648ef5d074b9b0d1c6c22e55f7a0671633a34e7c54f2c6"
+    },
+    "queue_run_id": "2ce0b7bb34a544fabede22841d07a4b7"
+  },
+  "relative_inputs": {
+    "group": "../collection-v1/group-00",
+    "receipt": "../receipts/group-00"
+  },
+  "schema_version": 1,
+  "started_at": "2026-10-15T17:20:22.981398+00:00",
+  "status": "passed",
+  "timing_evidence": false,
+  "toolkit_result_sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156"
+}

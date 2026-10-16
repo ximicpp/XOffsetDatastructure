@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "decision": "D022",
+  "date": "2026-10-16",
+  "status": "accepted_source_derived_auditor_correction",
+  "supersedes": "The historical PLAN/checker assumption of fixed16-byte alignment and32-byte uint64 allocation stride only; D018 workload, scope and all budgets remain unchanged.",
+  "reviewer": "/root/completion_audit",
+  "source_basis": [
+    "F AllocationHeader is16 bytes/align8 at xoffsetdatastructure.hpp:388-394",
+    "F allocation aligns max(alignof(T),alignof(std::max_align_t)) at xoffsetdatastructure.hpp:652, not a portable fixed16",
+    "Frozen Apple arm64 profile yields8-byte effective alignment; arena_header/minimum payload48; actualfirstu64offset64"
+  ],
+  "correct_exact_profile_expectations": {
+    "effective_alignment": 8,
+    "allocation_header_bytes": 16,
+    "payload_bytes": 8,
+    "empty_used_end": 48,
+    "user_offset_j": "64+24*j",
+    "end_after_j": "72+24*j",
+    "used_end_after_q": "48+24*q",
+    "free_before": "65536-used_end",
+    "free_after": "free_before+24*q",
+    "maximum_q": 1024,
+    "maximum_used_end": 24624
+  },
+  "unchanged": [
+    "C++ harness and both built binaries: actual alignof/sizeof and conserved free-memory checks already correct",
+    "Event counts/budgets, metadata capacity sequence, bucket/node ledger and thread rules",
+    "All26 total workload children, including the existing first record; 25 remaining only",
+    "Original prepared/build/failed collection and execution identities remain immutable"
+  ],
+  "existing_record": {
+    "path": "build/vm-owner-scaling/collection-v1/group-00/diagnostic-r256-o8-t1.stdout",
+    "sha256": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+    "child_exit": 0,
+    "actual_events": 1981,
+    "valid": true,
+    "dropped": 0,
+    "alloc_free_validated": 256,
+    "first_owner_used_end": 816,
+    "first_owner_free_before": 64720,
+    "first_owner_free_after": 65488,
+    "consumed_workload_budget": 1
+  },
+  "authorized_next": [
+    "Correct only auditor formulas/profile expectations, corresponding synthetic checks and explicit contract/doc erratum; keep exact checks rather than adding a range",
+    "Freeze corrected offline auditor as a supplement to unchanged build provenance; preserve original failed collection",
+    "Reaudit first raw record offline through new supplemental record with old execution and new audit identities separated",
+    "Execute exactly remaining25 distinct cases using unchanged built binaries, under original D018 limits",
+    "Assemble all26 records including initial run, exact duplicate/missing-case and full lifecycle/event checks; no arbitrary skip/resume framework"
+  ],
+  "recompile_required": false,
+  "first_case_retry_authorized": false,
+  "formal_timing_authorized": false,
+  "production_edits_authorized": false
+}

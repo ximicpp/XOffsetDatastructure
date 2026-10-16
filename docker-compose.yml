@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        CLANG_P2996_COMMIT: HEAD
+        CLANG_P2996_COMMIT: a5270822dede40aaaf2c62381b89f110d2cfda4c
     image: xoffset-clang-p2996:latest
     container_name: xoffset-dev
     volumes:

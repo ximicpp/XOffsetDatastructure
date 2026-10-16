@@ -1,0 +1,74 @@
+{
+  "adoption_allowed": false,
+  "executed_cpp": false,
+  "files": {
+    "prepared/historical-metadata.json": {
+      "bytes": 9091,
+      "sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed"
+    },
+    "prepared/preparation.json": {
+      "bytes": 6273,
+      "sha256": "80294597ae25781da557c2910096cea4551c593d50fe56ccd72fbc1729605d0c"
+    },
+    "prepared/source/D/bench_vm_compare.cpp": {
+      "bytes": 35096,
+      "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+    },
+    "prepared/source/D/bench_vm_improvements.cpp": {
+      "bytes": 29392,
+      "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+    },
+    "prepared/source/D/xoffset_virtual_memory.hpp": {
+      "bytes": 10584,
+      "sha256": "af90d9ea4281cba703878a1042ec63aedeb3fa1807fbe8feacd4b6dfae72b186"
+    },
+    "prepared/source/D/xoffsetdatastructure.hpp": {
+      "bytes": 180835,
+      "sha256": "896ac72ba55564bfa6177df3b89d7c192e0b2584c092fdb409c63e828bfadfb0"
+    },
+    "prepared/source/F/bench_vm_compare.cpp": {
+      "bytes": 35096,
+      "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+    },
+    "prepared/source/F/bench_vm_improvements.cpp": {
+      "bytes": 29392,
+      "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+    },
+    "prepared/source/F/xoffset_virtual_memory.hpp": {
+      "bytes": 19239,
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    },
+    "prepared/source/F/xoffsetdatastructure.hpp": {
+      "bytes": 183050,
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+    },
+    "protocol/default-contract.json": {
+      "bytes": 9927,
+      "sha256": "40bc2179baa85b14842bf8b85a1f426250712903030a6c91d4e52865a72c6a30"
+    },
+    "protocol/default_measurement.py": {
+      "bytes": 54691,
+      "sha256": "f73724c67f310dc71487c7726dc4ea073fd2391fcaa6442f444d5a599e71b510"
+    },
+    "protocol/paired_measurement.py": {
+      "bytes": 31083,
+      "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+    },
+    "protocol/prepare_default.py": {
+      "bytes": 6407,
+      "sha256": "4e316ecd5e95a72b155749b3559f0f223f197760134d71f7eee03fff8e707955"
+    },
+    "protocol/run_job.py": {
+      "bytes": 16898,
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+    },
+    "runtime.json": {
+      "bytes": 743884,
+      "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67"
+    }
+  },
+  "kind": "default-frozen",
+  "performance_evidence": false,
+  "schema_version": 1,
+  "status": "completed"
+}

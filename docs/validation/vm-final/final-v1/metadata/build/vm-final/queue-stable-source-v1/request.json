@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "experiments/vm_platform_validation/freeze_delivery.py",
+    "--out",
+    "docs/validation/vm-final/final-v1"
+  ],
+  "created_at": "2026-10-15T17:55:08.945341+00:00",
+  "cwd": "/Users/fanchensu/XOffsetDatastructure",
+  "kind": "validation",
+  "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+  "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-final/queue-stable-source-v1",
+  "owner": "W4",
+  "process_contract": "descendants must not detach from inherited session; daemon jobs require explicit adapter",
+  "run_id": "34b430a8dbd84a06b93ccad3ec4723ca",
+  "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+  "schema_version": 1,
+  "source_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "termination_grace_seconds": 2,
+  "timeout_seconds": 180.0,
+  "wait_seconds": 15
+}

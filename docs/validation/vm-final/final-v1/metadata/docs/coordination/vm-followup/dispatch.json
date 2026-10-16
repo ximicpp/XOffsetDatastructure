@@ -1,0 +1,389 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-15",
+  "parent_thread_id": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+  "objective": "Parent designs, coordinates and accepts; four independent chats implement the remaining roadmap.",
+  "workspace": "/Users/fanchensu/XOffsetDatastructure",
+  "branch": "next_cpp26",
+  "head": "07d649909d7f43ca0d11b85accb6d9dab991e284",
+  "baseline": {
+    "label": "F (current uncommitted source; HEAD is not F)",
+    "sha256": {
+      "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+      "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    }
+  },
+  "design": "docs/VM_FOLLOWUP_ORCHESTRATION.md",
+  "roles": [
+    {
+      "id": "W1",
+      "thread_id": "01a14015-23d6-7fb3-af5c-88d5b194a348",
+      "host_id": "local",
+      "title": "XBuffer \u540e\u7eed\uff1a\u7f51\u7edc\u529f\u80fd\u4e0e\u5931\u8d25\u9a8c\u8bc1",
+      "status": "complete_scoped_owner_functionality_archive",
+      "handoff": "experiments/vm_network/handoff.json",
+      "contract": "experiments/vm_network/contract.json",
+      "accepted_contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+      "accepted_contract_snapshot": "docs/coordination/vm-followup/contracts/W1-revision2",
+      "accepted_gate_revision": 2,
+      "accepted_model_subcases_sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+      "next": "No furtherwork inW1 scope; retainavailability for realreviewfindings only.",
+      "functional_acceptance": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+      "additional_owned_paths": [
+        "experiments/vm_owner_scaling/",
+        "docs/VM_OWNER_SCALING_RESULTS.md",
+        "docs/validation/vm-owner-scaling/",
+        "build/vm-owner-scaling/"
+      ],
+      "candidate_static_acceptance": "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json",
+      "owner_scaling_design_acceptance": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json",
+      "owner_functional_acceptance": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+      "owner_archive_acceptance": "docs/coordination/vm-followup/W1-owner-archive-acceptance.json"
+    },
+    {
+      "id": "W2",
+      "thread_id": "01a14015-990a-7090-98fa-b39e6ed7622c",
+      "host_id": "local",
+      "title": "XBuffer \u540e\u7eed\uff1a\u6027\u80fd\u8bca\u65ad\u4e0e\u5f52\u56e0",
+      "status": "complete_D031_tool_fix",
+      "handoff": "experiments/vm_observability/handoff.json",
+      "contract": "experiments/vm_observability/contract.json",
+      "accepted_contract_sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+      "accepted_contract_snapshot": "docs/coordination/vm-followup/contracts/W2-v1",
+      "accepted_supporting_contract_sha256": {
+        "event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+        "coverage.json": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9"
+      },
+      "next": "D032 fix and supplement source accepted; no further changes except concrete review findings.",
+      "functional_acceptance": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+      "network_design_acceptance": "docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json",
+      "network_acceptance": "docs/coordination/vm-followup/W2-network-acceptance.json",
+      "additional_owned_paths": [
+        "experiments/vm_owner_measurement/",
+        "build/vm-owner-measurement/",
+        "docs/perf/vm-owner-scaling/"
+      ],
+      "owner_measurement_design": "docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json",
+      "owner_measurement_acceptance": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json"
+    },
+    {
+      "id": "W3",
+      "thread_id": "01a14016-22fc-7433-993c-f723ec92f214",
+      "host_id": "local",
+      "title": "XBuffer \u540e\u7eed\uff1a\u7f51\u7edc\u6d4b\u91cf\u4e0e\u5019\u9009\u8bc4\u4f30",
+      "status": "complete_scoped_measurement_and_decisions",
+      "handoff": "experiments/vm_network_measurement/handoff.json",
+      "next": "No further execution; preserve accepted results and await concrete final review findings only.",
+      "network_calibration_approval": "docs/coordination/vm-followup/network-aa-1-approval.json",
+      "network_calibration_acceptance": "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+      "network_pool_approval": "docs/coordination/vm-followup/network-pool-1m-1-approval.json",
+      "network_pool_acceptance": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json",
+      "network_pool_archive_acceptance": "docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json",
+      "owner_measurement_approval": "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+      "owner_measurement_write_paths": [
+        "build/vm-owner-measurement/native-window.json",
+        "build/vm-owner-measurement/window-v1/",
+        "build/vm-owner-measurement/receipts/window-v1/",
+        "build/vm-owner-measurement/receipts/archive-v1/",
+        "build/vm-owner-measurement/relocation-v1/",
+        "docs/perf/vm-owner-scaling/measurement-v1/",
+        "docs/perf/vm-owner-scaling/RESULTS.md",
+        "docs/perf/vm-owner-scaling/handoff.json"
+      ],
+      "owner_measurement_acceptance": "docs/coordination/vm-followup/owner-measurement-acceptance.json"
+    },
+    {
+      "id": "W4",
+      "thread_id": "01a14014-8fc1-78c3-b0a0-f53887969e83",
+      "host_id": "local",
+      "title": "XBuffer \u540e\u7eed\uff1a\u5e73\u53f0\u9a8c\u8bc1\u4e0e\u6267\u884c\u534f\u8c03",
+      "status": "G4_finalization_authorized",
+      "handoff": "experiments/vm_coordination/handoff.json",
+      "platform_handoff": "experiments/vm_platform_validation/handoff.json",
+      "platform_assessment": "accepted",
+      "next": "Freeze final related source/tool/contracts/handoffs/metadata after W3 final report; validate capsule and complete independent review, no blanket native jobs.",
+      "inheritance_acceptance": "docs/coordination/vm-followup/G4-inheritance-acceptance.json",
+      "supplement_acceptance": "docs/coordination/vm-followup/G4-supplement-acceptance.json",
+      "final_delivery_draft": {
+        "path": "docs/VM_FINAL_DELIVERY.md",
+        "sha256": "6334c57666b5b4dd0c273ed63bfdedbdd429628cf9647740ec1f97c13fdb30aa",
+        "review": "Parent read full draft; scoped historical profiles and open gates accurately separated. Draft only, not final G4 acceptance."
+      },
+      "readme_acceptance": "docs/coordination/vm-followup/readme-window-acceptance.json"
+    }
+  ],
+  "gates": [
+    {
+      "id": "G0",
+      "status": "accepted",
+      "requirements": [
+        "Four implementation chats started with ownership boundaries",
+        "Accept W4 resource entry",
+        "Freeze W1 and W2 contracts"
+      ],
+      "evidence": [
+        "experiments/vm_coordination/handoff.json",
+        "build/vm-coordination/tests-20261015-05/test-results.json",
+        "docs/coordination/vm-followup/G0_REVIEW.md",
+        "docs/coordination/vm-followup/contracts/W2-v1/acceptance.json",
+        "docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json"
+      ],
+      "decision": "Four implementation chats started; local POSIX execution entry accepted; exact W1/W2 interfaces frozen. G1 implementation evidence remains pending."
+    },
+    {
+      "id": "G1",
+      "status": "accepted_scoped",
+      "requirements": [
+        "Network functionality/failure matrix",
+        "Diagnostic event semantics",
+        "Platform prerequisites inventory"
+      ],
+      "evidence": [
+        "docs/coordination/vm-followup/platform-acceptance.json",
+        "docs/coordination/vm-followup/W1-G1-acceptance.json",
+        "docs/coordination/vm-followup/W2-G1-acceptance.json"
+      ],
+      "decision": "Platform prerequisite inventory, W1 network functionality and W2 diagnostic foundation accepted. Explicit sanitizer/native platform/business prerequisites and wider N3 attribution remain open.",
+      "accepted_components": [
+        "platform_prerequisites",
+        "network_functionality",
+        "diagnostic_semantics"
+      ]
+    },
+    {
+      "id": "G2",
+      "status": "accepted_scoped_with_noise_limits",
+      "requirements": [
+        "Frozen-baseline network/default-path evidence",
+        "Offline audit and noise/platform limits"
+      ],
+      "evidence": [
+        "docs/coordination/vm-followup/default-aa-1-approval.json",
+        "docs/coordination/vm-followup/default-aa-1-acceptance.json",
+        "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "docs/coordination/vm-followup/network-aa-1-proposal-acceptance.json",
+        "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+        "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+      ],
+      "decision": "Default78 and network112calibration+88poolcomparison executed/audited; default and finalpool contrasts noise-unqualified. Scoped measurement delivery accepted, no D/F attribution/performance/adoption claim. Owner study remains separate N3/G4 work."
+    },
+    {
+      "id": "G3",
+      "status": "accepted_prerequisite_decisions_retain_F",
+      "requirements": [
+        "Per-candidate decision and basis",
+        "Lifetime/compatibility contracts"
+      ],
+      "evidence": [
+        "docs/coordination/vm-followup/G3-acceptance.json",
+        "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json",
+        "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+        "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+      ],
+      "decision": "Complete the currentG3 decision deliverable with all3directions prerequisite-unmet and retainF. No additionalnetwork timing, diagnostics, prototypes or productionAPI adoption. Open business/defaultD-F/platform prerequisites remain explicit; independent ownerstudy proceeds under D023."
+    },
+    {
+      "id": "G4",
+      "status": "pending",
+      "requirements": [
+        "Final immutable source/tool/contract/handoff/runner snapshot",
+        "Applicable validation",
+        "Task-by-task status",
+        "Independent review"
+      ],
+      "evidence": [],
+      "decision": null
+    }
+  ],
+  "execution": {
+    "entry": "experiments/vm_coordination/run_job.py",
+    "status": "accepted_local_posix",
+    "accepted_runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "accepted_test_sha256": "70374826b3208e5b275efb0c91d6480a8e3efaac45113c7be6a06045d8c7fb15",
+    "validation": "17 lightweight cases passed; parent independent read-only review verified 18 original receipts",
+    "scope": "Default lock; local POSIX session-bound commands; no detached sessions, forcibly killed supervisor, daemon/container or remote jobs",
+    "formal_timing_owner": "W3",
+    "build_parallelism": 2,
+    "shared_production_write_window": null
+  },
+  "limitations": [
+    "Actual network message sizes, protocol/library and synchronous/asynchronous requirements undetermined",
+    "Native Windows and native Linux performance prerequisites not yet established",
+    "No automatic commit, push, publication or remote CI"
+  ],
+  "decisions": [
+    {
+      "id": "D001",
+      "decision": "Dispatch four chats; parent does not implement feature code.",
+      "basis": "Explicit current user instruction"
+    },
+    {
+      "id": "D002",
+      "decision": "Freeze W2\u2192W3 diagnostic contract and immutable final tool/handoff snapshot in addition to W1 network contract.",
+      "basis": "Independent orchestration review"
+    },
+    {
+      "id": "D003",
+      "decision": "Accept the hashed local POSIX execution entry for builds and verification. Formal timing still requires its workload/contract/function/source gates and independent noise calibration.",
+      "basis": "W4 17-case evidence and parent independent 18-receipt/source review; daemon support explicitly unavailable"
+    },
+    {
+      "id": "D004",
+      "decision": "Freeze W2 contract, event catalog and coverage for W3 integration; G1 implementation/evidence acceptance pending.",
+      "basis": "docs/coordination/vm-followup/contracts/W2-v1/acceptance.json"
+    },
+    {
+      "id": "D005",
+      "decision": "Freeze W1 contract revision 2 and model subcases; allow W3 binding. G0 accepted; implementation and measurement gates remain separate.",
+      "basis": "docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json"
+    },
+    {
+      "id": "D006",
+      "decision": "Accept W4 prerequisite inventory; keep native Windows/full-P2996 and independent native Linux performance tasks open.",
+      "basis": "docs/coordination/vm-followup/platform-acceptance.json"
+    },
+    {
+      "id": "D007",
+      "decision": "G4 inherits reliable validation only after full relevant input/toolchain/flags/dependency/case identity mapping; rerun changed or unsupported surfaces only. Evaluate actual Linux verification gaps before implementing a Docker adapter; do not repeat the known identical ASan ABI link failure.",
+      "basis": "Parent review of W4 draft matrix, StageIII current 48-case evidence and W1 v2 sanitizer prerequisite failure; W4 assigned read-only mapping."
+    },
+    {
+      "id": "D008",
+      "decision": "Accept W1 frozen-v2 network functional/dual-build/evidence handoff for W3 integration; preserve actual ASan ABI failure and no timing/adoption claim.",
+      "basis": "docs/coordination/vm-followup/W1-G1-acceptance.json"
+    },
+    {
+      "id": "D009",
+      "decision": "Accept W2 final06 scoped diagnostic foundation and its137-file frozen evidence; G1 scoped components accepted, consumer-specific attribution remains gated.",
+      "basis": "docs/coordination/vm-followup/W2-G1-acceptance.json"
+    },
+    {
+      "id": "D010",
+      "decision": "Authorize W3 one preregistered F/F calibration,78 processes,900-second measurement window, no failed-calibration retry; outer queue1200s.",
+      "basis": "docs/coordination/vm-followup/default-aa-1-approval.json",
+      "approval_sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a"
+    },
+    {
+      "id": "D011",
+      "decision": "Do not retry this calibration or start D/F comparison/ablation. Preserve the measured limitation; continue independent network work.",
+      "basis": "docs/coordination/vm-followup/default-aa-1-acceptance.json"
+    },
+    {
+      "id": "D012",
+      "decision": "Dispatch W2 bounded network cost diagnostics,32workload processes/512MiB evidence/hard2048events perthread; source-derived assertions required, no timing claims.",
+      "basis": "docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json"
+    },
+    {
+      "id": "D013",
+      "decision": "No blanket base matrix rerun or Docker implementation. Supplement existing provenance without inventing missingbinary/SDK fingerprints;freeze finalselectedsource onlyafter W2network/W3network decisions stabilize.",
+      "basis": "docs/coordination/vm-followup/G4-inheritance-acceptance.json"
+    },
+    {
+      "id": "D014",
+      "decision": "Use W1 for independent concrete candidate feasibility and lifetime review while W2 diagnostics and W3 measurement proceed; no speculative implementation.",
+      "basis": "G3 remaining lifetime/compatibility evidence and user request for parallel implementation chats."
+    },
+    {
+      "id": "D015",
+      "decision": "Accept supplemental historical-profile provenance; retain historical TSan profile rather than claiming current-default validation. Draft final delivery can proceed while W2/W3/G3 remain pending. No final source freeze or blanket matrix authorized.",
+      "basis": "docs/coordination/vm-followup/G4-supplement-acceptance.json"
+    },
+    {
+      "id": "D016",
+      "decision": "Complete N3 fixed-request multi-owner/registry contention gap with a small isolated F timing/diagnostic harness; W1 prepares concrete bounded implementation design after candidate review, W3 remains sole formal timer. Do not reopen all63event kinds or historical accepted matrices.",
+      "basis": "Parent /root/completion_audit scope audit against N3 original five metrics, historical variable-work owner matrix and current W2 coverage."
+    },
+    {
+      "id": "D017",
+      "decision": "Accept static review only; combine with scoped W2 costs and W3 calibration for per-direction decision. No candidate chosen, rejected by experiment or adopted.",
+      "basis": "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json"
+    },
+    {
+      "id": "D018",
+      "decision": "Proceed with isolated implementation and bounded functionality/diagnostics. No further design permission needed for routine choices inside this contract. Report real contract/budget contradictions before changing them; do not retry noise calibration or execute formal timing.",
+      "basis": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json"
+    },
+    {
+      "id": "D019",
+      "decision": "Accept scoped network cost and lifecycle evidence and five-metric evidence mapping; no candidate/timing/adoption claim.",
+      "basis": "docs/coordination/vm-followup/W2-network-acceptance.json"
+    },
+    {
+      "id": "D020",
+      "decision": "Execute exactly this one frozen F/F window through accepted queue; preserve raw evidence and all failures. No automatic retry, pool comparison, candidate implementation or production adoption.",
+      "basis": "docs/coordination/vm-followup/network-aa-1-proposal-acceptance.json",
+      "approval_sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7"
+    },
+    {
+      "id": "D021",
+      "decision": "Accept executed native calibration with per-size results. Prepare only1MiB pool screening; retain the other3failed sizes, no retry.",
+      "basis": "docs/coordination/vm-followup/network-aa-1-acceptance.json"
+    },
+    {
+      "id": "D022",
+      "decision": "Correct source-derived Apple arm64 layout assumptions in owner auditor, preserve and offline re-audit first completed record, execute only remaining25; no C++ rebuild or retry needed.",
+      "basis": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json"
+    },
+    {
+      "id": "D023",
+      "decision": "Parallelize final owner measurement preparation in W2, retain W3 sole timing execution; fixed78process descriptive scaling protocol, no native execution before final W1/proposal acceptance.",
+      "basis": "docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json"
+    },
+    {
+      "id": "D024",
+      "decision": "Grant W4 exclusiveREADME-only window for reviewed three clarifications; no API/example changes or base rerun.",
+      "basis": "docs/coordination/vm-followup/readme-window.json"
+    },
+    {
+      "id": "D025",
+      "decision": "Execute this exact single1MiB screening window via accepted W3 timing queue. Each contrast needs new localAA and left/right/pooled drift; no previous qualification transfer. Preserve failure, no rerun/other sizes/candidate implementation/adoption.",
+      "basis": "docs/coordination/vm-followup/network-pool-1m-1-proposal-acceptance.json",
+      "approval_sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1"
+    },
+    {
+      "id": "D026",
+      "decision": "Accept complete one-shot pooled network research and explicit noise limitation; retainF, no rerun/other sizes/implementation/adoption. G2 scoped measurement/audit gate closes; defaultD/F and actual business adoption remain open.",
+      "basis": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+    },
+    {
+      "id": "D027",
+      "decision": "Accept original26 ownerfunctional/diagnostic cases andbuild, withD022 supplementaryaudit lineage; allowW2 exact D023 binding while portablearchive finishes. Noformal timing yet.",
+      "basis": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json"
+    },
+    {
+      "id": "D028",
+      "decision": "Complete the currentG3 decision deliverable with all3directions prerequisite-unmet and retainF. No additionalnetwork timing, diagnostics, prototypes or productionAPI adoption. Open business/defaultD-F/platform prerequisites remain explicit; independent ownerstudy proceeds under D023.",
+      "basis": "docs/coordination/vm-followup/G3-acceptance.json"
+    },
+    {
+      "id": "D029",
+      "decision": "Accept complete portable network88 andowner26 archive/relocation supplements without changing original functional/timing acceptances or authorizing newwork.",
+      "basis": [
+        "docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json",
+        "docs/coordination/vm-followup/W1-owner-archive-acceptance.json"
+      ]
+    },
+    {
+      "id": "D030",
+      "decision": "Execute exactly this proposal once through accepted W3 timing queue; retain all 24 cells and comparisons including uncertainty. Afterwards use one validation queue for complete portable archive and relocation audit. No rebuild, new samples, retries, optimization or production adoption.",
+      "basis": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+      "approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12"
+    },
+    {
+      "id": "D031",
+      "decision": "Correct approval-copy serialization defect with byte-preserving future tool and explicit original/derived offline supplement; preserve original78 and failed archive, no native retry.",
+      "basis": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json"
+    },
+    {
+      "id": "D032",
+      "decision": "W3 may execute the exact reviewed validation argv once, then audit the completed receipt and report original/derived archive identity. All original native and failed archive evidence remains immutable. This approves offline repair execution, not final owner research acceptance.",
+      "basis": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json"
+    },
+    {
+      "id": "D033",
+      "decision": "Accept complete bounded owner research, explicit partial qualification and original/derived offline archive. Close the fixed-request evidence deliverable; retain F. No retry, added samples, native rebuild, default attribution or candidate work. G4 final freeze and independent review may proceed; broader platform/default D-F/business prerequisites stay open.",
+      "basis": "docs/coordination/vm-followup/owner-measurement-acceptance.json"
+    }
+  ]
+}

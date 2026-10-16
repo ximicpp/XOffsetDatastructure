@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "decision": "D029",
+  "date": "2026-10-16",
+  "status": "accepted_portable_archive_supplement",
+  "supplements": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json",
+  "reviewer": "/root/orchestration_review",
+  "archive": "docs/perf/vm-network/pool-screening-1m-v1",
+  "window_files": 865,
+  "internal_hardlink_groups": 494,
+  "original_shared_inodes": 0,
+  "evidence_sha256": "0a834a4214f3fa75cc168686c9d474dcc38eb94944367faa660de5267187a1aa",
+  "copied_audit_log_sha256": "3dc63090122bccce21e0f2244111d8568efbe171f18ddcd8aa0b9c44f5a77988",
+  "archive_queue_result_sha256": "fa5872d485aa2b23a8b65d8d17adf824b3dcd2550831c84446509930d3735fc0",
+  "archive_queue_manifest_sha256": "f518fea94b9f89078d5df8c036a09cbfa1a8e48f88fc80d1d71a4fa48bc6071e",
+  "verification": "Keyoriginal/archive result,summary,approval,preregister,schedule,proposal-files,binding,instructions andqueue manifest byteequal; membermanifest exact; copiedfrozenprotocol auditpassed queue0 cleanupempty. Metadata/keyfilesonly, no repeated88statistics or369MBwire scan.",
+  "interpretation_unchanged": "executed-noise-unqualified; no gain/rejection/adoption or furthernetwork authorization"
+}

@@ -1,8 +1,7 @@
 // ============================================================================
-// Test: Adaptive Vector Reservation & Relocation Fallback
-// Purpose: Verify that the adaptive reserve() policy works correctly for
-//          both single-buffer and many-buffer scenarios, and that the
-//          relocation fallback path functions when grow() exceeds capacity.
+// Test: Virtual Address Reservation Policies
+// Purpose: Verify the default limit, legacy reservation hints, explicit hard
+//          limits, and stable growth without committing the whole reservation.
 // ============================================================================
 
 #include <iostream>
@@ -13,7 +12,6 @@
 
 using namespace XOffsetDatastructure;
 
-// Simple test struct
 struct SmallData {
     int id;
     double value;
@@ -24,319 +22,217 @@ struct SmallData {
     SmallData(Alloc alloc) : name(alloc), numbers(alloc) {}
 };
 
-// ============================================================================
-// Test 1: Adaptive reservation formula
-// ============================================================================
-bool test_adaptive_reservation() {
-    std::cout << "\n[TEST] Adaptive Reservation Formula\n";
-    std::cout << std::string(50, '-') << "\n";
+bool test_default_reservation() {
+    std::cout << "\n[TEST] Default virtual address reservation\n";
+    constexpr auto default_limit = XBufferCore::DEFAULT_MAXIMUM_CAPACITY;
+    static_assert(default_limit == 64ULL * 1024 * 1024);
 
-    using XMM = XBufferCore;  // XManagedMemory instantiation
-
-    // Verify compute_reservation formula
-    std::cout << "Test 1a: compute_reservation values... ";
-    assert(XMM::compute_reservation(512) == XMM::MIN_RESERVE);        // 512*16=8KB < 64KB → 64KB
-    assert(XMM::compute_reservation(4096) == XMM::MIN_RESERVE);       // 4K*16=64KB = MIN
-    assert(XMM::compute_reservation(8192) == 8192 * 16);              // 8K*16=128KB
-    assert(XMM::compute_reservation(1024*1024) == 1024*1024*16);      // 1M*16=16MB
-    assert(XMM::compute_reservation(32*1024*1024) == XMM::MAX_RESERVE); // 32M*16=512MB > 256MB → 256MB
-    std::cout << "[OK]\n";
-
-    // Verify actual buffer uses adaptive reservation
-    std::cout << "Test 1b: Small buffer uses small reservation... ";
-    {
-        XBuffer buf(4096);
-        auto* vec = buf.get_buffer();
-        std::size_t expected = XMM::compute_reservation(4096);
-        // capacity() should be at least the expected reservation
-        assert(vec->capacity() >= expected);
-        assert(vec->capacity() < XMM::MAX_RESERVE);   // NOT 256MB!
-        std::cout << "reserved=" << vec->capacity() / 1024 << "KB [OK]\n";
+    for (const auto initial_size : {4096u, 1024u * 1024u}) {
+        XBuffer buf(initial_size);
+        assert(buf.maximum_capacity() == default_limit);
+        assert(buf.reserved_capacity() == default_limit);
+        assert(buf.get_size() == initial_size);
+        assert(buf.get_buffer().size() == initial_size);
+        assert(buf.accessible_bytes() >= initial_size);
+        assert(buf.accessible_bytes() < buf.reserved_bytes());
+        assert(buf.reserved_bytes() >= buf.maximum_capacity());
     }
 
-    // Verify large buffer gets proportionally larger reservation
-    std::cout << "Test 1c: Large buffer uses large reservation... ";
-    {
-        XBuffer buf(1024 * 1024);  // 1MB
-        auto* vec = buf.get_buffer();
-        assert(vec->capacity() >= 1024 * 1024);  // at least initial size
-        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
-    }
-
-    std::cout << "[PASS] Adaptive reservation tests passed!\n";
+    // An initial arena larger than the default must still fit its reservation.
+    XBuffer large(default_limit + 4096);
+    assert(large.maximum_capacity() == default_limit + 4096);
+    assert(large.reserved_capacity() == large.maximum_capacity());
+    assert(large.get_size() == default_limit + 4096);
+    std::cout << "[PASS] Default reservation and initial-size floor\n";
     return true;
 }
 
-// ============================================================================
-// Test 2: Explicit max_capacity override
-// ============================================================================
-bool test_max_capacity_override() {
-    std::cout << "\n[TEST] MaxCapacity Override\n";
-    std::cout << std::string(50, '-') << "\n";
+bool test_capacity_policies() {
+    std::cout << "\n[TEST] Legacy hints and explicit maximum capacity\n";
+    constexpr auto small_limit = 64ULL * 1024;
+    constexpr auto large_hint = 256ULL * 1024 * 1024;
 
-    std::cout << "Test 2a: Explicit 64MB reservation... ";
-    {
-        XBuffer buf(4096, XBuffer::max_capacity(64 * 1024 * 1024));
-        auto* vec = buf.get_buffer();
-        // Should be at least 64MB
-        assert(vec->capacity() >= 64 * 1024 * 1024);
-        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
+    XBuffer legacy_small(4096, XBuffer::max_capacity(small_limit));
+    assert(legacy_small.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
+    const void* legacy_base = legacy_small.get_address();
+    const auto legacy_epoch = legacy_small.epoch();
+    assert(legacy_small.grow(2 * small_limit - legacy_small.get_size()));
+    assert(legacy_small.get_size() > small_limit);
+    assert(legacy_small.get_address() == legacy_base);
+    assert(legacy_small.epoch() == legacy_epoch);
+
+    XBuffer legacy_large(4096, XBuffer::max_capacity(large_hint));
+    assert(legacy_large.maximum_capacity() == large_hint);
+    assert(legacy_large.reserved_capacity() == large_hint);
+    assert(legacy_large.accessible_bytes() < legacy_large.reserved_bytes());
+
+    XBuffer limited(4096, XBuffer::maximum_capacity(small_limit));
+    assert(limited.maximum_capacity() == small_limit);
+    assert(limited.reserved_capacity() == small_limit);
+    bool rejected = false;
+    try {
+        XBuffer invalid(4096, XBuffer::maximum_capacity(1024));
+    } catch (const XBadAlloc&) {
+        rejected = true;
     }
-
-    std::cout << "Test 2b: Explicit 256MB reservation (max)... ";
-    {
-        XBuffer buf(4096, XBuffer::max_capacity(256 * 1024 * 1024));
-        auto* vec = buf.get_buffer();
-        assert(vec->capacity() >= 256 * 1024 * 1024);
-        std::cout << "reserved=" << vec->capacity() / (1024*1024) << "MB [OK]\n";
-    }
-
-    std::cout << "[PASS] MaxCapacity override tests passed!\n";
+    assert(rejected);
+    std::cout << "[PASS] Hint compatibility and hard-limit admission\n";
     return true;
 }
 
-// ============================================================================
-// Test 3: Many small buffers (10,000 instances)
-// ============================================================================
 bool test_many_small_buffers() {
-    std::cout << "\n[TEST] Many Small Buffers (10,000 instances)\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    const int N = 10000;
+    std::cout << "\n[TEST] 10,000 buffers with explicit 64 KiB limits\n";
+    constexpr int count = 10000;
+    constexpr auto limit = 64ULL * 1024;
     std::vector<std::unique_ptr<XBuffer>> buffers;
-    buffers.reserve(N);
-
-    std::cout << "Test 3a: Creating " << N << " XBuffer(4096) instances... ";
-    for (int i = 0; i < N; ++i) {
-        buffers.push_back(std::make_unique<XBuffer>(4096));
-    }
-    std::cout << "[OK]\n";
-
-    // Verify total virtual reservation is reasonable
-    std::cout << "Test 3b: Checking virtual address usage... ";
+    buffers.reserve(count);
     std::size_t total_reserved = 0;
-    for (auto& buf : buffers) {
-        total_reserved += buf->get_buffer()->capacity();
-    }
-    double total_gb = static_cast<double>(total_reserved) / (1024.0 * 1024 * 1024);
-    std::cout << "total=" << total_reserved / (1024*1024) << "MB (" 
-              << total_gb << "GB)... ";
-    
-    // With adaptive: 10K × 64KB = 640MB (vs old 10K × 256MB = 2.5TB)
-    assert(total_reserved < 2ULL * 1024 * 1024 * 1024);  // must be < 2GB
-    std::cout << "[OK]\n";
+    std::size_t total_accessible = 0;
 
-    // Create and verify objects in a subset
-    std::cout << "Test 3c: Creating root objects in first 100 buffers... ";
+    for (int i = 0; i < count; ++i) {
+        auto buf = std::make_unique<XBuffer>(4096, XBuffer::maximum_capacity(limit));
+        assert(buf->maximum_capacity() == limit);
+        assert(buf->reserved_capacity() == limit);
+        assert(buf->get_size() == 4096);
+        assert(buf->get_buffer().size() == 4096);
+        assert(buf->accessible_bytes() >= buf->get_size());
+        assert(buf->accessible_bytes() < buf->reserved_bytes());
+        total_reserved += buf->reserved_bytes();
+        total_accessible += buf->accessible_bytes();
+        buffers.push_back(std::move(buf));
+    }
+
+    assert(total_reserved >= count * limit);
+    assert(total_reserved < 2ULL * 1024 * 1024 * 1024);
+    assert(total_accessible < total_reserved);
+
     for (int i = 0; i < 100; ++i) {
         auto* data = buffers[i]->make<SmallData>();
         data->id = i;
         data->name = std::to_string(i).c_str();
         data->numbers.push_back(i * 10);
     }
-    // Verify data
     for (int i = 0; i < 100; ++i) {
         auto& data = buffers[i]->root<SmallData>();
         assert(data.id == i);
+        assert(data.name == std::to_string(i).c_str());
         assert(data.numbers[0] == i * 10);
     }
-    std::cout << "[OK]\n";
-
-    std::cout << "[PASS] Many small buffers test passed!\n";
+    std::cout << "[PASS] Reserved=" << total_reserved / (1024 * 1024)
+              << " MiB, accessible=" << total_accessible / (1024 * 1024)
+              << " MiB; subset objects verified\n";
     return true;
 }
 
-// ============================================================================
-// Test 4: Relocation fallback (grow beyond capacity)
-// ============================================================================
-bool test_relocation_fallback() {
-    std::cout << "\n[TEST] Relocation Fallback (grow beyond capacity)\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    // Create a buffer with small adaptive reservation (4KB → 64KB reserved).
-    // Then explicitly grow() past the capacity to trigger the relocation path.
-    std::cout << "Test 4a: Create, populate, then grow beyond capacity... ";
-    XBuffer buf(4096);
-    auto* vec = buf.get_buffer();
-    std::size_t initial_capacity = vec->capacity();
-    std::cout << "initial_reserved=" << initial_capacity / 1024 << "KB... ";
-
+bool test_stable_growth_and_round_trip() {
+    std::cout << "\n[TEST] Stable growth, continued mutation, and save/load\n";
+    XBuffer buf(4096, XBuffer::maximum_capacity(256 * 1024));
     auto* data = buf.make<SmallData>();
     data->id = 42;
-    data->name = "relocation_test";
-    for (int i = 0; i < 10; ++i) {
-        data->numbers.push_back(i);
-    }
+    data->value = 12.5;
+    data->name = "stable_growth_test";
+    for (int i = 0; i < 10; ++i) data->numbers.push_back(i);
 
-    // Record epoch before relocation
-    uint64_t epoch_before = buf.epoch();
+    const void* base = buf.get_address();
+    const auto epoch = buf.epoch();
+    const auto accessible = buf.accessible_bytes();
+    assert(buf.grow(128 * 1024 - buf.get_size()));
+    assert(buf.accessible_bytes() > accessible);
+    assert(buf.get_address() == base);
+    assert(buf.epoch() == epoch);
+    assert(&buf.root<SmallData>() == data);
+    assert(data->id == 42);
+    assert(data->name == "stable_growth_test");
+    for (int i = 0; i < 10; ++i) assert(data->numbers[i] == i);
 
-    // Explicitly grow beyond the reserved capacity
-    bool grew = buf.grow(initial_capacity + 4096);
-    assert(grew);
-
-    // After relocation + re-reserve, capacity should have increased
-    std::size_t new_capacity = vec->capacity();
-    std::cout << "new_reserved=" << new_capacity / 1024 << "KB... ";
-    assert(new_capacity > initial_capacity);
-
-    // Epoch should have incremented (relocation happened)
-    assert(buf.epoch() > epoch_before);
-    std::cout << "[OK]\n";
-
-    // Verify data integrity after relocation
-    std::cout << "Test 4b: Verify data integrity after relocation... ";
-    auto& ref = buf.root<SmallData>();
-    assert(ref.id == 42);
-    assert(ref.name == "relocation_test");
-    assert(ref.numbers.size() == 10);
-    for (int i = 0; i < 10; ++i) {
-        assert(ref.numbers[i] == i);
-    }
-    std::cout << "[OK]\n";
-
-    // Continue using the buffer after relocation — add more data
-    std::cout << "Test 4c: Continue adding data after relocation... ";
-    auto& ref2 = buf.root<SmallData>();
-    for (int i = 10; i < 1000; ++i) {
-        ref2.numbers.push_back(i);
-    }
-    assert(buf.root<SmallData>().numbers.size() == 1000);
-    assert(buf.root<SmallData>().numbers[999] == 999);
-    std::cout << "[OK]\n";
-
-    // XHandle works correctly after relocation
-    std::cout << "Test 4d: XHandle works after relocation... ";
+    for (int i = 10; i < 1000; ++i) data->numbers.push_back(i);
     auto handle = buf.handle<SmallData>();
-    assert(handle->id == 42);
+    assert(handle.get() == data);
     assert(handle->numbers.size() == 1000);
-    std::cout << "[OK]\n";
+    for (int i = 0; i < 1000; ++i) assert(handle->numbers[i] == i);
 
-    // Save/load round-trip after relocation
-    std::cout << "Test 4e: Save/load round-trip after relocation... ";
     std::string saved = buf.save();
+    assert(buf.get_address() == base);
+    assert(buf.epoch() == epoch);
+    assert(handle.get() == data);
     XBuffer loaded = XBuffer::load_unverified(saved);
     auto& loaded_data = loaded.unsafe_root<SmallData>();
     assert(loaded_data.id == 42);
-    assert(loaded_data.name == "relocation_test");
+    assert(loaded_data.value == 12.5);
+    assert(loaded_data.name == "stable_growth_test");
     assert(loaded_data.numbers.size() == 1000);
-    assert(loaded_data.numbers[999] == 999);
-    std::cout << "[OK]\n";
-
-    std::cout << "[PASS] Relocation fallback tests passed!\n";
+    for (int i = 0; i < 1000; ++i) assert(loaded_data.numbers[i] == i);
+    std::cout << "[PASS] Raw pointers, handles, and all serialized values intact\n";
     return true;
 }
 
-// ============================================================================
-// Test 5: Forced relocation + re-reserve behavior
-// ============================================================================
-bool test_forced_relocation() {
-    std::cout << "\n[TEST] Forced Relocation + Re-reserve\n";
-    std::cout << std::string(50, '-') << "\n";
-
-    // Create with small reservation to guarantee relocation
-    // 4096 bytes → 64KB reservation
-    std::cout << "Test 5a: Force grow beyond capacity... ";
-    XBuffer buf(4096);
-    auto initial_capacity = buf.get_buffer()->capacity();
+bool test_hard_capacity_failure() {
+    std::cout << "\n[TEST] Growth stops at the hard maximum\n";
+    constexpr auto limit = 64ULL * 1024;
+    XBuffer buf(4096, XBuffer::maximum_capacity(limit));
     auto* data = buf.make<SmallData>();
     data->id = 99;
+    data->name = "at_limit";
+    const void* base = buf.get_address();
+    const auto epoch = buf.epoch();
 
-    // Record initial epoch
-    uint64_t epoch_before = buf.epoch();
-
-    // Force grow way beyond 64KB capacity
-    bool grew = buf.grow(initial_capacity + 4096);  // exceed capacity
-    assert(grew);
-    
-    auto new_capacity = buf.get_buffer()->capacity();
-    std::cout << "before=" << initial_capacity/1024 << "KB "
-              << "after=" << new_capacity/1024 << "KB... ";
-    
-    // Capacity should have grown (re-reserve after relocation)
-    assert(new_capacity > initial_capacity);
-    std::cout << "[OK]\n";
-
-    // Epoch should have incremented (relocation happened)
-    std::cout << "Test 5b: Epoch incremented on relocation... ";
-    uint64_t epoch_after = buf.epoch();
-    assert(epoch_after > epoch_before);
-    std::cout << "epoch " << epoch_before << " → " << epoch_after << " [OK]\n";
-
-    // Verify data still accessible via root()
-    std::cout << "Test 5c: Data intact after forced relocation... ";
-    auto& ref = buf.root<SmallData>();
-    assert(ref.id == 99);
-    std::cout << "[OK]\n";
-
-    // Test 5d: After re-reserve, subsequent grows should be fast-path
-    std::cout << "Test 5d: Re-reserve enables fast-path for subsequent grows... ";
-    uint64_t epoch_stable = buf.epoch();
-    for (int i = 0; i < 10; ++i) {
-        bool ok = buf.grow(1024);  // small grow within re-reserved capacity
-        assert(ok);
-    }
-    // Epoch should NOT have changed if all grows stayed within capacity
-    if (buf.epoch() == epoch_stable) {
-        std::cout << "all fast-path [OK]\n";
-    } else {
-        // If capacity was tight, relocation may have happened once during re-reserve
-        std::cout << "some slow-path (acceptable) [OK]\n";
-    }
-
-    std::cout << "[PASS] Forced relocation tests passed!\n";
+    assert(buf.grow(limit - buf.get_size()));
+    assert(buf.get_size() == limit);
+    const auto accessible = buf.accessible_bytes();
+    assert(!buf.grow(1));
+    assert(!buf.grow(limit));
+    assert(buf.grow(0));
+    assert(buf.get_size() == limit);
+    assert(buf.maximum_capacity() == limit);
+    assert(buf.reserved_capacity() == limit);
+    assert(buf.accessible_bytes() == accessible);
+    assert(buf.get_address() == base);
+    assert(buf.epoch() == epoch);
+    assert(&buf.root<SmallData>() == data);
+    assert(data->id == 99);
+    assert(data->name == "at_limit");
+    std::cout << "[PASS] Failed growth preserves size, mapping, and live data\n";
     return true;
 }
 
-// ============================================================================
-// Test 6: TypedXBuffer with MaxCapacity
-// ============================================================================
-bool test_typed_buffer_max_capacity() {
-    std::cout << "\n[TEST] TypedXBuffer with MaxCapacity\n";
-    std::cout << std::string(50, '-') << "\n";
+bool test_typed_buffer_capacity() {
+    std::cout << "\n[TEST] TypedXBuffer capacity policies\n";
+    constexpr auto limit = 64ULL * 1024;
+    TypedXBuffer<SmallData> limited(4096, XBuffer::maximum_capacity(limit));
+    assert(limited.maximum_capacity() == limit);
+    auto* data = limited.make();
+    data->id = 123;
+    const void* base = limited.get_address();
+    const auto epoch = limited.epoch();
+    assert(limited.grow(limit - limited.get_size()));
+    assert(!limited.grow(1));
+    assert(limited.get_address() == base);
+    assert(limited.epoch() == epoch);
+    assert(&limited.root() == data);
+    assert(limited.root().id == 123);
 
-    std::cout << "Test 6a: TypedXBuffer with explicit capacity... ";
-    {
-        TypedXBuffer<SmallData> buf(4096, XBuffer::max_capacity(32 * 1024 * 1024));
-        assert(buf.get_buffer()->capacity() >= 32 * 1024 * 1024);
-        auto* data = buf.make();
-        data->id = 123;
-        assert(buf.root().id == 123);
-        std::cout << "[OK]\n";
-    }
-
-    std::cout << "Test 6b: TypedXBuffer with default adaptive... ";
-    {
-        TypedXBuffer<SmallData> buf(4096);
-        assert(buf.get_buffer()->capacity() < 256ULL * 1024 * 1024);
-        auto* data = buf.make();
-        data->id = 456;
-        assert(buf.root().id == 456);
-        std::cout << "[OK]\n";
-    }
-
-    std::cout << "[PASS] TypedXBuffer MaxCapacity tests passed!\n";
+    TypedXBuffer<SmallData> legacy(4096, XBuffer::max_capacity(limit));
+    assert(legacy.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
+    TypedXBuffer<SmallData> ordinary(4096);
+    assert(ordinary.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
+    ordinary.make()->id = 456;
+    assert(ordinary.root().id == 456);
+    std::cout << "[PASS] Typed buffers preserve hint and hard-limit semantics\n";
     return true;
 }
 
 int main() {
     try {
         bool all_passed = true;
-
-        all_passed &= test_adaptive_reservation();
-        all_passed &= test_max_capacity_override();
+        all_passed &= test_default_reservation();
+        all_passed &= test_capacity_policies();
         all_passed &= test_many_small_buffers();
-        all_passed &= test_relocation_fallback();
-        all_passed &= test_forced_relocation();
-        all_passed &= test_typed_buffer_max_capacity();
-
-        if (all_passed) {
-            std::cout << "\n[SUCCESS] All adaptive reservation tests passed!\n";
-            return 0;
-        } else {
-            std::cout << "\n[FAILURE] Some tests failed!\n";
-            return 1;
-        }
+        all_passed &= test_stable_growth_and_round_trip();
+        all_passed &= test_hard_capacity_failure();
+        all_passed &= test_typed_buffer_capacity();
+        std::cout << (all_passed ? "\n[SUCCESS] All reservation policy tests passed!\n"
+                               : "\n[FAILURE] Reservation policy tests failed!\n");
+        return all_passed ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << "[FAIL] Exception: " << e.what() << "\n";
         return 1;

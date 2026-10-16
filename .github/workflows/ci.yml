@@ -8,6 +8,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  storage:
+    name: C++17 OS storage (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure standalone storage
+        run: cmake -S . -B build-storage -DXOFFSET_STORAGE_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build-storage --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build-storage -C Release --output-on-failure --no-tests=error
+      - name: Install, relocate, and consume the storage package
+        run: python3 tools/validate_vm_package.py --source-dir . --out build-storage-package --suite storage
+      - name: Save platform inventory and test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-${{ matrix.os }}
+          path: |
+            build-storage/test-inventory.json
+            build-storage/CMakeCache.txt
+            build-storage/Testing/Temporary/*.log
+            build-storage-package/result.json
+            build-storage-package/*.log
+            build-storage-package/*manifest*.json
+            build-storage-package/*.xml
+
   test:
     name: Build & Test (P2996 Docker)
     runs-on: ubuntu-latest
@@ -37,20 +69,33 @@ jobs:
 
       - name: Pull P2996 Docker image
         run: |
-          echo "Pulling pre-built P2996 Docker image..."
-          docker pull ghcr.io/ximicpp/typelayout-p2996:latest
-          echo ""
-          echo "=== Image info ==="
-          docker images ghcr.io/ximicpp/typelayout-p2996:latest
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          echo "XOFFSET_CI_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          mkdir -p build
+          docker image inspect "$IMAGE" > build/ci-image.json
+
+      - name: Verify pinned compiler and dependencies
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            "$XOFFSET_CI_IMAGE" python3 tools/check_vm_toolchain.py \
+            --profile linux-p2996 --compiler /opt/p2996-toolchain/bin/clang++ \
+            --deps external --output build/ci-toolchain.json
+
+      - name: Prepare pinned CMake for C++26 consumer targets
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
 
       - name: Build, CTest, and signature self-check
         shell: bash
         run: |
           set -o pipefail
-          docker run --rm \
+          mkdir -p build
+          docker run --rm --platform linux/amd64 \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/ximicpp/typelayout-p2996:latest \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            "$XOFFSET_CI_IMAGE" \
             bash ./build.sh 2>&1 | tee build/ci-build.log
 
       - name: Signature contract verification
@@ -77,6 +122,16 @@ jobs:
           echo "::error::Type signatures changed. Review tools/sigs/*.sig.hpp and commit intentional baseline updates."
           exit 1
 
+      - name: Install, relocate, and consume the full package
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            "$XOFFSET_CI_IMAGE" python3 tools/validate_vm_package.py \
+            --source-dir . --out build/package-validation --suite full \
+            --compiler /opt/p2996-toolchain/bin/clang++ \
+            --library-dir /opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu
+
       - name: Upload signature artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -85,6 +140,25 @@ jobs:
           path: tools/sigs/*.sig.hpp
           retention-days: 30
           if-no-files-found: ignore
+
+      - name: Upload validation inputs and inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-inputs
+          path: |
+            build/ci-image.json
+            build/ci-toolchain.json
+            build/test-inventory.json
+            build/compile-checks/*.log
+            build/Testing/Temporary/*.log
+            build/package-validation/result.json
+            build/package-validation/*.log
+            build/package-validation/*manifest*.json
+            build/package-validation/*.xml
+            build/cmake-tool/result.json
+            build/cmake-tool/files.json
+          if-no-files-found: error
 
       - name: Upload build log on failure
         if: failure()
@@ -95,5 +169,8 @@ jobs:
             build/ci-build.log
             build/CMakeFiles/CMakeOutput.log
             build/CMakeFiles/CMakeError.log
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/compile-checks/*.log
+            build/Testing/Temporary/*.log
           retention-days: 7
           if-no-files-found: ignore

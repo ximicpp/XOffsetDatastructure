@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "reviewed_at": "2026-10-16T01:11:04.310396+08:00",
+  "reviewer": "/root/source_review",
+  "decision": "D018",
+  "status": "scoped_build_review_passed_workload_validation_open",
+  "scope": "Independent read-only audit of immutable build-v4 dual-profile source/include closure/binary/linkage evidence and all three prior failed build/queue receipts. No full workload or formal timing acceptance.",
+  "build_root": "build/vm-owner-scaling/build-v4",
+  "build_result_sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+  "source_sha256": {
+    "common/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "common/contract.json": "5bfb105ddd72ae578f835b50b8c047a415031590cc24529dc0d28af9669beacb",
+    "common/owner_scaling.cpp": "7470e32478027526a79030ee50b6975c37ae1a4e83c96af24cbd6cc82c84cb48",
+    "common/run_owner_scaling.py": "a1499ef8da25141eac00b25f8bb82446dd4a0a5a49f911cc945b82096b9c4ac9",
+    "common/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "common/w2/audit_events.py": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+    "common/w2/event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "input/diagnostic/n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "input/diagnostic/xoffset_virtual_memory.hpp": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+    "input/diagnostic/xoffsetdatastructure.hpp": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6",
+    "input/timing/xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "input/timing/xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+    "provenance/d018-acceptance.json": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+    "provenance/queue-runner.py": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "provenance/toolchain.json": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7",
+    "provenance/w2-acceptance.json": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "provenance/w2-build.json": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579"
+  },
+  "binaries_sha256": {
+    "diagnostic": "a9c176625111d668b501bf6b7a95d44352a27e4380baaa1e171031b001617f8f",
+    "timing": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45"
+  },
+  "profiles": {
+    "timing": {
+      "macro": "N3_DIAGNOSTIC=0",
+      "actual_dependency_count": 1018,
+      "dependency_alias_count": 1019,
+      "nonidentity_aliases": {
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread.h": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread/pthread.h",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/sched.h": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread/sched.h"
+      },
+      "required_selected_headers_checked": true,
+      "header_shadowing_rejected": true,
+      "binary_bytes": 102200,
+      "linkage_stdout_sha256": "d814c731191427d04db89bb8d0900a9b62757d2101b495e0b3f481b1dcabbc8d",
+      "linked_library_names": [
+        "@rpath/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib",
+        "@rpath/libunwind.1.dylib"
+      ]
+    },
+    "diagnostic": {
+      "macro": "N3_DIAGNOSTIC=1",
+      "actual_dependency_count": 1019,
+      "dependency_alias_count": 1020,
+      "nonidentity_aliases": {
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread.h": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread/pthread.h",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/sched.h": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread/sched.h"
+      },
+      "required_selected_headers_checked": true,
+      "header_shadowing_rejected": true,
+      "binary_bytes": 46621432,
+      "linkage_stdout_sha256": "4f6d770e4648fd5e4d888ca1b4f3ebdccac36e642382f7badc9f267a763546f9",
+      "linked_library_names": [
+        "@rpath/libc++.1.dylib",
+        "/usr/lib/libSystem.B.dylib",
+        "@rpath/libunwind.1.dylib"
+      ]
+    }
+  },
+  "compiler": {
+    "executed": "/usr/local/bin/clang++",
+    "resolved": "/usr/local/bin/clang-21",
+    "sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+    "version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n"
+  },
+  "runtime_sha256": {
+    "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+    "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6",
+    "/usr/local/lib/libunwind.1.0.dylib": "a7539f393b8f785dd09b4f7fb7c109382dd7d2db0ee903c10ab45e777c8cc4aa"
+  },
+  "link_tools_sha256": {
+    "/Library/Developer/CommandLineTools/usr/bin/ld": "28d85b9af18c923db12e0b4ce70b80ee217f2b7cade0e872baa9e8ddc396c08d",
+    "/Library/Developer/CommandLineTools/usr/bin/otool": "61ff2c63cf68eeeadf9c4700dadb8271740ff4960f98500f30db82b31521c0de",
+    "/usr/bin/ld": "b8763cf250e607a778bb4603cecb5b90338814d0a3dfcba0d57b1de242f610e9",
+    "/usr/bin/otool": "b8763cf250e607a778bb4603cecb5b90338814d0a3dfcba0d57b1de242f610e9"
+  },
+  "preserved_builds_and_receipts": [
+    {
+      "build": "build/vm-owner-scaling/build-v1",
+      "status": "failed",
+      "reason": "ValueError: new/changed unregistered external header: /usr/local/bin/../include/c++/v1/experimental/meta",
+      "result_sha256": "2c6290e66b2989217db95783839fbd033d4093fe1a8794658a61251493f5aeb6",
+      "runner_sha256": "c6a0ae00c6b091377eab471ae57521c7473ca985177db52b89bfdf795f3aabac",
+      "command_returncodes": [
+        0,
+        0
+      ],
+      "queue_receipt": "build/vm-owner-scaling/receipts/build-v1",
+      "queue_status": "failed",
+      "queue_returncode": 1,
+      "queue_request_sha256": "a712759e31f8d8f0675b74bac944290d0a1fc2bf56f60660c65c5c4088b0812b",
+      "queue_result_sha256": "00f8dd2e4e82ef0ca7ad4df3e09d5f327e15ea04b7c48d5913a6f3583572683f",
+      "queue_manifest_sha256": "6a4c7de0e44e50014f95c759eb958f893353489c19a3ff4081aefdf64f0b5360",
+      "source_lineage_checked": true
+    },
+    {
+      "build": "build/vm-owner-scaling/build-v2",
+      "status": "failed",
+      "reason": "ValueError: new/changed unregistered external header: /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/include/pthread.h",
+      "result_sha256": "db730bb5d2c3990fcb66eea93015077583ba21def0f69e34136718be95b78b4e",
+      "runner_sha256": "6cf0b77637007e021299230135d97773335a45392e4fa488571f75a8d7ee0a0f",
+      "command_returncodes": [
+        0,
+        0
+      ],
+      "queue_receipt": "build/vm-owner-scaling/receipts/build-v2",
+      "queue_status": "failed",
+      "queue_returncode": 1,
+      "queue_request_sha256": "9e421f3aa403a231b7534428ac23917aa7ea48b507c09aa719a354fd31cd8af2",
+      "queue_result_sha256": "5f51dafbd3ab2fec2262ef47794326c64fafc6460ca9f8a4698d67ef4932613a",
+      "queue_manifest_sha256": "1e36b6260e611ec130d6d781815869c395dce4494be1bfff12638c0f1415f8ef",
+      "source_lineage_checked": true
+    },
+    {
+      "build": "build/vm-owner-scaling/build-v3",
+      "status": "failed",
+      "reason": "ValueError: compile failed: diagnostic",
+      "result_sha256": "f537a1296ff06de648bf6349782952297f14fc8056b4a3dbad0fea684f9e5811",
+      "runner_sha256": "465d73c4bd8558902a531f5950440a7ac2832314712028ee927e1898ff7abbdc",
+      "command_returncodes": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "queue_receipt": "build/vm-owner-scaling/receipts/build-v3",
+      "queue_status": "failed",
+      "queue_returncode": 1,
+      "queue_request_sha256": "bf127d36cd94bf06d6fad7c53d63ab7fb21670b0e0e2030e50ceab94fd8aa3e5",
+      "queue_result_sha256": "d669738ba85a6eae0f5b3c5626ccc075ff1e71ac6d5c1abd7ae3e6188c897ebb",
+      "queue_manifest_sha256": "888acd3855a7b9c480541a652aafc3d6b5f8151b94f74d416077d2a8bbb5f3ca",
+      "source_lineage_checked": true
+    },
+    {
+      "build": "build/vm-owner-scaling/build-v4",
+      "status": "passed",
+      "reason": null,
+      "result_sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "runner_sha256": "a1499ef8da25141eac00b25f8bb82446dd4a0a5a49f911cc945b82096b9c4ac9",
+      "command_returncodes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "queue_receipt": "build/vm-owner-scaling/receipts/build-v4",
+      "queue_status": "complete",
+      "queue_returncode": 0,
+      "queue_request_sha256": "3082b4bef78cd155789dfd9932aa50cc2d23096fe723998f421f2d56d9400358",
+      "queue_result_sha256": "a9f52206506bdafb21d3d087c221759d727cfc86cc0a8b6a3420676f15f7ba6e",
+      "queue_manifest_sha256": "0f6c439e573e86250b57b1902b9ee1455b9d2a0d807c2f36321dbc2f0c48b47a",
+      "source_lineage_checked": true
+    }
+  ],
+  "failure_classification": {
+    "build-v1": "Successful timing compile, then closure checker rejected lexical ../ alias.",
+    "build-v2": "Successful timing compile, then closure checker rejected SDK symlink spelling.",
+    "build-v3": "Diagnostic frontend failed while writing object; raw stderr reports Filesize limit exceeded:25 under the previous 8MiB child file cap.",
+    "build-v4": "Both compile/link commands and both linkage probes returned0 under the new bounded stream/file limits."
+  },
+  "bounded_stream_static_review": {
+    "log_limit_bytes_per_stream": 8388608,
+    "compiler_regular_file_limit_bytes": 134217728,
+    "child_timeout_seconds": 30,
+    "queue_timeout_seconds_max": 180,
+    "review": "Selector drains separate stdout/stderr pipes with per-stream counters and a shared monotonic deadline; over-limit/timeouts fail, kill/reap direct child, and accepted queue contains descendants. File cap is separate from log cap; compile reserves two bounded regular outputs plus two logs and metadata margin. No new static blocker found for this scoped build."
+  },
+  "immutability": {
+    "directories_checked": 8,
+    "files_checked": 144,
+    "inventory_before_after_equal": true,
+    "inventory_digests": {
+      "build/vm-owner-scaling/build-v1": "8beeeed4aa38105a2391810d44cf041f80f03e3d5891dad798d945d5e37fad8c",
+      "build/vm-owner-scaling/build-v2": "736f13c79d242066cae0a14c6140f1467a9816c59df8c1dcdc8bf0342560adcc",
+      "build/vm-owner-scaling/build-v3": "a7b9b0141021d5b284eb68758c1899b6e266c3acf9ddc310b9b9177ac17e4838",
+      "build/vm-owner-scaling/build-v4": "ee0993b70de5a1fcc37d9160433122c32c5463f0b299d2ec0d36435b3fb37f92",
+      "build/vm-owner-scaling/receipts/build-v1": "e01f0b20ebd12f417741f7576e978d436a6942c128a8118c10248a586faa95ff",
+      "build/vm-owner-scaling/receipts/build-v2": "1f2e92efb1c84a9e6cfedea15a864c74b2736f72ce10f724e161fbe181154d8f",
+      "build/vm-owner-scaling/receipts/build-v3": "613e6290036a19c2ff2592a271a2f1703e48cd2aeaa292f3172e45f487db5cd7",
+      "build/vm-owner-scaling/receipts/build-v4": "25b291a1a81f1e31bf39ad3dacb58bae91d0900bb220fffaedf0a0e2a850e233"
+    }
+  },
+  "first_workload_boundary": {
+    "collection": "build/vm-owner-scaling/collection-v1/group-00",
+    "collection_status": "failed",
+    "collection_failure_reason": "AuditError: owners[0].used_end: conservation/extent mismatch",
+    "raw_child_returncode": 0,
+    "raw_child_status": "ok",
+    "raw_child_counts": {
+      "threads_started": 1,
+      "threads_joined": 1,
+      "created": 8,
+      "allocated": 256,
+      "freed": 256,
+      "destroyed": 8,
+      "validated": 256
+    },
+    "raw_event_count": 1981,
+    "first_owner_used_end": 816,
+    "interpretation": "One native workload process exists, but collector audit failed at its extent/ABI expectation. These raw values are observations, not a passed independent workload audit. Remaining25 processes are outside this build review."
+  },
+  "open_findings": [
+    "Workload auditor uses a32-byte stride expectation while the first native record reports a different extent consistent with a24-byte allocation stride; offline ABI review remains open.",
+    "Full26-case native/diagnostic/negative-control validation and final aggregate evidence audit remain open."
+  ],
+  "reviewer_execution": {
+    "cpp_builds": 0,
+    "cpp_workload_processes": 0,
+    "network_processes": 0,
+    "test_runs": 0,
+    "frozen_python_audits": [
+      "run_owner_scaling.audit_build",
+      "queue-runner.audit"
+    ],
+    "writes": [
+      "experiments/vm_owner_scaling/build-review.json"
+    ]
+  },
+  "timing_evidence": false
+}

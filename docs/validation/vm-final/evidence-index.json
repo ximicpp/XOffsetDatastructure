@@ -1,0 +1,971 @@
+{
+  "schema_version": 1,
+  "status": "final_research_index_complete",
+  "published_at_utc": "2026-10-15T19:27:37.977683+00:00",
+  "owner": "platform_inventory",
+  "scope": "Terminal evidence index for accepted follow-up research, D015 historical profile inheritance, D026-D033 decisions and explicit external prerequisites. Parent owns final G4 source seal and independent final review.",
+  "preparation": {
+    "workloads_executed": 0,
+    "compiler_or_test_invocations": 0,
+    "docker_invocations": 0,
+    "archives_opened_or_rehashed": 0,
+    "wire_files_read_or_rehashed": 0,
+    "small_authority_files_read_and_hashed": 22,
+    "writes": [
+      "docs/validation/vm-final/evidence-index.json",
+      "docs/validation/vm-final/verification-matrix.json"
+    ]
+  },
+  "digest_policy": {
+    "actual_hashes": "Only the listed small authority documents were read and hashed during this publication.",
+    "recorded_hashes": "Large evidence and binary hashes below are copied from accepted authority fields; they were not independently rehashed here. A named evidence_sha256 is preserved with its original field name and is not asserted to be a directory-tree hash.",
+    "historical_identity": "Parent-accepted relevant-source/profile inheritance with recorded provenance limits; no new full binary/compiler/SDK/runtime seal is asserted.",
+    "publication_history": "Older reviewed snapshot hashes in acceptance records remain original acceptance identities, distinct from current publication document hashes."
+  },
+  "authorities": [
+    {
+      "id": "base_inheritance",
+      "path": "docs/coordination/vm-followup/G4-inheritance-acceptance.json",
+      "sha256": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+      "bytes": 2376,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_identity_mapping_scoped",
+      "decision": null
+    },
+    {
+      "id": "D015_profiles",
+      "path": "docs/coordination/vm-followup/G4-supplement-acceptance.json",
+      "sha256": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+      "bytes": 2061,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_historical_profiles_scoped",
+      "decision": null
+    },
+    {
+      "id": "platform",
+      "path": "docs/coordination/vm-followup/platform-acceptance.json",
+      "sha256": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+      "bytes": 1262,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_prerequisite_assessment_only",
+      "decision": null
+    },
+    {
+      "id": "W1_network",
+      "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "bytes": 2765,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_with_explicit_sanitizer_prerequisite",
+      "decision": null
+    },
+    {
+      "id": "W2_foundation",
+      "path": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_scoped_foundation",
+      "decision": null
+    },
+    {
+      "id": "W2_network",
+      "path": "docs/coordination/vm-followup/W2-network-acceptance.json",
+      "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "bytes": 2665,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_bounded_network_diagnostics",
+      "decision": null
+    },
+    {
+      "id": "default_AA",
+      "path": "docs/coordination/vm-followup/default-aa-1-acceptance.json",
+      "sha256": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+      "bytes": 3250,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_executed_noise_unqualified",
+      "decision": null
+    },
+    {
+      "id": "network_AA",
+      "path": "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+      "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+      "bytes": 4309,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_executed_partial_qualification",
+      "decision": null
+    },
+    {
+      "id": "D026_pool",
+      "path": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json",
+      "sha256": "8fc361d44787aeacf5a7bc7533ddd969a0ae95b399d8d44fab646bb436b94552",
+      "bytes": 4157,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_executed_noise_unqualified",
+      "decision": "D026"
+    },
+    {
+      "id": "D027_owner",
+      "path": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "bytes": 3974,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_scoped_functionality_and_build",
+      "decision": "D027"
+    },
+    {
+      "id": "D028_G3",
+      "path": "docs/coordination/vm-followup/G3-acceptance.json",
+      "sha256": "43358d0d343837f68fbda165b057b13cc5170e42837e1683b41bebe79e8735a3",
+      "bytes": 3079,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_prerequisite_decisions_retain_F",
+      "decision": "D028"
+    },
+    {
+      "id": "D029_pool_archive",
+      "path": "docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json",
+      "sha256": "698b4871ac56a6ccb4ee9b8050daefebf304e386a7d0a3c85cfb683efe043dd0",
+      "bytes": 1201,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_portable_archive_supplement",
+      "decision": "D029"
+    },
+    {
+      "id": "D029_owner_archive",
+      "path": "docs/coordination/vm-followup/W1-owner-archive-acceptance.json",
+      "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+      "bytes": 1277,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_portable_archive_supplement",
+      "decision": "D029"
+    },
+    {
+      "id": "D030_proposal",
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+      "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+      "bytes": 3294,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "accepted_exact_proposal_one_window",
+      "decision": "D030"
+    },
+    {
+      "id": "D030_approval",
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+      "sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+      "bytes": 688,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "approved",
+      "decision": "D030"
+    },
+    {
+      "id": "linux_package_profile",
+      "path": "docs/coordination/vm-followup/platform-supplement-reviewed-v1/linux-package-provenance.json",
+      "sha256": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74",
+      "bytes": 10680,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "read_only_supplement_ready_for_parent_review",
+      "decision": null
+    },
+    {
+      "id": "stable_source_staging",
+      "path": "docs/validation/vm-final/final-v1/source-differences.json",
+      "sha256": "86aead6132c24100e5a05c8f14c28e87fda77d0fb6174e46b94617cba912b806",
+      "bytes": 16627,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "stable_source_staged_owner_measurement_deferred",
+      "decision": null
+    },
+    {
+      "id": "D031_approval_copy",
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+      "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+      "bytes": 3059,
+      "hash_method": "read_small_file_at_index_publication",
+      "reported_status": "offline_tool_fix_and_supplement_authorized",
+      "decision": "D031"
+    },
+    {
+      "id": "owner_measurement_final",
+      "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "bytes": 6870,
+      "hash_method": "read_small_file_at_final_index_publication",
+      "kind": "accepted_authority",
+      "reported_status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+      "decision": "D033"
+    },
+    {
+      "id": "D032_tool_fix",
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "bytes": 4959,
+      "hash_method": "read_small_file_at_final_index_publication",
+      "kind": "accepted_authority",
+      "reported_status": "accepted_tool_fix_and_offline_execution",
+      "decision": "D032"
+    },
+    {
+      "id": "W3_owner_final_handoff_metadata",
+      "path": "docs/perf/vm-owner-scaling/handoff.json",
+      "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+      "bytes": 25841,
+      "hash_method": "read_small_file_at_final_index_publication",
+      "kind": "role_metadata_reference_not_acceptance",
+      "reported_status": "D033_parent_accepted_owner_research_complete",
+      "decision": "D033",
+      "acceptance_authority": "owner_measurement_final",
+      "boundary": "Role metadata captured at publication; any older ready/pending status wording is superseded by parent D033, not a remaining index task."
+    },
+    {
+      "id": "W3_owner_final_report_metadata",
+      "path": "docs/perf/vm-owner-scaling/RESULTS.md",
+      "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68",
+      "bytes": 8129,
+      "hash_method": "read_small_file_at_final_index_publication",
+      "kind": "role_metadata_reference_not_acceptance",
+      "reported_status": null,
+      "decision": null,
+      "acceptance_authority": "owner_measurement_final",
+      "boundary": "Role metadata captured at publication; any older ready/pending status wording is superseded by parent D033, not a remaining index task."
+    }
+  ],
+  "evidence_groups": [
+    {
+      "id": "historical_base",
+      "authorities": [
+        "base_inheritance",
+        "D015_profiles",
+        "linux_package_profile",
+        "stable_source_staging"
+      ],
+      "accepted_profiles": {
+        "mac_tsan15": "Historical build option -mmacosx-version-min=10.15; executed on macOS26.6.2 arm64, not current default build and not macOS10.15 runtime validation.",
+        "linux_sanitizer": "26+2 per-case composite from two runs/CMake versions; inspected effective compile/link differences do not change validated behavior; not a single28-case run.",
+        "linux_package_full": "amd64 P2996Clang21/CMake4.2.3, emulated on arm64host; inputsha6509d40194dfdb77484d9b0d6e366a1f034f447bfc77aca2e6435fe28d2d2d53",
+        "linux_package_storage": "arm64 GNU13.3/CMake3.28.3 inside local VM/container; inputsha353e370a3e73a43f52b5e5b0769a05e2288e00a9dc525481aaa0dbf1de9c84bd; no independent physical-host performance claim"
+      },
+      "reviewed_snapshots": {
+        "initial": "docs/coordination/vm-followup/platform-mapping-reviewed-v1",
+        "supplement": "docs/coordination/vm-followup/platform-supplement-reviewed-v1"
+      },
+      "snapshot_member_hashes_recorded": {
+        "identity-notes.md": "efc17e59fc6006f2cc5e09374a6f0a4b29cfbc7e0126ac5924ab58d29587b7cc",
+        "identity-mapping.json": "593e05890ba943b916fab0f307714013738645ed68a3f80f4484ebbbf703439d",
+        "linux-package-provenance.json": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74"
+      },
+      "unconditional_new_base_cpp_jobs": 0,
+      "raw_roots": [
+        "docs/validation/2026-10-15-vm-stage3/macos-native-full",
+        "docs/validation/2026-10-15-vm-stage1/runner-wire",
+        "docs/validation/2026-10-15-vm-stage1/runner-native-tsan",
+        "docs/validation/2026-10-15-vm-stage1/runner-linux-sanitized-v2",
+        "docs/validation/2026-10-15-vm-stage3/linux-new-sanitized",
+        "docs/validation/2026-10-15-vm-stage2/package-native-full",
+        "docs/validation/2026-10-15-vm-stage2/package-native-storage",
+        "docs/validation/2026-10-15-vm-stage2/package-linux-full",
+        "docs/validation/2026-10-15-vm-stage2/package-linux-storage"
+      ],
+      "limits": [
+        "Missing historic binary/compiler/Python/fullSDK/runtime/sysroot seals cannot be invented",
+        "Full outer Docker request/response and per-container daemon identity not retained",
+        "TSan effective MachO minimum OS not established",
+        "Native Windows and independent native Linux performance remain unmet prerequisites",
+        "Wire: 84 new output full bytes were not retained; historical hash-only limitation.",
+        "Old ordinary Linux46 plus sanitized allocator2 does not establish ordinary Linux48."
+      ]
+    },
+    {
+      "id": "platform_inventory",
+      "authorities": [
+        "platform"
+      ],
+      "evidence_root": "experiments/vm_platform_validation/evidence/platform-20261015-01",
+      "recorded_small_manifest_hashes": {
+        "manifest.json": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+        "result.json": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e"
+      },
+      "facts": [
+        "Current F and frozen toolchain/dependency hashes match",
+        "SDK26.5 present; SDK27.0 is current default; future builds explicitly choose26.5",
+        "Windows frozen ZIP identity/126members/121source files/CRC verified",
+        "One configured SSH alias attempt timed out with exit255; no remote capability established"
+      ],
+      "unmet": [
+        "Native Windows x64 channel plus storage/consumer toolchain",
+        "Separate Windows full P2996 toolchain and execution",
+        "Reachable independent native Linux performance device/channel"
+      ],
+      "scope": "24 read-only commands and ZIP integrity assessment only; no platform compile/run/performance result."
+    },
+    {
+      "id": "W1_synchronous_network",
+      "authorities": [
+        "W1_network"
+      ],
+      "evidence_root": "docs/validation/vm-network/final-v2",
+      "recorded_evidence_hashes": {
+        "experiments/vm_network/handoff.json": "c1b7b54cbb79e271707700863898f1e5158af1817da176cb92ee8e392801bc1c",
+        "experiments/vm_network/HANDOFF.md": "6c7e099158acc7b43bfb588342873b0aefc9c508dc13f3938e1ad4a56eeb92ab",
+        "docs/validation/vm-network/final-v2/evidence.tar.gz": "19e335304fceb6c2443b7f1ce6bb1bd6f9d9cff6699695d6e80d2ab60727da79",
+        "docs/validation/vm-network/final-v2/manifest.json": "6731937b60f038462649e2b6c20ebb59e9c893c203ac0c08550c07b0abb8c74b",
+        "docs/validation/vm-network/final-v2/verify_bundle.py": "60ce3c8cf0298d5d997397a9f0569b2592326cc7b17c2a06ae61a6d29f41d075"
+      },
+      "recorded_binary_hashes": {
+        "timing": {
+          "path": "build/vm-network/timing-v2/net_reference",
+          "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18"
+        },
+        "diagnostic": {
+          "path": "build/vm-network/diagnostic-v2/net_reference",
+          "sha256": "ae6ce12e8ed06b246e19b73995f774da0d3c74f7a369e9f336b2d7fbc30558c8"
+        }
+      },
+      "checks": {
+        "each_profile_smoke_groups": 34,
+        "each_profile_smoke_subcases": 182,
+        "python_each_mode": 29,
+        "cli_commands": 16,
+        "processed_outputs_byte_equal": 12,
+        "archive_regular_members": 311,
+        "parent_independent_offline_audits": 5
+      },
+      "sanitizer": {
+        "status": "prerequisite_unavailable",
+        "runtime_test": "not_run",
+        "reason": "Frozen P2996 Clang requires ASan v8 version symbol; available Apple clang21 runtime provides Apple-specific ABI. Actual failed link evidence retained, no guard bypass."
+      },
+      "limits": [
+        "No production asynchronous transport or representative business consumer evidence",
+        "Logical admission credits are not physical memory or RSS",
+        "No performance conclusion; W3 preregistration/source/function/noise gates remain",
+        "No native Linux/Windows claim"
+      ]
+    },
+    {
+      "id": "W2_diagnostics_foundation",
+      "authorities": [
+        "W2_foundation"
+      ],
+      "evidence_roots": [
+        "docs/validation/vm-observability/frozen-implementation-v1",
+        "docs/validation/vm-observability/collection-06",
+        "docs/validation/vm-observability/runtime-controls-01"
+      ],
+      "recorded_evidence": {
+        "build_result_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+        "collection_result_sha256": "32fa091f6f76e0d8c48655198cc3e10f3434c9ccb36c6252ec76700b75587c03",
+        "original_binary_sha256": "498928f7ed536fe1ebda17b213e285525dd27b82febd673d58620c0c649a33a8",
+        "diagnostic_binary_sha256": "784d8e36a5a0a2f8c827a6991f7c41d04fad304f387728affca8aeae08cd083e",
+        "fixed_cases": 10,
+        "fixed_processes": 20,
+        "ordinary_valid_traces": 9,
+        "ordinary_valid_events": 480,
+        "runtime_controls": 3,
+        "python_tests": 57,
+        "external_dependency_files": 1018,
+        "queue_receipts_reviewed": 4
+      },
+      "event_coverage": {
+        "asserted_count_ledger_or_partial_snapshot": 29,
+        "structural_only": 11,
+        "invalid_control_only": 1,
+        "not_executed": 22
+      },
+      "limits": [
+        "22 unexecuted kinds and 11 structural-only kinds are not independently verified paths",
+        "Custom consumer semantics and permitted retained resources require explicit workload assertions",
+        "Shared domains2/3/4 are causal allocation attribution, not exclusive owner costs",
+        "Raw base lifetime reuse requires registry generations; observation peaks are not physical simultaneous peaks",
+        "Copy extents of different meanings cannot be summed as process traffic; lock probes perturb timing",
+        "Native macOS only; no new sanitizer/TSan, Windows or Linux runtime evidence",
+        "Default D/F reproduction and conditional ablation remain open"
+      ]
+    },
+    {
+      "id": "W2_network_diagnostics",
+      "authorities": [
+        "W2_network"
+      ],
+      "evidence_root": "docs/validation/vm-observability/network/final-v1",
+      "recorded_member_hashes": {
+        "result.json": "accd8115080556b7c01589598e27b8f1abd97fa51e2d0910ebbeb416267372cb",
+        "references.json": "5ed61aed25489b1592c64fe43a674c0570e4cd881896f24820cbeb2c2bf91a9c",
+        "handoff.json": "19de334fa7e9d15a6c8132f276ffd22e85cb3b0030f50e8edf312a39091ab1b0",
+        "source-identities.json": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51"
+      },
+      "processes": 32,
+      "coverage": "23 kinds in this batch; new assertions only fixture auto_growth/extent_request. Combined foundation42 ordinary executed,20 unexecuted,1 invalid-control-only; not all kinds exhaustive.",
+      "package_boundary": "20-file final-v1 plus1044 referenced original evidence files. Final-v1 alone is not a portable complete archive. Relocation control covers frozeninput+one4KiB warm case, not wholecollection relocation.",
+      "limits": [
+        "Diagnostic timings perturb paths and are not formal timing or latency savings",
+        "Network peakowner1 does not cover multi-owner contention",
+        "Metadata request bytes/observation-order peaks not physical memory or process total copies",
+        "Known first compiler-driver link failure preserved; no workload ran in that failed build",
+        "Native platform/sanitizer/business prerequisites unchanged"
+      ]
+    },
+    {
+      "id": "default_FF",
+      "authorities": [
+        "default_AA"
+      ],
+      "evidence_root": "build/vm-network-measurement/default-calibration-v1",
+      "portable_report": "docs/perf/vm-default-attribution/RESULTS.md",
+      "recorded_result_sha256": "f3f655510af52d11ec3b3b266096478b5e47653c2e7c48847aa3a49f7b20827b",
+      "recorded_summary_sha256": "b41e713102151a708616bbaed0e7c20b742a3d9df46d5054f38fa55a71f5e6bc",
+      "processes": 78,
+      "outcome": "accepted execution; all four metric rows and their anchors fail noise qualification; no D/F or ablation",
+      "limits": [
+        "This window does not establish 2% detection capability",
+        "Noise rejection is not an execution failure or proof of F regression/equivalence",
+        "No claim that this host can never support measurement",
+        "N3 reproduction and attribution remain open"
+      ]
+    },
+    {
+      "id": "network_calibration",
+      "authorities": [
+        "network_AA"
+      ],
+      "evidence_root": "build/vm-network-measurement/network-calibration-v1",
+      "recorded_result_hashes": {
+        "result.json": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+        "summary.json": "053ec410d8b24da50e428c4d4919697390ce7d490f33c130ff991cbfb666e069"
+      },
+      "portable_archive_record": {
+        "status": "accepted",
+        "path": "docs/perf/vm-network/calibration-v1",
+        "reviewer": "/root/orchestration_review",
+        "evidence_sha256": "893cda8bb2e2eb54b8da28bb4a23c4a112918141cc9545fcaed22a26de203297",
+        "relocated_audit_log_sha256": "1d490897a87b402c2bb7108ef42be733f22c49ba9a2f8575aadce462572a1460",
+        "copy_queue_result_sha256": "7635682569cc1c011ff13ef6461c11d6db4d0358783b36aba4d1a40d261a352f",
+        "copied_files": 2096,
+        "internal_hardlinks": 1656,
+        "original_shared_inodes": 0,
+        "scope": "Copied audit passed, original/copied key manifests and result/summary/approval/schedule byte-identical; parent reviewer checked file metadata without repeating full wire/statistics audit."
+      },
+      "processes": 112,
+      "wire_bytes": 620755072,
+      "outcome": "Only 1048576-byte stable window qualifies; no failed-size retry and no qualification carryover to the separate pool window."
+    },
+    {
+      "id": "D026_network_pool",
+      "authorities": [
+        "D026_pool",
+        "D029_pool_archive"
+      ],
+      "evidence_root": "build/vm-network-measurement/network-pool-screening-1m-v1",
+      "portable_root": "docs/perf/vm-network/pool-screening-1m-v1",
+      "recorded_result_hashes": {
+        "result.json": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+        "summary.json": "9c004bdf09fe829dc049e3a049654cfa383b07f93e5d148ffc8f88e02ab86113"
+      },
+      "recorded_portable_digest_fields": {
+        "evidence_sha256": "0a834a4214f3fa75cc168686c9d474dcc38eb94944367faa660de5267187a1aa",
+        "copied_audit_log_sha256": "3dc63090122bccce21e0f2244111d8568efbe171f18ddcd8aa0b9c44f5a77988",
+        "archive_queue_result_sha256": "fa5872d485aa2b23a8b65d8d17adf824b3dcd2550831c84446509930d3735fc0",
+        "archive_queue_manifest_sha256": "f518fea94b9f89078d5df8c036a09cbfa1a8e48f88fc80d1d71a4fa48bc6071e"
+      },
+      "native_processes": 88,
+      "raw_files": 704,
+      "wire_files": 352,
+      "wire_bytes": 369222656,
+      "outcome": "Local A/A passes both contrasts; stable windows fail both contrasts; retain F, no gain/equivalence/rejection/adoption claim. D029 completes portable supplement without new native execution."
+    },
+    {
+      "id": "D027_owner_functionality",
+      "authorities": [
+        "D027_owner",
+        "D029_owner_archive"
+      ],
+      "raw_roots": [
+        "build/vm-owner-scaling/build-v4",
+        "build/vm-owner-scaling/tooling-errata-v2",
+        "build/vm-owner-scaling/recovery-v2",
+        "build/vm-owner-scaling/collection-v1"
+      ],
+      "recorded_reviewed_hashes": {
+        "build/vm-owner-scaling/final-audit-v1.json": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+        "build/vm-owner-scaling/build-v4/result.json": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+        "build/vm-owner-scaling/tooling-errata-v2/result.json": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+        "build/vm-owner-scaling/recovery-v2/result.json": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8"
+      },
+      "recorded_binary_hashes": {
+        "diagnostic": "a9c176625111d668b501bf6b7a95d44352a27e4380baaa1e171031b001617f8f",
+        "timing": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45"
+      },
+      "case_ids": [
+        "diagnostic-fail_allocate",
+        "diagnostic-fail_create",
+        "diagnostic-fail_verify",
+        "diagnostic-partial_startup",
+        "diagnostic-r256-o256-t1",
+        "diagnostic-r256-o256-t2",
+        "diagnostic-r256-o256-t4",
+        "diagnostic-r256-o256-t8",
+        "diagnostic-r256-o64-t1",
+        "diagnostic-r256-o8-t1",
+        "timing-fail_allocate",
+        "timing-fail_create",
+        "timing-fail_verify",
+        "timing-partial_startup",
+        "timing-r256-o256-t1",
+        "timing-r256-o256-t2",
+        "timing-r256-o256-t4",
+        "timing-r256-o256-t8",
+        "timing-r256-o64-t1",
+        "timing-r256-o8-t1",
+        "timing-r8192-o256-t1",
+        "timing-r8192-o256-t2",
+        "timing-r8192-o256-t4",
+        "timing-r8192-o256-t8",
+        "timing-r8192-o64-t1",
+        "timing-r8192-o8-t1"
+      ],
+      "native_processes": 26,
+      "expected_success": 18,
+      "expected_failure": 8,
+      "history": "Original group00 collection remains failed due checker16byte assumption; newD022 supplemental audit accepts validoriginalrecord. Group01 preflightfailed with0native;groups02..08execute25 only. All original evidence retained.",
+      "portable_archive": {
+        "archive": "docs/validation/vm-owner-scaling/owner-scaling-v1.tar.gz",
+        "archive_sha256": "0f0593a92ba738c919c9fb5f82bcdf8b41735993e715a884faf616ee441852c0",
+        "archive_bytes": 3151435,
+        "regular_files": 462,
+        "unpacked_bytes": 67572019,
+        "manifest_sha256": "a2b07fa547b8663495670b7448d6150a655c5d27932884f1c8d86bdccc35d5fb",
+        "independent_report_sha256": "a9393f54da27684ad6cc09968b53f64b538017cfba25dc475921b36eb21648c3",
+        "independent_queue_result_sha256": "9ed9775ba06eb1faa17b66d6db3d8618a918ae32f552c3394d89a9910c7179b0"
+      },
+      "outcome": "Scoped functionality/build accepted; eight expected exit2 controls pass their assertions. Historical failures retained. No formal timing evidence."
+    },
+    {
+      "id": "D028_G3_decisions",
+      "authorities": [
+        "D028_G3"
+      ],
+      "decision_document": "docs/VM_IO_CANDIDATE_DECISIONS.md",
+      "candidate_preregister": "experiments/vm_io_candidates/candidate-preregister.json",
+      "recorded_document_hashes": {
+        "docs/VM_IO_CANDIDATE_DECISIONS.md": "ee9f5b3ccadcafb49955e56e7b3be7998ce8bfc3d24aa37d53ed54a89b45b58f",
+        "experiments/vm_io_candidates/candidate-preregister.json": "cdb14f3245b0623e25cfc62122773201d673875ed88b7b2ed09ea39997e4b5db"
+      },
+      "candidates": [
+        {
+          "id": "owner-reuse",
+          "decision": "prerequisite_unmet_retain_F",
+          "known_cost": "Warm F already reuses mappings, but retains freshowner registration/metadata/load work; no exact removable end-to-end fraction.",
+          "reopen_when": "Choose exact object/reservation/Core reuse, load-only commit/rollback and full active/spare resource accounting; give baseline equal-work pooled load+swap ifoldvalue preserved; obtain interpretable calibrated representative evidence."
+        },
+        {
+          "id": "new-staging-direct-read",
+          "decision": "prerequisite_unmet_retain_F",
+          "known_cost": "Owningreceive string toowner payloadcopy exists; wholeload phase isnot removablecopytime.",
+          "reopen_when": "Select oneendpoint, prezero versus unpublishedfill mechanism, fullV1admission/graphverification beforetypedpublish, partialread/cancelcompletion and futurezeroing; accountresources and measure nettoend benefit against equalwork F."
+        },
+        {
+          "id": "reduce-output-copy",
+          "decision": "prerequisite_unmet_retain_F",
+          "known_cost": "Response owningstring materialization exists; save_verified doesnot fullgraphscan, bothloadscans remain.",
+          "reopen_when": "Define ownedheader, immutableexclusivepayload, shortsend progress, actualcompletion/cancelcompletion, backpressureretention/late release and exactV1bytes; calibrated endtoend comparison including changedlifetimes."
+        }
+      ],
+      "cost_fraction": null,
+      "implementations": 0,
+      "experimental_rejections": 0,
+      "adoptions": 0,
+      "actual_business_consumer": "unevaluated; protocol/library,schema/size distribution,concurrency/completion/failure/resource requirements remain unspecified"
+    },
+    {
+      "id": "D030_owner78",
+      "authorities": [
+        "D030_proposal",
+        "D030_approval",
+        "D031_approval_copy",
+        "D032_tool_fix",
+        "owner_measurement_final"
+      ],
+      "state": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+      "proposal": "build/vm-owner-measurement/proposal-v1/proposal.json",
+      "recorded_proposal_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+      "recorded_approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+      "limits": [
+        "A/free versus C/free is a single-window fixed-request phase observation; owner count changes per-owner workload and metadata.",
+        "All multithread comparisons uncertain; no thread-scaling or registry-lock/hash causal conclusion.",
+        "Clocks include scheduling/barriers/bookkeeping and exclude other lifecycle work; not lookup latency, full application lifetime or production tails.",
+        "No default D/F result, 2 percent regression claim, optimization/adoption or production benefit.",
+        "Native producer timing_evidence=false remains unchanged; authorization and qualification are separate artifacts."
+      ],
+      "final_authority": {
+        "status": "accepted_bound",
+        "id": "owner_measurement_final",
+        "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+        "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+        "bytes": 6870,
+        "schema_version": 1,
+        "decision": "D033",
+        "accepted_status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+        "document_read": true,
+        "scope": "Final bounded owner research, explicit partial qualification and original/derived offline archive accepted. No G4-wide freeze or independent final-review acceptance is fabricated."
+      },
+      "execution": {
+        "role": "W3",
+        "native_processes": 78,
+        "preruns": 6,
+        "measured_processes": 72,
+        "samples_per_condition": 12,
+        "same_condition_pairs": 6,
+        "conditions": 6,
+        "phases": 4,
+        "requests_per_allocate_and_free": 8192,
+        "native_elapsed_seconds": 2.1085283330176026,
+        "all_exit_zero": true,
+        "timed_out": false,
+        "cleanup_empty": true,
+        "new_native_after_original_window": 0,
+        "rebuilds": 0,
+        "windows": 1
+      },
+      "qualification": {
+        "cells_total": 24,
+        "qualified_cells": [
+          {
+            "condition": "A",
+            "phase": "allocate"
+          },
+          {
+            "condition": "A",
+            "phase": "free"
+          },
+          {
+            "condition": "B",
+            "phase": "create"
+          },
+          {
+            "condition": "B",
+            "phase": "allocate"
+          },
+          {
+            "condition": "B",
+            "phase": "destroy"
+          },
+          {
+            "condition": "C",
+            "phase": "free"
+          },
+          {
+            "condition": "D",
+            "phase": "create"
+          }
+        ],
+        "qualified_cells_count": 7,
+        "uncertain_cells_count": 17,
+        "comparisons_total": 24,
+        "qualified_comparisons": [
+          {
+            "condition": "A",
+            "phase": "free",
+            "reference_condition": "C",
+            "median": 0.5747111004931337,
+            "min": 0.5621138261206782,
+            "max": 0.5845460436670925,
+            "ratios": [
+              0.566657672171826,
+              0.58179880109027,
+              0.5719407055128228,
+              0.5845460436670925,
+              0.5621138261206782,
+              0.5774814954734445
+            ],
+            "direction": "all_lower"
+          },
+          {
+            "condition": "C",
+            "phase": "free",
+            "reference_condition": "C",
+            "median": 1.0,
+            "min": 1.0,
+            "max": 1.0,
+            "ratios": [
+              1.0,
+              1.0,
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ],
+            "direction": "unresolved"
+          }
+        ],
+        "qualified_comparisons_count": 2,
+        "non_self_qualified_comparisons_count": 1,
+        "uncertain_comparisons_count": 22,
+        "all_multithread_comparisons_uncertain": true,
+        "rule": "Predeclared AA/block dispersion/anchor drift each <=1.10; comparisons require case and reference C qualification. All samples/cells/comparisons retained."
+      },
+      "accepted_records": {
+        "window": {
+          "path": "build/vm-owner-measurement/window-v1/window.json",
+          "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869"
+        },
+        "summary": {
+          "path": "build/vm-owner-measurement/window-v1/summary.json",
+          "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340"
+        },
+        "native_receipt": {
+          "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+          "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131"
+        },
+        "archive": {
+          "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+          "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7"
+        },
+        "archive_receipt": {
+          "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+          "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055"
+        }
+      },
+      "portable_archive": {
+        "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+        "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+        "payload_files": 698,
+        "payload_bytes": 8891188,
+        "payload_counts_exclude": [
+          "result.json",
+          "COMPLETE"
+        ],
+        "relocation_audit": {
+          "new_native_processes": 0,
+          "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+          "scope": "complete package including result.json, COMPLETE, both windows, all frozen tools and both full receipts",
+          "status": "passed"
+        },
+        "original_window_preserved": true,
+        "original_failed_archive_preserved": true,
+        "derived_window_is_original_bytes": false,
+        "only_derived_difference": [
+          {
+            "derived_bytes": 688,
+            "derived_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+            "original_bytes": 688,
+            "original_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+            "path": "approval.json"
+          }
+        ],
+        "supplement_elapsed_seconds": 1.7585252079879865,
+        "new_native_processes": 0
+      },
+      "metadata_refs": [
+        "W3_owner_final_handoff_metadata",
+        "W3_owner_final_report_metadata"
+      ],
+      "outcome": "Complete bounded descriptive owner research accepted;7/24 cells and2/24 comparisons qualify (one self-comparison); all multithread comparisons remain uncertain. Retain F; no retry/adoption or causal registry/thread-scaling conclusion."
+    },
+    {
+      "id": "stable_source_staging",
+      "authorities": [
+        "stable_source_staging",
+        "base_inheritance",
+        "D015_profiles"
+      ],
+      "record": "docs/validation/vm-final/final-v1/source-differences.json",
+      "status": "stable_source_staged_owner_measurement_deferred",
+      "cut_at": "2026-10-15T17:55:09.094267+00:00",
+      "files": 225,
+      "source_bytes": 2970586,
+      "base_candidate_inputs_same": 21,
+      "stageIII_records": 129,
+      "stageIII_differences": [
+        {
+          "path": "README.md",
+          "historical": {
+            "bytes": 13405,
+            "sha256": "cf62faed1f71adf6c77b4a32717c28550c4f66c886c8c1e46eaf8917a7e4f06b"
+          },
+          "current": {
+            "sha256": "aeb54c4d8428842982911ae4f944754f5894d21fdf755c8da50bd20e82dbfaad",
+            "bytes": 14101
+          },
+          "disposition": "D024 accepted documentary change; outside C++ build/runtime closure"
+        },
+        {
+          "path": "tools/audit_vm_allocator.py",
+          "historical": {
+            "bytes": 20092,
+            "sha256": "c5e5e618bfd42abaed16a326d1fdc6f83bcb992675717764d0bde46a565d21b0"
+          },
+          "current": {
+            "sha256": "1935b5cdc256df0dc831aeee466d61e0d0a6618221d1e254bcd833f5595b52e5",
+            "bytes": 25193
+          },
+          "disposition": "D013/D015 mapped offline auditor changes outside full CMake/CTest closure; retain separate tool evidence"
+        },
+        {
+          "path": "tools/tests/test_audit_vm_allocator.py",
+          "historical": {
+            "bytes": 10360,
+            "sha256": "52a7fa1c9af866a16f5eaef604689565f8da5115301e75e35d347c68e1f85c21"
+          },
+          "current": {
+            "sha256": "95f7e28463e82a4713a36325a7dde03bd36677f9f83bff91077ff60844212eb1",
+            "bytes": 14457
+          },
+          "disposition": "D013/D015 mapped offline auditor changes outside full CMake/CTest closure; retain separate tool evidence"
+        }
+      ],
+      "experimental_handoff_checks": {
+        "vm_network": {
+          "checks": 10,
+          "all_same": true
+        },
+        "vm_observability": {
+          "checks": 15,
+          "all_same": true
+        },
+        "vm_network_measurement": {
+          "checks": 4,
+          "all_same": true
+        }
+      },
+      "new_CPP_jobs": 0,
+      "final_G4_frozen": false,
+      "deferred": [
+        "experiments/vm_owner_measurement/",
+        "final role handoffs/reports/owner78 acceptance"
+      ],
+      "dependency_boundary": "External dependencies/compiler/SDK/runtime and executed binaries referenced by accepted manifests; bytes not bundled; no offline self-contained build claim",
+      "method": "Read and hash only the parent-produced small comparison document; do not reread or rehash225 staged sources.",
+      "record_boundary": "Historical stable-source cut record, not a statement that all129 comparison records are bundled or that final G4 freeze had occurred at that cut.",
+      "current_parent_accepted_review": {
+        "source": "Parent D033 finalization instruction",
+        "files": 225,
+        "source_bytes": 2970586,
+        "base_related_inputs": 21,
+        "experimental_handoff_sources": 29,
+        "preserved_items": 9,
+        "new_CPP_jobs": 0,
+        "no_new_source_scan_by_index_writer": true
+      },
+      "excluded_placeholder": {
+        "path": "tools/sigs/.gitkeep",
+        "bytes": 110,
+        "content": "unchanged comment placeholder",
+        "included_in_225": false,
+        "source": "Parent finalization instruction; not reread or rehashed here."
+      },
+      "deferral_disposition": "Owner tool/result/report/acceptance deferral at the earlier stable cut is closed by D032/D033 bindings in this index. The original cut document and its final_G4_frozen=false field are retained as historical facts."
+    },
+    {
+      "id": "D031_approval_copy_defect",
+      "authorities": [
+        "D031_approval_copy",
+        "D032_tool_fix",
+        "owner_measurement_final"
+      ],
+      "finding": "Frozen collector serializes approval with sorted keys; state/queue retain original raw approval SHA. audit_window correctly rejects the rewritten copy. The input approval and stored copy have identical parsed content and the copy exactly equals the frozen dump function output.",
+      "recorded_original_evidence_hashes": {
+        "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+        "build/vm-owner-measurement/window-v1/approval.json": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+        "build/vm-owner-measurement/window-v1/window.json": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869",
+        "build/vm-owner-measurement/window-v1/summary.json": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+        "build/vm-owner-measurement/receipts/window-v1/result.json": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131",
+        "build/vm-owner-measurement/receipts/archive-v1/result.json": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662",
+        "build/vm-owner-measurement/receipts/archive-v1/stderr.log": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6"
+      },
+      "native_execution": "Original78 completed; no native retry or rebuild authorized.",
+      "status": "original_failure_preserved_repair_and_offline_supplement_accepted",
+      "requirements": [
+        "Preserve original window and failed archive receipt exactly",
+        "Pin original external approval and original window/summary/receipt identities",
+        "Prove stored approval object identity plus exact legacy dump bytes",
+        "Derived audit view may differ only in approval.json restored to exact original approval bytes",
+        "Use original frozen audit_window and verify_receipt without weakening hash/schedule/semantic/statistic checks",
+        "Archive original evidence and declared derived view with exact difference manifest, frozen supplement, authority and receipts",
+        "Audit complete relocated package once; no native execution",
+        "Retain all24cells/24comparisons and original timing_evidence=false",
+        "Minimal negative tests: noncanonical approval accepted byte-preservingly; changed object/additional changed files/missing original rejected"
+      ],
+      "limits": {
+        "new_native": 0,
+        "new_builds": 0,
+        "measurement_windows": 0,
+        "existing_evidence_budget_bytes": 536870912
+      },
+      "boundary": "Only derived approval.json differs and is restored to exact original authority bytes. Derived window is not byte-identical to original. No native retry/rebuild/window added.",
+      "accepted_tool_fix": {
+        "authority_id": "D032_tool_fix",
+        "status": "accepted_tool_fix_and_offline_execution",
+        "source_hashes_recorded": {
+          "README.md": {
+            "path": "experiments/vm_owner_measurement/README.md",
+            "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c"
+          },
+          "audit_owner_measurement.py": {
+            "path": "experiments/vm_owner_measurement/audit_owner_measurement.py",
+            "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced"
+          },
+          "collect_owner_measurement.py": {
+            "path": "experiments/vm_owner_measurement/collect_owner_measurement.py",
+            "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426"
+          },
+          "supplement_approval_bytes.py": {
+            "path": "experiments/vm_owner_measurement/supplement_approval_bytes.py",
+            "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+          },
+          "test_approval_bytes.py": {
+            "path": "experiments/vm_owner_measurement/test_approval_bytes.py",
+            "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8"
+          },
+          "test_owner_measurement.py": {
+            "path": "experiments/vm_owner_measurement/test_owner_measurement.py",
+            "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c"
+          }
+        },
+        "tests_recorded": {
+          "count_each": 51,
+          "existing_tests": 41,
+          "native_processes": 0,
+          "new_regressions": 10,
+          "normal": {
+            "path": "build/vm-owner-measurement/d031/offline-tests.log",
+            "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02"
+          },
+          "optimized": {
+            "path": "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+            "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e"
+          }
+        },
+        "accepted_tests_each_mode": 51,
+        "new_regressions": 10,
+        "existing_tests_included": 41,
+        "limits": [
+          "51 tests include the earlier41; do not add these suites as disjoint test cases.",
+          "Frozen original tools unchanged; no historical samples or original approval copy rewritten.",
+          "Source/log hashes are copied from D032 accepted authority, not rehashed here."
+        ]
+      },
+      "resolution": "D032 accepts future byte-preserving fix/regressions; D033 accepts immutable original plus declared derived view and complete relocated audit. Original failed archive receipt and frozen tools remain unchanged."
+    }
+  ],
+  "publication_note": "D033 final authority bound; owner78 pending resolved; D031 original failure retained with separately accepted repair and original/derived offline supplement. No new execution or archive scan by index publication.",
+  "completion_authority": {
+    "status": "accepted_bound",
+    "id": "owner_measurement_final",
+    "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+    "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+    "bytes": 6870,
+    "schema_version": 1,
+    "decision": "D033",
+    "accepted_status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+    "document_read": true,
+    "scope": "Final bounded owner research, explicit partial qualification and original/derived offline archive accepted. No G4-wide freeze or independent final-review acceptance is fabricated."
+  },
+  "completion": {
+    "owner78": "accepted_D033",
+    "D031_tool_fix": "accepted_D032",
+    "original_derived_offline_supplement": "accepted_D033",
+    "remaining_index_updates": 0,
+    "final_G4_acceptance_claimed": false,
+    "parent_finalization_boundary": "This completed research index is input to parent final source sealing and independent G4 review; it is not their approval document."
+  }
+}

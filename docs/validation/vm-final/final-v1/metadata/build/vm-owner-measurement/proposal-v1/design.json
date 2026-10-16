@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "decision": "D023",
+  "date": "2026-10-16",
+  "status": "design_frozen_tool_implementation_authorized",
+  "purpose": "Descriptive current-F fixed-request owner scaling; not an optimization/adoption or2percent regression study",
+  "implementation_role": "W2",
+  "formal_execution_role": "W3",
+  "parent_role": "Design, binding acceptance, one-window authorization and independent acceptance",
+  "owned_paths": [
+    "experiments/vm_owner_measurement/",
+    "build/vm-owner-measurement/",
+    "docs/perf/vm-owner-scaling/"
+  ],
+  "dependencies": [
+    "D018+D022 unchanged native harness/binaries and final W1 functional/diagnostic parent acceptance",
+    "Final exact source/binary/build/include/runtime/contract/checker/functional binding before execution"
+  ],
+  "conditions": [
+    {
+      "id": "A",
+      "owners": 8,
+      "threads": 1
+    },
+    {
+      "id": "B",
+      "owners": 64,
+      "threads": 1
+    },
+    {
+      "id": "C",
+      "owners": 256,
+      "threads": 1
+    },
+    {
+      "id": "D",
+      "owners": 256,
+      "threads": 2
+    },
+    {
+      "id": "E",
+      "owners": 256,
+      "threads": 4
+    },
+    {
+      "id": "F",
+      "owners": 256,
+      "threads": 8
+    }
+  ],
+  "requests_per_allocate_and_free": 8192,
+  "control": "none",
+  "native_build": "Accepted original F timing binary only; no rebuild/new harness or diagnostic timing",
+  "schedule": {
+    "prerun_order": "ABCDEF",
+    "preruns": 6,
+    "prerun_scope": "Whole fresh processes; environment pre-runs do not prewarm registry/Core inside subsequent child",
+    "blocks": 6,
+    "block_rule": "For b=0..5, rotate ABCDEF left by b, followed by exact reverse of that order",
+    "per_block_processes": 12,
+    "measured_processes": 72,
+    "total_processes": 78,
+    "samples_per_condition": 12,
+    "same_condition_pairs": 6
+  },
+  "phases": [
+    "create",
+    "allocate",
+    "free",
+    "destroy"
+  ],
+  "clock_boundary": "Existing main clock/start barrier/end barrier/clock; includes synchronization/scheduling, pointer/count bookkeeping and corresponding library work. Excludes thread start, payload fill/verify, snapshots, join and output; registry process-lifetime bucket not destroyed by measured Core destroy.",
+  "metrics": {
+    "create_destroy": [
+      "batch_ns",
+      "ns_per_owner"
+    ],
+    "allocate_free": [
+      "batch_ns",
+      "ns_per8192_request",
+      "requests_per_second"
+    ],
+    "forbidden_labels": [
+      "lookup_latency",
+      "complete_application_lifetime",
+      "pure_registry_cost",
+      "production_tail_latency"
+    ]
+  },
+  "statistics": {
+    "block_value": "g_b=sqrt(t_b1*t_b2), all times positive",
+    "AA": "max_b exp(abs(log(t_b2/t_b1)))",
+    "block_dispersion": "max(g_b)/min(g_b)",
+    "anchors": "a_e=sqrt(g_(2e)*g_(2e+1)),e=0,1,2",
+    "anchor_drift": "max(a_e)/min(a_e); implied by block dispersion but retained for explicit whole-window audit",
+    "cell_qualification": "All AA/block_dispersion/anchor_drift<=1.10; else uncertain; keep all24condition-phase cells",
+    "comparison": "r_b=g_case,b/g_C,b for b0..5; list all6 and median/min/max; qualified only if case and referenceC cells both qualified",
+    "reference": "C=o256t1",
+    "interpretation": "Ratios within10percent are direction unresolved; outside only describes this single window. Min/max is not confidence interval. No bootstrap, outlier removal or tail inference."
+  },
+  "limits": {
+    "max_native_processes": 78,
+    "child_timeout_seconds": 30,
+    "queue_timeout_seconds": 900,
+    "new_evidence_bytes": 536870912,
+    "concurrent_native_children": 1,
+    "max_worker_threads": 8,
+    "max_windows": 1,
+    "retry_failed_window": false,
+    "substitute_samples": false,
+    "increase_requests": false
+  },
+  "implementation_requirements": [
+    "Use a small standalone collector/auditor and reuse accepted W1 exact semantic checker through immutable copied/reference identity; no generic framework or mutation of W1/W3 tools",
+    "Implement offline synthetic checks for schedule exactness, duplicate/missing/foreign samples, malformed/nonpositive times, qualification boundaries, wrong workload/build/approval and receipt integrity",
+    "Preserve each actual argv/exit/timeout/stdout/stderr plus all native reports; exact identity/semantic failure stops and preserves partial evidence",
+    "Current raw harness timing_evidence=false remains immutable: qualification is a separate externally approved measurement artifact, not a rewritten producer claim",
+    "Fresh run marker, independent parent approval SHA, exact frozen schedule/proposal/tools/Python identity; preparatory tests must not launch native benchmark",
+    "Archive a complete reviewable bundle with frozen collector/auditor, accepted producer linkage, raw reports and one relocation audit; do not replicate unrelated historical archives",
+    "Queue protects all actual timing and bulk archive work; W3 alone executes formal window after parent exact proposal acceptance"
+  ],
+  "limits_of_inference": [
+    "Owner count also changes per-owner requests, working set and Core metadata growth; fixed total requests does not isolate pure hash lookup complexity",
+    "Threads affect scheduling/barriers; R256 diagnosis cannot infer exact R8192 fractions or solely attribute delay to locks",
+    "No defaultD/F reopen, optimization implementation/adoption, production API or public-header edit"
+  ],
+  "preparation_authorized": true,
+  "native_execution_authorized": false
+}

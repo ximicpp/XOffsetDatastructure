@@ -1,0 +1,892 @@
+{
+  "actual_attempts": 78,
+  "actual_processes": 78,
+  "approval": "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+  "approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+  "archive_failure": {
+    "cause": "Frozen collect serializes approval via indent=2,sort_keys=True, whereas frozen audit requires original byte hash. Both files688B, key order differs.",
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "collector_written_approval_copy_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+    "command_returncode": 1,
+    "elapsed_seconds": 0.14511262497399002,
+    "error": "ValueError: independent parent approval SHA mismatch",
+    "failed_receipt_preserved": true,
+    "native_or_tools_modified": false,
+    "original_copy_overwritten": false,
+    "parent_approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+    "parsed_objects_equal": true,
+    "position": "archive -> audit_window -> verify_approval, before archive destination creation",
+    "queue": "build/vm-owner-measurement/receipts/archive-v1",
+    "repair_or_reseal_performed": false,
+    "run_id": "086c4f10b8314806998b2a693c8e2a5b",
+    "status": "failed"
+  },
+  "cell_qualification": [
+    {
+      "aa": 1.2444320035050995,
+      "anchor_drift": 1.0403756582131753,
+      "block_dispersion": 1.1176335685337766,
+      "checks": {
+        "aa": false,
+        "anchor_drift": true,
+        "block_dispersion": false
+      },
+      "condition": "A",
+      "owners": 8,
+      "phase": "create",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 1.045099567099567,
+      "anchor_drift": 1.0110920592369028,
+      "block_dispersion": 1.0226686321169076,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "A",
+      "owners": 8,
+      "phase": "allocate",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.0658137208445218,
+      "anchor_drift": 1.009435449991593,
+      "block_dispersion": 1.0334418599621742,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "A",
+      "owners": 8,
+      "phase": "free",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.1800776424916182,
+      "anchor_drift": 1.1343538080783075,
+      "block_dispersion": 1.2295190229521322,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "A",
+      "owners": 8,
+      "phase": "destroy",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 1.0220555051008753,
+      "anchor_drift": 1.0090343629633145,
+      "block_dispersion": 1.0124184249419268,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "B",
+      "owners": 64,
+      "phase": "create",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.0113168544049893,
+      "anchor_drift": 1.009446113034811,
+      "block_dispersion": 1.015491750454522,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "B",
+      "owners": 64,
+      "phase": "allocate",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.7952579020340826,
+      "anchor_drift": 1.3099533558079786,
+      "block_dispersion": 1.3355704449376036,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "B",
+      "owners": 64,
+      "phase": "free",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 1.0361978494623656,
+      "anchor_drift": 1.0101626296771706,
+      "block_dispersion": 1.0301266082650324,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "B",
+      "owners": 64,
+      "phase": "destroy",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.7663775359139278,
+      "anchor_drift": 1.0201083887477693,
+      "block_dispersion": 1.3517610815730616,
+      "checks": {
+        "aa": false,
+        "anchor_drift": true,
+        "block_dispersion": false
+      },
+      "condition": "C",
+      "owners": 256,
+      "phase": "create",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 3.156480935364119,
+      "anchor_drift": 1.015656225950586,
+      "block_dispersion": 1.8032965636484073,
+      "checks": {
+        "aa": false,
+        "anchor_drift": true,
+        "block_dispersion": false
+      },
+      "condition": "C",
+      "owners": 256,
+      "phase": "allocate",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 1.0310716049382715,
+      "anchor_drift": 1.0060417961055612,
+      "block_dispersion": 1.0136477854960904,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "C",
+      "owners": 256,
+      "phase": "free",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 1
+    },
+    {
+      "aa": 1.7392275055190094,
+      "anchor_drift": 1.1550536237048912,
+      "block_dispersion": 1.3327697349547283,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "C",
+      "owners": 256,
+      "phase": "destroy",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 1
+    },
+    {
+      "aa": 1.088526710402999,
+      "anchor_drift": 1.007714610699534,
+      "block_dispersion": 1.0179470899533385,
+      "checks": {
+        "aa": true,
+        "anchor_drift": true,
+        "block_dispersion": true
+      },
+      "condition": "D",
+      "owners": 256,
+      "phase": "create",
+      "qualified": true,
+      "status": "qualified",
+      "threads": 2
+    },
+    {
+      "aa": 1.757669713589275,
+      "anchor_drift": 1.2354527162880036,
+      "block_dispersion": 1.7546625236624471,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "D",
+      "owners": 256,
+      "phase": "allocate",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 2
+    },
+    {
+      "aa": 1.7678731141372765,
+      "anchor_drift": 1.1228599752750563,
+      "block_dispersion": 1.3179691404751273,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "D",
+      "owners": 256,
+      "phase": "free",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 2
+    },
+    {
+      "aa": 1.762262328844742,
+      "anchor_drift": 1.5695978578845096,
+      "block_dispersion": 1.8159884907162802,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "D",
+      "owners": 256,
+      "phase": "destroy",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 2
+    },
+    {
+      "aa": 1.210049599687561,
+      "anchor_drift": 1.0530284153187375,
+      "block_dispersion": 1.1442982320724058,
+      "checks": {
+        "aa": false,
+        "anchor_drift": true,
+        "block_dispersion": false
+      },
+      "condition": "E",
+      "owners": 256,
+      "phase": "create",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 4
+    },
+    {
+      "aa": 1.289636902051167,
+      "anchor_drift": 1.1805041726469763,
+      "block_dispersion": 1.3330736046886567,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "E",
+      "owners": 256,
+      "phase": "allocate",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 4
+    },
+    {
+      "aa": 23.83833130758675,
+      "anchor_drift": 2.2426401822797004,
+      "block_dispersion": 5.129321888039523,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "E",
+      "owners": 256,
+      "phase": "free",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 4
+    },
+    {
+      "aa": 1.8645430670719112,
+      "anchor_drift": 1.1632650718582573,
+      "block_dispersion": 1.3638092958739891,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "E",
+      "owners": 256,
+      "phase": "destroy",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 4
+    },
+    {
+      "aa": 10.367510627291125,
+      "anchor_drift": 2.056344598087763,
+      "block_dispersion": 4.456994205397657,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "F",
+      "owners": 256,
+      "phase": "create",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 8
+    },
+    {
+      "aa": 2.4302809450027043,
+      "anchor_drift": 1.3142958534485942,
+      "block_dispersion": 1.7666861398809297,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "F",
+      "owners": 256,
+      "phase": "allocate",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 8
+    },
+    {
+      "aa": 1.470796962302702,
+      "anchor_drift": 1.1227600206156594,
+      "block_dispersion": 1.379426565872237,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "F",
+      "owners": 256,
+      "phase": "free",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 8
+    },
+    {
+      "aa": 1.8411212836243511,
+      "anchor_drift": 1.4911487324218324,
+      "block_dispersion": 1.6360620519463882,
+      "checks": {
+        "aa": false,
+        "anchor_drift": false,
+        "block_dispersion": false
+      },
+      "condition": "F",
+      "owners": 256,
+      "phase": "destroy",
+      "qualified": false,
+      "status": "uncertain",
+      "threads": 8
+    }
+  ],
+  "child_timeout_seconds": 30,
+  "comparison_qualification": [
+    {
+      "condition": "A",
+      "direction": "all_lower",
+      "max": 0.041570685276770644,
+      "median": 0.03397652860112699,
+      "min": 0.027538854521860827,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "A",
+      "direction": "mixed",
+      "max": 1.0090885613275558,
+      "median": 0.7629198192298503,
+      "min": 0.5579691100171881,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "A",
+      "direction": "all_lower",
+      "max": 0.5845460436670925,
+      "median": 0.5747111004931337,
+      "min": 0.5621138261206782,
+      "phase": "free",
+      "qualified": true,
+      "reference_condition": "C",
+      "status": "qualified"
+    },
+    {
+      "condition": "A",
+      "direction": "all_lower",
+      "max": 0.0423273039889279,
+      "median": 0.0362143316718138,
+      "min": 0.0271658145232171,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "B",
+      "direction": "all_lower",
+      "max": 0.3259538775442283,
+      "median": 0.28185141728337754,
+      "min": 0.2421266569949275,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "B",
+      "direction": "mixed",
+      "max": 1.0112551332275102,
+      "median": 0.7513448757867178,
+      "min": 0.5522264247662805,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "B",
+      "direction": "mixed",
+      "max": 0.997531480700843,
+      "median": 0.8763583881942554,
+      "min": 0.7494813709679452,
+      "phase": "free",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "B",
+      "direction": "all_lower",
+      "max": 0.3286448537209181,
+      "median": 0.3233445502413052,
+      "min": 0.24231609833196868,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "C",
+      "direction": "unresolved",
+      "max": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "C",
+      "direction": "unresolved",
+      "max": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "C",
+      "direction": "unresolved",
+      "max": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "phase": "free",
+      "qualified": true,
+      "reference_condition": "C",
+      "status": "qualified"
+    },
+    {
+      "condition": "C",
+      "direction": "unresolved",
+      "max": 1.0,
+      "median": 1.0,
+      "min": 1.0,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "D",
+      "direction": "mixed",
+      "max": 1.0278946797394368,
+      "median": 0.8749437833095719,
+      "min": 0.7470049410884334,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "D",
+      "direction": "mixed",
+      "max": 3.1111428854252554,
+      "median": 1.5515459399784437,
+      "min": 1.0172737288364924,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "D",
+      "direction": "all_higher",
+      "max": 2.359951153514429,
+      "median": 2.2998197491828742,
+      "min": 1.7707348511457823,
+      "phase": "free",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "D",
+      "direction": "mixed",
+      "max": 1.0220262489205285,
+      "median": 0.7567354835180384,
+      "min": 0.5685935731339228,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "E",
+      "direction": "all_lower",
+      "max": 0.5785136420070566,
+      "median": 0.5107688078683863,
+      "min": 0.41292070290639904,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "E",
+      "direction": "all_higher",
+      "max": 3.2442916173966774,
+      "median": 2.8699704935731134,
+      "min": 1.7990709307428274,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "E",
+      "direction": "all_higher",
+      "max": 15.339618588747966,
+      "median": 3.123916205611156,
+      "min": 2.9791742720137613,
+      "phase": "free",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "E",
+      "direction": "all_lower",
+      "max": 0.7763382203056559,
+      "median": 0.5722074417926817,
+      "min": 0.43003997694547297,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "F",
+      "direction": "mixed",
+      "max": 3.111195740135031,
+      "median": 0.6962885697362178,
+      "min": 0.5219549592692541,
+      "phase": "create",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "F",
+      "direction": "all_higher",
+      "max": 6.174246033922211,
+      "median": 2.851541992690168,
+      "min": 2.1561492990529527,
+      "phase": "allocate",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "F",
+      "direction": "all_higher",
+      "max": 4.275853251454912,
+      "median": 3.4660267682295762,
+      "min": 3.059450746908418,
+      "phase": "free",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    },
+    {
+      "condition": "F",
+      "direction": "mixed",
+      "max": 1.1980490223244296,
+      "median": 0.9046406512686334,
+      "min": 0.7358640787237734,
+      "phase": "destroy",
+      "qualified": false,
+      "reference_condition": "C",
+      "status": "uncertain"
+    }
+  ],
+  "completed_attempts": 78,
+  "completed_processes": 78,
+  "completion_scope": {
+    "additional_execution_or_audit_required": false,
+    "all_multithread_comparisons_uncertain": true,
+    "causal_or_adoption_conclusion": false,
+    "complete_receipt_parent_accepted": true,
+    "only_qualified_nonself": "A/free relative to C/free",
+    "original_failed_archive_receipt_preserved": true,
+    "original_window_preserved": true,
+    "owner_research_accepted": true,
+    "qualified_cells": 7,
+    "qualified_comparisons": 2,
+    "self_comparisons_among_qualified": 1,
+    "sole_derived_difference": "approval.json uses exact original parent-approved bytes",
+    "supplement_payload_files": 698
+  },
+  "cpp_running": false,
+  "decision": "D033",
+  "expected_processes": 78,
+  "max_evidence_bytes": 536870912,
+  "max_windows": 1,
+  "measured_processes": 72,
+  "measurements_repeated": 0,
+  "native_timing_evidence_claim": false,
+  "new_builds": 0,
+  "new_measurement_windows": 0,
+  "new_native_processes": 0,
+  "next": "Current round complete under D033. No further execution or audit; finalG4 is parent-owned. Preserve original78, soleapproval-byte-derivedcopy, frozenproposal/tools and failedarchive receipt.",
+  "offline_supplement": {
+    "COMPLETE_matches_result_SHA": true,
+    "accepted_W2_handoff_sha256": "9684c482d442c69cb3085893975fdf54de2dc87fae04ae904b1bb6efd9185502",
+    "approval_proof": {
+      "objects_equal": true,
+      "original_bytes": 688,
+      "original_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+      "stored_bytes": 688,
+      "stored_equals_legacy_dump": true,
+      "stored_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1"
+    },
+    "attempts": 1,
+    "captured_request_equals_terminal_request": true,
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "command_equals_D032": true,
+    "command_returncode": 0,
+    "decision": "D032",
+    "derived_inventory_sha256": "8fc2a9bbd073b97aae2145a2d9bf4b2fc284df4ae94f11659b0e6997ab1648b0",
+    "derived_is_original_bytes": false,
+    "differences": [
+      {
+        "derived_bytes": 688,
+        "derived_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+        "original_bytes": 688,
+        "original_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+        "path": "approval.json"
+      }
+    ],
+    "new_builds": 0,
+    "new_measurement_windows": 0,
+    "new_native_processes": 0,
+    "original_inventory_origin": "First complete inventory created during D031 W3 validation; not an earlier D030 authority pin",
+    "original_inventory_sha256": "be1e4b9551d303ec0740d8269f1b4125567e8466180a4860e99cbe97a8110f29",
+    "originals_immutable": true,
+    "output": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+    "payload_bytes": 8891188,
+    "payload_files": 698,
+    "receipt": "build/vm-owner-measurement/receipts/approval-supplement-v1",
+    "receipt_manifest_sha256": "c90fab3be2d8f2f70932a1a876d952c27c5ee248b1438c8d6c6c1af94b4cbeac",
+    "receipt_request_sha256": "cf47a3ecad9847acab8aa7b748f76eb7c066d36452cd121eea2db0cd8a2b9cc8",
+    "receipt_result_sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055",
+    "relocation_audit": {
+      "new_native_processes": 0,
+      "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+      "scope": "complete package including result.json, COMPLETE, both windows, all frozen tools and both full receipts",
+      "status": "passed"
+    },
+    "result_sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+    "run_id_closed": true,
+    "status": "passed",
+    "terminal_receipt_audit": {
+      "job_status": "complete",
+      "run_id": "f2cfcec9e94741adae7aa5899b891e83",
+      "status": "audit_passed"
+    },
+    "tool": "experiments/vm_owner_measurement/supplement_approval_bytes.py",
+    "tool_sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+    "validation_elapsed_seconds": 1.7585252079879865,
+    "validation_finished_at": "2026-10-15T19:20:54.147842+00:00",
+    "validation_started_at": "2026-10-15T19:20:52.388868+00:00"
+  },
+  "original_native_processes": 78,
+  "parent_acceptance": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+  "parent_acceptance_sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+  "partial_archive_exists": false,
+  "performance_running": false,
+  "preruns": 6,
+  "proposal": "build/vm-owner-measurement/proposal-v1/proposal.json",
+  "proposal_acceptance_sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+  "proposal_run_id": "538efa15d7084db38b4c2f85575dc803",
+  "proposal_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+  "qualification": {
+    "all_multithread_comparisons_uncertain": true,
+    "causal_registry_inference": false,
+    "cell_threshold": 1.1,
+    "cells": 24,
+    "comparisons": 24,
+    "confidence_interval": false,
+    "direction_interval_inclusive": [
+      0.9,
+      1.1
+    ],
+    "only_qualified_nonself": {
+      "condition": "A",
+      "direction": "all_lower",
+      "max": 0.5845460436670925,
+      "median": 0.5747111004931337,
+      "median_direction": "lower",
+      "min": 0.5621138261206782,
+      "phase": "free",
+      "qualified": true,
+      "ratio_directions": [
+        "lower",
+        "lower",
+        "lower",
+        "lower",
+        "lower",
+        "lower"
+      ],
+      "ratios": [
+        0.566657672171826,
+        0.58179880109027,
+        0.5719407055128228,
+        0.5845460436670925,
+        0.5621138261206782,
+        0.5774814954734445
+      ],
+      "reference_condition": "C",
+      "status": "qualified"
+    },
+    "optimization_or_adoption_conclusion": false,
+    "qualified_cells": 7,
+    "qualified_comparisons": 2,
+    "qualified_nonself_comparisons": 1
+  },
+  "queue_cleanup": {
+    "live": [],
+    "process_groups": [],
+    "zombies": []
+  },
+  "queue_elapsed_seconds": 2.1085283330176026,
+  "queue_finished_at": "2026-10-15T17:49:30.887336+00:00",
+  "queue_finished_at_client": "2026-10-16T01:49:30.887336+08:00",
+  "queue_run_id": "e883a7e32e3440c1b996d4e77cd1c15a",
+  "queue_started_at": "2026-10-15T17:49:28.778332+00:00",
+  "queue_started_at_client": "2026-10-16T01:49:28.778332+08:00",
+  "rebuild": false,
+  "rebuilds": 0,
+  "report": "docs/perf/vm-owner-scaling/RESULTS.md",
+  "retry": false,
+  "role": "W3",
+  "schema_version": 1,
+  "small_record_identities": {
+    "failed_archive_queue_result": {
+      "bytes": 451,
+      "path": "build/vm-owner-measurement/receipts/archive-v1/result.json",
+      "sha256": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662"
+    },
+    "failed_archive_stderr": {
+      "bytes": 53,
+      "path": "build/vm-owner-measurement/receipts/archive-v1/stderr.log",
+      "sha256": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6"
+    },
+    "one_window_marker": {
+      "bytes": 382,
+      "path": "build/vm-owner-measurement/native-window.json",
+      "sha256": "11dbd41c7c829e326003e6204108c11629f6e5a1d533dcc2bd50a9629ec31850"
+    },
+    "summary": {
+      "bytes": 87538,
+      "path": "build/vm-owner-measurement/window-v1/summary.json",
+      "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340"
+    },
+    "timing_queue_result": {
+      "bytes": 448,
+      "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+      "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131"
+    },
+    "window_approval_copy": {
+      "bytes": 688,
+      "path": "build/vm-owner-measurement/window-v1/approval.json",
+      "sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1"
+    },
+    "window_state": {
+      "bytes": 112372,
+      "path": "build/vm-owner-measurement/window-v1/window.json",
+      "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869"
+    }
+  },
+  "stage": "final_handoff_complete",
+  "status": "D033_parent_accepted_owner_research_complete",
+  "summary_sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+  "timing_lock_released": true,
+  "timing_receipt": "build/vm-owner-measurement/receipts/window-v1",
+  "updated_at": "2026-10-15T19:25:31.326398+00:00",
+  "window": "build/vm-owner-measurement/window-v1",
+  "window_status": "native_complete_pending_receipt",
+  "window_timeout_seconds": 900
+}

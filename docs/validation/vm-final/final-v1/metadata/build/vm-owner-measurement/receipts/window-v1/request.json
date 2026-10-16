@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py",
+    "collect",
+    "--proposal",
+    "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/proposal-v1/proposal.json",
+    "--approval",
+    "/Users/fanchensu/XOffsetDatastructure/docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+    "--approval-sha256",
+    "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12"
+  ],
+  "created_at": "2026-10-15T17:49:28.745955+00:00",
+  "cwd": "/Users/fanchensu/XOffsetDatastructure",
+  "kind": "timing",
+  "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+  "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/window-v1",
+  "owner": "W3",
+  "process_contract": "descendants must not detach from inherited session; daemon jobs require explicit adapter",
+  "run_id": "e883a7e32e3440c1b996d4e77cd1c15a",
+  "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+  "schema_version": 1,
+  "source_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "termination_grace_seconds": 2,
+  "timeout_seconds": 900.0,
+  "wait_seconds": 900.0
+}

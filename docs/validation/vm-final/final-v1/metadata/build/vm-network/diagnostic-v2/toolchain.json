@@ -1,0 +1,16 @@
+{
+  "compiler": "/usr/local/bin/clang++",
+  "compiler_sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+  "host_machine": "arm64",
+  "host_system": "Darwin",
+  "library": "/usr/local/lib",
+  "profile": "macos-p2996",
+  "runtime": {
+    "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+    "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+  },
+  "sanitizer_resource": null,
+  "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+  "sdk_settings_sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe",
+  "version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n"
+}

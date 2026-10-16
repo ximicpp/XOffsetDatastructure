@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "purpose": "Public handoff preparation only; no new production feature or performance claim",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "accepted_source_files_verified": 245,
+  "immutable_metadata_files_verified": 236,
+  "python_tests": [
+    {
+      "command": "python3 -m unittest discover -s tools/tests -p test_verify_vm_handoff.py -v",
+      "passed": 18
+    },
+    {
+      "command": "python3 -O -m unittest discover -s tools/tests -p test_verify_vm_handoff.py -v",
+      "passed": 18
+    },
+    {
+      "command": "python3 -m unittest discover -s experiments/vm_windows -p test_prepare.py -v",
+      "passed": 18
+    },
+    {
+      "command": "python3 -m unittest discover -s experiments/vm_network_measurement -p test_prepare_default.py -v",
+      "passed": 5
+    }
+  ],
+  "limits": [
+    "No native Windows or Linux validation performed by this preparation",
+    "Historical experiment fixture closure is partial as documented in HANDOFF.md",
+    "No new benchmark or production API adoption",
+    "Fresh-checkout verification and public-remote delivery are checked externally after commit, not claimed by this record"
+  ]
+}

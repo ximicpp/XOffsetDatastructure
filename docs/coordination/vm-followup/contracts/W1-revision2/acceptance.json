@@ -1,0 +1,29 @@
+{
+  "role": "W1",
+  "status": "accepted_interface_only",
+  "accepted_at": "2026-10-15T15:26:48.709322+00:00",
+  "gate_revision": 2,
+  "sha256": {
+    "experiments/vm_network/contract.json": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "experiments/vm_network/model_subcases.json": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+    "experiments/vm_io/io_pipeline.cpp": "cd692447e6eecfed09af62c2b1e01b9b1ac00cf106ce95465b99f704e265c5ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+  },
+  "scope": "W3 may bind exact contract hash and gate_revision=2; source/build/functionality/performance not accepted by this gate.",
+  "cases": {
+    "groups": 34,
+    "subcases": 182,
+    "injected_model": 163,
+    "actual_tcp": 17,
+    "filesystem": 2
+  },
+  "review": "Parent and independent read-only review found all four prior interface requests resolved.",
+  "remaining": [
+    "Actual deadline and resource behavior",
+    "Counters derived from observed operations",
+    "Complete dual-build smoke and sanitizer evidence",
+    "Timing build excludes per-stage probes",
+    "Implementation source/build/evidence freeze"
+  ]
+}

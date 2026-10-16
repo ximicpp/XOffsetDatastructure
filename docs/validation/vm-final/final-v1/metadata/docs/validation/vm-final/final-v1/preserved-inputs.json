@@ -1,0 +1,65 @@
+[
+  {
+    "original": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/xoffsetdatastructure.hpp",
+    "source_path": "accepted-generated/diagnostic/xoffsetdatastructure.hpp",
+    "sha256": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6",
+    "bytes": 187645,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/xoffset_virtual_memory.hpp",
+    "source_path": "accepted-generated/diagnostic/xoffset_virtual_memory.hpp",
+    "sha256": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+    "bytes": 19618,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/n3_runtime.hpp",
+    "source_path": "accepted-generated/diagnostic/n3_runtime.hpp",
+    "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "bytes": 19990,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "build/vm-observability/network/build-v2/input/source/net_reference.cpp",
+    "source_path": "accepted-generated/network/net_reference.cpp",
+    "sha256": "e7cc3f07e2d22cbfa8ae6491e0b682a900e1760274e0cd2c9d59deb102251d7d",
+    "bytes": 48584,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "build/vm-observability/network/build-v2/input/source/network_support.hpp",
+    "source_path": "accepted-generated/network/network_support.hpp",
+    "sha256": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+    "bytes": 7003,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py",
+    "source_path": "accepted-executed/D030/collect_owner_measurement.py",
+    "sha256": "8ab7a0dbc2f8e5e879fd3b84f74598ffd4e84e1c2f06bac9f6b3fc89003c9214",
+    "bytes": 38406,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "build/vm-owner-measurement/proposal-v1/tools/audit_owner_measurement.py",
+    "source_path": "accepted-executed/D030/audit_owner_measurement.py",
+    "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+    "bytes": 13905,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "build/vm-owner-measurement/proposal-v1/tools/queue-runner.py",
+    "source_path": "accepted-executed/D030/queue-runner.py",
+    "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "bytes": 16898,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  },
+  {
+    "original": "experiments/vm_owner_measurement/test_owner_measurement.py",
+    "source_path": "accepted-executed/D030/test_owner_measurement.py",
+    "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+    "bytes": 50410,
+    "scope": "Accepted generated or original-D030 bytes; not the corrected D031 live revision"
+  }
+]

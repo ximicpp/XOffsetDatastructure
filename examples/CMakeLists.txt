@@ -3,3 +3,6 @@ configure_xoffset_target(xoffsetdatastructure_demo)
 
 add_executable(helloworld helloworld.cpp)
 configure_xoffset_target(helloworld)
+
+add_executable(stable_storage stable_storage.cpp)
+configure_xoffset_target(stable_storage)

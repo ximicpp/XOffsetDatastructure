@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "decision": "D024",
+  "role": "W4",
+  "status": "applied_verified_window_returned",
+  "finished_at": "2026-10-16T01:18:48.644908+08:00",
+  "authorization": "docs/coordination/vm-followup/readme-window.json",
+  "authorization_sha256": "7ad840ddc6b5ae7066c2dabc5272dcdcee7d8e7825b549dc8f4132879b055309",
+  "applied_file": "README.md",
+  "preimage_sha256": "cf62faed1f71adf6c77b4a32717c28550c4f66c886c8c1e46eaf8917a7e4f06b",
+  "postimage_sha256": "aeb54c4d8428842982911ae4f944754f5894d21fdf755c8da50bd20e82dbfaad",
+  "postimage_bytes": 14101,
+  "patch": "docs/validation/vm-final/shared-document-edits.patch",
+  "patch_sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+  "exact_reviewed_patch_matched": true,
+  "unique_text_edits": 3,
+  "unrelated_preexisting_bytes_preserved": true,
+  "new_local_links": [
+    "docs/VM_NETWORK_IMPLEMENTATION.md",
+    "docs/VM_NETWORK_PERFORMANCE.md"
+  ],
+  "new_local_links_exist": true,
+  "unchanged_files_sha256": {
+    "docs/STABLE_VM_STORAGE_MIGRATION.md": "8d9044b9703713e677712e76d982860c544e2bade2436a3de15b873c3a0950ba",
+    "examples/stable_storage.cpp": "9d2b0747aa0a4afe9a2d9f2444b014b72bf08a484494721a6569e8b0bc33d9bf"
+  },
+  "shared_window_returned": true,
+  "further_README_writes_authorized": false,
+  "CXX_changes": false,
+  "new_CXX_or_container_runs": 0,
+  "G4_complete": false,
+  "final_source_frozen": false
+}

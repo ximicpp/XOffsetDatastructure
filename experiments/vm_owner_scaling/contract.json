@@ -1,0 +1,168 @@
+{
+  "acceptance_path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json",
+  "acceptance_sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+  "baseline_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "bounded_validation": {
+    "build_parallelism_max": 2,
+    "child_timeout_seconds": 30,
+    "execution_entry": "accepted default POSIX queue; original failed attempts preserved, no automatic budget extension",
+    "expected_failures": "Both builds; exact injected cause/progress, drain and join, no published successful sample",
+    "failure_controls": [
+      "partial worker startup",
+      "one worker create failure",
+      "one worker allocation failure",
+      "main-thread between-phase verification failure"
+    ],
+    "failure_processes_max": 8,
+    "new_evidence_bytes_max": 536870912,
+    "queue_job_timeout_seconds": 180,
+    "success_details": "Six diagnostic R256, six original F R256 for equivalent semantic reference, six original F R8192 for intended timing workload functionality",
+    "successful_processes": 18,
+    "total_workload_processes_max": 26
+  },
+  "candidate_implementation_authorized": false,
+  "conditions": [
+    {
+      "owners": 8,
+      "threads": 1
+    },
+    {
+      "owners": 64,
+      "threads": 1
+    },
+    {
+      "owners": 256,
+      "threads": 1
+    },
+    {
+      "owners": 256,
+      "threads": 2
+    },
+    {
+      "owners": 256,
+      "threads": 4
+    },
+    {
+      "owners": 256,
+      "threads": 8
+    }
+  ],
+  "contract_revision": 2,
+  "decision": "D018",
+  "diagnostic": {
+    "assertions": [
+      "C register and C erase, active peak C/end0; no rebind/miss/fail",
+      "2R lookup hits; 2C+2R registry locks",
+      "R core_new/core_return; C+R metadata snapshots; no reuse/scan/extent/auto/wire/pool events",
+      "C reserve/enable/grow_zero/unmap, all successful; grow_zero bytes 65536*C",
+      "domain1 allocate/free C*(1+log2(R/C)), final0; domains3/4/5 absent",
+      "domain2 node and bucket allocation lineage checked; exactly one final shared bucket, dependent libc++ expectation 88/776/3176B for C8/64/256; no general residual allowance"
+    ],
+    "dump": "After all resource destruction and worker join",
+    "hard_events_per_process_success": 5631,
+    "max_events_per_thread_runtime": 16384,
+    "max_lifetime_threads": 16,
+    "reset_sampling_truncation": false,
+    "source": "Accepted W2 frozen-implementation-v1 generated headers/runtime, unchanged"
+  },
+  "failure_controls": {
+    "fail_allocate": {
+      "allocated": 7,
+      "created": 8,
+      "destroyed": 8,
+      "freed": 7,
+      "owners": 8,
+      "requests": 256,
+      "started": 1,
+      "threads": 1,
+      "validated": 0
+    },
+    "fail_create": {
+      "allocated": 0,
+      "created": 3,
+      "destroyed": 3,
+      "freed": 0,
+      "owners": 8,
+      "requests": 256,
+      "started": 1,
+      "threads": 1,
+      "validated": 0
+    },
+    "fail_verify": {
+      "allocated": 256,
+      "created": 8,
+      "destroyed": 8,
+      "freed": 256,
+      "owners": 8,
+      "requests": 256,
+      "started": 1,
+      "threads": 1,
+      "validated": 7
+    },
+    "partial_startup": {
+      "allocated": 0,
+      "created": 0,
+      "destroyed": 0,
+      "freed": 0,
+      "owners": 256,
+      "requests": 256,
+      "started": 2,
+      "threads": 4,
+      "validated": 0
+    }
+  },
+  "formal_timing_authorized": false,
+  "native_layout_erratum": {
+    "allocation_alignment_bytes": 8,
+    "allocation_header_bytes": 16,
+    "arena_initial_used_end": 48,
+    "core_new_subject_for_zero_based_j": "base+64+24*j",
+    "core_new_value_for_zero_based_j": "72+24*j",
+    "decision": "D022",
+    "decision_path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+    "decision_sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+    "evidence": "alignment-discrepancy-review.json",
+    "first_user_offset": 64,
+    "kind": "checker_and_synthetic_fixture_correction",
+    "original_assumption": "draft checker used16bytealignment/32bytestride; production allocator/harness correctlyusednativealignof(max_align_t)=8",
+    "original_case_no_retry": true,
+    "scope": "Frozen native macos-p2996 arm64 profile only",
+    "unchanged": [
+      "Fheaders",
+      "harnesssource",
+      "bothbinaries",
+      "C/T/R",
+      "counts",
+      "65536logical/maximum",
+      "5631eventhardbound",
+      "26workloadbudget",
+      "30s/180s/512MiB"
+    ],
+    "used_end_for_n_allocations": "48+24*n",
+    "user_block_bytes": 24
+  },
+  "schema": "vm-owner-scaling-contract",
+  "schema_version": 1,
+  "shared_production_edits_authorized": false,
+  "workload": {
+    "batches": 1,
+    "diagnostic_requests_per_allocate_or_free_phase": 256,
+    "formal_clock": "Original F only; per-phase wall time includes barriers/scheduling, excludes worker startup, payload value writes/checks, evidence output; not individual lookup latency",
+    "live_owner_invariant": "All C owners registered before any allocation; no destroy until all requests released",
+    "logical_and_maximum_bytes_per_owner": 65536,
+    "metadata_boundary": "Harness metadata preallocated before workers; Core vector/registry work stays in library phase and is separately diagnosed",
+    "object": "XBufferCore + XArenaAllocator<uint64_t>, no typed root/wire/pool/move/growth candidates",
+    "order": "sequential within each fixed worker owner subset; owner i belongs to worker i%T throughout lifetime",
+    "phases": [
+      "create",
+      "allocate",
+      "validate_outside_timing",
+      "free",
+      "destroy"
+    ],
+    "timing_requests_per_allocate_or_free_phase": 8192
+  }
+}

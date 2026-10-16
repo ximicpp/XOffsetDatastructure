@@ -24,6 +24,7 @@ jobs:
           echo "=== Key files ==="
           for f in \
             xoffsetdatastructure.hpp \
+            xoffset_virtual_memory.hpp \
             build.sh \
             CMakeLists.txt \
             tests/CMakeLists.txt \
@@ -46,13 +47,14 @@ jobs:
           awk '
             /set\(BASIC_TESTS/ {collect=1; next}
             /set\(REFLECTION_TESTS/ {collect=1; next}
+            /set\(STORAGE_TESTS/ {collect=1; next}
             collect && /^\)/ {collect=0; next}
             collect && $1 ~ /^test_/ {print $1}
           ' tests/CMakeLists.txt | sort > /tmp/cmake_tests.txt
 
           ls tests/test_*.cpp | \
             sed 's|tests/||; s|\.cpp||' | \
-            grep -v '^test_polymorphic_rejection$' | \
+            grep -vE '^test_polymorphic_(rejection|positive)$' | \
             sort > /tmp/test_files.txt
 
           echo "  CMake tests: $(wc -l < /tmp/cmake_tests.txt)"
@@ -77,3 +79,8 @@ jobs:
 
           echo ""
           echo "  ✓ Test inventory is consistent"
+
+      - name: Validate runner failure handling and measurement pairing
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_*.py' -v
+          python3 tools/test_benchmark_vm_stage1.py

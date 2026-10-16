@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "scope": "review delivery only; no candidate code or measurement",
+  "files": {
+    "REVIEW.md": {
+      "sha256": "8eddecd1728431dda9fbc25394cf204d66377d16d9ff931016e877f191901fde",
+      "bytes": 12525
+    },
+    "review.json": {
+      "sha256": "48ea118c8057ffc9fc4253e68f3ebb612929b054990d66c934473f24c11cefb6",
+      "bytes": 8882
+    },
+    "source-identities.json": {
+      "sha256": "77c19587e7a06ded9559c0739a920eb0ed043eff54caafd2fe994928189fd7c1",
+      "bytes": 1485
+    },
+    "reuse-staging-independent.md": {
+      "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+      "bytes": 11655
+    },
+    "output-copy-independent.md": {
+      "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+      "bytes": 7624
+    },
+    "HANDOFF.md": {
+      "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+      "bytes": 1237
+    },
+    "handoff.json": {
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995
+    }
+  }
+}

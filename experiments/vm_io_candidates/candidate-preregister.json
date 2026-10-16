@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "status": "accepted_prerequisite_decisions_retain_F",
+  "baseline": "F with none/cold/warm pooled verified loading controls",
+  "implementation_authorized": false,
+  "shared_header_changes_authorized": false,
+  "evidence_required": [
+    "Parent-accepted frozen W1 functional and W2 diagnostic contracts",
+    "Correctly calibrated native end-to-end baseline with same schema, processing, verification, connection and budgets",
+    "Exact separately diagnosed cost that the candidate can eliminate; overlapping phases not summed",
+    "Reviewable lifetime/failure contract and parent approval before isolated implementation",
+    "Parent freezes each selected variant commit point, failure-preserved state, actual completion point, total active/retained resource ledger and equal-work F pooled comparator; current unresolved fields forbid implementation."
+  ],
+  "budget": {
+    "target_end_to_end_gain_fraction": 0.05,
+    "maximum_default_regression_fraction": 0.02,
+    "confirmation_independent_qualified_windows": 3,
+    "adoption_aa_bias_limit_fraction": 0.01,
+    "adoption_aa_dispersion_limit_fraction": 0.01,
+    "adoption_anchor_drift_limit_fraction": 0.01,
+    "adoption_interval": "Preregister paired log-ratio bootstrap at 95%; each independent qualified window must have lower bound on left/right >= 1/0.95 for a claimed 5% time reduction. Small-sample interval is descriptive and is not an equivalence or population guarantee.",
+    "screening_5_percent_noise_is_adoption_qualification": false,
+    "failed_calibration_retries": 0,
+    "wire_format_changes": 0,
+    "hard_capacity_increase_bytes": 0,
+    "validation_omissions": 0,
+    "maximum_initial_candidate_variants": 1,
+    "maximum_screening_windows_per_variant": 1,
+    "maximum_followup_confirmation_windows": 3,
+    "maximum_child_seconds": 180,
+    "maximum_timing_window_seconds": 900,
+    "capacity_scope": "Both per-owner caps and total active/retained resource ledger must be frozen against an equal-work F comparator; existing idle-pool and logical string limits are not total live-owner budgets."
+  },
+  "candidates": [
+    {
+      "id": "owner-reuse",
+      "status": "prerequisite_unmet",
+      "eliminable_cost": "Fresh-owner mapping/register/unregister/release residual after comparison with F pooled loading",
+      "cost_fraction": null,
+      "failure_contract": "Load transaction must retain the old published value and its usability on parse/validation/allocation/cancellation failure. The selected variant must separately define epoch, logical extent and resource guarantees; process/save/send failures are not covered by that promise. Successful replacement invalidates old references under an explicit epoch/handle contract.",
+      "lifetime_cost": "Transactional staging or rollback and retained old storage must be counted; do not assume overwrite-in-place preserves old state.",
+      "unresolved_contract": [
+        "Choose C++ object vs retained reservation/Core reuse and one complete staging/spare/rollback mechanism.",
+        "Freeze load-only vs broader transaction scope, commit point and failure-preserved state.",
+        "If preserving an old published value, use equal-work F pooled load+swap comparator; count old/new/spare/rollback storage and registry/epoch work."
+      ],
+      "candidate_implemented": false,
+      "experimentally_rejected": false,
+      "adoption_qualified": false,
+      "parent_final_decision_pending": false,
+      "decision_rationale": "Warm already reuses mappings, while registrations/loading remain. Accepted event counts do not quantify residual eliminable end-to-end latency; both present F pool contrasts fail fresh absolute-drift qualification. Same-Core versus variable/swap reuse and a load-only commit/rollback contract plus equal-work F pooled load+swap and total old/new/spare resource costs are not selected.",
+      "supporting_evidence": [
+        "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json",
+        "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+      ],
+      "decision": "prerequisite_unmet_retain_F",
+      "decision_acceptance": "docs/coordination/vm-followup/G3-acceptance.json",
+      "reopen_when": "Choose exact object/reservation/Core reuse, load-only commit/rollback and full active/spare resource accounting; give baseline equal-work pooled load+swap ifoldvalue preserved; obtain interpretable calibrated representative evidence."
+    },
+    {
+      "id": "new-staging-direct-read",
+      "status": "prerequisite_unmet",
+      "eliminable_cost": "One verified input-owning-string to new-owner payload copy, if exact diagnosis proves it exists on the reference path",
+      "cost_fraction": null,
+      "failure_contract": "Validate fixed V1 header and all length/capacity bounds before allocation; receive partial payload only into an unpublished new owner; complete graph validation precedes typed publication; failure/cancel completes transport shutdown then frees staging state.",
+      "lifetime_cost": "The staged owner remains alive through real completion; cancel requested is not cancel completed. Header and receive bookkeeping remain owned; no external borrowed input is implied.",
+      "unresolved_contract": [
+        "Select server-side input only or another single endpoint; keep other endpoint and full validation unchanged.",
+        "Choose conservative ordinary-grow prezero or unpublished no-prezero staging; do not conflate memcpy removal with replacing it by equal-size memset.",
+        "Freeze internal fill/finalize capability, partial-read/cancel completion and dirty-spare future-zeroing behavior; no typed access before complete verification."
+      ],
+      "candidate_implemented": false,
+      "experimentally_rejected": false,
+      "adoption_qualified": false,
+      "parent_final_decision_pending": false,
+      "decision_rationale": "A scoped input payload copy exists; complete load time cannot be counted as removable copy. Ordinary grow can replace memcpy with equal-size zeroing. Unpublished fill/finalize, complete V1/graph validation, short-read/cancel completion and future growth zeroing contract are not selected; no qualified candidate latency or business evidence exists.",
+      "supporting_evidence": [
+        "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json",
+        "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+      ],
+      "decision": "prerequisite_unmet_retain_F",
+      "decision_acceptance": "docs/coordination/vm-followup/G3-acceptance.json",
+      "reopen_when": "Select oneendpoint, prezero versus unpublishedfill mechanism, fullV1admission/graphverification beforetypedpublish, partialread/cancelcompletion and futurezeroing; accountresources and measure nettoend benefit against equalwork F."
+    },
+    {
+      "id": "reduce-output-copy",
+      "status": "prerequisite_unmet",
+      "eliminable_cost": "Verified save owning response string allocation and payload materialization only; keep normalization, V1 header construction, existing typed/schema/root checks and actual transmission. F save_verified does not perform a full graph scan; both load_verified scans remain.",
+      "cost_fraction": null,
+      "failure_contract": "Exactly unchanged V1 bytes; stable owned header and immutable validated payload until actual send/cancel completion; partial transmission terminates this experimental connection, with no whole-frame retry.",
+      "lifetime_cost": "Exclusive access and owner retention through backpressure may outlive baseline owner release; count live/retained bytes and later release. Returning two borrowed spans is insufficient.",
+      "unresolved_contract": [
+        "Freeze stable owned header/payload/operation state and exclusive access through real send/cancel completion, including frame moves and short scatter/gather progress.",
+        "Count delayed owner/registry/pool retention, residual completion and release, active-owner count and bytes under backpressure.",
+        "Preserve exact V1 header and complete native payload bytes; no unsupported full-save-graph-scan cost claim.",
+        "save_verified shrinks before allocating the output string; any future whole-operation failure guarantee must separately account for logical extent and Core host state, rather than restoring values alone. No such whole-operation strong transaction is currently promised."
+      ],
+      "candidate_implemented": false,
+      "experimentally_rejected": false,
+      "adoption_qualified": false,
+      "parent_final_decision_pending": false,
+      "decision_rationale": "Response owning string materialization exists; F save_verified has no full graph scan. Header/normalization/checks and both load scans remain. Stable owned header/exclusive payload, short-write/completion and backpressure retention/release resource costs are not selected. Present F pool measurements do not implement or reject this candidate.",
+      "supporting_evidence": [
+        "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json",
+        "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json"
+      ],
+      "decision": "prerequisite_unmet_retain_F",
+      "decision_acceptance": "docs/coordination/vm-followup/G3-acceptance.json",
+      "reopen_when": "Define ownedheader, immutableexclusivepayload, shortsend progress, actualcompletion/cancelcompletion, backpressureretention/late release and exactV1bytes; calibrated endtoend comparison including changedlifetimes."
+    }
+  ],
+  "actual_business_consumer": "not_evaluated",
+  "decision": "D028 accepted all three directions as prerequisite_unmet_retain_F. Current 88-process F pool screening has no qualified contrast; zero candidate implementations, experimental rejections or adoptions. No further network timing, diagnostics, implementation or adoption authorized.",
+  "proposal_revision": 2,
+  "static_feasibility_review": {
+    "path": "experiments/vm_network/candidate-feasibility/REVIEW.md",
+    "status": "parent_accepted_static_review_of_prior_proposal_not_implementation_approval",
+    "reviewed_prior_proposal_only": true,
+    "followup": "This revision records its unresolved transaction/completion/resource prerequisites; no variant is selected.",
+    "parent_acceptance": "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json"
+  },
+  "accepted_scoped_cost_evidence": {
+    "parent_acceptance": "docs/coordination/vm-followup/W2-network-acceptance.json",
+    "summary": "docs/validation/vm-observability/network/final-v1/summary/summary.json",
+    "status": "scoped_counts_and_lifetimes_accepted_not_timing_savings",
+    "conditions": 12,
+    "native_processes": 32,
+    "valid_traces": 16,
+    "none_cold_per_condition_including_preflight": {
+      "registry_register": 5,
+      "os_reserve": 5,
+      "os_unmap": 5
+    },
+    "warm_per_condition_including_preflight_and_warmup": {
+      "registry_register": 7,
+      "os_reserve": 3,
+      "os_unmap": 3
+    },
+    "validation_domain5_peak_requested_bytes": 192,
+    "limits": [
+      "Diagnostic times perturb paths and do not give formal latency or eliminable end-to-end cost fractions.",
+      "Domain5 records its local allocator requests and observation-order peak, not all allocations or physical memory.",
+      "Network peak one owner does not cover multi-owner contention.",
+      "final-v1 plus references is the package; final-v1 alone is not a complete portable archive."
+    ],
+    "remaining_gate": "One network calibration plus parent-selected exact lifetime/resource/equal-work comparator contract before any isolated implementation."
+  },
+  "accepted_calibration_evidence": {
+    "parent_acceptance": "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+    "status": "accepted_executed_partial_qualification",
+    "report": "docs/perf/vm-network/RESULTS.md",
+    "processes": 112,
+    "only_stable_nominal_bytes": 1048576,
+    "other_failed_sizes_not_retried": true,
+    "pool_comparison_executed": false,
+    "candidate_implementation_authorized": false,
+    "adoption_qualified": false,
+    "remaining_gate": "Parent prepares and separately approves a new1MiB pool screening with its own complete AA/drift; calibrated comparisons and exact candidate transaction/resource contracts remain unmet."
+  },
+  "current_pool_screening_evidence": {
+    "status": "parent_D026_accepted_executed_noise_unqualified",
+    "window": "network-pool-1m-1",
+    "report": "docs/perf/vm-network/POOL_SCREENING_1M_RESULTS.md",
+    "result_sha256": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+    "summary_sha256": "9c004bdf09fe829dc049e3a049654cfa383b07f93e5d148ffc8f88e02ab86113",
+    "native_processes": 88,
+    "reported_operation_iterations": 352,
+    "outputs_bytes": 369222656,
+    "contrasts": [
+      {
+        "id": "none-cold",
+        "local_aa_qualified": true,
+        "stable_window_qualified": false,
+        "side_drift_relative": {
+          "left": 0.0654672617259635,
+          "right": 0.0588300437876683,
+          "pooled": 0.0630044178754252
+        }
+      },
+      {
+        "id": "none-warm",
+        "local_aa_qualified": true,
+        "stable_window_qualified": false,
+        "side_drift_relative": {
+          "left": 0.0247624406262532,
+          "right": 0.0108993111936966,
+          "pooled": 0.019514539236495
+        }
+      }
+    ],
+    "candidate_implemented": false,
+    "gain_or_regression_conclusion_qualified": false,
+    "whole_lifecycle_available": false,
+    "additional_runs_authorized": false,
+    "parent_acceptance": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json",
+    "portable_archive": "docs/perf/vm-network/pool-screening-1m-v1",
+    "portable_archive_evidence_sha256": "0a834a4214f3fa75cc168686c9d474dcc38eb94944367faa660de5267187a1aa",
+    "portable_copied_frozen_audit_passed": true
+  },
+  "additional_network_execution_authorized": false,
+  "additional_diagnostic_execution_authorized": false,
+  "budget_is_not_execution_authorization": true,
+  "research_round": "Current G3 decision deliverable accepted and complete under D028; performance/business adoption prerequisites remain open. Future candidate budgets are not authorization; independent owner study remains under its separate D023 gate.",
+  "decision_acceptance": "docs/coordination/vm-followup/G3-acceptance.json",
+  "decision_id": "D028"
+}

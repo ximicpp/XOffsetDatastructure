@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "parent_thread_id": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+  "role": "W2",
+  "status": "design_accepted_implementation_dispatched",
+  "scope": "Bounded diagnostic network consumer generated from accepted W1v2 and W2 fixedFdiagnostics; exclusive W2 files, no production/public API/timing modification.",
+  "snapshot_sha256": {
+    "PLAN.md": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+    "plan.json": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+    "anchor-census.json": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b"
+  },
+  "limits": {
+    "max_workload_processes": 32,
+    "network_conditions": 12,
+    "work_exchanges_per_condition": 2,
+    "warm_exchanges_when_warm": 1,
+    "max_new_evidence_bytes": 536870912,
+    "hard_events_per_thread": 2048,
+    "network_threads": 2,
+    "fixture_threads": 1,
+    "max_build_jobs": 2,
+    "diagnostic_queue_timeout_seconds": 180
+  },
+  "review": {
+    "reviewer": "/root/completion_audit",
+    "findings": "No blocking design issue;20 exact anchors match. Phase/resource order, join-before-dump, registration-prefix generation, warm lifetime accounting and predictable counts verified. Parent verifies explicit hard_events_per_thread_max=2048 revision."
+  },
+  "required_checks": [
+    "Actual compiler include dependencies select frozen diagnostic headers, no original-F shadowing",
+    "Fixed fixture and ABI assumptions, exact retained bucket origin/subject/size, domain5-only peak meaning",
+    "Raw stdout and all work/warm output bytes match fixed W1 reference; workload phase/resource assertions and bounded valid trace",
+    "Keep full warm prefix; no event sampling, hidden work or probes in formal timing",
+    "Unexpected assumption/hard-budget violations preserve evidence and return to parent; never relax based on data"
+  ],
+  "prohibitions": [
+    "No production headers or W1/W3 files changed",
+    "No accepted contract/catalog/runtime mutation",
+    "No C++ work outside default queue",
+    "No formal performance or adoption conclusion",
+    "No rerun of accepted standalone fixed diagnostic probes"
+  ]
+}

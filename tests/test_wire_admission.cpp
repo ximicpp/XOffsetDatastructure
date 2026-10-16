@@ -57,7 +57,11 @@ static_assert(std::is_same_v<XFlatSet<int32_t>, XSet<int32_t>>);
 static_assert(std::is_same_v<XFlatMap<int32_t, XString>, XMap<int32_t, XString>>);
 static_assert(is_v1_wire_admitted_v<WireRoot>);
 static_assert(is_v1_wire_admitted_v<WireOther>);
-static_assert(!is_v1_wire_admitted_v<HasLong>);
+// A typedef is the same C++ type as its underlying integer. On LP64 Linux
+// int64_t is long; on macOS it is long long. Preserve the fixed-width whitelist
+// rather than assuming the platform's alias selection or weakening admission.
+static_assert(is_v1_wire_admitted_v<HasLong> ==
+    (std::is_same_v<long, std::int32_t> || std::is_same_v<long, std::int64_t>));
 static_assert(!is_v1_wire_admitted_v<HasWchar>);
 static_assert(!is_v1_wire_admitted_v<HasLongDouble>);
 static_assert(!is_v1_wire_admitted_v<HasPointer>);

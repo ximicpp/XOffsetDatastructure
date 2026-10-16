@@ -1,0 +1,357 @@
+{
+  "accepted_contract": {
+    "acceptance": "docs/coordination/vm-followup/contracts/W2-v1/",
+    "catalog_sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "contract_sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "coverage_sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9"
+  },
+  "baseline_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "/Users/fanchensu/XOffsetDatastructure/experiments/vm_observability/observe.py",
+        "build",
+        "--prepared",
+        "build/vm-observability/prepared-06",
+        "--out",
+        "build/vm-observability/build-06",
+        "--compiler",
+        "/usr/local/bin/clang++",
+        "--sdk",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+        "--library",
+        "/usr/local/lib",
+        "--deps",
+        "/Users/fanchensu/XOffsetDatastructure/external"
+      ],
+      "kind": "build",
+      "owner": "W2",
+      "receipt": "docs/validation/vm-observability/build-job-06",
+      "returncode": 0,
+      "status": "complete"
+    },
+    {
+      "command": [
+        "python3",
+        "/Users/fanchensu/XOffsetDatastructure/experiments/vm_observability/observe.py",
+        "collect",
+        "--build",
+        "build/vm-observability/build-06",
+        "--out",
+        "docs/validation/vm-observability/collection-06"
+      ],
+      "kind": "diagnostic",
+      "owner": "W2",
+      "receipt": "docs/validation/vm-observability/collect-job-06",
+      "returncode": 0,
+      "status": "complete"
+    },
+    {
+      "command": [
+        "/usr/local/bin/clang++",
+        "-std=c++17",
+        "-stdlib=libc++",
+        "-pthread",
+        "-isysroot",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+        "-L/usr/local/lib",
+        "-Wl,-rpath,/usr/local/lib",
+        "experiments/vm_observability/runtime_controls.cpp",
+        "-o",
+        "build/vm-observability/runtime-controls-01"
+      ],
+      "kind": "build",
+      "owner": "W2",
+      "receipt": "docs/validation/vm-observability/runtime-build-job-01",
+      "returncode": 0,
+      "status": "complete"
+    },
+    {
+      "command": [
+        "python3",
+        "/Users/fanchensu/XOffsetDatastructure/experiments/vm_observability/verify_runtime_controls.py",
+        "--binary",
+        "build/vm-observability/runtime-controls-01",
+        "--out",
+        "docs/validation/vm-observability/runtime-controls-01"
+      ],
+      "kind": "diagnostic",
+      "owner": "W2",
+      "receipt": "docs/validation/vm-observability/runtime-controls-job-01",
+      "returncode": 0,
+      "status": "complete"
+    }
+  ],
+  "completed": [
+    "coverage/plan and accepted frozen machine contract",
+    "F-only 71-anchor generated diagnostic headers",
+    "scoped owner/lock/host allocator/copy/OS event implementation",
+    "predictable F/diagnostic semantic and failure controls",
+    "strict negative audit controls and actual recorder exhaustion controls",
+    "immutable source/build/output/checker freeze",
+    "independent source/evidence review"
+  ],
+  "default_path_attribution": {
+    "ablation_executed": false,
+    "dependency": "W3 reliable default-path D/F reproduction",
+    "performance_conclusion": "none",
+    "status": "waiting_dependency"
+  },
+  "errors_and_superseded": [
+    "build-job-02 failed before C++: N5 import wrote cache into prepared artifact; repaired non-writing loader and frozen imports; old evidence retained",
+    "build01/03/04/05 and collection04/05 superseded by reviewed06; no failed or old run counted as final success",
+    "network build-v1: compiler symlink resolved clang++ to clang-21, causing missing automatic C++ linkage; source/ABI compilation passed; failure retained, invoking lexical clang++ in build-v2"
+  ],
+  "evidence": {
+    "all_queue_receipts_offline_audited": true,
+    "auxiliary": "docs/validation/vm-observability/runtime-controls-01",
+    "auxiliary_actual_cases": 3,
+    "collection": "docs/validation/vm-observability/collection-06",
+    "collection_result_sha256": "32fa091f6f76e0d8c48655198cc3e10f3434c9ccb36c6252ec76700b75587c03",
+    "fixed_case_ids": [
+      "owner_basic",
+      "owner_transfer",
+      "core_metadata",
+      "copy_wire",
+      "pool_reclaim",
+      "threads",
+      "failure_registry",
+      "failure_metadata",
+      "failure_vm",
+      "recorder_overflow"
+    ],
+    "fixed_processes": 20,
+    "invalid_overflow_case": 1,
+    "ordinary_valid_diagnostic_cases": 9,
+    "python_log": "docs/validation/vm-observability/python-tests-final-02.log",
+    "python_tests": 57,
+    "relocation_audit": "docs/validation/vm-observability/relocation-audit-v1.json",
+    "valid_ordinary_diagnostic_events": 480
+  },
+  "execution_coverage": {
+    "classification_counts": {
+      "actual_structural_audit_only": 11,
+      "actual_with_asserted_counts_or_ledger": 29,
+      "declared_catalog_not_executed_this_round": 22,
+      "invalid_control_only": 1
+    },
+    "declared_kinds": 63,
+    "not_executed_kinds": [
+      "auto_growth",
+      "cache_flush",
+      "expand_capacity_failure",
+      "expand_existing",
+      "expand_success",
+      "extent_request",
+      "os_advise",
+      "os_advise_failed",
+      "os_enable_failed",
+      "os_protect",
+      "os_protect_failed",
+      "os_reclaim",
+      "os_reclaim_failed",
+      "os_replace_failed",
+      "os_reserve_failed",
+      "os_unmap_failed",
+      "save_header_append_extent",
+      "save_payload_append_extent",
+      "vector_erase_shift",
+      "vector_insert_shift",
+      "vector_insert_staged",
+      "wire_transfer_attempt"
+    ],
+    "path": "experiments/vm_observability/event-validation-coverage.json"
+  },
+  "final_handoff_snapshot": "docs/validation/vm-observability/final-handoff-v1/",
+  "frozen_implementation": {
+    "complete_sha256_matches": true,
+    "files": 137,
+    "path": "docs/validation/vm-observability/frozen-implementation-v1",
+    "snapshot_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d"
+  },
+  "independent_review": {
+    "cpp_reexecuted_by_reviewer": false,
+    "path": "experiments/vm_observability/REVIEW.md",
+    "sha256": "8e7d7ad575d0edefcc8d43f7a9efac780d7a5286f32a23edb8e7fcbb64d18cd1",
+    "status": "passed_scoped_G1"
+  },
+  "known_limits": [
+    "Scoped allocator request bytes exclude malloc overhead, static registry object and process totals/RSS",
+    "Domains2/3/4 are shared causal metadata, not exclusive owner cost",
+    "Raw-origin-owner peaks can merge reused bases; use registry generation intervals for lifetime claims",
+    "29 event kinds have asserted counts/ledger/partial snapshots,11 structural only,1 invalid control only,22 unexecuted native paths",
+    "Explicit byte operation extents, completed logical element relocation and estimated metadata movement cannot be added as physical process copying",
+    "Lock probes perturb contention; observation-order peaks are not physical simultaneous peaks",
+    "Metadata allocator and overflow comparisons with pristine F have explicitly narrower fault coverage",
+    "Native macOS arm64 only; no native Linux/Windows or new sanitizer/TSan evidence",
+    "Custom workload semantics and allowed retained resource classes/counts/bounds remain W3 responsibility"
+  ],
+  "network_diagnostic_design": {
+    "W1_contract_revision": 2,
+    "W1_contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "W1_prepared": "build/vm-network/prepared-v2",
+    "anchor_census": "experiments/vm_observability/network-plan-v1/anchor-census.json",
+    "anchor_census_sha256": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b",
+    "design_checks": "experiments/vm_observability/network-plan-v1/design-checks.json",
+    "design_manifest": "experiments/vm_observability/network-plan-v1/manifest.json",
+    "design_manifest_sha256": "26f58d54a9a9760418190a43f3ad0dfe87c393e4b1c01d63fcd31422cf70acb7",
+    "design_revision": 2,
+    "domain5_peak_scope": "192 bytes per verified-load local domain5 peak and for this strict synchronous chain; not an all-domain/process peak",
+    "formal_timing": false,
+    "frozen_foundation_modified": false,
+    "hard_events_per_thread_max": 2048,
+    "independent_review": {
+      "path": "experiments/vm_observability/network-plan-v1/REVIEW.md",
+      "sha256": "88bd5a86979771ec0096b99399ad9c5522a002b86df1cc61c635915f4da55b59",
+      "status": "passed_design_only"
+    },
+    "machine_plan": "experiments/vm_observability/network-plan-v1/plan.json",
+    "machine_plan_sha256": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+    "new_Cpp_builds": 2,
+    "new_Cpp_runs": 32,
+    "next_gate": "Parent acceptance of docs/validation/vm-observability/network/final-v1",
+    "path": "experiments/vm_observability/network-plan-v1/PLAN.md",
+    "plan_sha256": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+    "planned_events_per_thread_max": 2048,
+    "planned_fixture_conditions": 4,
+    "planned_network_conditions": 12,
+    "planned_work_iterations_each": 2,
+    "raw_output_estimate_MiB": 257,
+    "record_warmup": true,
+    "requires_default_DF_reproduction": false,
+    "source_anchor_count": 20,
+    "status": "implementation_verified_ready_for_acceptance",
+    "warm_output_oracle": "N3 warm owning output versus same-condition canonical original-W1 work0 output; no original W1 warm artifact claimed"
+  },
+  "network_diagnostic_implementation": {
+    "N3_five_metric_map": "docs/VM_OBSERVABILITY_RESULTS.md",
+    "accepted_dispatch": "docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json",
+    "accounted_network_bytes": 380768236,
+    "all_work_warm_outputs_byte_equal_W1": true,
+    "budget_remaining_bytes": 156102676,
+    "build": "build/vm-observability/network/build-v2",
+    "build_result_sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+    "collection": "docs/validation/vm-observability/network/collection-v1",
+    "collection_result_sha256": "9a5924cd9e7297dfa7adc2c0de4a7b98ef8e10ed1ebae2bacb6eef0e35143de2",
+    "coverage_increment": "docs/validation/vm-observability/network/summary-v1/coverage-increment.json",
+    "cpp_build_jobs": 2,
+    "diagnostic_processes": 16,
+    "dropped_events": 0,
+    "failed_build_jobs": 1,
+    "final_delivery": "docs/validation/vm-observability/network/final-v1",
+    "final_delivery_audit": "passed",
+    "final_result_sha256": "accd8115080556b7c01589598e27b8f1abd97fa51e2d0910ebbeb416267372cb",
+    "fixture_conditions": 4,
+    "frozen_foundation_modified": false,
+    "full_recorded_warm_exchanges": 4,
+    "hard_events_per_thread": 2048,
+    "independent_review": "experiments/vm_observability/network/REVIEW.md",
+    "max_events_per_thread": 129,
+    "native_include_resolution_verified": true,
+    "network_conditions": 12,
+    "newly_executed_kinds": {
+      "auto_growth": 4,
+      "extent_request": 8
+    },
+    "no_formal_timing_or_candidate_adoption": true,
+    "ordinary_valid_traces": 16,
+    "original_W1_warm_artifact_claimed": false,
+    "overall_N3_complete": false,
+    "package_controls": {
+      "cpp_executions": 0,
+      "negative": 11,
+      "path": "docs/validation/vm-observability/network/package-controls-v1/controls.json",
+      "positive": 1
+    },
+    "package_files": 20,
+    "package_references": 1044,
+    "parent_independent_review_received": true,
+    "python_log": "docs/validation/vm-observability/network/python-tests-v1.log",
+    "python_tests": 36,
+    "recorded_events": 2263,
+    "reference_processes": 16,
+    "source_identities": "docs/validation/vm-observability/network/final-v1/source-identities.json",
+    "status": "passed_scoped_network_diagnostics",
+    "still_unexecuted_ordinary_kinds": 20,
+    "work_exchanges": 24,
+    "workload_processes": 32
+  },
+  "next_gate": "Parent accepts final-v1 network diagnostic package; no additional workloads or formal timing requested",
+  "overall_N3_complete": false,
+  "parent_G1_acceptance": {
+    "overall_N3_complete": false,
+    "record": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+    "snapshot_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+    "status": "accepted_scoped_foundation"
+  },
+  "pending": [
+    "parent final network diagnostic package acceptance",
+    "W3 reliable formal default/network measurements and any later adopted candidate gates",
+    "representative multi-owner throughput/registry-contention attribution is a separate parent-dispatched harness",
+    "remaining 20 ordinary unexecuted event paths require separate workload assertions; no expansion requested"
+  ],
+  "performance_running": false,
+  "role": "W2/N3",
+  "running": {
+    "build": false,
+    "diagnostic": false,
+    "tests": false,
+    "timing": false
+  },
+  "schema": "vm-followup-handoff-v1",
+  "selected_build": {
+    "dependencies": {
+      "boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+      "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+    },
+    "diagnostic_binary_sha256": "784d8e36a5a0a2f8c827a6991f7c41d04fad304f387728affca8aeae08cd083e",
+    "external_file_hashes": 1018,
+    "original_binary_sha256": "498928f7ed536fe1ebda17b213e285525dd27b82febd673d58620c0c649a33a8",
+    "path": "build/vm-observability/build-06",
+    "result_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+    "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
+  },
+  "source_identity": {
+    "README.md": "2a09a6ae0eb5874ccab67d65fa4aa5f03e7f8d0b9c898c9c9709f5cdf61c4d22",
+    "REVIEW.md": "8e7d7ad575d0edefcc8d43f7a9efac780d7a5286f32a23edb8e7fcbb64d18cd1",
+    "audit_events.py": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+    "contract.json": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "coverage.json": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+    "event-validation-coverage.json": "7d26d6b55b410660048ece69af53edc7dd22a42d5c878c1dd3e51ae16c8631dc",
+    "event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "generate.py": "94785b7c11ac7c2dfa0dc5913a59a66a06629caf8522a64cc1701d002ebdc826",
+    "make_catalog.py": "33f644c8bf0a2e6ce3de0df3314ea80219211e3b84652577ad8fd796e9ccf710",
+    "n3_probe.cpp": "177ccfed682b689f016bf0d78974fcd1701bb43f56634deac3119e509ebd00ba",
+    "n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "observe.py": "d632be7084efc21af34ce742d27613198bd9e9667bcffd4103ebbb3046c20f6a",
+    "runtime_controls.cpp": "04b590e53826d7c041185b8e47141c8f04934b1014ece593cbba2f15cf471a98",
+    "summarize_coverage.py": "540e54f5ca582319f8f6819d155bdf4d68e5b15fab9c8f1b2b2f0cb8f7aece2a",
+    "test_audit_events.py": "45b00799f67c0e5a0463ba614d62b8bfaa0dd3d4f2be0fc8d06e0b94194094fb",
+    "test_observe.py": "0694aae05ddcd2a01fd964825edbe42cacb6256f24fc799ea020d5ffbc9531b4",
+    "verify_runtime_controls.py": "06f3052fe75e4a0b28db6d3a09bac62196f095838662dbafa9d7a6353a5659c1"
+  },
+  "stage": "network_diagnostic_complete_ready_for_parent_acceptance",
+  "status": "ready_for_review",
+  "test_running": false,
+  "updated_at": "2026-10-15T16:39:58.243816+00:00",
+  "w3_interface": {
+    "contract": "experiments/vm_observability/contract.json",
+    "custom_workload_scope": "fresh process, all warm-up/resource construction recorded; join before dump; W3 must assert preregistered active/outstanding resources and workload semantics",
+    "diagnostic_include_dir": "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic",
+    "formal_timing_forbidden": true,
+    "frozen_collection_audit_command": [
+      "python3",
+      "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-observability/frozen-implementation-v1/collection/tool/observe.py",
+      "audit",
+      "--record",
+      "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-observability/frozen-implementation-v1/collection"
+    ],
+    "kind_catalog": "experiments/vm_observability/event_kinds.json",
+    "runtime_header": "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/n3_runtime.hpp",
+    "structural_auditor": "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-observability/frozen-implementation-v1/source/audit_events.py"
+  }
+}

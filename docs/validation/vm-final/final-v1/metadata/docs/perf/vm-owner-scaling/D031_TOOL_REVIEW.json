@@ -1,0 +1,159 @@
+{
+  "actual_supplement_executed": false,
+  "authority": {
+    "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+    "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb"
+  },
+  "collector_diff": {
+    "path": "build/vm-owner-measurement/d031/collector-vs-frozen.diff",
+    "sha256": "f72902cfafe49675bd9e2064f1ba4eb4373b5044fa55c5bede2bfbe363accbd9"
+  },
+  "collector_fix": "Hash, parse, and preserve the same raw approval byte buffer. No JSON reserialization; source mutation after verification cannot change the saved approval.",
+  "decision": "D031",
+  "execution": {
+    "archive": "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+    "cwd": "/Users/fanchensu/XOffsetDatastructure",
+    "package_argv": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "package",
+      "--repo",
+      "/Users/fanchensu/XOffsetDatastructure",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+      "--tool-sha256",
+      "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    ],
+    "proposed_receipt_is_not_a_completed_receipt": true,
+    "queue_argv": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_coordination/run_job.py",
+      "run",
+      "--owner",
+      "W3",
+      "--kind",
+      "validation",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/approval-supplement-v1",
+      "--timeout-seconds",
+      "900",
+      "--wait-seconds",
+      "900",
+      "--",
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "package",
+      "--repo",
+      "/Users/fanchensu/XOffsetDatastructure",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+      "--tool-sha256",
+      "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    ],
+    "receipt": "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/approval-supplement-v1",
+    "required_kind": "validation",
+    "required_parent_source_review": true,
+    "required_role": "W3"
+  },
+  "full_window_inventory_created": false,
+  "handoff_case_rename": {
+    "case_only_duplicate": false,
+    "current": "experiments/vm_owner_measurement/handoff.json",
+    "previous_exact_bytes": {
+      "path": "build/vm-owner-measurement/d031/handoff-before.json",
+      "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7"
+    }
+  },
+  "independent_source_review": {
+    "executed_native": 0,
+    "executed_package": false,
+    "reviewer": "internal d031_review agent",
+    "status": "passed",
+    "tool_sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+  },
+  "inference_boundaries": [
+    "Existing 78 native processes belong to the original D030 W3 window; no rerun",
+    "Derived window is not original bytes; only its approval.json is restored",
+    "First full original-window inventory will be created at D031 W3 validation, not claimed as a D030 authority pin",
+    "All 24 cells/comparisons and original native timing_evidence=false retained",
+    "No new statistics, optimization/adoption, confidence interval, or tail inference"
+  ],
+  "new_builds": 0,
+  "new_measurement_windows": 0,
+  "new_native_processes": 0,
+  "offline_tests": {
+    "count_each": 51,
+    "existing_tests": 41,
+    "native_processes": 0,
+    "new_regressions": 10,
+    "normal": {
+      "path": "build/vm-owner-measurement/d031/offline-tests.log",
+      "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02"
+    },
+    "optimized": {
+      "path": "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+      "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e"
+    }
+  },
+  "original_pins_checked": {
+    "build/vm-owner-measurement/receipts/archive-v1/result.json": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662",
+    "build/vm-owner-measurement/receipts/archive-v1/stderr.log": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6",
+    "build/vm-owner-measurement/receipts/window-v1/result.json": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131",
+    "build/vm-owner-measurement/window-v1/approval.json": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+    "build/vm-owner-measurement/window-v1/summary.json": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+    "build/vm-owner-measurement/window-v1/window.json": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12"
+  },
+  "regression_scope": [
+    "Real collect path with actual noncanonical D030 approval bytes and mocked native child",
+    "Real collect path with unsorted UTF-8/CRLF approval bytes",
+    "Source mutation after approval verification",
+    "SHA mismatch/existing target rejection",
+    "Changed approval object/nonlegacy serialization rejection",
+    "Additional changed original/derived state, summary or sample rejection",
+    "Extra/missing/symlink evidence and missing original rejection"
+  ],
+  "role": "W2",
+  "schema": "owner-measurement-d031-tool-review-v1",
+  "selected_small_input_identities": {
+    "path": "build/vm-owner-measurement/d031/small-input-identities.json",
+    "sha256": "0b2f769fc3f8c967b4c3da00aa87231a7487033567828e599b510c0202a86202"
+  },
+  "sources": {
+    "README.md": {
+      "path": "experiments/vm_owner_measurement/README.md",
+      "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c"
+    },
+    "audit_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/audit_owner_measurement.py",
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced"
+    },
+    "collect_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/collect_owner_measurement.py",
+      "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426"
+    },
+    "supplement_approval_bytes.py": {
+      "path": "experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    },
+    "test_approval_bytes.py": {
+      "path": "experiments/vm_owner_measurement/test_approval_bytes.py",
+      "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8"
+    },
+    "test_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/test_owner_measurement.py",
+      "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c"
+    }
+  },
+  "status": "tools_ready_for_parent_source_review_before_W3_validation",
+  "supplement_scope": [
+    "Pin exact D031 authority, D030 acceptance, original external approval and seven original evidence SHA values",
+    "Preserve complete original window, full original timing receipt, failed archive receipt and original frozen tools",
+    "Prove semantic approval identity and exact frozen legacy dump bytes",
+    "Derived copy changes only approval.json to original external approval bytes; exact difference manifest",
+    "Use original frozen audit_window and verify_receipt with all original gates",
+    "Audit complete relocated package including result.json and COMPLETE before final sealing",
+    "Recheck original evidence and authority before final sealing"
+  ],
+  "updated_at": "2026-10-15T18:06:35.318932+00:00"
+}

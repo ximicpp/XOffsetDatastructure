@@ -41,7 +41,8 @@ int main() {
     r.labels.push_back("array-one");
     r.values.reserve(4);
     r.values.push_back(10);
-    r.values.reserve(16); // Include a retired allocation.
+    r.map.reserve(4); // Keep values non-tail so reserve must retire its old block.
+    r.values.reserve(16); // Include a retired allocation for hostile freelist tests.
     r.map.try_emplace(1, 11);
     r.map.try_emplace(2, 22);
     const auto original = buf.save_verified<CheckedRoot>();
@@ -73,10 +74,13 @@ int main() {
     {
         auto bytes = original;
         auto state = read<XAllocatorStateV1>(bytes, alloc);
+        bool injected_cycle = false;
         for (auto head : state.freelist_head) if (head) {
             write(bytes, alloc + head, head); // Cycle back to this node.
+            injected_cycle = true;
             break;
         }
+        assert(injected_cycle);
         reject(bytes);
     }
     {

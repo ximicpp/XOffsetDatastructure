@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "decision": "D024",
+  "date": "2026-10-16",
+  "status": "authorized_document_only",
+  "role": "W4",
+  "exclusive_write_paths": [
+    "README.md"
+  ],
+  "proposal": "docs/validation/vm-final/shared-document-edits.patch",
+  "proposal_sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+  "readme_preimage_sha256": "cf62faed1f71adf6c77b4a32717c28550c4f66c886c8c1e46eaf8917a7e4f06b",
+  "scope": "Apply only three reviewed README text changes: reflected API vs independentC++17 storage; platform profile scope; accepted synchronousTCP reference/status links. Preserve unrelated existing modifications.",
+  "unchanged_files": [
+    "docs/STABLE_VM_STORAGE_MIGRATION.md",
+    "examples/stable_storage.cpp"
+  ],
+  "validation": "Check exact patch/text/link targets and final diff; noC++build/matrix needed for this documentary update. Record postimage and return exclusive window.",
+  "G4_complete": false,
+  "final_source_freeze_authorized": false
+}

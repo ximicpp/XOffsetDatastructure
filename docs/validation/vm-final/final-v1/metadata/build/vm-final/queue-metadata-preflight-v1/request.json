@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "-c",
+    "import importlib.util,json,pathlib; p=pathlib.Path(\"experiments/vm_platform_validation/seal_delivery.py\"); s=importlib.util.spec_from_file_location(\"g4seal\",p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); c=json.loads(pathlib.Path(\"experiments/vm_platform_validation/final-package-spec.json\").read_text()); paths,aliases=m.metadata_paths(c); print(json.dumps({\"metadata_paths\":len(paths),\"aliases\":aliases,\"bytes\":sum((m.ROOT/x).stat().st_size for x in paths),\"seal_attempted\":False}))"
+  ],
+  "created_at": "2026-10-15T18:18:22.886709+00:00",
+  "cwd": "/Users/fanchensu/XOffsetDatastructure",
+  "kind": "validation",
+  "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+  "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-final/queue-metadata-preflight-v1",
+  "owner": "W4",
+  "process_contract": "descendants must not detach from inherited session; daemon jobs require explicit adapter",
+  "run_id": "aa351c0dc4f8441b9125eeb94a078457",
+  "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+  "schema_version": 1,
+  "source_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "termination_grace_seconds": 2,
+  "timeout_seconds": 120.0,
+  "wait_seconds": 15
+}

@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-XOffsetDatastructure is a **single-header C++26 library** (`xoffsetdatastructure.hpp`) for
+XOffsetDatastructure is a **header-only C++26 library** (`xoffsetdatastructure.hpp`,
+with `xoffset_virtual_memory.hpp` for the OS storage layer) for
 fixed-schema, zero-decode data buffers. It requires **Clang with P2996 reflection support**
 (a custom Clang fork) — not standard Clang or GCC.
 
@@ -27,9 +28,12 @@ verified load/save, and arena compaction.
 ```bash
 # MUST use 'bash' prefix — './build.sh' alone fails on permissions
 docker run --rm -v $(pwd):/workspace -w /workspace \
-  ghcr.io/ximicpp/typelayout-p2996:latest bash ./build.sh
+  -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  ghcr.io/ximicpp/typelayout-p2996@sha256:fab845dadf9c7171d104cd34f8a3941119809e49baa7d0cd7ce1a7a2d71ad999 bash ./build.sh
 
 # Apple Silicon: add --platform linux/amd64
+# First prepare CMake with:
+# python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
 ```
 
 ### Run a single test
@@ -50,20 +54,46 @@ cmake --build . --config Release -j$(nproc)
 ctest --verbose
 ```
 
-**Critical CMake rule**: Use `add_compile_options(-std=c++26 -freflection ...)` — never `set(CMAKE_CXX_STANDARD 26)` (CMake 3.10 doesn't support it).
+**CMake rule**: full-library settings are target-scoped in `cmake/XOffsetBuildChecks.cmake`.
+Full targets require CMake 3.30+ for transitive `cxx_std_26`; storage keeps its CMake 3.13 minimum.
+Do not apply them globally to the independent C++17 storage targets.
 
-## Test Suite (25 tests)
+### Standalone OS storage (no reflection or submodules)
+
+```bash
+cmake -S . -B build-storage -DXOFFSET_STORAGE_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-storage --config Release --parallel 2
+ctest --test-dir build-storage -C Release --output-on-failure
+```
+
+This validates the OS owner and pool only. It does not establish full XBuffer
+or Windows P2996 support. Fixed full-library inputs are recorded in
+`toolchains/vm-validation.json`; use `tools/check_vm_toolchain.py` before
+historical comparisons. Supply the SDK explicitly rather than relying on xcrun's
+current default. `build.sh --build-dir PATH --sdk PATH` supports a fresh build
+directory with an explicit macOS SDK.
+
+## Test Suite (38 library executables, 48 CTest cases)
 
 - **Basic (7)**: test_basic_types, test_vector, test_map_set, test_nested, test_compaction, test_modify, test_xbuffer_api
-- **Reflection (18)**: test_reflection_core, test_reflection_advanced, test_type_signatures, test_field_limit_fix, test_type_safety, test_wire_admission, test_enum_support, test_xstring_direct_assign, test_xhandle, test_schema_envelope, test_fixed_layout_containers, test_error_paths, test_memory_efficiency, test_zero_boilerplate, test_complex_nesting, test_inheritance, test_adaptive_reservation, test_main_containers
+- **Reflection (29)**: test_reflection_core, test_reflection_advanced, test_type_signatures, test_field_limit_fix, test_type_safety, test_wire_admission, test_enum_support, test_xstring_direct_assign, test_xhandle, test_schema_envelope, test_fixed_layout_containers, test_error_paths, test_memory_efficiency, test_zero_boilerplate, test_complex_nesting, test_inheritance, test_adaptive_reservation, test_main_containers, test_runtime_regressions, test_mutation_failures, test_wire_validation, test_stable_storage, test_vm_lifecycle, test_vm_transport, test_owner_registry, test_tail_expansion, test_storage_policies, test_allocator_model, test_allocator_failures
+- **OS storage (2)**: test_virtual_memory_storage, test_vm_pool (standalone C++17; supplement the full reflection suite)
 
-When adding a test: register in `tests/CMakeLists.txt` (add to `REFLECTION_TESTS` list), add `run_test` call in `build.sh`, update `tests/README.md`.
+The 38 executables plus 5 lifecycle exit scenarios, 2 actual registry allocation
+failure scenarios, and 3 tooling checks total 48 CTest cases. Configure-time
+reflection, positive admission and polymorphic-rejection checks are separate.
+The generated `build/test-inventory.json` is authoritative for the selected mode;
+storage-only currently has 2 programs/2 CTest cases.
+
+When adding a test: register in the appropriate list in `tests/CMakeLists.txt`.
+`build.sh` runs CTest's inventory directly. Keep the CI inventory and docs current.
 
 ## Architecture
 
-### Single header: `xoffsetdatastructure.hpp`
+### Public header: `xoffsetdatastructure.hpp`
 
-The entire library lives in one header, organized as:
+The public library header is organized as follows; its independent VM owner
+lives in `xoffset_virtual_memory.hpp`:
 
 1. **Platform guards** — enforces 64-bit little-endian only
 2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`)
@@ -94,7 +124,11 @@ Clang P2996 fork (from bloomberg/clang-p2996). Searched at: `/usr/local/bin/clan
 
 - **`next_cpp26`** — active development branch
 - **`main`** — stable branch
-- CI runs on push to both: `.github/workflows/ci.yml` pulls `ghcr.io/ximicpp/typelayout-p2996:latest` Docker image, builds, runs all 23 tests, and checks for type-signature contract drift in `tools/sigs/`.
+- CI runs on push to both: `.github/workflows/ci.yml` reads the fixed Linux image
+  digest from `toolchains/vm-validation.json`, verifies compiler/dependency
+  identity, builds, runs CTest and checks signature drift in `tools/sigs/`.
+  Separate Linux/macOS/Windows jobs run only the ordinary C++17 OS layer.
+  A configured job is not a verified platform until its execution passes.
 
 ## OpenSpec Change Process
 

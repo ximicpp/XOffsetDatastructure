@@ -1,0 +1,3462 @@
+{
+  "schema_version": 1,
+  "handoff_branch": "codex/vm-handoff-20261016",
+  "git_base": "07d649909d7f43ca0d11b85accb6d9dab991e284",
+  "files": {
+    ".claude/skills/sync-typelayout/SKILL.md": {
+      "sha256": "21267d4158274b27fdba295feea848cee37d8e67dd2ce0af154ea9a2f03b5c8b",
+      "bytes": 8369,
+      "role": "inherited-published-base"
+    },
+    ".dockerignore": {
+      "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6",
+      "bytes": 425,
+      "role": "inherited-published-base"
+    },
+    ".gitattributes": {
+      "sha256": "838dc85f1585bae49d3d772670c10910799c04fc126bb04f7489f368038160be",
+      "bytes": 166,
+      "role": "handoff-addition"
+    },
+    ".github/workflows/ci-test.yml": {
+      "sha256": "2aa1a0cfd5d8660b2ab187657c2ec727624c2ea9738ae09f57310ab7eb2c328f",
+      "bytes": 2639,
+      "role": "accepted-source-245"
+    },
+    ".github/workflows/ci.yml": {
+      "sha256": "3ead11afb9dff2058062b489d72cc8505d31eba4d162a0c90bb44e2b9eb97c7e",
+      "bytes": 6440,
+      "role": "accepted-source-245"
+    },
+    ".gitignore": {
+      "sha256": "2dfc538c595606a2aaaa6f1db0de501a73e8b09357ef73cc8e688e70bd4724ea",
+      "bytes": 1167,
+      "role": "inherited-published-base"
+    },
+    ".gitmodules": {
+      "sha256": "09e0b9dda131c2a008bc84ec5fe328db4d0504eafd2105742a7fef8a1769d29e",
+      "bytes": 246,
+      "role": "accepted-source-245"
+    },
+    "AGENTS.md": {
+      "sha256": "964d636b8031ed1f01da2ad3843601729096d816730b169631201fce13a84289",
+      "bytes": 538,
+      "role": "handoff-addition"
+    },
+    "CLAUDE.md": {
+      "sha256": "b452529a682e534c4a4d0dd8d78a22b14e1699a4756b190a35a5546ccdb04e82",
+      "bytes": 7569,
+      "role": "accepted-source-245"
+    },
+    "CMakeLists.txt": {
+      "sha256": "2d5bc6112e3db243d48d7957bb486e7043fbf72b3bb5b7cf79497c2c3a1b2b37",
+      "bytes": 3318,
+      "role": "accepted-source-245"
+    },
+    "Dockerfile": {
+      "sha256": "26ade532f909f9a797eb098877cb00cdc48000c840036a3ad928ebf1bfe07c2e",
+      "bytes": 3862,
+      "role": "accepted-source-245"
+    },
+    "HANDOFF.md": {
+      "sha256": "2449159291b08023f313fa84ecd16fbefffe3c83deccef90bf9bd698880bb984",
+      "bytes": 11006,
+      "role": "handoff-addition"
+    },
+    "LICENSE": {
+      "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973",
+      "bytes": 1061,
+      "role": "accepted-source-245"
+    },
+    "README.md": {
+      "sha256": "aeb54c4d8428842982911ae4f944754f5894d21fdf755c8da50bd20e82dbfaad",
+      "bytes": 14101,
+      "role": "accepted-source-245"
+    },
+    "accepted-executed/D030/audit_owner_measurement.py": {
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+      "bytes": 13905,
+      "role": "accepted-source-245"
+    },
+    "accepted-executed/D030/collect_owner_measurement.py": {
+      "sha256": "8ab7a0dbc2f8e5e879fd3b84f74598ffd4e84e1c2f06bac9f6b3fc89003c9214",
+      "bytes": 38406,
+      "role": "accepted-source-245"
+    },
+    "accepted-executed/D030/queue-runner.py": {
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+      "bytes": 16898,
+      "role": "accepted-source-245"
+    },
+    "accepted-executed/D030/test_owner_measurement.py": {
+      "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+      "bytes": 50410,
+      "role": "accepted-source-245"
+    },
+    "accepted-generated/diagnostic/n3_runtime.hpp": {
+      "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+      "bytes": 19990,
+      "role": "accepted-source-245"
+    },
+    "accepted-generated/diagnostic/xoffset_virtual_memory.hpp": {
+      "sha256": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+      "bytes": 19618,
+      "role": "accepted-source-245"
+    },
+    "accepted-generated/diagnostic/xoffsetdatastructure.hpp": {
+      "sha256": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6",
+      "bytes": 187645,
+      "role": "accepted-source-245"
+    },
+    "accepted-generated/network/net_reference.cpp": {
+      "sha256": "e7cc3f07e2d22cbfa8ae6491e0b682a900e1760274e0cd2c9d59deb102251d7d",
+      "bytes": 48584,
+      "role": "accepted-source-245"
+    },
+    "accepted-generated/network/network_support.hpp": {
+      "sha256": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+      "bytes": 7003,
+      "role": "accepted-source-245"
+    },
+    "build.sh": {
+      "sha256": "3db57d916ee50ef63a6d41966082ffe923b5916f24a648d8af051df5497cf454",
+      "bytes": 7987,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetBuildChecks.cmake": {
+      "sha256": "f893d279dd421900288c580bdba049dc52e2d5e9f9abd0a109fec02489e424a0",
+      "bytes": 4802,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetDatastructureConfig.cmake.in": {
+      "sha256": "5a0b5dc781260abb3140334f3fd641348d8fb9af9ba89dd1a5ecbc250a176db3",
+      "bytes": 1220,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetDependencies.cmake": {
+      "sha256": "a82c513eaae4132fd5baa66a3f2fd7caa3ff766f2dabcae51db08f976e7eecd2",
+      "bytes": 2432,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetDependencyLock.cmake": {
+      "sha256": "45fd512c2f001f922ef4edc25e461939b1960f71218c4da6da0bda0fa786f24e",
+      "bytes": 1896,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetInstall.cmake": {
+      "sha256": "c5c14bedda35381e08a3658a246929e94f1af7352ae70f5c816e5cc49d7e3661",
+      "bytes": 2437,
+      "role": "accepted-source-245"
+    },
+    "cmake/XOffsetTestInventory.cmake": {
+      "sha256": "a2c4e8f439b8c6a94edde6ff29a3cc45235f468863b4270e1b58b8d282a72808",
+      "bytes": 2855,
+      "role": "accepted-source-245"
+    },
+    "cmake/reflection_probe.cpp": {
+      "sha256": "04009b1b5f81181b5e7923b7396389efaf9b477493d715a18ed6e97c9acd661e",
+      "bytes": 653,
+      "role": "accepted-source-245"
+    },
+    "cmake/tests/verify_compile_guards.py": {
+      "sha256": "65c66cb5f54c732f6d8fed201be157d27f11e2c0de86b75ebacedd02c44c7d59",
+      "bytes": 5750,
+      "role": "accepted-source-245"
+    },
+    "docker-compose.yml": {
+      "sha256": "ed65d8b3a3303d8f4f2b2dc2611986eafbb8d38e60b959e11045e009708ff861",
+      "bytes": 369,
+      "role": "accepted-source-245"
+    },
+    "docs/BOOST_PERFORMANCE_COMPARISON_PLAN.md": {
+      "sha256": "d607721e61817ea4530f3a52527d6b8e31a35ab12b7e685538c0be6989308a6b",
+      "bytes": 2203,
+      "role": "current-project-documentation"
+    },
+    "docs/BOOST_PERFORMANCE_COMPARISON_RESULTS.md": {
+      "sha256": "e673b1b4c0c0706c70dc5964d598029472491367092305349b973f8a779153f1",
+      "bytes": 3213,
+      "role": "current-project-documentation"
+    },
+    "docs/STABLE_VM_STORAGE_DESIGN.md": {
+      "sha256": "fe9b2f33d1a0048e5bf5ea06e392e46868b3e6a5d10b6f0e7635dfc11ce55aa6",
+      "bytes": 9161,
+      "role": "current-project-documentation"
+    },
+    "docs/STABLE_VM_STORAGE_MIGRATION.md": {
+      "sha256": "8d9044b9703713e677712e76d982860c544e2bade2436a3de15b873c3a0950ba",
+      "bytes": 11445,
+      "role": "current-project-documentation"
+    },
+    "docs/STABLE_VM_STORAGE_VALIDATION.md": {
+      "sha256": "67ab164abef86aa1b4fd26e9c8f530a58b9acdb097dcde8ade837a2cf437b793",
+      "bytes": 15515,
+      "role": "current-project-documentation"
+    },
+    "docs/V1_CORRECTNESS_REPAIR.md": {
+      "sha256": "d18758edc95b4a2855cb774159f3bcf767f3bdf59fecae5e99bb26be505789ce",
+      "bytes": 6453,
+      "role": "current-project-documentation"
+    },
+    "docs/V1_CORRECTNESS_REPAIR_BENCH.tsv": {
+      "sha256": "77a4107e1fe80b54717200c31c8e863994c057ae80ff6fad3df2b62f5e863ebd",
+      "bytes": 788,
+      "role": "inherited-published-base"
+    },
+    "docs/V1_FIXED_SCHEMA_DESIGN.md": {
+      "sha256": "70297fc1496ca424ca2e3ff800d78cc2b01c805ab8a1f833e96e694632c69933",
+      "bytes": 22847,
+      "role": "current-project-documentation"
+    },
+    "docs/V1_FIXED_SCHEMA_STATUS.md": {
+      "sha256": "60acf95a066d636566e351786e0d0b49b9533b7e25acd02b23e97bff1a8a6465",
+      "bytes": 6452,
+      "role": "current-project-documentation"
+    },
+    "docs/V1_REMEDIATION_PLAN.md": {
+      "sha256": "25f06f7d67ba89799d6d0186b72e7a4c831d1a41510569666db274aa58b20ded",
+      "bytes": 10407,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_AUTOMATIC_TRACE_RESULTS.md": {
+      "sha256": "e3c25b0c2b774562eabe09630b28fa356a6810fe549378d91df20040bcdc2082",
+      "bytes": 8942,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_EVIDENCE_ERRATA.md": {
+      "sha256": "2a3890022ee2f060163182fc163cfc3d2e4657bb06f9c30d067c5695f408783f",
+      "bytes": 796,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_FINAL_DELIVERY.md": {
+      "sha256": "459a01465300928459a417c1d330e1d2ae079225adb536b1373aab000fab705c",
+      "bytes": 28239,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_FOLLOWUP_ORCHESTRATION.md": {
+      "sha256": "46d4a270442cbb4be6bac85e7b608d76fdf84b781bd8f3666d191a4616be537a",
+      "bytes": 21125,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_IO_CANDIDATE_DECISIONS.md": {
+      "sha256": "b9213985fbf9a14a5a66c79d88915c27825d1af8dd19f76f919d9751449e90ef",
+      "bytes": 6037,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_IO_PRESTUDY.md": {
+      "sha256": "3cc6a3c736c704443e2acdcdc21ec800ef9ae4adf009cb4d4a7a5591135a5daf",
+      "bytes": 9146,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_IO_SCREENING_RESULTS.md": {
+      "sha256": "527546992a3635b68feb34ffbd8cea654aa99328a78f03b96ac564eaf3b6f891",
+      "bytes": 7461,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_MEMORY_REUSE_RESULTS.md": {
+      "sha256": "a3a7245ee1f2c69723925f429537c04096954ad698af5ff24bd949cf9540ac20",
+      "bytes": 13448,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_NETWORK_IMPLEMENTATION.md": {
+      "sha256": "9d8ced957bdcff594cfa8c43d8f3e2207986ea09da0a53bc25ab02671cad9d6c",
+      "bytes": 7950,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_NETWORK_PERFORMANCE.md": {
+      "sha256": "45af1dc009dcb20b317a83c1cd2e31c060f156cf3fc2a2932e33ee777a09b7b3",
+      "bytes": 6400,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_NETWORK_PLAN.md": {
+      "sha256": "e5476770487f1eac276e1a5ecf08e2745f6610cbb5770ee18be92563ccfbd693",
+      "bytes": 12957,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_NEXT_STAGE_PLAN.md": {
+      "sha256": "0903b09d03eea13e9d6f848e2ab3348cb521040f495d562bf7a032d4f0552b30",
+      "bytes": 28637,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_OBSERVABILITY_RESULTS.md": {
+      "sha256": "d371f066b63b1b66bb68fb7765de88f9107f00ec4b8728648a583ce81bbe2466",
+      "bytes": 19093,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_OWNER_SCALING_RESULTS.md": {
+      "sha256": "3e8accbbbd9373f0e9bdd23693588f2bde66b669780c58244e17868e1da97fbb",
+      "bytes": 3684,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_PACKAGING.md": {
+      "sha256": "b1ca8850e036b884d05c47f93c1bad8e026b4b2189eaf32c0116c79441801e8b",
+      "bytes": 8124,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_PERFORMANCE_COMPARISON_RESULTS.md": {
+      "sha256": "9d000869869ee0eece2199aa777ff3d6f2bb5ac5aa996567d6387f583bbaed28",
+      "bytes": 14279,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_PLATFORM_FOLLOWUP.md": {
+      "sha256": "7fe1a6716d6f64fd2d5f08f7ad2a81c58c6ec8cf5b1b6bdc0c55d0f13dbef1c5",
+      "bytes": 6284,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_POOL_WORKLOAD_RESULTS.md": {
+      "sha256": "b8d3f1ade5c7ee5d7ecb6a52c4503c52a9e415b54b00fd833ead1cd90d144438",
+      "bytes": 9440,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STAGE1_RESULTS.md": {
+      "sha256": "0f142b173f80850f93b2aaa306313446644cede0d9ec129318933a1be82d376f",
+      "bytes": 5277,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STAGE1_RUNNER_ERRATA.md": {
+      "sha256": "319a20aee899b01be92eeb4313b8d0611a3cd736f2d8536534566ae64c96c892",
+      "bytes": 2976,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STAGE2_RESULTS.md": {
+      "sha256": "d6544db8b9de5ec68272762f1d7800dd1e5619d144d009ff43a72628dbe0a0c2",
+      "bytes": 7431,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STAGE3_PLAN.md": {
+      "sha256": "ce32bc8f3e092034046d3272cc28e20c5c62b2dee8ae96b929b7a1e41c96287b",
+      "bytes": 19392,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STAGE3_RESULTS.md": {
+      "sha256": "d04d1e071cf5bc04476ce4187656bb550bc81373e6f7030130919553e99816cb",
+      "bytes": 13148,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STORAGE_IMPROVEMENTS_RESULTS.md": {
+      "sha256": "99e90fb163956ba618d45265887a5477a6f2472e643114a1ce5a0aaff529a4ac",
+      "bytes": 15301,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_STORAGE_IMPROVEMENT_PLAN.md": {
+      "sha256": "f7e1cf3cba4c46e563fe09c4fc944583417d9704d0da66a7b8b78824330b413d",
+      "bytes": 21195,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_VALIDATION_RUNNER.md": {
+      "sha256": "a5c3072da04624075d129dc138a2b59d2edcdc3bf4655a500c7625ebd2c66a51",
+      "bytes": 10833,
+      "role": "current-project-documentation"
+    },
+    "docs/VM_WINDOWS_HANDOFF.md": {
+      "sha256": "aa74ad3d84e4fc46eadeabeac3effc1f2d157078b7a69effc8699487df2691fd",
+      "bytes": 6470,
+      "role": "current-project-documentation"
+    },
+    "docs/coordination/vm-followup/G0_REVIEW.md": {
+      "sha256": "14f478c5ed267941d091bba90f848d11f2b7e1008173dc22d786072b01977844",
+      "bytes": 3868,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G3-acceptance.json": {
+      "sha256": "43358d0d343837f68fbda165b057b13cc5170e42837e1683b41bebe79e8735a3",
+      "bytes": 3079,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G3-reviewed-v1/VM_IO_CANDIDATE_DECISIONS.md": {
+      "sha256": "ee9f5b3ccadcafb49955e56e7b3be7998ce8bfc3d24aa37d53ed54a89b45b58f",
+      "bytes": 5663,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G3-reviewed-v1/candidate-preregister.json": {
+      "sha256": "cdb14f3245b0623e25cfc62122773201d673875ed88b7b2ed09ea39997e4b5db",
+      "bytes": 13517,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G4-final-acceptance.json": {
+      "sha256": "aa7dfcef7d14020f51f93908a40996a7560b71f9ecea2fda545d8ac1167ff245",
+      "bytes": 6857,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G4-inheritance-acceptance.json": {
+      "sha256": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+      "bytes": 2376,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/G4-supplement-acceptance.json": {
+      "sha256": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+      "bytes": 2061,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W1-G1-acceptance.json": {
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "bytes": 2765,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W1-owner-archive-acceptance.json": {
+      "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+      "bytes": 1277,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W1-owner-functional-acceptance.json": {
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "bytes": 3974,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W1-owner-functional-reviewed/final-audit-v1.json": {
+      "sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+      "bytes": 2026,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-G1-acceptance.json": {
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-G1-handoff.json": {
+      "sha256": "40971974e0b4ea9c6f556f933d503a486edce17ca57f865cb4410709f83a245d",
+      "bytes": 11539,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-network-acceptance.json": {
+      "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "bytes": 2665,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-network-reviewed-v1/handoff.json": {
+      "sha256": "19de334fa7e9d15a6c8132f276ffd22e85cb3b0030f50e8edf312a39091ab1b0",
+      "bytes": 16367,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-network-reviewed-v1/references.json": {
+      "sha256": "5ed61aed25489b1592c64fe43a674c0570e4cd881896f24820cbeb2c2bf91a9c",
+      "bytes": 183469,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-network-reviewed-v1/result.json": {
+      "sha256": "accd8115080556b7c01589598e27b8f1abd97fa51e2d0910ebbeb416267372cb",
+      "bytes": 2504,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/W2-network-reviewed-v1/source-identities.json": {
+      "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+      "bytes": 1779,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/HANDOFF.md": {
+      "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+      "bytes": 1237,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/REVIEW.md": {
+      "sha256": "8eddecd1728431dda9fbc25394cf204d66377d16d9ff931016e877f191901fde",
+      "bytes": 12525,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json": {
+      "sha256": "e7d3458a54b685c210edafd0ea701349c1c5e4d3a54d2440a29bac8977ebb65a",
+      "bytes": 2837,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/handoff.json": {
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/output-copy-independent.md": {
+      "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+      "bytes": 7624,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/reuse-staging-independent.md": {
+      "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+      "bytes": 11655,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review-manifest.json": {
+      "sha256": "a8c5cc59e4a0358b76b1d140f1ebecd8b41632d765af2f5c44b37774980f43de",
+      "bytes": 1103,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review.json": {
+      "sha256": "48ea118c8057ffc9fc4253e68f3ebb612929b054990d66c934473f24c11cefb6",
+      "bytes": 8882,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-candidate-static-v1/source-identities.json": {
+      "sha256": "77c19587e7a06ded9559c0739a920eb0ed043eff54caafd2fe994928189fd7c1",
+      "bytes": 1485,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json": {
+      "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+      "bytes": 5343,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/W2-G1-acceptance.json": {
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/diagnostic-budget-review.md": {
+      "sha256": "249bb5ef6b989de5e5872d1d52d5b36961e9fbcfe000a6e9ee7c890fab5ce676",
+      "bytes": 13253,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/old-harness-review.md": {
+      "sha256": "873fe8f14aafd6986692ea15f1849be09245fb23ede32bc715074c21eb48d655",
+      "bytes": 12155,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json": {
+      "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "bytes": 2816,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json": {
+      "sha256": "2adf22ec0e4bc94cabc9fa370add79ecd1a7e1218eca628518ba44bf43e52ab2",
+      "bytes": 1324,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-revision2/contract.json": {
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+      "bytes": 99703,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W1-revision2/model_subcases.json": {
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+      "bytes": 65234,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-network-v1/PLAN.md": {
+      "sha256": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+      "bytes": 18858,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json": {
+      "sha256": "fffeefb7f2578701a66c41619b24405559c46ff79445ceae22cc6d50c7cb40a6",
+      "bytes": 2190,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-network-v1/anchor-census.json": {
+      "sha256": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b",
+      "bytes": 9493,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-network-v1/plan.json": {
+      "sha256": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+      "bytes": 12449,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-v1/acceptance.json": {
+      "sha256": "ee9c8bd4ad643bd9676bd5b9f56932f2a7b213c96554e694a4916c408baae9e3",
+      "bytes": 958,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-v1/contract.json": {
+      "sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+      "bytes": 10057,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-v1/coverage.json": {
+      "sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+      "bytes": 5397,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/W2-v1/event_kinds.json": {
+      "sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+      "bytes": 36417,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json": {
+      "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+      "bytes": 3059,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json": {
+      "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+      "bytes": 5498,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json": {
+      "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+      "bytes": 3294,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json": {
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "bytes": 4959,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json": {
+      "sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+      "bytes": 688,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/default-aa-1-acceptance.json": {
+      "sha256": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+      "bytes": 3250,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/default-aa-1-approval.json": {
+      "sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+      "bytes": 1632,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/dispatch.json": {
+      "sha256": "be62293952140ab89ebe89be41f640eb5ce8b51a16b3fecb5a32d3258ae7ea3c",
+      "bytes": 24379,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/goal-external-prerequisites.json": {
+      "sha256": "9330cd1ceca2085ec883150fd7ac3be05995b2131f5c3fcaab4eb475ef1ffe44",
+      "bytes": 2310,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-aa-1-acceptance.json": {
+      "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+      "bytes": 4309,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-aa-1-approval.json": {
+      "sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+      "bytes": 26691,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-aa-1-proposal-acceptance.json": {
+      "sha256": "ecd20d09987e0f54d3e3464e0275a8e2eb4b2551b8ccd3ae3c128dcdaa585987",
+      "bytes": 1538,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-aa-1-reviewed/result.json": {
+      "sha256": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+      "bytes": 331154,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-aa-1-reviewed/summary.json": {
+      "sha256": "053ec410d8b24da50e428c4d4919697390ce7d490f33c130ff991cbfb666e069",
+      "bytes": 73245,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json": {
+      "sha256": "8fc361d44787aeacf5a7bc7533ddd969a0ae95b399d8d44fab646bb436b94552",
+      "bytes": 4157,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-approval.json": {
+      "sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1",
+      "bytes": 26035,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json": {
+      "sha256": "698b4871ac56a6ccb4ee9b8050daefebf304e386a7d0a3c85cfb683efe043dd0",
+      "bytes": 1201,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-proposal-acceptance.json": {
+      "sha256": "1cd2a676307f6bb24d0f017238869665542d9cf01e59e5f657ef42a73efe8ba7",
+      "bytes": 1850,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-reviewed/result.json": {
+      "sha256": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+      "bytes": 135713,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/network-pool-1m-1-reviewed/summary.json": {
+      "sha256": "9c004bdf09fe829dc049e3a049654cfa383b07f93e5d148ffc8f88e02ab86113",
+      "bytes": 51276,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/owner-measurement-acceptance.json": {
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "bytes": 6870,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-acceptance.json": {
+      "sha256": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+      "bytes": 1262,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-mapping-reviewed-v1/G4_MATRIX.md": {
+      "sha256": "8509e98c14b756752dc75a221bb7ee152280e98933919d8dab115414f6d06edd",
+      "bytes": 13509,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-mapping-reviewed-v1/identity-mapping.json": {
+      "sha256": "3deb3fc720225fdc9e69de3f2f3685638aed0fb0c9fef99842633175737118ac",
+      "bytes": 4615241,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-mapping-reviewed-v1/independent-review.json": {
+      "sha256": "c22b8a179fc007a4016f60d190ec1296cc8c5af7c4f3ca1945df4469da39b076",
+      "bytes": 27240,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-supplement-reviewed-v1/identity-mapping.json": {
+      "sha256": "593e05890ba943b916fab0f307714013738645ed68a3f80f4484ebbbf703439d",
+      "bytes": 4819826,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-supplement-reviewed-v1/identity-notes.md": {
+      "sha256": "efc17e59fc6006f2cc5e09374a6f0a4b29cfbc7e0126ac5924ab58d29587b7cc",
+      "bytes": 8346,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/platform-supplement-reviewed-v1/linux-package-provenance.json": {
+      "sha256": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74",
+      "bytes": 10680,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/readme-window-acceptance.json": {
+      "sha256": "f1b4991066267b16ac79ce8e06767e4588a6bd84076ff5a08986684ffc6800ca",
+      "bytes": 655,
+      "role": "current-coordination-documentation"
+    },
+    "docs/coordination/vm-followup/readme-window.json": {
+      "sha256": "7ad840ddc6b5ae7066c2dabc5272dcdcee7d8e7825b549dc8f4132879b055309",
+      "bytes": 995,
+      "role": "current-coordination-documentation"
+    },
+    "docs/perf/2026-10-15-vm-stage1/README.md": {
+      "sha256": "dd938932ce8d5d8298b61d3776e84b47e17b9dccc63cd988f7449e7f24079d6f",
+      "bytes": 12903,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/SHA256SUMS": {
+      "sha256": "7d43a2c428bcca2ae3f5c126af00db23f5937e2886f7244d063308b9cc5ed745",
+      "bytes": 1267,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/audit.log": {
+      "sha256": "92399c479c1a61149280737a84c0a89ac7342e757a5ef4dc80cbb9aa8744c424",
+      "bytes": 66,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/compile_D.log": {
+      "sha256": "407c15ee20a53fd2cdfd3b6e68ebc831fe44e0c7a2208ba77d720ba66411ce5b",
+      "bytes": 319,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/compile_F.log": {
+      "sha256": "407c15ee20a53fd2cdfd3b6e68ebc831fe44e0c7a2208ba77d720ba66411ce5b",
+      "bytes": 319,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/interpretation.json": {
+      "sha256": "045314d329cacf3cb4a589a474f979c9c0ca6a9c395bfb600b29c8845947fd5c",
+      "bytes": 865,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/metadata.json": {
+      "sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed",
+      "bytes": 9091,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/runner_tests.log": {
+      "sha256": "ca9adaa8311b834009d7f399daf482dd47bb12432a2e7f15608ed045b7f845af",
+      "bytes": 103,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/source_snapshots.tar.gz": {
+      "sha256": "de160a216d890d3004d002f3878b5f45159ad705a7258894738d266ecc1ac64e",
+      "bytes": 98659,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/summary.json": {
+      "sha256": "43eb397b3ab8b3814021702ffc524cadce9d407882878f47242e2602aba2bd67",
+      "bytes": 51977,
+      "role": "resume-input"
+    },
+    "docs/perf/2026-10-15-vm-stage1/window_01/raw.jsonl.gz": {
+      "sha256": "033ca4e686b77439835ff4a889e5316d13184a0eecaeb553a7e93dac40a21dc7",
+      "bytes": 21861,
+      "role": "resume-input"
+    },
+    "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json": {
+      "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15",
+      "bytes": 7924,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/perf/vm-owner-scaling/RESULTS.md": {
+      "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68",
+      "bytes": 8129,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/perf/vm-owner-scaling/handoff.json": {
+      "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+      "bytes": 25841,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json": {
+      "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+      "bytes": 124518,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/2026-10-15-vm-followup/README.md": {
+      "sha256": "71b8f46e015959ef3cf1c8f84f6e8c1eb563ee516fe003bf49f200936105471b",
+      "bytes": 3088,
+      "role": "resume-input"
+    },
+    "docs/validation/2026-10-15-vm-followup/final-validation-summary.json": {
+      "sha256": "520fdd899b6af8240ed0139bd84ff18d0be12b149b66777e1b16b940b2055978",
+      "bytes": 80134,
+      "role": "resume-input"
+    },
+    "docs/validation/2026-10-15-vm-followup/wire-inputs-and-versions.tar.gz": {
+      "sha256": "8ec72d53f54fb5ef8b56c5f84c90fcc56f4cd56d2e7591e30a215300df433485",
+      "bytes": 865506,
+      "role": "preserved-wire-input"
+    },
+    "docs/validation/2026-10-15-vm-stage2/final-source/source-manifest.json": {
+      "sha256": "b4db950e010cfe68958360103a5cbfe3330f565c9ec63d2b0f88897daa5d8025",
+      "bytes": 17097,
+      "role": "resume-input"
+    },
+    "docs/validation/2026-10-15-vm-stage2/final-source/source.tar.gz": {
+      "sha256": "c1a69f06cf67db2f773368d5828798873a9faac071f40f0e4c5550507897b3a3",
+      "bytes": 276177,
+      "role": "resume-input"
+    },
+    "docs/validation/vm-final/audit_final_capsule.py": {
+      "sha256": "bcc8d12b39c58f411e6923004737df23903866e64b37c73ff5b61a19bcbb69cc",
+      "bytes": 49164,
+      "role": "post-cut-final-acceptance"
+    },
+    "docs/validation/vm-final/build-identities.json": {
+      "sha256": "c82bc3ed871326d52f08a6792bab9ca636e107c968752270fc83666f084936b0",
+      "bytes": 145846,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/draft-status.json": {
+      "sha256": "3d7ba2519dfc3c5eb3cdac2d773e2538f05f961f6e62c0dffa794a754026e357",
+      "bytes": 24816,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/evidence-index.json": {
+      "sha256": "4c4b550b6aaaa8050efeb07a751865f2d728bafd7b57aea449c54dce5ceb541b",
+      "bytes": 47362,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/final-handoff.json": {
+      "sha256": "fd6b6190fcb1024282713298bf3850b2a0234896ad3260fed4217faef26f7b03",
+      "bytes": 6493,
+      "role": "post-cut-final-acceptance"
+    },
+    "docs/validation/vm-final/final-increment.json": {
+      "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+      "bytes": 3565,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/final-review.json": {
+      "sha256": "47f2dd487d168fdbba3ca1115dedaa1ca0fef31ec1050744138cd04b0d8272b6",
+      "bytes": 3971,
+      "role": "post-cut-final-acceptance"
+    },
+    "docs/validation/vm-final/final-seal.json": {
+      "sha256": "8da3c210bfec3b9d2952d9abb6b58663f6c6b459a951f5d80f49d574adf03286",
+      "bytes": 4214,
+      "role": "post-cut-final-acceptance"
+    },
+    "docs/validation/vm-final/final-v1/CAPSULE.md": {
+      "sha256": "e66694d43ede2815d4852ba8713087ebfd1a7bb4f2874cddbc05f1f64caca45c",
+      "bytes": 1953,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/cut.json": {
+      "sha256": "cc4f27b11a6838a786ee014e1a486a77dbd04543033e54806fd028cc43df5b65",
+      "bytes": 1334,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/final-input-differences.json": {
+      "sha256": "d951d56aae7a06817d32c618bcf01069e9c10f73f28f14c871639cbc5687d532",
+      "bytes": 1960,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/manifest.json": {
+      "sha256": "bbc9ef46f959dce03c9864479c0f96e5a623376737b8ebef6d802158f8ce4190",
+      "bytes": 43567,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata-manifest.json": {
+      "sha256": "c1a56d89809b8dfe1328dbc05a969fddb9cd5c9a86ba0ded704ac47f83030950",
+      "bytes": 40112,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata-path-aliases.json": {
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/manifest.json": {
+      "sha256": "6c2649f7803a5e65c1e51c8c3499832667454ec7a278bd981a5fbd9366a9f84b",
+      "bytes": 912,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/request.json": {
+      "sha256": "625e34280e687b3ddedaf22f4e404eb76d3d980cce303764d376f32866a5764c",
+      "bytes": 4316,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/result.json": {
+      "sha256": "7b18ef519a2e4709141a391e6b275eeb97b327fd1c6b73a121ca341793c63bd3",
+      "bytes": 453,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-final-increment-v1/stdout.log": {
+      "sha256": "a7fb3748ced6fd08e72abdbcbb9cd5676f29139b6090610d1e91d08309b4d87e",
+      "bytes": 256,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/manifest.json": {
+      "sha256": "a350d0ed2f7182ad8673494138e26ead32a130bc34450b922e31891f40f25fd9",
+      "bytes": 914,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/request.json": {
+      "sha256": "0f74bd5217461ae0dc1658b88fb9dd7b1896725ee9bf51ea02dae9882289a55a",
+      "bytes": 1008,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/result.json": {
+      "sha256": "5d30b8d7da5c627f0163258819ecd9bcd4dd22459a4c0e828f2c9013389158c7",
+      "bytes": 453,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-input-inspection-v1/stdout.log": {
+      "sha256": "7134ad821767fa8221887baf290abcabade797e44481b5269c80b5c65a49e0cc",
+      "bytes": 12285,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/manifest.json": {
+      "sha256": "7e5576369a0cc42c7d99e72e297f8a9fba8c65492aeefc542d4d14230536e62f",
+      "bytes": 911,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/request.json": {
+      "sha256": "4b1c78e320c6401ed45ff8afdd93d9b50df623f5f0242e8cbac8b1e5f0e8be77",
+      "bytes": 1480,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/result.json": {
+      "sha256": "b30ec903676b1d4d353dca6cf3ce3e264d5e2716b3b8b081a8459f2923314043",
+      "bytes": 451,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-metadata-preflight-v1/stdout.log": {
+      "sha256": "7ef0babcc61fdb5ce25f18478fb5c1c600e33ad2a1a8857f0180c04308bf12a4",
+      "bytes": 82,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/manifest.json": {
+      "sha256": "947a109d07b28be9b6e742cb226310d9a7fad40202b010dec06816ff45ab22b8",
+      "bytes": 911,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/request.json": {
+      "sha256": "491f06febb545b608fef36d053bcbc323de62ba3f2ae7e0cd661a5d782febe40",
+      "bytes": 1009,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/result.json": {
+      "sha256": "228c79e479037bce28642f5f4cad52e85a62e5b030dc912b6bf61e6d7a9f0919",
+      "bytes": 453,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-preserved-inputs-v1/stdout.log": {
+      "sha256": "4a3688fe8761e4eda394cf971a728642bb5d9dd3263f6fb6b67664a7581cd7b4",
+      "bytes": 78,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/manifest.json": {
+      "sha256": "b3fb8cd47d68ba88d45b9e0f90d17c6e470bfee07abd6a468fbc13a7da9e9c69",
+      "bytes": 913,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/request.json": {
+      "sha256": "5cf1128f86d381db1fa2919c6a24e2041dd4b7e974f6b0e89dc972c420b9d0c0",
+      "bytes": 1054,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/result.json": {
+      "sha256": "140fe111a651c1259533128dfbf64b4af41a9bac3fd8773f403010dc099c51fb",
+      "bytes": 452,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-final/queue-stable-source-v1/stdout.log": {
+      "sha256": "825671fcd38750e1157c9f3bdfd82322483b09f579036a6b8b43bd11c94d193f",
+      "bytes": 1248,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/binaries.json": {
+      "sha256": "10bba076e0bd5a67b53b216b029c68a7a62f949812c872e0d99e6bf2f62434ef",
+      "bytes": 235,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/commands/D.receipt.json": {
+      "sha256": "9ff063d6159d7cfefd0aeda8e6b0eba7c86c300442eacace6c3db3b30d5284a8",
+      "bytes": 1990,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/commands/F.receipt.json": {
+      "sha256": "77b133d3c424f720873a57333072759010e4b6894bfffe4a412f3749037783dd",
+      "bytes": 1990,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json": {
+      "sha256": "ce2c7466aed719b44e2408d6929b47e0240c6abf215c6bd4eac7f77855160f82",
+      "bytes": 219,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout": {
+      "sha256": "7099cf9d0f52244e0efb313f6c70305be93cd513a2900005b7dbfc6daa765cf5",
+      "bytes": 220,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/execution-context.json": {
+      "sha256": "b8e93df57dadd2b386c4c3b521cfd7e1fb3a5fe9c5e8ff6a3146e115c7b9eb50",
+      "bytes": 1340,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/historical-metadata.json": {
+      "sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed",
+      "bytes": 9091,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/preparation.json": {
+      "sha256": "80294597ae25781da557c2910096cea4551c593d50fe56ccd72fbc1729605d0c",
+      "bytes": 6273,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/frozen/result.json": {
+      "sha256": "0547aac5db4d20ffee3d948cc5116160f710343bcdce1e5d381c68cbccaaecea",
+      "bytes": 2675,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/frozen/runtime.json": {
+      "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67",
+      "bytes": 743884,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/default-build-v1/result.json": {
+      "sha256": "9e925ba0e356de831419965c347f76d23a4110c9a7fd268e1847026b9be07015",
+      "bytes": 4773,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/binding.json": {
+      "sha256": "d8533b574825fbe1d6836a069b40aff8f54d9decf8d8a218cb3ff2aa97dd91f4",
+      "bytes": 2332,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json": {
+      "sha256": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+      "bytes": 26707,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/preregister.json": {
+      "sha256": "229d6e6a0634ed3d3e8116df8edabfa501a33f93d40d94a757124ffa139f1e0b",
+      "bytes": 128037,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/proposal-files.json": {
+      "sha256": "ef7a60af4a99925cc5a1cbc5f6d7b68d8e3a7fb75c6be51f638349714547cd27",
+      "bytes": 25516,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/result.json": {
+      "sha256": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+      "bytes": 331154,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-calibration-v1/schedule.json": {
+      "sha256": "b56b7d9db8cd76352e022855f61848a8c62afcaa0ac41074b70cf987df2b68e5",
+      "bytes": 28227,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/binding.json": {
+      "sha256": "09180925cafc5453158762891b6649d6a77ef601251fbe308533b2991c8f2e4c",
+      "bytes": 2376,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json": {
+      "sha256": "1452d89eb8a6d06d8b66ef2b59b28c8a8cb269d4b334c25f7bddfeaf607a39e2",
+      "bytes": 26051,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/preregister.json": {
+      "sha256": "0c26a2757b718c837b49071abd209803ef7c000e0bf1e186bfeb12962673b5cd",
+      "bytes": 108192,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/proposal-files.json": {
+      "sha256": "c2a4c2cc38ab6b14e398ab5bd2a717aa3253a0ceaa0f8419f7f1a70f14145796",
+      "bytes": 24827,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/result.json": {
+      "sha256": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+      "bytes": 135713,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-pool-screening-1m-v1/schedule.json": {
+      "sha256": "af59258bb0238521980e25bb897b0a4ead1ceff0d04d1fb5356cea753cfd24cb",
+      "bytes": 22791,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-tools-v2/source-inventory.json": {
+      "sha256": "7c5da6b1025cf58648060168f4a239e5e225e4a779168fd8088246d32028ffc6",
+      "bytes": 590,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network-measurement/network-tools-v3/source-inventory.json": {
+      "sha256": "ca6cbecd52fbc034fab9c5943466f78e70a03881e56e81d9747e99cef8e88781",
+      "bytes": 590,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/diagnostic-v2/dependencies.json": {
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "bytes": 117168,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/diagnostic-v2/result.json": {
+      "sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+      "bytes": 5594,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/diagnostic-v2/source-inventory.json": {
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "bytes": 1021,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/diagnostic-v2/toolchain.json": {
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "bytes": 914,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/timing-v2/dependencies.json": {
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "bytes": 117168,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/timing-v2/result.json": {
+      "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+      "bytes": 5562,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/timing-v2/source-inventory.json": {
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "bytes": 1021,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-network/timing-v2/toolchain.json": {
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "bytes": 914,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-observability/network/build-v2/dependencies.d": {
+      "sha256": "57b8ea9986c1b629149cfe1ea1c2c0188d054fd90fe8b841dc3d5672ab834270",
+      "bytes": 73678,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-observability/network/build-v2/include-resolution.json": {
+      "sha256": "eba11996347ee2e267b888be9f45dc161b0be1ffe2ca8965f602803496d804c8",
+      "bytes": 734,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-observability/network/build-v2/result.json": {
+      "sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+      "bytes": 150112,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/d031/collector-vs-frozen.diff": {
+      "sha256": "f72902cfafe49675bd9e2064f1ba4eb4373b5044fa55c5bede2bfbe363accbd9",
+      "bytes": 4913,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/d031/handoff-before.json": {
+      "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7",
+      "bytes": 5120,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/d031/offline-tests-optimized.log": {
+      "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e",
+      "bytes": 9046,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/d031/offline-tests.log": {
+      "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02",
+      "bytes": 9046,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/d031/small-input-identities.json": {
+      "sha256": "0b2f769fc3f8c967b4c3da00aa87231a7487033567828e599b510c0202a86202",
+      "bytes": 3247,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/native-window.json": {
+      "sha256": "11dbd41c7c829e326003e6204108c11629f6e5a1d533dcc2bd50a9629ec31850",
+      "bytes": 382,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/design.json": {
+      "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+      "bytes": 5498,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/binding.json": {
+      "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+      "bytes": 1471,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/build_result.json": {
+      "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "bytes": 549953,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/contract.json": {
+      "sha256": "8b2bfe3b9f0524a200b5fbf7f5cce51bee37ab7c51abbc5748c5ba1f788b8fcf",
+      "bytes": 5853,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/functional_result.json": {
+      "sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+      "bytes": 2026,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/layout_correction.json": {
+      "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "bytes": 2816,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/parent_acceptance.json": {
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "bytes": 3974,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/recovery_result.json": {
+      "sha256": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8",
+      "bytes": 54960,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/timing.d": {
+      "sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+      "bytes": 69004,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/producer/toolkit_result.json": {
+      "sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+      "bytes": 1732,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/proposal.json": {
+      "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+      "bytes": 145299,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/proposal-v1/schedule.json": {
+      "sha256": "49fb5d0cc634ba48b5fff7966ba2348bb495bb11dce7481724684d24090d1875",
+      "bytes": 14714,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/manifest.json": {
+      "sha256": "c90fab3be2d8f2f70932a1a876d952c27c5ee248b1438c8d6c6c1af94b4cbeac",
+      "bytes": 911,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/request.json": {
+      "sha256": "cf47a3ecad9847acab8aa7b748f76eb7c066d36452cd121eea2db0cd8a2b9cc8",
+      "bytes": 1384,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/result.json": {
+      "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055",
+      "bytes": 452,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stdout.log": {
+      "sha256": "00933f91b35e67b340a0b62d56ae57bdd7501d471f353cb56d8bdf82efdf7011",
+      "bytes": 87,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/manifest.json": {
+      "sha256": "1bd4e6e4039c3b45e3a5a75a8be0e1d35e441c36cf37934fbe2dfc74eda27e00",
+      "bytes": 911,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/request.json": {
+      "sha256": "7bbda87094f510dc021a01953b9a42571f33dec7dd0a2427c64e3335922921d7",
+      "bytes": 1418,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/result.json": {
+      "sha256": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662",
+      "bytes": 451,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/stderr.log": {
+      "sha256": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6",
+      "bytes": 53,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/archive-v1/stdout.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/events.json": {
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/manifest.json": {
+      "sha256": "f8f9f7fbe1494fc8f0806a4fdc0f6382a8c90b87b01f5aea4f221d939878ae2f",
+      "bytes": 911,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/request.json": {
+      "sha256": "89213cf787b71f196d456fa0fc694266b9205ddb88afd1f1819f681386400ddd",
+      "bytes": 1465,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/result.json": {
+      "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131",
+      "bytes": 448,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/receipts/window-v1/stdout.log": {
+      "sha256": "1954653a90ed6d1b5f4352d5add9cfbb201e678b28af63bd9efff99193a68965",
+      "bytes": 91,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/window-v1/approval.json": {
+      "sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+      "bytes": 688,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/window-v1/summary.json": {
+      "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+      "bytes": 87538,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-measurement/window-v1/window.json": {
+      "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869",
+      "bytes": 112372,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/diagnostic.d": {
+      "sha256": "1e7c1edf4db009e27e0acaec69c0f944561ee2ae980cd0a3a479951cffe09765",
+      "bytes": 69122,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/prebuild-external.json": {
+      "sha256": "b9e6438d29cb8841bc12445f7cd389a03c1b0a147ada3db59027ce55c006fc99",
+      "bytes": 275709,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/prepared-result.json": {
+      "sha256": "855058e7a1f86e48aeb1ef606534b6b72896b2f0e81b5f7b3a4374cc4dbe1a1c",
+      "bytes": 4197,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/provenance/d018-acceptance.json": {
+      "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+      "bytes": 5343,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/provenance/toolchain.json": {
+      "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7",
+      "bytes": 2989,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/provenance/w2-acceptance.json": {
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/provenance/w2-build.json": {
+      "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "bytes": 144598,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/result.json": {
+      "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "bytes": 549953,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/build-v4/timing.d": {
+      "sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+      "bytes": 69004,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/final-audit-v1.json": {
+      "sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+      "bytes": 2026,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/recovery-v2/result.json": {
+      "sha256": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8",
+      "bytes": 54960,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/build/vm-owner-scaling/tooling-errata-v2/result.json": {
+      "sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+      "bytes": 1732,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/STABLE_VM_STORAGE_DESIGN.md": {
+      "sha256": "fe9b2f33d1a0048e5bf5ea06e392e46868b3e6a5d10b6f0e7635dfc11ce55aa6",
+      "bytes": 9161,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/STABLE_VM_STORAGE_MIGRATION.md": {
+      "sha256": "8d9044b9703713e677712e76d982860c544e2bade2436a3de15b873c3a0950ba",
+      "bytes": 11445,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/STABLE_VM_STORAGE_VALIDATION.md": {
+      "sha256": "67ab164abef86aa1b4fd26e9c8f530a58b9acdb097dcde8ade837a2cf437b793",
+      "bytes": 15515,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_EVIDENCE_ERRATA.md": {
+      "sha256": "2a3890022ee2f060163182fc163cfc3d2e4657bb06f9c30d067c5695f408783f",
+      "bytes": 796,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_FINAL_DELIVERY.md": {
+      "sha256": "459a01465300928459a417c1d330e1d2ae079225adb536b1373aab000fab705c",
+      "bytes": 28239,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_FOLLOWUP_ORCHESTRATION.md": {
+      "sha256": "267f53c90290459c2500d99bc0b516e7d11d40cea9716ac8c6116755e3f6abf7",
+      "bytes": 20121,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_IO_CANDIDATE_DECISIONS.md": {
+      "sha256": "b9213985fbf9a14a5a66c79d88915c27825d1af8dd19f76f919d9751449e90ef",
+      "bytes": 6037,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_NETWORK_IMPLEMENTATION.md": {
+      "sha256": "9d8ced957bdcff594cfa8c43d8f3e2207986ea09da0a53bc25ab02671cad9d6c",
+      "bytes": 7950,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_NETWORK_PERFORMANCE.md": {
+      "sha256": "45af1dc009dcb20b317a83c1cd2e31c060f156cf3fc2a2932e33ee777a09b7b3",
+      "bytes": 6400,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_NETWORK_PLAN.md": {
+      "sha256": "e5476770487f1eac276e1a5ecf08e2745f6610cbb5770ee18be92563ccfbd693",
+      "bytes": 12957,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_NEXT_STAGE_PLAN.md": {
+      "sha256": "b502d27377e4334b91cfae685d541b994610cff542930aa31ad49218cc3d4f6a",
+      "bytes": 28392,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_OBSERVABILITY_RESULTS.md": {
+      "sha256": "d371f066b63b1b66bb68fb7765de88f9107f00ec4b8728648a583ce81bbe2466",
+      "bytes": 19093,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_PACKAGING.md": {
+      "sha256": "b1ca8850e036b884d05c47f93c1bad8e026b4b2189eaf32c0116c79441801e8b",
+      "bytes": 8124,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_PLATFORM_FOLLOWUP.md": {
+      "sha256": "7fe1a6716d6f64fd2d5f08f7ad2a81c58c6ec8cf5b1b6bdc0c55d0f13dbef1c5",
+      "bytes": 6284,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_STAGE1_RESULTS.md": {
+      "sha256": "0f142b173f80850f93b2aaa306313446644cede0d9ec129318933a1be82d376f",
+      "bytes": 5277,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_STAGE2_RESULTS.md": {
+      "sha256": "d6544db8b9de5ec68272762f1d7800dd1e5619d144d009ff43a72628dbe0a0c2",
+      "bytes": 7431,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_STAGE3_RESULTS.md": {
+      "sha256": "d04d1e071cf5bc04476ce4187656bb550bc81373e6f7030130919553e99816cb",
+      "bytes": 13148,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/VM_VALIDATION_RUNNER.md": {
+      "sha256": "a5c3072da04624075d129dc138a2b59d2edcdc3bf4655a500c7625ebd2c66a51",
+      "bytes": 10833,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G0_REVIEW.md": {
+      "sha256": "14f478c5ed267941d091bba90f848d11f2b7e1008173dc22d786072b01977844",
+      "bytes": 3868,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G3-acceptance.json": {
+      "sha256": "43358d0d343837f68fbda165b057b13cc5170e42837e1683b41bebe79e8735a3",
+      "bytes": 3079,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G3-reviewed-v1/VM_IO_CANDIDATE_DECISIONS.md": {
+      "sha256": "ee9f5b3ccadcafb49955e56e7b3be7998ce8bfc3d24aa37d53ed54a89b45b58f",
+      "bytes": 5663,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G3-reviewed-v1/candidate-preregister.json": {
+      "sha256": "cdb14f3245b0623e25cfc62122773201d673875ed88b7b2ed09ea39997e4b5db",
+      "bytes": 13517,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G4-inheritance-acceptance.json": {
+      "sha256": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+      "bytes": 2376,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/G4-supplement-acceptance.json": {
+      "sha256": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+      "bytes": 2061,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W1-G1-acceptance.json": {
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "bytes": 2765,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W1-owner-archive-acceptance.json": {
+      "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+      "bytes": 1277,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W1-owner-functional-acceptance.json": {
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "bytes": 3974,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W2-G1-acceptance.json": {
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W2-G1-handoff.json": {
+      "sha256": "40971974e0b4ea9c6f556f933d503a486edce17ca57f865cb4410709f83a245d",
+      "bytes": 11539,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/W2-network-acceptance.json": {
+      "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "bytes": 2665,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/HANDOFF.md": {
+      "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+      "bytes": 1237,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/REVIEW.md": {
+      "sha256": "8eddecd1728431dda9fbc25394cf204d66377d16d9ff931016e877f191901fde",
+      "bytes": 12525,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json": {
+      "sha256": "e7d3458a54b685c210edafd0ea701349c1c5e4d3a54d2440a29bac8977ebb65a",
+      "bytes": 2837,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/handoff.json": {
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/output-copy-independent.md": {
+      "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+      "bytes": 7624,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/reuse-staging-independent.md": {
+      "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+      "bytes": 11655,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review-manifest.json": {
+      "sha256": "a8c5cc59e4a0358b76b1d140f1ebecd8b41632d765af2f5c44b37774980f43de",
+      "bytes": 1103,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review.json": {
+      "sha256": "48ea118c8057ffc9fc4253e68f3ebb612929b054990d66c934473f24c11cefb6",
+      "bytes": 8882,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/source-identities.json": {
+      "sha256": "77c19587e7a06ded9559c0739a920eb0ed043eff54caafd2fe994928189fd7c1",
+      "bytes": 1485,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json": {
+      "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+      "bytes": 5343,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/W2-G1-acceptance.json": {
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/diagnostic-budget-review.md": {
+      "sha256": "249bb5ef6b989de5e5872d1d52d5b36961e9fbcfe000a6e9ee7c890fab5ce676",
+      "bytes": 13253,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/old-harness-review.md": {
+      "sha256": "873fe8f14aafd6986692ea15f1849be09245fb23ede32bc715074c21eb48d655",
+      "bytes": 12155,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json": {
+      "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "bytes": 2816,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json": {
+      "sha256": "2adf22ec0e4bc94cabc9fa370add79ecd1a7e1218eca628518ba44bf43e52ab2",
+      "bytes": 1324,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-revision2/contract.json": {
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+      "bytes": 99703,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W1-revision2/model_subcases.json": {
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+      "bytes": 65234,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-network-v1/PLAN.md": {
+      "sha256": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+      "bytes": 18858,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json": {
+      "sha256": "fffeefb7f2578701a66c41619b24405559c46ff79445ceae22cc6d50c7cb40a6",
+      "bytes": 2190,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-network-v1/anchor-census.json": {
+      "sha256": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b",
+      "bytes": 9493,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-network-v1/plan.json": {
+      "sha256": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+      "bytes": 12449,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-v1/acceptance.json": {
+      "sha256": "ee9c8bd4ad643bd9676bd5b9f56932f2a7b213c96554e694a4916c408baae9e3",
+      "bytes": 958,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-v1/contract.json": {
+      "sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+      "bytes": 10057,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-v1/coverage.json": {
+      "sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+      "bytes": 5397,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/W2-v1/event_kinds.json": {
+      "sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+      "bytes": 36417,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json": {
+      "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+      "bytes": 3059,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json": {
+      "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+      "bytes": 5498,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json": {
+      "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+      "bytes": 3294,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json": {
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "bytes": 4959,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json": {
+      "sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+      "bytes": 688,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/default-aa-1-acceptance.json": {
+      "sha256": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+      "bytes": 3250,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/default-aa-1-approval.json": {
+      "sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+      "bytes": 1632,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/dispatch.json": {
+      "sha256": "0a4aaacac5372fd53e207da4b986d1b06e6947af4de1f3bf0504e9d25288f31b",
+      "bytes": 22865,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-aa-1-acceptance.json": {
+      "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+      "bytes": 4309,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-aa-1-approval.json": {
+      "sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+      "bytes": 26691,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-aa-1-proposal-acceptance.json": {
+      "sha256": "ecd20d09987e0f54d3e3464e0275a8e2eb4b2551b8ccd3ae3c128dcdaa585987",
+      "bytes": 1538,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-pool-1m-1-acceptance.json": {
+      "sha256": "8fc361d44787aeacf5a7bc7533ddd969a0ae95b399d8d44fab646bb436b94552",
+      "bytes": 4157,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-pool-1m-1-approval.json": {
+      "sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1",
+      "bytes": 26035,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json": {
+      "sha256": "698b4871ac56a6ccb4ee9b8050daefebf304e386a7d0a3c85cfb683efe043dd0",
+      "bytes": 1201,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/network-pool-1m-1-proposal-acceptance.json": {
+      "sha256": "1cd2a676307f6bb24d0f017238869665542d9cf01e59e5f657ef42a73efe8ba7",
+      "bytes": 1850,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/owner-measurement-acceptance.json": {
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "bytes": 6870,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/platform-acceptance.json": {
+      "sha256": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+      "bytes": 1262,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/platform-supplement-reviewed-v1/identity-notes.md": {
+      "sha256": "efc17e59fc6006f2cc5e09374a6f0a4b29cfbc7e0126ac5924ab58d29587b7cc",
+      "bytes": 8346,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/platform-supplement-reviewed-v1/linux-package-provenance.json": {
+      "sha256": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74",
+      "bytes": 10680,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/readme-window-acceptance.json": {
+      "sha256": "f1b4991066267b16ac79ce8e06767e4588a6bd84076ff5a08986684ffc6800ca",
+      "bytes": 655,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/coordination/vm-followup/readme-window.json": {
+      "sha256": "7ad840ddc6b5ae7066c2dabc5272dcdcee7d8e7825b549dc8f4132879b055309",
+      "bytes": 995,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json": {
+      "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15",
+      "bytes": 7924,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/perf/vm-owner-scaling/RESULTS.md": {
+      "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68",
+      "bytes": 8129,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/perf/vm-owner-scaling/handoff.json": {
+      "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+      "bytes": 25841,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json": {
+      "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+      "bytes": 124518,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/build-identities.json": {
+      "sha256": "c82bc3ed871326d52f08a6792bab9ca636e107c968752270fc83666f084936b0",
+      "bytes": 145846,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/draft-status.json": {
+      "sha256": "3d7ba2519dfc3c5eb3cdac2d773e2538f05f961f6e62c0dffa794a754026e357",
+      "bytes": 24816,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/evidence-index.json": {
+      "sha256": "4c4b550b6aaaa8050efeb07a751865f2d728bafd7b57aea449c54dce5ceb541b",
+      "bytes": 47362,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/final-increment.json": {
+      "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+      "bytes": 3565,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/final-v1/preserved-inputs.json": {
+      "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+      "bytes": 3385,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/readme-window-return.json": {
+      "sha256": "11fd9291b1d7232ed943ba97e2c5cbbe168acee40984166eb8340a14fe86ebb5",
+      "bytes": 1416,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/shared-document-edits.json": {
+      "sha256": "6c3af6b26f2e0d617a6e1c8aa36e1719c129251039b516a6e5e4e44c80a8c59b",
+      "bytes": 3989,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/shared-document-edits.md": {
+      "sha256": "e556c08004c115e48c52ab97311604bb34b58f616e0ee07f1e3cdd490d3e4c20",
+      "bytes": 2351,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/shared-document-edits.patch": {
+      "sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+      "bytes": 1493,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-final/verification-matrix.json": {
+      "sha256": "7c798253d496d131e57f61241187efbb88fdf2649cb07e303dc71a7eb9ad310b",
+      "bytes": 40989,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d": {
+      "sha256": "9dea9c3242e04e460dee8d1e0982017ea969a6c2a6cc3d1e2fe2b37ff5e6d2fa",
+      "bytes": 69147,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d": {
+      "sha256": "a8e16af6bf34252e33d26b64a7936274ea7b017ef8f1750d960e33dc06a22d3a",
+      "bytes": 69035,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-observability/frozen-implementation-v1/build/result.json": {
+      "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "bytes": 144598,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-observability/frozen-implementation-v1/snapshot.json": {
+      "sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+      "bytes": 16838,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/docs/validation/vm-observability/network/final-v1/source-identities.json": {
+      "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+      "bytes": 1779,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_coordination/HANDOFF.md": {
+      "sha256": "180723d0985b261f9ad964093e0d56c7f9905d2784eee52d75f902523bf0feaf",
+      "bytes": 11906,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_coordination/handoff.json": {
+      "sha256": "0353b542b24051bf2dd6d821dfc0b29204f0e14bd4fb675ba39dd3db920e87be",
+      "bytes": 25736,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_coordination/independent-review.json": {
+      "sha256": "b7daff044a4a01e39dbacacc3b490ed317c6ddea97d7ccb3bef8477a3632e0be",
+      "bytes": 1201,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network/HANDOFF.md": {
+      "sha256": "edebaf883523546cabc9bf2be340bd420ae7cc5e4c2ec73855e666e2ba189b24",
+      "bytes": 2315,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network/candidate-feasibility/HANDOFF.md": {
+      "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+      "bytes": 1237,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network/candidate-feasibility/handoff.json": {
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network/handoff.json": {
+      "sha256": "01d212a72cc82e0aa7651cd786268f89698766fe623df278582300b4cca6e7dd",
+      "bytes": 12252,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network_measurement/HANDOFF.md": {
+      "sha256": "d108fd48c81588a9405d2bfcc723e4ce14326a8b0ce689bf2a4025302b9f2ab7",
+      "bytes": 6421,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_network_measurement/handoff.json": {
+      "sha256": "4347ec7bc28295c94f3ac037dc56936d9b4917d1d86294414a2aa59561e4ae9e",
+      "bytes": 26578,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_observability/HANDOFF.md": {
+      "sha256": "cc56b9a6dea273cfce1a6c4206c59c14945d0f0565d571ba464a22c6d13b3f6c",
+      "bytes": 3612,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_observability/handoff.json": {
+      "sha256": "6fbf7cb2fcfeb19152e9d1ad7cfebf8b1e4098512cccdc79854ca513eb2482e5",
+      "bytes": 16640,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_owner_measurement/handoff.json": {
+      "sha256": "9684c482d442c69cb3085893975fdf54de2dc87fae04ae904b1bb6efd9185502",
+      "bytes": 11459,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_owner_scaling/HANDOFF.md": {
+      "sha256": "5aba2ced33d440a4368f15bdc50abb6a81c4f0ce3338eda2a78a9eef659fab31",
+      "bytes": 3184,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_owner_scaling/handoff.json": {
+      "sha256": "58ba3fc12b0561eff9a6bcf2e0f9ae160c1e8c82c1cc004609b73f52a98f7d0f",
+      "bytes": 4964,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/HANDOFF.md": {
+      "sha256": "75912c64f72df08c56f400752e20d95c7dcd31ea68976b1188964a8a326a05df",
+      "bytes": 4611,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/evidence/platform-20261015-01/manifest.json": {
+      "sha256": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+      "bytes": 6166,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/evidence/platform-20261015-01/result.json": {
+      "sha256": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e",
+      "bytes": 47781,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/final-package-spec.json": {
+      "sha256": "4656ca14d6f3fe54d750207e3a2c39a9bf3b997ef1a6e0d7f9aabdfaaa87645a",
+      "bytes": 9086,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/handoff.json": {
+      "sha256": "6e417af2803530c160d71b19da4426ff10d05a5c13435310eff16ebd13873b91",
+      "bytes": 5468,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/experiments/vm_platform_validation/independent-review.json": {
+      "sha256": "1b6b9ea1bdeac0b0ab294ac292b3b5ef2cda0098779edd8d5e4490b655d9b45d",
+      "bytes": 1813,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/external/boost/LICENSE_1_0.txt": {
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "bytes": 1338,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/external/typelayout/LICENSE": {
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "bytes": 1338,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/external/typelayout/LICENSE_1_0.txt": {
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "bytes": 1338,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/metadata/openspec/changes/vm-next-stage-hardening/tasks.md": {
+      "sha256": "5a4d9a1ec07e8cfb61eb3824989ccd589f51de727dd966190567fb456c3bfff0",
+      "bytes": 15039,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/preserved-inputs.json": {
+      "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+      "bytes": 3385,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/source-differences.json": {
+      "sha256": "86aead6132c24100e5a05c8f14c28e87fda77d0fb6174e46b94617cba912b806",
+      "bytes": 16627,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/source-manifest.json": {
+      "sha256": "06ce0fa38afb8a4e91cdf5c7dafdd78b9667965ed0e58cdcdaaa0dd48d58e3a8",
+      "bytes": 37427,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/source.tar.gz": {
+      "sha256": "c2ae11fa881721769ab92d0252c76e7b72bd6f1dfaaaa3f46b0daaa885f1cd0b",
+      "bytes": 805745,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/final-v1/stable-source-manifest.json": {
+      "sha256": "562d9a6ba2b0b5702097111cd1405135bce5a37f34a7047b949fd26a402f2ed1",
+      "bytes": 34115,
+      "role": "immutable-final-v1-capsule"
+    },
+    "docs/validation/vm-final/readme-window-return.json": {
+      "sha256": "11fd9291b1d7232ed943ba97e2c5cbbe168acee40984166eb8340a14fe86ebb5",
+      "bytes": 1416,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/shared-document-edits.json": {
+      "sha256": "6c3af6b26f2e0d617a6e1c8aa36e1719c129251039b516a6e5e4e44c80a8c59b",
+      "bytes": 3989,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/shared-document-edits.md": {
+      "sha256": "e556c08004c115e48c52ab97311604bb34b58f616e0ee07f1e3cdd490d3e4c20",
+      "bytes": 2351,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/shared-document-edits.patch": {
+      "sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+      "bytes": 1493,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-final/verification-matrix.json": {
+      "sha256": "7c798253d496d131e57f61241187efbb88fdf2649cb07e303dc71a7eb9ad310b",
+      "bytes": 40989,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d": {
+      "sha256": "9dea9c3242e04e460dee8d1e0982017ea969a6c2a6cc3d1e2fe2b37ff5e6d2fa",
+      "bytes": 69147,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d": {
+      "sha256": "a8e16af6bf34252e33d26b64a7936274ea7b017ef8f1750d960e33dc06a22d3a",
+      "bytes": 69035,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-observability/frozen-implementation-v1/build/result.json": {
+      "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "bytes": 144598,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json": {
+      "sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+      "bytes": 16838,
+      "role": "materialized-cut-metadata"
+    },
+    "docs/validation/vm-observability/network/final-v1/source-identities.json": {
+      "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+      "bytes": 1779,
+      "role": "materialized-cut-metadata"
+    },
+    "examples/CMakeLists.txt": {
+      "sha256": "80e51c3ef9dc746d345c7511073b7dbdd5fa3b9c2abeb0b0e6832c389d73b743",
+      "bytes": 275,
+      "role": "accepted-source-245"
+    },
+    "examples/demo.cpp": {
+      "sha256": "d33b57f62b762f4d496be9fde2a4f7ed64d0d4a31e152ee0cabdec376021e9e4",
+      "bytes": 22658,
+      "role": "accepted-source-245"
+    },
+    "examples/game_data.hpp": {
+      "sha256": "f82d78fef7116906baa0f448945f844de96e5e3e7a2a6edb7a066c7a59f70a2b",
+      "bytes": 595,
+      "role": "accepted-source-245"
+    },
+    "examples/helloworld.cpp": {
+      "sha256": "076aab49f53e4abd1cc0e31e9351394b10a19edf62f3b38b1b4f23cb9df4c36f",
+      "bytes": 5717,
+      "role": "accepted-source-245"
+    },
+    "examples/player.hpp": {
+      "sha256": "b440114f6d197776e982980ba89b60b1b4f530c03387fd5d9185e2053d82618a",
+      "bytes": 303,
+      "role": "accepted-source-245"
+    },
+    "examples/stable_storage.cpp": {
+      "sha256": "9d2b0747aa0a4afe9a2d9f2444b014b72bf08a484494721a6569e8b0bc33d9bf",
+      "bytes": 2358,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_coordination/HANDOFF.md": {
+      "sha256": "180723d0985b261f9ad964093e0d56c7f9905d2784eee52d75f902523bf0feaf",
+      "bytes": 11906,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_coordination/README.md": {
+      "sha256": "50501d94a0cf9f11556a6dd11fcc26ac90fcc66d22b6edcb8576fdea3cbaee66",
+      "bytes": 4859,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_coordination/fake_docker.py": {
+      "sha256": "caafd6dfc63924ab62009fac283b86aa2620bb91361a1cbfae293f76df752e76",
+      "bytes": 6692,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_coordination/handoff.json": {
+      "sha256": "0353b542b24051bf2dd6d821dfc0b29204f0e14bd4fb675ba39dd3db920e87be",
+      "bytes": 25736,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_coordination/independent-review.json": {
+      "sha256": "b7daff044a4a01e39dbacacc3b490ed317c6ddea97d7ccb3bef8477a3632e0be",
+      "bytes": 1201,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_coordination/run_job.py": {
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+      "bytes": 16898,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_coordination/test_docker_adapter.py": {
+      "sha256": "6a0bce154197ff5733f296896d5a262ce138a4beabe652f44f725c46a3983756",
+      "bytes": 17824,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_coordination/test_run_job.py": {
+      "sha256": "70374826b3208e5b275efb0c91d6480a8e3efaac45113c7be6a06045d8c7fb15",
+      "bytes": 14409,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_io_candidates/candidate-preregister.json": {
+      "sha256": "69f372c4e442a450c451ff8cb32522a1268943a63b487d5712f3aa22be4c9f81",
+      "bytes": 14666,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/HANDOFF.md": {
+      "sha256": "edebaf883523546cabc9bf2be340bd420ae7cc5e4c2ec73855e666e2ba189b24",
+      "bytes": 2315,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network/candidate-feasibility/HANDOFF.md": {
+      "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+      "bytes": 1237,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network/candidate-feasibility/REVIEW.md": {
+      "sha256": "8eddecd1728431dda9fbc25394cf204d66377d16d9ff931016e877f191901fde",
+      "bytes": 12525,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/candidate-feasibility/handoff.json": {
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network/candidate-feasibility/output-copy-independent.md": {
+      "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+      "bytes": 7624,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/candidate-feasibility/reuse-staging-independent.md": {
+      "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+      "bytes": 11655,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/candidate-feasibility/review-manifest.json": {
+      "sha256": "a8c5cc59e4a0358b76b1d140f1ebecd8b41632d765af2f5c44b37774980f43de",
+      "bytes": 1103,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/candidate-feasibility/review.json": {
+      "sha256": "48ea118c8057ffc9fc4253e68f3ebb612929b054990d66c934473f24c11cefb6",
+      "bytes": 8882,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/candidate-feasibility/source-identities.json": {
+      "sha256": "77c19587e7a06ded9559c0739a920eb0ed043eff54caafd2fe994928189fd7c1",
+      "bytes": 1485,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/check_cli.py": {
+      "sha256": "d8aad53c0a54281c7a345ad96c0289a7e27c557eb630df55e7451bf25ee1abd8",
+      "bytes": 6926,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/contract.json": {
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+      "bytes": 99703,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/frame_model.hpp": {
+      "sha256": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb",
+      "bytes": 18201,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/frame_model_tests.hpp": {
+      "sha256": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c",
+      "bytes": 41487,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/handoff.json": {
+      "sha256": "01d212a72cc82e0aa7651cd786268f89698766fe623df278582300b4cca6e7dd",
+      "bytes": 12252,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network/model_subcases.json": {
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+      "bytes": 65234,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/net_reference.cpp": {
+      "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+      "bytes": 44678,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/run_network.py": {
+      "sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477",
+      "bytes": 43161,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network/test_run_network.py": {
+      "sha256": "8613cf4338c5ee8c5e29f6981d7ac07c40d8f0ab5e6479807cdada529f2b3394",
+      "bytes": 27935,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/HANDOFF.md": {
+      "sha256": "d108fd48c81588a9405d2bfcc723e4ce14326a8b0ce689bf2a4025302b9f2ab7",
+      "bytes": 6421,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network_measurement/README.md": {
+      "sha256": "21bfaf93cac64b5a4598a87497a971a41d272fc369e235f3cd234140c14b7a43",
+      "bytes": 4482,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/archive_calibration.py": {
+      "sha256": "8e6ad514009cc3fcdcc5eae50b9310a941e38f6957f83dd20a4475cb941a80d3",
+      "bytes": 3998,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/archive_default_evidence.py": {
+      "sha256": "51f01a9cecfb201bffc3b00d3205a8fdef05383020feb5743efdb657b1f13990",
+      "bytes": 2961,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/archive_network_evidence.py": {
+      "sha256": "3dfdcb996fc11a8f20134d083788c83d60e33ff716b51f7735dc3d9fe5d63b85",
+      "bytes": 12019,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/archive_network_pool_evidence.py": {
+      "sha256": "2d0fa942db1e4d38ffb929477678aea7ceb2b6ed705a35c8d2c1e9035507f0a1",
+      "bytes": 13430,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/bind_network_window.py": {
+      "sha256": "dcf8ea7b103647e1ff8429bfd9999f20ed91dc4f0f7d64d08c79a36fa09b3bef",
+      "bytes": 50119,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/default-contract.json": {
+      "sha256": "40bc2179baa85b14842bf8b85a1f426250712903030a6c91d4e52865a72c6a30",
+      "bytes": 9927,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/default_measurement.py": {
+      "sha256": "f73724c67f310dc71487c7726dc4ea073fd2391fcaa6442f444d5a599e71b510",
+      "bytes": 54691,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/handoff.json": {
+      "sha256": "4347ec7bc28295c94f3ac037dc56936d9b4917d1d86294414a2aa59561e4ae9e",
+      "bytes": 26578,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_network_measurement/network-preregister.json": {
+      "sha256": "bed58a0adf44cfa1e1a3e3d76387b67ebd4c93f578974c923007aeb796d72126",
+      "bytes": 6473,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/network_measurement.py": {
+      "sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+      "bytes": 91724,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/paired_measurement.py": {
+      "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+      "bytes": 31083,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/prepare_default.py": {
+      "sha256": "4e316ecd5e95a72b155749b3559f0f223f197760134d71f7eee03fff8e707955",
+      "bytes": 6407,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/test_bind_network_window.py": {
+      "sha256": "e45f83059745f8c4b7350395b2500259544303e59b507a6202a8bb4724e224d4",
+      "bytes": 29270,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/test_default_measurement.py": {
+      "sha256": "0b1c2a5f08a31bcd1673a406acfa2d490d00d4f9168ded5749dedb0d83d87e25",
+      "bytes": 21752,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/test_network_measurement.py": {
+      "sha256": "e62ae1f908997420900131fcf0c6f568fef3b64df511bea9ff8c13819ef51152",
+      "bytes": 66669,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/test_paired_measurement.py": {
+      "sha256": "479686417758684d9327c5105928a596b94a890a7a230b839b43c3fb10fe55d9",
+      "bytes": 37374,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_network_measurement/test_prepare_default.py": {
+      "sha256": "0b4165a4c9773a1ba579436bb8540b152799260b76486d951ce4a127425e4416",
+      "bytes": 3922,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/HANDOFF.md": {
+      "sha256": "cc56b9a6dea273cfce1a6c4206c59c14945d0f0565d571ba464a22c6d13b3f6c",
+      "bytes": 3612,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_observability/README.md": {
+      "sha256": "2a09a6ae0eb5874ccab67d65fa4aa5f03e7f8d0b9c898c9c9709f5cdf61c4d22",
+      "bytes": 2218,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/REVIEW.md": {
+      "sha256": "8e7d7ad575d0edefcc8d43f7a9efac780d7a5286f32a23edb8e7fcbb64d18cd1",
+      "bytes": 11666,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/audit_events.py": {
+      "sha256": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+      "bytes": 19731,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/contract-revision.json": {
+      "sha256": "222ca8b8417b3b229e1d6f17fc0b1c2d30bab062ac193d436c6b7bf32fd29953",
+      "bytes": 1630,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/contract.json": {
+      "sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+      "bytes": 10057,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/coverage.json": {
+      "sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+      "bytes": 5397,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/event-validation-coverage.json": {
+      "sha256": "7d26d6b55b410660048ece69af53edc7dd22a42d5c878c1dd3e51ae16c8631dc",
+      "bytes": 44393,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/event_kinds.json": {
+      "sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+      "bytes": 36417,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/generate.py": {
+      "sha256": "94785b7c11ac7c2dfa0dc5913a59a66a06629caf8522a64cc1701d002ebdc826",
+      "bytes": 13996,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/handoff.json": {
+      "sha256": "6fbf7cb2fcfeb19152e9d1ad7cfebf8b1e4098512cccdc79854ca513eb2482e5",
+      "bytes": 16640,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_observability/make_catalog.py": {
+      "sha256": "33f644c8bf0a2e6ce3de0df3314ea80219211e3b84652577ad8fd796e9ccf710",
+      "bytes": 8221,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/n3_probe.cpp": {
+      "sha256": "177ccfed682b689f016bf0d78974fcd1701bb43f56634deac3119e509ebd00ba",
+      "bytes": 9140,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/n3_runtime.hpp": {
+      "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+      "bytes": 19990,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/COMPLETE": {
+      "sha256": "93740cbdaa59deeb9301fbe80b972235051562d5321cb25e22de5e3785ac2fd0",
+      "bytes": 65,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/PLAN.md": {
+      "sha256": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+      "bytes": 18858,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/REVIEW.md": {
+      "sha256": "88bd5a86979771ec0096b99399ad9c5522a002b86df1cc61c635915f4da55b59",
+      "bytes": 10443,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/anchor-census.json": {
+      "sha256": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b",
+      "bytes": 9493,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/design-checks.json": {
+      "sha256": "35e6e4888e4a09236ea7cff30c3837764af72b609196b09d227b74e7f8b605e7",
+      "bytes": 756,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/manifest.json": {
+      "sha256": "26f58d54a9a9760418190a43f3ad0dfe87c393e4b1c01d63fcd31422cf70acb7",
+      "bytes": 832,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network-plan-v1/plan.json": {
+      "sha256": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+      "bytes": 12449,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/README.md": {
+      "sha256": "6a8ac4cf9a37290971597b0cd59b1233c95b813c2b1876cf7bd8b3d2e98827df",
+      "bytes": 3015,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/REVIEW.md": {
+      "sha256": "098b235c1772f6df4f66c08573c6939b1a28efeba4c8c54535b333e79e898a1e",
+      "bytes": 3181,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/audit_network_delivery.py": {
+      "sha256": "bf27a32811faded76954af90f63c2e99d5147f9600d5e058de270dea11a6bf36",
+      "bytes": 2798,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/network_audit.py": {
+      "sha256": "570ac1cbc59bd2c2c6ef9bae96e99daf4162457fc7f3ffc1f012bfd1dfb79cc7",
+      "bytes": 26697,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/network_generate.py": {
+      "sha256": "d5e54292d44c1f77c49f211a0d273a94601ef6f618bd80fd2f4ab5971ca39ca3",
+      "bytes": 20718,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/network_support.hpp": {
+      "sha256": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+      "bytes": 7003,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/run_network_observation.py": {
+      "sha256": "9ea3b73645ab8581518d71f03c6689b4b3d0b80d879242ccc62506256da36ffb",
+      "bytes": 29683,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/summarize_network.py": {
+      "sha256": "788537c5cbcd2321005d16970dc7b997f7907905b266a62a2781debd5ad1c638",
+      "bytes": 4703,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/test_network_audit.py": {
+      "sha256": "bfd673962a7a3f1eb6eb2bde9d5459be71c4ef78b62ad6e815fb6760580dda09",
+      "bytes": 17770,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/test_network_runner.py": {
+      "sha256": "294a4c89ac9440a5a43032cbd1dc5e7a6af107accbae932f0553b2bb9a239f23",
+      "bytes": 5328,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/network/verify_network_package.py": {
+      "sha256": "3632e3d46d7a6103993219eb3e2130fa7911a3197b1f32cdc2913c8f080ac7e0",
+      "bytes": 4719,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/observe.py": {
+      "sha256": "d632be7084efc21af34ce742d27613198bd9e9667bcffd4103ebbb3046c20f6a",
+      "bytes": 19284,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/runtime_controls.cpp": {
+      "sha256": "04b590e53826d7c041185b8e47141c8f04934b1014ece593cbba2f15cf471a98",
+      "bytes": 3796,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/summarize_coverage.py": {
+      "sha256": "540e54f5ca582319f8f6819d155bdf4d68e5b15fab9c8f1b2b2f0cb8f7aece2a",
+      "bytes": 4586,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/test_audit_events.py": {
+      "sha256": "45b00799f67c0e5a0463ba614d62b8bfaa0dd3d4f2be0fc8d06e0b94194094fb",
+      "bytes": 19992,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/test_observe.py": {
+      "sha256": "0694aae05ddcd2a01fd964825edbe42cacb6256f24fc799ea020d5ffbc9531b4",
+      "bytes": 22779,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_observability/verify_runtime_controls.py": {
+      "sha256": "06f3052fe75e4a0b28db6d3a09bac62196f095838662dbafa9d7a6353a5659c1",
+      "bytes": 2739,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/README.md": {
+      "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c",
+      "bytes": 7296,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/REVIEW.md": {
+      "sha256": "164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1",
+      "bytes": 2109,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/audit_owner_measurement.py": {
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+      "bytes": 13905,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/collect_owner_measurement.py": {
+      "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426",
+      "bytes": 39326,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/handoff.json": {
+      "sha256": "9684c482d442c69cb3085893975fdf54de2dc87fae04ae904b1bb6efd9185502",
+      "bytes": 11459,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_owner_measurement/producer-binding-v1.json": {
+      "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+      "bytes": 1471,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/producer-binding.template.json": {
+      "sha256": "3e67f13868bcbd653e010def3037a15c5c510e34d0b8c1e0e80ebb8855440ff9",
+      "bytes": 259,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/supplement_approval_bytes.py": {
+      "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+      "bytes": 22322,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/test_approval_bytes.py": {
+      "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8",
+      "bytes": 15110,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_measurement/test_owner_measurement.py": {
+      "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+      "bytes": 50410,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/HANDOFF.md": {
+      "sha256": "5aba2ced33d440a4368f15bdc50abb6a81c4f0ce3338eda2a78a9eef659fab31",
+      "bytes": 3184,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_owner_scaling/PLAN.md": {
+      "sha256": "9e0d592607b896a27d7139708f0e6afc86fa2a514b5f2c077c2b1b17fe01d38d",
+      "bytes": 11798,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/alignment-discrepancy-review.json": {
+      "sha256": "f5a55bd9e33248ce52c2c3f47cc138246ffaf8a1f216ab77969e3657ad954607",
+      "bytes": 12374,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/alignment-errata-audit.json": {
+      "sha256": "03f6c19040b4cfe9ea80fa1703b6d884cbaffa2272906a49290c72dd182fdcb6",
+      "bytes": 6919,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/audit_owner_scaling.py": {
+      "sha256": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+      "bytes": 21898,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/build-review.json": {
+      "sha256": "acab3a7ffeaa4da445b791b03a64d982454e1d49d73699e9e44e2c9922810036",
+      "bytes": 12896,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/continue_owner_scaling.py": {
+      "sha256": "1e265ba3da04ea3e8cfe94f39a0dcb1c5d88d2f36a8b286678a38eb9761aedf9",
+      "bytes": 19772,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/contract.json": {
+      "sha256": "8b2bfe3b9f0524a200b5fbf7f5cce51bee37ab7c51abbc5748c5ba1f788b8fcf",
+      "bytes": 5853,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/diagnostic-budget-review.md": {
+      "sha256": "249bb5ef6b989de5e5872d1d52d5b36961e9fbcfe000a6e9ee7c890fab5ce676",
+      "bytes": 13253,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/handoff.json": {
+      "sha256": "58ba3fc12b0561eff9a6bcf2e0f9ae160c1e8c82c1cc004609b73f52a98f7d0f",
+      "bytes": 4964,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_owner_scaling/old-harness-review.md": {
+      "sha256": "873fe8f14aafd6986692ea15f1849be09245fb23ede32bc715074c21eb48d655",
+      "bytes": 12155,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/owner_scaling.cpp": {
+      "sha256": "7470e32478027526a79030ee50b6975c37ae1a4e83c96af24cbd6cc82c84cb48",
+      "bytes": 25861,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/package_evidence.py": {
+      "sha256": "67b0afe744a55464e33e49f9bfaf292b2cfb899a5e5c25b1c26c28aafba22b9b",
+      "bytes": 9195,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/run_owner_scaling.py": {
+      "sha256": "a1499ef8da25141eac00b25f8bb82446dd4a0a5a49f911cc945b82096b9c4ac9",
+      "bytes": 34980,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/static-review.json": {
+      "sha256": "7cc21868a1e11661fcb3a37513b5836538f8edd1d574116d9c58b5f045afd9b2",
+      "bytes": 7115,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_owner_scaling/test_audit_owner_scaling.py": {
+      "sha256": "56199206a26c811b327f0ab9012edf38b7f94f11e9542ae63ad2891feac09e56",
+      "bytes": 13077,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_platform_validation/HANDOFF.md": {
+      "sha256": "75912c64f72df08c56f400752e20d95c7dcd31ea68976b1188964a8a326a05df",
+      "bytes": 4611,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/evidence/platform-20261015-01/manifest.json": {
+      "sha256": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+      "bytes": 6166,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/evidence/platform-20261015-01/result.json": {
+      "sha256": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e",
+      "bytes": 47781,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/final-package-spec.json": {
+      "sha256": "4656ca14d6f3fe54d750207e3a2c39a9bf3b997ef1a6e0d7f9aabdfaaa87645a",
+      "bytes": 9086,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/freeze_delivery.py": {
+      "sha256": "67ac9e2f80a7722015066110733e89746a95f2bdc0bf7a0163336c2355193c0f",
+      "bytes": 6980,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_platform_validation/handoff.json": {
+      "sha256": "6e417af2803530c160d71b19da4426ff10d05a5c13435310eff16ebd13873b91",
+      "bytes": 5468,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/independent-review.json": {
+      "sha256": "1b6b9ea1bdeac0b0ab294ac292b3b5ef2cda0098779edd8d5e4490b655d9b45d",
+      "bytes": 1813,
+      "role": "materialized-cut-metadata"
+    },
+    "experiments/vm_platform_validation/inspect_final_inputs.py": {
+      "sha256": "cb7198f99980a2939f3d357c2b654bf366688e239dc8f11b0956ac7768872739",
+      "bytes": 1328,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_platform_validation/preserve_final_inputs.py": {
+      "sha256": "9fbb289961f22ea184d29325a59ccd17c6865be299307ce6ade0afebbc9b5619",
+      "bytes": 3130,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_platform_validation/probe_platform.py": {
+      "sha256": "4bc6080c668b66160c7ac7a2875492807f250eda1e45aa114189dcf3d13629ad",
+      "bytes": 24625,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_platform_validation/seal_delivery.py": {
+      "sha256": "d983be9cc1c79db5dd9b12b80529d0e0ea1a7037f045106e05b03e19857a9f98",
+      "bytes": 15459,
+      "role": "accepted-source-245"
+    },
+    "experiments/vm_windows/bundle_support.py": {
+      "sha256": "c0f92d0b52ac1b02f7b6935a3255287e086f5c39da4dc70960852e33d3746cf0",
+      "bytes": 5583,
+      "role": "resume-input"
+    },
+    "experiments/vm_windows/prepare.py": {
+      "sha256": "575ad0d55029b1691291c8e4fcdd3a9e1c9e374c538778b95dbc2868502db4f4",
+      "bytes": 3055,
+      "role": "resume-input"
+    },
+    "experiments/vm_windows/run-windows.ps1": {
+      "sha256": "c6065840343b0d4743b6ce6191aafdaf63dd6cff4c4ee38dd1187981016b8faf",
+      "bytes": 1140,
+      "role": "resume-input"
+    },
+    "experiments/vm_windows/test_prepare.py": {
+      "sha256": "7cb5bae1068c861c7f6624cab13b88faa8e8bc4f5c7c7a432bcdd3d7ae8430df",
+      "bytes": 8749,
+      "role": "resume-input"
+    },
+    "experiments/vm_windows/validate_windows.py": {
+      "sha256": "cb5cca21a804c6c1a66b7d0dcd5ed066caf532257a5bf4c1671a0dc84ed6de1b",
+      "bytes": 9411,
+      "role": "resume-input"
+    },
+    "handoff/materialization.json": {
+      "sha256": "c4a7a2fa0c085380dbb6f29496fc4cdb9bc54d9c2a9c1b75a6446c0460f8ab46",
+      "bytes": 68656,
+      "role": "handoff-addition"
+    },
+    "handoff/prepublication-checks.json": {
+      "sha256": "89814ffefd2ad4a9a775aecb5bf1743eb2c688f775dc9dd78335e47804f9abec",
+      "bytes": 1259,
+      "role": "handoff-addition"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-improvements/design.md": {
+      "sha256": "b24e3c24a6a836c469af421c61d39e3465419bc55c4731abcb48f115f2982543",
+      "bytes": 1289,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-improvements/proposal.md": {
+      "sha256": "5c504a91ef535b34a8e3ec2f06856b08a536e72a310dee254269889a4e05befd",
+      "bytes": 815,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-improvements/specs/improvements.md": {
+      "sha256": "66babf86441098bba1f0e88e5622fda8bc062addab00fb7ba0333694d1f4b9af",
+      "bytes": 2005,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-improvements/tasks.md": {
+      "sha256": "fa7f14f2745db2cafb0b70accfc124fdfd9ef70fe1489ad99e0b1cd810f6530a",
+      "bytes": 1083,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-storage/design.md": {
+      "sha256": "f2c4cf507c4bdb71fe498c9cf75b938d04532d1374d7751e6d5cb1126b9858a5",
+      "bytes": 675,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-storage/proposal.md": {
+      "sha256": "d3da4582d10de70a5743787b4a4a2e84c11e6b18fafb056e259f36f414ae54b7",
+      "bytes": 694,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-storage/specs/stable-storage.md": {
+      "sha256": "6d0419fc5c2e6f05a87e2f7a604a0237b7c451e80ab06ad8a205057d6d68cd3f",
+      "bytes": 1733,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-13-stable-vm-storage/tasks.md": {
+      "sha256": "e240c814a13cf0bbfb99856eeab8d6e315b20ea7abb4e38277f4e9f33c85fe28",
+      "bytes": 1680,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-15-vm-memory-reuse-followup/design.md": {
+      "sha256": "b54d162203c24fe3693252ebbee96e26d06dbedb97687b32830d1c55c23e4a90",
+      "bytes": 8653,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-15-vm-memory-reuse-followup/proposal.md": {
+      "sha256": "384fe02c2995aec6109c852af3cd3a73f99d98ab657b3e136215ad73ccf66cdc",
+      "bytes": 1807,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-15-vm-memory-reuse-followup/specs/reuse.md": {
+      "sha256": "552227498ccac65219347750e87b5e425b5e72b61a77dbb496a4593b0e944966",
+      "bytes": 2485,
+      "role": "current-plan"
+    },
+    "openspec/changes/archive/2026-10-15-vm-memory-reuse-followup/tasks.md": {
+      "sha256": "16f3a5ff9d7a9cf8f990c10366400b1d07c849534a26184f9855198f4c3add3b",
+      "bytes": 1185,
+      "role": "current-plan"
+    },
+    "openspec/changes/vm-next-stage-hardening/design.md": {
+      "sha256": "af0f73e40292ef80fa9b236008397fd08ff600d6cb8707c2e5aa4d93ff0bc7b5",
+      "bytes": 1253,
+      "role": "current-plan"
+    },
+    "openspec/changes/vm-next-stage-hardening/proposal.md": {
+      "sha256": "9287d55944b8cb6027b700b758cfeb2527ebf1f4f35e063e7e6d8cb92d81faaf",
+      "bytes": 3300,
+      "role": "current-plan"
+    },
+    "openspec/changes/vm-next-stage-hardening/specs/allocator-research.md": {
+      "sha256": "2490e63f2ebc38559eac58e33d0f30999f4d726bf76e02920cd87620b6dc357b",
+      "bytes": 3143,
+      "role": "current-plan"
+    },
+    "openspec/changes/vm-next-stage-hardening/tasks.md": {
+      "sha256": "1a54c596e6b1330a62c5392e73e37971bda59810cc3b580da01bb8405d074027",
+      "bytes": 15969,
+      "role": "current-plan"
+    },
+    "tests/CMakeLists.txt": {
+      "sha256": "ece1a935a89442d97c530eef7d5d7a13bdbf6d4b049ae844e589066734a8dc0c",
+      "bytes": 3507,
+      "role": "accepted-source-245"
+    },
+    "tests/allocator_model_support.hpp": {
+      "sha256": "d0ddf320f10045818fe6523a1d3c9a79616d5612df0859b98cd945610b1fc581",
+      "bytes": 9849,
+      "role": "accepted-source-245"
+    },
+    "tests/package_consumer/CMakeLists.txt": {
+      "sha256": "0bef67ec1db13c973157cdd3a5bc8bde632574d1106cae3a5bdd2906f97afa8a",
+      "bytes": 1867,
+      "role": "accepted-source-245"
+    },
+    "tests/package_consumer/consumer.hpp": {
+      "sha256": "18604d2997c787e4aa9f82b52cac11510b94c3d4672e25caf42ddb21d3c31cf0",
+      "bytes": 796,
+      "role": "accepted-source-245"
+    },
+    "tests/package_consumer/create.cpp": {
+      "sha256": "1788dae4902f44488754ed122faf5f1ded1cefb37f0a42665b5f4a02165733f1",
+      "bytes": 509,
+      "role": "accepted-source-245"
+    },
+    "tests/package_consumer/main.cpp": {
+      "sha256": "bc156af6ddc7707ac0858cb978f58f276394e95a4d336d964779f37e3f9c67be",
+      "bytes": 916,
+      "role": "accepted-source-245"
+    },
+    "tests/package_consumer/mutate.cpp": {
+      "sha256": "be7a0d5db0cff40fc49ac4219ad91825ce3f9d782c5c0aac236117efba139d15",
+      "bytes": 869,
+      "role": "accepted-source-245"
+    },
+    "tests/test_adaptive_reservation.cpp": {
+      "sha256": "2bfb521e853d5d6760649b28eddebe70e0d2aa2c2abea657555cdaf165793e16",
+      "bytes": 9543,
+      "role": "accepted-source-245"
+    },
+    "tests/test_allocator_failures.cpp": {
+      "sha256": "c7c6f5d6b18107d04fe1e0c01ffe616b376bfc2f0fd4de9f912195f000787e09",
+      "bytes": 4682,
+      "role": "accepted-source-245"
+    },
+    "tests/test_allocator_model.cpp": {
+      "sha256": "e6aefc4a4f0c409c9d7af4b35aa236fb8a6a2e7d19b8a11690518ae769e9fbb0",
+      "bytes": 8656,
+      "role": "accepted-source-245"
+    },
+    "tests/test_basic_types.cpp": {
+      "sha256": "affae4037bf1a5bb83707bab44f8385a7050eda673d7553ee35c9813e8dc9c2d",
+      "bytes": 1879,
+      "role": "accepted-source-245"
+    },
+    "tests/test_compaction.cpp": {
+      "sha256": "b6938f1c9f6606849e88d224ad169a828243aaf860710f20b73f74dfd293843e",
+      "bytes": 3800,
+      "role": "accepted-source-245"
+    },
+    "tests/test_complex_nesting.cpp": {
+      "sha256": "fbc213f448514985285a1b869e7710f47c2263ab0c833ccefbc83d1494491fbb",
+      "bytes": 19000,
+      "role": "accepted-source-245"
+    },
+    "tests/test_enum_support.cpp": {
+      "sha256": "b4732f8523deead52174b67eecb32035fe59ee0cdaaaad8c599b3850a920132c",
+      "bytes": 12025,
+      "role": "accepted-source-245"
+    },
+    "tests/test_error_paths.cpp": {
+      "sha256": "23b2e6d861b2490b83eda7d33998172837f4567ca0f76b78723f3d6f47d726e0",
+      "bytes": 4657,
+      "role": "accepted-source-245"
+    },
+    "tests/test_field_limit_fix.cpp": {
+      "sha256": "f0e45851b72ee448fc18464c0802674f37d91b379bebc14aead0e5d1ace0b09b",
+      "bytes": 8259,
+      "role": "accepted-source-245"
+    },
+    "tests/test_fixed_layout_containers.cpp": {
+      "sha256": "7ed570fec59e1ea6a9fd8a1cd92a0e60c8f82392f9ca7dac24a744abae74052a",
+      "bytes": 13251,
+      "role": "accepted-source-245"
+    },
+    "tests/test_inheritance.cpp": {
+      "sha256": "90c13c2ad38df741ce0d9f8fda54b2cf1388178e78a4f93c8f119b8b01aef246",
+      "bytes": 12811,
+      "role": "accepted-source-245"
+    },
+    "tests/test_main_containers.cpp": {
+      "sha256": "2ec29a32c716e35de8f5355ae1ce4cee179c571d3f42baaec966d28e8c685dde",
+      "bytes": 8804,
+      "role": "accepted-source-245"
+    },
+    "tests/test_map_set.cpp": {
+      "sha256": "848c50c3b99899069878bbb215ce7bfdf391d9ad6d892911bdcdbb68247427e7",
+      "bytes": 3758,
+      "role": "accepted-source-245"
+    },
+    "tests/test_memory_efficiency.cpp": {
+      "sha256": "542e886e87876dfd43745bf01d6b5af76430b7ea96d5f22d848b24cb597ee368",
+      "bytes": 25568,
+      "role": "accepted-source-245"
+    },
+    "tests/test_modify.cpp": {
+      "sha256": "64c69e30ce85622b328aa1e40204965bd3aa376991a790272181d130e2c5d76d",
+      "bytes": 13302,
+      "role": "accepted-source-245"
+    },
+    "tests/test_mutation_failures.cpp": {
+      "sha256": "a911bf1be7f9d19c262438b8d763ef0ffc7b099ae58cfc742e3f699e228b6a28",
+      "bytes": 3738,
+      "role": "accepted-source-245"
+    },
+    "tests/test_nested.cpp": {
+      "sha256": "e82b9a04edf4fa9e12b5cda8fe9067eaacd97863f4493c222b629ac5c9c5ab73",
+      "bytes": 4158,
+      "role": "accepted-source-245"
+    },
+    "tests/test_owner_registry.cpp": {
+      "sha256": "215707ac74355165c81e8af4297d915a4348e1d017f291d69ace37294acf7db0",
+      "bytes": 7857,
+      "role": "accepted-source-245"
+    },
+    "tests/test_polymorphic_positive.cpp": {
+      "sha256": "c5752b8161a9976d89359583da42cbf85e901af11688697af4a283bff70fc9d7",
+      "bytes": 361,
+      "role": "accepted-source-245"
+    },
+    "tests/test_polymorphic_rejection.cpp": {
+      "sha256": "32fc5012abca84f4406d6eb87ec330aa072df209566d9f1324f990e7c35083d3",
+      "bytes": 322,
+      "role": "accepted-source-245"
+    },
+    "tests/test_reflection_advanced.cpp": {
+      "sha256": "2d3dc4cb8c77e704038bf78c81d42a04a234201f0373158d30c48b3b5a710bc5",
+      "bytes": 9112,
+      "role": "accepted-source-245"
+    },
+    "tests/test_reflection_core.cpp": {
+      "sha256": "0178135d93d6ff988f62298b18cb4a6c484bd3d057b51945502dc6efe51b372a",
+      "bytes": 10372,
+      "role": "accepted-source-245"
+    },
+    "tests/test_runtime_regressions.cpp": {
+      "sha256": "3ea2406626c2ddfc6b217efd3c7c6d58642e6f3faee91eae5e19db5472c6405e",
+      "bytes": 4622,
+      "role": "accepted-source-245"
+    },
+    "tests/test_schema_envelope.cpp": {
+      "sha256": "b6a54196a2434ec92d0db3e569137d3bbcab194cb5bc47b808157e52341f48f9",
+      "bytes": 7877,
+      "role": "accepted-source-245"
+    },
+    "tests/test_stable_storage.cpp": {
+      "sha256": "66a24c94855be50d1fbedc1581da9c8142d312c5bbb8e592a13bf8f637074084",
+      "bytes": 35255,
+      "role": "accepted-source-245"
+    },
+    "tests/test_storage_policies.cpp": {
+      "sha256": "52b0ce6aac973781eab535a34a8221d75d38af4ae61f0eea282fc5376d2dcd07",
+      "bytes": 13392,
+      "role": "accepted-source-245"
+    },
+    "tests/test_tail_expansion.cpp": {
+      "sha256": "6397acd4758b21aff06ccb2fbe7a200d1f05c9256eba313ac0c8f009aa8a1225",
+      "bytes": 15235,
+      "role": "accepted-source-245"
+    },
+    "tests/test_type_safety.cpp": {
+      "sha256": "ce267a3f6924dddc3b9be8fd0a03865773a3f0866550a1e0a1d9fe9b879fd920",
+      "bytes": 8194,
+      "role": "accepted-source-245"
+    },
+    "tests/test_type_signatures.cpp": {
+      "sha256": "cc74da32636807ab2bae5dfc66c0e3373119d7859651f512f82e550f85ecf88c",
+      "bytes": 13595,
+      "role": "accepted-source-245"
+    },
+    "tests/test_vector.cpp": {
+      "sha256": "a0ec07d06f7008432f1a71ec61f1d2256082534579a624e64f6c23ea4e8f6c57",
+      "bytes": 3005,
+      "role": "accepted-source-245"
+    },
+    "tests/test_virtual_memory_storage.cpp": {
+      "sha256": "a8e68caca0303bfd33d7014581047787cd1b01817a0595a2ca8d027cbdd517a8",
+      "bytes": 33412,
+      "role": "accepted-source-245"
+    },
+    "tests/test_vm_lifecycle.cpp": {
+      "sha256": "66f6c7fba3027889c1adaad039bc660548d758397931874625483e660896b079",
+      "bytes": 8099,
+      "role": "accepted-source-245"
+    },
+    "tests/test_vm_pool.cpp": {
+      "sha256": "6ea904e1bb7bd1b1a9a9d8413cc87956502597fabc4ed6b868aa2253579267bd",
+      "bytes": 15262,
+      "role": "accepted-source-245"
+    },
+    "tests/test_vm_transport.cpp": {
+      "sha256": "a5cd6206507c9885c7d83b2a08cffcad959459f34bef04e5d577d6fdb7dbcf71",
+      "bytes": 8568,
+      "role": "accepted-source-245"
+    },
+    "tests/test_wire_admission.cpp": {
+      "sha256": "6a6f033c547f80e1870ea342c9084370a2c5f5e6f50d8eefab0dc8d6ca5b797f",
+      "bytes": 6875,
+      "role": "accepted-source-245"
+    },
+    "tests/test_wire_validation.cpp": {
+      "sha256": "8ac42f01be86dbab9ed138c60095e1cf268853d517973230d34ef55a2e292624",
+      "bytes": 5377,
+      "role": "accepted-source-245"
+    },
+    "tests/test_xbuffer_api.cpp": {
+      "sha256": "026a45a6c1af2bd065eac8fccaed735467ceb4c736ce3400d72ee8a57fb21fa6",
+      "bytes": 7766,
+      "role": "accepted-source-245"
+    },
+    "tests/test_xhandle.cpp": {
+      "sha256": "f9151a753b108a7e94dc95a5bf636011c588024fad708c0ed307476f378c7c14",
+      "bytes": 10001,
+      "role": "accepted-source-245"
+    },
+    "tests/test_xstring_direct_assign.cpp": {
+      "sha256": "5eee4bfb775669c08324fbdf70cb91d65ea346b52f2cc11eedad6971092c43e7",
+      "bytes": 9143,
+      "role": "accepted-source-245"
+    },
+    "tests/test_zero_boilerplate.cpp": {
+      "sha256": "335e92aed072df19c80ee07e0b96ccdc9d8fbb19f4d55ad5f42d997ef72fc00f",
+      "bytes": 9288,
+      "role": "accepted-source-245"
+    },
+    "toolchains/README.md": {
+      "sha256": "2cf6d7ce607b05ddd48635f16a47415dab373215a3030204ac3d7895c531feb7",
+      "bytes": 2755,
+      "role": "accepted-source-245"
+    },
+    "toolchains/vm-validation.json": {
+      "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7",
+      "bytes": 2989,
+      "role": "accepted-source-245"
+    },
+    "tools/CMakeLists.txt": {
+      "sha256": "44b5564dc016600a10aae1605d939bf5f8c272b509f183f6d8121040bf98a8c3",
+      "bytes": 3629,
+      "role": "accepted-source-245"
+    },
+    "tools/audit_vm_allocator.py": {
+      "sha256": "1935b5cdc256df0dc831aeee466d61e0d0a6618221d1e254bcd833f5595b52e5",
+      "bytes": 25193,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_compare.cpp": {
+      "sha256": "b804301bcffc9e4fe3ec39e259db75d8af2e51838a0d07caf21cc1254ce6c1dd",
+      "bytes": 14235,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_allocator.cpp": {
+      "sha256": "036559136a93132ae8524f82bc214582092f999e0801c1c0d8d905adfc987250",
+      "bytes": 6199,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_allocator_containers.cpp": {
+      "sha256": "e0b5d2ec80a4c3e133eb1b94db065ea6110020f1451d0d2a574192d17c14a49e",
+      "bytes": 3959,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_automatic_trace.cpp": {
+      "sha256": "f590f15c67ae04a543a2ec91108d8fb0438ccbba7dc74533d86e2f9a9a7535fc",
+      "bytes": 10867,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_compare.cpp": {
+      "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d",
+      "bytes": 35096,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_followup.cpp": {
+      "sha256": "98888651e07dbe8f64e22dfec3e0a152beb36adaec31b03910dc475bcdade7f2",
+      "bytes": 19467,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_improvements.cpp": {
+      "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551",
+      "bytes": 29392,
+      "role": "accepted-source-245"
+    },
+    "tools/bench_vm_pool_matrix.cpp": {
+      "sha256": "15389e88a16db0021995f8aaadc5cdd26e0d962135e041b131a121cb2385ae23",
+      "bytes": 17172,
+      "role": "accepted-source-245"
+    },
+    "tools/benchmark_vm_stage1.py": {
+      "sha256": "a933263d6205d17228b39584234d77404a2bc9973447fb3298ba6aab7696ea9c",
+      "bytes": 22533,
+      "role": "accepted-source-245"
+    },
+    "tools/check_compat.cpp": {
+      "sha256": "6d1e1f555041c32ea1dd6fe14205e2e2f2c41313a03755d9d2249d3c72d3fc2d",
+      "bytes": 802,
+      "role": "accepted-source-245"
+    },
+    "tools/check_compat_baselines.hpp.in": {
+      "sha256": "873cbee1a682bac18f68e2a4d6af45e8e3000d6e1cb8e03a7d6ffdb8f6e9162c",
+      "bytes": 687,
+      "role": "accepted-source-245"
+    },
+    "tools/check_signature_matrix.cpp": {
+      "sha256": "f8bcde0a36611f294ef19db71ea585665d3dbf6bc6fdf6d9c59e690794c820ac",
+      "bytes": 2414,
+      "role": "accepted-source-245"
+    },
+    "tools/check_signature_regeneration.cmake": {
+      "sha256": "3a269a0c1d6b483a5d06a0bb7894e4b7f52e7b3aeb66bf140d8cfc33578a996e",
+      "bytes": 1408,
+      "role": "accepted-source-245"
+    },
+    "tools/check_vm_toolchain.py": {
+      "sha256": "af0ff6591a8b6f3cdf01d13876c6374a65d6a9541ef8a7f0f27d76b2066634da",
+      "bytes": 3919,
+      "role": "accepted-source-245"
+    },
+    "tools/collect_vm_allocator_diagnostics.py": {
+      "sha256": "62b6e307f5bf8060e96da38d7aec0b18fe520a1a3e9087c7352ebe5e9214ca39",
+      "bytes": 8340,
+      "role": "accepted-source-245"
+    },
+    "tools/export_signatures.cpp": {
+      "sha256": "3d44726e4056a07b9589df13a51b91dc6d24485300246e0aa41a02044210623c",
+      "bytes": 7126,
+      "role": "accepted-source-245"
+    },
+    "tools/prepare_vm_cmake.py": {
+      "sha256": "5cd74893fc6449165398cdd0b4fe217271efefa91a5a5df8b25c32389cc7d6ce",
+      "bytes": 2823,
+      "role": "accepted-source-245"
+    },
+    "tools/run_perf_compare.sh": {
+      "sha256": "4e6a1ee74101ca7c720ddbc350f6ac108167585e9b86e2e17f42600e60a85595",
+      "bytes": 4077,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_allocator.py": {
+      "sha256": "4c482f3ba4a9bb9f6a1f77c1dcbab33ed4725f4e67f54e33ae03ba6436f64112",
+      "bytes": 35441,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_automatic_trace.py": {
+      "sha256": "339fce86f70d13d9df82ebb1ad5149339f1c866e124213cbc7adb62089a45b1e",
+      "bytes": 21036,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_followup.py": {
+      "sha256": "4fc7f5eec228faba95d20818c657bf473405fac504a63af4d06c82f42f300dec",
+      "bytes": 13134,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_improvements.py": {
+      "sha256": "787a74686e2671feef7b21606bfe11ddca9568abcbf5dfdd20a24df9433827df",
+      "bytes": 20416,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_perf_compare.py": {
+      "sha256": "113b2fb8111c3a2cc36ac1d9a7a149439f90b8b7550827e07a4bc7b23a9921b3",
+      "bytes": 16494,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_pool_matrix.py": {
+      "sha256": "45829b53f21bfdd0c486899c153ede256362c671201968610a3a2552f3e0f8f9",
+      "bytes": 18009,
+      "role": "accepted-source-245"
+    },
+    "tools/run_vm_regression_guards.py": {
+      "sha256": "afdd4f0679967ddc619ee3879a84554bf4a1e2e845de26f48eef75d4db1da434",
+      "bytes": 7097,
+      "role": "accepted-source-245"
+    },
+    "tools/signature_catalog.hpp": {
+      "sha256": "f91872c7f185e34df675ffd58903b3f38853696fefa21c32c9cdab2a8a5c2d76",
+      "bytes": 2059,
+      "role": "accepted-source-245"
+    },
+    "tools/signature_target_matrix.hpp": {
+      "sha256": "98e930356397ddaaedb100a7804e7d20bd97dba415a3eec60658958868637f3f",
+      "bytes": 1991,
+      "role": "accepted-source-245"
+    },
+    "tools/signature_type_list.hpp": {
+      "sha256": "22be53bf22bf5dd88ee4811605ed5f5f3e6e9b5858c3e49d451f76f5f0eae4d0",
+      "bytes": 392,
+      "role": "accepted-source-245"
+    },
+    "tools/signature_type_names.hpp": {
+      "sha256": "ae24686316e5e536e87d8c659e611837d3eb36f450d96289e01317745a1d0fe4",
+      "bytes": 537,
+      "role": "accepted-source-245"
+    },
+    "tools/sigs/.gitkeep": {
+      "sha256": "ed770881e801e685d2bd91b09bd4146ae33a5c081b51ef58698c7fa98f68ab25",
+      "bytes": 110,
+      "role": "inherited-published-base"
+    },
+    "tools/sigs/arm64_android_clang.sig.hpp": {
+      "sha256": "16fb4ca94a9c3bffd607662c43a493b0a98b4d6388687970c1a1e4e9649cb8c1",
+      "bytes": 3578,
+      "role": "accepted-source-245"
+    },
+    "tools/sigs/arm64_ios_clang.sig.hpp": {
+      "sha256": "56722ac96252f0972a61679d2e430f24bbf0accfe50944082cf78bc1a9b4e2f5",
+      "bytes": 3544,
+      "role": "accepted-source-245"
+    },
+    "tools/sigs/x86_64_linux_clang.sig.hpp": {
+      "sha256": "56213588f7c1fd779256732972701ce04112d22bded80c08f2d06c7801b6ccfa",
+      "bytes": 3568,
+      "role": "accepted-source-245"
+    },
+    "tools/sigs/x86_64_windows_clang.sig.hpp": {
+      "sha256": "786ec119715a6021bfcdbc8ed74879aadb4c44e5618bb3af8f2acff20971ce63",
+      "bytes": 3584,
+      "role": "accepted-source-245"
+    },
+    "tools/stage3-preregister.json": {
+      "sha256": "a6235f75d8043c5b4b0e6fe2bb57496fb416ad06d1b48b0f72b9157b9ef128b6",
+      "bytes": 2105,
+      "role": "accepted-source-245"
+    },
+    "tools/stage3_candidates_core.py": {
+      "sha256": "7666c402095c14f0a4967b6e0c0ff2195735dd1897ef273f1af912bc5c0201a7",
+      "bytes": 12069,
+      "role": "accepted-source-245"
+    },
+    "tools/stage3_candidates_index.py": {
+      "sha256": "6dbc72eb11ab07f79f52d00ef0d22f3efcdc17679ef158a355c17ea3af48a380",
+      "bytes": 19023,
+      "role": "accepted-source-245"
+    },
+    "tools/stage3_candidates_wire.py": {
+      "sha256": "e22d3b2466e4a8ea7108fac9af54da36d7b3d9107fd8884904010223cc067b85",
+      "bytes": 11301,
+      "role": "accepted-source-245"
+    },
+    "tools/test_benchmark_vm_stage1.py": {
+      "sha256": "a0a9fc0c815db2c0297233a248b685d341b86988e9ec41acbe604a21a497b3dc",
+      "bytes": 10299,
+      "role": "accepted-source-245"
+    },
+    "tools/test_vm_allocator_base.cpp": {
+      "sha256": "54726e3d28f1e01916187f14b0cec299219840a4f9748ac2ac59be1b8516f925",
+      "bytes": 11135,
+      "role": "accepted-source-245"
+    },
+    "tools/test_vm_allocator_core.cpp": {
+      "sha256": "bbd65990d1c6054e50d22ae241670ba99140f5eb42ab0e50f03749ad77c21f5b",
+      "bytes": 13436,
+      "role": "accepted-source-245"
+    },
+    "tools/test_vm_allocator_index.cpp": {
+      "sha256": "05fad3956abf56920d1b89021f7bde9987f0c6f8af5817e3a15017bfa6f9a926",
+      "bytes": 15980,
+      "role": "accepted-source-245"
+    },
+    "tools/test_vm_allocator_wire.cpp": {
+      "sha256": "640e4dbc6f7b354721988018ebf0d6ed5ec0d8e8c61340c63439a637ddfd52af",
+      "bytes": 34739,
+      "role": "accepted-source-245"
+    },
+    "tools/test_vm_automatic_tail_candidate.cpp": {
+      "sha256": "fd0a593a14c1bb96f490075280496d71f0733038a11338882049d84cdf315f77",
+      "bytes": 3935,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_audit_vm_allocator.py": {
+      "sha256": "95f7e28463e82a4713a36325a7dde03bd36677f9f83bff91077ff60844212eb1",
+      "bytes": 14457,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_prepare_vm_cmake.py": {
+      "sha256": "0ce93eca95159355c2f59ee31db4d7aa03676467b9ecc311c598a07d64bdb699",
+      "bytes": 1745,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_stage3_candidates_index.py": {
+      "sha256": "3c28511749b4fa0df444de0f064a7219c3168abd7c3181d9a0e8c778a68b2539",
+      "bytes": 2246,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_stage3_core_generator.py": {
+      "sha256": "696008527480a07e66fd15be6c95334461c07639e4d29122b5fe2769be881e94",
+      "bytes": 2201,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_stage3_wire_generator.py": {
+      "sha256": "0295fddb730f5d4cd6799d127103693c3b95cefc0eef07d1bff7e2a2eae9526d",
+      "bytes": 2218,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_validate_vm.py": {
+      "sha256": "f53d39b451ccf5cbdf1875035e892f8da1fe705b3800c92575c3293502323310",
+      "bytes": 15441,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_validate_vm_package.py": {
+      "sha256": "bbd7dcdceb1eb99f9fec775bd0d0a0679b412de3aefcd611ae32f01d9ac2d301",
+      "bytes": 5359,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_verify_vm_handoff.py": {
+      "sha256": "0399946fb9576862b7f21e3b0c2c6a6bcec7d447b39868166cf03ed0de28fd46",
+      "bytes": 7960,
+      "role": "handoff-addition"
+    },
+    "tools/tests/test_vm_allocator.py": {
+      "sha256": "e9c2e0b73291a4fccf6f19559953330bbf1ca427f583f46f09a56c264f7b98e8",
+      "bytes": 25186,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_vm_allocator_diagnostics.py": {
+      "sha256": "db32ec9d8604ecbfc4abe2a01e2778c18647976002136056b0a47f721224b9f0",
+      "bytes": 19210,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_vm_automatic_trace.py": {
+      "sha256": "2ac09d3aeba09205194cddc35d6c985ae0bec0f2757dfbd3de874443f6273e0a",
+      "bytes": 6979,
+      "role": "accepted-source-245"
+    },
+    "tools/tests/test_vm_pool_matrix.py": {
+      "sha256": "cb7051153a8fb2ce7265cba98f1acd4159ab2c61e12cdb8131e3c8df61050f4f",
+      "bytes": 7085,
+      "role": "accepted-source-245"
+    },
+    "tools/validate_vm.py": {
+      "sha256": "1f54736a190a86e560d325bae65b90aa1ce706148fb00fb074aeb6a57694d657",
+      "bytes": 32032,
+      "role": "accepted-source-245"
+    },
+    "tools/validate_vm_package.py": {
+      "sha256": "9c272d0e008fb4076c52a07344f34610dddd191ab8f857b57e179bad77bcb9ce",
+      "bytes": 13533,
+      "role": "accepted-source-245"
+    },
+    "tools/verify_vm_handoff.py": {
+      "sha256": "0ff36e3a5ae4f613724746b14e9922b68c73dffbc048febdd3e4348d1ae769fb",
+      "bytes": 6535,
+      "role": "handoff-addition"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+      "bytes": 19239,
+      "role": "accepted-source-245"
+    },
+    "xoffsetdatastructure.hpp": {
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+      "bytes": 183050,
+      "role": "accepted-source-245"
+    }
+  },
+  "gitlinks": {
+    "external/boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+    "external/typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+  },
+  "scope": "Initial portable source/document snapshot. This manifest excludes itself. Dependency/toolchain bytes and large historical raw evidence are not bundled."
+}

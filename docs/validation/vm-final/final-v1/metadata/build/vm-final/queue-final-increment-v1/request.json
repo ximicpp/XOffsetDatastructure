@@ -1,0 +1,25 @@
+{
+  "command": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "-B",
+    "-c",
+    "\nimport hashlib,json\nfrom datetime import datetime,timezone\nfrom pathlib import Path\nroot=Path.cwd()\ndef identity(p):\n if p.is_symlink() or not p.is_file():raise RuntimeError('nonregular '+str(p))\n b=p.read_bytes()\n if len(b)>2*1024*1024:raise RuntimeError('oversize '+str(p))\n return {'sha256':hashlib.sha256(b).hexdigest(),'bytes':len(b)}\ndef read(path,sha):\n p=root/path\n if identity(p)['sha256']!=sha:raise RuntimeError('authority changed '+path)\n return json.loads(p.read_text())\nowner_path='docs/coordination/vm-followup/owner-measurement-acceptance.json'\ntool_path='docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json'\nowner_sha='d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd'\ntool_sha='3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad'\nowner=read(owner_path,owner_sha);tool=read(tool_path,tool_sha)\nassert owner['status'].startswith('accepted') and tool['status'].startswith('accepted')\nexpected={v['path']:(v['sha256'],'D032 exact accepted live source') for v in tool['sources'].values()}\nexpected.update({'experiments/vm_owner_measurement/REVIEW.md':('164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1','D023 historical review retained in D031 handoff-before snapshot'),'experiments/vm_owner_measurement/producer-binding-v1.json':('6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14','D030 accepted proposal producer binding')})\nrecords={}\nfor p in sorted((root/'experiments/vm_owner_measurement').rglob('*')):\n if '__pycache__' in p.parts or p.name.lower().startswith('handoff'):continue\n if p.is_dir():continue\n if p.suffix not in {'.py','.json','.md','.hpp','.cpp'}:continue\n name=p.relative_to(root).as_posix();actual=identity(p)\n if name in expected:\n  sha,basis=expected[name]\n  if actual['sha256']!=sha:raise RuntimeError('accepted source changed '+name)\n  checked=True\n elif name=='experiments/vm_owner_measurement/producer-binding.template.json':\n  json.loads(p.read_text());basis='Unexecuted auxiliary JSON template: static identity included for source completeness, not claimed as a historical test or execution input';checked=False\n else:raise RuntimeError('unexpected source '+name)\n records[name]={**actual,'basis':basis,'accepted_historical_identity_matched':checked}\nassert len(records)==9 and set(expected).issubset(records)\nout=root/'docs/validation/vm-final/final-increment.json'\nvalue={'schema_version':1,'created_at':datetime.now(timezone.utc).isoformat(),'status':'final_owner_source_increment_recorded_for_independent_static_review','authority':{'owner':{'path':owner_path,'sha256':owner_sha},'tools':{'path':tool_path,'sha256':tool_sha}},'source_closed_set':records,'accepted_historical_source_constraints':8,'new_static_auxiliary_templates':1,'new_CPP_jobs':0,'new_native_processes':0,'native_or_historical_statistics_recomputed':False,'scope':'Only9smallownerfilesand2exactacceptedauthoritydocuments;noexternalrawarchivesorbinariesread'}\nwith out.open('x') as f:json.dump(value,f,ensure_ascii=False,indent=2);f.write('\\n')\nprint(json.dumps({'record':out.relative_to(root).as_posix(),'identity':identity(out),'source_files':len(records),'source_bytes':sum(x['bytes'] for x in records.values()),'new_native_processes':0,'new_CPP_jobs':0}))\n"
+  ],
+  "created_at": "2026-10-15T19:27:25.785804+00:00",
+  "cwd": "/Users/fanchensu/XOffsetDatastructure",
+  "kind": "validation",
+  "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+  "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-final/queue-final-increment-v1",
+  "owner": "W4",
+  "process_contract": "descendants must not detach from inherited session; daemon jobs require explicit adapter",
+  "run_id": "2e1fb587d06845ebb6f863156e642f8e",
+  "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+  "schema_version": 1,
+  "source_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "termination_grace_seconds": 2,
+  "timeout_seconds": 60.0,
+  "wait_seconds": 15
+}

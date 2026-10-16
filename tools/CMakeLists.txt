@@ -53,36 +53,42 @@ configure_xoffset_target(export_signatures)
 add_executable(bench_compare bench_compare.cpp)
 configure_xoffset_target(bench_compare)
 
+if(XOFFSET_BUILD_TESTS)
 add_test(
     NAME check_signature_regeneration
     COMMAND ${CMAKE_COMMAND}
         -DEXPORTER=$<TARGET_FILE:export_signatures>
-        -DSOURCE_SIG_DIR=${CMAKE_SOURCE_DIR}/tools/sigs
-        -DGENERATED_SIG_DIR=${CMAKE_BINARY_DIR}/generated_sigs
+        -DSOURCE_SIG_DIR=${PROJECT_SOURCE_DIR}/tools/sigs
+        -DGENERATED_SIG_DIR=${PROJECT_BINARY_DIR}/generated_sigs
         -P ${CMAKE_CURRENT_SOURCE_DIR}/check_signature_regeneration.cmake)
 set_tests_properties(check_signature_regeneration PROPERTIES LABELS "tooling")
+endif()
 
 # Exact target-matrix inventory verifier.
 add_executable(check_signature_matrix check_signature_matrix.cpp)
 target_compile_features(check_signature_matrix PRIVATE cxx_std_17)
 target_include_directories(check_signature_matrix PRIVATE
-    "${CMAKE_SOURCE_DIR}")
+    "${PROJECT_SOURCE_DIR}")
 set_target_properties(check_signature_matrix PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+if(XOFFSET_BUILD_TESTS)
 add_test(
     NAME check_signature_matrix
-    COMMAND $<TARGET_FILE:check_signature_matrix> "${CMAKE_SOURCE_DIR}/tools/sigs")
+    COMMAND $<TARGET_FILE:check_signature_matrix> "${PROJECT_SOURCE_DIR}/tools/sigs")
 set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
+endif()
 
 # Lightweight baseline verifier: consumes committed .sig.hpp files only.
 add_executable(check_compat check_compat.cpp)
 target_compile_features(check_compat PRIVATE cxx_std_17)
 target_include_directories(check_compat PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
-    "${CMAKE_SOURCE_DIR}")
+    "${PROJECT_SOURCE_DIR}")
 target_include_directories(check_compat SYSTEM PRIVATE
     ${TYPELAYOUT_INCLUDE_DIRS})
 set_target_properties(check_compat PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+if(XOFFSET_BUILD_TESTS)
 add_test(NAME check_compat COMMAND $<TARGET_FILE:check_compat>)
 set_tests_properties(check_compat PROPERTIES LABELS "tooling")
+endif()

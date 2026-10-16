@@ -1,0 +1,13 @@
+{
+  "classification": "background-contention/diagnostic-only",
+  "strict_quiet_host_precondition_satisfied": false,
+  "completed_separate_windows": 3,
+  "measured_rows": 252,
+  "warmup_rows": 36,
+  "implementation_changed": false,
+  "source_level_attribution_established": false,
+  "two_percent_non_regression_established": false,
+  "observation": "First-save D/F median direction varies; tail-append median D/F is below one in all windows but overlaps identical-binary AA variability. No causal or equivalence claim.",
+  "remaining": "Repeat the frozen protocol on a genuinely quiet host before source attribution, ablation or performance-policy decisions.",
+  "background": "Coordinator confirmed an unrelated active OrbStack container after window 1; all three windows share the environment limitation. No user application or unrelated container was stopped."
+}

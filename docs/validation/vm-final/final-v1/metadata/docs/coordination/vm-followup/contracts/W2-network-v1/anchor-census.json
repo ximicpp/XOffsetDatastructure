@@ -1,0 +1,207 @@
+{
+  "schema": "n3-network-anchor-census-v1",
+  "status": "design_only_not_generated",
+  "source_sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+  "anchors": [
+    {
+      "id": "fixture.entry",
+      "source": "net_reference.cpp",
+      "line": 192,
+      "anchor": "FixtureResult fixture(const fs::path& output,std::size_t count,std::size_t* terminal_count=nullptr) {",
+      "anchor_sha256": "ede41841338b5b0a9601336e325254922089059165f714b52a8b2f9305a3a6b6",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "phase holder before owner; reserve/save/readback/teardown stages"
+    },
+    {
+      "id": "receive.owning_string",
+      "source": "net_reference.cpp",
+      "line": 176,
+      "anchor": "std::string wire(admission.wire_bytes,'\\0');++progress.allocations;std::memcpy(wire.data(),&header,H);",
+      "anchor_sha256": "874cf30a507ddd63bd9e177b9988f620a0526274ebb4becab2b124b98deaf610",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "sidecar logical size/capacity and completed header memcpy counters; no N3 kind alias"
+    },
+    {
+      "id": "server.entry",
+      "source": "net_reference.cpp",
+      "line": 213,
+      "anchor": "ServerResult serve_one(int fd,const vm_network::Limits& limits,std::size_t timeout,std::size_t count,const XBufferPool& pool,std::size_t chunk=chunk_bytes) {",
+      "anchor_sha256": "f21cad3e8574bb30c958c3b5c5f2f35c745fc341b99da67a5fc3aad302c26391",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "read-only cycle label in copy; phase/scope holders declared before resources"
+    },
+    {
+      "id": "server.load",
+      "source": "net_reference.cpp",
+      "line": 219,
+      "anchor": "auto owner=Buffer::load_verified(wire,XBuffer::maximum_capacity(limits.owner_capacity).with_pool(pool));",
+      "anchor_sha256": "44d679b02974ffcad4467ce5ab4f1bea084f80f91aab28697450149e76ebcf73",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "preserve auto owner and lexical destruction; stage phase before initializer"
+    },
+    {
+      "id": "server.save",
+      "source": "net_reference.cpp",
+      "line": 221,
+      "anchor": "saved=owner.save_verified();",
+      "anchor_sha256": "090720f6a83107142607373f1ec7ad24794b52c41a079aba4a41afe5a33d934d",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "save phase; sample saved size/capacity for bounded sidecar"
+    },
+    {
+      "id": "server.release",
+      "source": "net_reference.cpp",
+      "line": 225,
+      "anchor": "// saved owns the immutable bytes; the source owner is already released.",
+      "anchor_sha256": "a37470771cfed21aee8310275a23b057ef53a91e399ba0cb84e3f8b49a5e875e",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "release phase must be active across preceding original block end"
+    },
+    {
+      "id": "worker.entry",
+      "source": "net_reference.cpp",
+      "line": 229,
+      "anchor": "class Worker {",
+      "anchor_sha256": "5e3a5fb7c182ee90d46674851ebf7b2bed0676d2b569b45dd455cd0d7b5bdde5",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "one immutable warm-first flag before thread_ plus worker-local ordinal; no new thread/request"
+    },
+    {
+      "id": "worker.loop",
+      "source": "net_reference.cpp",
+      "line": 233,
+      "anchor": "void loop(){for(;;)",
+      "anchor_sha256": "914a12d22b8de151dfd5859bd02fc58fd57ff4eef80acaa1cd2110f4da170297",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "worker-local phase labels; existing lock/start/finish unchanged"
+    },
+    {
+      "id": "worker.join",
+      "source": "net_reference.cpp",
+      "line": 240,
+      "anchor": "if(thread_.joinable())thread_.join();",
+      "anchor_sha256": "5157621e3fb77de419a15a005069d069ea033a99850c7d701628c5af61b62897",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "preserve original destructor join; dump only after run returns"
+    },
+    {
+      "id": "client.entry",
+      "source": "net_reference.cpp",
+      "line": 242,
+      "anchor": "Sample exchange(Connection& connection,Worker& worker,const std::string& request,const vm_network::Limits& limits,std::size_t timeout,std::size_t count,const XBufferPool& client_pool,std::size_t chunk=chunk_bytes) {",
+      "anchor_sha256": "6a6e22803d0de33bb17be613a6c067968ea79b711c206c5b1e7cb745f0f2f74e",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "cycle read-only label; preserve existing optional owner"
+    },
+    {
+      "id": "client.release",
+      "source": "net_reference.cpp",
+      "line": 248,
+      "anchor": "verified.reset();sample.client_release=elapsed(point);",
+      "anchor_sha256": "e2d225644c0d095d6a091b36ef46e8cf45052d161f1f9f40b5ac276cd3b16db4",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "client.release phase around exact existing reset; then residual server wait"
+    },
+    {
+      "id": "run.entry",
+      "source": "net_reference.cpp",
+      "line": 277,
+      "anchor": "RunResult run(const fs::path& input,const fs::path& directory,std::string mode,std::size_t iterations,vm_network::Limits limits,std::size_t timeout,std::size_t chunk=chunk_bytes) {",
+      "anchor_sha256": "57eeee39b195e570503b53879b3043172ee8bbabbeeb846497e68c49a5205be1",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "holder before ledger/request/pools/worker, teardown phase survives all original resource destructors"
+    },
+    {
+      "id": "run.preflight",
+      "source": "net_reference.cpp",
+      "line": 283,
+      "anchor": "{auto preflight=Buffer::load_verified(request,XBuffer::maximum_capacity(limits.owner_capacity));",
+      "anchor_sha256": "a91a30e46964ac3c654a1f3c6a438899936a6e9659b12411c9c4de369be86006",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "record preflight load/process/release; retain complete trace prefix"
+    },
+    {
+      "id": "run.pool_prepare",
+      "source": "net_reference.cpp",
+      "line": 285,
+      "anchor": "if(mode!=\"none\"){const auto budget=limits.owner_capacity+chunk_bytes;server_pool=XBufferPool({1,budget,budget});client_pool=XBufferPool({1,budget,budget});}",
+      "anchor_sha256": "5b64de6ae6d470323ad02aa36d604434ae89759b7ead4460a4fc7ef044e23a3a",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "separate init.pool.server/client phases and preserve limits"
+    },
+    {
+      "id": "run.warm",
+      "source": "net_reference.cpp",
+      "line": 288,
+      "anchor": "if(mode==\"warm\"){point=Clock::now();(void)exchange(connection,worker,request,limits,timeout,result.count,client_pool,chunk);result.warmup=elapsed(point);}",
+      "anchor_sha256": "a97ef9c0a9acb9621bd7ced95a835326f5219e6608df01b6bcf1df2229fe7188",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "retain the complete warm trace; both endpoints use the same warm cycle; a short returned Sample scope archives the owning warm output then releases it before work0; explicit diagnostic overhead"
+    },
+    {
+      "id": "run.work",
+      "source": "net_reference.cpp",
+      "line": 291,
+      "anchor": "auto sample=exchange(connection,worker,request,limits,timeout,result.count,client_pool,chunk);",
+      "anchor_sha256": "bf7f57dd8e87d8f11ff6dbcf0b77d869144cddee8e8a165e5a505107ca6efff4",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "work.0/1 cycles without changing work"
+    },
+    {
+      "id": "run.final_clear",
+      "source": "net_reference.cpp",
+      "line": 298,
+      "anchor": "point=Clock::now();server_pool.clear();client_pool.clear();result.final_clear=elapsed(point);",
+      "anchor_sha256": "25ca0f0aabbef5db7fa25d3a3e9ee0bc92f872c25cac8415028af7ba3c7e26c9",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "snapshot existing server_after/client_after, final clear and request release; exact retained ledger policy"
+    },
+    {
+      "id": "main.run_result",
+      "source": "net_reference.cpp",
+      "line": 444,
+      "anchor": "run_json(run(input,output,pool,iterations,{wire,owner,inflight,1},timeout));",
+      "anchor_sha256": "5e96e5b26b1e27535f845c0a5a25295b7e4ebb9f79b307fa130ff1084b6efcd0",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "save returned RunResult, dump after completed teardown/join, emit unchanged run_json"
+    },
+    {
+      "id": "main.fixture_result",
+      "source": "net_reference.cpp",
+      "line": 442,
+      "anchor": "const auto result=fixture(output,count);",
+      "anchor_sha256": "0f188bff174193efb389f4f2eafb2f82526a688ede0d22d95f70e1cd4655bd71",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "dump after fixture locals destroyed; preserve original fixture JSON"
+    },
+    {
+      "id": "worker.after_serve",
+      "source": "net_reference.cpp",
+      "line": 234,
+      "anchor": "result_=serve_one(fd_,limits_,timeout_,count_,pool_,chunk_);",
+      "anchor_sha256": "5187c96b255df84e2ed41d1954e0fdf248c3053b2949a0fe5091f08ce3821172",
+      "expected_count": 1,
+      "observed_count": 1,
+      "design_action": "server string lifetime completion checkpoint after serve_one returns and before existing synchronized done publication; do not rely on local ServerResult destructor guard or NRVO"
+    }
+  ]
+}

@@ -1,0 +1,2687 @@
+{
+  "adapter_schema": "w1-network-revision2-v1",
+  "artifacts": {
+    "contract/W1-G1-acceptance.json": {
+      "bytes": 2765,
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599"
+    },
+    "contract/W1-G1-manifest.json": {
+      "bytes": 54420,
+      "sha256": "6731937b60f038462649e2b6c20ebb59e9c893c203ac0c08550c07b0abb8c74b"
+    },
+    "contract/W1-handoff-locator.json": {
+      "bytes": 12252,
+      "sha256": "01d212a72cc82e0aa7651cd786268f89698766fe623df278582300b4cca6e7dd"
+    },
+    "contract/acceptance.json": {
+      "bytes": 1324,
+      "sha256": "2adf22ec0e4bc94cabc9fa370add79ecd1a7e1218eca628518ba44bf43e52ab2"
+    },
+    "contract/contract.json": {
+      "bytes": 99703,
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718"
+    },
+    "contract/fixture-preparation/cases/1048576/case-spec.json": {
+      "bytes": 44921,
+      "sha256": "a88a9b8c528e3644af17549bac95f9f3a02be12b218d1d826721dc8d0ed087f8"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/adapter-receipt.json": {
+      "bytes": 3282,
+      "sha256": "2794e7e140c1e3664cb3956d3652f0830ddb9d9ff946128b5984d26ac7a6cf24"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/normalized.json": {
+      "bytes": 2750,
+      "sha256": "bbbcbb7b61e2baa357613432fcd871c9f7393b637e73c0be1f04dfe0db496b3d"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/outputs/output-0.wire": {
+      "bytes": 1048928,
+      "sha256": "cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/receipt.json": {
+      "bytes": 3020,
+      "sha256": "efa8756f24f8f50fc03d463a036b19820b515e18f44c85a8b0b458aed2f2acef"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/1048576/commands/j000000/stdout": {
+      "bytes": 1440,
+      "sha256": "3ac8c5441b02dcee8d7d98a53e28be8d1b7e76d992f9ad25bfcf53d32b734e42"
+    },
+    "contract/fixture-preparation/cases/1048576/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f": {
+      "bytes": 1048928,
+      "sha256": "14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f"
+    },
+    "contract/fixture-preparation/cases/1048576/data/cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a": {
+      "bytes": 1048928,
+      "sha256": "cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a"
+    },
+    "contract/fixture-preparation/cases/1048576/fixture-command/receipt.json": {
+      "bytes": 2641,
+      "sha256": "aa00c021cd752475185762197d779a0a3dc366b93a0b818f067a1010d6e1c5ea"
+    },
+    "contract/fixture-preparation/cases/1048576/fixture-command/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/1048576/fixture-command/stdout": {
+      "bytes": 217,
+      "sha256": "48376fd51f0d98ceb30411a52024000c319550f8095173dc970cb49315d107d3"
+    },
+    "contract/fixture-preparation/cases/1048576/input.wire": {
+      "bytes": 1048928,
+      "sha256": "14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f"
+    },
+    "contract/fixture-preparation/cases/16777216/case-spec.json": {
+      "bytes": 45065,
+      "sha256": "a9e5c8ad386f40690b81ead40252f956b0ae0b42743f4e03e32db408116bd316"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/adapter-receipt.json": {
+      "bytes": 3285,
+      "sha256": "20d84a80a7f8eda282da040bd0eb6b76520cb0a0d8ee657864c846dbfe078be2"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/normalized.json": {
+      "bytes": 2754,
+      "sha256": "1642dc8e6e4c20f13b19a3febab5067f9b4128ef03cfa9212423d4242deb76d8"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/outputs/output-0.wire": {
+      "bytes": 16777568,
+      "sha256": "a4760a38dd6241969b8e2778514ff57781b07d886c74bc7a8de473ab0a2a2dfa"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/receipt.json": {
+      "bytes": 3022,
+      "sha256": "6be7527668b3f7fa109ee8b1a7d87086211679982e35b4b4c9ec5e49c7476a43"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/16777216/commands/j000000/stdout": {
+      "bytes": 1444,
+      "sha256": "1df6d121645ed108fce75adb90ff46c84e97067b94e8d30b4badef7546a8e6f0"
+    },
+    "contract/fixture-preparation/cases/16777216/data/a4760a38dd6241969b8e2778514ff57781b07d886c74bc7a8de473ab0a2a2dfa": {
+      "bytes": 16777568,
+      "sha256": "a4760a38dd6241969b8e2778514ff57781b07d886c74bc7a8de473ab0a2a2dfa"
+    },
+    "contract/fixture-preparation/cases/16777216/data/d2e7e068d9b336d8cde3683e3dcc37b478145ff76e8a873652d0d09e0d73b026": {
+      "bytes": 16777568,
+      "sha256": "d2e7e068d9b336d8cde3683e3dcc37b478145ff76e8a873652d0d09e0d73b026"
+    },
+    "contract/fixture-preparation/cases/16777216/fixture-command/receipt.json": {
+      "bytes": 2643,
+      "sha256": "a4f9607eef8894396e1f62987eacfde1100109047c634d97646108a4baa8e268"
+    },
+    "contract/fixture-preparation/cases/16777216/fixture-command/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/16777216/fixture-command/stdout": {
+      "bytes": 219,
+      "sha256": "6419c1a4b585a8aae33dacfb30c09762add8d66a2f1ca738f6d0f3383d70add5"
+    },
+    "contract/fixture-preparation/cases/16777216/input.wire": {
+      "bytes": 16777568,
+      "sha256": "d2e7e068d9b336d8cde3683e3dcc37b478145ff76e8a873652d0d09e0d73b026"
+    },
+    "contract/fixture-preparation/cases/4096/case-spec.json": {
+      "bytes": 44493,
+      "sha256": "eeea6566a33e03e7d5731d82164b76c5f11051cb2cd5dc7db3cccfd921b29fce"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/adapter-receipt.json": {
+      "bytes": 3273,
+      "sha256": "b3885869cf32ba9c631d404cfdda69c0a4b68c6f5709eb4a593c20d3317986a3"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/normalized.json": {
+      "bytes": 2732,
+      "sha256": "47d6fd1e3abcd7b67553be9d281b45b4c3abb047e7c6e783a4581c3d39daa99a"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/outputs/output-0.wire": {
+      "bytes": 4448,
+      "sha256": "d5bea70f9b04293838e43bb8c53bbf5b4c1dbd9679808b8471a994fd7bcd66f1"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/receipt.json": {
+      "bytes": 3014,
+      "sha256": "32151970d69f41d9bb3a42c5ee1833b76be55280f05d850fc84dc52984e8f328"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/4096/commands/j000000/stdout": {
+      "bytes": 1422,
+      "sha256": "bf0fc4876898d4fc0a9e4a270de06b965610f428cc355601ee632c17bd637a21"
+    },
+    "contract/fixture-preparation/cases/4096/data/77070936b350983c1703d220482e89fa0de7093af2301d7b42b5db62dfaec519": {
+      "bytes": 4448,
+      "sha256": "77070936b350983c1703d220482e89fa0de7093af2301d7b42b5db62dfaec519"
+    },
+    "contract/fixture-preparation/cases/4096/data/d5bea70f9b04293838e43bb8c53bbf5b4c1dbd9679808b8471a994fd7bcd66f1": {
+      "bytes": 4448,
+      "sha256": "d5bea70f9b04293838e43bb8c53bbf5b4c1dbd9679808b8471a994fd7bcd66f1"
+    },
+    "contract/fixture-preparation/cases/4096/fixture-command/receipt.json": {
+      "bytes": 2636,
+      "sha256": "39376c99e2b18784f9f37fff901569a69705fc924d769b5f118af856c0cf7ae6"
+    },
+    "contract/fixture-preparation/cases/4096/fixture-command/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/4096/fixture-command/stdout": {
+      "bytes": 211,
+      "sha256": "f7de30b766065c0267fc6e7711c750dd66307d50d8f7e9c7569d6080d6d6fc6c"
+    },
+    "contract/fixture-preparation/cases/4096/input.wire": {
+      "bytes": 4448,
+      "sha256": "77070936b350983c1703d220482e89fa0de7093af2301d7b42b5db62dfaec519"
+    },
+    "contract/fixture-preparation/cases/65536/case-spec.json": {
+      "bytes": 44636,
+      "sha256": "c533f2d17bb89ad54f9f50d48068e75085ec86326b5f35154ba78e5d5f3035af"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/adapter-receipt.json": {
+      "bytes": 3276,
+      "sha256": "6fc93b779c47c9cc34ba38e328811d9ed16f5fc3663f2f9a32045a2b3c7e5a80"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/normalized.json": {
+      "bytes": 2733,
+      "sha256": "b6ee928eb0100238c3e30abbdd4e287b7ec5d3e70b55e7ec86019e0a263680e8"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/outputs/output-0.wire": {
+      "bytes": 65888,
+      "sha256": "e068a756073ce8f2efb8fe1ef0cf7f7c0d4dbc99ec19e1745a8f1602bdebbbba"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/receipt.json": {
+      "bytes": 3016,
+      "sha256": "6a088da65a33771f9dfaefa53c2199e0287db59052fea34773e9101f45690fcc"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/65536/commands/j000000/stdout": {
+      "bytes": 1422,
+      "sha256": "545fecd384aea881c2ff9147e997739d8cf6678ca9a0eb526772b0cd576363b2"
+    },
+    "contract/fixture-preparation/cases/65536/data/9f4babcbc899ad822896644358e98152cc794ecc1f7f601773eba2206e822d4b": {
+      "bytes": 65888,
+      "sha256": "9f4babcbc899ad822896644358e98152cc794ecc1f7f601773eba2206e822d4b"
+    },
+    "contract/fixture-preparation/cases/65536/data/e068a756073ce8f2efb8fe1ef0cf7f7c0d4dbc99ec19e1745a8f1602bdebbbba": {
+      "bytes": 65888,
+      "sha256": "e068a756073ce8f2efb8fe1ef0cf7f7c0d4dbc99ec19e1745a8f1602bdebbbba"
+    },
+    "contract/fixture-preparation/cases/65536/fixture-command/receipt.json": {
+      "bytes": 2638,
+      "sha256": "c3775833440abdc3b4ddf2a04b0715ac20c0c934910b02712ff70d7fc57eb770"
+    },
+    "contract/fixture-preparation/cases/65536/fixture-command/stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/cases/65536/fixture-command/stdout": {
+      "bytes": 213,
+      "sha256": "04f3d66d37edaa9b63fd7fc8c67c8403aa76edbaa2ae22207077ea9e6c86481d"
+    },
+    "contract/fixture-preparation/cases/65536/input.wire": {
+      "bytes": 65888,
+      "sha256": "9f4babcbc899ad822896644358e98152cc794ecc1f7f601773eba2206e822d4b"
+    },
+    "contract/fixture-preparation/fixture-preparation.json": {
+      "bytes": 16188,
+      "sha256": "e5912d36caa82bd7602588f6a8d6a5ad48b2a28f6f7c2640211a27e89d8bd647"
+    },
+    "contract/fixture-preparation/parent-G1.json": {
+      "bytes": 2765,
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599"
+    },
+    "contract/fixture-preparation/preregister.json": {
+      "bytes": 1140,
+      "sha256": "6cff17891b05720658a16e8588bc73c0b5b5634a70231eb27e2151bd9d53f2c1"
+    },
+    "contract/fixture-preparation/protocol/network_measurement.py": {
+      "bytes": 83356,
+      "sha256": "c53e484f9459cf0dc4e8d4e33c6b582fd8b4fa316c04023638b238d1dfa6dc59"
+    },
+    "contract/fixture-preparation/protocol/paired_measurement.py": {
+      "bytes": 31083,
+      "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+    },
+    "contract/fixture-preparation/queue/events.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "contract/fixture-preparation/queue/manifest.json": {
+      "bytes": 912,
+      "sha256": "ac0ca10d5b069a417edaa4bd2212205004bd8937a656cc3c76a4482a9f164a72"
+    },
+    "contract/fixture-preparation/queue/request.json": {
+      "bytes": 1705,
+      "sha256": "54988bac7400661305111a5fd236be5987557cf4fdbaea0b70edcdb9a61f1729"
+    },
+    "contract/fixture-preparation/queue/result.json": {
+      "bytes": 452,
+      "sha256": "827164a5b9d0deecf18d8f188726bc8002aaa38182f07cc86f95d5a7e43c48e7"
+    },
+    "contract/fixture-preparation/queue/stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contract/fixture-preparation/queue/stdout.log": {
+      "bytes": 132,
+      "sha256": "cc283538782c965d6cc9887090c303760031d6976a491d5054f8f135ddbfadbf"
+    },
+    "contract/fixture-preparation/queue/supervisor.log": {
+      "bytes": 410,
+      "sha256": "27f1d8f15c3376234a04b1c47466b6300f6a268dcb28ef5d5a183b9bcc34ec6a"
+    },
+    "contract/model_subcases.json": {
+      "bytes": 65234,
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8"
+    },
+    "contract/selection/acceptance.json": {
+      "bytes": 4309,
+      "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba"
+    },
+    "contract/selection/result.json": {
+      "bytes": 331154,
+      "sha256": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25"
+    },
+    "contract/selection/summary.json": {
+      "bytes": 73245,
+      "sha256": "053ec410d8b24da50e428c4d4919697390ce7d490f33c130ff991cbfb666e069"
+    },
+    "data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f": {
+      "bytes": 1048928,
+      "sha256": "14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f"
+    },
+    "data/cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a": {
+      "bytes": 1048928,
+      "sha256": "cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a"
+    },
+    "protocol/bind_network_window.py": {
+      "bytes": 50119,
+      "sha256": "dcf8ea7b103647e1ff8429bfd9999f20ed91dc4f0f7d64d08c79a36fa09b3bef"
+    },
+    "protocol/collector-runtime.json": {
+      "bytes": 457,
+      "sha256": "52e85bc8be014682406920fc26f1c8199a18d4a6c1a7cd34b13e2d9c6b712c29"
+    },
+    "protocol/network-preregister.json": {
+      "bytes": 6473,
+      "sha256": "bed58a0adf44cfa1e1a3e3d76387b67ebd4c93f578974c923007aeb796d72126"
+    },
+    "protocol/network-tools-inventory.json": {
+      "bytes": 590,
+      "sha256": "ca6cbecd52fbc034fab9c5943466f78e70a03881e56e81d9747e99cef8e88781"
+    },
+    "protocol/network_measurement.py": {
+      "bytes": 91724,
+      "sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84"
+    },
+    "protocol/paired_measurement.py": {
+      "bytes": 31083,
+      "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+    },
+    "protocol/run_job.py": {
+      "bytes": 16898,
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+    },
+    "protocol/test_bind_network_window.py": {
+      "bytes": 29270,
+      "sha256": "e45f83059745f8c4b7350395b2500259544303e59b507a6202a8bb4724e224d4"
+    },
+    "protocol/test_network_measurement.py": {
+      "bytes": 66669,
+      "sha256": "e62ae1f908997420900131fcf0c6f568fef3b64df511bea9ff8c13819ef51152"
+    },
+    "w1-build/COMPLETE": {
+      "bytes": 65,
+      "sha256": "66fc0476e801f9a598aeaaf8bb7275d57c32d5c07b7f7c325a957e91970e8ded"
+    },
+    "w1-build/compile.stderr": {
+      "bytes": 319,
+      "sha256": "407c15ee20a53fd2cdfd3b6e68ebc831fe44e0c7a2208ba77d720ba66411ce5b"
+    },
+    "w1-build/compile.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "w1-build/dependencies.json": {
+      "bytes": 117168,
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97"
+    },
+    "w1-build/net_reference": {
+      "bytes": 325424,
+      "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18"
+    },
+    "w1-build/prepared-result.json": {
+      "bytes": 1961,
+      "sha256": "2af642fcd617b1fa193873b46f2892549e8d9dabcd457953bae2b8f7d5ac65fd"
+    },
+    "w1-build/result.json": {
+      "bytes": 5562,
+      "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc"
+    },
+    "w1-build/source-inventory.json": {
+      "bytes": 1021,
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508"
+    },
+    "w1-build/source/LICENSE": {
+      "bytes": 1061,
+      "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973"
+    },
+    "w1-build/source/contract.json": {
+      "bytes": 99703,
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718"
+    },
+    "w1-build/source/frame_model.hpp": {
+      "bytes": 18201,
+      "sha256": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb"
+    },
+    "w1-build/source/frame_model_tests.hpp": {
+      "bytes": 41487,
+      "sha256": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c"
+    },
+    "w1-build/source/model_subcases.json": {
+      "bytes": 65234,
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8"
+    },
+    "w1-build/source/net_reference.cpp": {
+      "bytes": 44678,
+      "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf"
+    },
+    "w1-build/source/run_network.py": {
+      "bytes": 43161,
+      "sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477"
+    },
+    "w1-build/source/test_run_network.py": {
+      "bytes": 27935,
+      "sha256": "8613cf4338c5ee8c5e29f6981d7ac07c40d8f0ab5e6479807cdada529f2b3394"
+    },
+    "w1-build/source/toolchains/vm-validation.json": {
+      "bytes": 2989,
+      "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7"
+    },
+    "w1-build/source/xoffset_virtual_memory.hpp": {
+      "bytes": 19239,
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    },
+    "w1-build/source/xoffsetdatastructure.hpp": {
+      "bytes": 183050,
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+    },
+    "w1-build/toolchain.json": {
+      "bytes": 914,
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4"
+    },
+    "w1-functional/COMPLETE": {
+      "bytes": 65,
+      "sha256": "81e9ab1e21547ec1a8d4528716423f694c25ebb7afc6c2ea21458bedbb03c671"
+    },
+    "w1-functional/build/COMPLETE": {
+      "bytes": 65,
+      "sha256": "66fc0476e801f9a598aeaaf8bb7275d57c32d5c07b7f7c325a957e91970e8ded"
+    },
+    "w1-functional/build/compile.stderr": {
+      "bytes": 319,
+      "sha256": "407c15ee20a53fd2cdfd3b6e68ebc831fe44e0c7a2208ba77d720ba66411ce5b"
+    },
+    "w1-functional/build/compile.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "w1-functional/build/dependencies.json": {
+      "bytes": 117168,
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97"
+    },
+    "w1-functional/build/net_reference": {
+      "bytes": 325424,
+      "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18"
+    },
+    "w1-functional/build/prepared-result.json": {
+      "bytes": 1961,
+      "sha256": "2af642fcd617b1fa193873b46f2892549e8d9dabcd457953bae2b8f7d5ac65fd"
+    },
+    "w1-functional/build/result.json": {
+      "bytes": 5562,
+      "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc"
+    },
+    "w1-functional/build/source-inventory.json": {
+      "bytes": 1021,
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508"
+    },
+    "w1-functional/build/source/LICENSE": {
+      "bytes": 1061,
+      "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973"
+    },
+    "w1-functional/build/source/contract.json": {
+      "bytes": 99703,
+      "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718"
+    },
+    "w1-functional/build/source/frame_model.hpp": {
+      "bytes": 18201,
+      "sha256": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb"
+    },
+    "w1-functional/build/source/frame_model_tests.hpp": {
+      "bytes": 41487,
+      "sha256": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c"
+    },
+    "w1-functional/build/source/model_subcases.json": {
+      "bytes": 65234,
+      "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8"
+    },
+    "w1-functional/build/source/net_reference.cpp": {
+      "bytes": 44678,
+      "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf"
+    },
+    "w1-functional/build/source/run_network.py": {
+      "bytes": 43161,
+      "sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477"
+    },
+    "w1-functional/build/source/test_run_network.py": {
+      "bytes": 27935,
+      "sha256": "8613cf4338c5ee8c5e29f6981d7ac07c40d8f0ab5e6479807cdada529f2b3394"
+    },
+    "w1-functional/build/source/toolchains/vm-validation.json": {
+      "bytes": 2989,
+      "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7"
+    },
+    "w1-functional/build/source/xoffset_virtual_memory.hpp": {
+      "bytes": 19239,
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    },
+    "w1-functional/build/source/xoffsetdatastructure.hpp": {
+      "bytes": 183050,
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+    },
+    "w1-functional/build/toolchain.json": {
+      "bytes": 914,
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4"
+    },
+    "w1-functional/cases/backpressure.wire": {
+      "bytes": 2097504,
+      "sha256": "91dd476082b355e334ab7af76c11106b60f6c82971ff48da71a3a3e2f84fa47b"
+    },
+    "w1-functional/cases/cold/output-0.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/cold/output-1.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/fragmented/output-0.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/fragmented/output-1.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/input.wire": {
+      "bytes": 1384,
+      "sha256": "f43bd4af8d2c83e01642fc9c5b245c0651566bf97f7cc904124f2f2ee7fb3d14"
+    },
+    "w1-functional/cases/none/output-0.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/none/output-1.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/protected.wire.pending": {
+      "bytes": 8,
+      "sha256": "2b7847b7b705781d7cf21a05e9c1bb37cbf078aea103bc3edcc6aca52ab65453"
+    },
+    "w1-functional/cases/warm/output-0.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/cases/warm/output-1.wire": {
+      "bytes": 1384,
+      "sha256": "428741742c934ceddb4f1254dcd7198e5a903d3f63603f2fe00cd1cfc1446cae"
+    },
+    "w1-functional/result.json": {
+      "bytes": 5694,
+      "sha256": "671fdc3e0d33119ee402ff37a2190674a65c5b6893db31537e1506e4e2eceb3d"
+    },
+    "w1-functional/smoke.json": {
+      "bytes": 123657,
+      "sha256": "56c35d843704df6c9bb99f7a961be97a324dd3e85f65e16a58021c6e6c622c40"
+    },
+    "w1-functional/smoke.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "w1-functional/smoke.stdout": {
+      "bytes": 92509,
+      "sha256": "29fea874eb9543af8817eaa0811a5af3f95614504ed3dc0fd02ff89a0b62f958"
+    }
+  },
+  "baseline_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "binding_design": "independent one-MiB none/cold/warm screening; prior qualification selects range only; both contrasts calibrate locally with three-anchor side drift; no adoption",
+  "binding_mode": "pool-screening-1m",
+  "binding_protocol_identity": {
+    "binder_sha256": "dcf8ea7b103647e1ff8429bfd9999f20ed91dc4f0f7d64d08c79a36fa09b3bef",
+    "binder_tests_sha256": "e45f83059745f8c4b7350395b2500259544303e59b507a6202a8bb4724e224d4"
+  },
+  "build_execution_root": "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2",
+  "collector_execution_path": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-tools-v3/network_measurement.py",
+  "collector_runtime": {
+    "interpreter": {
+      "bytes": 52640,
+      "path": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "resolved_path": "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+      "sha256": "2cbb3ee843d8abcf93ed35bb9102391f18eefccb03d47908547bd8db67bc395c",
+      "version": "3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]"
+    },
+    "schema": "w1-collector-runtime",
+    "schema_version": 1
+  },
+  "comparisons": [
+    {
+      "calibration": "F-none",
+      "id": "none-cold",
+      "left": "F-none",
+      "right": "F-cold"
+    },
+    {
+      "calibration": "F-none",
+      "id": "none-warm",
+      "left": "F-none",
+      "right": "F-warm"
+    }
+  ],
+  "conditions": {
+    "F-cold": {
+      "pool": "cold",
+      "profile": "timing",
+      "variant": "F"
+    },
+    "F-none": {
+      "pool": "none",
+      "profile": "timing",
+      "variant": "F"
+    },
+    "F-warm": {
+      "pool": "warm",
+      "profile": "timing",
+      "variant": "F"
+    }
+  },
+  "contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+  "contract_version": "1.0.0",
+  "controls": {
+    "connection": "one persistent TCP IPv4 loopback connection, one in-flight request",
+    "max_inflight_bytes": 134217728,
+    "max_wire_bytes": 33554432,
+    "owner_capacity_bytes": 33554432,
+    "pool_idle_reserved_bytes": 67239936,
+    "processing_id": "fixture_value/processed_value/markers/labels/exact-values-v1",
+    "schema_id": "n7.reference.file-pipeline.v1"
+  },
+  "environment_policy": {
+    "collection": "window edges only; outside producer timers",
+    "commands": {
+      "cpu": [
+        "/usr/sbin/sysctl",
+        "hw.ncpu",
+        "hw.logicalcpu",
+        "hw.physicalcpu",
+        "hw.cpufrequency"
+      ],
+      "power": [
+        "/usr/bin/pmset",
+        "-g",
+        "batt"
+      ],
+      "processes": [
+        "/bin/ps",
+        "-axo",
+        "pid=,ppid=,pcpu=,comm="
+      ],
+      "thermal": [
+        "/usr/bin/pmset",
+        "-g",
+        "therm"
+      ]
+    },
+    "max_probe_seconds": 3,
+    "max_retained_bytes_per_stream": 1048576,
+    "schema_version": 1
+  },
+  "evidence_class": "native",
+  "exclusions": [
+    "pool preparation",
+    "connection setup including worker creation",
+    "warmup",
+    "client response string destruction",
+    "immutable client request string destruction",
+    "persistent worker creation and final join",
+    "pool/connection destruction",
+    "input read/preflight/checksum",
+    "output file writes",
+    "process startup/JSON serialization/scheduler gaps"
+  ],
+  "execution_root": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1",
+  "expected_data": {
+    "1048576": {
+      "elements": 262144,
+      "input_bytes": 1048928,
+      "input_sha256": "14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "output_bytes": 1048928,
+      "output_sha256": "cef0c0ff105dbd99a2f1331e46c707cbfc7dd511f2b6de2d14a89d9357773d0a",
+      "processing_id": "fixture_value/processed_value/markers/labels/exact-values-v1",
+      "schema_id": "n7.reference.file-pipeline.v1",
+      "semantic_checksum": "7764963542867500290"
+    }
+  },
+  "gate_revision": 2,
+  "identities": {
+    "F-cold": {
+      "binary": "w1-build/net_reference",
+      "source_manifest": "w1-build/source-inventory.json",
+      "toolchain_manifest": "w1-build/toolchain.json"
+    },
+    "F-none": {
+      "binary": "w1-build/net_reference",
+      "source_manifest": "w1-build/source-inventory.json",
+      "toolchain_manifest": "w1-build/toolchain.json"
+    },
+    "F-warm": {
+      "binary": "w1-build/net_reference",
+      "source_manifest": "w1-build/source-inventory.json",
+      "toolchain_manifest": "w1-build/toolchain.json"
+    }
+  },
+  "invocations": {
+    "j000000": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000000/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000001": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000001/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000002": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000002/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000003": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000003/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000004": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000004/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000005": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000005/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000006": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000006/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000007": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000007/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000008": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000008/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000009": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000009/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000010": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000010/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000011": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000011/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000012": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000012/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000013": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000013/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000014": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000014/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000015": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000015/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000016": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000016/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000017": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000017/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000018": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000018/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000019": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000019/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000020": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000020/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000021": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000021/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000022": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000022/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000023": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000023/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000024": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000024/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000025": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000025/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000026": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000026/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000027": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000027/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000028": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000028/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000029": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000029/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000030": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000030/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000031": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000031/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000032": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000032/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000033": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000033/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000034": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000034/outputs",
+      "--pool",
+      "cold",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000035": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000035/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000036": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000036/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000037": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000037/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000038": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000038/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000039": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000039/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000040": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000040/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000041": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000041/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000042": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000042/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000043": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000043/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000044": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000044/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000045": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000045/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000046": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000046/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000047": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000047/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000048": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000048/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000049": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000049/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000050": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000050/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000051": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000051/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000052": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000052/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000053": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000053/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000054": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000054/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000055": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000055/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000056": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000056/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000057": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000057/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000058": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000058/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000059": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000059/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000060": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000060/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000061": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000061/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000062": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000062/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000063": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000063/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000064": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000064/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000065": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000065/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000066": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000066/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000067": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000067/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000068": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000068/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000069": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000069/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000070": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000070/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000071": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000071/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000072": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000072/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000073": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000073/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000074": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000074/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000075": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000075/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000076": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000076/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000077": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000077/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000078": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000078/outputs",
+      "--pool",
+      "warm",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000079": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000079/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000080": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000080/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000081": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000081/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000082": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000082/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000083": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000083/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000084": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000084/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000085": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000085/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000086": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000086/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ],
+    "j000087": [
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+      "run",
+      "--input",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f",
+      "--out-dir",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000087/outputs",
+      "--pool",
+      "none",
+      "--iterations",
+      "4",
+      "--max-wire",
+      "33554432",
+      "--owner-capacity",
+      "33554432",
+      "--max-inflight-bytes",
+      "134217728",
+      "--timeout-ms",
+      "5000"
+    ]
+  },
+  "limits": [
+    "synthetic reference only",
+    "no production p99",
+    "no business benefit or adoption from one window"
+  ],
+  "max_retained_output_bytes": 2147483648,
+  "metric_boundary": "client immediately before request send through complete response receive, load_verified and exact marker/count/label/each-value verification",
+  "model_subcases_sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+  "native_execution_authorized": false,
+  "parent_approval_schema": {
+    "accepted_inputs": "<complete frozen input inventory>",
+    "build_result_sha256": "<accepted timing build result digest>",
+    "contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "evidence_class": "native-posix-tcp-loopback",
+    "execution_root": "<unique original absolute window archive root>",
+    "functional_result_sha256": "<accepted timing smoke result digest>",
+    "limits": [
+      "one preregistered local POSIX loopback window; no adoption",
+      "client response string destruction",
+      "immutable client request string destruction",
+      "persistent worker creation and final join",
+      "pool/connection destruction",
+      "input read/preflight/checksum",
+      "output file writes",
+      "process startup/JSON serialization/scheduler gaps"
+    ],
+    "model_subcases_sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+    "native_execution_authorized": true,
+    "preregister_sha256": "<digest>",
+    "queue_lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+    "queue_receipt_out": "<unique original absolute outer queue receipt root>",
+    "queue_timeout_seconds": "<positive finite bound>",
+    "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "schema": "vm-network-parent-measurement-approval",
+    "schema_version": 1,
+    "source_and_functionality_accepted": true,
+    "status": "approved",
+    "window_command": [
+      "<exact root-owned window collector argv>"
+    ],
+    "window_id": "<unique preregistered window id>"
+  },
+  "paths": {
+    "binary": "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference",
+    "inputs": {
+      "1048576": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/data/14ca67655743fb6886a3af9c29fd6241cc5bd0b2b1522216bede44b9a22e471f"
+    },
+    "outputs": {
+      "j000000": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000000/outputs",
+      "j000001": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000001/outputs",
+      "j000002": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000002/outputs",
+      "j000003": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000003/outputs",
+      "j000004": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000004/outputs",
+      "j000005": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000005/outputs",
+      "j000006": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000006/outputs",
+      "j000007": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000007/outputs",
+      "j000008": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000008/outputs",
+      "j000009": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000009/outputs",
+      "j000010": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000010/outputs",
+      "j000011": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000011/outputs",
+      "j000012": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000012/outputs",
+      "j000013": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000013/outputs",
+      "j000014": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000014/outputs",
+      "j000015": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000015/outputs",
+      "j000016": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000016/outputs",
+      "j000017": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000017/outputs",
+      "j000018": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000018/outputs",
+      "j000019": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000019/outputs",
+      "j000020": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000020/outputs",
+      "j000021": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000021/outputs",
+      "j000022": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000022/outputs",
+      "j000023": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000023/outputs",
+      "j000024": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000024/outputs",
+      "j000025": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000025/outputs",
+      "j000026": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000026/outputs",
+      "j000027": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000027/outputs",
+      "j000028": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000028/outputs",
+      "j000029": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000029/outputs",
+      "j000030": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000030/outputs",
+      "j000031": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000031/outputs",
+      "j000032": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000032/outputs",
+      "j000033": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000033/outputs",
+      "j000034": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000034/outputs",
+      "j000035": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000035/outputs",
+      "j000036": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000036/outputs",
+      "j000037": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000037/outputs",
+      "j000038": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000038/outputs",
+      "j000039": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000039/outputs",
+      "j000040": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000040/outputs",
+      "j000041": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000041/outputs",
+      "j000042": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000042/outputs",
+      "j000043": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000043/outputs",
+      "j000044": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000044/outputs",
+      "j000045": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000045/outputs",
+      "j000046": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000046/outputs",
+      "j000047": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000047/outputs",
+      "j000048": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000048/outputs",
+      "j000049": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000049/outputs",
+      "j000050": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000050/outputs",
+      "j000051": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000051/outputs",
+      "j000052": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000052/outputs",
+      "j000053": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000053/outputs",
+      "j000054": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000054/outputs",
+      "j000055": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000055/outputs",
+      "j000056": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000056/outputs",
+      "j000057": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000057/outputs",
+      "j000058": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000058/outputs",
+      "j000059": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000059/outputs",
+      "j000060": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000060/outputs",
+      "j000061": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000061/outputs",
+      "j000062": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000062/outputs",
+      "j000063": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000063/outputs",
+      "j000064": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000064/outputs",
+      "j000065": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000065/outputs",
+      "j000066": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000066/outputs",
+      "j000067": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000067/outputs",
+      "j000068": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000068/outputs",
+      "j000069": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000069/outputs",
+      "j000070": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000070/outputs",
+      "j000071": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000071/outputs",
+      "j000072": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000072/outputs",
+      "j000073": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000073/outputs",
+      "j000074": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000074/outputs",
+      "j000075": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000075/outputs",
+      "j000076": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000076/outputs",
+      "j000077": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000077/outputs",
+      "j000078": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000078/outputs",
+      "j000079": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000079/outputs",
+      "j000080": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000080/outputs",
+      "j000081": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000081/outputs",
+      "j000082": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000082/outputs",
+      "j000083": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000083/outputs",
+      "j000084": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000084/outputs",
+      "j000085": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000085/outputs",
+      "j000086": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000086/outputs",
+      "j000087": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/network-pool-screening-1m-v1/commands/j000087/outputs"
+    }
+  },
+  "policy": {
+    "absolute_anchor_drift_relative_limit": 0.01,
+    "adoption_gain_threshold": 0.05,
+    "calibration_pairs_per_anchor": 4,
+    "child_timeout_seconds": 180,
+    "default_regression_budget": 0.02,
+    "dispersion_relative_limit": 0.05,
+    "max_processes": 400,
+    "max_window_seconds": 900,
+    "measured_pairs": 8,
+    "minimum_confirmation_windows": 3,
+    "minimum_window_gap_seconds": 60,
+    "noise_relative_limit": 0.05,
+    "retry_failed_calibration": false,
+    "warmup_pairs": 2
+  },
+  "primary_metric": "reclamation_adjusted_mean_ns",
+  "producer_identity": {
+    "binary_sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18",
+    "dependencies_sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+    "source_inventory_sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+    "toolchain_sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4"
+  },
+  "profile": "network",
+  "purpose": "screening",
+  "queue_receipt_out": "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/queue-network-pool-screening-1m-v1",
+  "queue_runner_execution_path": "/Users/fanchensu/XOffsetDatastructure/experiments/vm_coordination/run_job.py",
+  "ready": true,
+  "retained_output_bytes_expected": 369222656,
+  "runtime_status": "ready_for_parent_review",
+  "schema_version": 1,
+  "selection_lineage": {
+    "acceptance_sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+    "comparison_execution_authorized": false,
+    "previous_approval_sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+    "qualification_carryover": false,
+    "reviewed_sha256": {
+      "result.json": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+      "summary.json": "053ec410d8b24da50e428c4d4919697390ce7d490f33c130ff991cbfb666e069"
+    },
+    "scope": "prior one-MiB pass selects scope only; each new contrast requires its own three-anchor A/A and left/right/pooled drift gates",
+    "selected_workload": {
+      "elements": 262144,
+      "id": "1048576",
+      "iterations": 4,
+      "nominal_bytes": 1048576
+    }
+  },
+  "timeout_ms": 5000,
+  "timing_unit": "ns",
+  "unmeasured_costs": [
+    "client response string destruction",
+    "immutable client request string destruction",
+    "persistent worker creation and final join",
+    "pool/connection destruction",
+    "input read/preflight/checksum",
+    "output file writes",
+    "process startup/JSON serialization/scheduler gaps"
+  ],
+  "w1_accepted_archive_members": {
+    "build": {
+      "bytes": 5562,
+      "path": "build/vm-network/timing-v2/result.json",
+      "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc"
+    },
+    "functional": {
+      "bytes": 5694,
+      "path": "build/vm-network/smoke-timing-v2/result.json",
+      "sha256": "671fdc3e0d33119ee402ff37a2190674a65c5b6893db31537e1506e4e2eceb3d"
+    },
+    "manifest_sha256": "6731937b60f038462649e2b6c20ebb59e9c893c203ac0c08550c07b0abb8c74b"
+  },
+  "whole_lifecycle_available": false,
+  "window_id": "network-pool-screening-1m-1",
+  "window_ordinal": 1,
+  "workloads": [
+    {
+      "elements": 262144,
+      "id": "1048576",
+      "iterations": 4,
+      "nominal_bytes": 1048576
+    }
+  ]
+}

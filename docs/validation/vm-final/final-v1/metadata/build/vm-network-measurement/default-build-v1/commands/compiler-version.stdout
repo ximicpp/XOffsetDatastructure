@@ -1,0 +1,5 @@
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /usr/local/bin
+Build config: +assertions

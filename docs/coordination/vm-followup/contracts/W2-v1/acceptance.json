@@ -1,0 +1,19 @@
+{
+  "role": "W2",
+  "status": "accepted_interface_only",
+  "accepted_at": "2026-10-15T15:25:55.220010+00:00",
+  "sha256": {
+    "contract.json": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "coverage.json": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9"
+  },
+  "source": "experiments/vm_observability",
+  "scope": "Frozen W3 integration interface; not G1 semantic, build, evidence, timing or performance acceptance.",
+  "review": "Parent and independent read-only review accepted all four interface revisions.",
+  "remaining": [
+    "Validate actual traces and original-F parity",
+    "Validate lifetime generations and allocation ledger including shared domains 2/3/4",
+    "Exercise fixed-probe and supported custom trace audits/negative controls",
+    "Freeze source/build/evidence before cost interpretation"
+  ]
+}
