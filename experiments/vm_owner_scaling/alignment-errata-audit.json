@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "status": "offline_corrected_audit_passed",
+  "scope": "active native-Apple-arm64 checker/fixture alignment erratum only; original compiled source/binaries/evidence unchanged",
+  "api_unchanged": "audit_record(record, *, expected_profile=None, expected_condition=None, expected_control=\"none\") -> dict; raises AuditError(ValueError)",
+  "native_executions": 0,
+  "cpp_builds": 0,
+  "formal_timing_runs": 0,
+  "original_native_attempt_consumption_unchanged": 1,
+  "geometry_profile": {
+    "name": "fixed_native_apple_arm64_effective_alignment8",
+    "effective_alignment": 8,
+    "initial_used_end": 48,
+    "stride_bytes": 24,
+    "user_offset_j": "64+24*j",
+    "core_new_end_j": "72+24*j",
+    "used_end_after_n": "48+24*n",
+    "free_after": "65488 after every successful corresponding free",
+    "policy": "fixed source/compiler/ABI expectation; no adaptive inference from input trace; wrong32stride fixture rejected"
+  },
+  "active_sources_sha256": {
+    "experiments/vm_owner_scaling/audit_owner_scaling.py": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+    "experiments/vm_owner_scaling/test_audit_owner_scaling.py": "56199206a26c811b327f0ab9012edf38b7f94f11e9542ae63ad2891feac09e56"
+  },
+  "original_native_record": {
+    "path": "build/vm-owner-scaling/collection-v1/group-00/diagnostic-r256-o8-t1.stdout",
+    "sha256_before": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+    "sha256_after": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+    "unchanged": true,
+    "offline_full_workload_audit": "passed",
+    "condition": {
+      "owners": 8,
+      "threads": 1,
+      "requests": 256,
+      "per_owner": 32
+    },
+    "counts": {
+      "threads_started": 1,
+      "threads_joined": 1,
+      "created": 8,
+      "allocated": 256,
+      "freed": 256,
+      "destroyed": 8,
+      "validated": 256
+    },
+    "checksum": "8565427578676381477",
+    "event_count": 1981,
+    "thread_count": 1,
+    "kind_counts": {
+      "core_metadata_capacity": 264,
+      "core_new": 256,
+      "core_return": 256,
+      "grow_zero": 8,
+      "host_allocate": 59,
+      "host_deallocate": 58,
+      "os_enable": 8,
+      "os_reserve": 8,
+      "os_unmap": 8,
+      "registry_erase": 8,
+      "registry_lock": 528,
+      "registry_lookup_hit": 512,
+      "registry_register": 8
+    },
+    "registry_peak_active": 8,
+    "registry_end_active": 0,
+    "registry_complete_generations": 8,
+    "outstanding": [
+      {
+        "subject": 4424286416,
+        "domain": 2,
+        "bytes": 88,
+        "origin_owner": 4415684608,
+        "origin_thread": 0,
+        "allocation_sequence": 43,
+        "allocation_phase": "create"
+      }
+    ],
+    "summary_path": "build/vm-owner-scaling/errata-tests-v1/original-native-offline-audit.json",
+    "summary_sha256": "6eb0426019028715af07f59e12b1d33d212acdb5bf68d6b34490958e7391c7a9"
+  },
+  "python_tests": {
+    "synthetic_tests_per_mode": 13,
+    "modes": [
+      "normal",
+      "-O"
+    ],
+    "results": [
+      {
+        "profile": "normal",
+        "argv": [
+          "/opt/homebrew/opt/python@3.14/bin/python3.14",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "experiments/vm_owner_scaling",
+          "-p",
+          "test_audit_owner_scaling.py",
+          "-v"
+        ],
+        "environment": {
+          "PYTHONDONTWRITEBYTECODE": "1"
+        },
+        "returncode": 0,
+        "files_sha256": {
+          "build/vm-owner-scaling/errata-tests-v1/normal.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "build/vm-owner-scaling/errata-tests-v1/normal.stderr": "36ff4f158f43435154f97a5ea2359f01ffa87e2808e4116c8f2667a292363fa4"
+        }
+      },
+      {
+        "profile": "optimized",
+        "argv": [
+          "/opt/homebrew/opt/python@3.14/bin/python3.14",
+          "-O",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "experiments/vm_owner_scaling",
+          "-p",
+          "test_audit_owner_scaling.py",
+          "-v"
+        ],
+        "environment": {
+          "PYTHONDONTWRITEBYTECODE": "1"
+        },
+        "returncode": 0,
+        "files_sha256": {
+          "build/vm-owner-scaling/errata-tests-v1/optimized.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "build/vm-owner-scaling/errata-tests-v1/optimized.stderr": "d457388cd0d4808ca1a0f1fd15971f0c42dbffdb81d636e06e6e34f11b4999bb"
+        }
+      }
+    ],
+    "new_negative_case": "test_wrong_platform32_stride_fixture_rejected",
+    "synthetic_not_native_evidence": true
+  },
+  "protected_inputs_sha256_before": {
+    "build/vm-owner-scaling/prepared-v1/common/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "build/vm-owner-scaling/prepared-v1/common/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "build/vm-owner-scaling/build-v1/common/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "build/vm-owner-scaling/build-v1/common/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "build/vm-owner-scaling/build-v1/result.json": "2c6290e66b2989217db95783839fbd033d4093fe1a8794658a61251493f5aeb6"
+  },
+  "protected_inputs_sha256_after": {
+    "build/vm-owner-scaling/prepared-v1/common/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "build/vm-owner-scaling/prepared-v1/common/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "build/vm-owner-scaling/build-v1/common/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "build/vm-owner-scaling/build-v1/common/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "build/vm-owner-scaling/build-v1/result.json": "2c6290e66b2989217db95783839fbd033d4093fe1a8794658a61251493f5aeb6"
+  },
+  "protected_inputs_unchanged": true,
+  "limitations": [
+    "Only the already executed original first diagnostic stdout was re-audited offline; no native rerun occurred.",
+    "The prior collection failure and original frozen checker/test copies remain preserved.",
+    "This report does not execute or authorize the remaining25 native processes, alter process budgets, or provide formal timing evidence."
+  ],
+  "authorization": {
+    "decision": "D022",
+    "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+    "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+    "first_record_sha256_matches": true,
+    "recompile_required": false,
+    "first_case_retry_authorized": false,
+    "formal_timing_authorized": false
+  }
+}

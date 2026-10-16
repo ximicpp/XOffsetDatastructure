@@ -1,0 +1,1276 @@
+{
+  "classification_counts": {
+    "actual_structural_audit_only": 11,
+    "actual_with_asserted_counts_or_ledger": 29,
+    "declared_catalog_not_executed_this_round": 22,
+    "invalid_control_only": 1
+  },
+  "declared_kinds": 63,
+  "kinds": [
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "auto_growth",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "cache_flush",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "owner_basic bytes=4096; owner_transfer count=0 including empty owner under outer Scope"
+      ],
+      "invalid_controls": [],
+      "kind": "copy_bytes_string_extent",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "core_metadata logical estimate bytes=112"
+      ],
+      "invalid_controls": [],
+      "kind": "core_erase_movement_estimate",
+      "ordinary_runs": [
+        {
+          "case": "core_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_transfer four empty-owner snapshots have owner=0 and bytes=0; other capacities structurally audited"
+      ],
+      "invalid_controls": [],
+      "kind": "core_metadata_capacity",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 11,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 17,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 8,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_basic=1, core_metadata=11, threads=2"
+      ],
+      "invalid_controls": [],
+      "kind": "core_new",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 5,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 11,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 7,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_basic=1, core_metadata=12, failure_metadata=1"
+      ],
+      "invalid_controls": [],
+      "kind": "core_return",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 12,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "failure_metadata=1"
+      ],
+      "invalid_controls": [],
+      "kind": "core_return_failed",
+      "ordinary_runs": [
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "core_metadata=1, threads=2"
+      ],
+      "invalid_controls": [],
+      "kind": "core_reuse",
+      "ordinary_runs": [
+        {
+          "case": "core_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "core_metadata=1, threads=2"
+      ],
+      "invalid_controls": [],
+      "kind": "core_scan",
+      "ordinary_runs": [
+        {
+          "case": "core_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "expand_capacity_failure",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "expand_check",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "expand_existing",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "expand_rejected",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "expand_success",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "extent_request",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "failure_vm completed bytes=65536"
+      ],
+      "invalid_controls": [],
+      "kind": "grow_zero",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "failure_vm",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "core_metadata domain1 calls=7, requested bytes=352, two origin owners; all traces allocation ledger"
+      ],
+      "invalid_controls": [],
+      "kind": "host_allocate",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 10,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 16,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 5,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "runtime_allocator",
+          "count": 1,
+          "source": "docs/validation/vm-observability/runtime-controls-01/allocator.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "failure_registry=1, failure_metadata=1; actual allocator auxiliary=1"
+      ],
+      "invalid_controls": [],
+      "kind": "host_allocate_failed",
+      "ordinary_runs": [
+        {
+          "case": "failure_registry",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "runtime_allocator",
+          "count": 1,
+          "source": "docs/validation/vm-observability/runtime-controls-01/allocator.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "all completed frees match live allocation subject/domain/bytes; fixed probes retain only registry metadata"
+      ],
+      "invalid_controls": [],
+      "kind": "host_deallocate",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 9,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 15,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "runtime_allocator",
+          "count": 1,
+          "source": "docs/validation/vm-observability/runtime-controls-01/allocator.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "copy_wire count=3"
+      ],
+      "invalid_controls": [],
+      "kind": "load_header_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "copy_wire count=2 and bytes=2*payload_bytes=1200"
+      ],
+      "invalid_controls": [],
+      "kind": "load_payload_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_advise",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_advise_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_enable",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "failure_vm",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_enable_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_protect",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_protect_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_reclaim",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_reclaim_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "failure_vm os_replace+os_reclaim count=1 (macOS actual os_replace1)"
+      ],
+      "invalid_controls": [],
+      "kind": "os_replace",
+      "ordinary_runs": [
+        {
+          "case": "pool_reclaim",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "failure_vm",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_replace_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_reserve",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "failure_vm",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_reserve_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "pool_reclaim count>=2 (actual2)"
+      ],
+      "invalid_controls": [],
+      "kind": "os_unmap",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "pool_reclaim",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "failure_vm",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "os_unmap_failed",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [
+        {
+          "case": "recorder_overflow",
+          "count": 16384,
+          "source": "docs/validation/vm-observability/collection-06/recorder_overflow-diagnostic.stdout"
+        }
+      ],
+      "kind": "overflow_control",
+      "ordinary_runs": [],
+      "status": "invalid_control_only"
+    },
+    {
+      "assertions": [
+        "pool_reclaim count>=5 (actual8); waits/holds not performance evidence"
+      ],
+      "invalid_controls": [],
+      "kind": "pool_lock",
+      "ordinary_runs": [
+        {
+          "case": "pool_reclaim",
+          "count": 8,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "pool_reclaim count=1"
+      ],
+      "invalid_controls": [],
+      "kind": "pool_scan",
+      "ordinary_runs": [
+        {
+          "case": "pool_reclaim",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/pool_reclaim-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_basic=1, core_metadata=2, threads=2, owner_transfer=2; active registry empty at fixed-probe dump"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_erase",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [
+        {
+          "case": "runtime_threads",
+          "count": 16,
+          "source": "docs/validation/vm-observability/runtime-controls-01/threads.stdout"
+        },
+        {
+          "case": "runtime_labels",
+          "count": 1,
+          "source": "docs/validation/vm-observability/runtime-controls-01/labels.stdout"
+        }
+      ],
+      "kind": "registry_lock",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 10,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 29,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 14,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 12,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 5,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 6,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [
+        "owner_basic=2; registry ledger checks owner mapping across all traces"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_lookup_hit",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 24,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 8,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 8,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_transfer=1 and exact-zero owner legal constraint"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_lookup_miss",
+      "ordinary_runs": [
+        {
+          "case": "owner_transfer",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_transfer=4; ledger checks base generation and current C++ owner"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_rebind",
+      "ordinary_runs": [
+        {
+          "case": "owner_transfer",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "owner_basic=1, core_metadata=2, threads=2, owner_transfer=2"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_register",
+      "ordinary_runs": [
+        {
+          "case": "owner_basic",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/owner_basic-diagnostic.stdout"
+        },
+        {
+          "case": "owner_transfer",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/owner_transfer-diagnostic.stdout"
+        },
+        {
+          "case": "core_metadata",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/core_metadata-diagnostic.stdout"
+        },
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        },
+        {
+          "case": "threads",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/threads-diagnostic.stdout"
+        },
+        {
+          "case": "failure_registry",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        },
+        {
+          "case": "failure_metadata",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/failure_metadata-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [
+        "failure_registry=2"
+      ],
+      "invalid_controls": [],
+      "kind": "registry_register_failed",
+      "ordinary_runs": [
+        {
+          "case": "failure_registry",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_registry-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "relocate_trivial_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "save_header_append_extent",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "copy_wire count=1"
+      ],
+      "invalid_controls": [],
+      "kind": "save_header_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "save_payload_append_extent",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "copy_wire bytes=payload_bytes=600"
+      ],
+      "invalid_controls": [],
+      "kind": "save_payload_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "string_assign_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [
+        "copy_wire bytes=3"
+      ],
+      "invalid_controls": [],
+      "kind": "string_relocate_copy",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "vector_erase_shift",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "vector_insert_shift",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "vector_insert_staged",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    },
+    {
+      "assertions": [
+        "copy_wire logical completed extent bytes=16"
+      ],
+      "invalid_controls": [],
+      "kind": "vector_relocated_element",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "vector_relocation_attempt",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 4,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [
+        "failure_vm count=2, operation bits=[4,8]"
+      ],
+      "invalid_controls": [],
+      "kind": "vm_injected_failure",
+      "ordinary_runs": [
+        {
+          "case": "failure_vm",
+          "count": 2,
+          "source": "docs/validation/vm-observability/collection-06/failure_vm-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_with_asserted_counts_or_ledger"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "wire_return",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 3,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "wire_reuse",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "wire_scan",
+      "ordinary_runs": [
+        {
+          "case": "copy_wire",
+          "count": 1,
+          "source": "docs/validation/vm-observability/collection-06/copy_wire-diagnostic.stdout"
+        }
+      ],
+      "status": "actual_structural_audit_only"
+    },
+    {
+      "assertions": [],
+      "invalid_controls": [],
+      "kind": "wire_transfer_attempt",
+      "note": "Known-kind/legal-value catalog is loaded and schema constraints are unit-tested generically; this does not execute or verify this C++ path. Linux/Windows and fallback string branches are separate prerequisites where applicable.",
+      "ordinary_runs": [],
+      "status": "declared_catalog_not_executed_this_round"
+    }
+  ],
+  "schema": "n3-event-validation-coverage-v1",
+  "scope": "macOS arm64 explicit frozen SDK26.5; collection06+auxiliary01 only; invalid controls are never cost evidence; generic catalog tests are not per-kind native execution"
+}

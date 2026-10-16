@@ -1,0 +1,986 @@
+{
+  "CAPSULE.md": {
+    "sha256": "e66694d43ede2815d4852ba8713087ebfd1a7bb4f2874cddbc05f1f64caca45c",
+    "bytes": 1953
+  },
+  "cut.json": {
+    "sha256": "cc4f27b11a6838a786ee014e1a486a77dbd04543033e54806fd028cc43df5b65",
+    "bytes": 1334
+  },
+  "final-input-differences.json": {
+    "sha256": "d951d56aae7a06817d32c618bcf01069e9c10f73f28f14c871639cbc5687d532",
+    "bytes": 1960
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/manifest.json": {
+    "sha256": "6c2649f7803a5e65c1e51c8c3499832667454ec7a278bd981a5fbd9366a9f84b",
+    "bytes": 912
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/request.json": {
+    "sha256": "625e34280e687b3ddedaf22f4e404eb76d3d980cce303764d376f32866a5764c",
+    "bytes": 4316
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/result.json": {
+    "sha256": "7b18ef519a2e4709141a391e6b275eeb97b327fd1c6b73a121ca341793c63bd3",
+    "bytes": 453
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-final/queue-final-increment-v1/stdout.log": {
+    "sha256": "a7fb3748ced6fd08e72abdbcbb9cd5676f29139b6090610d1e91d08309b4d87e",
+    "bytes": 256
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/manifest.json": {
+    "sha256": "a350d0ed2f7182ad8673494138e26ead32a130bc34450b922e31891f40f25fd9",
+    "bytes": 914
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/request.json": {
+    "sha256": "0f74bd5217461ae0dc1658b88fb9dd7b1896725ee9bf51ea02dae9882289a55a",
+    "bytes": 1008
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/result.json": {
+    "sha256": "5d30b8d7da5c627f0163258819ecd9bcd4dd22459a4c0e828f2c9013389158c7",
+    "bytes": 453
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-final/queue-input-inspection-v1/stdout.log": {
+    "sha256": "7134ad821767fa8221887baf290abcabade797e44481b5269c80b5c65a49e0cc",
+    "bytes": 12285
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/manifest.json": {
+    "sha256": "7e5576369a0cc42c7d99e72e297f8a9fba8c65492aeefc542d4d14230536e62f",
+    "bytes": 911
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/request.json": {
+    "sha256": "4b1c78e320c6401ed45ff8afdd93d9b50df623f5f0242e8cbac8b1e5f0e8be77",
+    "bytes": 1480
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/result.json": {
+    "sha256": "b30ec903676b1d4d353dca6cf3ce3e264d5e2716b3b8b081a8459f2923314043",
+    "bytes": 451
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-final/queue-metadata-preflight-v1/stdout.log": {
+    "sha256": "7ef0babcc61fdb5ce25f18478fb5c1c600e33ad2a1a8857f0180c04308bf12a4",
+    "bytes": 82
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/manifest.json": {
+    "sha256": "947a109d07b28be9b6e742cb226310d9a7fad40202b010dec06816ff45ab22b8",
+    "bytes": 911
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/request.json": {
+    "sha256": "491f06febb545b608fef36d053bcbc323de62ba3f2ae7e0cd661a5d782febe40",
+    "bytes": 1009
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/result.json": {
+    "sha256": "228c79e479037bce28642f5f4cad52e85a62e5b030dc912b6bf61e6d7a9f0919",
+    "bytes": 453
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-final/queue-preserved-inputs-v1/stdout.log": {
+    "sha256": "4a3688fe8761e4eda394cf971a728642bb5d9dd3263f6fb6b67664a7581cd7b4",
+    "bytes": 78
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/manifest.json": {
+    "sha256": "b3fb8cd47d68ba88d45b9e0f90d17c6e470bfee07abd6a468fbc13a7da9e9c69",
+    "bytes": 913
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/request.json": {
+    "sha256": "5cf1128f86d381db1fa2919c6a24e2041dd4b7e974f6b0e89dc972c420b9d0c0",
+    "bytes": 1054
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/result.json": {
+    "sha256": "140fe111a651c1259533128dfbf64b4af41a9bac3fd8773f403010dc099c51fb",
+    "bytes": 452
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-final/queue-stable-source-v1/stdout.log": {
+    "sha256": "825671fcd38750e1157c9f3bdfd82322483b09f579036a6b8b43bd11c94d193f",
+    "bytes": 1248
+  },
+  "metadata/build/vm-network/diagnostic-v2/dependencies.json": {
+    "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+    "bytes": 117168
+  },
+  "metadata/build/vm-network/diagnostic-v2/result.json": {
+    "sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+    "bytes": 5594
+  },
+  "metadata/build/vm-network/diagnostic-v2/source-inventory.json": {
+    "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+    "bytes": 1021
+  },
+  "metadata/build/vm-network/diagnostic-v2/toolchain.json": {
+    "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+    "bytes": 914
+  },
+  "metadata/build/vm-network/timing-v2/dependencies.json": {
+    "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+    "bytes": 117168
+  },
+  "metadata/build/vm-network/timing-v2/result.json": {
+    "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+    "bytes": 5562
+  },
+  "metadata/build/vm-network/timing-v2/source-inventory.json": {
+    "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+    "bytes": 1021
+  },
+  "metadata/build/vm-network/timing-v2/toolchain.json": {
+    "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+    "bytes": 914
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/binaries.json": {
+    "sha256": "10bba076e0bd5a67b53b216b029c68a7a62f949812c872e0d99e6bf2f62434ef",
+    "bytes": 235
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/commands/D.receipt.json": {
+    "sha256": "9ff063d6159d7cfefd0aeda8e6b0eba7c86c300442eacace6c3db3b30d5284a8",
+    "bytes": 1990
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/commands/F.receipt.json": {
+    "sha256": "77b133d3c424f720873a57333072759010e4b6894bfffe4a412f3749037783dd",
+    "bytes": 1990
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json": {
+    "sha256": "ce2c7466aed719b44e2408d6929b47e0240c6abf215c6bd4eac7f77855160f82",
+    "bytes": 219
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout": {
+    "sha256": "7099cf9d0f52244e0efb313f6c70305be93cd513a2900005b7dbfc6daa765cf5",
+    "bytes": 220
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/execution-context.json": {
+    "sha256": "b8e93df57dadd2b386c4c3b521cfd7e1fb3a5fe9c5e8ff6a3146e115c7b9eb50",
+    "bytes": 1340
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/historical-metadata.json": {
+    "sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed",
+    "bytes": 9091
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/preparation.json": {
+    "sha256": "80294597ae25781da557c2910096cea4551c593d50fe56ccd72fbc1729605d0c",
+    "bytes": 6273
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/frozen/result.json": {
+    "sha256": "0547aac5db4d20ffee3d948cc5116160f710343bcdce1e5d381c68cbccaaecea",
+    "bytes": 2675
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/frozen/runtime.json": {
+    "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67",
+    "bytes": 743884
+  },
+  "metadata/build/vm-network-measurement/default-build-v1/result.json": {
+    "sha256": "9e925ba0e356de831419965c347f76d23a4110c9a7fd268e1847026b9be07015",
+    "bytes": 4773
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/binding.json": {
+    "sha256": "d8533b574825fbe1d6836a069b40aff8f54d9decf8d8a218cb3ff2aa97dd91f4",
+    "bytes": 2332
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json": {
+    "sha256": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+    "bytes": 26707
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/preregister.json": {
+    "sha256": "229d6e6a0634ed3d3e8116df8edabfa501a33f93d40d94a757124ffa139f1e0b",
+    "bytes": 128037
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/proposal-files.json": {
+    "sha256": "ef7a60af4a99925cc5a1cbc5f6d7b68d8e3a7fb75c6be51f638349714547cd27",
+    "bytes": 25516
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/result.json": {
+    "sha256": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+    "bytes": 331154
+  },
+  "metadata/build/vm-network-measurement/network-calibration-v1/schedule.json": {
+    "sha256": "b56b7d9db8cd76352e022855f61848a8c62afcaa0ac41074b70cf987df2b68e5",
+    "bytes": 28227
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/binding.json": {
+    "sha256": "09180925cafc5453158762891b6649d6a77ef601251fbe308533b2991c8f2e4c",
+    "bytes": 2376
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json": {
+    "sha256": "1452d89eb8a6d06d8b66ef2b59b28c8a8cb269d4b334c25f7bddfeaf607a39e2",
+    "bytes": 26051
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/preregister.json": {
+    "sha256": "0c26a2757b718c837b49071abd209803ef7c000e0bf1e186bfeb12962673b5cd",
+    "bytes": 108192
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/proposal-files.json": {
+    "sha256": "c2a4c2cc38ab6b14e398ab5bd2a717aa3253a0ceaa0f8419f7f1a70f14145796",
+    "bytes": 24827
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/result.json": {
+    "sha256": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+    "bytes": 135713
+  },
+  "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/schedule.json": {
+    "sha256": "af59258bb0238521980e25bb897b0a4ead1ceff0d04d1fb5356cea753cfd24cb",
+    "bytes": 22791
+  },
+  "metadata/build/vm-network-measurement/network-tools-v2/source-inventory.json": {
+    "sha256": "7c5da6b1025cf58648060168f4a239e5e225e4a779168fd8088246d32028ffc6",
+    "bytes": 590
+  },
+  "metadata/build/vm-network-measurement/network-tools-v3/source-inventory.json": {
+    "sha256": "ca6cbecd52fbc034fab9c5943466f78e70a03881e56e81d9747e99cef8e88781",
+    "bytes": 590
+  },
+  "metadata/build/vm-observability/network/build-v2/dependencies.d": {
+    "sha256": "57b8ea9986c1b629149cfe1ea1c2c0188d054fd90fe8b841dc3d5672ab834270",
+    "bytes": 73678
+  },
+  "metadata/build/vm-observability/network/build-v2/include-resolution.json": {
+    "sha256": "eba11996347ee2e267b888be9f45dc161b0be1ffe2ca8965f602803496d804c8",
+    "bytes": 734
+  },
+  "metadata/build/vm-observability/network/build-v2/result.json": {
+    "sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+    "bytes": 150112
+  },
+  "metadata/build/vm-owner-measurement/d031/collector-vs-frozen.diff": {
+    "sha256": "f72902cfafe49675bd9e2064f1ba4eb4373b5044fa55c5bede2bfbe363accbd9",
+    "bytes": 4913
+  },
+  "metadata/build/vm-owner-measurement/d031/handoff-before.json": {
+    "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7",
+    "bytes": 5120
+  },
+  "metadata/build/vm-owner-measurement/d031/offline-tests-optimized.log": {
+    "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e",
+    "bytes": 9046
+  },
+  "metadata/build/vm-owner-measurement/d031/offline-tests.log": {
+    "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02",
+    "bytes": 9046
+  },
+  "metadata/build/vm-owner-measurement/d031/small-input-identities.json": {
+    "sha256": "0b2f769fc3f8c967b4c3da00aa87231a7487033567828e599b510c0202a86202",
+    "bytes": 3247
+  },
+  "metadata/build/vm-owner-measurement/native-window.json": {
+    "sha256": "11dbd41c7c829e326003e6204108c11629f6e5a1d533dcc2bd50a9629ec31850",
+    "bytes": 382
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/design.json": {
+    "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+    "bytes": 5498
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/binding.json": {
+    "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+    "bytes": 1471
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/build_result.json": {
+    "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+    "bytes": 549953
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/contract.json": {
+    "sha256": "8b2bfe3b9f0524a200b5fbf7f5cce51bee37ab7c51abbc5748c5ba1f788b8fcf",
+    "bytes": 5853
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/functional_result.json": {
+    "sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+    "bytes": 2026
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/layout_correction.json": {
+    "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+    "bytes": 2816
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/parent_acceptance.json": {
+    "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+    "bytes": 3974
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/recovery_result.json": {
+    "sha256": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8",
+    "bytes": 54960
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/timing.d": {
+    "sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+    "bytes": 69004
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/producer/toolkit_result.json": {
+    "sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+    "bytes": 1732
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/proposal.json": {
+    "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+    "bytes": 145299
+  },
+  "metadata/build/vm-owner-measurement/proposal-v1/schedule.json": {
+    "sha256": "49fb5d0cc634ba48b5fff7966ba2348bb495bb11dce7481724684d24090d1875",
+    "bytes": 14714
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/manifest.json": {
+    "sha256": "c90fab3be2d8f2f70932a1a876d952c27c5ee248b1438c8d6c6c1af94b4cbeac",
+    "bytes": 911
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/request.json": {
+    "sha256": "cf47a3ecad9847acab8aa7b748f76eb7c066d36452cd121eea2db0cd8a2b9cc8",
+    "bytes": 1384
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/result.json": {
+    "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055",
+    "bytes": 452
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stdout.log": {
+    "sha256": "00933f91b35e67b340a0b62d56ae57bdd7501d471f353cb56d8bdf82efdf7011",
+    "bytes": 87
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/manifest.json": {
+    "sha256": "1bd4e6e4039c3b45e3a5a75a8be0e1d35e441c36cf37934fbe2dfc74eda27e00",
+    "bytes": 911
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/request.json": {
+    "sha256": "7bbda87094f510dc021a01953b9a42571f33dec7dd0a2427c64e3335922921d7",
+    "bytes": 1418
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/result.json": {
+    "sha256": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662",
+    "bytes": 451
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/stderr.log": {
+    "sha256": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6",
+    "bytes": 53
+  },
+  "metadata/build/vm-owner-measurement/receipts/archive-v1/stdout.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/events.json": {
+    "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "bytes": 3
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/manifest.json": {
+    "sha256": "f8f9f7fbe1494fc8f0806a4fdc0f6382a8c90b87b01f5aea4f221d939878ae2f",
+    "bytes": 911
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/request.json": {
+    "sha256": "89213cf787b71f196d456fa0fc694266b9205ddb88afd1f1819f681386400ddd",
+    "bytes": 1465
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/result.json": {
+    "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131",
+    "bytes": 448
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/stderr.log": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "metadata/build/vm-owner-measurement/receipts/window-v1/stdout.log": {
+    "sha256": "1954653a90ed6d1b5f4352d5add9cfbb201e678b28af63bd9efff99193a68965",
+    "bytes": 91
+  },
+  "metadata/build/vm-owner-measurement/window-v1/approval.json": {
+    "sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+    "bytes": 688
+  },
+  "metadata/build/vm-owner-measurement/window-v1/summary.json": {
+    "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+    "bytes": 87538
+  },
+  "metadata/build/vm-owner-measurement/window-v1/window.json": {
+    "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869",
+    "bytes": 112372
+  },
+  "metadata/build/vm-owner-scaling/build-v4/diagnostic.d": {
+    "sha256": "1e7c1edf4db009e27e0acaec69c0f944561ee2ae980cd0a3a479951cffe09765",
+    "bytes": 69122
+  },
+  "metadata/build/vm-owner-scaling/build-v4/prebuild-external.json": {
+    "sha256": "b9e6438d29cb8841bc12445f7cd389a03c1b0a147ada3db59027ce55c006fc99",
+    "bytes": 275709
+  },
+  "metadata/build/vm-owner-scaling/build-v4/prepared-result.json": {
+    "sha256": "855058e7a1f86e48aeb1ef606534b6b72896b2f0e81b5f7b3a4374cc4dbe1a1c",
+    "bytes": 4197
+  },
+  "metadata/build/vm-owner-scaling/build-v4/provenance/d018-acceptance.json": {
+    "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+    "bytes": 5343
+  },
+  "metadata/build/vm-owner-scaling/build-v4/provenance/toolchain.json": {
+    "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7",
+    "bytes": 2989
+  },
+  "metadata/build/vm-owner-scaling/build-v4/provenance/w2-acceptance.json": {
+    "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "bytes": 2838
+  },
+  "metadata/build/vm-owner-scaling/build-v4/provenance/w2-build.json": {
+    "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+    "bytes": 144598
+  },
+  "metadata/build/vm-owner-scaling/build-v4/result.json": {
+    "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+    "bytes": 549953
+  },
+  "metadata/build/vm-owner-scaling/build-v4/timing.d": {
+    "sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+    "bytes": 69004
+  },
+  "metadata/build/vm-owner-scaling/final-audit-v1.json": {
+    "sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+    "bytes": 2026
+  },
+  "metadata/build/vm-owner-scaling/recovery-v2/result.json": {
+    "sha256": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8",
+    "bytes": 54960
+  },
+  "metadata/build/vm-owner-scaling/tooling-errata-v2/result.json": {
+    "sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+    "bytes": 1732
+  },
+  "metadata/docs/STABLE_VM_STORAGE_DESIGN.md": {
+    "sha256": "fe9b2f33d1a0048e5bf5ea06e392e46868b3e6a5d10b6f0e7635dfc11ce55aa6",
+    "bytes": 9161
+  },
+  "metadata/docs/STABLE_VM_STORAGE_MIGRATION.md": {
+    "sha256": "8d9044b9703713e677712e76d982860c544e2bade2436a3de15b873c3a0950ba",
+    "bytes": 11445
+  },
+  "metadata/docs/STABLE_VM_STORAGE_VALIDATION.md": {
+    "sha256": "67ab164abef86aa1b4fd26e9c8f530a58b9acdb097dcde8ade837a2cf437b793",
+    "bytes": 15515
+  },
+  "metadata/docs/VM_EVIDENCE_ERRATA.md": {
+    "sha256": "2a3890022ee2f060163182fc163cfc3d2e4657bb06f9c30d067c5695f408783f",
+    "bytes": 796
+  },
+  "metadata/docs/VM_FINAL_DELIVERY.md": {
+    "sha256": "459a01465300928459a417c1d330e1d2ae079225adb536b1373aab000fab705c",
+    "bytes": 28239
+  },
+  "metadata/docs/VM_FOLLOWUP_ORCHESTRATION.md": {
+    "sha256": "267f53c90290459c2500d99bc0b516e7d11d40cea9716ac8c6116755e3f6abf7",
+    "bytes": 20121
+  },
+  "metadata/docs/VM_IO_CANDIDATE_DECISIONS.md": {
+    "sha256": "b9213985fbf9a14a5a66c79d88915c27825d1af8dd19f76f919d9751449e90ef",
+    "bytes": 6037
+  },
+  "metadata/docs/VM_NETWORK_IMPLEMENTATION.md": {
+    "sha256": "9d8ced957bdcff594cfa8c43d8f3e2207986ea09da0a53bc25ab02671cad9d6c",
+    "bytes": 7950
+  },
+  "metadata/docs/VM_NETWORK_PERFORMANCE.md": {
+    "sha256": "45af1dc009dcb20b317a83c1cd2e31c060f156cf3fc2a2932e33ee777a09b7b3",
+    "bytes": 6400
+  },
+  "metadata/docs/VM_NETWORK_PLAN.md": {
+    "sha256": "e5476770487f1eac276e1a5ecf08e2745f6610cbb5770ee18be92563ccfbd693",
+    "bytes": 12957
+  },
+  "metadata/docs/VM_NEXT_STAGE_PLAN.md": {
+    "sha256": "b502d27377e4334b91cfae685d541b994610cff542930aa31ad49218cc3d4f6a",
+    "bytes": 28392
+  },
+  "metadata/docs/VM_OBSERVABILITY_RESULTS.md": {
+    "sha256": "d371f066b63b1b66bb68fb7765de88f9107f00ec4b8728648a583ce81bbe2466",
+    "bytes": 19093
+  },
+  "metadata/docs/VM_PACKAGING.md": {
+    "sha256": "b1ca8850e036b884d05c47f93c1bad8e026b4b2189eaf32c0116c79441801e8b",
+    "bytes": 8124
+  },
+  "metadata/docs/VM_PLATFORM_FOLLOWUP.md": {
+    "sha256": "7fe1a6716d6f64fd2d5f08f7ad2a81c58c6ec8cf5b1b6bdc0c55d0f13dbef1c5",
+    "bytes": 6284
+  },
+  "metadata/docs/VM_STAGE1_RESULTS.md": {
+    "sha256": "0f142b173f80850f93b2aaa306313446644cede0d9ec129318933a1be82d376f",
+    "bytes": 5277
+  },
+  "metadata/docs/VM_STAGE2_RESULTS.md": {
+    "sha256": "d6544db8b9de5ec68272762f1d7800dd1e5619d144d009ff43a72628dbe0a0c2",
+    "bytes": 7431
+  },
+  "metadata/docs/VM_STAGE3_RESULTS.md": {
+    "sha256": "d04d1e071cf5bc04476ce4187656bb550bc81373e6f7030130919553e99816cb",
+    "bytes": 13148
+  },
+  "metadata/docs/VM_VALIDATION_RUNNER.md": {
+    "sha256": "a5c3072da04624075d129dc138a2b59d2edcdc3bf4655a500c7625ebd2c66a51",
+    "bytes": 10833
+  },
+  "metadata/docs/coordination/vm-followup/G0_REVIEW.md": {
+    "sha256": "14f478c5ed267941d091bba90f848d11f2b7e1008173dc22d786072b01977844",
+    "bytes": 3868
+  },
+  "metadata/docs/coordination/vm-followup/G3-acceptance.json": {
+    "sha256": "43358d0d343837f68fbda165b057b13cc5170e42837e1683b41bebe79e8735a3",
+    "bytes": 3079
+  },
+  "metadata/docs/coordination/vm-followup/G3-reviewed-v1/VM_IO_CANDIDATE_DECISIONS.md": {
+    "sha256": "ee9f5b3ccadcafb49955e56e7b3be7998ce8bfc3d24aa37d53ed54a89b45b58f",
+    "bytes": 5663
+  },
+  "metadata/docs/coordination/vm-followup/G3-reviewed-v1/candidate-preregister.json": {
+    "sha256": "cdb14f3245b0623e25cfc62122773201d673875ed88b7b2ed09ea39997e4b5db",
+    "bytes": 13517
+  },
+  "metadata/docs/coordination/vm-followup/G4-inheritance-acceptance.json": {
+    "sha256": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+    "bytes": 2376
+  },
+  "metadata/docs/coordination/vm-followup/G4-supplement-acceptance.json": {
+    "sha256": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+    "bytes": 2061
+  },
+  "metadata/docs/coordination/vm-followup/W1-G1-acceptance.json": {
+    "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+    "bytes": 2765
+  },
+  "metadata/docs/coordination/vm-followup/W1-owner-archive-acceptance.json": {
+    "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+    "bytes": 1277
+  },
+  "metadata/docs/coordination/vm-followup/W1-owner-functional-acceptance.json": {
+    "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+    "bytes": 3974
+  },
+  "metadata/docs/coordination/vm-followup/W2-G1-acceptance.json": {
+    "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "bytes": 2838
+  },
+  "metadata/docs/coordination/vm-followup/W2-G1-handoff.json": {
+    "sha256": "40971974e0b4ea9c6f556f933d503a486edce17ca57f865cb4410709f83a245d",
+    "bytes": 11539
+  },
+  "metadata/docs/coordination/vm-followup/W2-network-acceptance.json": {
+    "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+    "bytes": 2665
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/HANDOFF.md": {
+    "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+    "bytes": 1237
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/REVIEW.md": {
+    "sha256": "8eddecd1728431dda9fbc25394cf204d66377d16d9ff931016e877f191901fde",
+    "bytes": 12525
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/acceptance.json": {
+    "sha256": "e7d3458a54b685c210edafd0ea701349c1c5e4d3a54d2440a29bac8977ebb65a",
+    "bytes": 2837
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/handoff.json": {
+    "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+    "bytes": 1995
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/output-copy-independent.md": {
+    "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+    "bytes": 7624
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/reuse-staging-independent.md": {
+    "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+    "bytes": 11655
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review-manifest.json": {
+    "sha256": "a8c5cc59e4a0358b76b1d140f1ebecd8b41632d765af2f5c44b37774980f43de",
+    "bytes": 1103
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/review.json": {
+    "sha256": "48ea118c8057ffc9fc4253e68f3ebb612929b054990d66c934473f24c11cefb6",
+    "bytes": 8882
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-candidate-static-v1/source-identities.json": {
+    "sha256": "77c19587e7a06ded9559c0739a920eb0ed043eff54caafd2fe994928189fd7c1",
+    "bytes": 1485
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json": {
+    "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+    "bytes": 5343
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/W2-G1-acceptance.json": {
+    "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+    "bytes": 2838
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/diagnostic-budget-review.md": {
+    "sha256": "249bb5ef6b989de5e5872d1d52d5b36961e9fbcfe000a6e9ee7c890fab5ce676",
+    "bytes": 13253
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/inputs/old-harness-review.md": {
+    "sha256": "873fe8f14aafd6986692ea15f1849be09245fb23ede32bc715074c21eb48d655",
+    "bytes": 12155
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json": {
+    "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+    "bytes": 2816
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-revision2/acceptance.json": {
+    "sha256": "2adf22ec0e4bc94cabc9fa370add79ecd1a7e1218eca628518ba44bf43e52ab2",
+    "bytes": 1324
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-revision2/contract.json": {
+    "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+    "bytes": 99703
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W1-revision2/model_subcases.json": {
+    "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+    "bytes": 65234
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-network-v1/PLAN.md": {
+    "sha256": "e859da6e64254f80d8df75e49fb115844abef41639d36f2eb7c2f9abea9e4f9e",
+    "bytes": 18858
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json": {
+    "sha256": "fffeefb7f2578701a66c41619b24405559c46ff79445ceae22cc6d50c7cb40a6",
+    "bytes": 2190
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-network-v1/anchor-census.json": {
+    "sha256": "a3dbafac4dff100864f113e77872c958f79ecd7e98739f231724d1fa4f77556b",
+    "bytes": 9493
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-network-v1/plan.json": {
+    "sha256": "b6ab834068d9bf23cb57afd367cb4299d9c3c6c153b7862875c1a52e9cad8ecf",
+    "bytes": 12449
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-v1/acceptance.json": {
+    "sha256": "ee9c8bd4ad643bd9676bd5b9f56932f2a7b213c96554e694a4916c408baae9e3",
+    "bytes": 958
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-v1/contract.json": {
+    "sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "bytes": 10057
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-v1/coverage.json": {
+    "sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+    "bytes": 5397
+  },
+  "metadata/docs/coordination/vm-followup/contracts/W2-v1/event_kinds.json": {
+    "sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "bytes": 36417
+  },
+  "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json": {
+    "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+    "bytes": 3059
+  },
+  "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json": {
+    "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+    "bytes": 5498
+  },
+  "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json": {
+    "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+    "bytes": 3294
+  },
+  "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json": {
+    "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+    "bytes": 4959
+  },
+  "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json": {
+    "sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+    "bytes": 688
+  },
+  "metadata/docs/coordination/vm-followup/default-aa-1-acceptance.json": {
+    "sha256": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+    "bytes": 3250
+  },
+  "metadata/docs/coordination/vm-followup/default-aa-1-approval.json": {
+    "sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+    "bytes": 1632
+  },
+  "metadata/docs/coordination/vm-followup/dispatch.json": {
+    "sha256": "0a4aaacac5372fd53e207da4b986d1b06e6947af4de1f3bf0504e9d25288f31b",
+    "bytes": 22865
+  },
+  "metadata/docs/coordination/vm-followup/network-aa-1-acceptance.json": {
+    "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+    "bytes": 4309
+  },
+  "metadata/docs/coordination/vm-followup/network-aa-1-approval.json": {
+    "sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+    "bytes": 26691
+  },
+  "metadata/docs/coordination/vm-followup/network-aa-1-proposal-acceptance.json": {
+    "sha256": "ecd20d09987e0f54d3e3464e0275a8e2eb4b2551b8ccd3ae3c128dcdaa585987",
+    "bytes": 1538
+  },
+  "metadata/docs/coordination/vm-followup/network-pool-1m-1-acceptance.json": {
+    "sha256": "8fc361d44787aeacf5a7bc7533ddd969a0ae95b399d8d44fab646bb436b94552",
+    "bytes": 4157
+  },
+  "metadata/docs/coordination/vm-followup/network-pool-1m-1-approval.json": {
+    "sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1",
+    "bytes": 26035
+  },
+  "metadata/docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json": {
+    "sha256": "698b4871ac56a6ccb4ee9b8050daefebf304e386a7d0a3c85cfb683efe043dd0",
+    "bytes": 1201
+  },
+  "metadata/docs/coordination/vm-followup/network-pool-1m-1-proposal-acceptance.json": {
+    "sha256": "1cd2a676307f6bb24d0f017238869665542d9cf01e59e5f657ef42a73efe8ba7",
+    "bytes": 1850
+  },
+  "metadata/docs/coordination/vm-followup/owner-measurement-acceptance.json": {
+    "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+    "bytes": 6870
+  },
+  "metadata/docs/coordination/vm-followup/platform-acceptance.json": {
+    "sha256": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+    "bytes": 1262
+  },
+  "metadata/docs/coordination/vm-followup/platform-supplement-reviewed-v1/identity-notes.md": {
+    "sha256": "efc17e59fc6006f2cc5e09374a6f0a4b29cfbc7e0126ac5924ab58d29587b7cc",
+    "bytes": 8346
+  },
+  "metadata/docs/coordination/vm-followup/platform-supplement-reviewed-v1/linux-package-provenance.json": {
+    "sha256": "dc8068e2b42236ee2e7b4a37ebe13e17af854fd6f0616a5966454fe2e7017e74",
+    "bytes": 10680
+  },
+  "metadata/docs/coordination/vm-followup/readme-window-acceptance.json": {
+    "sha256": "f1b4991066267b16ac79ce8e06767e4588a6bd84076ff5a08986684ffc6800ca",
+    "bytes": 655
+  },
+  "metadata/docs/coordination/vm-followup/readme-window.json": {
+    "sha256": "7ad840ddc6b5ae7066c2dabc5272dcdcee7d8e7825b549dc8f4132879b055309",
+    "bytes": 995
+  },
+  "metadata/docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json": {
+    "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15",
+    "bytes": 7924
+  },
+  "metadata/docs/perf/vm-owner-scaling/RESULTS.md": {
+    "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68",
+    "bytes": 8129
+  },
+  "metadata/docs/perf/vm-owner-scaling/handoff.json": {
+    "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+    "bytes": 25841
+  },
+  "metadata/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json": {
+    "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+    "bytes": 124518
+  },
+  "metadata/docs/validation/vm-final/build-identities.json": {
+    "sha256": "c82bc3ed871326d52f08a6792bab9ca636e107c968752270fc83666f084936b0",
+    "bytes": 145846
+  },
+  "metadata/docs/validation/vm-final/draft-status.json": {
+    "sha256": "3d7ba2519dfc3c5eb3cdac2d773e2538f05f961f6e62c0dffa794a754026e357",
+    "bytes": 24816
+  },
+  "metadata/docs/validation/vm-final/evidence-index.json": {
+    "sha256": "4c4b550b6aaaa8050efeb07a751865f2d728bafd7b57aea449c54dce5ceb541b",
+    "bytes": 47362
+  },
+  "metadata/docs/validation/vm-final/final-increment.json": {
+    "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+    "bytes": 3565
+  },
+  "metadata/docs/validation/vm-final/final-v1/preserved-inputs.json": {
+    "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+    "bytes": 3385
+  },
+  "metadata/docs/validation/vm-final/readme-window-return.json": {
+    "sha256": "11fd9291b1d7232ed943ba97e2c5cbbe168acee40984166eb8340a14fe86ebb5",
+    "bytes": 1416
+  },
+  "metadata/docs/validation/vm-final/shared-document-edits.json": {
+    "sha256": "6c3af6b26f2e0d617a6e1c8aa36e1719c129251039b516a6e5e4e44c80a8c59b",
+    "bytes": 3989
+  },
+  "metadata/docs/validation/vm-final/shared-document-edits.md": {
+    "sha256": "e556c08004c115e48c52ab97311604bb34b58f616e0ee07f1e3cdd490d3e4c20",
+    "bytes": 2351
+  },
+  "metadata/docs/validation/vm-final/shared-document-edits.patch": {
+    "sha256": "6a1064714fe7f59c419a9955de1e79910c7cfc66bd7d240955d5fcd77bf126a3",
+    "bytes": 1493
+  },
+  "metadata/docs/validation/vm-final/verification-matrix.json": {
+    "sha256": "7c798253d496d131e57f61241187efbb88fdf2649cb07e303dc71a7eb9ad310b",
+    "bytes": 40989
+  },
+  "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d": {
+    "sha256": "9dea9c3242e04e460dee8d1e0982017ea969a6c2a6cc3d1e2fe2b37ff5e6d2fa",
+    "bytes": 69147
+  },
+  "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d": {
+    "sha256": "a8e16af6bf34252e33d26b64a7936274ea7b017ef8f1750d960e33dc06a22d3a",
+    "bytes": 69035
+  },
+  "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/result.json": {
+    "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+    "bytes": 144598
+  },
+  "metadata/docs/validation/vm-observability/frozen-implementation-v1/snapshot.json": {
+    "sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+    "bytes": 16838
+  },
+  "metadata/docs/validation/vm-observability/network/final-v1/source-identities.json": {
+    "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+    "bytes": 1779
+  },
+  "metadata/experiments/vm_coordination/HANDOFF.md": {
+    "sha256": "180723d0985b261f9ad964093e0d56c7f9905d2784eee52d75f902523bf0feaf",
+    "bytes": 11906
+  },
+  "metadata/experiments/vm_coordination/handoff.json": {
+    "sha256": "0353b542b24051bf2dd6d821dfc0b29204f0e14bd4fb675ba39dd3db920e87be",
+    "bytes": 25736
+  },
+  "metadata/experiments/vm_coordination/independent-review.json": {
+    "sha256": "b7daff044a4a01e39dbacacc3b490ed317c6ddea97d7ccb3bef8477a3632e0be",
+    "bytes": 1201
+  },
+  "metadata/experiments/vm_network/HANDOFF.md": {
+    "sha256": "edebaf883523546cabc9bf2be340bd420ae7cc5e4c2ec73855e666e2ba189b24",
+    "bytes": 2315
+  },
+  "metadata/experiments/vm_network/candidate-feasibility/HANDOFF.md": {
+    "sha256": "d5f877bfbc023876470ec522dbfdf5b875c735478fa31db165420d07fe18b84b",
+    "bytes": 1237
+  },
+  "metadata/experiments/vm_network/candidate-feasibility/handoff.json": {
+    "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+    "bytes": 1995
+  },
+  "metadata/experiments/vm_network/handoff.json": {
+    "sha256": "01d212a72cc82e0aa7651cd786268f89698766fe623df278582300b4cca6e7dd",
+    "bytes": 12252
+  },
+  "metadata/experiments/vm_network_measurement/HANDOFF.md": {
+    "sha256": "d108fd48c81588a9405d2bfcc723e4ce14326a8b0ce689bf2a4025302b9f2ab7",
+    "bytes": 6421
+  },
+  "metadata/experiments/vm_network_measurement/handoff.json": {
+    "sha256": "4347ec7bc28295c94f3ac037dc56936d9b4917d1d86294414a2aa59561e4ae9e",
+    "bytes": 26578
+  },
+  "metadata/experiments/vm_observability/HANDOFF.md": {
+    "sha256": "cc56b9a6dea273cfce1a6c4206c59c14945d0f0565d571ba464a22c6d13b3f6c",
+    "bytes": 3612
+  },
+  "metadata/experiments/vm_observability/handoff.json": {
+    "sha256": "6fbf7cb2fcfeb19152e9d1ad7cfebf8b1e4098512cccdc79854ca513eb2482e5",
+    "bytes": 16640
+  },
+  "metadata/experiments/vm_owner_measurement/handoff.json": {
+    "sha256": "9684c482d442c69cb3085893975fdf54de2dc87fae04ae904b1bb6efd9185502",
+    "bytes": 11459
+  },
+  "metadata/experiments/vm_owner_scaling/HANDOFF.md": {
+    "sha256": "5aba2ced33d440a4368f15bdc50abb6a81c4f0ce3338eda2a78a9eef659fab31",
+    "bytes": 3184
+  },
+  "metadata/experiments/vm_owner_scaling/handoff.json": {
+    "sha256": "58ba3fc12b0561eff9a6bcf2e0f9ae160c1e8c82c1cc004609b73f52a98f7d0f",
+    "bytes": 4964
+  },
+  "metadata/experiments/vm_platform_validation/HANDOFF.md": {
+    "sha256": "75912c64f72df08c56f400752e20d95c7dcd31ea68976b1188964a8a326a05df",
+    "bytes": 4611
+  },
+  "metadata/experiments/vm_platform_validation/evidence/platform-20261015-01/manifest.json": {
+    "sha256": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+    "bytes": 6166
+  },
+  "metadata/experiments/vm_platform_validation/evidence/platform-20261015-01/result.json": {
+    "sha256": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e",
+    "bytes": 47781
+  },
+  "metadata/experiments/vm_platform_validation/final-package-spec.json": {
+    "sha256": "4656ca14d6f3fe54d750207e3a2c39a9bf3b997ef1a6e0d7f9aabdfaaa87645a",
+    "bytes": 9086
+  },
+  "metadata/experiments/vm_platform_validation/handoff.json": {
+    "sha256": "6e417af2803530c160d71b19da4426ff10d05a5c13435310eff16ebd13873b91",
+    "bytes": 5468
+  },
+  "metadata/experiments/vm_platform_validation/independent-review.json": {
+    "sha256": "1b6b9ea1bdeac0b0ab294ac292b3b5ef2cda0098779edd8d5e4490b655d9b45d",
+    "bytes": 1813
+  },
+  "metadata/external/boost/LICENSE_1_0.txt": {
+    "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+    "bytes": 1338
+  },
+  "metadata/external/typelayout/LICENSE": {
+    "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+    "bytes": 1338
+  },
+  "metadata/external/typelayout/LICENSE_1_0.txt": {
+    "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+    "bytes": 1338
+  },
+  "metadata/openspec/changes/vm-next-stage-hardening/tasks.md": {
+    "sha256": "5a4d9a1ec07e8cfb61eb3824989ccd589f51de727dd966190567fb456c3bfff0",
+    "bytes": 15039
+  },
+  "metadata-manifest.json": {
+    "sha256": "c1a56d89809b8dfe1328dbc05a969fddb9cd5c9a86ba0ded704ac47f83030950",
+    "bytes": 40112
+  },
+  "metadata-path-aliases.json": {
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "bytes": 3
+  },
+  "preserved-inputs.json": {
+    "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+    "bytes": 3385
+  },
+  "source-differences.json": {
+    "sha256": "86aead6132c24100e5a05c8f14c28e87fda77d0fb6174e46b94617cba912b806",
+    "bytes": 16627
+  },
+  "source-manifest.json": {
+    "sha256": "06ce0fa38afb8a4e91cdf5c7dafdd78b9667965ed0e58cdcdaaa0dd48d58e3a8",
+    "bytes": 37427
+  },
+  "source.tar.gz": {
+    "sha256": "c2ae11fa881721769ab92d0252c76e7b72bd6f1dfaaaa3f46b0daaa885f1cd0b",
+    "bytes": 805745
+  },
+  "stable-source-manifest.json": {
+    "sha256": "562d9a6ba2b0b5702097111cd1405135bce5a37f34a7047b949fd26a402f2ed1",
+    "bytes": 34115
+  }
+}

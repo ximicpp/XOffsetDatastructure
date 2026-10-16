@@ -1,0 +1,24 @@
+{
+  "build_result_sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+  "collection_result_sha256": "9a5924cd9e7297dfa7adc2c0de4a7b98ef8e10ed1ebae2bacb6eef0e35143de2",
+  "compiled_consumer_sha256": "e7cc3f07e2d22cbfa8ae6491e0b682a900e1760274e0cd2c9d59deb102251d7d",
+  "diagnostic_header_sha256": {
+    "n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "xoffset_virtual_memory.hpp": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+    "xoffsetdatastructure.hpp": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6"
+  },
+  "native_binary_sha256": "12d97eb430a8d894a4491944827fce7b169835ebb9dec040b02b92a66f8ba2ed",
+  "source": {
+    "README.md": "6a8ac4cf9a37290971597b0cd59b1233c95b813c2b1876cf7bd8b3d2e98827df",
+    "REVIEW.md": "098b235c1772f6df4f66c08573c6939b1a28efeba4c8c54535b333e79e898a1e",
+    "audit_network_delivery.py": "bf27a32811faded76954af90f63c2e99d5147f9600d5e058de270dea11a6bf36",
+    "network_audit.py": "570ac1cbc59bd2c2c6ef9bae96e99daf4162457fc7f3ffc1f012bfd1dfb79cc7",
+    "network_generate.py": "d5e54292d44c1f77c49f211a0d273a94601ef6f618bd80fd2f4ab5971ca39ca3",
+    "network_support.hpp": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+    "run_network_observation.py": "9ea3b73645ab8581518d71f03c6689b4b3d0b80d879242ccc62506256da36ffb",
+    "summarize_network.py": "788537c5cbcd2321005d16970dc7b997f7907905b266a62a2781debd5ad1c638",
+    "test_network_audit.py": "bfd673962a7a3f1eb6eb2bde9d5459be71c4ef78b62ad6e815fb6760580dda09",
+    "test_network_runner.py": "294a4c89ac9440a5a43032cbd1dc5e7a6af107accbae932f0553b2bb9a239f23",
+    "verify_network_package.py": "3632e3d46d7a6103993219eb3e2130fa7911a3197b1f32cdc2913c8f080ac7e0"
+  }
+}

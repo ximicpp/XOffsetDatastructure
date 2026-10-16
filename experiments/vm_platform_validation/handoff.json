@@ -1,0 +1,126 @@
+{
+  "background_activity": {
+    "actions": "inventory_only_no_enter_stop_or_modify",
+    "image": "layoutcompare-r2-family-f4-python3137",
+    "inference": "background activity may exist; no heavy-load amount inferred; runner acceptance does not establish noise gate",
+    "ownership": "not_owned",
+    "unrelated_running_container": "upbeat_goldstine"
+  },
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "experiments/vm_platform_validation/probe_platform.py",
+        "--out",
+        "experiments/vm_platform_validation/evidence/platform-20261015-01"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "result": {
+        "command_count": 24,
+        "compile_status": "unexecuted",
+        "status": "ready_for_review",
+        "test_run_status": "unexecuted",
+        "windows_zip": "passed"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "python3",
+        "experiments/vm_platform_validation/probe_platform.py",
+        "--audit",
+        "experiments/vm_platform_validation/evidence/platform-20261015-01"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "returncode": 0,
+      "stdout": {
+        "compile_status": "unexecuted",
+        "files": 38,
+        "inventory_status": "ready_for_review",
+        "status": "audit_passed",
+        "test_run_status": "unexecuted"
+      }
+    }
+  ],
+  "compile_status": "unexecuted",
+  "completed": [
+    "24 raw subprocess records with exact argv/rc/stdout/stderr",
+    "compiler/standard library/TSan runtime hashes match frozen toolchain",
+    "frozen SDK26.5 exists; default SDK27.0 recorded separately",
+    "F headers and dependency content hashes match",
+    "frozen Windows ZIP exact members/bytes/hash/source manifest/CRC audit",
+    "38-file immutable evidence manifest offline audit"
+  ],
+  "deliverable": "read_only_platform_prerequisite_assessment",
+  "errors_and_limitations": [
+    {
+      "reason": "existing sfcdev alias TCP connection timed out after approximately 5.02 seconds; one attempt only",
+      "returncode": 255,
+      "source": "commands/024.json"
+    },
+    "No native Windows x64 execution environment demonstrated",
+    "No compile/run/performance matrix executed",
+    "Remote workload queue unsupported; bounded SSH metadata attempt was environment feasibility only"
+  ],
+  "evidence": "experiments/vm_platform_validation/evidence/platform-20261015-01",
+  "execution_source_sha256": {
+    "docs/VM_PLATFORM_FOLLOWUP.md": "b29ef85f7f9e121453438df0a75c7d159230eab74d94c7467ab82dac1ffaf805",
+    "experiments/vm_platform_validation/probe_platform.py": "4bc6080c668b66160c7ac7a2875492807f250eda1e45aa114189dcf3d13629ad"
+  },
+  "g4": "waiting_for_orchestrator",
+  "heavy_work_running": false,
+  "input_changes": [],
+  "manifest_sha256": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+  "next_gate": [
+    "parent G1 acceptance of prerequisite assessment",
+    "await orchestrator G4 before selected-source freeze or validation matrix",
+    "provide native Windows x64 execution channel and reachable independent Linux device for remaining platform work"
+  ],
+  "performance_running": false,
+  "performance_status": "unexecuted",
+  "platform_status": {
+    "linux_amd64_image": "present_cross_architecture_emulation_if_executed",
+    "local_linux_arm64_vm": "virtualized_inventory_only_not_entered",
+    "macos": "local_inventory_observed_not_tested",
+    "native_independent_linux_performance": "not_verified",
+    "ssh_sfcdev": "prerequisite_unavailable_connection_timeout",
+    "windows_full_p2996": "prerequisite_unavailable",
+    "windows_storage": "prerequisite_unavailable"
+  },
+  "post_probe_documentation": "Actual results/background inventory paragraphs added after immutable evidence creation; execution input snapshot retained; probe not rerun.",
+  "production_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "result_sha256": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e",
+  "role": "W4-platform",
+  "schema_version": 1,
+  "source_sha256": {
+    "docs/VM_PLATFORM_FOLLOWUP.md": "7fe1a6716d6f64fd2d5f08f7ad2a81c58c6ec8cf5b1b6bdc0c55d0f13dbef1c5",
+    "experiments/vm_platform_validation/HANDOFF.md": "75912c64f72df08c56f400752e20d95c7dcd31ea68976b1188964a8a326a05df",
+    "experiments/vm_platform_validation/probe_platform.py": "4bc6080c668b66160c7ac7a2875492807f250eda1e45aa114189dcf3d13629ad",
+    "experiments/vm_platform_validation/independent-review.json": "1b6b9ea1bdeac0b0ab294ac292b3b5ef2cda0098779edd8d5e4490b655d9b45d"
+  },
+  "status": "ready_for_review",
+  "test_run_status": "unexecuted",
+  "tests_running": false,
+  "windows_requirements": [
+    "native Windows x64 access",
+    "MSVC x64 Developer PowerShell with C++ workload and Windows SDK",
+    "Python >=3.9",
+    "CMake and CTest >=3.21",
+    "NMake, or preinstalled Ninja when selected",
+    "new results directory outside the frozen package and complete evidence return"
+  ],
+  "review": {
+    "status": "passed_no_blocking_findings",
+    "record": "experiments/vm_platform_validation/independent-review.json",
+    "probe_sha256": "4bc6080c668b66160c7ac7a2875492807f250eda1e45aa114189dcf3d13629ad",
+    "recursive_evidence_files": 38,
+    "platform_commands_reexecuted": false
+  }
+}

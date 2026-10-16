@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "cut_at": "2026-10-15T19:35:43.832893+00:00",
+  "status": "frozen_for_independent_G4_review",
+  "parent_G4_accepted": false,
+  "owner_acceptance": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+  "owner_acceptance_sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+  "scope": "Bounded local research delivery; external roadmap prerequisites remain open",
+  "dependency_boundary": "Source and metadata reference capsule; external dependencies, toolchains, SDK/runtime, binaries and large evidence are not bundled. Accepted content identities and missing historic seals remain explicit.",
+  "new_CPP_jobs": 0,
+  "new_container_jobs": 0,
+  "source_files": 245,
+  "metadata_files": 236,
+  "source_tar_verified": true,
+  "final_review": "Outside capsule, bound to manifest to avoid a hash cycle",
+  "phase_scope": "stable-source-manifest/source-differences preserve the earlier staged cut; source-manifest and current metadata govern the completed cut",
+  "sealing_python": {
+    "executable": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "version": "3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]",
+    "identity": {
+      "sha256": "2cbb3ee843d8abcf93ed35bb9102391f18eefccb03d47908547bd8db67bc395c",
+      "bytes": 52640
+    }
+  }
+}

@@ -1,0 +1,2874 @@
+{
+  "schema_version": 1,
+  "role": "W4 independent build identity index",
+  "status": "ready_for_final_capsule_seal_and_independent_audit",
+  "created_at": "2026-10-15T18:02:54.490396+00:00",
+  "scope": "Accepted small build/result/source identity records and final D032/D033/source-increment/publication metadata only; no binary/compiler/runtime/header/external tree/archive payload bytes read or rehashed. Six small candidate sources were earlier hash-checked; final nine-source identities are read from the accepted queued increment. No native/test execution or statistical recomputation.",
+  "workloads_executed": 0,
+  "tests_executed": 0,
+  "binaries_rehashed": 0,
+  "external_tree_scans": 0,
+  "archives_opened_or_rehashed": 0,
+  "profiles": [
+    {
+      "id": "W1-network-timing",
+      "scope": "Accepted W1v2 native macOS synchronous TCP reference; diagnostic label here is W1 phase output, not W2 generated F instrumentation.",
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+        "bytes": 2765,
+        "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+        "kind": "metadata_index_read_only"
+      },
+      "build_result": {
+        "path": "build/vm-network/timing-v2/result.json",
+        "bytes": 5562,
+        "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+        "kind": "metadata_index_read_only"
+      },
+      "binary": {
+        "path": "build/vm-network/timing-v2/net_reference",
+        "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18",
+        "identity_method": "recorded accepted result; binary not read or rehashed"
+      },
+      "source": {
+        "net_reference.cpp": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+        "baseline_headers": {
+          "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+          "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+        },
+        "contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+        "executed_runner_sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477"
+      },
+      "compile_argv": [
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-DN7_NET_DIAGNOSTICS=0",
+          "-pthread",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/source",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/source/net_reference.cpp",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/timing-v2/net_reference"
+        ]
+      ],
+      "toolchain": {
+        "record": {
+          "path": "build/vm-network/timing-v2/toolchain.json",
+          "bytes": 914,
+          "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+          "kind": "metadata_index_read_only"
+        },
+        "compiler": "/usr/local/bin/clang++",
+        "compiler_sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+        "host_machine": "arm64",
+        "host_system": "Darwin",
+        "library": "/usr/local/lib",
+        "profile": "macos-p2996",
+        "runtime": {
+          "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+          "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+        },
+        "sanitizer_resource": null,
+        "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+        "sdk_settings_sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe",
+        "version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n"
+      },
+      "dependencies_manifest": {
+        "path": "build/vm-network/timing-v2/dependencies.json",
+        "bytes": 117168,
+        "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+        "kind": "metadata_index_read_only"
+      },
+      "source_inventory": {
+        "path": "build/vm-network/timing-v2/source-inventory.json",
+        "bytes": 1021,
+        "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+        "kind": "metadata_index_read_only"
+      },
+      "include_closure": {
+        "actual_compiler_depfile_retained": false,
+        "scope": "Build records source inventory and dependency tree identities, not an actual per-build compiler .d closure. No missing closure invented."
+      }
+    },
+    {
+      "id": "W1-network-diagnostic",
+      "scope": "Accepted W1v2 native macOS synchronous TCP reference; diagnostic label here is W1 phase output, not W2 generated F instrumentation.",
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+        "bytes": 2765,
+        "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+        "kind": "metadata_index_read_only"
+      },
+      "build_result": {
+        "path": "build/vm-network/diagnostic-v2/result.json",
+        "bytes": 5594,
+        "sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+        "kind": "metadata_index_read_only"
+      },
+      "binary": {
+        "path": "build/vm-network/diagnostic-v2/net_reference",
+        "sha256": "ae6ce12e8ed06b246e19b73995f774da0d3c74f7a369e9f336b2d7fbc30558c8",
+        "identity_method": "recorded accepted result; binary not read or rehashed"
+      },
+      "source": {
+        "net_reference.cpp": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+        "baseline_headers": {
+          "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+          "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+        },
+        "contract_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+        "executed_runner_sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477"
+      },
+      "compile_argv": [
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-DN7_NET_DIAGNOSTICS=1",
+          "-pthread",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/diagnostic-v2/source",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/diagnostic-v2/source/net_reference.cpp",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-network/diagnostic-v2/net_reference"
+        ]
+      ],
+      "toolchain": {
+        "record": {
+          "path": "build/vm-network/diagnostic-v2/toolchain.json",
+          "bytes": 914,
+          "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+          "kind": "metadata_index_read_only"
+        },
+        "compiler": "/usr/local/bin/clang++",
+        "compiler_sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+        "host_machine": "arm64",
+        "host_system": "Darwin",
+        "library": "/usr/local/lib",
+        "profile": "macos-p2996",
+        "runtime": {
+          "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+          "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+        },
+        "sanitizer_resource": null,
+        "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+        "sdk_settings_sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe",
+        "version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n"
+      },
+      "dependencies_manifest": {
+        "path": "build/vm-network/diagnostic-v2/dependencies.json",
+        "bytes": 117168,
+        "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+        "kind": "metadata_index_read_only"
+      },
+      "source_inventory": {
+        "path": "build/vm-network/diagnostic-v2/source-inventory.json",
+        "bytes": 1021,
+        "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+        "kind": "metadata_index_read_only"
+      },
+      "include_closure": {
+        "actual_compiler_depfile_retained": false,
+        "scope": "Build records source inventory and dependency tree identities, not an actual per-build compiler .d closure. No missing closure invented."
+      }
+    },
+    {
+      "id": "W2-foundation-original-and-diagnostic",
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+        "bytes": 2838,
+        "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+        "kind": "metadata_index_read_only"
+      },
+      "snapshot": {
+        "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+        "bytes": 16838,
+        "sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+        "kind": "metadata_index_read_only"
+      },
+      "build_result": {
+        "path": "docs/validation/vm-observability/frozen-implementation-v1/build/result.json",
+        "bytes": 144598,
+        "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+        "kind": "metadata_index_read_only"
+      },
+      "binaries": [
+        {
+          "profile": "original",
+          "path": "docs/validation/vm-observability/frozen-implementation-v1/build/n3_original",
+          "sha256": "498928f7ed536fe1ebda17b213e285525dd27b82febd673d58620c0c649a33a8",
+          "identity_method": "recorded accepted snapshot; no binary rehash"
+        },
+        {
+          "profile": "diagnostic",
+          "path": "docs/validation/vm-observability/frozen-implementation-v1/build/n3_diagnostic",
+          "sha256": "784d8e36a5a0a2f8c827a6991f7c41d04fad304f387728affca8aeae08cd083e",
+          "identity_method": "recorded accepted snapshot; no binary rehash"
+        }
+      ],
+      "source": {
+        "n3_probe.cpp": "177ccfed682b689f016bf0d78974fcd1701bb43f56634deac3119e509ebd00ba",
+        "baseline_headers": {
+          "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+          "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+        }
+      },
+      "compile_argv": [
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-pthread",
+          "-arch",
+          "arm64",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-MD",
+          "-MF",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/dependencies-original.d",
+          "-DN3_DIAGNOSTIC=0",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/input/original",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/input/n3_probe.cpp",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/n3_original"
+        ],
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-pthread",
+          "-arch",
+          "arm64",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-MD",
+          "-MF",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/dependencies-diagnostic.d",
+          "-DN3_DIAGNOSTIC=1",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/input/diagnostic",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/input/n3_probe.cpp",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/build-06/n3_diagnostic"
+        ]
+      ],
+      "compiler_version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n",
+      "recorded_toolchain_files": {
+        "/usr/local/bin/clang-21": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+        "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+        "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+      },
+      "dependency_commits": {
+        "boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+        "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+      },
+      "include_closure": {
+        "index": {
+          "path": "docs/validation/vm-observability/frozen-implementation-v1/build/result.json",
+          "bytes": 144598,
+          "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+          "kind": "metadata_index_read_only",
+          "json_pointer": "/external_files"
+        },
+        "recorded_external_files": 1018,
+        "compiler_depfiles": [
+          {
+            "path": "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d",
+            "sha256": "a8e16af6bf34252e33d26b64a7936274ea7b017ef8f1750d960e33dc06a22d3a"
+          },
+          {
+            "path": "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d",
+            "sha256": "9dea9c3242e04e460dee8d1e0982017ea969a6c2a6cc3d1e2fe2b37ff5e6d2fa"
+          }
+        ]
+      },
+      "generated_inputs_from_snapshot": {
+        "build/input/diagnostic/n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+        "build/input/diagnostic/xoffset_virtual_memory.hpp": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+        "build/input/diagnostic/xoffsetdatastructure.hpp": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6"
+      },
+      "SDK_scope": "Exact SDK26.5 selector in argv and recorded included headers; no full SDK tree seal claimed."
+    },
+    {
+      "id": "W2-network-generated-diagnostic",
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/W2-network-acceptance.json",
+        "bytes": 2665,
+        "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+        "kind": "metadata_index_read_only"
+      },
+      "build_result": {
+        "path": "build/vm-observability/network/build-v2/result.json",
+        "bytes": 150112,
+        "sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+        "kind": "metadata_index_read_only"
+      },
+      "source_identities": {
+        "path": "docs/validation/vm-observability/network/final-v1/source-identities.json",
+        "bytes": 1779,
+        "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+        "kind": "metadata_index_read_only"
+      },
+      "binary": {
+        "path": "build/vm-observability/network/build-v2/n3_network",
+        "sha256": "12d97eb430a8d894a4491944827fce7b169835ebb9dec040b02b92a66f8ba2ed",
+        "identity_method": "recorded accepted result/source-identities; no binary rehash"
+      },
+      "original_W1_comparator": {
+        "profile": "W1-network-diagnostic",
+        "build_result_sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+        "binary_sha256": "ae6ce12e8ed06b246e19b73995f774da0d3c74f7a369e9f336b2d7fbc30558c8"
+      },
+      "generated_consumer_and_support": [
+        {
+          "path": "build/vm-observability/network/build-v2/input/source/net_reference.cpp",
+          "sha256": "e7cc3f07e2d22cbfa8ae6491e0b682a900e1760274e0cd2c9d59deb102251d7d",
+          "identity_source": {
+            "path": "build/vm-observability/network/build-v2/result.json",
+            "json_pointer": "/files/input~1source~1net_reference.cpp"
+          }
+        },
+        {
+          "path": "build/vm-observability/network/build-v2/input/source/network_support.hpp",
+          "sha256": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+          "identity_source": {
+            "path": "build/vm-observability/network/build-v2/result.json",
+            "json_pointer": "/files/input~1source~1network_support.hpp"
+          }
+        }
+      ],
+      "generated_diagnostic_headers": {
+        "n3_runtime.hpp": {
+          "path": "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/input/source/n3_runtime.hpp",
+          "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "path": "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/input/source/xoffset_virtual_memory.hpp",
+          "sha256": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57"
+        },
+        "xoffsetdatastructure.hpp": {
+          "path": "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/input/source/xoffsetdatastructure.hpp",
+          "sha256": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6"
+        }
+      },
+      "compile_argv": [
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-pthread",
+          "-DN7_NET_DIAGNOSTICS=1",
+          "-arch",
+          "arm64",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/input/source",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-MD",
+          "-MF",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/dependencies.d",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/input/source/net_reference.cpp",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-observability/network/build-v2/n3_network"
+        ]
+      ],
+      "compiler_version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n",
+      "recorded_toolchain_files": {
+        "/usr/local/bin/clang++": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+        "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+        "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+      },
+      "include_closure": {
+        "index": {
+          "path": "build/vm-observability/network/build-v2/result.json",
+          "bytes": 150112,
+          "sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+          "kind": "metadata_index_read_only",
+          "json_pointer": "/external_files"
+        },
+        "recorded_external_files": 1077,
+        "depfile": {
+          "path": "build/vm-observability/network/build-v2/dependencies.d",
+          "sha256": "57b8ea9986c1b629149cfe1ea1c2c0188d054fd90fe8b841dc3d5672ab834270"
+        },
+        "include_resolution": {
+          "path": "build/vm-observability/network/build-v2/include-resolution.json",
+          "sha256": "eba11996347ee2e267b888be9f45dc161b0be1ffe2ca8965f602803496d804c8"
+        }
+      }
+    },
+    {
+      "id": "owner26-accepted-build-v4",
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+        "bytes": 3974,
+        "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+        "kind": "metadata_index_read_only"
+      },
+      "archive_acceptance": {
+        "path": "docs/coordination/vm-followup/W1-owner-archive-acceptance.json",
+        "bytes": 1277,
+        "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+        "kind": "metadata_index_read_only"
+      },
+      "build_result": {
+        "path": "build/vm-owner-scaling/build-v4/result.json",
+        "bytes": 549953,
+        "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+        "kind": "metadata_index_read_only"
+      },
+      "binaries": [
+        {
+          "profile": "diagnostic",
+          "path": "build/vm-owner-scaling/build-v4/owner_scaling_diagnostic",
+          "sha256": "a9c176625111d668b501bf6b7a95d44352a27e4380baaa1e171031b001617f8f",
+          "identity_method": "recorded D027 and build result; no binary rehash"
+        },
+        {
+          "profile": "timing",
+          "path": "build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "sha256": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45",
+          "identity_method": "recorded D027 and build result; no binary rehash"
+        }
+      ],
+      "source": {
+        "harness_sha256": "7470e32478027526a79030ee50b6975c37ae1a4e83c96af24cbd6cc82c84cb48",
+        "original_build_checker_sha256": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+        "D022_corrected_checker_sha256": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+        "corrected_checker_location": "build/vm-owner-scaling/tooling-errata-v2/audit_owner_scaling.py",
+        "D022_authority": {
+          "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+          "bytes": 2816,
+          "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+          "kind": "metadata_index_read_only"
+        },
+        "generated_input_hashes": {
+          "input/diagnostic/n3_runtime.hpp": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+          "input/diagnostic/xoffset_virtual_memory.hpp": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+          "input/diagnostic/xoffsetdatastructure.hpp": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6",
+          "input/timing/xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+          "input/timing/xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+        }
+      },
+      "compiler": {
+        "executed": "/usr/local/bin/clang++",
+        "resolved": "/usr/local/bin/clang-21",
+        "sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+        "version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions\n"
+      },
+      "runtime": {
+        "/usr/local/lib/libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+        "/usr/local/lib/libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6",
+        "/usr/local/lib/libunwind.1.0.dylib": "a7539f393b8f785dd09b4f7fb7c109382dd7d2db0ee903c10ab45e777c8cc4aa"
+      },
+      "sdk_settings": {
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/SDKSettings.json": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe"
+      },
+      "dependencies": {
+        "boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+        "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+      },
+      "compile_argv": [
+        [
+          "/usr/local/bin/clang++",
+          "--version"
+        ],
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-pthread",
+          "-arch",
+          "arm64",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-MD",
+          "-MF",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/timing.d",
+          "-DN3_DIAGNOSTIC=0",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/input/timing",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/common/owner_scaling.cpp",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing"
+        ],
+        [
+          "/usr/local/bin/clang++",
+          "-O2",
+          "-std=c++26",
+          "-freflection",
+          "-fexpansion-statements",
+          "-stdlib=libc++",
+          "-pthread",
+          "-arch",
+          "arm64",
+          "-isysroot",
+          "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+          "-mmacosx-version-min=10.15",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+          "-isystem",
+          "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+          "-L/usr/local/lib",
+          "-Wl,-rpath,/usr/local/lib",
+          "-MD",
+          "-MF",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/diagnostic.d",
+          "-DN3_DIAGNOSTIC=1",
+          "-I",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/input/diagnostic",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/common/owner_scaling.cpp",
+          "-o",
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_diagnostic"
+        ]
+      ],
+      "include_closure": {
+        "index": {
+          "path": "build/vm-owner-scaling/build-v4/result.json",
+          "bytes": 549953,
+          "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+          "kind": "metadata_index_read_only",
+          "json_pointer": "/closures"
+        },
+        "recorded_counts": {
+          "diagnostic": 1019,
+          "timing": 1018
+        },
+        "lexical_alias_counts": {
+          "diagnostic": 1020,
+          "timing": 1019
+        },
+        "depfiles": [
+          {
+            "path": "build/vm-owner-scaling/build-v4/diagnostic.d",
+            "sha256": "1e7c1edf4db009e27e0acaec69c0f944561ee2ae980cd0a3a479951cffe09765",
+            "identity_source": {
+              "path": "build/vm-owner-scaling/build-v4/result.json",
+              "json_pointer": "/files/diagnostic.d"
+            }
+          },
+          {
+            "path": "build/vm-owner-scaling/build-v4/timing.d",
+            "sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+            "identity_source": {
+              "path": "build/vm-owner-scaling/build-v4/result.json",
+              "json_pointer": "/files/timing.d"
+            }
+          }
+        ]
+      },
+      "toolchain_manifest": {
+        "path": "build/vm-owner-scaling/build-v4/provenance/toolchain.json",
+        "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7"
+      },
+      "prebuild_external_manifest": {
+        "path": "build/vm-owner-scaling/build-v4/prebuild-external.json",
+        "sha256": "b9e6438d29cb8841bc12445f7cd389a03c1b0a147ada3db59027ce55c006fc99"
+      },
+      "scope": "26 accepted functionality/diagnostic cases; D022 corrected audit only, same C++ binaries; no producer timing_evidence claim added.",
+      "corrected_toolkit_record": {
+        "path": "build/vm-owner-scaling/tooling-errata-v2/result.json",
+        "bytes": 1732,
+        "sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156"
+      },
+      "D022_corrected_audit_and_continuation": [
+        {
+          "path": "build/vm-owner-scaling/tooling-errata-v2/audit_owner_scaling.py",
+          "sha256": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d"
+        },
+        {
+          "path": "build/vm-owner-scaling/tooling-errata-v2/continue_owner_scaling.py",
+          "sha256": "1e265ba3da04ea3e8cfe94f39a0dcb1c5d88d2f36a8b286678a38eb9761aedf9"
+        },
+        {
+          "path": "build/vm-owner-scaling/tooling-errata-v2/test_audit_owner_scaling.py",
+          "sha256": "56199206a26c811b327f0ab9012edf38b7f94f11e9542ae63ad2891feac09e56"
+        }
+      ]
+    },
+    {
+      "id": "default-D-F-producers",
+      "build_result": {
+        "path": "build/vm-network-measurement/default-build-v1/result.json",
+        "bytes": 4773,
+        "sha256": "9e925ba0e356de831419965c347f76d23a4110c9a7fd268e1847026b9be07015",
+        "kind": "metadata_index_read_only"
+      },
+      "acceptance": {
+        "path": "docs/coordination/vm-followup/default-aa-1-approval.json",
+        "bytes": 1632,
+        "sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+        "kind": "metadata_index_read_only"
+      },
+      "binaries": [
+        {
+          "profile": "D",
+          "path": "build/vm-network-measurement/default-build-v1/bin/D",
+          "bytes": 218320,
+          "sha256": "389916a0a454fd775474995d9e970fa15bc9dc7421ac10111a6d74c7e302163d",
+          "identity_method": "recorded accepted binaries.json; no binary rehash",
+          "actual_measurement_scope": "functional-equivalence only; no D/F timing"
+        },
+        {
+          "profile": "F",
+          "path": "build/vm-network-measurement/default-build-v1/bin/F",
+          "bytes": 220192,
+          "sha256": "2ef8eea55d1152d68fdabc084f7158492109ec4f7b3d200f286ac70bf4d286af",
+          "identity_method": "recorded accepted binaries.json; no binary rehash",
+          "actual_measurement_scope": "F/F78"
+        }
+      ],
+      "binaries_manifest": {
+        "path": "build/vm-network-measurement/default-build-v1/binaries.json",
+        "bytes": 235,
+        "sha256": "10bba076e0bd5a67b53b216b029c68a7a62f949812c872e0d99e6bf2f62434ef",
+        "kind": "metadata_index_read_only"
+      },
+      "source_entries": {
+        "frozen/prepared/source/D/bench_vm_compare.cpp": {
+          "bytes": 35096,
+          "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+        },
+        "frozen/prepared/source/D/bench_vm_improvements.cpp": {
+          "bytes": 29392,
+          "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+        },
+        "frozen/prepared/source/D/xoffset_virtual_memory.hpp": {
+          "bytes": 10584,
+          "sha256": "af90d9ea4281cba703878a1042ec63aedeb3fa1807fbe8feacd4b6dfae72b186"
+        },
+        "frozen/prepared/source/D/xoffsetdatastructure.hpp": {
+          "bytes": 180835,
+          "sha256": "896ac72ba55564bfa6177df3b89d7c192e0b2584c092fdb409c63e828bfadfb0"
+        },
+        "frozen/prepared/source/F/bench_vm_compare.cpp": {
+          "bytes": 35096,
+          "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+        },
+        "frozen/prepared/source/F/bench_vm_improvements.cpp": {
+          "bytes": 29392,
+          "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+        },
+        "frozen/prepared/source/F/xoffset_virtual_memory.hpp": {
+          "bytes": 19239,
+          "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+        },
+        "frozen/prepared/source/F/xoffsetdatastructure.hpp": {
+          "bytes": 183050,
+          "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+        }
+      },
+      "runtime_manifest": {
+        "path": "build/vm-network-measurement/default-build-v1/frozen/runtime.json",
+        "bytes": 743884,
+        "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67",
+        "kind": "metadata_index_read_only"
+      },
+      "runtime_files": {
+        "compiler": {
+          "bytes": 275674200,
+          "path": "/usr/local/bin/clang++",
+          "resolved_path": "/usr/local/bin/clang-21",
+          "sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f"
+        },
+        "libc++.1.dylib": {
+          "bytes": 1153376,
+          "path": "/usr/local/lib/libc++.1.0.dylib",
+          "resolved_path": "/usr/local/lib/libc++.1.0.dylib",
+          "sha256": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc"
+        },
+        "libc++abi.1.dylib": {
+          "bytes": 351408,
+          "path": "/usr/local/lib/libc++abi.1.0.dylib",
+          "resolved_path": "/usr/local/lib/libc++abi.1.0.dylib",
+          "sha256": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+        },
+        "libunwind.1.dylib": {
+          "bytes": 92432,
+          "path": "/usr/local/lib/libunwind.1.0.dylib",
+          "resolved_path": "/usr/local/lib/libunwind.1.0.dylib",
+          "sha256": "a7539f393b8f785dd09b4f7fb7c109382dd7d2db0ee903c10ab45e777c8cc4aa"
+        }
+      },
+      "sdk": {
+        "path": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+        "settings": {
+          "bytes": 7774,
+          "sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe"
+        }
+      },
+      "include_surface": {
+        "index": {
+          "path": "build/vm-network-measurement/default-build-v1/frozen/runtime.json",
+          "bytes": 743884,
+          "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67",
+          "kind": "metadata_index_read_only",
+          "json_pointer": "/include_roots"
+        },
+        "roots": 13,
+        "scope": "Recorded include-root inventories; no compiler-generated .d closure stored in default build.",
+        "root_manifest_identities": [
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+            "recorded_files": 106,
+            "manifest_sha256": "0d78230c79b51ea3beb7ed93defe6478d04065a8ad8fbc27f394341818cb09b2"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+            "recorded_files": 56,
+            "manifest_sha256": "ba4ae3334c0eb2f0bb2fa4f1ffc84161b11fcff92865c3e82d3ec81efb7033ee"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+            "recorded_files": 95,
+            "manifest_sha256": "73eb8e8d5a9f4aa093335c7cfaff1e2f9b626e09cf47001103f41ffec76a2fe0"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+            "recorded_files": 2,
+            "manifest_sha256": "c330b5c25fc0559802204a60563ceaa133fb919de06d1231abdea19554733173"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+            "recorded_files": 1,
+            "manifest_sha256": "814965a016bc22803d1202ad51a5c38b77606634bb8fb0c94cf438a23399373b"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+            "recorded_files": 16,
+            "manifest_sha256": "5f4ed08b645d0a5e4360070c0e6fe302cb002702fd9747236fe297c5b2fa18df"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+            "recorded_files": 199,
+            "manifest_sha256": "6ad740d39b61508ca5a5ef587840377f939f41c165f947e116c1fbecb7c00a68"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+            "recorded_files": 120,
+            "manifest_sha256": "e5fe4490d1502bb28db19b59e6c3d6656969aa00a24a5c48a515d7434c0fffc1"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+            "recorded_files": 95,
+            "manifest_sha256": "a64e97cac2d3a8d6aa5c275ab7dab25d53c0b12f6816411ed453c0ebcfb5af27"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+            "recorded_files": 142,
+            "manifest_sha256": "0cd0818e2aeb5c6bd999c9613e7f0f3fe47b108aa264511c8423ca9816ee98f7"
+          },
+          {
+            "path": "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+            "recorded_files": 19,
+            "manifest_sha256": "dae211a5562e032aba838459e6b17ec36fd4cb80b01548463ebbc7123ef8f808"
+          },
+          {
+            "path": "/usr/local/include/c++/v1",
+            "recorded_files": 1671,
+            "manifest_sha256": "a53c37f71c1e4c31624cebba315e018b3541fd1445d789df1f423f1615472c91"
+          },
+          {
+            "path": "/usr/local/lib/clang/21/include",
+            "recorded_files": 273,
+            "manifest_sha256": "8f208fe6ff4780cc29bcc097588a7bec6993f426ef657786c2cb1346a5b2fd70"
+          }
+        ]
+      },
+      "compile_receipts": [
+        {
+          "path": "build/vm-network-measurement/default-build-v1/commands/D.receipt.json",
+          "sha256": {
+            "bytes": 1990,
+            "sha256": "9ff063d6159d7cfefd0aeda8e6b0eba7c86c300442eacace6c3db3b30d5284a8"
+          }
+        },
+        {
+          "path": "build/vm-network-measurement/default-build-v1/commands/F.receipt.json",
+          "sha256": {
+            "bytes": 1990,
+            "sha256": "77b133d3c424f720873a57333072759010e4b6894bfffe4a412f3749037783dd"
+          }
+        },
+        {
+          "path": "build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json",
+          "sha256": {
+            "bytes": 219,
+            "sha256": "ce2c7466aed719b44e2408d6929b47e0240c6abf215c6bd4eac7f77855160f82"
+          }
+        }
+      ],
+      "frozen_protocol_hashes": {
+        "frozen/protocol/default-contract.json": {
+          "bytes": 9927,
+          "sha256": "40bc2179baa85b14842bf8b85a1f426250712903030a6c91d4e52865a72c6a30"
+        },
+        "frozen/protocol/default_measurement.py": {
+          "bytes": 54691,
+          "sha256": "f73724c67f310dc71487c7726dc4ea073fd2391fcaa6442f444d5a599e71b510"
+        },
+        "frozen/protocol/paired_measurement.py": {
+          "bytes": 31083,
+          "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+        },
+        "frozen/protocol/prepare_default.py": {
+          "bytes": 6407,
+          "sha256": "4e316ecd5e95a72b155749b3559f0f223f197760134d71f7eee03fff8e707955"
+        },
+        "frozen/protocol/run_job.py": {
+          "bytes": 16898,
+          "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+        }
+      },
+      "portable_evidence_reference": "docs/perf/vm-default-attribution/calibration-v1; producer linkage retained in nested frozen functional/build records.",
+      "compiler_version_stdout": {
+        "path": "build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout",
+        "sha256": {
+          "bytes": 220,
+          "sha256": "7099cf9d0f52244e0efb313f6c70305be93cd513a2900005b7dbfc6daa765cf5"
+        }
+      }
+    },
+    {
+      "id": "network112-producer-binding",
+      "producer_profile": "W1-network-timing",
+      "binary": {
+        "relative_to_window": "w1-build/net_reference",
+        "bytes": 325424,
+        "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18",
+        "identity_method": "accepted input index, no binary rehash"
+      },
+      "build_result_sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+      "functional_result_sha256": "671fdc3e0d33119ee402ff37a2190674a65c5b6893db31537e1506e4e2eceb3d",
+      "producer_manifest": {
+        "path": "build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json",
+        "bytes": 26707,
+        "sha256": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+        "kind": "metadata_index_read_only",
+        "json_pointer": "/accepted_inputs"
+      },
+      "producer_entries": {
+        "w1-build/net_reference": {
+          "bytes": 325424,
+          "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18"
+        },
+        "w1-build/result.json": {
+          "bytes": 5562,
+          "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc"
+        },
+        "w1-build/source/net_reference.cpp": {
+          "bytes": 44678,
+          "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf"
+        },
+        "w1-build/toolchain.json": {
+          "bytes": 914,
+          "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4"
+        }
+      },
+      "binding": {
+        "path": "build/vm-network-measurement/network-calibration-v1/binding.json",
+        "bytes": 2332,
+        "sha256": "d8533b574825fbe1d6836a069b40aff8f54d9decf8d8a218cb3ff2aa97dd91f4",
+        "kind": "metadata_index_read_only"
+      },
+      "executed_protocol_hashes": {
+        "binder_sha256": "6d333147e0b2298ded5ee936f7bf9a1d25ce4a07536964aa261d6cb755b29257",
+        "binder_test_sha256": "43531c3313ed75d09580e1ec9dc2d4fc752ce390153d9d72d62f8dbb5a403e48",
+        "fixture_execution_protocol_sha256": "c53e484f9459cf0dc4e8d4e33c6b582fd8b4fa316c04023638b238d1dfa6dc59",
+        "network_sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+        "paired_sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+      },
+      "scope": "Same accepted W1 timing binary5cf8a18e; not W2 generated diagnostic binary. Producer compiler/SDK/runtime identities inherited from W1 timing result/toolchain above."
+    },
+    {
+      "id": "network88-producer-binding",
+      "producer_profile": "W1-network-timing",
+      "binary": {
+        "relative_to_window": "w1-build/net_reference",
+        "bytes": 325424,
+        "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18",
+        "identity_method": "accepted input index, no binary rehash"
+      },
+      "build_result_sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+      "functional_result_sha256": "671fdc3e0d33119ee402ff37a2190674a65c5b6893db31537e1506e4e2eceb3d",
+      "producer_manifest": {
+        "path": "build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json",
+        "bytes": 26051,
+        "sha256": "1452d89eb8a6d06d8b66ef2b59b28c8a8cb269d4b334c25f7bddfeaf607a39e2",
+        "kind": "metadata_index_read_only",
+        "json_pointer": "/accepted_inputs"
+      },
+      "producer_entries": {
+        "w1-build/net_reference": {
+          "bytes": 325424,
+          "sha256": "5cf8a18e11ab38676cd7a1791556233b239b8791c9b4e665642f0092dcec7f18"
+        },
+        "w1-build/result.json": {
+          "bytes": 5562,
+          "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc"
+        },
+        "w1-build/source/net_reference.cpp": {
+          "bytes": 44678,
+          "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf"
+        },
+        "w1-build/toolchain.json": {
+          "bytes": 914,
+          "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4"
+        }
+      },
+      "binding": {
+        "path": "build/vm-network-measurement/network-pool-screening-1m-v1/binding.json",
+        "bytes": 2376,
+        "sha256": "09180925cafc5453158762891b6649d6a77ef601251fbe308533b2991c8f2e4c",
+        "kind": "metadata_index_read_only"
+      },
+      "executed_protocol_hashes": {
+        "binder_sha256": "dcf8ea7b103647e1ff8429bfd9999f20ed91dc4f0f7d64d08c79a36fa09b3bef",
+        "binder_test_sha256": "e45f83059745f8c4b7350395b2500259544303e59b507a6202a8bb4724e224d4",
+        "fixture_execution_protocol_sha256": "c53e484f9459cf0dc4e8d4e33c6b582fd8b4fa316c04023638b238d1dfa6dc59",
+        "network_sha256": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+        "paired_sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a"
+      },
+      "scope": "Same accepted W1 timing binary5cf8a18e; not W2 generated diagnostic binary. Producer compiler/SDK/runtime identities inherited from W1 timing result/toolchain above."
+    },
+    {
+      "id": "owner78-D030-actual-execution",
+      "authority": {
+        "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+        "bytes": 3294,
+        "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+        "kind": "metadata_index_read_only"
+      },
+      "proposal": {
+        "path": "build/vm-owner-measurement/proposal-v1/proposal.json",
+        "bytes": 145299,
+        "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+        "kind": "metadata_index_read_only"
+      },
+      "binary": {
+        "path": "build/vm-owner-measurement/proposal-v1/producer/owner_scaling_timing",
+        "sha256": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45",
+        "build_profile": "owner26-accepted-build-v4 timing",
+        "identity_method": "recorded immutable proposal, no binary rehash"
+      },
+      "binding_sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+      "producer_binding": {
+        "path": "build/vm-owner-measurement/proposal-v1/producer/binding.json",
+        "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14"
+      },
+      "producer_closure_index": {
+        "path": "build/vm-owner-measurement/proposal-v1/proposal.json",
+        "bytes": 145299,
+        "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+        "kind": "metadata_index_read_only",
+        "json_pointer": "/producer/external_files"
+      },
+      "recorded_external_files": 1020,
+      "original_tools": [
+        {
+          "path": "build/vm-owner-measurement/proposal-v1/tools/audit_owner_measurement.py",
+          "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+          "must_keep_original_bytes": true,
+          "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/audit_owner_measurement.py",
+          "bytes": 13905
+        },
+        {
+          "path": "build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py",
+          "sha256": "8ab7a0dbc2f8e5e879fd3b84f74598ffd4e84e1c2f06bac9f6b3fc89003c9214",
+          "must_keep_original_bytes": true,
+          "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/collect_owner_measurement.py",
+          "bytes": 38406
+        },
+        {
+          "path": "build/vm-owner-measurement/proposal-v1/tools/queue-runner.py",
+          "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+          "must_keep_original_bytes": true,
+          "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/queue-runner.py",
+          "bytes": 16898
+        }
+      ],
+      "test_source": {
+        "accepted_sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+        "accepted_bytes": 50410,
+        "located_at_review": "experiments/vm_owner_measurement/test_owner_measurement.py",
+        "small_source_hash_verified": true,
+        "not_in_proposal_tools": true,
+        "must_freeze_original_before_live_changes": false,
+        "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/test_owner_measurement.py",
+        "preserved_original_bytes": true
+      },
+      "python": {
+        "executable": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "executable_sha256": "2cbb3ee843d8abcf93ed35bb9102391f18eefccb03d47908547bd8db67bc395c",
+        "implementation": "cpython",
+        "machine": "arm64",
+        "module_files": {
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/argparse.py": "7b73a121353cca465b96265ba256b7c5b92f18e3b2fb2d9a5a950e227b7fccf5",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/datetime.py": "742884b0c8e7dc69911858245db4f34d42e8ec0f769d580c570bd56032b0866c",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/decimal.py": "af29fa99aa720a68cab5a6384c7beba4c8e9480a6c1d53a512efeeb5a7e5c781",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/fractions.py": "7a95f1c506c9ac4b2277df5f2bdd9d61cc67b520c45021a5a961939770221ef6",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/hashlib.py": "88fa624821fbdee7eb2ef87c2437b207afe328cf117c7463367e2db5eb1af492",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py": "95022d150a27a2bfd54ac21bfce35812c96b53c420bb7b018dcb573f13e52da0",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/fcntl.cpython-314-darwin.so": "d20d721bb3d8edebef19b21299b9e601a730725218e19bb01834caaf10e11242",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/math.cpython-314-darwin.so": "255d6c258e3a059a3066c61331d6a9362ff1119befc9650326b5f97b9cdf0143",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/resource.cpython-314-darwin.so": "ebef57dbe2db56a636d0197d70bced7ca513f0a56c52dd246cea8d54392a6d89",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/os.py": "1494f3b93c6714d7a511963586f2b392dc92f3181c0d1ead82c621a4b0aad969",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/pathlib/__init__.py": "042a4d0a5e1ef66778daa86dc269af205bd42d06e793e53d8b99dff4c45928ca",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/platform.py": "240eba74565cd0dc4f99f182f7afc32bbea0593016ddb34165b529b5bcb6be0a",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/selectors.py": "4b8a60cfbb619d080f87dffe1578372e56e8c0ac826f043224a154cf7b77606d",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/shutil.py": "ab36f39f04e349020cdd13cf41b50905fc399150fb5e6a7cf73d69b22dd949cd",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/statistics.py": "b7558385a2005432c0ae74a222866316bf4f9c3ed448555659e7014b1077173a",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py": "44f1dd075f61930212ad38dfe555492e0fd89f114cf9eaab2e3960945112383d",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/types.py": "8e3836b81d5764ef5449bd155c49bf745d5e79f6056978d35b7cd4b4d752e9ef",
+          "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/uuid.py": "18cf6964825ae92a6c92758c5daab09b92e962dfb50622ea3d0a069a7fbc6857"
+        },
+        "resolved_executable": "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "system": "Darwin",
+        "version": "3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]"
+      },
+      "schedule": {
+        "path": "build/vm-owner-measurement/proposal-v1/schedule.json",
+        "sha256": "49fb5d0cc634ba48b5fff7966ba2348bb495bb11dce7481724684d24090d1875"
+      },
+      "scope": "Original78 native invocations used frozen D030 collector8ab7/auditor1711 and owner26 build-v4 timing binary2ff7. D032 corrected collector5f14/supplement411d are separately accepted, with0new native/build/window in the D031 supplement; do not relabel them as original executed native source. D033 accepts7/24cells and2/24comparisons including1self; all multithread comparisons uncertain.",
+      "D031_followup": {
+        "authority": {
+          "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+          "bytes": 3059,
+          "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+          "kind": "metadata_index_read_only"
+        },
+        "status": "accepted_D032_tool_fix_D033_original_and_derived_offline_supplement",
+        "new_native": 0,
+        "new_builds": 0,
+        "expected_change": "Byte-preserving future collector and explicitly declared derived offline audit view only; originals immutable.",
+        "accepted_supplement_source_hashes": {
+          "experiments/vm_owner_measurement/README.md": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c",
+          "experiments/vm_owner_measurement/REVIEW.md": "164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1",
+          "experiments/vm_owner_measurement/audit_owner_measurement.py": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+          "experiments/vm_owner_measurement/collect_owner_measurement.py": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426",
+          "experiments/vm_owner_measurement/producer-binding-v1.json": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+          "experiments/vm_owner_measurement/producer-binding.template.json": "3e67f13868bcbd653e010def3037a15c5c510e34d0b8c1e0e80ebb8855440ff9",
+          "experiments/vm_owner_measurement/supplement_approval_bytes.py": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+          "experiments/vm_owner_measurement/test_approval_bytes.py": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8",
+          "experiments/vm_owner_measurement/test_owner_measurement.py": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c"
+        },
+        "final_parent_acceptance": {
+          "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+          "bytes": 4959,
+          "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+          "kind": "small_accepted_record_or_final_publication_read_only"
+        },
+        "observed_at": "2026-10-15T19:20:52.397706+00:00",
+        "tool_candidate_observation": {
+          "status": "tools_ready_for_parent_source_review_before_W3_validation",
+          "report": {
+            "path": "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+            "bytes": 7924,
+            "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15",
+            "kind": "small_metadata_observation_not_parent_acceptance"
+          },
+          "sources": {
+            "experiments/vm_owner_measurement/README.md": {
+              "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c",
+              "bytes": 7296
+            },
+            "experiments/vm_owner_measurement/audit_owner_measurement.py": {
+              "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+              "bytes": 13905
+            },
+            "experiments/vm_owner_measurement/collect_owner_measurement.py": {
+              "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426",
+              "bytes": 39326
+            },
+            "experiments/vm_owner_measurement/supplement_approval_bytes.py": {
+              "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+              "bytes": 22322
+            },
+            "experiments/vm_owner_measurement/test_approval_bytes.py": {
+              "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8",
+              "bytes": 15110
+            },
+            "experiments/vm_owner_measurement/test_owner_measurement.py": {
+              "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+              "bytes": 50410
+            }
+          },
+          "source_identity_method": "Six small current source files hash-matched to matching W2 tool-review/handoff maps; not accepted final source closure.",
+          "offline_tests_reported": {
+            "count_each": 51,
+            "existing_tests": 41,
+            "native_processes": 0,
+            "new_regressions": 10,
+            "normal": {
+              "path": "build/vm-owner-measurement/d031/offline-tests.log",
+              "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02"
+            },
+            "optimized": {
+              "path": "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+              "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e"
+            }
+          },
+          "test_results_scope": "W2 reports 51 normal and 51 optimized pass results; this index read identities only and ran no tests.",
+          "actual_supplement_executed": false,
+          "completed_W3_validation_receipt": null,
+          "new_native_processes": 0,
+          "new_builds": 0,
+          "new_measurement_windows": 0,
+          "independent_incremental_review": "in_progress_as_reported_by_parent_not_final_acceptance",
+          "observation_disposition": "Historical preacceptance observation; superseded for current status by exact D032/D033 acceptances below."
+        },
+        "final_owner_acceptance": {
+          "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+          "bytes": 6870,
+          "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+          "kind": "small_accepted_record_or_final_publication_read_only"
+        },
+        "pending_final_content_bindings": [],
+        "accepted_at_index_update": "2026-10-15T19:31:39.398755+00:00",
+        "accepted_source_closure_record": {
+          "path": "docs/validation/vm-final/final-increment.json",
+          "bytes": 3565,
+          "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+          "kind": "small_accepted_record_or_final_publication_read_only"
+        },
+        "accepted_source_categories": {
+          "D032_direct_sources": 6,
+          "D023_inherited_REVIEW": 1,
+          "D030_inherited_producer_binding": 1,
+          "unexecuted_auxiliary_JSON_template": 1,
+          "template_is_historical_execution_input": false
+        },
+        "final_offline_supplement": {
+          "package_result": {
+            "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+            "bytes": 124518,
+            "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+            "kind": "small_accepted_record_or_final_publication_read_only"
+          },
+          "completed_validation_receipt": {
+            "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+            "bytes": 452,
+            "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055",
+            "kind": "small_accepted_record_or_final_publication_read_only"
+          },
+          "payload_recorded_files": 698,
+          "payload_recorded_bytes": 8891188,
+          "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+          "payload_bytes_reread_by_this_index": 0,
+          "only_derived_difference": [
+            {
+              "derived_bytes": 688,
+              "derived_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+              "original_bytes": 688,
+              "original_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+              "path": "approval.json"
+            }
+          ],
+          "new_native_processes": 0,
+          "new_builds": 0,
+          "new_measurement_windows": 0,
+          "scope": "Accepted D031 offline original/derived archive, completed W3 validation receipt, and relocated package. D032 execution proposal is historical authorization, not completed receipt proof."
+        },
+        "final_W3_publication": [
+          {
+            "path": "docs/perf/vm-owner-scaling/RESULTS.md",
+            "bytes": 8129,
+            "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68",
+            "kind": "small_accepted_record_or_final_publication_read_only"
+          },
+          {
+            "path": "docs/perf/vm-owner-scaling/handoff.json",
+            "bytes": 25841,
+            "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+            "kind": "small_accepted_record_or_final_publication_read_only"
+          }
+        ]
+      },
+      "final_measurement_acceptance": {
+        "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+        "bytes": 6870,
+        "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+        "kind": "small_accepted_record_or_final_publication_read_only"
+      },
+      "accepted_execution": {
+        "native_processes": 78,
+        "preruns": 6,
+        "measured_processes": 72,
+        "samples_per_condition": 12,
+        "same_condition_pairs": 6,
+        "conditions": 6,
+        "phases": 4,
+        "new_native_after_original_window": 0,
+        "rebuilds": 0,
+        "windows": 1
+      },
+      "accepted_qualification": {
+        "cells_total": 24,
+        "qualified_cells_count": 7,
+        "uncertain_cells_count": 17,
+        "comparisons_total": 24,
+        "qualified_comparisons_count": 2,
+        "non_self_qualified_comparisons_count": 1,
+        "uncertain_comparisons_count": 22,
+        "all_multithread_comparisons_uncertain": true
+      },
+      "accepted_inference_limits": [
+        "A/free versus C/free is a single-window fixed-request phase observation; owner count changes per-owner workload and metadata.",
+        "All multithread comparisons uncertain; no thread-scaling or registry-lock/hash causal conclusion.",
+        "Clocks include scheduling/barriers/bookkeeping and exclude other lifecycle work; not lookup latency, full application lifetime or production tails.",
+        "No default D/F result, 2 percent regression claim, optimization/adoption or production benefit.",
+        "Native producer timing_evidence=false remains unchanged; authorization and qualification are separate artifacts."
+      ]
+    }
+  ],
+  "required_capsule_generated_content": [
+    {
+      "source_path": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/xoffsetdatastructure.hpp",
+      "sha256": "8d9447a81ca07f758fa813fbcc0823f8e8910d94cc2d9214bd7fda757a2964e6",
+      "kind": "accepted_generated_diagnostic_header_or_runtime",
+      "identity_source": {
+        "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+        "json_pointer": "/files/build~1input~1diagnostic~1xoffsetdatastructure.hpp"
+      },
+      "must_include_actual_bytes_in_capsule": true,
+      "bytes_rehashed_in_this_assignment": false,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-generated/diagnostic/xoffsetdatastructure.hpp",
+      "preserved_bytes": 187645,
+      "preservation_record_path": "docs/validation/vm-final/final-v1/preserved-inputs.json"
+    },
+    {
+      "source_path": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/xoffset_virtual_memory.hpp",
+      "sha256": "b1caeed243f6ba412c3f68104730df21e0ad580193adc1c3186749c76c1c4e57",
+      "kind": "accepted_generated_diagnostic_header_or_runtime",
+      "identity_source": {
+        "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+        "json_pointer": "/files/build~1input~1diagnostic~1xoffset_virtual_memory.hpp"
+      },
+      "must_include_actual_bytes_in_capsule": true,
+      "bytes_rehashed_in_this_assignment": false,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-generated/diagnostic/xoffset_virtual_memory.hpp",
+      "preserved_bytes": 19618,
+      "preservation_record_path": "docs/validation/vm-final/final-v1/preserved-inputs.json"
+    },
+    {
+      "source_path": "docs/validation/vm-observability/frozen-implementation-v1/build/input/diagnostic/n3_runtime.hpp",
+      "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+      "kind": "accepted_generated_diagnostic_header_or_runtime",
+      "identity_source": {
+        "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+        "json_pointer": "/files/build~1input~1diagnostic~1n3_runtime.hpp"
+      },
+      "must_include_actual_bytes_in_capsule": true,
+      "bytes_rehashed_in_this_assignment": false,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-generated/diagnostic/n3_runtime.hpp",
+      "preserved_bytes": 19990,
+      "preservation_record_path": "docs/validation/vm-final/final-v1/preserved-inputs.json"
+    },
+    {
+      "source_path": "build/vm-observability/network/build-v2/input/source/net_reference.cpp",
+      "sha256": "e7cc3f07e2d22cbfa8ae6491e0b682a900e1760274e0cd2c9d59deb102251d7d",
+      "kind": "accepted_generated_network_consumer_or_support",
+      "identity_source": {
+        "path": "build/vm-observability/network/build-v2/result.json",
+        "json_pointer": "/files/input~1source~1net_reference.cpp"
+      },
+      "must_include_actual_bytes_in_capsule": true,
+      "bytes_rehashed_in_this_assignment": false,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-generated/network/net_reference.cpp",
+      "preserved_bytes": 48584,
+      "preservation_record_path": "docs/validation/vm-final/final-v1/preserved-inputs.json"
+    },
+    {
+      "source_path": "build/vm-observability/network/build-v2/input/source/network_support.hpp",
+      "sha256": "8ec552329b13ca7c226a658adce4d6813f7d2af1a0b1ab09735546e8c0e419ec",
+      "kind": "accepted_generated_network_consumer_or_support",
+      "identity_source": {
+        "path": "build/vm-observability/network/build-v2/result.json",
+        "json_pointer": "/files/input~1source~1network_support.hpp"
+      },
+      "must_include_actual_bytes_in_capsule": true,
+      "bytes_rehashed_in_this_assignment": false,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-generated/network/network_support.hpp",
+      "preserved_bytes": 7003,
+      "preservation_record_path": "docs/validation/vm-final/final-v1/preserved-inputs.json"
+    }
+  ],
+  "immutable_D030_original_tools": [
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/tools/audit_owner_measurement.py",
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+      "must_keep_original_bytes": true,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/audit_owner_measurement.py",
+      "bytes": 13905
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py",
+      "sha256": "8ab7a0dbc2f8e5e879fd3b84f74598ffd4e84e1c2f06bac9f6b3fc89003c9214",
+      "must_keep_original_bytes": true,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/collect_owner_measurement.py",
+      "bytes": 38406
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/tools/queue-runner.py",
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+      "must_keep_original_bytes": true,
+      "preserved_capsule_path": "docs/validation/vm-final/final-v1/source/accepted-executed/D030/queue-runner.py",
+      "bytes": 16898
+    }
+  ],
+  "metadata_records_read": [
+    {
+      "path": "build/vm-network/timing-v2/result.json",
+      "bytes": 5562,
+      "sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/timing-v2/toolchain.json",
+      "bytes": 914,
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+      "bytes": 2765,
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/timing-v2/dependencies.json",
+      "bytes": 117168,
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/timing-v2/source-inventory.json",
+      "bytes": 1021,
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/result.json",
+      "bytes": 5594,
+      "sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/toolchain.json",
+      "bytes": 914,
+      "sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/dependencies.json",
+      "bytes": 117168,
+      "sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/source-inventory.json",
+      "bytes": 1021,
+      "sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+      "bytes": 16838,
+      "sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/build/result.json",
+      "bytes": 144598,
+      "sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+      "bytes": 2838,
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-observability/network/build-v2/result.json",
+      "bytes": 150112,
+      "sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/validation/vm-observability/network/final-v1/source-identities.json",
+      "bytes": 1779,
+      "sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-network-acceptance.json",
+      "bytes": 2665,
+      "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/result.json",
+      "bytes": 549953,
+      "sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+      "bytes": 3974,
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-owner-archive-acceptance.json",
+      "bytes": 1277,
+      "sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+      "bytes": 2816,
+      "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/result.json",
+      "bytes": 4773,
+      "sha256": "9e925ba0e356de831419965c347f76d23a4110c9a7fd268e1847026b9be07015",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/binaries.json",
+      "bytes": 235,
+      "sha256": "10bba076e0bd5a67b53b216b029c68a7a62f949812c872e0d99e6bf2f62434ef",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/frozen/runtime.json",
+      "bytes": 743884,
+      "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/default-aa-1-approval.json",
+      "bytes": 1632,
+      "sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json",
+      "bytes": 26707,
+      "sha256": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/binding.json",
+      "bytes": 2332,
+      "sha256": "d8533b574825fbe1d6836a069b40aff8f54d9decf8d8a218cb3ff2aa97dd91f4",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json",
+      "bytes": 26051,
+      "sha256": "1452d89eb8a6d06d8b66ef2b59b28c8a8cb269d4b334c25f7bddfeaf607a39e2",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/binding.json",
+      "bytes": 2376,
+      "sha256": "09180925cafc5453158762891b6649d6a77ef601251fbe308533b2991c8f2e4c",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/proposal.json",
+      "bytes": 145299,
+      "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+      "bytes": 3294,
+      "sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+      "bytes": 3059,
+      "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+      "kind": "metadata_index_read_only"
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+      "bytes": 7924,
+      "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15",
+      "kind": "small_metadata_observation_not_parent_acceptance"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/small-input-identities.json",
+      "bytes": 3247,
+      "sha256": "0b2f769fc3f8c967b4c3da00aa87231a7487033567828e599b510c0202a86202",
+      "kind": "small_metadata_observation_not_parent_acceptance"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/handoff-before.json",
+      "bytes": 5120,
+      "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7",
+      "kind": "small_metadata_observation_not_parent_acceptance"
+    },
+    {
+      "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "bytes": 6870,
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "bytes": 4959,
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "docs/validation/vm-final/final-increment.json",
+      "bytes": 3565,
+      "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "build/vm-owner-measurement/window-v1/window.json",
+      "bytes": 112372,
+      "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "build/vm-owner-measurement/window-v1/summary.json",
+      "bytes": 87538,
+      "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+      "bytes": 448,
+      "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+      "bytes": 124518,
+      "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+      "bytes": 452,
+      "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/handoff.json",
+      "bytes": 25841,
+      "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    }
+  ],
+  "limitations": [
+    "Record paths are workspace-relative evidence locators; historical absolute argv are provenance, not a claim that relocation or rebuilding is transparent.",
+    "Build manifest SHA binds recorded fields; this index does not reverify their referenced binaries or external bytes.",
+    "SDK settings and included header inventories do not seal a full SDK/runtime/sysroot or all loaded process libraries.",
+    "W1/default lack actual compiler-generated include .d closure in their preserved build metadata; explicit dependency/input inventories are retained instead.",
+    "Recorded10.15 compiler option is not oldOS runtime support or independently checked MachO effective minimum.",
+    "D031 live correction and declared derived audit view must be added only after exact parent acceptance; never replace D030 executed tool hashes."
+  ],
+  "next_action": "Root may seal the final bounded source/metadata capsule after latest plan/handoff capture. Then run the independent auditor once through default validation queue with exact outer manifest and D033/D032 authority SHA anchors. Final review stays outside capsule; no native rerun.",
+  "preserved_input_record": {
+    "path": "docs/validation/vm-final/final-v1/preserved-inputs.json",
+    "bytes": 3385,
+    "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+    "entries": 9,
+    "scope": "Parent queued copy checked source SHA before writing; final capsule audit will verify copied bytes against final manifest. This index reads only the small preservation record."
+  },
+  "suggested_capsule_metadata_files": [
+    "build/vm-final/queue-final-increment-v1/events.json",
+    "build/vm-final/queue-final-increment-v1/manifest.json",
+    "build/vm-final/queue-final-increment-v1/request.json",
+    "build/vm-final/queue-final-increment-v1/result.json",
+    "build/vm-final/queue-final-increment-v1/stderr.log",
+    "build/vm-final/queue-final-increment-v1/stdout.log",
+    "build/vm-network-measurement/default-build-v1/binaries.json",
+    "build/vm-network-measurement/default-build-v1/commands/D.receipt.json",
+    "build/vm-network-measurement/default-build-v1/commands/F.receipt.json",
+    "build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json",
+    "build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout",
+    "build/vm-network-measurement/default-build-v1/execution-context.json",
+    "build/vm-network-measurement/default-build-v1/frozen/prepared/historical-metadata.json",
+    "build/vm-network-measurement/default-build-v1/frozen/prepared/preparation.json",
+    "build/vm-network-measurement/default-build-v1/frozen/result.json",
+    "build/vm-network-measurement/default-build-v1/frozen/runtime.json",
+    "build/vm-network-measurement/default-build-v1/result.json",
+    "build/vm-network-measurement/network-calibration-v1/binding.json",
+    "build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json",
+    "build/vm-network-measurement/network-calibration-v1/preregister.json",
+    "build/vm-network-measurement/network-calibration-v1/proposal-files.json",
+    "build/vm-network-measurement/network-calibration-v1/result.json",
+    "build/vm-network-measurement/network-calibration-v1/schedule.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/binding.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/preregister.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/proposal-files.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/result.json",
+    "build/vm-network-measurement/network-pool-screening-1m-v1/schedule.json",
+    "build/vm-network-measurement/network-tools-v2/source-inventory.json",
+    "build/vm-network-measurement/network-tools-v3/source-inventory.json",
+    "build/vm-network/diagnostic-v2/dependencies.json",
+    "build/vm-network/diagnostic-v2/result.json",
+    "build/vm-network/diagnostic-v2/source-inventory.json",
+    "build/vm-network/diagnostic-v2/toolchain.json",
+    "build/vm-network/timing-v2/dependencies.json",
+    "build/vm-network/timing-v2/result.json",
+    "build/vm-network/timing-v2/source-inventory.json",
+    "build/vm-network/timing-v2/toolchain.json",
+    "build/vm-observability/network/build-v2/dependencies.d",
+    "build/vm-observability/network/build-v2/include-resolution.json",
+    "build/vm-observability/network/build-v2/result.json",
+    "build/vm-owner-measurement/d031/collector-vs-frozen.diff",
+    "build/vm-owner-measurement/d031/handoff-before.json",
+    "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+    "build/vm-owner-measurement/d031/offline-tests.log",
+    "build/vm-owner-measurement/d031/small-input-identities.json",
+    "build/vm-owner-measurement/native-window.json",
+    "build/vm-owner-measurement/proposal-v1/design.json",
+    "build/vm-owner-measurement/proposal-v1/producer/binding.json",
+    "build/vm-owner-measurement/proposal-v1/producer/build_result.json",
+    "build/vm-owner-measurement/proposal-v1/producer/contract.json",
+    "build/vm-owner-measurement/proposal-v1/producer/functional_result.json",
+    "build/vm-owner-measurement/proposal-v1/producer/layout_correction.json",
+    "build/vm-owner-measurement/proposal-v1/producer/parent_acceptance.json",
+    "build/vm-owner-measurement/proposal-v1/producer/recovery_result.json",
+    "build/vm-owner-measurement/proposal-v1/producer/timing.d",
+    "build/vm-owner-measurement/proposal-v1/producer/toolkit_result.json",
+    "build/vm-owner-measurement/proposal-v1/proposal.json",
+    "build/vm-owner-measurement/proposal-v1/schedule.json",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/events.json",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/manifest.json",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/request.json",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/stderr.log",
+    "build/vm-owner-measurement/receipts/approval-supplement-v1/stdout.log",
+    "build/vm-owner-measurement/receipts/archive-v1/events.json",
+    "build/vm-owner-measurement/receipts/archive-v1/manifest.json",
+    "build/vm-owner-measurement/receipts/archive-v1/request.json",
+    "build/vm-owner-measurement/receipts/archive-v1/result.json",
+    "build/vm-owner-measurement/receipts/archive-v1/stderr.log",
+    "build/vm-owner-measurement/receipts/archive-v1/stdout.log",
+    "build/vm-owner-measurement/receipts/window-v1/events.json",
+    "build/vm-owner-measurement/receipts/window-v1/manifest.json",
+    "build/vm-owner-measurement/receipts/window-v1/request.json",
+    "build/vm-owner-measurement/receipts/window-v1/result.json",
+    "build/vm-owner-measurement/receipts/window-v1/stderr.log",
+    "build/vm-owner-measurement/receipts/window-v1/stdout.log",
+    "build/vm-owner-measurement/window-v1/approval.json",
+    "build/vm-owner-measurement/window-v1/summary.json",
+    "build/vm-owner-measurement/window-v1/window.json",
+    "build/vm-owner-scaling/build-v4/diagnostic.d",
+    "build/vm-owner-scaling/build-v4/prebuild-external.json",
+    "build/vm-owner-scaling/build-v4/prepared-result.json",
+    "build/vm-owner-scaling/build-v4/provenance/d018-acceptance.json",
+    "build/vm-owner-scaling/build-v4/provenance/toolchain.json",
+    "build/vm-owner-scaling/build-v4/provenance/w2-acceptance.json",
+    "build/vm-owner-scaling/build-v4/provenance/w2-build.json",
+    "build/vm-owner-scaling/build-v4/result.json",
+    "build/vm-owner-scaling/build-v4/timing.d",
+    "build/vm-owner-scaling/final-audit-v1.json",
+    "build/vm-owner-scaling/recovery-v2/result.json",
+    "build/vm-owner-scaling/tooling-errata-v2/result.json",
+    "docs/coordination/vm-followup/W1-G1-acceptance.json",
+    "docs/coordination/vm-followup/W1-owner-archive-acceptance.json",
+    "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+    "docs/coordination/vm-followup/W2-G1-acceptance.json",
+    "docs/coordination/vm-followup/W2-network-acceptance.json",
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+    "docs/coordination/vm-followup/default-aa-1-approval.json",
+    "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+    "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+    "docs/perf/vm-owner-scaling/RESULTS.md",
+    "docs/perf/vm-owner-scaling/handoff.json",
+    "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+    "docs/validation/vm-final/final-increment.json",
+    "docs/validation/vm-final/final-v1/preserved-inputs.json",
+    "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d",
+    "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d",
+    "docs/validation/vm-observability/frozen-implementation-v1/build/result.json",
+    "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+    "docs/validation/vm-observability/network/final-v1/source-identities.json"
+  ],
+  "suggested_capsule_metadata_file_details": [
+    {
+      "path": "build/vm-final/queue-final-increment-v1/events.json",
+      "observed_bytes": 3,
+      "existing_recorded_sha256": {
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/events.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-final/queue-final-increment-v1/manifest.json",
+      "observed_bytes": 912,
+      "existing_recorded_sha256": {
+        "bytes": 912,
+        "sha256": "6c2649f7803a5e65c1e51c8c3499832667454ec7a278bd981a5fbd9366a9f84b"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/manifest.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-final/queue-final-increment-v1/request.json",
+      "observed_bytes": 4316,
+      "existing_recorded_sha256": {
+        "bytes": 4316,
+        "sha256": "625e34280e687b3ddedaf22f4e404eb76d3d980cce303764d376f32866a5764c"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/request.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-final/queue-final-increment-v1/result.json",
+      "observed_bytes": 453,
+      "existing_recorded_sha256": {
+        "bytes": 453,
+        "sha256": "7b18ef519a2e4709141a391e6b275eeb97b327fd1c6b73a121ca341793c63bd3"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/result.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-final/queue-final-increment-v1/stderr.log",
+      "observed_bytes": 0,
+      "existing_recorded_sha256": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/stderr.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-final/queue-final-increment-v1/stdout.log",
+      "observed_bytes": 256,
+      "existing_recorded_sha256": {
+        "bytes": 256,
+        "sha256": "a7fb3748ced6fd08e72abdbcbb9cd5676f29139b6090610d1e91d08309b4d87e"
+      },
+      "copy_as": "metadata/build/vm-final/queue-final-increment-v1/stdout.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/binaries.json",
+      "observed_bytes": 235,
+      "existing_recorded_sha256": {
+        "bytes": 235,
+        "sha256": "10bba076e0bd5a67b53b216b029c68a7a62f949812c872e0d99e6bf2f62434ef"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/binaries.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/commands/D.receipt.json",
+      "observed_bytes": 1990,
+      "existing_recorded_sha256": {
+        "bytes": 1990,
+        "sha256": "9ff063d6159d7cfefd0aeda8e6b0eba7c86c300442eacace6c3db3b30d5284a8"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/commands/D.receipt.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/commands/F.receipt.json",
+      "observed_bytes": 1990,
+      "existing_recorded_sha256": {
+        "bytes": 1990,
+        "sha256": "77b133d3c424f720873a57333072759010e4b6894bfffe4a412f3749037783dd"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/commands/F.receipt.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json",
+      "observed_bytes": 219,
+      "existing_recorded_sha256": {
+        "bytes": 219,
+        "sha256": "ce2c7466aed719b44e2408d6929b47e0240c6abf215c6bd4eac7f77855160f82"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.receipt.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout",
+      "observed_bytes": 220,
+      "existing_recorded_sha256": {
+        "bytes": 220,
+        "sha256": "7099cf9d0f52244e0efb313f6c70305be93cd513a2900005b7dbfc6daa765cf5"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/commands/compiler-version.stdout"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/execution-context.json",
+      "observed_bytes": 1340,
+      "existing_recorded_sha256": {
+        "bytes": 1340,
+        "sha256": "b8e93df57dadd2b386c4c3b521cfd7e1fb3a5fe9c5e8ff6a3146e115c7b9eb50"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/execution-context.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/frozen/prepared/historical-metadata.json",
+      "observed_bytes": 9091,
+      "existing_recorded_sha256": {
+        "bytes": 9091,
+        "sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/historical-metadata.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/frozen/prepared/preparation.json",
+      "observed_bytes": 6273,
+      "existing_recorded_sha256": {
+        "bytes": 6273,
+        "sha256": "80294597ae25781da557c2910096cea4551c593d50fe56ccd72fbc1729605d0c"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/frozen/prepared/preparation.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/frozen/result.json",
+      "observed_bytes": 2675,
+      "existing_recorded_sha256": {
+        "bytes": 2675,
+        "sha256": "0547aac5db4d20ffee3d948cc5116160f710343bcdce1e5d381c68cbccaaecea"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/frozen/result.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/frozen/runtime.json",
+      "observed_bytes": 743884,
+      "existing_recorded_sha256": {
+        "bytes": 743884,
+        "sha256": "7bde06152fe767bf4786efad7352cb0efe923fe4b1a3579efd368ac19f069d67"
+      },
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/frozen/runtime.json"
+    },
+    {
+      "path": "build/vm-network-measurement/default-build-v1/result.json",
+      "observed_bytes": 4773,
+      "existing_recorded_sha256": "9e925ba0e356de831419965c347f76d23a4110c9a7fd268e1847026b9be07015",
+      "copy_as": "metadata/build/vm-network-measurement/default-build-v1/result.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/binding.json",
+      "observed_bytes": 2332,
+      "existing_recorded_sha256": "d8533b574825fbe1d6836a069b40aff8f54d9decf8d8a218cb3ff2aa97dd91f4",
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/binding.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json",
+      "observed_bytes": 26707,
+      "existing_recorded_sha256": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/parent-approval-proposal.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/preregister.json",
+      "observed_bytes": 128037,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/preregister.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/proposal-files.json",
+      "observed_bytes": 25516,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/proposal-files.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/result.json",
+      "observed_bytes": 331154,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/result.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-calibration-v1/schedule.json",
+      "observed_bytes": 28227,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-calibration-v1/schedule.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/binding.json",
+      "observed_bytes": 2376,
+      "existing_recorded_sha256": "09180925cafc5453158762891b6649d6a77ef601251fbe308533b2991c8f2e4c",
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/binding.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json",
+      "observed_bytes": 26051,
+      "existing_recorded_sha256": "1452d89eb8a6d06d8b66ef2b59b28c8a8cb269d4b334c25f7bddfeaf607a39e2",
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/parent-approval-proposal.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/preregister.json",
+      "observed_bytes": 108192,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/preregister.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/proposal-files.json",
+      "observed_bytes": 24827,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/proposal-files.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/result.json",
+      "observed_bytes": 135713,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/result.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-pool-screening-1m-v1/schedule.json",
+      "observed_bytes": 22791,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-pool-screening-1m-v1/schedule.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-tools-v2/source-inventory.json",
+      "observed_bytes": 590,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-tools-v2/source-inventory.json"
+    },
+    {
+      "path": "build/vm-network-measurement/network-tools-v3/source-inventory.json",
+      "observed_bytes": 590,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-network-measurement/network-tools-v3/source-inventory.json"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/dependencies.json",
+      "observed_bytes": 117168,
+      "existing_recorded_sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "copy_as": "metadata/build/vm-network/diagnostic-v2/dependencies.json"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/result.json",
+      "observed_bytes": 5594,
+      "existing_recorded_sha256": "7539a017c849e818afd3b31e121b197d9172087bb064172ad56fd1364cb41dd1",
+      "copy_as": "metadata/build/vm-network/diagnostic-v2/result.json"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/source-inventory.json",
+      "observed_bytes": 1021,
+      "existing_recorded_sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "copy_as": "metadata/build/vm-network/diagnostic-v2/source-inventory.json"
+    },
+    {
+      "path": "build/vm-network/diagnostic-v2/toolchain.json",
+      "observed_bytes": 914,
+      "existing_recorded_sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "copy_as": "metadata/build/vm-network/diagnostic-v2/toolchain.json"
+    },
+    {
+      "path": "build/vm-network/timing-v2/dependencies.json",
+      "observed_bytes": 117168,
+      "existing_recorded_sha256": "e15f71ca51544888a3061d92bf28915226977b7b9f85d5071e6a74d93a998b97",
+      "copy_as": "metadata/build/vm-network/timing-v2/dependencies.json"
+    },
+    {
+      "path": "build/vm-network/timing-v2/result.json",
+      "observed_bytes": 5562,
+      "existing_recorded_sha256": "41a9eda112b0f396226d08ec1b5712ea619dfbc4fe00b28d4fbf73326d59e0cc",
+      "copy_as": "metadata/build/vm-network/timing-v2/result.json"
+    },
+    {
+      "path": "build/vm-network/timing-v2/source-inventory.json",
+      "observed_bytes": 1021,
+      "existing_recorded_sha256": "58f9cd61f91c4b521890ae3496edfa3d1284c8084caa6ef667da0e49ef278508",
+      "copy_as": "metadata/build/vm-network/timing-v2/source-inventory.json"
+    },
+    {
+      "path": "build/vm-network/timing-v2/toolchain.json",
+      "observed_bytes": 914,
+      "existing_recorded_sha256": "71207f3ac92453294446732a8057e885461ab2d44c5f4dff555a67b94b095bc4",
+      "copy_as": "metadata/build/vm-network/timing-v2/toolchain.json"
+    },
+    {
+      "path": "build/vm-observability/network/build-v2/dependencies.d",
+      "observed_bytes": 73678,
+      "existing_recorded_sha256": "57b8ea9986c1b629149cfe1ea1c2c0188d054fd90fe8b841dc3d5672ab834270",
+      "copy_as": "metadata/build/vm-observability/network/build-v2/dependencies.d"
+    },
+    {
+      "path": "build/vm-observability/network/build-v2/include-resolution.json",
+      "observed_bytes": 734,
+      "existing_recorded_sha256": "eba11996347ee2e267b888be9f45dc161b0be1ffe2ca8965f602803496d804c8",
+      "copy_as": "metadata/build/vm-observability/network/build-v2/include-resolution.json"
+    },
+    {
+      "path": "build/vm-observability/network/build-v2/result.json",
+      "observed_bytes": 150112,
+      "existing_recorded_sha256": "a4a2da454b1f1ebfbd536cf63aa49d1abbbeb42c00123f1238e193ab91a66c53",
+      "copy_as": "metadata/build/vm-observability/network/build-v2/result.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/collector-vs-frozen.diff",
+      "observed_bytes": 4913,
+      "existing_recorded_sha256": {
+        "bytes": 4913,
+        "sha256": "f72902cfafe49675bd9e2064f1ba4eb4373b5044fa55c5bede2bfbe363accbd9"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/d031/collector-vs-frozen.diff",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/handoff-before.json",
+      "observed_bytes": 5120,
+      "existing_recorded_sha256": {
+        "bytes": 5120,
+        "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/d031/handoff-before.json",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+      "observed_bytes": 9046,
+      "existing_recorded_sha256": {
+        "bytes": 9046,
+        "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/d031/offline-tests-optimized.log",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/offline-tests.log",
+      "observed_bytes": 9046,
+      "existing_recorded_sha256": {
+        "bytes": 9046,
+        "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/d031/offline-tests.log",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "build/vm-owner-measurement/d031/small-input-identities.json",
+      "observed_bytes": 3247,
+      "existing_recorded_sha256": {
+        "bytes": 3247,
+        "sha256": "0b2f769fc3f8c967b4c3da00aa87231a7487033567828e599b510c0202a86202"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/d031/small-input-identities.json",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "build/vm-owner-measurement/native-window.json",
+      "observed_bytes": 382,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-owner-measurement/native-window.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/design.json",
+      "observed_bytes": 5498,
+      "existing_recorded_sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/design.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/binding.json",
+      "observed_bytes": 1471,
+      "existing_recorded_sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/binding.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/build_result.json",
+      "observed_bytes": 549953,
+      "existing_recorded_sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/build_result.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/contract.json",
+      "observed_bytes": 5853,
+      "existing_recorded_sha256": "8b2bfe3b9f0524a200b5fbf7f5cce51bee37ab7c51abbc5748c5ba1f788b8fcf",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/contract.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/functional_result.json",
+      "observed_bytes": 2026,
+      "existing_recorded_sha256": "eaa428b8cb82b984ab335411655f2485007bf4d66fe2ab874b6a035a09b66bbf",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/functional_result.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/layout_correction.json",
+      "observed_bytes": 2816,
+      "existing_recorded_sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/layout_correction.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/parent_acceptance.json",
+      "observed_bytes": 3974,
+      "existing_recorded_sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/parent_acceptance.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/recovery_result.json",
+      "observed_bytes": 54960,
+      "existing_recorded_sha256": "ada37cf668cbbbf6a1fd35f08c94bee0a00f0c49d6d0011e5573b62061ff29e8",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/recovery_result.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/timing.d",
+      "observed_bytes": 69004,
+      "existing_recorded_sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/timing.d"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/producer/toolkit_result.json",
+      "observed_bytes": 1732,
+      "existing_recorded_sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/producer/toolkit_result.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/proposal.json",
+      "observed_bytes": 145299,
+      "existing_recorded_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/proposal.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/proposal-v1/schedule.json",
+      "observed_bytes": 14714,
+      "existing_recorded_sha256": "49fb5d0cc634ba48b5fff7966ba2348bb495bb11dce7481724684d24090d1875",
+      "copy_as": "metadata/build/vm-owner-measurement/proposal-v1/schedule.json"
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/events.json",
+      "observed_bytes": 3,
+      "existing_recorded_sha256": {
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/events.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/manifest.json",
+      "observed_bytes": 911,
+      "existing_recorded_sha256": {
+        "bytes": 911,
+        "sha256": "c90fab3be2d8f2f70932a1a876d952c27c5ee248b1438c8d6c6c1af94b4cbeac"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/manifest.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/request.json",
+      "observed_bytes": 1384,
+      "existing_recorded_sha256": {
+        "bytes": 1384,
+        "sha256": "cf47a3ecad9847acab8aa7b748f76eb7c066d36452cd121eea2db0cd8a2b9cc8"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/request.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+      "observed_bytes": 452,
+      "existing_recorded_sha256": {
+        "bytes": 452,
+        "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/stderr.log",
+      "observed_bytes": 0,
+      "existing_recorded_sha256": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stderr.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/stdout.log",
+      "observed_bytes": 87,
+      "existing_recorded_sha256": {
+        "bytes": 87,
+        "sha256": "00933f91b35e67b340a0b62d56ae57bdd7501d471f353cb56d8bdf82efdf7011"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/approval-supplement-v1/stdout.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/events.json",
+      "observed_bytes": 3,
+      "existing_recorded_sha256": {
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/events.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/manifest.json",
+      "observed_bytes": 911,
+      "existing_recorded_sha256": {
+        "bytes": 911,
+        "sha256": "1bd4e6e4039c3b45e3a5a75a8be0e1d35e441c36cf37934fbe2dfc74eda27e00"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/manifest.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/request.json",
+      "observed_bytes": 1418,
+      "existing_recorded_sha256": {
+        "bytes": 1418,
+        "sha256": "7bbda87094f510dc021a01953b9a42571f33dec7dd0a2427c64e3335922921d7"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/request.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/result.json",
+      "observed_bytes": 451,
+      "existing_recorded_sha256": {
+        "bytes": 451,
+        "sha256": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/result.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/stderr.log",
+      "observed_bytes": 53,
+      "existing_recorded_sha256": {
+        "bytes": 53,
+        "sha256": "95f12e176d9df2be22a469abb37b5163203b4f566847cbd9e114784399669ca6"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/stderr.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/stdout.log",
+      "observed_bytes": 0,
+      "existing_recorded_sha256": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/archive-v1/stdout.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/events.json",
+      "observed_bytes": 3,
+      "existing_recorded_sha256": {
+        "bytes": 3,
+        "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/events.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/manifest.json",
+      "observed_bytes": 911,
+      "existing_recorded_sha256": {
+        "bytes": 911,
+        "sha256": "f8f9f7fbe1494fc8f0806a4fdc0f6382a8c90b87b01f5aea4f221d939878ae2f"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/manifest.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/request.json",
+      "observed_bytes": 1465,
+      "existing_recorded_sha256": {
+        "bytes": 1465,
+        "sha256": "89213cf787b71f196d456fa0fc694266b9205ddb88afd1f1819f681386400ddd"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/request.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+      "observed_bytes": 448,
+      "existing_recorded_sha256": {
+        "bytes": 448,
+        "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/result.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/stderr.log",
+      "observed_bytes": 0,
+      "existing_recorded_sha256": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/stderr.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/receipts/window-v1/stdout.log",
+      "observed_bytes": 91,
+      "existing_recorded_sha256": {
+        "bytes": 91,
+        "sha256": "1954653a90ed6d1b5f4352d5add9cfbb201e678b28af63bd9efff99193a68965"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/receipts/window-v1/stdout.log",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/window-v1/approval.json",
+      "observed_bytes": 688,
+      "existing_recorded_sha256": {
+        "bytes": 688,
+        "sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/window-v1/approval.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/window-v1/summary.json",
+      "observed_bytes": 87538,
+      "existing_recorded_sha256": {
+        "bytes": 87538,
+        "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/window-v1/summary.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-measurement/window-v1/window.json",
+      "observed_bytes": 112372,
+      "existing_recorded_sha256": {
+        "bytes": 112372,
+        "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869"
+      },
+      "copy_as": "metadata/build/vm-owner-measurement/window-v1/window.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/diagnostic.d",
+      "observed_bytes": 69122,
+      "existing_recorded_sha256": "1e7c1edf4db009e27e0acaec69c0f944561ee2ae980cd0a3a479951cffe09765",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/diagnostic.d"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/prebuild-external.json",
+      "observed_bytes": 275709,
+      "existing_recorded_sha256": "b9e6438d29cb8841bc12445f7cd389a03c1b0a147ada3db59027ce55c006fc99",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/prebuild-external.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/prepared-result.json",
+      "observed_bytes": 4197,
+      "existing_recorded_sha256": "855058e7a1f86e48aeb1ef606534b6b72896b2f0e81b5f7b3a4374cc4dbe1a1c",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/prepared-result.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/provenance/d018-acceptance.json",
+      "observed_bytes": 5343,
+      "existing_recorded_sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/provenance/d018-acceptance.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/provenance/toolchain.json",
+      "observed_bytes": 2989,
+      "existing_recorded_sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/provenance/toolchain.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/provenance/w2-acceptance.json",
+      "observed_bytes": 2838,
+      "existing_recorded_sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/provenance/w2-acceptance.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/provenance/w2-build.json",
+      "observed_bytes": 144598,
+      "existing_recorded_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/provenance/w2-build.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/result.json",
+      "observed_bytes": 549953,
+      "existing_recorded_sha256": "8cfb16df844a8f95e26171a8de43fadebf4af4e5dcd99af9b5b819e0f54f45b4",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/result.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/build-v4/timing.d",
+      "observed_bytes": 69004,
+      "existing_recorded_sha256": "e445a1d267c08892f055c7820cc9075c82dabd74114dcc7c18404f60171b45d9",
+      "copy_as": "metadata/build/vm-owner-scaling/build-v4/timing.d"
+    },
+    {
+      "path": "build/vm-owner-scaling/final-audit-v1.json",
+      "observed_bytes": 2026,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-owner-scaling/final-audit-v1.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/recovery-v2/result.json",
+      "observed_bytes": 54960,
+      "existing_recorded_sha256": null,
+      "copy_as": "metadata/build/vm-owner-scaling/recovery-v2/result.json"
+    },
+    {
+      "path": "build/vm-owner-scaling/tooling-errata-v2/result.json",
+      "observed_bytes": 1732,
+      "existing_recorded_sha256": "805a312ccb6c2df34a26755039df4ccd14929aff8c4d227b65354321cf879156",
+      "copy_as": "metadata/build/vm-owner-scaling/tooling-errata-v2/result.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+      "observed_bytes": 2765,
+      "existing_recorded_sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "copy_as": "metadata/docs/coordination/vm-followup/W1-G1-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-owner-archive-acceptance.json",
+      "observed_bytes": 1277,
+      "existing_recorded_sha256": "aff3a730bfff7d584e9bd1a64ef9835a310de483f012a56bb8cbbeb03e474959",
+      "copy_as": "metadata/docs/coordination/vm-followup/W1-owner-archive-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+      "observed_bytes": 3974,
+      "existing_recorded_sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+      "copy_as": "metadata/docs/coordination/vm-followup/W1-owner-functional-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+      "observed_bytes": 2838,
+      "existing_recorded_sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "copy_as": "metadata/docs/coordination/vm-followup/W2-G1-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-network-acceptance.json",
+      "observed_bytes": 2665,
+      "existing_recorded_sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "copy_as": "metadata/docs/coordination/vm-followup/W2-network-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+      "observed_bytes": 2816,
+      "existing_recorded_sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "copy_as": "metadata/docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+      "observed_bytes": 3059,
+      "existing_recorded_sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb",
+      "copy_as": "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+      "observed_bytes": 3294,
+      "existing_recorded_sha256": "33d65123ace553c6306cf9904e1c1416f8d8ff0fd101346db7794825a69a3fad",
+      "copy_as": "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "observed_bytes": 4959,
+      "existing_recorded_sha256": {
+        "bytes": 4959,
+        "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad"
+      },
+      "copy_as": "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+      "observed_bytes": 688,
+      "existing_recorded_sha256": {
+        "bytes": 688,
+        "sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12"
+      },
+      "copy_as": "metadata/docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/coordination/vm-followup/default-aa-1-approval.json",
+      "observed_bytes": 1632,
+      "existing_recorded_sha256": "40b4f2f45ab19140bcccbd9ee8faceffa60717f4a8e0730b6a25fddc0e713d8a",
+      "copy_as": "metadata/docs/coordination/vm-followup/default-aa-1-approval.json"
+    },
+    {
+      "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "observed_bytes": 6870,
+      "existing_recorded_sha256": {
+        "bytes": 6870,
+        "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd"
+      },
+      "copy_as": "metadata/docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+      "observed_bytes": 7924,
+      "existing_recorded_sha256": {
+        "bytes": 7924,
+        "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15"
+      },
+      "copy_as": "metadata/docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+      "observation_scope": "D031 tools-ready evidence; not final accepted supplement or execution"
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/RESULTS.md",
+      "observed_bytes": 8129,
+      "existing_recorded_sha256": {
+        "bytes": 8129,
+        "sha256": "fa0998a73157eb2efd8441ab9b6665817cc237cee2b46d7e431480059e9fbd68"
+      },
+      "copy_as": "metadata/docs/perf/vm-owner-scaling/RESULTS.md",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/handoff.json",
+      "observed_bytes": 25841,
+      "existing_recorded_sha256": {
+        "bytes": 25841,
+        "sha256": "50130be3014319f98ebc858091b6ffa22177def4acde992d4b0ee2e0c2c5182c"
+      },
+      "copy_as": "metadata/docs/perf/vm-owner-scaling/handoff.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+      "observed_bytes": 124518,
+      "existing_recorded_sha256": {
+        "bytes": 124518,
+        "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7"
+      },
+      "copy_as": "metadata/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/validation/vm-final/final-increment.json",
+      "observed_bytes": 3565,
+      "existing_recorded_sha256": {
+        "bytes": 3565,
+        "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955"
+      },
+      "copy_as": "metadata/docs/validation/vm-final/final-increment.json",
+      "observation_scope": "Exact accepted final owner/source or completed receipt/publication record; large referenced evidence not reread."
+    },
+    {
+      "path": "docs/validation/vm-final/final-v1/preserved-inputs.json",
+      "observed_bytes": 3385,
+      "existing_recorded_sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+      "copy_as": "metadata/docs/validation/vm-final/final-v1/preserved-inputs.json"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d",
+      "observed_bytes": 69147,
+      "existing_recorded_sha256": "9dea9c3242e04e460dee8d1e0982017ea969a6c2a6cc3d1e2fe2b37ff5e6d2fa",
+      "copy_as": "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-diagnostic.d"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d",
+      "observed_bytes": 69035,
+      "existing_recorded_sha256": "a8e16af6bf34252e33d26b64a7936274ea7b017ef8f1750d960e33dc06a22d3a",
+      "copy_as": "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/dependencies-original.d"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/build/result.json",
+      "observed_bytes": 144598,
+      "existing_recorded_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+      "copy_as": "metadata/docs/validation/vm-observability/frozen-implementation-v1/build/result.json"
+    },
+    {
+      "path": "docs/validation/vm-observability/frozen-implementation-v1/snapshot.json",
+      "observed_bytes": 16838,
+      "existing_recorded_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+      "copy_as": "metadata/docs/validation/vm-observability/frozen-implementation-v1/snapshot.json"
+    },
+    {
+      "path": "docs/validation/vm-observability/network/final-v1/source-identities.json",
+      "observed_bytes": 1779,
+      "existing_recorded_sha256": "68b41f96104c0f4cc8fa65e938b5f9b583f37789fa1cf94bba7528c1a4ec7e51",
+      "copy_as": "metadata/docs/validation/vm-observability/network/final-v1/source-identities.json"
+    }
+  ],
+  "capsule_metadata_policy": {
+    "source_paths": "workspace-relative; copy hierarchy under metadata/ without altering original record bytes",
+    "max_file_bytes": 2097152,
+    "files": 116,
+    "total_observed_metadata_bytes": 4907929,
+    "exclusions": "No binaries, actual external dependency/header/runtime/compiler bytes, rawwire or historical large archives. Compiler .d files and JSON inventory/closure records are metadata, not dependency contents.",
+    "known_SHA_scope": "existing_recorded_sha256 is copied from accepted result/proposal or previously read metadata identity; null means final queued copy must establish its manifest SHA, not an unverified claim",
+    "D031": "Exact D032 accepted source map plus D023/D030 inheritance and queued static auxiliary template form the nine-file final owner closure. Original D030 executed source remains separate. D033 binds actual completed supplement/relocation and partial qualification; payload/binaries remain accepted external references."
+  },
+  "metadata_suggestion_missing_optional_paths": [],
+  "small_D031_source_observation": {
+    "files": 6,
+    "bytes": 148369,
+    "accepted": false
+  },
+  "owner_final_source_closure": {
+    "record": {
+      "path": "docs/validation/vm-final/final-increment.json",
+      "bytes": 3565,
+      "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+      "kind": "small_accepted_record_or_final_publication_read_only"
+    },
+    "files": 9,
+    "bytes": 152208,
+    "sources": {
+      "experiments/vm_owner_measurement/README.md": {
+        "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c",
+        "bytes": 7296,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/REVIEW.md": {
+        "sha256": "164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1",
+        "bytes": 2109,
+        "basis": "D023 historical review retained in D031 handoff-before snapshot",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/audit_owner_measurement.py": {
+        "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+        "bytes": 13905,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/collect_owner_measurement.py": {
+        "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426",
+        "bytes": 39326,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/producer-binding-v1.json": {
+        "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+        "bytes": 1471,
+        "basis": "D030 accepted proposal producer binding",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/producer-binding.template.json": {
+        "sha256": "3e67f13868bcbd653e010def3037a15c5c510e34d0b8c1e0e80ebb8855440ff9",
+        "bytes": 259,
+        "basis": "Unexecuted auxiliary JSON template: static identity included for source completeness, not claimed as a historical test or execution input",
+        "accepted_historical_identity_matched": false
+      },
+      "experiments/vm_owner_measurement/supplement_approval_bytes.py": {
+        "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+        "bytes": 22322,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/test_approval_bytes.py": {
+        "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8",
+        "bytes": 15110,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      },
+      "experiments/vm_owner_measurement/test_owner_measurement.py": {
+        "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+        "bytes": 50410,
+        "basis": "D032 exact accepted live source",
+        "accepted_historical_identity_matched": true
+      }
+    },
+    "historical_or_parent_accepted": 8,
+    "new_static_auxiliary_templates": 1,
+    "native_execution_inputs_added": 0
+  },
+  "final_index_update": "2026-10-15T19:31:39.404551+00:00"
+}

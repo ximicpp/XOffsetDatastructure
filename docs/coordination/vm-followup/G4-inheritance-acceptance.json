@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "parent_thread_id": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+  "status": "accepted_identity_mapping_scoped",
+  "reviewer": "/root/remaining_plan_check",
+  "reviewed_sha256": {
+    "identity-mapping.json": "3deb3fc720225fdc9e69de3f2f3685638aed0fb0c9fef99842633175737118ac",
+    "G4_MATRIX.md": "8509e98c14b756752dc75a221bb7ee152280e98933919d8dab115414f6d06edd",
+    "independent-review.json": "c22b8a179fc007a4016f60d190ec1296cc8c5af7c4f3ca1945df4469da39b076"
+  },
+  "current_sha256_at_acceptance": {
+    "identity-mapping.json": "3deb3fc720225fdc9e69de3f2f3685638aed0fb0c9fef99842633175737118ac",
+    "G4_MATRIX.md": "8509e98c14b756752dc75a221bb7ee152280e98933919d8dab115414f6d06edd",
+    "independent-review.json": "c22b8a179fc007a4016f60d190ec1296cc8c5af7c4f3ca1945df4469da39b076"
+  },
+  "unconditional_new_base_cpp_jobs": 0,
+  "accepted_inheritance": {
+    "mac_full": "48CTest+3configure;129source records checked,two differing Pythonauditors not executed by this path",
+    "wire": "504operations;historicalprofile only;84newoutput fullbytes not retained,hash-only limitation",
+    "native_package": "full/storage each3installed+3subproject;relevant build/install/consumer/dependency closure matches;storage AppleClangC++17 profile"
+  },
+  "needs_read_only_provenance": {
+    "mac_tsan15_and_storage2": "CMake/interface/cxx_std26/discovery changes require active flags/entrypoint lineage;retain historical passedscope meanwhile",
+    "linux_sanitizer26": "entrypoint/effectiveflags explanation;26+2 fromdifferentCMakeversions are composite percase coverage,notone28caserun",
+    "linux_package": "inputclosure same;outerimage/executionreceipt linkage missing"
+  },
+  "conditional_only": [
+    "Ordinary Linux added2 only if a current ordinaryLinux48 claim is required and safeexecution available",
+    "W1 newnetwork sanitizer only if compatibleexecution becomes available;neverrepeat knownAppleABI failure",
+    "Rerun affected newrolecases if their frozeninputs change"
+  ],
+  "decision": "No blanket base matrix rerun or Docker implementation. Supplement existing provenance without inventing missingbinary/SDK fingerprints;freeze finalselectedsource onlyafter W2network/W3network decisions stabilize.",
+  "final_G4_freeze_accepted": false,
+  "snapshot": "docs/coordination/vm-followup/platform-mapping-reviewed-v1"
+}

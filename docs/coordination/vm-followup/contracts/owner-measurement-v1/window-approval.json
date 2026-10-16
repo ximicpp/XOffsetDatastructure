@@ -1,0 +1,15 @@
+{
+  "schema": "owner-measurement-approval-v1",
+  "decision": "D030",
+  "status": "approved",
+  "approved_by": "parent",
+  "native_execution_authorized": true,
+  "producer_functional_parent_accepted": true,
+  "proposal_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+  "design_sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+  "producer_binding_sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+  "producer_parent_acceptance_sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+  "run_id": "538efa15d7084db38b4c2f85575dc803",
+  "formal_execution_role": "W3",
+  "max_windows": 1
+}

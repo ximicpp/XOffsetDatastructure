@@ -1,0 +1,216 @@
+{
+  "archive_sha256": "de160a216d890d3004d002f3878b5f45159ad705a7258894738d266ecc1ac64e",
+  "attribution": "no source-level attribution or ablation until stable cross-window difference exceeds AA variation",
+  "binary_sha256": {
+    "D": "389916a0a454fd775474995d9e970fa15bc9dc7421ac10111a6d74c7e302163d",
+    "F": "2ef8eea55d1152d68fdabc084f7158492109ec4f7b3d200f286ac70bf4d286af"
+  },
+  "cases": [
+    {
+      "cycles": 1,
+      "id": "save_first_64m",
+      "metrics": [
+        "first_ms"
+      ],
+      "size": 67108864,
+      "workload": "save"
+    },
+    {
+      "cycles": 4,
+      "id": "save_repeated_64m",
+      "metrics": [
+        "first_ms",
+        "repeated_mean_ms"
+      ],
+      "size": 67108864,
+      "workload": "save"
+    },
+    {
+      "cycles": 1,
+      "id": "vector_tail_1m",
+      "metrics": [
+        "elapsed_ms"
+      ],
+      "size": 1000000,
+      "workload": "vector_tail"
+    }
+  ],
+  "compile_commands": {
+    "D": [
+      "/usr/local/bin/clang++",
+      "-O3",
+      "-DNDEBUG",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-pthread",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+      "-mmacosx-version-min=10.15",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+      "-I",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/D",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/D/bench_vm_improvements.cpp",
+      "-L/usr/local/lib",
+      "-Wl,-rpath,/usr/local/lib",
+      "-o",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/D"
+    ],
+    "F": [
+      "/usr/local/bin/clang++",
+      "-O3",
+      "-DNDEBUG",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-pthread",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+      "-mmacosx-version-min=10.15",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+      "-I",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/F",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/F/bench_vm_improvements.cpp",
+      "-L/usr/local/lib",
+      "-Wl,-rpath,/usr/local/lib",
+      "-o",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/F"
+    ]
+  },
+  "compiler_version": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /usr/local/bin\nBuild config: +assertions",
+  "contrasts": {
+    "AA": {
+      "after": "F",
+      "before": "F"
+    },
+    "DF": {
+      "after": "F",
+      "before": "D"
+    }
+  },
+  "counter_limits": "unmodified historical harness; missing or uninstrumented counters are not zero work; see README metric definitions",
+  "cpu_count": 12,
+  "dependencies": {
+    "boost": {
+      "path": "/Users/fanchensu/XOffsetDatastructure/external/boost",
+      "revision": "da041154c6bac1a4aa98254a7d6819059e8ac0b0"
+    },
+    "typelayout": {
+      "path": "/Users/fanchensu/XOffsetDatastructure/external/typelayout",
+      "revision": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+    }
+  },
+  "host": {
+    "hw.logicalcpu": "12",
+    "hw.memsize": "38654705664",
+    "hw.physicalcpu": "12",
+    "machdep.cpu.brand_string": "Apple M3 Pro"
+  },
+  "interval_limit": "10,000 paired-ratio bootstrap resamples within each window; small samples and 3 host windows do not establish equivalence or a population confidence guarantee",
+  "linked_libraries": {
+    "D": "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/D:\n\t@rpath/libc++.1.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)\n\t@rpath/libunwind.1.dylib (compatibility version 1.0.0, current version 1.0.0)",
+    "F": "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/F:\n\t@rpath/libc++.1.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)\n\t@rpath/libunwind.1.dylib (compatibility version 1.0.0, current version 1.0.0)"
+  },
+  "machine": "arm64",
+  "minimum_window_gap_seconds": 60,
+  "page_size": 16384,
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "prepared_at": "2026-10-15T17:54:52.654849+08:00",
+  "required_windows": 3,
+  "runner_sha256": "a660c12c9c8720e3f68995cf63275f52cacfd9d728a9cc743576ea7bc3cdf7fe",
+  "runs": 7,
+  "runtime_files": {
+    "compiler": {
+      "path": "/usr/local/bin/clang++",
+      "resolved_path": "/usr/local/bin/clang-21",
+      "sha256": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f"
+    },
+    "libc++.1.dylib": {
+      "path": "/usr/local/lib/libc++.1.0.dylib",
+      "sha256": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc"
+    },
+    "libc++abi.1.dylib": {
+      "path": "/usr/local/lib/libc++abi.1.0.dylib",
+      "sha256": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6"
+    },
+    "libunwind.1.dylib": {
+      "path": "/usr/local/lib/libunwind.1.0.dylib",
+      "sha256": "a7539f393b8f785dd09b4f7fb7c109382dd7d2db0ee903c10ab45e777c8cc4aa"
+    }
+  },
+  "schedule": "fresh child per sample; sequential; rotate cases by window; alternate paired endpoint order and AA/DF contrast order",
+  "schema_version": 1,
+  "sdk": {
+    "path": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "settings_sha256": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe"
+  },
+  "source_manifests": {
+    "D": {
+      "bench_vm_compare.cpp": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d",
+      "bench_vm_improvements.cpp": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551",
+      "xoffset_virtual_memory.hpp": "af90d9ea4281cba703878a1042ec63aedeb3fa1807fbe8feacd4b6dfae72b186",
+      "xoffsetdatastructure.hpp": "896ac72ba55564bfa6177df3b89d7c192e0b2584c092fdb409c63e828bfadfb0"
+    },
+    "F": {
+      "bench_vm_compare.cpp": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d",
+      "bench_vm_improvements.cpp": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551",
+      "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+      "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+    }
+  },
+  "target_resolution_percent": 2,
+  "validation": "full values and save/load checks outside timers; semantic/work/layout identity must match across all endpoints and windows; exact wire hash reported separately",
+  "variant_labels": {
+    "D": "D_896ac72ba555",
+    "F": "F_9bc8f1f533be"
+  },
+  "warmups": 1
+}

@@ -1,0 +1,4032 @@
+{
+  "approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+  "attempts": [
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.128574+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.119829+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "A",
+        "control": "none",
+        "index": 0,
+        "owners": 8,
+        "position": 0,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "386b42930741ef0403942b195fe6083aabf0bdcede8ee4d6262e8b32b7a1bc88"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.153726+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.134867+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "B",
+        "control": "none",
+        "index": 1,
+        "owners": 64,
+        "position": 1,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "389a033cd1961982075b0710283e0a6a37ccff6c9bc94cc9a5ee6d9c8160c73e"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.169628+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.160131+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "C",
+        "control": "none",
+        "index": 2,
+        "owners": 256,
+        "position": 2,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9e1a328657e14ca30cff3b908f7264cfea38cdf8defbd1a4ac6206fa605f9381"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.187521+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.177364+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "D",
+        "control": "none",
+        "index": 3,
+        "owners": 256,
+        "position": 3,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "895ade690f0a949b4ebfc3ecab3f9bb0b636abc39cd18c416188b69aac14fe29"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.204605+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.195467+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "E",
+        "control": "none",
+        "index": 4,
+        "owners": 256,
+        "position": 4,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b36d6cbc161620bb34ad7279133508a2ec2c31c728e8b131fbdef292da0273c0"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.245358+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.212671+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": null,
+        "condition": "F",
+        "control": "none",
+        "index": 5,
+        "owners": 256,
+        "position": 5,
+        "requests": 8192,
+        "stage": "prerun",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "dbfbc99e349770613588deecb4171bd088b0cae7d6325fa03df08055032ff12e"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.261007+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.253495+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "A",
+        "control": "none",
+        "index": 6,
+        "owners": 8,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "31d17e5e0fdef45ea84abaab4db71819cea526e30e12a047c5adbbc5acddc9a3"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.275405+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.267636+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "B",
+        "control": "none",
+        "index": 7,
+        "owners": 64,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "6a5cfb37cc38810a6e610bf025cbe607b311ffcd65555b30b641c7e92d51204e"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.293463+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.282525+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "C",
+        "control": "none",
+        "index": 8,
+        "owners": 256,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "0bde30f5892fa96f20b931e8cdbf152ca0f2050269d3af19862ad2664af73e99"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.311917+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.302167+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "D",
+        "control": "none",
+        "index": 9,
+        "owners": 256,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "22c8c66dce0c7d90d15680e5322f10dc6feabc6f6f56fa2acbf344299a3f9483"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.329830+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.320484+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "E",
+        "control": "none",
+        "index": 10,
+        "owners": 256,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e1c4ebeb4fb8a657148fa58a3fac0917a249304c7b562a14f58bf56b0ef7d87a"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.348291+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.338486+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "F",
+        "control": "none",
+        "index": 11,
+        "owners": 256,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "6174d2e2ddcce75362b15b9c3bbec3244692cba36a2142454a714b04e6f64386"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.367263+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.356904+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "F",
+        "control": "none",
+        "index": 12,
+        "owners": 256,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "81e716f276f97e83faf0468eee7f89558d4c1cbce64a54bbeb3c2098e6864bd8"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.385264+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.376144+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "E",
+        "control": "none",
+        "index": 13,
+        "owners": 256,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f3a3445b46bd65a3ddc55b7c80b7b59935087946d628af08b42138553c28ec86"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.403704+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.393667+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "D",
+        "control": "none",
+        "index": 14,
+        "owners": 256,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "64d455eef6f9d7a47a58d63ee6bc7d2173e8854f774b2805272befbdc04022d5"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.424388+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.412915+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "C",
+        "control": "none",
+        "index": 15,
+        "owners": 256,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "31d791e1cf4f7999b44de3f051c2200a484392baf75704e7461140ff948613cd"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.440875+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.433164+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "B",
+        "control": "none",
+        "index": 16,
+        "owners": 64,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "502066bd27d60dfdf66a321683c4d46c6c136647dea3268daedc91c2cbbc2459"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.457203+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.448292+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 0,
+        "condition": "A",
+        "control": "none",
+        "index": 17,
+        "owners": 8,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "246f3a5c65123d22b862ae481e661da737bae812509e47130082576678dad0b0"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.471840+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.463889+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "B",
+        "control": "none",
+        "index": 18,
+        "owners": 64,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9d3f106a00afa6a91b06593f7fae47bbbab7036d65fad4c6460542e824831b81"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.487948+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.478761+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "C",
+        "control": "none",
+        "index": 19,
+        "owners": 256,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b2d5141591b6f8debef7452537fc2663e4d363da4d4ecaf1243297cc42ad26c3"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.507674+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.497516+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "D",
+        "control": "none",
+        "index": 20,
+        "owners": 256,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4ae99b2a88ff8623515f4c82c188b8ab90b983d692b60fd38a10999bc2449b88"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.543249+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.517563+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "E",
+        "control": "none",
+        "index": 21,
+        "owners": 256,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ffefbc60981bb779aa1a33d61a4e834b44e610b248e172fc5ce5c2b248b3ef16"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.563942+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.552937+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "F",
+        "control": "none",
+        "index": 22,
+        "owners": 256,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5224e36e24b597ff6e5c56123c2cff1f4b1c63da7dc3d9b315329b3412043ed7"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.581789+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.573969+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "A",
+        "control": "none",
+        "index": 23,
+        "owners": 8,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4bc7f28522f718d9dde14d21448e30aa4d191e8a6ee4f9b0804cc6dd4157c7b3"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.596474+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.589086+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "A",
+        "control": "none",
+        "index": 24,
+        "owners": 8,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "2fc8f1e605fc99dc504787d32f98c69b6a24e99145634d16ec5865173609085c"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.614071+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.603622+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "F",
+        "control": "none",
+        "index": 25,
+        "owners": 256,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "042746ad872672bd65de03f0a50eff961f4877d9d4058a2ae43155ad1db01e18"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.633877+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.624439+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "E",
+        "control": "none",
+        "index": 26,
+        "owners": 256,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "dd2a9bb4d9e5ff19b51cae30e8e9bdf49381f5aa2ae45fb2fe8e0428d589fdb3"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.654167+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.644062+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "D",
+        "control": "none",
+        "index": 27,
+        "owners": 256,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "da18207e05cc3bebb8929975a3df07e1594e0b0089fcf43c23348b03e18707d3"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.673147+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.664046+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "C",
+        "control": "none",
+        "index": 28,
+        "owners": 256,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b61b04a33259fba20a1b61c9df187e00ba08febd360f0aab7f4681f4da04cc00"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.690290+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.682669+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 1,
+        "condition": "B",
+        "control": "none",
+        "index": 29,
+        "owners": 64,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4ff26e0b8a0fda66211e67445090161d147132f621c8fb87a9a99a8dd68e28c5"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.707789+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.698406+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "C",
+        "control": "none",
+        "index": 30,
+        "owners": 256,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "03692c581cdbf172fa794eff54731c19d64aae45dca205389d04706aa8eaff91"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.727976+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.718213+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "D",
+        "control": "none",
+        "index": 31,
+        "owners": 256,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "7f889a4482c13395e4cd30bb718e08a0c3f1e544e19d2b247085060d6a0bed00"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.748912+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.738701+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "E",
+        "control": "none",
+        "index": 32,
+        "owners": 256,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "a91a0260de32adf922557588d28715db060797023fce93e574c6f830931c44fc"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.768965+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.758975+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "F",
+        "control": "none",
+        "index": 33,
+        "owners": 256,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "260feceb2a8da87d08cde8abf4c3bca78c2aa792ae806462914cce35c5a7f957"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.787934+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.780892+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "A",
+        "control": "none",
+        "index": 34,
+        "owners": 8,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "aad8b3392c82fdef6cbc6a4c1866792cc91fa0815b14e6f9f9ee47bac47ddee5"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.803853+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.796414+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "B",
+        "control": "none",
+        "index": 35,
+        "owners": 64,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "75e51873c76b91f5f2d3b2591e072afe7fcb1a6c270d8e2c007eef2367bd7980"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.820040+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.812592+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "B",
+        "control": "none",
+        "index": 36,
+        "owners": 64,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "948b565e26b64cf04084d2bece4924917da2fb3c8ce12d13f7c896a1764c6fea"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.837527+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.830097+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "A",
+        "control": "none",
+        "index": 37,
+        "owners": 8,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "eaa959e7fb4a7022af99b09a9bf33f04d7f8fc22e334a23cd823d47d25f2c80b"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.856630+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.845694+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "F",
+        "control": "none",
+        "index": 38,
+        "owners": 256,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4006b616508e58672dce48786dab67a461e46d53f89cda24a18f1adb16b1de71"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.877545+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.867728+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "E",
+        "control": "none",
+        "index": 39,
+        "owners": 256,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d27c65da6a21c59037b733a4b6ed3d3d0782b8f2cc40a5212556532c689b6b7f"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.900730+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.890955+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "D",
+        "control": "none",
+        "index": 40,
+        "owners": 256,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4cf861215de859e380d560c9b350d7aa6eee764a6e1a05fb3eeecafdfba70917"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.921068+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.911829+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 2,
+        "condition": "C",
+        "control": "none",
+        "index": 41,
+        "owners": 256,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "1e217fe25e68930754010adaf0f1d237594a8b03bc9e4122b42936e79bb54e33"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.942862+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.933246+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "D",
+        "control": "none",
+        "index": 42,
+        "owners": 256,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "2c76ade8b51590bd72238c9662ddd144b2aaaed25c92ee987f7764540168b330"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.963834+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.954527+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "E",
+        "control": "none",
+        "index": 43,
+        "owners": 256,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b4f9ce03cf9472a5eff120131a2e7879ab8f601cf8580fa307dda967f3c24118"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:29.986015+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.975397+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "F",
+        "control": "none",
+        "index": 44,
+        "owners": 256,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "6afca64c8e6edc1ecaf113425d2acac4689c1ccb10437e291ff41783ec669311"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.005111+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:29.997987+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "A",
+        "control": "none",
+        "index": 45,
+        "owners": 8,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "dd8d6e38a20023a0cac1992e459ee3a2ae90f5beaccb6b8d9efc3ef5d8ffb32e"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.022410+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.014783+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "B",
+        "control": "none",
+        "index": 46,
+        "owners": 64,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c9639b8f7521f7c66443c68417f46b7815b7d878883fb0e42c40e7b87d58c5c4"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.042576+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.032770+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "C",
+        "control": "none",
+        "index": 47,
+        "owners": 256,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c072e477c2386fc9f73e3de3bd9eb66ea526a5c44e065dd13e8cbbc67868a8e1"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.063661+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.054496+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "C",
+        "control": "none",
+        "index": 48,
+        "owners": 256,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5d05059db2a4fb5595fb39fae6f218998e46028707911136771a141cbcd01e28"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.083336+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.075662+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "B",
+        "control": "none",
+        "index": 49,
+        "owners": 64,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "91af91d9ec7e32f81a0135f3f04f93944f07c5f9cb263c46e183bf2c9e316b5d"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.100748+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.093553+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "A",
+        "control": "none",
+        "index": 50,
+        "owners": 8,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c47d926b66f42175e797ab543c7cc018a2a0c14c8af9171a76af9c15c6ed2921"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.120247+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.110063+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "F",
+        "control": "none",
+        "index": 51,
+        "owners": 256,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "cb28deb4076e35a76ccb64064249efd57131be99b9f71b4364c439853548ff58"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.142057+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.132619+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "E",
+        "control": "none",
+        "index": 52,
+        "owners": 256,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "76471309c260babab19302220af2249832d35d3b0d466330d5cb6c2ac723251a"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.164343+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.154457+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 3,
+        "condition": "D",
+        "control": "none",
+        "index": 53,
+        "owners": 256,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "047a2de651ec4bcf1a0252a43f22290f03ed03871f013cb4a9ae4c8bef92465c"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.185322+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.176162+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "E",
+        "control": "none",
+        "index": 54,
+        "owners": 256,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f5764103f7d4caf5a08b665089a074d9101c0d6236c467d45738233211f374c1"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.207229+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.196702+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "F",
+        "control": "none",
+        "index": 55,
+        "owners": 256,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ff2454d87900dcd2d9da6d6d3abc0c68350b5716bf33220aa674e481bed55b15"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.226227+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.218936+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "A",
+        "control": "none",
+        "index": 56,
+        "owners": 8,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "8eb00d74dd517ae80a2c1b498252bea2308bb7cc36d53df32f143b1c6bd5ce4a"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.244462+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.236690+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "B",
+        "control": "none",
+        "index": 57,
+        "owners": 64,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d249f54f1a7452984c3f62c8a03f82582505f3758aca9b6b3c0691f6ed5183bd"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.264229+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.255462+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "C",
+        "control": "none",
+        "index": 58,
+        "owners": 256,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "848992ced3d48b94cf046f02f6e26fe724970966eed1f41cbba308f3d1bf7178"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.285405+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.276095+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "D",
+        "control": "none",
+        "index": 59,
+        "owners": 256,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5c6e692e41552318eddf476005854c7d0ea8f7a4ce355beecd3a70cf23ca5a80"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.307047+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.297980+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "D",
+        "control": "none",
+        "index": 60,
+        "owners": 256,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9199fcf2039fe79088d38bb2c79ee7688b3cbbfe3f4363381698a3effb632290"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.328404+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.319330+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "C",
+        "control": "none",
+        "index": 61,
+        "owners": 256,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "a52a7141c5bc8229f98b09bb1e016e5ad0ebb06c0ff0757de386b97a284325bb"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.348543+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.340991+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "B",
+        "control": "none",
+        "index": 62,
+        "owners": 64,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "61a4eaa0aca32553cd116fd064869d4c3a8af8ccc1f0c34651a0e9da44320732"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.366698+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.359403+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "A",
+        "control": "none",
+        "index": 63,
+        "owners": 8,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ccb5cd62cc2604a2f86f197bb91e73c0d227fd7720685570b95a3aac3ccda679"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.400550+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.376538+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "F",
+        "control": "none",
+        "index": 64,
+        "owners": 256,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4cf787fda7327af812a4299a0a097ca3ea93e16f83ba1ebeca65b6ae13ce6e2c"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.421969+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.413147+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 4,
+        "condition": "E",
+        "control": "none",
+        "index": 65,
+        "owners": 256,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5e18ada39fac4ca9e6114751dc001aec2d0311e404ab998288900bd328ba03ee"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.444819+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.434772+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "F",
+        "control": "none",
+        "index": 66,
+        "owners": 256,
+        "position": 0,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "aa79987cd6cad2e959321105b3aaf6ea5d455e66d2ae2835c69d289535bfd024"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.464147+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.457156+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "A",
+        "control": "none",
+        "index": 67,
+        "owners": 8,
+        "position": 1,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e399f3ba4ed938b1f9b8701cc8631600e59b8760a82b3ae17f67be227bde845d"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.482213+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.474653+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "B",
+        "control": "none",
+        "index": 68,
+        "owners": 64,
+        "position": 2,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "65ab2b404a13ad74e1e72f9412889787739b5c61ca87330b3ba2e111f5c6a5e2"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.502121+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.493381+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "C",
+        "control": "none",
+        "index": 69,
+        "owners": 256,
+        "position": 3,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ed78871e0d09a1d53e7a50d0107799ecf2ae02dddfb7ea6ce169f26a7aa7de05"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.525283+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.514946+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "D",
+        "control": "none",
+        "index": 70,
+        "owners": 256,
+        "position": 4,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "42638d371a9966f950621a439660d5420ed5b583e94dc85c6ab5dcd2ca7c1611"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.548439+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.538831+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "E",
+        "control": "none",
+        "index": 71,
+        "owners": 256,
+        "position": 5,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f7d1a206baaec3999546fdc5929e887569a723c791215fb975609d65e88d1afc"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "4",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "4",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.570646+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.560965+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "E",
+        "control": "none",
+        "index": 72,
+        "owners": 256,
+        "position": 6,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 4
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "df53775ec17d17380659c1c2219f4053d93a4325f2618b086c9274208a2f26e5"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "2",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "2",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.593451+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.583808+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "D",
+        "control": "none",
+        "index": 73,
+        "owners": 256,
+        "position": 7,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 2
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "fb895ba72e2e9089454c4b21cc5bab26f0840e2dc75e515073fb4e0a94401cb5"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.616709+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.606000+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "C",
+        "control": "none",
+        "index": 74,
+        "owners": 256,
+        "position": 8,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9eec541dacf0b7b88c64169e80aa23b98f50d320d7d2bf106bb8d40dccb608b8"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "64",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "64",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.637811+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.629903+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "B",
+        "control": "none",
+        "index": 75,
+        "owners": 64,
+        "position": 9,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4188c0310a3882b18cd49c3fc1ea5e8b12a6f0c6bcb570d46cc6ef18d46dfe95"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "8",
+        "--threads",
+        "1",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "8",
+          "--threads",
+          "1",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.656419+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.649340+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "A",
+        "control": "none",
+        "index": 76,
+        "owners": 8,
+        "position": 10,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 1
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "94191cf36a1624a875e6ed5b2b1435ed41a479b72c704694084b9c4e56fb099e"
+    },
+    {
+      "argv": [
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+        "--owners",
+        "256",
+        "--threads",
+        "8",
+        "--requests",
+        "8192",
+        "--control",
+        "none"
+      ],
+      "command": {
+        "argv": [
+          "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-scaling/build-v4/owner_scaling_timing",
+          "--owners",
+          "256",
+          "--threads",
+          "8",
+          "--requests",
+          "8192",
+          "--control",
+          "none"
+        ],
+        "environment": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+          "TZ": "UTC"
+        },
+        "finished_at": "2026-10-15T17:49:30.677528+00:00",
+        "returncode": 0,
+        "started_at": "2026-10-15T17:49:30.667716+00:00",
+        "timed_out": false,
+        "timeout_seconds": 30
+      },
+      "slot": {
+        "block": 5,
+        "condition": "F",
+        "control": "none",
+        "index": 77,
+        "owners": 256,
+        "position": 11,
+        "requests": 8192,
+        "stage": "measured",
+        "threads": 8
+      },
+      "status": "complete",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "586af0d99b70217c73ecf9ebf5322cd210ae81619944a80e002bab086d4b5230"
+    }
+  ],
+  "coordination": {
+    "metadata": {
+      "kind": "timing",
+      "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/window-v1",
+      "owner": "W3",
+      "run_id": "e883a7e32e3440c1b996d4e77cd1c15a",
+      "started_at": "2026-10-15T17:49:28.778332+00:00",
+      "status": "running",
+      "supervisor_pid": 19162
+    },
+    "request": {
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py",
+        "collect",
+        "--proposal",
+        "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/proposal-v1/proposal.json",
+        "--approval",
+        "/Users/fanchensu/XOffsetDatastructure/docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+        "--approval-sha256",
+        "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12"
+      ],
+      "created_at": "2026-10-15T17:49:28.745955+00:00",
+      "cwd": "/Users/fanchensu/XOffsetDatastructure",
+      "kind": "timing",
+      "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+      "out": "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/window-v1",
+      "owner": "W3",
+      "process_contract": "descendants must not detach from inherited session; daemon jobs require explicit adapter",
+      "run_id": "e883a7e32e3440c1b996d4e77cd1c15a",
+      "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+      "schema_version": 1,
+      "source_headers": {
+        "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+        "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+      },
+      "termination_grace_seconds": 2,
+      "timeout_seconds": 900.0,
+      "wait_seconds": 900.0
+    }
+  },
+  "finished_at": "2026-10-15T17:49:30.817705+00:00",
+  "measurement_qualification": "pending_completed_receipt",
+  "native_timing_evidence_claim": false,
+  "proposal_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+  "run_id": "538efa15d7084db38b4c2f85575dc803",
+  "schema": "owner-measurement-window-v1",
+  "started_at": "2026-10-15T17:49:29.111411+00:00",
+  "status": "native_complete_pending_receipt"
+}

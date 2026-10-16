@@ -1,0 +1,160 @@
+{
+  "approval_schema": {
+    "approval_id": "PARENT_CHOSEN_IDENTIFIER",
+    "approved_action": "calibration_only",
+    "bridge_sha256": "EXACT_HASH",
+    "build_result_sha256": "EXACT_HASH",
+    "contract_sha256": "EXACT_HASH",
+    "functional_result_sha256": "EXACT_HASH",
+    "kind": "vm-default-calibration-approval",
+    "parent_chat": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+    "preregister_sha256": "EXACT_HASH",
+    "schema_version": 1,
+    "status": "accepted"
+  },
+  "boundaries": {
+    "memory": "reported native VM/RSS records are measurements; 129MiB/32MiB are configured logical/capacity conditions, not an RSS hard bound",
+    "pool": "no pool on historical default D/F path; no network capacity budget applies",
+    "save": "save_verified starts through returned owning output string; first/repeated output destruction excluded; source prep, pretouch, full values/readback, optional wire write, memory sampling, process startup/final destruction excluded",
+    "vector": "sum of 4096-element append batches; fixed preallocated logical extent; setup, full values, save/load/readback and wire output excluded",
+    "wire_retention": "--wire-path writes the full final validated wire outside native timers for every process; retained SHA-256 and full bytes; this IO can affect later process state and is held fixed"
+  },
+  "calibration": {
+    "adoption_allowed": false,
+    "canonical_wire_binding": "all native wire V1 headers and exact deterministic extent/semantic IDs checked; functional independently recomputes FNV once per distinct full-wire SHA256 (cached; historical two distinct files approx68MiB); same-case D/F full bytes must match. Calibration outputs pin approved functional SHA256/FNV/header tuple and never repeat Python FNV across78 outputs.",
+    "checks": [
+      "overall median log-ratio bias",
+      "AB and BA median log-ratio bias",
+      "median absolute log-ratio",
+      "log MAD",
+      "log IQR <= 2*log(1.01)",
+      "absolute per-case/per-metric cross-anchor drift: pooled median max/min <=1.01 and side A/B median max/min <=1.01; preserve per-anchor A/B full absolute sample distributions"
+    ],
+    "child_timeout_seconds": 30,
+    "dispersion_relative_limit": 0.01,
+    "drift_relative_limit": 0.01,
+    "interpretation": "single bounded calibration only; no equivalence/bootstrap/population or D/F adoption claim; separate comparison preregistration and at least three independent qualified confirmation windows required",
+    "max_retained_wire_bytes": 6442450944,
+    "max_window_seconds": 900,
+    "measured": "pre/mid/post anchors; 4 F/F pairs per case/anchor; pair orders AB,BA,AB,BA; 72 processes; rotate case order by anchor",
+    "noise_relative_limit": 0.01,
+    "process_count": 78,
+    "retry": false,
+    "state": "disabled until external parent approval JSON and externally supplied approval SHA256 bind exact contract/bridge/preregister/build/functional hashes and one exclusive calibration output",
+    "target_regression_resolution": 0.02,
+    "warmup": "one F/F pair per case = 6 processes, excluded from statistics"
+  },
+  "cases": [
+    {
+      "cycles": 1,
+      "expected_semantic_checksum_u64": 15740387299717957747,
+      "expected_used_end_bytes": 67109072,
+      "expected_wire_bytes": 67109160,
+      "id": "save_first_64m",
+      "initial_logical_bytes": 135266304,
+      "maximum_capacity_bytes": 135266304,
+      "metrics_ms": [
+        "first_ms"
+      ],
+      "setup_pretouched_bytes": 135266304,
+      "size": 67108864,
+      "size_unit": "payload_bytes",
+      "workload": "save"
+    },
+    {
+      "cycles": 4,
+      "expected_semantic_checksum_u64": 15740387299717957747,
+      "expected_used_end_bytes": 67109072,
+      "expected_wire_bytes": 67109160,
+      "id": "save_repeated_64m",
+      "initial_logical_bytes": 135266304,
+      "maximum_capacity_bytes": 135266304,
+      "metrics_ms": [
+        "first_ms",
+        "repeated_mean_ms"
+      ],
+      "setup_pretouched_bytes": 135266304,
+      "size": 67108864,
+      "size_unit": "payload_bytes",
+      "workload": "save"
+    },
+    {
+      "cycles": 1,
+      "expected_semantic_checksum_u64": 11399947380475585011,
+      "expected_used_end_bytes": 4194544,
+      "expected_wire_bytes": 4194632,
+      "id": "vector_tail_1m",
+      "initial_logical_bytes": 33554432,
+      "maximum_capacity_bytes": 33554432,
+      "metrics_ms": [
+        "elapsed_ms"
+      ],
+      "size": 1000000,
+      "size_unit": "elements_u32",
+      "workload": "vector_tail"
+    }
+  ],
+  "commands": {
+    "audit": "python3 -B experiments/vm_network_measurement/default_measurement.py audit BUNDLE [--approval-sha256 EXTERNALLY_ACCEPTED_SHA256 for completed calibration]",
+    "build": "python3 -B experiments/vm_coordination/run_job.py run --owner W3 --kind build --out BUILD/queue --timeout-seconds 650 -- /ABS/PYTHON /Users/fanchensu/XOffsetDatastructure/experiments/vm_network_measurement/default_measurement.py build --frozen FROZEN --out BUILD --queue BUILD/queue",
+    "calibrate": "only after accepted parent approval: run_job --owner W3 --kind timing --out NEW_CALIBRATION/queue --timeout-seconds 1100 -- /ABS/PYTHON /ABS/default_measurement.py calibrate --functional FUNCTIONAL --preregister NEW_PREREGISTER.json --approval PARENT_APPROVAL.json --approval-sha256 EXTERNALLY_ACCEPTED_SHA256 --out NEW_CALIBRATION --queue NEW_CALIBRATION/queue",
+    "freeze": "python3 -B /Users/fanchensu/XOffsetDatastructure/experiments/vm_network_measurement/default_measurement.py freeze --prepared PREPARED --out FROZEN",
+    "functional": "python3 -B experiments/vm_coordination/run_job.py run --owner W3 --kind functional --out FUNCTIONAL/queue --timeout-seconds 300 -- /ABS/PYTHON /Users/fanchensu/XOffsetDatastructure/experiments/vm_network_measurement/default_measurement.py functional --build BUILD --out FUNCTIONAL --queue FUNCTIONAL/queue",
+    "preregister": "python3 -B experiments/vm_network_measurement/default_measurement.py preregister --functional FUNCTIONAL --out NEW_PREREGISTER.json --window-id default-aa-1 --window-out NEW_CALIBRATION"
+  },
+  "environment": "before/after snapshots outside native timers under same queue window: UTC+Asia/Shanghai, OS uname/platform, CPU logical count, Darwin sysctl brand/physical/logical/memory, load average, disk bytes, ps pid/comm/%cpu/%mem, pmset power source+thermal; each command bounded5s and UTF8 replacement, unavailable/error reasons retained. Presence does not establish quiet host.",
+  "kind": "default-measurement-contract",
+  "native_cli": [
+    "BINARY",
+    "--workload",
+    "save|vector_tail",
+    "--size",
+    "CASE_SIZE",
+    "--cycles",
+    "CASE_CYCLES",
+    "--threads",
+    "1",
+    "--order",
+    "sequential",
+    "--reserve",
+    "0",
+    "--wire-path",
+    "NEW_OUTPUT_FILE"
+  ],
+  "native_schema": {
+    "format": "one complete JSON document; exact frozen serializer fields; no extra stdout; UTF-8",
+    "improvement_schema_version": 1,
+    "schema_version": 1,
+    "selected_metrics": {
+      "elapsed_ms": "sum of native timed operation_samples_ms",
+      "first_ms": "first save operation_samples_ms[0]",
+      "repeated_mean_ms": "sum(operation_samples_ms[1:])/(cycles-1)"
+    },
+    "unavailable": "owner_probe_count=null; never interpret as zero owner work",
+    "units": "all *_ms milliseconds; *_bytes bytes; *_est estimates, never precise events; checksum fields unsigned 64-bit FNV values"
+  },
+  "parent_chat": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+  "queue": {
+    "accepted_runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "build": "exact inherited compile flags; relocate only source include, translation unit and output; D/F sequential, max two compiles",
+    "execution": "run_job wraps the entire build, functional job, or calibration window once; no nested queue; direct Python bridge child, inherited session",
+    "functional": "six native processes: each exact case D then F; full semantic/work/layout identity, V1 header and same-case D/F full wire SHA equality; cached FNV independently binds raw checksum to full retained bytes; timing fields carry no performance claim",
+    "lock_dir": "/Users/fanchensu/XOffsetDatastructure/build/vm-coordination",
+    "owner": "W3",
+    "provenance": "start_run freezes full queue request SHA256, exact command, actual bridge path/SHA256, interpreter executable path/resolved path/bytes/SHA256 and Python version in payload execution-context.json. Offline audit requires request SHA match, exact original command and interpreter context; functional result hash transitively pins queue request before parent approval.",
+    "queue_location": "NEW_BUNDLE/queue"
+  },
+  "schema_version": 1,
+  "scope": "exact historical D/F source bridge; one calibration-only attempt before any D/F comparison",
+  "source_and_toolchain": {
+    "current_identity": "compiler driver preserved; resolved compiler and libc++/ABI/unwind hashes; complete -isystem and compiler implicit include byte manifests; SDKSettings hash; machine/page size; before/after identity checks",
+    "limitations": [
+      "SDKSettings is not a complete SDK/OS byte manifest",
+      "system-library/OS behavior is not captured by bundled runtime hashes"
+    ],
+    "offline": "bundle embeds frozen protocol/source/runtime/build/functional evidence and all raw native stdout/stderr, process receipts, normalized mapping and full wire. Audit reopens no original absolute artifact paths and writes nothing; exact original argv is reconstructed from accepted queue request out root. Completed calibration requires external accepted approval SHA256.",
+    "source": "prepare_default.py audit must pass all eight historical D/F source files; production headers remain read-only; deterministic layout/semantic assertions tie this bridge to inherited arm64 harness, not a cross-platform benchmark"
+  },
+  "status": "proposed_for_parent_review",
+  "timing_authorized": false
+}

@@ -1,0 +1,30 @@
+--- a/README.md
++++ b/README.md
+@@ -13,7 +13,8 @@
+ - Linux, macOS, or Windows virtual-memory APIs
+ - Git submodules initialized for `external/typelayout` and `external/boost`
+ 
+-Reflection is required. There is no non-reflection fallback mode in this repository.
++The reflected public library requires P2996; its API has no non-reflection fallback.
++The independent `xoffset_virtual_memory.hpp` storage layer requires C++17.
+ 
+ ## Minimal Example
+ 
+@@ -123,8 +124,17 @@
+ documented in the [maintained validation entry point](docs/VM_VALIDATION_RUNNER.md).
+ Pinned compiler/dependency profiles are in [toolchains](toolchains/README.md).
+ OS-only platform checks and full P2996 support are reported separately.
++Validation is profile-specific: native Windows execution and independent native
++Linux performance remain unverified. The recorded Linux amd64 full-library
++profile was emulated on an ARM64 host; ARM64 GNU storage results are separate.
+ See the [stage 2 delivery and validation](docs/VM_STAGE2_RESULTS.md) for the installable
+ package and the current policy decisions.
++
++The [experimental synchronous TCP reference consumer](docs/VM_NETWORK_IMPLEMENTATION.md)
++has accepted native macOS functionality and lifecycle evidence. See
++[network measurement status](docs/VM_NETWORK_PERFORMANCE.md) for per-size calibration
++and pooled-comparison scope. Production transport and representative business
++integration remain open; no new public I/O API has been adopted.
+ 
+ ## Safety Rules
+ 

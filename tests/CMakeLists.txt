@@ -1,12 +1,33 @@
 function(add_xoffset_test test_name test_label)
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
-    target_compile_options(${test_name} PRIVATE -UNDEBUG)
+    xoffset_enable_test_assertions(${test_name})
     add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
     set_tests_properties(${test_name} PROPERTIES LABELS "${test_label}")
 endfunction()
 
-# Basic tests (no reflection required)
+# These tests include only the OS header, with no full-library dependencies.
+set(STORAGE_TESTS
+    test_virtual_memory_storage
+    test_vm_pool
+)
+foreach(test_name ${STORAGE_TESTS})
+    add_executable(${test_name} ${test_name}.cpp)
+    set_target_properties(${test_name} PROPERTIES
+        CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO
+        RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+    target_link_libraries(${test_name} PRIVATE XOffset::storage)
+    xoffset_enable_test_assertions(${test_name})
+    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
+    set_tests_properties(${test_name} PROPERTIES LABELS "storage")
+endforeach()
+
+if(XOFFSET_STORAGE_ONLY)
+    xoffset_write_test_inventory()
+    return()
+endif()
+
+# Basic library behavior (still requires the full P2996 header/toolchain).
 set(BASIC_TESTS
     test_basic_types
     test_vector
@@ -44,30 +65,47 @@ set(REFLECTION_TESTS
     test_runtime_regressions
     test_mutation_failures
     test_wire_validation
+    test_stable_storage
+    test_vm_lifecycle
+    test_vm_transport
+    test_owner_registry
+    test_tail_expansion
+    test_storage_policies
+    test_allocator_model
+    test_allocator_failures
 )
 
 foreach(test_name ${REFLECTION_TESTS})
     add_xoffset_test(${test_name} reflection)
 endforeach()
 
-# Negative compile test — should NOT compile (validates static_assert)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_polymorphic_rejection.cpp")
-    try_compile(POLYMORPHIC_COMPILES
-        ${CMAKE_BINARY_DIR}/try_compile_polymorphic
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_polymorphic_rejection.cpp
-        CMAKE_FLAGS
-            "-DINCLUDE_DIRECTORIES=${BOOST_INCLUDE_DIRS};${TYPELAYOUT_INCLUDE_DIRS};${CMAKE_SOURCE_DIR}"
-        COMPILE_DEFINITIONS -std=c++26 -freflection -fexpansion-statements -stdlib=libc++
-    )
-    if(NOT POLYMORPHIC_COMPILES)
-        message(STATUS "✓ test_polymorphic_rejection correctly fails to compile")
-    else()
-        message(WARNING "✗ test_polymorphic_rejection compiled — static_assert may be broken!")
-    endif()
-endif()
+# Observe process exit after main() returns: these exercise global/static
+# destructor order, which an ordinary in-process assertion cannot cover.
+set(VM_EXIT_MODES
+    empty-globals
+    global-assigned
+    static-before-registry
+    static-after-registry
+    shutdown-transfers
+)
+foreach(exit_mode ${VM_EXIT_MODES})
+    add_test(NAME test_vm_lifecycle_${exit_mode}
+        COMMAND $<TARGET_FILE:test_vm_lifecycle> --exit-${exit_mode})
+    set_tests_properties(test_vm_lifecycle_${exit_mode} PROPERTIES LABELS "reflection;lifecycle")
+endforeach()
 
-# Summary
-list(LENGTH BASIC_TESTS BASIC_COUNT)
-list(LENGTH REFLECTION_TESTS REFLECTION_COUNT)
-math(EXPR TOTAL_COUNT "${BASIC_COUNT} + ${REFLECTION_COUNT}")
-message(STATUS "Tests: ${BASIC_COUNT} basic + ${REFLECTION_COUNT} reflection = ${TOTAL_COUNT} total")
+# Real host allocation failures inside unordered_map, independently of the
+# pre-registration fault hook. Rehash needs a fresh process/bucket inventory.
+set(REGISTRY_FAILURE_MODES
+    node
+    rehash
+)
+foreach(failure_mode ${REGISTRY_FAILURE_MODES})
+    add_test(NAME test_owner_registry_fail_${failure_mode}
+        COMMAND $<TARGET_FILE:test_owner_registry> --fail-${failure_mode})
+    set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
+endforeach()
+
+# These are mandatory configure-time checks, not runtime test programs.
+xoffset_check_polymorphic_rejection()
+xoffset_write_test_inventory()

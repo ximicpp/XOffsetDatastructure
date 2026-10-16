@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-15",
+  "parent_thread_id": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+  "role": "W2",
+  "gate": "G1_diagnostic_semantics",
+  "status": "accepted_scoped_foundation",
+  "scope": "Separate fixed-F diagnostic implementation, exact event catalog and covered semantic/failure controls; permits bounded consumer integration, not formal timing or completed N3 attribution.",
+  "frozen_implementation": {
+    "path": "docs/validation/vm-observability/frozen-implementation-v1",
+    "snapshot_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d",
+    "files": 137
+  },
+  "source": {
+    "runtime_sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+    "auditor_sha256": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08"
+  },
+  "evidence": {
+    "build_result_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+    "collection_result_sha256": "32fa091f6f76e0d8c48655198cc3e10f3434c9ccb36c6252ec76700b75587c03",
+    "original_binary_sha256": "498928f7ed536fe1ebda17b213e285525dd27b82febd673d58620c0c649a33a8",
+    "diagnostic_binary_sha256": "784d8e36a5a0a2f8c827a6991f7c41d04fad304f387728affca8aeae08cd083e",
+    "fixed_cases": 10,
+    "fixed_processes": 20,
+    "ordinary_valid_traces": 9,
+    "ordinary_valid_events": 480,
+    "runtime_controls": 3,
+    "python_tests": 57,
+    "external_dependency_files": 1018,
+    "queue_receipts_reviewed": 4
+  },
+  "event_coverage": {
+    "asserted_count_ledger_or_partial_snapshot": 29,
+    "structural_only": 11,
+    "invalid_control_only": 1,
+    "not_executed": 22
+  },
+  "review": {
+    "reviewer": "/root/completion_audit",
+    "method": "Static source, raw stdout/ledger recomputation, all snapshot/dependency hashes and read-only frozen collection audit; no C++ execution.",
+    "findings": "No blocking findings; empty-owner copy suppressed, origin allocator ledger and shared domain distinction verified."
+  },
+  "handoff_snapshot": {
+    "path": "docs/coordination/vm-followup/W2-G1-handoff.json",
+    "sha256": "40971974e0b4ea9c6f556f933d503a486edce17ca57f865cb4410709f83a245d"
+  },
+  "limitations": [
+    "22 unexecuted kinds and 11 structural-only kinds are not independently verified paths",
+    "Custom consumer semantics and permitted retained resources require explicit workload assertions",
+    "Shared domains2/3/4 are causal allocation attribution, not exclusive owner costs",
+    "Raw base lifetime reuse requires registry generations; observation peaks are not physical simultaneous peaks",
+    "Copy extents of different meanings cannot be summed as process traffic; lock probes perturb timing",
+    "Native macOS only; no new sanitizer/TSan, Windows or Linux runtime evidence",
+    "Default D/F reproduction and conditional ablation remain open"
+  ]
+}

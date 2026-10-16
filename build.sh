@@ -13,6 +13,7 @@ BUILD_DIR="build"
 BUILD_TYPE="Release"
 VERBOSE=0
 USER_COMPILER="${CXX:-}"
+USER_SDK=""
 
 detect_platform() {
     case "${OSTYPE:-unknown}" in
@@ -40,6 +41,8 @@ Usage: ./build.sh [OPTIONS]
 
 Options:
   --compiler PATH   Use a specific Clang P2996 compiler
+  --build-dir PATH  Use an explicit build directory (default: build)
+  --sdk PATH        Use an explicit macOS SDK instead of xcrun's default
   --debug           Configure a Debug build
   --verbose, -v     Print invoked commands and verbose CTest output
   -j N              Use N parallel build jobs
@@ -78,6 +81,17 @@ supports_reflection() {
 }
 
 find_compiler() {
+    # An explicit choice is a reproducibility constraint, not a preference.
+    if [[ -n "$USER_COMPILER" ]]; then
+        local explicit_compiler="$USER_COMPILER"
+        if [[ ! -x "$explicit_compiler" ]]; then
+            explicit_compiler="$(command -v -- "$explicit_compiler")" || return 1
+        fi
+        [[ -x "$explicit_compiler" ]] || return 1
+        supports_reflection "$explicit_compiler" || return 1
+        echo "$explicit_compiler"
+        return 0
+    fi
     local seen=""
     local candidate=""
     local candidates=(
@@ -165,6 +179,16 @@ while [[ $# -gt 0 ]]; do
             BUILD_TYPE="Debug"
             shift
             ;;
+        --build-dir)
+            [[ $# -ge 2 && -n "$2" ]] || die "--build-dir requires a path"
+            BUILD_DIR="$2"
+            shift 2
+            ;;
+        --sdk)
+            [[ $# -ge 2 && -n "$2" ]] || die "--sdk requires a path"
+            USER_SDK="$2"
+            shift 2
+            ;;
         --verbose|-v)
             VERBOSE=1
             shift
@@ -202,10 +226,17 @@ echo -e "${BLUE}Jobs:${NC} ${GREEN}${NUM_JOBS}${NC}"
 CMAKE_OSX_SYSROOT_VALUE=""
 
 if [[ "$PLATFORM" == "macos" ]]; then
-    MACOS_SDK="$(xcrun --show-sdk-path 2>/dev/null || true)"
+    MACOS_SDK="$USER_SDK"
+    if [[ -z "$MACOS_SDK" ]]; then
+        MACOS_SDK="$(xcrun --show-sdk-path 2>/dev/null || true)"
+    elif [[ ! -d "$MACOS_SDK" ]]; then
+        die "explicit SDK directory does not exist: $MACOS_SDK"
+    fi
     if [[ -n "$MACOS_SDK" ]]; then
         CMAKE_OSX_SYSROOT_VALUE="$MACOS_SDK"
     fi
+elif [[ -n "$USER_SDK" ]]; then
+    die "--sdk is supported only for macOS builds"
 fi
 
 section "Configure"
@@ -216,6 +247,10 @@ cmake_args=(
     -S .
     -B "$BUILD_DIR"
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+    -DXOFFSET_STORAGE_ONLY=OFF
+    -DXOFFSET_BUILD_TESTS=ON
+    -DXOFFSET_BUILD_TOOLS=ON
+    -DXOFFSET_BUILD_EXAMPLES=ON
     -DCMAKE_CXX_COMPILER="$CXX_COMPILER"
     -DCMAKE_CXX_FLAGS=
     -DCMAKE_EXE_LINKER_FLAGS=
@@ -257,23 +292,12 @@ run_cmd ctest "${ctest_args[@]}"
 
 section "Signature Tools"
 
-if export_bin="$(find_binary export_signatures)"; then
-    run_cmd "$export_bin" tools/sigs
-else
-    echo -e "${YELLOW}export_signatures not found; skipping.${NC}"
-fi
-
-if matrix_bin="$(find_binary check_signature_matrix)"; then
-    run_cmd "$matrix_bin" tools/sigs
-else
-    echo -e "${YELLOW}check_signature_matrix not found; skipping.${NC}"
-fi
-
-if compat_bin="$(find_binary check_compat)"; then
-    run_cmd "$compat_bin"
-else
-    echo -e "${YELLOW}check_compat not found; skipping.${NC}"
-fi
+export_bin="$(find_binary export_signatures)" || die "required export_signatures binary missing"
+matrix_bin="$(find_binary check_signature_matrix)" || die "required check_signature_matrix binary missing"
+compat_bin="$(find_binary check_compat)" || die "required check_compat binary missing"
+run_cmd "$export_bin" tools/sigs
+run_cmd "$matrix_bin" tools/sigs
+run_cmd "$compat_bin"
 
 section "Done"
 echo -e "${GREEN}Build and verification completed successfully.${NC}"

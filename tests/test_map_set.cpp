@@ -102,8 +102,8 @@ bool test_map_set_operations() {
     
     // Test 8: Persistence
     std::cout << "Test 8: Persistence test... ";
-    auto* buffer = xbuf.get_buffer();
-    XBuffer loaded_buf(buffer->data(), buffer->size());
+    auto buffer = xbuf.get_buffer();
+    XBuffer loaded_buf(buffer.data(), buffer.size());
     auto& loaded_obj = loaded_buf.unsafe_root<MapSetTest>();
     assert(loaded_obj.intSet.size() == 50);
     assert(loaded_obj.intMap.size() == 20);

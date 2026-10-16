@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "decision": "D033",
+  "date": "2026-10-16",
+  "status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement",
+  "branch": "next_cpp26",
+  "baseline": "F current uncommitted sources; HEAD is not F",
+  "authority": [
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/proposal-acceptance.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/window-approval.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json"
+  ],
+  "accepted_records": {
+    "window": {
+      "path": "build/vm-owner-measurement/window-v1/window.json",
+      "sha256": "9534af410e632fac2bb4879b2014690f2a5e36178e1f0537a52795567ce10869"
+    },
+    "summary": {
+      "path": "build/vm-owner-measurement/window-v1/summary.json",
+      "sha256": "59e192b428848734d14f3f64676481d267f0744697a372c942101442da9d2340"
+    },
+    "native_receipt": {
+      "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+      "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131"
+    },
+    "archive": {
+      "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1/result.json",
+      "sha256": "cbaf56a9e4ad79267c90cb2a0c9853d502f62e1cbb0903c8c1ed5492578ca1f7"
+    },
+    "archive_receipt": {
+      "path": "build/vm-owner-measurement/receipts/approval-supplement-v1/result.json",
+      "sha256": "24dcf164f4873455550cf1c049bd6d3a3abff99636cdc2be2973acbfe4986055"
+    }
+  },
+  "execution": {
+    "role": "W3",
+    "native_processes": 78,
+    "preruns": 6,
+    "measured_processes": 72,
+    "samples_per_condition": 12,
+    "same_condition_pairs": 6,
+    "conditions": 6,
+    "phases": 4,
+    "requests_per_allocate_and_free": 8192,
+    "native_elapsed_seconds": 2.1085283330176026,
+    "all_exit_zero": true,
+    "timed_out": false,
+    "cleanup_empty": true,
+    "new_native_after_original_window": 0,
+    "rebuilds": 0,
+    "windows": 1
+  },
+  "qualification": {
+    "cells_total": 24,
+    "qualified_cells": [
+      {
+        "condition": "A",
+        "phase": "allocate"
+      },
+      {
+        "condition": "A",
+        "phase": "free"
+      },
+      {
+        "condition": "B",
+        "phase": "create"
+      },
+      {
+        "condition": "B",
+        "phase": "allocate"
+      },
+      {
+        "condition": "B",
+        "phase": "destroy"
+      },
+      {
+        "condition": "C",
+        "phase": "free"
+      },
+      {
+        "condition": "D",
+        "phase": "create"
+      }
+    ],
+    "qualified_cells_count": 7,
+    "uncertain_cells_count": 17,
+    "comparisons_total": 24,
+    "qualified_comparisons": [
+      {
+        "condition": "A",
+        "phase": "free",
+        "reference_condition": "C",
+        "median": 0.5747111004931337,
+        "min": 0.5621138261206782,
+        "max": 0.5845460436670925,
+        "ratios": [
+          0.566657672171826,
+          0.58179880109027,
+          0.5719407055128228,
+          0.5845460436670925,
+          0.5621138261206782,
+          0.5774814954734445
+        ],
+        "direction": "all_lower"
+      },
+      {
+        "condition": "C",
+        "phase": "free",
+        "reference_condition": "C",
+        "median": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "ratios": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "direction": "unresolved"
+      }
+    ],
+    "qualified_comparisons_count": 2,
+    "non_self_qualified_comparisons_count": 1,
+    "uncertain_comparisons_count": 22,
+    "all_multithread_comparisons_uncertain": true,
+    "rule": "Predeclared AA/block dispersion/anchor drift each <=1.10; comparisons require case and reference C qualification. All samples/cells/comparisons retained."
+  },
+  "archive": {
+    "path": "docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+    "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+    "payload_files": 698,
+    "payload_bytes": 8891188,
+    "payload_counts_exclude": [
+      "result.json",
+      "COMPLETE"
+    ],
+    "relocation_audit": {
+      "new_native_processes": 0,
+      "payload_sha256": "096b68dc7dfc2bcec681bb634fc0fa83a86d208f1ef628d92537215bb15cb625",
+      "scope": "complete package including result.json, COMPLETE, both windows, all frozen tools and both full receipts",
+      "status": "passed"
+    },
+    "original_window_preserved": true,
+    "original_failed_archive_preserved": true,
+    "derived_window_is_original_bytes": false,
+    "only_derived_difference": [
+      {
+        "derived_bytes": 688,
+        "derived_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+        "original_bytes": 688,
+        "original_sha256": "92058415a840fe800a7e519a3835461c18032f177e9cfe2a2d0e2743ef9d3aa1",
+        "path": "approval.json"
+      }
+    ],
+    "supplement_elapsed_seconds": 1.7585252079879865,
+    "new_native_processes": 0
+  },
+  "tool_fix": {
+    "acceptance": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+    "normal_tests": 51,
+    "optimized_tests": 51,
+    "frozen_original_tools_unchanged": true
+  },
+  "independent_review": {
+    "reviewer": "/root/remaining_plan_check",
+    "window": "All78 slots, argv, exit0, raw hashes and original W1 semantic checker verified. Independently recomputed all24cells/24comparisons, AA/dispersion/anchors, normalized metrics and six ratios.",
+    "supplement": "All698 payload members/bytes, unique approval difference, original identities and stdout/stderr hashes, immutable frozen tools, complete relocation and exact completed validation receipt verified. No duplicate native or full SDK scan."
+  },
+  "inference_limits": [
+    "A/free versus C/free is a single-window fixed-request phase observation; owner count changes per-owner workload and metadata.",
+    "All multithread comparisons uncertain; no thread-scaling or registry-lock/hash causal conclusion.",
+    "Clocks include scheduling/barriers/bookkeeping and exclude other lifecycle work; not lookup latency, full application lifetime or production tails.",
+    "No default D/F result, 2 percent regression claim, optimization/adoption or production benefit.",
+    "Native producer timing_evidence=false remains unchanged; authorization and qualification are separate artifacts."
+  ],
+  "decision_text": "Accept complete bounded owner research, explicit partial qualification and original/derived offline archive. Close the fixed-request evidence deliverable; retain F. No retry, added samples, native rebuild, default attribution or candidate work. G4 final freeze and independent review may proceed; broader platform/default D-F/business prerequisites stay open."
+}

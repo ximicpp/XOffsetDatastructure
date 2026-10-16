@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "status": "accepted_for_one_calibration",
+  "reviewer": "/root/orchestration_review",
+  "reviewed_sha256": {
+    "parent-approval-proposal.json": "84eaf3d2841b4ef9704d21de227a0dd9c507e151f50966490b51caaaae06d9db",
+    "preregister.json": "229d6e6a0634ed3d3e8116df8edabfa501a33f93d40d94a757124ffa139f1e0b",
+    "proposal-files.json": "ef7a60af4a99925cc5a1cbc5f6d7b68d8e3a7fb75c6be51f638349714547cd27",
+    "schedule.json": "b56b7d9db8cd76352e022855f61848a8c62afcaa0ac41074b70cf987df2b68e5"
+  },
+  "approval_sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+  "approval": "docs/coordination/vm-followup/network-aa-1-approval.json",
+  "checks": {
+    "manifest_files": 148,
+    "accepted_inputs": 143,
+    "full_data_files": 8,
+    "processes": 112,
+    "warmup": 16,
+    "calibration": 96,
+    "all_pool_none": true
+  },
+  "limits": {
+    "total_window_seconds": 900,
+    "child_seconds": 180,
+    "expected_output_bytes": 620755072,
+    "max_output_bytes": 2147483648,
+    "noise_relative": 0.05,
+    "dispersion_relative": 0.05,
+    "absolute_anchor_drift_relative": 0.01
+  },
+  "metric": "reclamation_adjusted_mean_ns, with listed whole-lifecycle exclusions",
+  "no_retries": true,
+  "comparison_authorized": false,
+  "adoption_authorized": false,
+  "decision": "Execute exactly this one frozen F/F window through accepted queue; preserve raw evidence and all failures. No automatic retry, pool comparison, candidate implementation or production adoption."
+}

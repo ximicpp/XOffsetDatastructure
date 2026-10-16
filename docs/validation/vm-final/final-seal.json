@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-16T03:40:01.718936+08:00",
+  "status": "source_capsule_and_independent_audit_complete_ready_for_parent_G4_review",
+  "parent_G4_accepted": false,
+  "scope": "Source/metadata reference capsule; not a self-contained offline build environment or external roadmap closure",
+  "anchors": {
+    "docs/validation/vm-final/final-v1/manifest.json": {
+      "sha256": "bbc9ef46f959dce03c9864479c0f96e5a623376737b8ebef6d802158f8ce4190",
+      "bytes": 43567
+    },
+    "docs/validation/vm-final/final-v1/source.tar.gz": {
+      "sha256": "c2ae11fa881721769ab92d0252c76e7b72bd6f1dfaaaa3f46b0daaa885f1cd0b",
+      "bytes": 805745
+    },
+    "docs/validation/vm-final/final-v1/source-manifest.json": {
+      "sha256": "06ce0fa38afb8a4e91cdf5c7dafdd78b9667965ed0e58cdcdaaa0dd48d58e3a8",
+      "bytes": 37427
+    },
+    "docs/validation/vm-final/final-v1/metadata-manifest.json": {
+      "sha256": "c1a56d89809b8dfe1328dbc05a969fddb9cd5c9a86ba0ded704ac47f83030950",
+      "bytes": 40112
+    },
+    "docs/validation/vm-final/final-v1/cut.json": {
+      "sha256": "cc4f27b11a6838a786ee014e1a486a77dbd04543033e54806fd028cc43df5b65",
+      "bytes": 1334
+    },
+    "docs/validation/vm-final/final-review.json": {
+      "sha256": "47f2dd487d168fdbba3ca1115dedaa1ca0fef31ec1050744138cd04b0d8272b6",
+      "bytes": 3971
+    },
+    "docs/validation/vm-final/audit_final_capsule.py": {
+      "sha256": "bcc8d12b39c58f411e6923004737df23903866e64b37c73ff5b61a19bcbb69cc",
+      "bytes": 49164
+    },
+    "docs/coordination/vm-followup/owner-measurement-acceptance.json": {
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "bytes": 6870
+    },
+    "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json": {
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "bytes": 4959
+    },
+    "docs/validation/vm-final/final-handoff.json": {
+      "sha256": "fd6b6190fcb1024282713298bf3850b2a0234896ad3260fed4217faef26f7b03",
+      "bytes": 6493
+    }
+  },
+  "source_files": 245,
+  "source_bytes": 3543842,
+  "source_breakdown": {
+    "stable": 225,
+    "preserved": 9,
+    "final_owner": 9,
+    "packaging_helpers": 2
+  },
+  "metadata_files": 236,
+  "outer_listed_files": 246,
+  "actual_capsule_files_including_manifest": 247,
+  "capsule_listed_bytes": 7089694,
+  "new_CPP_jobs": 0,
+  "new_native_processes": 0,
+  "new_container_jobs": 0,
+  "historical_statistics_recomputed": false,
+  "independent_audit_passed": true,
+  "findings": 0,
+  "completed_validation_receipts": {
+    "final-increment": {
+      "path": "build/vm-final/queue-final-increment-v1",
+      "result": {
+        "sha256": "7b18ef519a2e4709141a391e6b275eeb97b327fd1c6b73a121ca341793c63bd3",
+        "bytes": 453
+      },
+      "manifest": {
+        "sha256": "6c2649f7803a5e65c1e51c8c3499832667454ec7a278bd981a5fbd9366a9f84b",
+        "bytes": 912
+      },
+      "run_id": "2e1fb587d06845ebb6f863156e642f8e",
+      "status": "complete_rc0_cleanup_empty"
+    },
+    "seal": {
+      "path": "build/vm-final/queue-seal-v1",
+      "result": {
+        "sha256": "3cea2e0d3cff18d6d745417faf924fc1033e5ed73aac287d5c2f392cd8725260",
+        "bytes": 452
+      },
+      "manifest": {
+        "sha256": "dfc44c9731afdea6ccbf3a660981f8da9ccc65d451c55c8afc0968df1b1bbfb1",
+        "bytes": 912
+      },
+      "run_id": "ba3a2e3c4cac4703a7407db5e92c3f1e",
+      "status": "complete_rc0_cleanup_empty"
+    },
+    "independent-audit": {
+      "path": "build/vm-final/queue-independent-audit-v1",
+      "result": {
+        "sha256": "ce2aa5e757c2ef6c193874c16929ebad756eccc6eeb53cebc415dc8fa1a8b453",
+        "bytes": 453
+      },
+      "manifest": {
+        "sha256": "b2b23c5149eccf9d8878b3d551f4a1f01c9b570284da0b644476bbbf34129a66",
+        "bytes": 912
+      },
+      "run_id": "1303548b7f72466fb1d29a184e32ab43",
+      "status": "complete_rc0_cleanup_empty"
+    }
+  },
+  "current_binding_receipt": "build/vm-final/queue-final-binding-v1",
+  "hash_cycle_boundary": "Manifest excludes itself. Review,final handoff and seal are outside capsule. Current binding receipt completes afterward and is linked by live W4 handoff."
+}

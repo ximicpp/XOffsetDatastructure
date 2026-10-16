@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "status": "accepted_executed_partial_qualification",
+  "reviewer": "/root/orchestration_review",
+  "artifact": "build/vm-network-measurement/network-calibration-v1",
+  "reviewed_sha256": {
+    "result.json": "47b27ebb0e759a41630fe5582b267ce138e75bbb6b3030e9f78c1dcbba53fa25",
+    "summary.json": "053ec410d8b24da50e428c4d4919697390ce7d490f33c130ff991cbfb666e069"
+  },
+  "approval_sha256": "8e566541e460bfeb28babbbd41e627055601b0fcb62975ac7575f86cc2c330f7",
+  "queue_result_sha256": "bd8cda42fcaa9466002df9b00eab21caef8426fcc5a44bd715ac40f09f93dd3d",
+  "processes": 112,
+  "all_exit_zero": true,
+  "timeouts": 0,
+  "stderr_empty": true,
+  "raw_command_files": 1932,
+  "wire_files": 1484,
+  "wire_bytes": 620755072,
+  "queue_started_at": "2026-10-15T16:54:18.310699+00:00",
+  "queue_finished_at": "2026-10-15T16:54:39.672260+00:00",
+  "cleanup": {
+    "live": [],
+    "process_groups": [],
+    "zombies": []
+  },
+  "all_stable_windows_qualified": false,
+  "rows": [
+    {
+      "nominal_bytes": 4096,
+      "local_aa_qualified": false,
+      "anchor_drift_qualified": false,
+      "stable_window_qualified": false,
+      "anchor_qualification": {
+        "mid": true,
+        "post": true,
+        "pre": false
+      },
+      "side_maximum_over_minimum": {
+        "left": 1.0171765745216383,
+        "pooled": 1.0273614581781387,
+        "right": 1.0513861494857601
+      }
+    },
+    {
+      "nominal_bytes": 65536,
+      "local_aa_qualified": true,
+      "anchor_drift_qualified": false,
+      "stable_window_qualified": false,
+      "anchor_qualification": {
+        "mid": true,
+        "post": true,
+        "pre": true
+      },
+      "side_maximum_over_minimum": {
+        "left": 1.0165512270715737,
+        "pooled": 1.0157645935842496,
+        "right": 1.019375464500304
+      }
+    },
+    {
+      "nominal_bytes": 1048576,
+      "local_aa_qualified": true,
+      "anchor_drift_qualified": true,
+      "stable_window_qualified": true,
+      "anchor_qualification": {
+        "mid": true,
+        "post": true,
+        "pre": true
+      },
+      "side_maximum_over_minimum": {
+        "left": 1.0081200462590632,
+        "pooled": 1.0041602648818435,
+        "right": 1.0075193071124284
+      }
+    },
+    {
+      "nominal_bytes": 16777216,
+      "local_aa_qualified": false,
+      "anchor_drift_qualified": true,
+      "stable_window_qualified": false,
+      "anchor_qualification": {
+        "mid": true,
+        "post": false,
+        "pre": true
+      },
+      "side_maximum_over_minimum": {
+        "left": 1.0065659298328027,
+        "pooled": 1.0006503716621717,
+        "right": 1.0074908926264363
+      }
+    }
+  ],
+  "verification": "Frozen offline audit and independent recomputation from rawstdout of reclamation-adjusted metrics, pair noise and left/right/pooled anchor drift; exact112job set and full rawwire checked.",
+  "interpretation": [
+    "row aa_qualified is local-only; stable_window_qualified is complete per-size criterion",
+    "Overall false does not mean no native execution; summary generic synthetic wording cannot override native receipts",
+    "No failed-size retry; no adoption or candidate implementation",
+    "OneMiB pass only qualifies preparation of a new independently approved pool screening window with its own calibration; no carryover of noise qualification"
+  ],
+  "decision": "Accept executed native calibration with per-size results. Prepare only1MiB pool screening; retain the other3failed sizes, no retry.",
+  "comparison_execution_authorized": false,
+  "portable_archive_acceptance": {
+    "status": "accepted",
+    "path": "docs/perf/vm-network/calibration-v1",
+    "reviewer": "/root/orchestration_review",
+    "evidence_sha256": "893cda8bb2e2eb54b8da28bb4a23c4a112918141cc9545fcaed22a26de203297",
+    "relocated_audit_log_sha256": "1d490897a87b402c2bb7108ef42be733f22c49ba9a2f8575aadce462572a1460",
+    "copy_queue_result_sha256": "7635682569cc1c011ff13ef6461c11d6db4d0358783b36aba4d1a40d261a352f",
+    "copied_files": 2096,
+    "internal_hardlinks": 1656,
+    "original_shared_inodes": 0,
+    "scope": "Copied audit passed, original/copied key manifests and result/summary/approval/schedule byte-identical; parent reviewer checked file metadata without repeating full wire/statistics audit."
+  }
+}

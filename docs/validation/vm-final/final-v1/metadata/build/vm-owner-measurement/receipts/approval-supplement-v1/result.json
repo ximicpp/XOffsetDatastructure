@@ -1,0 +1,18 @@
+{
+  "cleanup": {
+    "live": [],
+    "process_groups": [],
+    "zombies": []
+  },
+  "command_elapsed_seconds": 1.7585252079879865,
+  "command_pid": 41760,
+  "command_returncode": 0,
+  "finished_at": "2026-10-15T19:20:54.147842+00:00",
+  "kind": "validation",
+  "owner": "W3",
+  "reason": "command_exit",
+  "run_id": "f2cfcec9e94741adae7aa5899b891e83",
+  "schema_version": 1,
+  "started_at": "2026-10-15T19:20:52.388868+00:00",
+  "status": "complete"
+}

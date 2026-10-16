@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-15T19:27:25.846743+00:00",
+  "status": "final_owner_source_increment_recorded_for_independent_static_review",
+  "authority": {
+    "owner": {
+      "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd"
+    },
+    "tools": {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad"
+    }
+  },
+  "source_closed_set": {
+    "experiments/vm_owner_measurement/README.md": {
+      "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c",
+      "bytes": 7296,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/REVIEW.md": {
+      "sha256": "164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1",
+      "bytes": 2109,
+      "basis": "D023 historical review retained in D031 handoff-before snapshot",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/audit_owner_measurement.py": {
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced",
+      "bytes": 13905,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/collect_owner_measurement.py": {
+      "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426",
+      "bytes": 39326,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/producer-binding-v1.json": {
+      "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14",
+      "bytes": 1471,
+      "basis": "D030 accepted proposal producer binding",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/producer-binding.template.json": {
+      "sha256": "3e67f13868bcbd653e010def3037a15c5c510e34d0b8c1e0e80ebb8855440ff9",
+      "bytes": 259,
+      "basis": "Unexecuted auxiliary JSON template: static identity included for source completeness, not claimed as a historical test or execution input",
+      "accepted_historical_identity_matched": false
+    },
+    "experiments/vm_owner_measurement/supplement_approval_bytes.py": {
+      "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698",
+      "bytes": 22322,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/test_approval_bytes.py": {
+      "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8",
+      "bytes": 15110,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    },
+    "experiments/vm_owner_measurement/test_owner_measurement.py": {
+      "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c",
+      "bytes": 50410,
+      "basis": "D032 exact accepted live source",
+      "accepted_historical_identity_matched": true
+    }
+  },
+  "accepted_historical_source_constraints": 8,
+  "new_static_auxiliary_templates": 1,
+  "new_CPP_jobs": 0,
+  "new_native_processes": 0,
+  "native_or_historical_statistics_recomputed": false,
+  "scope": "Only9smallownerfilesand2exactacceptedauthoritydocuments;noexternalrawarchivesorbinariesread"
+}

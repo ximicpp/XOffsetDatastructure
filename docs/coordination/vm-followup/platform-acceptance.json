@@ -1,0 +1,25 @@
+{
+  "role": "W4-platform",
+  "status": "accepted_prerequisite_assessment_only",
+  "accepted_at": "2026-10-15T15:34:59.385684+00:00",
+  "evidence": "experiments/vm_platform_validation/evidence/platform-20261015-01",
+  "sha256": {
+    "manifest.json": "09b09e30a230ae1033bdd2320ea9e28d7041352f6c72c89f9235c5e58d9aca96",
+    "result.json": "868c7894c3ccfd528c3a9bcb1a4ba5f5bd677acf9b49c9154ffdd701c11be51e"
+  },
+  "verified_inventory_files": 38,
+  "raw_commands": 24,
+  "scope": "Read-only environment and package integrity evidence; no new platform compile/test/performance result. N1 stays open.",
+  "facts": [
+    "Current F and frozen toolchain/dependency hashes match",
+    "SDK26.5 present; SDK27.0 is current default; future builds explicitly choose26.5",
+    "Windows frozen ZIP identity/126members/121source files/CRC verified",
+    "One configured SSH alias attempt timed out with exit255; no remote capability established"
+  ],
+  "unmet": [
+    "Native Windows x64 channel plus storage/consumer toolchain",
+    "Separate Windows full P2996 toolchain and execution",
+    "Reachable independent native Linux performance device/channel"
+  ],
+  "review": "Parent independent read-only review accepted complete inventory and raw evidence; no probes rerun."
+}

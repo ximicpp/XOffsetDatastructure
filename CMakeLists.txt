@@ -1,76 +1,80 @@
 cmake_minimum_required(VERSION 3.13)
-project(XOffsetDatastructure)
+project(XOffsetDatastructure LANGUAGES CXX)
 
-enable_testing()
-
-# This project requires C++26 with reflection support
-# Note: we still set the language mode manually because reflection flags are custom.
-message(STATUS "Using C++26 with reflection")
-
-# Verify we're using Clang with P2996 support
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    message(FATAL_ERROR "This project requires Clang with P2996 reflection support")
+# A dependency should contribute interface targets, not its developer programs.
+set(XOFFSET_TOP_LEVEL OFF)
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(XOFFSET_TOP_LEVEL ON)
 endif()
+option(XOFFSET_STORAGE_ONLY "Configure only the independent C++17 OS layer" OFF)
+option(XOFFSET_BUILD_TESTS "Build and register XOffset tests" ${XOFFSET_TOP_LEVEL})
+option(XOFFSET_BUILD_TOOLS "Build XOffset signature and benchmark tools" ${XOFFSET_TOP_LEVEL})
+option(XOFFSET_BUILD_EXAMPLES "Build XOffset examples" ${XOFFSET_TOP_LEVEL})
+option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEVEL})
 
-# Get the clang install directory
-get_filename_component(CLANG_BIN_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
-get_filename_component(CLANG_INSTALL_DIR ${CLANG_BIN_DIR} DIRECTORY)
+if(XOFFSET_BUILD_TESTS)
+    enable_testing()
+endif()
+include(cmake/XOffsetBuildChecks.cmake)
+include(cmake/XOffsetTestInventory.cmake)
+find_package(Threads REQUIRED)
 
-message(STATUS "Added -freflection flag")
-message(STATUS "Clang install: ${CLANG_INSTALL_DIR}")
+add_library(xoffset_storage INTERFACE)
+add_library(XOffset::storage ALIAS xoffset_storage)
+set_target_properties(xoffset_storage PROPERTIES EXPORT_NAME storage)
+target_compile_features(xoffset_storage INTERFACE cxx_std_17)
+target_link_libraries(xoffset_storage INTERFACE Threads::Threads)
+target_include_directories(xoffset_storage INTERFACE
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>)
 
-# macOS specific settings
-if(APPLE)
-    # Ensure we use the correct deployment target
-    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version" FORCE)
+# This branch precedes compiler-family checks, reflection flags and dependencies.
+if(NOT XOFFSET_STORAGE_ONLY)
+    if(CMAKE_VERSION VERSION_LESS 3.30)
+        message(FATAL_ERROR "The full XOffset C++26 target requires CMake 3.30 or newer")
     endif()
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "This project requires Clang with P2996 reflection support")
+    endif()
+    message(STATUS "Using C++26 with reflection")
+    get_filename_component(CLANG_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(CLANG_INSTALL_DIR "${CLANG_BIN_DIR}" DIRECTORY)
+
+    # Build-tree convenience only. Installed consumers locate their toolchain
+    # explicitly; these directories are never exported.
+    if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version")
+    endif()
+    include(cmake/XOffsetDependencies.cmake)
+    xoffset_validate_dependencies()
+    add_library(xoffset_common INTERFACE)
+    add_library(XOffset::xoffset ALIAS xoffset_common)
+    set_target_properties(xoffset_common PROPERTIES EXPORT_NAME xoffset)
+    xoffset_configure_full_interface(xoffset_common)
+
+    # An imported interface transfers the real settings to try_compile().
+    add_library(xoffset_probe_settings INTERFACE IMPORTED)
+    xoffset_configure_full_interface(xoffset_probe_settings)
+    xoffset_require_reflection()
+
+    function(configure_xoffset_target target_name)
+        target_link_libraries(${target_name} PRIVATE xoffset_common)
+        set_target_properties(${target_name} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+    endfunction()
+
+    if(XOFFSET_BUILD_EXAMPLES)
+        add_subdirectory(examples)
+    endif()
+    if(XOFFSET_BUILD_TOOLS)
+        add_subdirectory(tools)
+    endif()
+else()
+    message(STATUS "Configuring standalone C++17 OS storage layer")
 endif()
 
-# Set TypeLayout include directories
-set(TYPELAYOUT_INCLUDE_DIRS
-    ${CMAKE_SOURCE_DIR}/external/typelayout/include
-)
-
-# Active Boost header surface used by this repository. The vendored superproject
-# is larger, but the build only exposes the subset required by xoffsetdatastructure.hpp.
-set(BOOST_INCLUDE_DIRS
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/container/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/core/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/config/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/throw_exception/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/static_assert/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/container_hash/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/type_traits/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/winapi/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/intrusive/include
-    ${CMAKE_SOURCE_DIR}/external/boost/libs/predef/include
-)
-
-add_library(xoffset_common INTERFACE)
-target_compile_options(xoffset_common INTERFACE
-    -std=c++26
-    -freflection
-    -fexpansion-statements
-    -stdlib=libc++)
-target_link_options(xoffset_common INTERFACE
-    -stdlib=libc++)
-target_include_directories(xoffset_common SYSTEM INTERFACE
-    ${BOOST_INCLUDE_DIRS}
-    ${TYPELAYOUT_INCLUDE_DIRS}
-    ${CLANG_INSTALL_DIR}/include/c++/v1)
-target_include_directories(xoffset_common INTERFACE
-    ${CMAKE_SOURCE_DIR})
-target_link_directories(xoffset_common INTERFACE
-    ${CLANG_INSTALL_DIR}/lib)
-
-# Helper: configure a target with shared deps and output dir.
-function(configure_xoffset_target target_name)
-    target_link_libraries(${target_name} PRIVATE xoffset_common)
-    set_target_properties(${target_name} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
-endfunction()
-
-add_subdirectory(examples)
-add_subdirectory(tools)
-add_subdirectory(tests)
+if(XOFFSET_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+if(XOFFSET_INSTALL)
+    include(cmake/XOffsetInstall.cmake)
+endif()

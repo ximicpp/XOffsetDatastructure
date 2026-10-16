@@ -1,0 +1,8 @@
+{
+  "bind_network_window.py": "6d333147e0b2298ded5ee936f7bf9a1d25ce4a07536964aa261d6cb755b29257",
+  "network-preregister.json": "bed58a0adf44cfa1e1a3e3d76387b67ebd4c93f578974c923007aeb796d72126",
+  "network_measurement.py": "93e235728b30dd85a0c658bb695eab838a00623a1496c510417963f4ac9d8b84",
+  "paired_measurement.py": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+  "test_bind_network_window.py": "43531c3313ed75d09580e1ec9dc2d4fc752ce390153d9d72d62f8dbb5a403e48",
+  "test_network_measurement.py": "e62ae1f908997420900131fcf0c6f568fef3b64df511bea9ff8c13819ef51152"
+}

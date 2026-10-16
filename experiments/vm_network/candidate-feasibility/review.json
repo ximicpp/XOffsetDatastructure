@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "kind": "read_only_static_candidate_feasibility_and_lifetime_review",
+  "status": "ready_for_parent_review",
+  "implementation_authorized": false,
+  "production_api_adoption_authorized": false,
+  "performance_benefit_assessed": false,
+  "measured_cost_fraction": null,
+  "recommendation": "Retain F; static seams are describable, but do not approve or experimentally reject any candidate. Parent decides using W2 exact costs and W3 calibrated baseline.",
+  "inputs": "source-identities.json",
+  "report": "REVIEW.md",
+  "candidates": [
+    {
+      "id": "owner-reuse",
+      "internal_landings": [
+        "xoffsetdatastructure.hpp:477 init_from_bytes",
+        "xoffsetdatastructure.hpp:505 move_from and registry transfer",
+        "xoffsetdatastructure.hpp:306 swap and epoch",
+        "xoffsetdatastructure.hpp:745 private storage/free_blocks/type/epoch",
+        "xoffsetdatastructure.hpp:3720 load_verified",
+        "xoffset_virtual_memory.hpp:191 from_bytes"
+      ],
+      "existing_public_baseline": "load_verified(new temporary) then swap preserves old load state on failure, but still creates/registers a new owner",
+      "public_api_needed_now": false,
+      "production_api_gap": "No supported transactional in-place verified refill/finalize; any new public surface requires later consumer contract",
+      "potentially_removed": [
+        "Residual mapping/acquire/release beyond F pooled load",
+        "Fresh owner registry insertion/removal when genuinely retaining registered owners"
+      ],
+      "retained_or_added": [
+        "Complete structural and semantic verification",
+        "Old published owner plus spare or rollback storage",
+        "Host free_blocks/growth/schema/type/extent preparation or restoration",
+        "Swap/epoch/registry lock and commit synchronization",
+        "Final retained-storage release"
+      ],
+      "required_contract": [
+        "Object-variable reuse vs VM mapping vs registered Core reuse must be distinguished",
+        "Load-only commit vs receive/process/save/send failure scope",
+        "Same old-state workload in F pooled load+swap comparator",
+        "All dirty writes complete before rollback/reuse/pool return",
+        "Success invalidates old raw views; handles may re-resolve new root on same C++ object",
+        "No global registry lock held over network wait"
+      ],
+      "minimal_copy_boundary": "One independently generated F refill/validate/commit copy with two registered published/spare owners, or one explicitly selected rollback design; not both and not combined with direct-read/output-copy"
+    },
+    {
+      "id": "new-staging-direct-read",
+      "internal_landings": [
+        "net_reference.cpp:171 receive_frame",
+        "net_reference.cpp:219 server load_verified",
+        "xoffset_virtual_memory.hpp:191-208 reserve/enable/copy/logical extent",
+        "xoffsetdatastructure.hpp:477-503 arena acceptance/registration",
+        "xoffsetdatastructure.hpp:3786-3815 complete verified finalization"
+      ],
+      "existing_public_baseline": "Supported load_verified(span/string) still copies; raw data/unsafe access is not verified finalization",
+      "public_api_needed_now": false,
+      "production_api_gap": "Unpublished staging write capability and checked finalize/adopt seam are absent from supported F API",
+      "potentially_removed": [
+        "One selected endpoint receiving owning string and its initialization",
+        "One selected endpoint P-byte string-to-owner payload copy"
+      ],
+      "retained_or_added": [
+        "Owned aligned V1 header and transport progress",
+        "Mapping/pool/page enable/fault and registry work",
+        "All arena/root/allocator/graph and semantic checks",
+        "Ordinary grow_to adds P-byte memset; must not count it as eliminated memory traversal",
+        "Pending-operation staging retention, dirty failure cleanup and future growth zeroing"
+      ],
+      "required_contract": [
+        "Header/length/endian/wire/owner/total credits admitted before allocation",
+        "Partial payload never parsed or typed-published",
+        "Set completed logical extent only inside quarantine, then full graph checks and schema bind before publication",
+        "Staging/header/context retained until actual send/receive/cancel completion",
+        "Every subsequently published byte completely overwritten; future grow zeroing unchanged",
+        "Client-side raw output archival replacement/copy cost explicitly defined if client path changed"
+      ],
+      "minimal_copy_boundary": "Server-only receive+verified-load adapter with internally isolated reserve/prepare/fill/finalize; retain client F path, process/save/wire/connection/pool limits unchanged"
+    },
+    {
+      "id": "reduce-output-copy",
+      "internal_landings": [
+        "xoffsetdatastructure.hpp:3619-3679 save_verified",
+        "xoffsetdatastructure.hpp:283-289 shrink_to_fit",
+        "xoffsetdatastructure.hpp:556-573 prune and used extent",
+        "net_reference.cpp:216-226 saved response lifetime/send",
+        "net_reference.cpp:248 residual server completion wait",
+        "xoffset_virtual_memory.hpp:444 release/pool return"
+      ],
+      "existing_public_baseline": "Fixed consumer may compose public shrink/root/allocator/bytes into an internal helper; bare spans alone do not give the same gates, normalization, header or lifetime",
+      "public_api_needed_now": false,
+      "production_api_gap": "Generic owned immutable prepared-frame contract and real transport completion ownership would need explicit later design",
+      "potentially_removed": [
+        "Owning response string allocation",
+        "P-byte payload copy and header concatenation into response string"
+      ],
+      "retained_or_added": [
+        "Same normalization/type/schema/root/allocator/header preparation",
+        "Existing full graph scans at both load_verified endpoints (not at save_verified)",
+        "All actual socket transfer and client response validation",
+        "Stable owned header/owner/descriptors and split-range offsets",
+        "Owner/registry/pages/pool-handle retention under backpressure",
+        "Later owner release or pool return including residual beyond primary timer"
+      ],
+      "required_contract": [
+        "F save_verified has no full graph scan; do not claim such a scan as savings or omit load scans",
+        "Exactly unchanged native 88-byte V1 header plus normalized full payload, including internal free/slack/padding bytes",
+        "No other aliases mutate/swap/replace/return/destroy payload until real completion",
+        "Rebuild descriptor/header pointers after movable frame reaches stable ownership",
+        "Partial send errors close experiment connection; no whole-frame retry",
+        "Include deferred send completion/owner release and resource retention in comparison horizon"
+      ],
+      "minimal_copy_boundary": "Separate internal prepare-verified-header/payload from string materialization in a generated copy, or fixed-consumer helper; replace only server saved response/send scope, retain original string API/control"
+    }
+  ],
+  "cross_cutting_gaps": [
+    "Per-owner cap unchanged does not imply unchanged total live/rollback/idle resources",
+    "W1 four-wire logical credits exclude owner VM and pool idle storage",
+    "Pool idle caps do not bound active owner count or live-byte backpressure",
+    "W1 actual synchronous syscalls and shutdown/join are distinct from single-threaded injected completion model and unselected production async library",
+    "Primary client verified end excludes some residual server work; moving release out of it is not evidence of savings"
+  ],
+  "independent_subreviews": [
+    {
+      "agent": "/root/reuse_staging_review",
+      "note": "reuse-staging-independent.md",
+      "sha256": "10fb6fd375bdad9ce50c238cb961ce35cd31173c4aa8addbb7202db4833659b2",
+      "consolidated_report_cross_check": "No blocking factual/transaction/staging issue; no corrections necessary; read-only"
+    },
+    {
+      "agent": "/root/output_copy_review",
+      "note": "output-copy-independent.md",
+      "sha256": "be1c2fefad4779b13a7d76760df45b8fa70b56ef2b4856efb68750ebc7b6aa83",
+      "consolidated_report_cross_check": "No blocking factual issue; public API and save-vs-load graph distinctions accurate; read-only"
+    }
+  ],
+  "execution": {
+    "compiled": false,
+    "tests_run": false,
+    "timing_run": false,
+    "network_run": false,
+    "queue_jobs": false,
+    "process_control": false,
+    "implementation_changes": false,
+    "frozen_evidence_changes": false,
+    "W3_files_written": false
+  },
+  "next_gate": "Parent combines this static review with W2 exact cost attribution and W3 calibration and freezes one complete lifetime/resource/comparator contract before any isolated implementation"
+}

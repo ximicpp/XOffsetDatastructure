@@ -1,0 +1,78 @@
+--- /Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/proposal-v1/tools/collect_owner_measurement.py	2026-10-16 01:33:49
++++ /Users/fanchensu/XOffsetDatastructure/experiments/vm_owner_measurement/collect_owner_measurement.py	2026-10-16 01:56:59
+@@ -52,16 +52,19 @@
+     return h.hexdigest()
+ 
+ 
+-def read(path):
++def read_json_bytes(data):
+     def unique(pairs):
+         obj = {}
+         for key, value in pairs:
+             require(key not in obj, 'duplicate JSON field: '+key);obj[key] = value
+         return obj
+-    return json.loads(Path(path).read_text(), object_pairs_hook=unique,
++    return json.loads(data.decode('utf-8'), object_pairs_hook=unique,
+                       parse_constant=lambda value:(_ for _ in ()).throw(ValueError('nonfinite JSON: '+value)))
+ 
+ 
++def read(path):return read_json_bytes(Path(path).read_bytes())
++
++
+ def dump(value):return json.dumps(value, indent=2, sort_keys=True, allow_nan=False)+'\n'
+ def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
+ 
+@@ -75,6 +78,19 @@
+         with temporary.open('x') as f:f.write(dump(value));f.flush();os.fsync(f.fileno())
+         os.replace(temporary,path)
+     fd = os.open(path.parent,os.O_RDONLY)
++    try:os.fsync(fd)
++    finally:os.close(fd)
++
++
++def preserve_approval(source, target, expected_sha, *, data=None):
++    """Copy the externally approved bytes without changing JSON serialization."""
++    if data is None:data=Path(source).read_bytes()
++    require(hashlib.sha256(data).hexdigest()==expected_sha,'approval bytes changed before preservation')
++    target=Path(target)
++    with target.open('xb') as f:
++        f.write(data);f.flush();os.fsync(f.fileno())
++    require(sha(target)==expected_sha,'preserved approval SHA mismatch')
++    fd=os.open(target.parent,os.O_RDONLY)
+     try:os.fsync(fd)
+     finally:os.close(fd)
+ 
+@@ -259,10 +275,11 @@
+     return p
+ 
+ 
+-def verify_approval(root, approval_path, expected_sha):
++def verify_approval(root, approval_path, expected_sha, *, raw_bytes=None):
+     require(Path(approval_path).is_file() and not Path(approval_path).is_symlink(),'independent parent approval missing/nonregular')
+-    require(type(expected_sha) is str and len(expected_sha)==64 and sha(approval_path)==expected_sha,'independent parent approval SHA mismatch')
+-    a=read(approval_path);require(set(a)==APPROVAL_FIELDS and a['schema']=='owner-measurement-approval-v1','approval schema')
++    if raw_bytes is None:raw_bytes=Path(approval_path).read_bytes()
++    require(type(expected_sha) is str and len(expected_sha)==64 and hashlib.sha256(raw_bytes).hexdigest()==expected_sha,'independent parent approval SHA mismatch')
++    a=read_json_bytes(raw_bytes);require(set(a)==APPROVAL_FIELDS and a['schema']=='owner-measurement-approval-v1','approval schema')
+     require(a['proposal_sha256']==sha(root/'proposal.json'),'independent approval binds a foreign proposal')
+     proposal=audit_proposal(root,True)
+     for key,value in {'status':'approved','approved_by':'parent','native_execution_authorized':True,
+@@ -361,7 +378,8 @@
+ 
+ 
+ def collect(root, approval_path, approval_sha):
+-    proposal,approval=verify_approval(root,approval_path,approval_sha);e=proposal['execution'];repo=Path(e['repository'])
++    approval_bytes=Path(approval_path).read_bytes() if Path(approval_path).is_file() else None
++    proposal,approval=verify_approval(root,approval_path,approval_sha,raw_bytes=approval_bytes);e=proposal['execution'];repo=Path(e['repository'])
+     require(Path(__file__).resolve()==Path(e['collector']).resolve(),'collector entry differs from frozen proposal')
+     require(str(approval_path.absolute())==e['approval'] and str(root/'proposal.json')==e['proposal'],'execution approval/proposal path differs')
+     require(python_identity()==proposal['python'],'Python identity differs from proposal')
+@@ -372,7 +390,7 @@
+     queue=active_queue(proposal,approval_sha);out=owned(e['window'],repo,'build/vm-owner-measurement');marker=repo/'build/vm-owner-measurement/native-window.json'
+     require(not marker.exists() and not out.exists(),'D023 single window already consumed; no resume/retry')
+     budget(repo,2*LOG_LIMIT+4*1024*1024);out.mkdir(parents=True);(out/'samples').mkdir()
+-    write(out/'approval.json',approval,exclusive=True);shutil.copytree(root,out/'proposal');write(out/'coordination.json',queue,exclusive=True)
++    preserve_approval(approval_path,out/'approval.json',approval_sha,data=approval_bytes);shutil.copytree(root,out/'proposal');write(out/'coordination.json',queue,exclusive=True)
+     state={'schema':'owner-measurement-window-v1','status':'running','run_id':proposal['run_id'],'proposal_sha256':sha(root/'proposal.json'),
+            'approval_sha256':approval_sha,'native_timing_evidence_claim':False,'measurement_qualification':'pending_completed_receipt',
+            'coordination':queue,'attempts':[],'started_at':now()}

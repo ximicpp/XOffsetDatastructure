@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-15",
+  "baseline": {
+    "name": "F",
+    "git_base": "07d649909d7f43ca0d11b85accb6d9dab991e284",
+    "headers": {
+      "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+      "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    }
+  },
+  "dependencies": {
+    "boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+    "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+  },
+  "full_library_flags": [
+    "-std=c++26",
+    "-freflection",
+    "-fexpansion-statements",
+    "-stdlib=libc++"
+  ],
+  "profiles": {
+    "linux-p2996": {
+      "image": "ghcr.io/ximicpp/typelayout-p2996@sha256:fab845dadf9c7171d104cd34f8a3941119809e49baa7d0cd7ce1a7a2d71ad999",
+      "platform": "linux/amd64",
+      "compiler": "/opt/p2996-toolchain/bin/clang++",
+      "compiler_commit": "a5270822dede40aaaf2c62381b89f110d2cfda4c",
+      "target": "x86_64-unknown-linux-gnu",
+      "sanitizer_runtime": {
+        "required_for": [
+          "address-undefined",
+          "thread"
+        ],
+        "source_package": "libclang-rt-21-dev_amd64.deb",
+        "source_package_sha256": "d6f84c34953b0404ec9648ba7364004a82454f79cc447f67894b9a27317ef6ce",
+        "note": "Supply the extracted compiler resource directory explicitly; not needed for an unsanitized build."
+      }
+    },
+    "macos-p2996": {
+      "compiler_commit": "d77eff1cbd78fd065668acf93b1f5f400d39134d",
+      "target": "arm64-apple-darwin25.6.0",
+      "sdk": "MacOSX26.5.sdk",
+      "compiler_binary_sha256_observed": "b63aa0e51a70e4569e75ed49c575361aa20cbe5d9c3ef7457fb8b5db83763a8f",
+      "runtime_sha256_observed": {
+        "libc++.1.0.dylib": "55a5a76021ef1d69f1049f39da0b5d7de357a442485b0c18eaa93fe9707e67bc",
+        "libc++abi.1.0.dylib": "608567f0ee857f57f0dfb6a3f180be5d48d82556409bf197419fe1e8cb1385a6",
+        "libclang_rt.tsan_osx_dynamic.dylib": "6f7114babe190d1010186c1106e05112e58946502d8cec7bb98beebcab7aa0e9"
+      },
+      "note": "Explicit compiler, SDK and library locations are supplied by the caller; do not substitute the current xcrun default SDK. Binary hashes describe the observed build, not all builds of the same compiler revision."
+    }
+  },
+  "build_tools": {
+    "cmake": {
+      "version": "4.2.3",
+      "minimum_full": "3.30",
+      "upstream_checksums": "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-SHA-256.txt",
+      "archives": {
+        "linux-x86_64": {
+          "url": "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz",
+          "sha256": "5bb505d5e0cca0480a330f7f27ccf52c2b8b5214c5bba97df08899f5ef650c23"
+        },
+        "linux-aarch64": {
+          "url": "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-aarch64.tar.gz",
+          "sha256": "e529c75f18f27ba27c52b329efe7b1f98dc32ccc0c6d193c7ab343f888962672"
+        }
+      }
+    }
+  }
+}

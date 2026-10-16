@@ -32,6 +32,11 @@
 #include <memory>
 #include <new>
 #include <stdexcept>
+#include <exception>
+#include <optional>
+#include <mutex>
+#include <unordered_map>
+#include "xoffset_virtual_memory.hpp"
 
 // TypeLayout library — the authoritative byte-copy-safety engine.
 // XOffset uses TypeLayout for recursive admission and safety checks.
@@ -58,6 +63,14 @@ namespace XOffsetDatastructure {
     public:
         XBadAlloc() : XException("XOffset arena allocation failed") {}
     };
+
+    namespace detail {
+        // Registration is the only registry operation allowed to allocate.
+        // One-shot thread-local injection leaves existing owners untouched.
+        inline thread_local bool pending_registry_failure = false;
+        inline void fail_next_registry_registration() noexcept { pending_registry_failure = true; }
+        inline void clear_registry_failures() noexcept { pending_registry_failure = false; }
+    }
 
     template <typename T, typename Arena>
     class XArenaAllocatorBase {
@@ -124,6 +137,9 @@ namespace XOffsetDatastructure {
     template <typename K, typename V> struct XKeyValue;
     struct XAllocatorStateV1;
 
+    enum class XGrowPolicy { Explicit, Automatic };
+    using XBufferPool = detail::VmStoragePool;
+
     class XBufferCore {
     public:
         using size_type = std::size_t;
@@ -139,6 +155,17 @@ namespace XOffsetDatastructure {
 
             void* allocate_aligned(std::uint32_t bytes, std::size_t alignment) {
                 return owner().allocate_aligned_impl(bytes, alignment);
+            }
+
+            void* allocate_without_growth(std::uint32_t bytes, std::size_t alignment) {
+                return owner().allocate_aligned_impl(bytes, alignment, false);
+            }
+
+            // Internal allocator operation: ptr must identify a live allocation
+            // from this arena. Only its physical tail block can grow, and only
+            // within the configured capacity. Failure leaves it unchanged.
+            bool try_expand(void* ptr, std::uint32_t bytes, std::size_t alignment) {
+                return owner().try_expand_impl(ptr, bytes, alignment);
             }
 
             void deallocate(void* ptr) noexcept {
@@ -162,10 +189,7 @@ namespace XOffsetDatastructure {
         }
 
         XBufferCore& operator=(XBufferCore&& other) noexcept {
-            if (this != &other) {
-                unregister_registry();
-                move_from(std::move(other));
-            }
+            if (this != &other) move_from(std::move(other));
             return *this;
         }
 
@@ -173,6 +197,42 @@ namespace XOffsetDatastructure {
         static constexpr std::size_t MIN_RESERVE = 64ULL * 1024;
         static constexpr std::size_t MAX_RESERVE = 256ULL * 1024 * 1024;
         static constexpr std::size_t MAX_PAYLOAD = 0x7ffffff8u;
+
+#ifdef XOFFSET_DEFAULT_MAXIMUM_CAPACITY
+        static constexpr std::size_t DEFAULT_MAXIMUM_CAPACITY = XOFFSET_DEFAULT_MAXIMUM_CAPACITY;
+#else
+        static constexpr std::size_t DEFAULT_MAXIMUM_CAPACITY = 64ULL * 1024 * 1024;
+#endif
+        static_assert(DEFAULT_MAXIMUM_CAPACITY >= sizeof(arena_header) &&
+                      DEFAULT_MAXIMUM_CAPACITY <= MAX_PAYLOAD);
+
+        struct MaximumCapacity {
+            size_type value;
+            XGrowPolicy growth = XGrowPolicy::Explicit;
+            XBufferPool pool;
+
+            MaximumCapacity with_growth(XGrowPolicy policy) const noexcept {
+                auto result = *this;
+                result.growth = policy;
+                return result;
+            }
+            MaximumCapacity with_pool(const XBufferPool& shared_pool) const noexcept {
+                auto result = *this;
+                result.pool = shared_pool;
+                return result;
+            }
+        };
+        static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
+        size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
+        XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
+        void set_growth_policy(XGrowPolicy policy) noexcept { growth_policy_ = policy; }
+        detail::VmReclaimResult reclaim_tail_pages() noexcept { return buffer_.reclaim_tail(); }
+
+        // Numeric reservation parameters are legacy minimum hints, not hard limits.
+        static size_type capacity_from_hint(size_type size, size_type hint = 0) {
+            if (size > MAX_PAYLOAD || hint > MAX_PAYLOAD) throw XBadAlloc();
+            return std::max({size, hint, DEFAULT_MAXIMUM_CAPACITY});
+        }
 
         static constexpr std::size_t compute_reservation(std::size_t size) {
             std::size_t r;
@@ -187,48 +247,37 @@ namespace XOffsetDatastructure {
         }
 
         explicit XBufferCore(size_type size) {
-            init_fresh(size, compute_reservation(size));
+            init_fresh(size, capacity_from_hint(size));
         }
 
         XBufferCore(size_type size, size_type max_reserved) {
-            init_fresh(size, max_reserved);
+            init_fresh(size, capacity_from_hint(size, max_reserved));
+        }
+
+        XBufferCore(size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+            init_fresh(size, cap.value, cap.pool);
         }
 
         XBufferCore(const char* data, size_type size) {
-            init_from_bytes(data, size, compute_reservation(size));
+            init_from_bytes(data, size, capacity_from_hint(size));
         }
 
         XBufferCore(const char* data, size_type size, size_type max_reserved) {
-            init_from_bytes(data, size, max_reserved);
+            init_from_bytes(data, size, capacity_from_hint(size, max_reserved));
+        }
+
+        XBufferCore(const char* data, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+            init_from_bytes(data, size, cap.value, cap.pool);
         }
 
         uint64_t epoch() const noexcept { return m_epoch; }
 
         bool grow(size_type extra_bytes) {
             if (extra_bytes == 0) return true;
-            if (extra_bytes > MAX_PAYLOAD - buffer_.size()) return false;
-            char* old_addr = buffer_.empty() ? nullptr : buffer_.data();
-            try {
-                const auto new_size = buffer_.size() + extra_bytes;
-                if (new_size > buffer_.capacity()) {
-                    buffer_.reserve(std::max(new_size,
-                        std::min(MAX_PAYLOAD, buffer_.capacity() * 2u)));
-                }
-                buffer_.resize(new_size, char(0));
-            } catch (const std::bad_alloc&) {
-                return false;
-            }
-            if (!buffer_.empty()) {
-                auto* sm = arena();
-                if (sm->used_end > buffer_.size()) {
-                    sm->used_end = buffer_.size();
-                }
-            }
-            if (!buffer_.empty() && buffer_.data() != old_addr) {
-                ++m_epoch;
-            }
-            refresh_registry();
-            return true;
+            if (buffer_.empty() || extra_bytes > buffer_.maximum_capacity() - buffer_.size()) return false;
+            // The allocator reads the storage's logical extent directly. No segment
+            // reopen, offset rewrite, or potentially throwing allocator update follows.
+            return buffer_.grow_to(buffer_.size() + extra_bytes);
         }
 
         void shrink_to_fit() {
@@ -236,22 +285,43 @@ namespace XOffsetDatastructure {
             prune_free_blocks();
             auto used = used_end_clamped();
             if (used < buffer_.size()) {
-                buffer_.resize(used);
+                buffer_.resize_logical(used);
             }
-            char* old_addr = buffer_.data();
-            buffer_.shrink_to_fit();
-            if (buffer_.data() != old_addr) {
-                ++m_epoch;
-            }
-            refresh_registry();
         }
 
         const void* get_address() const { return buffer_.data(); }
-        std::vector<char>* get_buffer() { return &buffer_; }
-        const std::vector<char>* get_buffer() const { return &buffer_; }
+        char* data() noexcept { return buffer_.data(); }
+        const char* data() const noexcept { return buffer_.data(); }
+        std::span<char> get_buffer() noexcept { return {buffer_.data(), buffer_.size()}; }
+        std::span<const char> get_buffer() const noexcept { return {buffer_.data(), buffer_.size()}; }
+        std::string copy_bytes() const {
+            return buffer_.empty() ? std::string{} : std::string(buffer_.data(), buffer_.size());
+        }
         size_type get_size() const { return buffer_.size(); }
         size_type segment_size() const { return buffer_.size(); }
         size_type reserved_capacity() const { return buffer_.capacity(); }
+        size_type reserved_bytes() const noexcept { return buffer_.reserved_bytes(); }
+        size_type accessible_bytes() const noexcept { return buffer_.accessible_bytes(); }
+
+        void swap(XBufferCore& other) noexcept {
+            if (this == &other) return;
+            auto& state = registry_state();
+            std::lock_guard lock(state.mutex);
+            buffer_.swap(other.buffer_);
+            free_blocks_.swap(other.free_blocks_);
+            std::swap(growth_policy_, other.growth_policy_);
+            std::swap(root_type_identity_, other.root_type_identity_);
+            std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
+            std::swap(schema_bound_, other.schema_bound_);
+            std::swap(bound_root_type_id_, other.bound_root_type_id_);
+            std::swap(bound_schema_hash_, other.bound_schema_hash_);
+            ++m_epoch;
+            ++other.m_epoch;
+            update_registry_owner_locked(state);
+            other.update_registry_owner_locked(state);
+        }
+
+        friend void swap(XBufferCore& a, XBufferCore& b) noexcept { a.swap(b); }
 
         size_type get_free_memory() const {
             if (buffer_.empty()) return 0;
@@ -286,8 +356,18 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename... Args>
         T* construct_root_storage(Args&&... args) {
-            return construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
+            T* result = construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
+            bind_root_type<T>();
+            return result;
         }
+
+        template <typename T>
+        void bind_root_type() noexcept { root_type_identity_ = type_identity<std::remove_cv_t<T>>(); }
+
+        template <typename T>
+        bool root_type_matches() const noexcept { return root_type_identity_ == type_identity<std::remove_cv_t<T>>(); }
+
+        bool root_type_known() const noexcept { return root_type_identity_ != nullptr; }
 
         template <typename T>
         T* find_allocator_storage() noexcept {
@@ -323,9 +403,36 @@ namespace XOffsetDatastructure {
 
         static constexpr char payload_magic_[8] = {'X', 'B', 'U', 'F', 'V', '1', '\0', '\0'};
 
-        static XBufferCore*& registry() {
-            static XBufferCore* head = nullptr;
-            return head;
+        struct AddressHash {
+            std::size_t operator()(const void* pointer) const noexcept {
+                // Mix page-aligned addresses instead of relying on their low bits.
+                auto bits = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(pointer));
+                bits ^= bits >> 30;
+                bits *= 0xbf58476d1ce4e5b9ULL;
+                bits ^= bits >> 27;
+                bits *= 0x94d049bb133111ebULL;
+                return static_cast<std::size_t>(bits ^ (bits >> 31));
+            }
+        };
+
+        struct RegistryState {
+            std::mutex mutex;
+            std::unordered_map<const void*, XBufferCore*, AddressHash> owners;
+        };
+
+        static RegistryState& registry_state() {
+            // Globals may first register in main and unregister after ordinary
+            // function statics have been destroyed. The index and mutex share
+            // process lifetime; its nodes are erased as owners are destroyed.
+            alignas(RegistryState) static std::byte storage[sizeof(RegistryState)];
+            static auto* state = ::new (static_cast<void*>(storage)) RegistryState;
+            return *state;
+        }
+
+        template <typename T>
+        static const void* type_identity() noexcept {
+            static char token;
+            return &token;
         }
 
         static size_type align_up(size_type value, size_type alignment) noexcept {
@@ -333,26 +440,29 @@ namespace XOffsetDatastructure {
         }
 
         static XBufferCore& owner_from_payload_ptr(const void* ptr) {
-            auto address = reinterpret_cast<std::uintptr_t>(ptr);
-            for (auto* entry = registry(); entry; entry = entry->registry_next_) {
-                auto begin = reinterpret_cast<std::uintptr_t>(entry->buffer_.data());
-                if (address >= begin && address - begin < entry->buffer_.size()) {
-                    return *entry;
-                }
-            }
-            throw XException(
-                "arena owner lookup failed");
+            auto& state = registry_state();
+            std::lock_guard lock(state.mutex);
+            // The sole caller is arena_header::owner(): ptr is exactly the base.
+            const auto found = state.owners.find(ptr);
+            if (found != state.owners.end()) return *found->second;
+            throw XException("arena owner lookup failed");
         }
 
         static size_type min_payload_size() noexcept {
             return align_up(sizeof(arena_header), alignof(std::max_align_t));
         }
 
-        void init_fresh(size_type size, size_type max_reserved) {
+        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
             size = std::max(size, min_payload_size());
-            buffer_.assign(size, char(0));
-            buffer_.reserve(std::max(size, max_reserved));
+            if (size > max_reserved) throw XBadAlloc();
+            try {
+                buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            } catch (const std::length_error&) {
+                throw XBadAlloc();
+            }
             auto* sm = arena();
             std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
             sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
@@ -361,17 +471,24 @@ namespace XOffsetDatastructure {
             sm->allocator_offset = 0;
             sm->used_end = min_payload_size();
             sm->reserved0 = 0;
-            refresh_registry();
+            register_registry();
         }
 
-        void init_from_bytes(const char* data, size_type size, size_type max_reserved) {
+        void init_from_bytes(const char* data, size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
             if (!data || size < sizeof(arena_header)) {
                 throw XException(
                     "XBufferCore: payload too small");
             }
-            buffer_.assign(data, data + size);
-            buffer_.reserve(std::max(size, max_reserved));
+            if (size > max_reserved) throw XBadAlloc();
+            try {
+                buffer_ = detail::VirtualMemoryStorage::from_bytes(data, size, max_reserved, pool);
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            } catch (const std::length_error&) {
+                throw XBadAlloc();
+            }
+            typed_root_access_allowed_ = false;
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
@@ -382,30 +499,58 @@ namespace XOffsetDatastructure {
                 throw XException(
                     "XBufferCore: payload used_end out of range");
             }
-            refresh_registry();
+            register_registry();
         }
 
         void move_from(XBufferCore&& other) noexcept {
-            other.unregister_registry();
+            auto& state = registry_state();
+            std::lock_guard lock(state.mutex);
+            unregister_registry_locked(state);
             buffer_ = std::move(other.buffer_);
             free_blocks_ = std::move(other.free_blocks_);
+            growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
+            root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
+            typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
+            schema_bound_ = std::exchange(other.schema_bound_, false);
+            bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
+            bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
             ++m_epoch;
             ++other.m_epoch;
-            refresh_registry();
+            // The source key already exists. Transfer its value in place,
+            // without allocating a new node or triggering a rehash.
+            update_registry_owner_locked(state);
+        }
+
+        void update_registry_owner_locked(RegistryState& state) noexcept {
+            if (!buffer_.data()) return;
+            const auto found = state.owners.find(buffer_.data());
+            if (found == state.owners.end()) std::terminate(); // broken internal ownership
+            found->second = this;
         }
 
         void unregister_registry() noexcept {
-            auto** link = &registry();
-            while (*link && *link != this) link = &(*link)->registry_next_;
-            if (*link) *link = registry_next_;
-            registry_next_ = nullptr;
+            if (!buffer_.data()) return;
+            auto& state = registry_state();
+            std::lock_guard lock(state.mutex);
+            unregister_registry_locked(state);
         }
 
-        void refresh_registry() noexcept {
-            unregister_registry();
-            if (buffer_.empty()) return;
-            registry_next_ = registry();
-            registry() = this;
+        void unregister_registry_locked(RegistryState& state) noexcept {
+            if (buffer_.data()) state.owners.erase(buffer_.data());
+        }
+
+        void register_registry() {
+            if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
+            auto& state = registry_state();
+            std::lock_guard lock(state.mutex);
+            try {
+                const auto result = state.owners.emplace(buffer_.data(), this);
+                if (!result.second) throw XException("duplicate arena owner registration");
+            } catch (const std::bad_alloc&) {
+                // With nonthrowing hash/equality, failed insertion preserves all
+                // existing entries. The constructor releases its new VM owner.
+                throw XBadAlloc();
+            }
         }
 
         void prune_free_blocks() {
@@ -447,25 +592,28 @@ namespace XOffsetDatastructure {
         template <typename T>
         T* object_at_offset(std::uint64_t offset) noexcept {
             if (offset == 0 || offset > buffer_.size() ||
-                sizeof(T) > buffer_.size() - offset || offset % alignof(T) != 0) {
+                sizeof(T) > buffer_.size() - offset) {
                 return nullptr;
             }
             auto* raw = buffer_.data() + static_cast<size_type>(offset);
+            if (reinterpret_cast<std::uintptr_t>(raw) % alignof(T) != 0) return nullptr;
             return std::launder(reinterpret_cast<T*>(raw));
         }
 
         template <typename T>
         const T* object_at_offset_const(std::uint64_t offset) const noexcept {
             if (offset == 0 || offset > buffer_.size() ||
-                sizeof(T) > buffer_.size() - offset || offset % alignof(T) != 0) {
+                sizeof(T) > buffer_.size() - offset) {
                 return nullptr;
             }
             auto* raw = buffer_.data() + static_cast<size_type>(offset);
+            if (reinterpret_cast<std::uintptr_t>(raw) % alignof(T) != 0) return nullptr;
             return std::launder(reinterpret_cast<const T*>(raw));
         }
 
         template <typename T, typename... Args>
         T* construct_object_at_slot(std::uint64_t& slot, Args&&... args) {
+            if constexpr (sizeof(T) > MAX_PAYLOAD) throw XBadAlloc();
             if (slot != 0) {
                 throw XException(
                     "XBufferCore: object slot already populated");
@@ -484,7 +632,20 @@ namespace XOffsetDatastructure {
             return obj;
         }
 
-        void* allocate_aligned_impl(std::uint32_t bytes, std::size_t alignment) {
+        bool ensure_allocation_extent(size_type required, bool allow_growth = true) {
+            if (required <= buffer_.size()) return true;
+            if (!allow_growth || growth_policy_ != XGrowPolicy::Automatic ||
+                buffer_.empty() || required > buffer_.maximum_capacity()) return false;
+            const auto maximum = buffer_.maximum_capacity();
+            const auto current = buffer_.size();
+            const auto geometric = current > maximum / 2 ? maximum : current * 2;
+            // Throw on an OS/preparation failure. In particular, a container's
+            // failed tail expansion must not silently retry via a new allocation.
+            if (!buffer_.grow_to(std::max(required, geometric))) throw XBadAlloc();
+            return true;
+        }
+
+        void* allocate_aligned_impl(std::uint32_t bytes, std::size_t alignment, bool allow_growth = true) {
             if (bytes > MAX_PAYLOAD || alignment == 0 ||
                 (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
             if (bytes == 0) bytes = 1;
@@ -494,6 +655,7 @@ namespace XOffsetDatastructure {
                 const auto& block = free_blocks_[i];
                 if (block.user_bytes >= bytes && block.alignment >= alignment) {
                     void* ptr = buffer_.data() + block.user_offset;
+                    if (reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0) continue;
                     free_blocks_.erase(free_blocks_.begin() + static_cast<std::ptrdiff_t>(i));
                     return ptr;
                 }
@@ -501,13 +663,19 @@ namespace XOffsetDatastructure {
 
             auto* sm = arena();
             size_type current_end = used_end_clamped();
-            size_type block_begin = align_up(current_end + sizeof(AllocationHeader), alignment) -
-                sizeof(AllocationHeader);
-            size_type user_offset = block_begin + sizeof(AllocationHeader);
-            size_type block_end = user_offset + bytes;
-            if (block_end > buffer_.size()) {
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto limit = (std::numeric_limits<std::uintptr_t>::max)();
+            if (current_end > limit - base || sizeof(AllocationHeader) > limit - base - current_end)
                 throw XBadAlloc();
-            }
+            const auto first_address = base + current_end + sizeof(AllocationHeader);
+            if (alignment - 1u > limit - first_address) throw XBadAlloc();
+            const auto user_address = align_up(first_address, alignment);
+            const size_type user_offset = user_address - base;
+            if (user_offset > MAX_PAYLOAD || bytes > MAX_PAYLOAD - user_offset)
+                throw XBadAlloc();
+            const size_type block_begin = user_offset - sizeof(AllocationHeader);
+            const size_type block_end = user_offset + bytes;
+            if (!ensure_allocation_extent(block_end, allow_growth)) throw XBadAlloc();
 
             auto* header = std::launder(
                 reinterpret_cast<AllocationHeader*>(buffer_.data() + block_begin));
@@ -517,6 +685,35 @@ namespace XOffsetDatastructure {
             header->alignment = static_cast<std::uint32_t>(alignment);
             sm->used_end = std::max<std::uint64_t>(sm->used_end, block_end);
             return buffer_.data() + user_offset;
+        }
+
+        bool try_expand_impl(void* ptr, std::uint32_t bytes, std::size_t alignment) {
+            if (!ptr || buffer_.empty() || bytes == 0 || bytes > MAX_PAYLOAD ||
+                alignment == 0 || (alignment & (alignment - 1)) != 0 ||
+                alignment > MAX_PAYLOAD) return false;
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (address < base || address - base < sizeof(AllocationHeader) ||
+                address - base >= buffer_.size() || address % alignment != 0 ||
+                (address - sizeof(AllocationHeader)) % alignof(AllocationHeader) != 0) return false;
+            const auto offset = static_cast<size_type>(address - base);
+            auto* header = std::launder(reinterpret_cast<AllocationHeader*>(
+                buffer_.data() + offset - sizeof(AllocationHeader)));
+            if (header->user_offset != offset || header->user_bytes == 0 ||
+                header->user_bytes > buffer_.size() - offset ||
+                header->total_bytes != std::uint64_t(header->user_bytes) + sizeof(AllocationHeader) ||
+                header->alignment < alignment || header->alignment > MAX_PAYLOAD ||
+                (header->alignment & (header->alignment - 1)) != 0 ||
+                address % header->alignment != 0 ||
+                offset + header->user_bytes != arena()->used_end) return false;
+            // Reuse can give a container more physical storage than its recorded
+            // capacity. Never shorten that storage or lose its tail identity.
+            if (bytes <= header->user_bytes) return true;
+            if (bytes > MAX_PAYLOAD - offset || !ensure_allocation_extent(offset + bytes)) return false;
+            header->user_bytes = bytes;
+            header->total_bytes = static_cast<std::uint32_t>(sizeof(AllocationHeader) + bytes);
+            arena()->used_end = offset + bytes;
+            return true;
         }
 
         void deallocate_impl(void* ptr) noexcept {
@@ -537,10 +734,20 @@ namespace XOffsetDatastructure {
             }
         }
 
-        std::vector<char> buffer_;
+    protected:
+        // Storage-associated access/schema state belongs to the owner so even
+        // transfers through XBufferCore cannot leave derived flags behind.
+        bool typed_root_access_allowed_ = true;
+        bool schema_bound_ = false;
+        std::uint64_t bound_root_type_id_ = 0;
+        std::uint64_t bound_schema_hash_ = 0;
+
+    private:
+        detail::VirtualMemoryStorage buffer_;
+        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
         std::vector<FreeBlock> free_blocks_;
+        const void* root_type_identity_ = nullptr;
         std::uint64_t m_epoch = 0;
-        XBufferCore* registry_next_ = nullptr;
     };
 
     // ========================================================================
@@ -862,16 +1069,48 @@ namespace XOffsetDatastructure {
 
             void* raw = nullptr;
             try {
-                raw = arena->allocate_aligned(aligned_bytes, alignment);
+                raw = arena->allocate_without_growth(aligned_bytes, alignment);
             } catch (const XBadAlloc&) {
-                if (!alloc_ref.state || alloc_ref.state->free_bytes == 0) {
-                    throw;
-                }
-                release_cached_blocks(alloc_ref.state);
+                if (alloc_ref.state && alloc_ref.state->free_bytes != 0)
+                    release_cached_blocks(alloc_ref.state);
                 raw = arena->allocate_aligned(aligned_bytes, alignment);
             }
             note_allocator_block(alloc_ref.state, raw, aligned_bytes);
             return raw;
+        }
+
+        inline bool try_expand_dynamic_bytes(const allocator_ref& alloc_ref,
+                                             void* ptr, std::uint32_t bytes,
+                                             std::size_t alignment) {
+            if (!alloc_ref.segment || !ptr || bytes == 0 || alignment == 0 ||
+                (alignment & (alignment - 1)) != 0 || alignment > XBufferCore::MAX_PAYLOAD ||
+                bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u)) return false;
+            const auto aligned_bytes = round_up_to_alignment(
+                bytes, static_cast<std::uint32_t>(std::max<std::size_t>(alignment, 8u)));
+
+            // Containers supply only live allocations. Check every state update
+            // before the Core publishes the enlarged physical allocation.
+            std::uint32_t offset = 0;
+            std::uint32_t end = 0;
+            if (auto* state = alloc_ref.state) {
+                const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+                const auto origin = reinterpret_cast<std::uintptr_t>(state);
+                if (address <= origin || address - origin > std::numeric_limits<std::uint32_t>::max())
+                    return false;
+                XBufferCore::AllocationHeader header;
+                std::memcpy(&header, static_cast<const char*>(ptr) - sizeof(header), sizeof(header));
+                const auto physical_bytes = std::max(aligned_bytes, header.user_bytes);
+                const auto candidate_end = std::uint64_t(address - origin) + physical_bytes;
+                if (candidate_end > std::numeric_limits<std::uint32_t>::max()) return false;
+                offset = static_cast<std::uint32_t>(address - origin);
+                end = static_cast<std::uint32_t>(candidate_end);
+            }
+            if (!alloc_ref.segment->try_expand(ptr, aligned_bytes, alignment)) return false;
+            if (auto* state = alloc_ref.state) {
+                if (state->arena_begin == 0 || offset < state->arena_begin) state->arena_begin = offset;
+                if (end > state->arena_end) state->arena_end = end;
+            }
+            return true;
         }
 
         inline void retire_dynamic_bytes(const allocator_ref& alloc_ref,
@@ -1216,6 +1455,11 @@ namespace XOffsetDatastructure {
             if (new_cap <= capacity_) return;
 
             auto alloc = binding();
+            if (fixed_detail::try_expand_dynamic_bytes(
+                    alloc, data(), static_cast<std::uint32_t>(new_cap + 1), alignof(char))) {
+                capacity_ = new_cap;
+                return;
+            }
             auto* new_data = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(
                 alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)));
 
@@ -1424,6 +1668,11 @@ namespace XOffsetDatastructure {
             ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
+            if (fixed_detail::try_expand_dynamic_bytes(
+                    binding(), data(), static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T))) {
+                capacity_ = new_cap;
+                return;
+            }
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 if (new_cap > max_size()) throw XBadAlloc();
                 auto alloc = binding();
@@ -3133,8 +3382,10 @@ namespace XOffsetDatastructure {
     public:
         XHandle() noexcept : buffer_(nullptr) {}
 
-        explicit XHandle(XBufferCore& buf) noexcept
-            : buffer_(&buf), cached_ptr_(nullptr), cached_epoch_(0)
+        using resolver_type = T* (*)(XBufferCore&);
+
+        explicit XHandle(XBufferCore& buf, resolver_type resolver = nullptr) noexcept
+            : buffer_(&buf), cached_ptr_(nullptr), cached_epoch_(0), resolver_(resolver)
         {
             resolve();
         }
@@ -3160,7 +3411,9 @@ namespace XOffsetDatastructure {
             if (!buffer_) return nullptr;
             uint64_t current_epoch = buffer_->epoch();
             if (cached_ptr_ && cached_epoch_ == current_epoch) return cached_ptr_;
-            cached_ptr_ = detail::find_root<T>(*buffer_);
+            cached_ptr_ = resolver_ ? resolver_(*buffer_)
+                : (buffer_->root_type_known() && !buffer_->template root_type_matches<T>()
+                    ? nullptr : detail::find_root<T>(*buffer_));
             cached_epoch_ = current_epoch;
             return cached_ptr_;
         }
@@ -3168,6 +3421,7 @@ namespace XOffsetDatastructure {
         XBufferCore* buffer_;
         mutable T* cached_ptr_ = nullptr;
         mutable uint64_t cached_epoch_ = 0;
+        resolver_type resolver_ = nullptr;
     };
 
     // XBuffer — Single root object per buffer (make/root/has_root).
@@ -3193,7 +3447,12 @@ namespace XOffsetDatastructure {
             typed_root_access_allowed_ = false;
         }
 
-        /// Explicit max capacity override for the adaptive reservation.
+        XBuffer(const char* data, std::size_t size, MaximumCapacity cap)
+            : XBufferCore(data, size, cap) {
+            typed_root_access_allowed_ = false;
+        }
+
+        /// Legacy minimum reservation hint. Use maximum_capacity() for a hard limit.
         struct MaxCapacity { std::size_t value; };
         static MaxCapacity max_capacity(std::size_t bytes) { return {bytes}; }
 
@@ -3202,6 +3461,18 @@ namespace XOffsetDatastructure {
             (void)detail::ensure_allocator_state(*this);
         }
 
+        XBuffer(std::size_t size, MaximumCapacity cap)
+            : XBufferCore(size, cap) {
+            (void)detail::ensure_allocator_state(*this);
+        }
+
+        void swap(XBuffer& other) noexcept {
+            if (this == &other) return;
+            XBufferCore::swap(other);
+        }
+
+        friend void swap(XBuffer& a, XBuffer& b) noexcept { a.swap(b); }
+
         template <typename T>
         static XBuffer create(std::size_t reserve_bytes = 4096) {
             XBuffer xbuf(reserve_bytes);
@@ -3209,7 +3480,15 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
-        /// Create the root object. Returned pointer may dangle after grow/compact.
+        template <typename T>
+        static XBuffer create(std::size_t initial_bytes, MaximumCapacity cap) {
+            XBuffer xbuf(initial_bytes, cap);
+            (void)xbuf.template make<T>();
+            return xbuf;
+        }
+
+        /// Create the root object. Growth/shrink/save retain its address;
+        /// replacing this buffer's storage or destroying it invalidates the pointer.
         template<typename T>
         T* make() {
             static_assert(is_byte_copy_safe_v<T>,
@@ -3224,6 +3503,7 @@ namespace XOffsetDatastructure {
             }
             auto* result = detail::construct_root<T>(*this);
             typed_root_access_allowed_ = true;
+            this->template bind_root_type<T>();
             bind_schema_if_available<T>();
             return result;
         }
@@ -3267,7 +3547,7 @@ namespace XOffsetDatastructure {
         template<typename T>
         XHandle<T> make_handle() {
             make<T>();
-            return XHandle<T>(*this);
+            return handle<T>();
         }
 
         template<typename T>
@@ -3276,7 +3556,13 @@ namespace XOffsetDatastructure {
                 "handle<T>(): typed handle access requires local construction or load_verified<T>(); "
                 "use unsafe_handle<T>() only for trusted raw payloads");
             require_schema_match<T>("handle<T>(): schema mismatch for requested root type");
-            return XHandle<T>(*this);
+            return XHandle<T>(*this, [](XBufferCore& core) -> T* {
+                auto& buffer = static_cast<XBuffer&>(core);
+                if (!buffer.typed_root_access_allowed_ || !buffer.template root_type_matches<T>())
+                    return nullptr;
+                if (buffer.schema_bound_ && !buffer.template matches_schema<T>()) return nullptr;
+                return detail::find_root<T>(buffer);
+            });
         }
 
         template<typename T>
@@ -3326,7 +3612,7 @@ namespace XOffsetDatastructure {
             this->shrink_to_fit();
             const char* base = static_cast<const char*>(this->get_address());
             std::size_t exact_size = this->segment_size();
-            return std::string(base, exact_size);
+            return exact_size == 0 ? std::string{} : std::string(base, exact_size);
         }
 
         template <typename T>
@@ -3350,14 +3636,15 @@ namespace XOffsetDatastructure {
             }
 
             const char* base = static_cast<const char*>(this->get_address());
-            std::string payload(base, this->segment_size());
+            const auto payload_size = this->segment_size();
             XWireHeaderV1 header{};
             std::memcpy(header.magic, XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
             header.format_major = XWIRE_FORMAT_MAJOR_V1;
             header.format_minor = XWIRE_FORMAT_MINOR_V1;
             header.header_size = static_cast<std::uint32_t>(sizeof(XWireHeaderV1));
-            header.used_bytes = static_cast<std::uint64_t>(payload.size());
-            header.reserved_bytes = static_cast<std::uint64_t>(this->reserved_capacity());
+            header.used_bytes = static_cast<std::uint64_t>(payload_size);
+            // Keep transport normalized. OS reservations are process-local metadata.
+            header.reserved_bytes = header.used_bytes;
             header.root_offset = static_cast<std::uint64_t>(
                 reinterpret_cast<const char*>(root_ptr) -
                 static_cast<const char*>(this->get_address()));
@@ -3372,14 +3659,31 @@ namespace XOffsetDatastructure {
             header.crc32c = 0;
             header.reserved0 = 0;
 
-            std::string out(sizeof(XWireHeaderV1) + payload.size(), '\0');
-            std::memcpy(out.data(), &header, sizeof(header));
-            std::memcpy(out.data() + sizeof(header), payload.data(), payload.size());
+            std::string out;
+            if (sizeof(header) > out.max_size() ||
+                payload_size > out.max_size() - sizeof(header)) {
+                throw std::length_error("save_verified<T>(): output size exceeds string limit");
+            }
+            const auto output_size = sizeof(header) + payload_size;
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+            out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
+                std::memcpy(output, &header, sizeof(header));
+                std::memcpy(output + sizeof(header), base, payload_size);
+                return output_size;
+            });
+#else
+            out.reserve(output_size);
+            out.append(reinterpret_cast<const char*>(&header), sizeof(header));
+            out.append(base, payload_size);
+#endif
             return out;
         }
 
-        static XBuffer load_unverified(std::span<const std::byte> data) {
-            XBuffer xbuf(reinterpret_cast<const char*>(data.data()), data.size_bytes());
+        static XBuffer load_unverified(std::span<const std::byte> data,
+                                       std::optional<MaximumCapacity> cap = std::nullopt) {
+            XBuffer xbuf = cap
+                ? XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes(), *cap)
+                : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
             xbuf.typed_root_access_allowed_ = false;
             xbuf.schema_bound_ = false;
             xbuf.bound_root_type_id_ = 0;
@@ -3387,32 +3691,34 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
-        static XBuffer load_unverified(const std::string& data) {
+        static XBuffer load_unverified(const std::string& data,
+                                       std::optional<MaximumCapacity> cap = std::nullopt) {
             return load_unverified(std::span<const std::byte>(
                 reinterpret_cast<const std::byte*>(data.data()),
-                data.size()));
+                data.size()), cap);
         }
 
-        static XBuffer load(const std::string& data) {
-            return load_unverified(data);
+        static XBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_unverified(data, cap);
         }
 
-        static XBuffer load(std::span<const std::byte> data) {
-            return load_unverified(data);
-        }
-
-        template <typename T>
-        static XBuffer load(const std::string& data) {
-            return load_verified<T>(data);
+        static XBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_unverified(data, cap);
         }
 
         template <typename T>
-        static XBuffer load(std::span<const std::byte> data) {
-            return load_verified<T>(data);
+        static XBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_verified<T>(data, cap);
         }
 
         template <typename T>
-        static XBuffer load_verified(std::span<const std::byte> data) {
+        static XBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_verified<T>(data, cap);
+        }
+
+        template <typename T>
+        static XBuffer load_verified(std::span<const std::byte> data,
+                                     std::optional<MaximumCapacity> cap = std::nullopt) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "load_verified<T>() requires a v1-admitted fixed-schema wire type.");
             if (data.size_bytes() < sizeof(XWireHeaderV1)) {
@@ -3472,9 +3778,11 @@ namespace XOffsetDatastructure {
                     "load_verified<T>(): allocator offset out of bounds");
             }
 
-            XBuffer xbuf(reinterpret_cast<const char*>(data.data() + sizeof(XWireHeaderV1)),
-                         static_cast<std::size_t>(header.used_bytes),
-                         static_cast<std::size_t>(header.reserved_bytes));
+            const char* payload = reinterpret_cast<const char*>(data.data() + sizeof(XWireHeaderV1));
+            XBuffer xbuf = cap
+                ? XBuffer(payload, static_cast<std::size_t>(header.used_bytes), *cap)
+                : XBuffer(payload, static_cast<std::size_t>(header.used_bytes),
+                          static_cast<std::size_t>(header.reserved_bytes));
             if (xbuf.arena()->used_end != header.used_bytes) {
                 throw XException("load_verified<T>(): non-normalized payload extent");
             }
@@ -3509,10 +3817,11 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        static XBuffer load_verified(const std::string& data) {
+        static XBuffer load_verified(const std::string& data,
+                                     std::optional<MaximumCapacity> cap = std::nullopt) {
             return load_verified<T>(std::span<const std::byte>(
                 reinterpret_cast<const std::byte*>(data.data()),
-                data.size()));
+                data.size()), cap);
         }
 
         MemoryStats stats() {
@@ -3535,6 +3844,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         void bind_schema() noexcept {
+            this->template bind_root_type<T>();
             if constexpr (has_schema_name_v<T>) {
                 schema_bound_ = true;
                 bound_root_type_id_ = detail::wire_root_type_id<T>();
@@ -3549,10 +3859,6 @@ namespace XOffsetDatastructure {
             }
         }
 
-        bool typed_root_access_allowed_ = true;
-        bool schema_bound_ = false;
-        std::uint64_t bound_root_type_id_ = 0;
-        std::uint64_t bound_schema_hash_ = 0;
     };
 
     // ========================================================================
@@ -3579,6 +3885,12 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
+        static TypedXBuffer create(std::size_t initial_bytes, MaximumCapacity cap) {
+            TypedXBuffer xbuf(initial_bytes, cap);
+            (void)xbuf.make();
+            return xbuf;
+        }
+
         /// Creates the single root object of type T.
         T* make() { return XBuffer::make<T>(); }
 
@@ -3597,30 +3909,30 @@ namespace XOffsetDatastructure {
         XHandle<T> handle() { return XBuffer::handle<T>(); }
 
         /// Load from serialized data and return a typed buffer.
-        static TypedXBuffer load(const std::string& data) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data));
+        static TypedXBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
-        static TypedXBuffer load(std::span<const std::byte> data) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data));
+        static TypedXBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
-        static TypedXBuffer load_unverified(const std::string& data) {
-            return TypedXBuffer(XBuffer::load_unverified(data));
+        static TypedXBuffer load_unverified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
-        static TypedXBuffer load_unverified(std::span<const std::byte> data) {
-            return TypedXBuffer(XBuffer::load_unverified(data));
+        static TypedXBuffer load_unverified(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
         std::string save_verified() { return XBuffer::save_verified<T>(); }
 
-        static TypedXBuffer load_verified(const std::string& data) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data));
+        static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
-        static TypedXBuffer load_verified(std::span<const std::byte> data) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data));
+        static TypedXBuffer load_verified(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
         /// Construct from an existing XBuffer (e.g., after compaction).

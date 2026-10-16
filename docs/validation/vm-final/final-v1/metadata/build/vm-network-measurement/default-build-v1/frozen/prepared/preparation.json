@@ -1,0 +1,176 @@
+{
+  "executed_cpp": false,
+  "historical_archive_sha256": "de160a216d890d3004d002f3878b5f45159ad705a7258894738d266ecc1ac64e",
+  "historical_cases": [
+    {
+      "cycles": 1,
+      "id": "save_first_64m",
+      "metrics": [
+        "first_ms"
+      ],
+      "size": 67108864,
+      "workload": "save"
+    },
+    {
+      "cycles": 4,
+      "id": "save_repeated_64m",
+      "metrics": [
+        "first_ms",
+        "repeated_mean_ms"
+      ],
+      "size": 67108864,
+      "workload": "save"
+    },
+    {
+      "cycles": 1,
+      "id": "vector_tail_1m",
+      "metrics": [
+        "elapsed_ms"
+      ],
+      "size": 1000000,
+      "workload": "vector_tail"
+    }
+  ],
+  "historical_evidence_reexecuted": false,
+  "historical_metadata_sha256": "dedfcbc9a94504b71c1782dc6a2058a9a5c2c3fd42efc6dfebb576d22d3cb5ed",
+  "inherited_build_commands": {
+    "D": [
+      "/usr/local/bin/clang++",
+      "-O3",
+      "-DNDEBUG",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-pthread",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+      "-mmacosx-version-min=10.15",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+      "-I",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/D",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/D/bench_vm_improvements.cpp",
+      "-L/usr/local/lib",
+      "-Wl,-rpath,/usr/local/lib",
+      "-o",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/D"
+    ],
+    "F": [
+      "/usr/local/bin/clang++",
+      "-O3",
+      "-DNDEBUG",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-pthread",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+      "-mmacosx-version-min=10.15",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/fanchensu/XOffsetDatastructure/external/typelayout/include",
+      "-I",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/F",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/snapshots/F/bench_vm_improvements.cpp",
+      "-L/usr/local/lib",
+      "-Wl,-rpath,/usr/local/lib",
+      "-o",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm_stage1_20261015_final/F"
+    ]
+  },
+  "kind": "default-source-preparation",
+  "limits": [
+    "source preparation only",
+    "old timing results are not new measurements",
+    "do not run legacy benchmark runner against schema-1 historical metadata"
+  ],
+  "pending": [
+    "parent approval",
+    "new frozen toolchain/runtime checks",
+    "queue-owned build if needed",
+    "reviewed exact raw/normalized adapter",
+    "single bounded calibration window before comparisons"
+  ],
+  "performance_evidence": false,
+  "schema_version": 1,
+  "source_files": {
+    "D/bench_vm_compare.cpp": {
+      "bytes": 35096,
+      "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+    },
+    "D/bench_vm_improvements.cpp": {
+      "bytes": 29392,
+      "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+    },
+    "D/xoffset_virtual_memory.hpp": {
+      "bytes": 10584,
+      "sha256": "af90d9ea4281cba703878a1042ec63aedeb3fa1807fbe8feacd4b6dfae72b186"
+    },
+    "D/xoffsetdatastructure.hpp": {
+      "bytes": 180835,
+      "sha256": "896ac72ba55564bfa6177df3b89d7c192e0b2584c092fdb409c63e828bfadfb0"
+    },
+    "F/bench_vm_compare.cpp": {
+      "bytes": 35096,
+      "sha256": "e1da4e993f477770259e3c79a6b5fc097192f587dccdb9b30a972055857ffa2d"
+    },
+    "F/bench_vm_improvements.cpp": {
+      "bytes": 29392,
+      "sha256": "5e40e681af29bcc442ca7b65696cfb5efab6a45aa388601851c2992532d41551"
+    },
+    "F/xoffset_virtual_memory.hpp": {
+      "bytes": 19239,
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+    },
+    "F/xoffsetdatastructure.hpp": {
+      "bytes": 183050,
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+    }
+  },
+  "status": "ready_for_review"
+}

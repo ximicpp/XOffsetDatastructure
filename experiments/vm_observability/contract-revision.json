@@ -1,0 +1,36 @@
+{
+  "accepted_contract": {
+    "acceptance": "docs/coordination/vm-followup/contracts/W2-v1/",
+    "catalog_sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+    "contract_sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+    "coverage_sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9"
+  },
+  "cpp_executed": true,
+  "frozen_implementation": {
+    "complete_sha256_matches": true,
+    "files": 137,
+    "path": "docs/validation/vm-observability/frozen-implementation-v1",
+    "snapshot_sha256": "fc1780b5ce1f6cb7cfbbdfb85896d9746740c20b5e3df59bddedee5a42bb3c8d"
+  },
+  "independent_review": {
+    "cpp_reexecuted_by_reviewer": false,
+    "path": "experiments/vm_observability/REVIEW.md",
+    "sha256": "8e7d7ad575d0edefcc8d43f7a9efac780d7a5286f32a23edb8e7fcbb64d18cd1",
+    "status": "passed_scoped_G1"
+  },
+  "overall_N3_complete": false,
+  "schema": "n3-contract-revision-v1",
+  "selected_build": {
+    "dependencies": {
+      "boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+      "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+    },
+    "diagnostic_binary_sha256": "784d8e36a5a0a2f8c827a6991f7c41d04fad304f387728affca8aeae08cd083e",
+    "external_file_hashes": 1018,
+    "original_binary_sha256": "498928f7ed536fe1ebda17b213e285525dd27b82febd673d58620c0c649a33a8",
+    "path": "build/vm-observability/build-06",
+    "result_sha256": "5860c08dc5f614993aa88708e2c5a741dd30a69a5362a2df8a50951b592ce579",
+    "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
+  },
+  "status": "accepted_external_frozen_implementation"
+}

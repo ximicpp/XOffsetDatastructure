@@ -1,0 +1,394 @@
+{
+  "schema_version": 1,
+  "status": "stable_source_staged_owner_measurement_deferred",
+  "cut_at": "2026-10-15T17:55:09.094267+00:00",
+  "files": 225,
+  "source_bytes": 2970586,
+  "final_G4_frozen": false,
+  "deferred": [
+    "experiments/vm_owner_measurement/",
+    "final role handoffs/reports/owner78 acceptance"
+  ],
+  "base_inheritance_candidate_checks": {
+    "CMakeLists.txt": {
+      "expected_sha256": "2d5bc6112e3db243d48d7957bb486e7043fbf72b3bb5b7cf79497c2c3a1b2b37",
+      "sha256": "2d5bc6112e3db243d48d7957bb486e7043fbf72b3bb5b7cf79497c2c3a1b2b37",
+      "bytes": 3318,
+      "same": true
+    },
+    "LICENSE": {
+      "expected_sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973",
+      "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973",
+      "bytes": 1061,
+      "same": true
+    },
+    "cmake/XOffsetBuildChecks.cmake": {
+      "expected_sha256": "f893d279dd421900288c580bdba049dc52e2d5e9f9abd0a109fec02489e424a0",
+      "sha256": "f893d279dd421900288c580bdba049dc52e2d5e9f9abd0a109fec02489e424a0",
+      "bytes": 4802,
+      "same": true
+    },
+    "cmake/XOffsetDatastructureConfig.cmake.in": {
+      "expected_sha256": "5a0b5dc781260abb3140334f3fd641348d8fb9af9ba89dd1a5ecbc250a176db3",
+      "sha256": "5a0b5dc781260abb3140334f3fd641348d8fb9af9ba89dd1a5ecbc250a176db3",
+      "bytes": 1220,
+      "same": true
+    },
+    "cmake/XOffsetDependencies.cmake": {
+      "expected_sha256": "a82c513eaae4132fd5baa66a3f2fd7caa3ff766f2dabcae51db08f976e7eecd2",
+      "sha256": "a82c513eaae4132fd5baa66a3f2fd7caa3ff766f2dabcae51db08f976e7eecd2",
+      "bytes": 2432,
+      "same": true
+    },
+    "cmake/XOffsetDependencyLock.cmake": {
+      "expected_sha256": "45fd512c2f001f922ef4edc25e461939b1960f71218c4da6da0bda0fa786f24e",
+      "sha256": "45fd512c2f001f922ef4edc25e461939b1960f71218c4da6da0bda0fa786f24e",
+      "bytes": 1896,
+      "same": true
+    },
+    "cmake/XOffsetInstall.cmake": {
+      "expected_sha256": "c5c14bedda35381e08a3658a246929e94f1af7352ae70f5c816e5cc49d7e3661",
+      "sha256": "c5c14bedda35381e08a3658a246929e94f1af7352ae70f5c816e5cc49d7e3661",
+      "bytes": 2437,
+      "same": true
+    },
+    "cmake/XOffsetTestInventory.cmake": {
+      "expected_sha256": "a2c4e8f439b8c6a94edde6ff29a3cc45235f468863b4270e1b58b8d282a72808",
+      "sha256": "a2c4e8f439b8c6a94edde6ff29a3cc45235f468863b4270e1b58b8d282a72808",
+      "bytes": 2855,
+      "same": true
+    },
+    "cmake/reflection_probe.cpp": {
+      "expected_sha256": "04009b1b5f81181b5e7923b7396389efaf9b477493d715a18ed6e97c9acd661e",
+      "sha256": "04009b1b5f81181b5e7923b7396389efaf9b477493d715a18ed6e97c9acd661e",
+      "bytes": 653,
+      "same": true
+    },
+    "tests/CMakeLists.txt": {
+      "expected_sha256": "ece1a935a89442d97c530eef7d5d7a13bdbf6d4b049ae844e589066734a8dc0c",
+      "sha256": "ece1a935a89442d97c530eef7d5d7a13bdbf6d4b049ae844e589066734a8dc0c",
+      "bytes": 3507,
+      "same": true
+    },
+    "tests/package_consumer/CMakeLists.txt": {
+      "expected_sha256": "0bef67ec1db13c973157cdd3a5bc8bde632574d1106cae3a5bdd2906f97afa8a",
+      "sha256": "0bef67ec1db13c973157cdd3a5bc8bde632574d1106cae3a5bdd2906f97afa8a",
+      "bytes": 1867,
+      "same": true
+    },
+    "tests/package_consumer/consumer.hpp": {
+      "expected_sha256": "18604d2997c787e4aa9f82b52cac11510b94c3d4672e25caf42ddb21d3c31cf0",
+      "sha256": "18604d2997c787e4aa9f82b52cac11510b94c3d4672e25caf42ddb21d3c31cf0",
+      "bytes": 796,
+      "same": true
+    },
+    "tests/package_consumer/create.cpp": {
+      "expected_sha256": "1788dae4902f44488754ed122faf5f1ded1cefb37f0a42665b5f4a02165733f1",
+      "sha256": "1788dae4902f44488754ed122faf5f1ded1cefb37f0a42665b5f4a02165733f1",
+      "bytes": 509,
+      "same": true
+    },
+    "tests/package_consumer/main.cpp": {
+      "expected_sha256": "bc156af6ddc7707ac0858cb978f58f276394e95a4d336d964779f37e3f9c67be",
+      "sha256": "bc156af6ddc7707ac0858cb978f58f276394e95a4d336d964779f37e3f9c67be",
+      "bytes": 916,
+      "same": true
+    },
+    "tests/package_consumer/mutate.cpp": {
+      "expected_sha256": "be7a0d5db0cff40fc49ac4219ad91825ce3f9d782c5c0aac236117efba139d15",
+      "sha256": "be7a0d5db0cff40fc49ac4219ad91825ce3f9d782c5c0aac236117efba139d15",
+      "bytes": 869,
+      "same": true
+    },
+    "tests/test_polymorphic_positive.cpp": {
+      "expected_sha256": "c5752b8161a9976d89359583da42cbf85e901af11688697af4a283bff70fc9d7",
+      "sha256": "c5752b8161a9976d89359583da42cbf85e901af11688697af4a283bff70fc9d7",
+      "bytes": 361,
+      "same": true
+    },
+    "tests/test_polymorphic_rejection.cpp": {
+      "expected_sha256": "32fc5012abca84f4406d6eb87ec330aa072df209566d9f1324f990e7c35083d3",
+      "sha256": "32fc5012abca84f4406d6eb87ec330aa072df209566d9f1324f990e7c35083d3",
+      "bytes": 322,
+      "same": true
+    },
+    "tools/CMakeLists.txt": {
+      "expected_sha256": "44b5564dc016600a10aae1605d939bf5f8c272b509f183f6d8121040bf98a8c3",
+      "sha256": "44b5564dc016600a10aae1605d939bf5f8c272b509f183f6d8121040bf98a8c3",
+      "bytes": 3629,
+      "same": true
+    },
+    "tools/validate_vm_package.py": {
+      "expected_sha256": "9c272d0e008fb4076c52a07344f34610dddd191ab8f857b57e179bad77bcb9ce",
+      "sha256": "9c272d0e008fb4076c52a07344f34610dddd191ab8f857b57e179bad77bcb9ce",
+      "bytes": 13533,
+      "same": true
+    },
+    "xoffset_virtual_memory.hpp": {
+      "expected_sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+      "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+      "bytes": 19239,
+      "same": true
+    },
+    "xoffsetdatastructure.hpp": {
+      "expected_sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+      "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+      "bytes": 183050,
+      "same": true
+    }
+  },
+  "stageIII_129_record_comparison": {
+    "records": 129,
+    "differences": [
+      {
+        "path": "README.md",
+        "historical": {
+          "bytes": 13405,
+          "sha256": "cf62faed1f71adf6c77b4a32717c28550c4f66c886c8c1e46eaf8917a7e4f06b"
+        },
+        "current": {
+          "sha256": "aeb54c4d8428842982911ae4f944754f5894d21fdf755c8da50bd20e82dbfaad",
+          "bytes": 14101
+        },
+        "disposition": "D024 accepted documentary change; outside C++ build/runtime closure"
+      },
+      {
+        "path": "tools/audit_vm_allocator.py",
+        "historical": {
+          "bytes": 20092,
+          "sha256": "c5e5e618bfd42abaed16a326d1fdc6f83bcb992675717764d0bde46a565d21b0"
+        },
+        "current": {
+          "sha256": "1935b5cdc256df0dc831aeee466d61e0d0a6618221d1e254bcd833f5595b52e5",
+          "bytes": 25193
+        },
+        "disposition": "D013/D015 mapped offline auditor changes outside full CMake/CTest closure; retain separate tool evidence"
+      },
+      {
+        "path": "tools/tests/test_audit_vm_allocator.py",
+        "historical": {
+          "bytes": 10360,
+          "sha256": "52a7fa1c9af866a16f5eaef604689565f8da5115301e75e35d347c68e1f85c21"
+        },
+        "current": {
+          "sha256": "95f7e28463e82a4713a36325a7dde03bd36677f9f83bff91077ff60844212eb1",
+          "bytes": 14457
+        },
+        "disposition": "D013/D015 mapped offline auditor changes outside full CMake/CTest closure; retain separate tool evidence"
+      }
+    ]
+  },
+  "experimental_handoff_source_checks": {
+    "vm_network": [
+      {
+        "path": "xoffsetdatastructure.hpp",
+        "expected_sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+        "sha256": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+        "bytes": 183050,
+        "same": true
+      },
+      {
+        "path": "xoffset_virtual_memory.hpp",
+        "expected_sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+        "sha256": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+        "bytes": 19239,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/contract.json",
+        "expected_sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+        "sha256": "496791aaf988cfe3aa72a8cdc0d120e2e0384434f8fc1bf628a2e79223191718",
+        "bytes": 99703,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/model_subcases.json",
+        "expected_sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+        "sha256": "e3c0d57e1b92a1f63ffdbb684967656c64f8c1813f401b393ce110344964d9b8",
+        "bytes": 65234,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/net_reference.cpp",
+        "expected_sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+        "sha256": "d4235d100ca1687e7834ad0383d20864b19347dc254e09b6ae2a2649b9617dcf",
+        "bytes": 44678,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/frame_model.hpp",
+        "expected_sha256": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb",
+        "sha256": "52c65fc0d0f8b447b486b437b5d5a526e61f947dc84ab5d64439336c4358bfeb",
+        "bytes": 18201,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/frame_model_tests.hpp",
+        "expected_sha256": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c",
+        "sha256": "35466c49713f2e24b946181d468b93cf0455f7e1db2885969c2846b10c83e69c",
+        "bytes": 41487,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/run_network.py",
+        "expected_sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477",
+        "sha256": "5d397f975d6a1ceaa864e52cc611898bec7d2ace421a90f5a02754450ef7c477",
+        "bytes": 43161,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/test_run_network.py",
+        "expected_sha256": "8613cf4338c5ee8c5e29f6981d7ac07c40d8f0ab5e6479807cdada529f2b3394",
+        "sha256": "8613cf4338c5ee8c5e29f6981d7ac07c40d8f0ab5e6479807cdada529f2b3394",
+        "bytes": 27935,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network/check_cli.py",
+        "expected_sha256": "d8aad53c0a54281c7a345ad96c0289a7e27c557eb630df55e7451bf25ee1abd8",
+        "sha256": "d8aad53c0a54281c7a345ad96c0289a7e27c557eb630df55e7451bf25ee1abd8",
+        "bytes": 6926,
+        "same": true
+      }
+    ],
+    "vm_observability": [
+      {
+        "path": "experiments/vm_observability/audit_events.py",
+        "expected_sha256": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+        "sha256": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+        "bytes": 19731,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/contract.json",
+        "expected_sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+        "sha256": "6e5dc6f1a72621fac1f3955f5ce5b16f640003223147edfafc4eb476236af16a",
+        "bytes": 10057,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/coverage.json",
+        "expected_sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+        "sha256": "a62688caef037752d2191f249da26810b0731d493483738de100251916b79de9",
+        "bytes": 5397,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/event-validation-coverage.json",
+        "expected_sha256": "7d26d6b55b410660048ece69af53edc7dd22a42d5c878c1dd3e51ae16c8631dc",
+        "sha256": "7d26d6b55b410660048ece69af53edc7dd22a42d5c878c1dd3e51ae16c8631dc",
+        "bytes": 44393,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/event_kinds.json",
+        "expected_sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+        "sha256": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c",
+        "bytes": 36417,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/generate.py",
+        "expected_sha256": "94785b7c11ac7c2dfa0dc5913a59a66a06629caf8522a64cc1701d002ebdc826",
+        "sha256": "94785b7c11ac7c2dfa0dc5913a59a66a06629caf8522a64cc1701d002ebdc826",
+        "bytes": 13996,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/make_catalog.py",
+        "expected_sha256": "33f644c8bf0a2e6ce3de0df3314ea80219211e3b84652577ad8fd796e9ccf710",
+        "sha256": "33f644c8bf0a2e6ce3de0df3314ea80219211e3b84652577ad8fd796e9ccf710",
+        "bytes": 8221,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/n3_probe.cpp",
+        "expected_sha256": "177ccfed682b689f016bf0d78974fcd1701bb43f56634deac3119e509ebd00ba",
+        "sha256": "177ccfed682b689f016bf0d78974fcd1701bb43f56634deac3119e509ebd00ba",
+        "bytes": 9140,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/n3_runtime.hpp",
+        "expected_sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+        "sha256": "0ee7e25b9a76f0e7b06acc25554be57219cd17982e3d6e1898a376ddacfba10a",
+        "bytes": 19990,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/observe.py",
+        "expected_sha256": "d632be7084efc21af34ce742d27613198bd9e9667bcffd4103ebbb3046c20f6a",
+        "sha256": "d632be7084efc21af34ce742d27613198bd9e9667bcffd4103ebbb3046c20f6a",
+        "bytes": 19284,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/runtime_controls.cpp",
+        "expected_sha256": "04b590e53826d7c041185b8e47141c8f04934b1014ece593cbba2f15cf471a98",
+        "sha256": "04b590e53826d7c041185b8e47141c8f04934b1014ece593cbba2f15cf471a98",
+        "bytes": 3796,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/summarize_coverage.py",
+        "expected_sha256": "540e54f5ca582319f8f6819d155bdf4d68e5b15fab9c8f1b2b2f0cb8f7aece2a",
+        "sha256": "540e54f5ca582319f8f6819d155bdf4d68e5b15fab9c8f1b2b2f0cb8f7aece2a",
+        "bytes": 4586,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/test_audit_events.py",
+        "expected_sha256": "45b00799f67c0e5a0463ba614d62b8bfaa0dd3d4f2be0fc8d06e0b94194094fb",
+        "sha256": "45b00799f67c0e5a0463ba614d62b8bfaa0dd3d4f2be0fc8d06e0b94194094fb",
+        "bytes": 19992,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/test_observe.py",
+        "expected_sha256": "0694aae05ddcd2a01fd964825edbe42cacb6256f24fc799ea020d5ffbc9531b4",
+        "sha256": "0694aae05ddcd2a01fd964825edbe42cacb6256f24fc799ea020d5ffbc9531b4",
+        "bytes": 22779,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_observability/verify_runtime_controls.py",
+        "expected_sha256": "06f3052fe75e4a0b28db6d3a09bac62196f095838662dbafa9d7a6353a5659c1",
+        "sha256": "06f3052fe75e4a0b28db6d3a09bac62196f095838662dbafa9d7a6353a5659c1",
+        "bytes": 2739,
+        "same": true
+      }
+    ],
+    "vm_network_measurement": [
+      {
+        "path": "experiments/vm_network_measurement/paired_measurement.py",
+        "expected_sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+        "sha256": "40627ac7cdad4ebec10428e4d8a74e83b790509341411e6def162c526204003a",
+        "bytes": 31083,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network_measurement/prepare_default.py",
+        "expected_sha256": "4e316ecd5e95a72b155749b3559f0f223f197760134d71f7eee03fff8e707955",
+        "sha256": "4e316ecd5e95a72b155749b3559f0f223f197760134d71f7eee03fff8e707955",
+        "bytes": 6407,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network_measurement/test_paired_measurement.py",
+        "expected_sha256": "479686417758684d9327c5105928a596b94a890a7a230b839b43c3fb10fe55d9",
+        "sha256": "479686417758684d9327c5105928a596b94a890a7a230b839b43c3fb10fe55d9",
+        "bytes": 37374,
+        "same": true
+      },
+      {
+        "path": "experiments/vm_network_measurement/test_prepare_default.py",
+        "expected_sha256": "0b4165a4c9773a1ba579436bb8540b152799260b76486d951ce4a127425e4416",
+        "sha256": "0b4165a4c9773a1ba579436bb8540b152799260b76486d951ce4a127425e4416",
+        "bytes": 3922,
+        "same": true
+      }
+    ]
+  },
+  "new_CPP_jobs": 0,
+  "dependency_boundary": "External dependencies/compiler/SDK/runtime and executed binaries referenced by accepted manifests; bytes not bundled; no offline self-contained build claim"
+}

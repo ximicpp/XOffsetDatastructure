@@ -1,0 +1,8 @@
+{
+  "approval_sha256": "0157b0d310d7388729f51a4031c6ca552ca32f9d15982972d7e0c5aebe1d9e12",
+  "proposal_sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+  "queue_run_id": "e883a7e32e3440c1b996d4e77cd1c15a",
+  "run_id": "538efa15d7084db38b4c2f85575dc803",
+  "schema": "owner-measurement-one-window-v1",
+  "started_at": "2026-10-15T17:49:29.111527+00:00"
+}

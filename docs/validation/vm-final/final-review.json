@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "role": "independent_final_capsule_audit",
+  "created_at": "2026-10-15T19:36:16.822079+00:00",
+  "status": "passed_with_scope_limits",
+  "parent_G4_accepted": false,
+  "capsule": "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-final/final-v1",
+  "trust_anchors": {
+    "manifest_sha256": "bbc9ef46f959dce03c9864479c0f96e5a623376737b8ebef6d802158f8ce4190",
+    "owner_acceptance_path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+    "owner_acceptance_sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+    "D031_acceptance_path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+    "D031_acceptance_sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+    "owner_source_increment_path": "docs/validation/vm-final/final-increment.json",
+    "owner_source_increment_sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955"
+  },
+  "audit_script": {
+    "path": "/Users/fanchensu/XOffsetDatastructure/docs/validation/vm-final/audit_final_capsule.py",
+    "identity": {
+      "sha256": "bcc8d12b39c58f411e6923004737df23903866e64b37c73ff5b61a19bcbb69cc",
+      "bytes": 49164
+    }
+  },
+  "completed_phases": [
+    "outer_and_metadata_closed_sets",
+    "source_archive",
+    "source_lineage",
+    "metadata_and_builds",
+    "classifications",
+    "same_capsule_bytes_at_end"
+  ],
+  "findings": [],
+  "new_native_workloads": 0,
+  "compiler_or_test_or_Docker_or_SSH_invocations": 0,
+  "historical_archives_or_external_binaries_read": 0,
+  "scope": "New source/metadata capsule bytes only; external accepted evidence referenced, not reread or reexecuted.",
+  "outer": {
+    "files": 246,
+    "directories": 78,
+    "metadata_files": 236,
+    "aliases": 0
+  },
+  "source_archive": {
+    "regular_members": 245,
+    "unpacked_bytes": 3543842,
+    "total_decompressed_bytes": 3737600,
+    "exact": true
+  },
+  "owner_acceptance": {
+    "decision": "D033",
+    "native_processes": 78,
+    "qualified_cells": 7,
+    "cells": 24,
+    "qualified_comparisons": 2,
+    "comparisons": 24,
+    "non_self_qualified_comparisons": 1,
+    "all_multithread_comparisons_uncertain": true,
+    "external_payload_recorded_files": 698,
+    "external_payload_recorded_bytes": 8891188,
+    "external_payload_bytes_reread": 0,
+    "statistics_recomputed": false
+  },
+  "owner_source_closure": {
+    "files": 9,
+    "bytes": 152208,
+    "historical_or_parent_accepted": 8,
+    "unexecuted_auxiliary_template": 1,
+    "increment_sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955"
+  },
+  "lineage": {
+    "stable": 225,
+    "preserved": 9,
+    "base_closure": 21,
+    "historical_records": 129,
+    "nonruntime_deltas": 3,
+    "D030_original_and_D031_final_separate": true
+  },
+  "builds": {
+    "profiles": 9,
+    "accepted_binary_SHA_values": 9,
+    "binary_bytes_read": 0,
+    "external_include_trees_read": 0
+  },
+  "classification": {
+    "rows": 50,
+    "counts": {
+      "inherited_same_identity": 8,
+      "new_passed": 19,
+      "failed": 8,
+      "prerequisite_unavailable": 9,
+      "not_applicable_with_reason": 6
+    },
+    "retained_failed_axes": [
+      "D026_pool_stable_windows",
+      "D031_approval_copy_offline_failure",
+      "D033_owner_unqualified_subset",
+      "W2_network_initial_link_failure",
+      "default_FF_noise",
+      "network_AA_other_sizes_noise",
+      "owner_group01_preflight_failure",
+      "owner_original_checker_failure"
+    ],
+    "unmet_prerequisites": [
+      "G3_new-staging-direct-read",
+      "G3_owner-reuse",
+      "G3_reduce-output-copy",
+      "W1_network_ASan_runtime",
+      "default_DF_attribution",
+      "independent_native_Linux_performance",
+      "native_Windows_full_P2996",
+      "native_Windows_storage_consumer",
+      "real_business_consumer"
+    ],
+    "large_external_evidence_followed": false,
+    "statistics_recomputed": false
+  }
+}

@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <cassert>
 // Conditional chrono include to avoid Clang-14 + libstdc++-14 conflicts
 #if !defined(__clang__) || __clang_major__ >= 15
 #include <chrono>
@@ -18,6 +19,8 @@
 #include "game_data.hpp"
 
 using namespace XOffsetDatastructure;
+
+XOFFSET_REGISTER_SCHEMA_NAME(GameData, "example.GameData")
 
 // ============================================================================
 // Demo Utilities
@@ -130,6 +133,8 @@ void demo_memory_management() {
     print_subsection("Adding Data");
     auto* game = xbuf.make<GameData>();
     game->player_name = "TestPlayer";
+    // The allocator exposes the logical extent, so grow before this batch.
+    if (!xbuf.grow(8192)) throw XBadAlloc();
     for (int i = 0; i < 100; i++) {
         game->achievements.insert(i);  // Add achievement IDs
     }
@@ -138,17 +143,13 @@ void demo_memory_management() {
     print_info("After Adding Data", std::to_string(stats.used_size) + " bytes used");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
     
-    // ── Rule 1: Pointer Invalidation ──
-    // grow() may relocate the underlying buffer, invalidating all existing
-    // pointers.  Always re-acquire pointers through root<T>() after grow().
-    print_subsection("Growing Buffer (Pointer Invalidation Demo)");
-    xbuf.grow(4096);
-    // ⚠  'game' is now DANGLING — the buffer has been relocated.
-    //    Re-acquire through root<T>() before any further access.
-    if (xbuf.has_root<GameData>()) {
-        game = &xbuf.root<GameData>();
-        print_check("Pointer re-acquired after grow()");
-    }
+    // VM growth preserves the arena base and this independently allocated root.
+    // Container reserve/insert/erase may still invalidate element pointers.
+    print_subsection("Growing Buffer (Stable Root Address)");
+    const auto* root_before_grow = game;
+    if (!xbuf.grow(4096)) throw XBadAlloc();
+    assert(game == root_before_grow && game == &xbuf.root<GameData>());
+    print_check("Root pointer preserved after grow()");
     stats = xbuf.stats();
     print_info("New Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
@@ -156,17 +157,14 @@ void demo_memory_management() {
     
     print_subsection("Shrinking to Fit");
     xbuf.shrink_to_fit();
-    // shrink_to_fit() may also relocate — re-acquire again.
-    if (xbuf.has_root<GameData>()) {
-        game = &xbuf.root<GameData>();
-    }
+    // Logical shrink retains the reservation and enabled pages.
+    assert(game == &xbuf.root<GameData>());
     stats = xbuf.stats();
     print_info("After Shrink", std::to_string(stats.total_size) + " bytes");
     print_info("Usage", std::to_string(static_cast<int>(stats.usage_percent())) + "%");
-    print_check("Memory optimized");
+    print_check("Logical payload trimmed; enabled pages retained");
     
     // ── XHandle: Epoch-Cached Safe Handle ──
-    // Instead of manually re-acquiring pointers after every grow/shrink,
     // XHandle<T> caches the pointer + buffer epoch. On dereference it checks
     // if the epoch changed (O(1) integer comparison). If not, it returns the
     // cached pointer directly. If yes, it re-finds the root object once.
@@ -181,13 +179,12 @@ void demo_memory_management() {
     h->level = 77;
     print_check("XHandle created, player_name = " + std::string(h->player_name.c_str()));
     
-    // grow() invalidates raw pointers, but XHandle auto-recovers
-    hbuf.grow(4096);
-    // No need to call root<T>() — XHandle detects the epoch change
+    // Growth preserves the cached root and its epoch.
+    if (!hbuf.grow(4096)) throw XBadAlloc();
     print_info("After grow()", std::string("level = ") + std::to_string(h->level));
-    print_check("XHandle survived grow() — no manual re-acquire needed");
+    print_check("XHandle retained the same root through grow()");
     
-    // shrink_to_fit() also invalidates — XHandle still works
+    // Logical shrink also preserves the cached root.
     hbuf.shrink_to_fit();
     print_info("After shrink()", std::string("player_name = ") + std::string(h->player_name.c_str()));
     print_check("XHandle survived shrink_to_fit()");
@@ -222,11 +219,11 @@ void demo_serialization() {
     print_info("Level", std::to_string(src_game->level));
     
     print_subsection("Serializing to Binary");
-    std::string binary_data = src_buf.save();
+    std::string binary_data = src_buf.save_verified<GameData>();
     print_check("Serialized to " + std::to_string(binary_data.size()) + " bytes");
     
     print_subsection("Deserializing from Binary");
-    XBuffer dst_buf = XBuffer::load(binary_data);
+    XBuffer dst_buf = XBuffer::load_verified<GameData>(binary_data);
     
     if (dst_buf.has_root<GameData>()) {
         auto& dst_game = dst_buf.root<GameData>();
@@ -405,7 +402,7 @@ void demo_performance() {
     print_subsection("Memory Layout");
     print_info("Allocator", "Sequential-fit (fast)");
     print_info("Alignment", "8-byte (BASIC_ALIGNMENT)");
-    print_info("Pointers", "Offset-based (relocatable)");
+    print_info("Pointers", "Relative offsets; stable arena base");
     
     print_subsection("Platform Requirements");
     print_info("Architecture", "64-bit only");
@@ -421,6 +418,7 @@ void demo_performance() {
     
     // Insert 1000 items — reflection auto-injects allocator
     auto* game = xbuf.make<GameData>();
+    game->items.reserve(1000);
     for (int i = 0; i < 1000; i++) {
         game->items.emplace_back();
         auto& item = game->items.back();
@@ -475,7 +473,7 @@ void demo_advanced_features() {
     print_check("Dynamic buffer growth");
     print_check("Shrink-to-fit optimization");
     print_check("Memory usage statistics");
-    print_check("Zero-copy deserialization");
+    print_check("Zero-decode loading into a copied, validated VM payload");
     
     print_subsection("C++26 Reflection Features (Active)");
     print_check("std::meta::members_of - Get all struct members");
@@ -528,7 +526,7 @@ int main() {
         std::cout << "     - C++26 reflection-based type signatures\n";
         std::cout << "     - No code generation required\n";
         std::cout << "     - Direct type introspection\n";
-        std::cout << "     - Binary serialization with zero-copy\n";
+        std::cout << "     - Zero-decode serialization with explicit output copies\n";
         std::cout << "     - Memory-efficient growth strategy\n";
         std::cout << "\n";
         

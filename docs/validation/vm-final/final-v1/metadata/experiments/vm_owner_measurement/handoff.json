@@ -1,0 +1,258 @@
+{
+  "actual_supplement_executed": false,
+  "authority": {
+    "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/approval-copy-supplement.json",
+    "sha256": "ea768e0857471588ff103002e7ccd545e8b501842836f9850d6bf80625f5afdb"
+  },
+  "current_changes": [
+    "Live collector preserves the verified raw approval byte buffer",
+    "Added real collect-path regression and small supplement negative controls",
+    "Added minimal offline original/derived approval-byte supplement packager with full final-package relocation audit",
+    "Handoff filename normalized to lowercase; old accepted content preserved"
+  ],
+  "decision": "D031",
+  "historical_preparation": {
+    "canonical_window_marker_exists": false,
+    "corrected_checker_sha256": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+    "cpp_builds": 0,
+    "decision": "D023",
+    "design": {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json",
+      "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243"
+    },
+    "external_identities": 1020,
+    "formal_approval_created_by_W2": false,
+    "formal_execution_role": "W3",
+    "independent_review": "experiments/vm_owner_measurement/REVIEW.md",
+    "inference_boundaries": [
+      "Current preparation has no measured window/results",
+      "Native timing_evidence=false is preserved; parent-approved wrapper is separate",
+      "All24cells retained; 10percent descriptive one-window scope only",
+      "No optimization/adoption, 2percent, lookup latency, pure registry cost, production tail or complete application lifetime claim",
+      "Original26 functional cases are not timing samples"
+    ],
+    "limits": {
+      "child_timeout_seconds": 30,
+      "concurrent_native_children": 1,
+      "increase_requests": false,
+      "max_native_processes": 78,
+      "max_windows": 1,
+      "max_worker_threads": 8,
+      "new_evidence_bytes": 536870912,
+      "queue_timeout_seconds": 900,
+      "retry_failed_window": false,
+      "substitute_samples": false
+    },
+    "native_execution_authorized": false,
+    "native_processes_started": 0,
+    "offline_tests": {
+      "count_each": 41,
+      "native_processes": 0,
+      "normal": {
+        "path": "build/vm-owner-measurement/offline-tests-v2.log",
+        "sha256": "fe2267f8b68af05ca6ef15bf3995e386fff3c8f06b2d1c07596a33d8279b398d"
+      },
+      "optimized": {
+        "path": "build/vm-owner-measurement/offline-tests-optimized-v2.log",
+        "sha256": "dfa264fe3283b3603187905430617760f0ec5b759cdfac3977e5af0fca154874"
+      }
+    },
+    "parent_next_gate": "Independent exact tool/proposal acceptance and separate one-window approval; W3 alone executes",
+    "producer_binding": {
+      "path": "experiments/vm_owner_measurement/producer-binding-v1.json",
+      "sha256": "6b3da0f9c127dfc7fcf58ad08a8262a7e1bee9d06d93dba4230c9ff082335b14"
+    },
+    "producer_parent_acceptance": {
+      "decision": "D027",
+      "path": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+      "sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db"
+    },
+    "proposal": {
+      "cells": 24,
+      "measured": 72,
+      "path": "build/vm-owner-measurement/proposal-v1/proposal.json",
+      "preruns": 6,
+      "same_condition_pairs": 6,
+      "samples_per_condition": 12,
+      "schedule_sha256": "49fb5d0cc634ba48b5fff7966ba2348bb495bb11dce7481724684d24090d1875",
+      "sha256": "8dde7bf6e5536704dc8921de4507564499e8a4e208a4fe0606fe599596268b9a",
+      "slots": 78,
+      "status": "unapproved_proposal"
+    },
+    "proposal_relocation_audit": {
+      "native_processes": 0,
+      "path": "build/vm-owner-measurement/proposal-relocation-audit-v1.json",
+      "scope": "accepted-producer-bound unapproved proposal only; future full window relocation remains unexecuted",
+      "sha256": "e3603fc6e78e6e1b11f722f186caa8a2bc227b8bcd7b581bc8c99234d2a3dd8e",
+      "status": "passed"
+    },
+    "queue_receipts": {
+      "prepare-proposal-v1": {
+        "audit_status": "audit_passed",
+        "kind": "validation",
+        "native_executions": 0,
+        "owner": "W2",
+        "path": "build/vm-owner-measurement/receipts/prepare-proposal-v1",
+        "result_sha256": "a1ea831bc9e443ce70c7476827215e86af8088504843c1c6a76eac1fd769defe"
+      },
+      "proposal-relocation-v1": {
+        "audit_status": "audit_passed",
+        "kind": "validation",
+        "native_executions": 0,
+        "owner": "W2",
+        "path": "build/vm-owner-measurement/receipts/proposal-relocation-v1",
+        "result_sha256": "f89b8752025f37a93a36b4b2b4f46003cdfec399c69e62e7e73b3dc71fc87fdd"
+      }
+    },
+    "report": "docs/perf/vm-owner-scaling/PREPARATION.md",
+    "role": "W2",
+    "schema": "owner-measurement-handoff-v1",
+    "source": {
+      "README.md": {
+        "path": "experiments/vm_owner_measurement/README.md",
+        "sha256": "8fa7cc37b1a29c44aac4fb99907e857d7eed7845404628ce2b5bd136c3b88c08"
+      },
+      "REVIEW.md": {
+        "path": "experiments/vm_owner_measurement/REVIEW.md",
+        "sha256": "164213e457aeef1c5dd8b0f97a72a2ddb5f048b651b69915701bb8f39d9792d1"
+      },
+      "audit_owner_measurement.py": {
+        "path": "experiments/vm_owner_measurement/audit_owner_measurement.py",
+        "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced"
+      },
+      "collect_owner_measurement.py": {
+        "path": "experiments/vm_owner_measurement/collect_owner_measurement.py",
+        "sha256": "8ab7a0dbc2f8e5e879fd3b84f74598ffd4e84e1c2f06bac9f6b3fc89003c9214"
+      },
+      "test_owner_measurement.py": {
+        "path": "experiments/vm_owner_measurement/test_owner_measurement.py",
+        "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c"
+      }
+    },
+    "status": "tooling_and_D027_bound_proposal_ready_for_parent_review",
+    "timing_binary_sha256": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45",
+    "updated_at": "2026-10-15T17:39:36.508350+00:00"
+  },
+  "historical_preparation_snapshot": {
+    "path": "build/vm-owner-measurement/d031/handoff-before.json",
+    "sha256": "f19ee2fe3609060a365c45f504f980768a11fc13ae0daf46f35e02065679bef7"
+  },
+  "inference_boundaries": [
+    "Existing 78 native processes belong to the original D030 W3 window; no rerun",
+    "Derived window is not original bytes; only its approval.json is restored",
+    "First full original-window inventory will be created at D031 W3 validation, not claimed as a D030 authority pin",
+    "All 24 cells/comparisons and original native timing_evidence=false retained",
+    "No new statistics, optimization/adoption, confidence interval, or tail inference"
+  ],
+  "native_execution_authorized": false,
+  "new_builds": 0,
+  "new_measurement_windows": 0,
+  "new_native_processes": 0,
+  "offline_tests": {
+    "count_each": 51,
+    "existing_tests": 41,
+    "native_processes": 0,
+    "new_regressions": 10,
+    "normal": {
+      "path": "build/vm-owner-measurement/d031/offline-tests.log",
+      "sha256": "6d1362a9d0c7b1853ff8c7ef86a096547ad510a35c636b1395511455b8dc8b02"
+    },
+    "optimized": {
+      "path": "build/vm-owner-measurement/d031/offline-tests-optimized.log",
+      "sha256": "ca16b473f2aa000942bf71feb514da23d6633bf7465e0909f6547ed558790c5e"
+    }
+  },
+  "original_d030_window": {
+    "execution_role": "W3",
+    "failed_archive_result": {
+      "path": "build/vm-owner-measurement/receipts/archive-v1/result.json",
+      "sha256": "104dab0d0d58092c2d7714bdc17ab17296151881487d0757cc5bd669e2946662"
+    },
+    "native_processes": 78,
+    "new_execution_in_this_D031_W2_work": 0,
+    "timing_result": {
+      "path": "build/vm-owner-measurement/receipts/window-v1/result.json",
+      "sha256": "86772763e903df29465aaf853d50fc02393e301b530a2fc25889723135cfb131"
+    }
+  },
+  "parent_next_gate": "Review exact current source/test SHA and D031 authority, then dispatch W3 one default validation job with the recorded argv. No native/build/rerun.",
+  "proposed_W3_validation": {
+    "archive": "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+    "cwd": "/Users/fanchensu/XOffsetDatastructure",
+    "package_argv": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "package",
+      "--repo",
+      "/Users/fanchensu/XOffsetDatastructure",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+      "--tool-sha256",
+      "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    ],
+    "proposed_receipt_is_not_a_completed_receipt": true,
+    "queue_argv": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_coordination/run_job.py",
+      "run",
+      "--owner",
+      "W3",
+      "--kind",
+      "validation",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/approval-supplement-v1",
+      "--timeout-seconds",
+      "900",
+      "--wait-seconds",
+      "900",
+      "--",
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/fanchensu/XOffsetDatastructure/experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "package",
+      "--repo",
+      "/Users/fanchensu/XOffsetDatastructure",
+      "--out",
+      "/Users/fanchensu/XOffsetDatastructure/docs/perf/vm-owner-scaling/measurement-approval-supplement-v1",
+      "--tool-sha256",
+      "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    ],
+    "receipt": "/Users/fanchensu/XOffsetDatastructure/build/vm-owner-measurement/receipts/approval-supplement-v1",
+    "required_kind": "validation",
+    "required_parent_source_review": true,
+    "required_role": "W3"
+  },
+  "report": {
+    "path": "docs/perf/vm-owner-scaling/D031_TOOL_REVIEW.json",
+    "sha256": "33133d53e89c15ba400a2da553499acad4c2d239e0722893de81d302c52f3b15"
+  },
+  "role": "W2",
+  "schema": "owner-measurement-handoff-v2",
+  "sources": {
+    "README.md": {
+      "path": "experiments/vm_owner_measurement/README.md",
+      "sha256": "25639037ce64481064da6cee9de59210c964a11a170664a48bf7ba55f51b8a4c"
+    },
+    "audit_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/audit_owner_measurement.py",
+      "sha256": "1711b558bd75376bd4ef6654427a9b0b0519bc94b288b211087bfdf1b132fced"
+    },
+    "collect_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/collect_owner_measurement.py",
+      "sha256": "5f14fa1de1bd93ad5db2a9cd726856051c5508a6738ba85de888c7fb0a6c2426"
+    },
+    "supplement_approval_bytes.py": {
+      "path": "experiments/vm_owner_measurement/supplement_approval_bytes.py",
+      "sha256": "411d4e6054c18e09cd0a2f0d5caa8e972552376e1918856062941e039dc37698"
+    },
+    "test_approval_bytes.py": {
+      "path": "experiments/vm_owner_measurement/test_approval_bytes.py",
+      "sha256": "9cf879a9092d157621aed70c26a94bbc38e53c512f7dd11b742803c6b5d31eb8"
+    },
+    "test_owner_measurement.py": {
+      "path": "experiments/vm_owner_measurement/test_owner_measurement.py",
+      "sha256": "ba1aff8fff93fe3ddaf48740605d0ae794c97a0c7808475b6635e3b2b4e1f61c"
+    }
+  },
+  "status": "tools_ready_for_parent_source_review_before_W3_validation",
+  "updated_at": "2026-10-15T18:06:35.318932+00:00"
+}

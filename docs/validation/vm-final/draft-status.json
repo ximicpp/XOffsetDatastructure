@@ -1,0 +1,514 @@
+{
+  "schema_version": 1,
+  "role": "W4",
+  "status": "accepted_final_inputs_ready_for_single_seal_and_independent_audit",
+  "updated_at": "2026-10-16T03:35:35.338849+08:00",
+  "document": "docs/VM_FINAL_DELIVERY.md",
+  "document_sha256": "459a01465300928459a417c1d330e1d2ae079225adb536b1373aab000fab705c",
+  "final_delivery": true,
+  "G4_complete": false,
+  "final_selected_source_frozen": false,
+  "new_matrix_runs": 0,
+  "compiles_executed_in_this_draft_assignment": 0,
+  "container_workloads_executed": 0,
+  "unconditional_new_base_cpp_validation_jobs": 0,
+  "current_research_separate_from_base_validation": [
+    "D016 current-F fixed-request multi-owner/registry contention design and later W3 formal measurement"
+  ],
+  "accepted_baseline_profiles": [
+    "macOS full48 plus3 configure checks separately",
+    "Apple21 C++17 standalone storage2",
+    "historical macOS26.6.2 arm64 TSan15 with recorded10.15 compiler deployment option",
+    "Linux sanitizer26+2 per-case composite from two runs, not a single28 run",
+    "wire504 historical operations,84 generated outputs hash-only limitation",
+    "native full/storage package installed3+subproject3 each; Apple storage profile distinct",
+    "Linux full package amd64/P2996 emulated versus ARM64 GNU13.3 storage package"
+  ],
+  "accepted_followup": [
+    "G0 local POSIX runner and scoped G1 prerequisite assessment",
+    "W1 frozen-v2 native synchronous TCP reference and independent lifecycle model",
+    "W2 fixed-F scoped diagnostic foundation",
+    "D015 historical-profile provenance supplement",
+    "default F/F executed_noise_unqualified:78 processes,4metrics andanchors failed; no retry/D-F/ablation",
+    "D019 bounded W2 network diagnostics32 processes,16 valid traces,20-file+1044-external-reference artifact boundary",
+    "D021 actual112-process native F/F calibration,only1MiB complete qualification;raw original andportable archive/relocation accepted within metadata-review scope",
+    "D024 README3 reviewed text edits applied within exact exclusive window,postimage recorded/window returned;no CXX/API/run changes",
+    "D026 complete88-process 1MiB network pool screening accepted; both contrasts stable-window noise unqualified; retain F and no retry/adoption.",
+    "D027 owner26 functionality/diagnostics accepted:18 success+8 expected failure controls; D022 original checker failure preserved and offline corrected audit accepted; no C++ rebuild/first-record retry.",
+    "D028 three candidate decisions accepted prerequisite_unmet_retain_F: zero implementations, experimental rejections or adoptions.",
+    "D029 network88 and owner26 portable archives/relocation supplements accepted.",
+    "D032 accepted exact6live source changes and51normal/51optimized tests including10newregressions; original frozen execution bytes retained.",
+    "D033 accepted original78 complete owner research with7/24cells and2/24comparisons(1self), all multithread uncertain; complete original/derived offline supplement and terminal validation receipt accepted;0newnative/rebuild."
+  ],
+  "open_results": [
+    "Single final source/metadata seal",
+    "Independent final capsule audit",
+    "External small seal and parent incremental G4 acceptance"
+  ],
+  "prerequisite_unavailable": [
+    "Native Windows storage/package execution and separate full-P2996 execution; full-library toolchain assessment itself accepted complete",
+    "Reachable independent native Linux performance device/channel",
+    "Compatible native W1 network ASan runtime ABI",
+    "Representative business network consumer and complete production transport/lifetime parameters"
+  ],
+  "source_observations": [
+    {
+      "path": "docs/coordination/vm-followup/G4-supplement-acceptance.json",
+      "sha256": "cb042ac275076cca530ec82e8d0c79eb42dc5c125d9d241802d1e6586cadafca",
+      "bytes": 2061
+    },
+    {
+      "path": "docs/coordination/vm-followup/G4-inheritance-acceptance.json",
+      "sha256": "4ea43796182ec88c8ebcc449fd5665a4f87d8c4556038676ea1693a11b75c524",
+      "bytes": 2376
+    },
+    {
+      "path": "docs/coordination/vm-followup/W1-G1-acceptance.json",
+      "sha256": "f2dbaa41ae10f331562f5b89d9ec381523d169e172c09ca85ec3487b093bd599",
+      "bytes": 2765
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-G1-acceptance.json",
+      "sha256": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b",
+      "bytes": 2838
+    },
+    {
+      "path": "docs/coordination/vm-followup/default-aa-1-acceptance.json",
+      "sha256": "a5541652792b53bc158691074638b8a37886edea305fa02de1ee93434324246f",
+      "bytes": 3250
+    },
+    {
+      "path": "docs/coordination/vm-followup/platform-acceptance.json",
+      "sha256": "a3fc7f122d52b2381c801d48c293b4e998f61daf8f087ab58bc93ec72c269327",
+      "bytes": 1262
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/W2-network-v1/acceptance.json",
+      "sha256": "fffeefb7f2578701a66c41619b24405559c46ff79445ceae22cc6d50c7cb40a6",
+      "bytes": 2190
+    },
+    {
+      "path": "docs/coordination/vm-followup/dispatch.json",
+      "sha256": "74320b8810ce324b182f16e5375bde0a525428afe4f327dc808e481f9a6bddb3",
+      "bytes": 12609
+    },
+    {
+      "path": "openspec/changes/vm-next-stage-hardening/tasks.md",
+      "sha256": "a9bacf85c7ef63265e6e887f06c2dc3a541ec6512cd3e2f89fc797f1326f4fc5",
+      "bytes": 12598
+    },
+    {
+      "path": "docs/VM_STAGE1_RESULTS.md",
+      "sha256": "0f142b173f80850f93b2aaa306313446644cede0d9ec129318933a1be82d376f",
+      "bytes": 5277
+    },
+    {
+      "path": "docs/VM_STAGE2_RESULTS.md",
+      "sha256": "d6544db8b9de5ec68272762f1d7800dd1e5619d144d009ff43a72628dbe0a0c2",
+      "bytes": 7431
+    },
+    {
+      "path": "docs/VM_STAGE3_RESULTS.md",
+      "sha256": "d04d1e071cf5bc04476ce4187656bb550bc81373e6f7030130919553e99816cb",
+      "bytes": 13148
+    },
+    {
+      "path": "docs/VM_NETWORK_PERFORMANCE.md",
+      "sha256": "8d1c2b4185d7c71dbb0173ccffc7dd339a73d92312a570b3295889809da059b7",
+      "bytes": 5092
+    },
+    {
+      "path": "docs/VM_IO_CANDIDATE_DECISIONS.md",
+      "sha256": "21af8be7710d0c095cc5f4e15af48965f46c3f0e06f728ce3fd61810a6bb2e14",
+      "bytes": 3869,
+      "previous_observation_sha256": "1255439546b60a6fcc6232d286d060c26135adcf04aeb7d8b643c0bf0c92899f"
+    },
+    {
+      "path": "docs/VM_PLATFORM_FOLLOWUP.md",
+      "sha256": "7fe1a6716d6f64fd2d5f08f7ad2a81c58c6ec8cf5b1b6bdc0c55d0f13dbef1c5",
+      "bytes": 6284
+    },
+    {
+      "path": "docs/perf/vm-default-attribution/RESULTS.md",
+      "sha256": "9e11363c7170b132e592844fb6bee50e9469126360b0844994d1ddb0a2cb73d6",
+      "bytes": 3751
+    },
+    {
+      "path": "experiments/vm_network_measurement/handoff.json",
+      "sha256": "437691e09ac386e0e018d07bfea4bc676473a119e56646ab4233199ae728ed6d",
+      "bytes": 12086,
+      "scope": "live progress observation only, no parent runtime acceptance inferred"
+    },
+    {
+      "path": "experiments/vm_network/candidate-feasibility/handoff.json",
+      "sha256": "c0f6f6643205edc8f21f37596320d3b39a0d74ea52773894f19fcc058839c10e",
+      "bytes": 1995,
+      "scope": "live progress observation only, no parent runtime acceptance inferred"
+    },
+    {
+      "path": "docs/coordination/vm-followup/W2-network-acceptance.json",
+      "sha256": "28d82f1b95c88e66fafefcba0755d1fb31328d2ed7898a0acc2d37d71ce44b06",
+      "bytes": 2665,
+      "revision": 2,
+      "scope": "Accepted decision or live progress observation, as named; no implicit acceptance of other executions/archives"
+    },
+    {
+      "path": "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+      "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+      "bytes": 4309,
+      "revision": 2,
+      "scope": "Accepted decision or live progress observation, as named; no implicit acceptance of other executions/archives",
+      "previous_observations": [
+        {
+          "sha256": "c18ef60d424d1c1b4e27c748eb2ec568ae6dd6f2076c83eebc82c14e377801ba",
+          "bytes": 4309
+        }
+      ]
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json",
+      "sha256": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+      "bytes": 5343,
+      "revision": 2,
+      "scope": "Accepted decision or live progress observation, as named; no implicit acceptance of other executions/archives"
+    },
+    {
+      "path": "experiments/vm_owner_scaling/handoff.json",
+      "sha256": "48c46a1a33723821ea59d9b4228b49a8257aa200140d14f994023a6b657b1fa1",
+      "bytes": 4169,
+      "revision": 2,
+      "scope": "Accepted decision or live progress observation, as named; no implicit acceptance of other executions/archives",
+      "previous_observations": [
+        {
+          "sha256": "6f7b364cbe134b9cfbcd7f8992440b3079117a0c4cd66a041e9fac75a5b23dff",
+          "bytes": 3901
+        }
+      ]
+    },
+    {
+      "path": "docs/coordination/vm-followup/dispatch.json",
+      "sha256": "5da206d7c1960275caaf2eb24e6a03e6a828395c35fdc826c71dc0100d86cea5",
+      "bytes": 16525,
+      "revision": 2,
+      "scope": "Live progress observation; may advance after this draft",
+      "previous_observations": [
+        {
+          "sha256": "7150efe6fa945e8407d53d4dfe94473f8ad2c57eb0c8049cc5b85e160d0a170c",
+          "bytes": 15888
+        }
+      ]
+    },
+    {
+      "path": "experiments/vm_network_measurement/handoff.json",
+      "sha256": "320f96356fa19dac63a4488b8bc3aeba2c7a2b2f0d998ffaeae4a042e37436b5",
+      "bytes": 19388,
+      "revision": 2,
+      "scope": "Live progress observation; may advance after this draft"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/layout-correction.json",
+      "sha256": "0113de64a4e83f3c4d10a710b92be9a70ccc4cadaf69807ab747e4ca3fbf865d",
+      "bytes": 2816,
+      "revision": 2,
+      "scope": "Subsequent documentary authorization observation,not completed functionality or formal timing"
+    },
+    {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/design.json",
+      "sha256": "9465f8bfbed6fcc9557e935501834f31f17eed340674a1e18600ad0047f1d243",
+      "bytes": 5498,
+      "revision": 2,
+      "scope": "Subsequent documentary authorization observation,not completed functionality or formal timing"
+    },
+    {
+      "path": "docs/coordination/vm-followup/readme-window.json",
+      "sha256": "7ad840ddc6b5ae7066c2dabc5272dcdcee7d8e7825b549dc8f4132879b055309",
+      "bytes": 995,
+      "revision": 2,
+      "scope": "Exact documentary write authorization/application receipt;not sourcefreeze or runtime evidence"
+    },
+    {
+      "path": "docs/validation/vm-final/readme-window-return.json",
+      "sha256": "11fd9291b1d7232ed943ba97e2c5cbbe168acee40984166eb8340a14fe86ebb5",
+      "bytes": 1416,
+      "revision": 2,
+      "scope": "Exact documentary write authorization/application receipt;not sourcefreeze or runtime evidence"
+    },
+    {
+      "path": "docs/coordination/vm-followup/network-pool-1m-1-proposal-acceptance.json",
+      "sha256": "1cd2a676307f6bb24d0f017238869665542d9cf01e59e5f657ef42a73efe8ba7",
+      "bytes": 1850,
+      "revision": 2,
+      "scope": "D025 exact88-process execution approval;no accepted result inferred"
+    }
+  ],
+  "source_observation_scope": "Small documentary inputs observed for this draft; live dispatch/tasks may advance. This is not a final source archive, role/source freeze, test execution, or retroactive binary/SDK seal. Historical evidence not recopied or modified.",
+  "independent_review": {
+    "status": "not_executed_at_input_cut",
+    "path": "docs/validation/vm-final/final-review.json",
+    "scope": "New capsule and small accepted metadata only; no external raw/statistics rerun"
+  },
+  "shared_files_modified": [
+    "README.md"
+  ],
+  "next_gate": "Execute single final source/metadata seal, then independent final capsule audit and external small seal; parent incremental G4 acceptance remains separate.",
+  "revision": 3,
+  "previous_reviewed_revision": {
+    "document_sha256": "6334c57666b5b4dd0c273ed63bfdedbdd429628cf9647740ec1f97c13fdb30aa",
+    "independent_review": {
+      "status": "passed_with_explicit_draft_scope",
+      "path": "docs/validation/vm-final/draft-review.json",
+      "sha256": "e936f00810a5a8cb28ca8bbdacd146081479faf79fae0a75615d6a8e211b4d82",
+      "document_sha256": "6334c57666b5b4dd0c273ed63bfdedbdd429628cf9647740ec1f97c13fdb30aa",
+      "blocking_findings": 0,
+      "unresolved_actionable_findings": 0,
+      "checked_local_links": 35,
+      "scope": "Small documentary inputs and drafted claims only; not a final G4 source freeze or runtime validation",
+      "live_document_progress": "Review distinguishes3 live documentary advances after draft observation, including D017 static-review acceptance; no changed G3/G4 or timing/adoption claim"
+    },
+    "scope": "Historical draft-v1 observation; superseded for current document, not a current-v2 review"
+  },
+  "shared_document_review": {
+    "status": "D024_applied_verified_window_returned",
+    "notes": "docs/validation/vm-final/shared-document-edits.md",
+    "exact_edits": "docs/validation/vm-final/shared-document-edits.json",
+    "patch": "docs/validation/vm-final/shared-document-edits.patch",
+    "edit_count": 3,
+    "target": "README.md",
+    "no_change": [
+      "docs/STABLE_VM_STORAGE_MIGRATION.md",
+      "examples/stable_storage.cpp"
+    ],
+    "shared_files_written": true,
+    "window_return_receipt": "docs/validation/vm-final/readme-window-return.json",
+    "readme_postimage_sha256": "aeb54c4d8428842982911ae4f944754f5894d21fdf755c8da50bd20e82dbfaad",
+    "further_README_writes_authorized": false
+  },
+  "network_calibration": {
+    "acceptance": "docs/coordination/vm-followup/network-aa-1-acceptance.json",
+    "status": "accepted_executed_partial_qualification",
+    "processes": 112,
+    "warmup": 16,
+    "calibration": 96,
+    "per_size": {
+      "4KiB": {
+        "local_aa": false,
+        "drift": false,
+        "complete": false
+      },
+      "64KiB": {
+        "local_aa": true,
+        "drift": false,
+        "complete": false
+      },
+      "1MiB": {
+        "local_aa": true,
+        "drift": true,
+        "complete": true
+      },
+      "16MiB": {
+        "local_aa": false,
+        "drift": true,
+        "complete": false
+      }
+    },
+    "adoption": false,
+    "new88_scope": "D026 exact88 accepted scoped research, localAA passed but both stable-window drift gates failed; D029 archive accepted; no gain/adoption claim.",
+    "portable_archive": {
+      "status": "accepted",
+      "path": "docs/perf/vm-network/calibration-v1",
+      "copied_files": 2096,
+      "internal_hardlinks": 1656,
+      "original_shared_inodes": 0,
+      "scope": "Copied audit passed;parent checked key byte equality andfilemetadata,not a repeated fullwire/statistics audit"
+    },
+    "comparison_execution_authorized_at_D021": false
+  },
+  "completion_slots": {
+    "base_validation": "inherit accepted unchanged complete relevant closure;unconditionalnewbaseCpp0",
+    "W3_pool88": "D026 executed/audited/accepted with both contrasts stable-window noise unqualified; D029 portable archive accepted; no rerun/adoption.",
+    "owner_functionality26": "D027 accepted exact26=18 success+8 expected failure controls; D029 portable archive accepted; D022 failure lineage retained.",
+    "owner_formal_measurement": "D033 accepted original78 and explicit7/24 cells,2/24 comparisons(1self), all multithread uncertain; D032 complete original/derived supplement accepted,0native/rebuild.",
+    "G3": "D028 accepted all3 prerequisite_unmet_retain_F current decision deliverable; implementations/rejections/adoptions all0.",
+    "shared_docs": "D024 exact3README text edits applied andverified;window returned;postimage aeb54c4d;no migration/CXXexample change or baseline rerun",
+    "final_freeze": "All final source/document/index inputs accepted and ready; spec ready_to_seal. Exact final source count and archive identities are established by the sealing receipt.",
+    "final_review": "Auditor final authority schema and independent static review complete; final capsule audit not yet run. Actual result must be read from external final-review.json.",
+    "network_calibration_archive": "accepted;retain2096-copy/1656-internal-hardlink/0-original-inode andparent metadata-only review boundary"
+  },
+  "temporary_IO_restriction": {
+    "status": "ended_by_parent_after_D025_job",
+    "scope": "Normal accepted queue rules restored;CXX/large archive/hash work still coordinated;no such W4 workload performed",
+    "no_queue_interruption": true,
+    "G4_authority_added": false,
+    "reported_window_start": "2026-10-16T01:21:55.033+08:00",
+    "reported_window_end": "2026-10-16T01:22:04.783+08:00"
+  },
+  "light_document_checks": {
+    "checked_at": "2026-10-16T01:23:05.826033+08:00",
+    "local_links": {
+      "docs/VM_FINAL_DELIVERY.md": 44,
+      "docs/validation/vm-final/shared-document-edits.md": 6
+    },
+    "README_exact_reviewed_postimage": true,
+    "migration_and_CXX_example_unchanged": true,
+    "new_CPP_or_container_runs": 0,
+    "scope": "Small documentary files only;no bulk scan/hash during W3 window"
+  },
+  "previous_reviewed_revision_v2": {
+    "document_sha256": "547cfd9e1246bc938a1cf388a8f003676da945032015e8d41a820f700c0aa497",
+    "review": {
+      "status": "passed_with_explicit_draft_scope",
+      "path": "docs/validation/vm-final/draft-review-v2.json",
+      "sha256": "84620a5af7e877e60312f69d88b33bb6db7cc50beab765b89010ed231aeaa342",
+      "document_sha256": "547cfd9e1246bc938a1cf388a8f003676da945032015e8d41a820f700c0aa497",
+      "blocking_findings": 0,
+      "unresolved_actionable_findings": 0,
+      "checked_local_document_links": 44,
+      "scope": "Current draft and exact README documentary window;not finalG4 or a new runtime/statistical audit"
+    },
+    "scope": "Historical reviewed draft-v2;final G4 report not yet reviewed"
+  },
+  "stable_source_staging": {
+    "path": "docs/validation/vm-final/final-v1/source",
+    "files": 225,
+    "bytes": 2970586,
+    "difference_report": "docs/validation/vm-final/final-v1/source-differences.json",
+    "default_queue_receipt": "build/vm-final/queue-stable-source-v1",
+    "status": "stable225_staged_not_final_sealed",
+    "base21_mismatches": 0,
+    "stageIII129_differences": [
+      "README.md D024 documentary",
+      "tools/audit_vm_allocator.py preaccepted non-CTest tool",
+      "tools/tests/test_audit_vm_allocator.py preaccepted non-CTest tool"
+    ],
+    "new_CPP_validation_jobs": 0,
+    "deferred": [
+      "experiments/vm_owner_measurement liveD031fix",
+      "owner78 parent acceptance/finalhandoffs/report/index"
+    ],
+    "preserved_generated_and_original_D030": {
+      "manifest": "docs/validation/vm-final/final-v1/preserved-inputs.json",
+      "sha256": "63161fb2ca6d94fd75227eeb8676d385c8976e9737f5c5e3f64dd189b26cb5b2",
+      "accepted_files": 9,
+      "live_D031_frozen": false,
+      "queue_receipt": "build/vm-final/queue-preserved-inputs-v1"
+    }
+  },
+  "G2_status": "accepted_scoped_with_noise_limits",
+  "G3_status": "accepted_prerequisite_decisions_retain_F",
+  "CPP_jobs_added": 0,
+  "finalization_authority": "Parent D033 direct final G4 seal/independent-review dispatch. Zero unconditional C++ jobs; no historical native/statistics/large-archive re-audit.",
+  "metadata_preflight": {
+    "queue_receipt": "build/vm-final/queue-metadata-preflight-v1",
+    "paths_at_inspection": 192,
+    "bytes_at_inspection": 5635717,
+    "final_cut_may_add_accepted_last_records": true,
+    "final_seal_attempted": false
+  },
+  "previous_revision_v2_progress": {
+    "reported_preparation_not_yet_accepted": [
+      "W1 owner functionality checker/layout issue reported; incomplete26-process bounded validation; no production/OS failure conclusion"
+    ],
+    "pool_window_execution": {
+      "decision": "D025",
+      "status": "parent_reported_job_complete_statistics_and_qualification_pending_independent_audit",
+      "processes": 88,
+      "nominal_bytes": 1048576,
+      "approval_sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1",
+      "previous_noise_qualification_transferred": false,
+      "reported_cleanup": "empty",
+      "completion_evidence_scope": "Parent message only in this draft stage;W4 did not read/audit new raw results",
+      "result_acceptance": false
+    }
+  },
+  "pool_window_execution": {
+    "decision": "D026",
+    "status": "accepted_executed_noise_unqualified",
+    "processes": 88,
+    "nominal_bytes": 1048576,
+    "result_acceptance": "docs/coordination/vm-followup/network-pool-1m-1-acceptance.json",
+    "archive_acceptance": "docs/coordination/vm-followup/network-pool-1m-1-archive-acceptance.json",
+    "previous_noise_qualification_transferred": false,
+    "performance_gain_claim": false
+  },
+  "final_audit_preparation": {
+    "script": "docs/validation/vm-final/audit_final_capsule.py",
+    "status": "final_schema_bound_static_review_complete_not_executed",
+    "executed": false,
+    "final_report_created": false,
+    "reported_sha256": "bcc8d12b39c58f411e6923004737df23903866e64b37c73ff5b61a19bcbb69cc",
+    "reported_bytes": 49164,
+    "syntax_check": "AST/JSON static parse only, reported by independent reviewer",
+    "FINAL_AUTHORITY_SCHEMA_BOUND": true,
+    "last_required_bindings": [],
+    "static_report_review": "Two independent static reviewers found no remaining report blocker after78process-record/preseal wording corrections."
+  },
+  "historical_dependency_observations": [
+    {
+      "observed_at": "2026-10-16T02:32:17.284611+08:00",
+      "parent_thread_id": "01a130de-d9f3-7501-9d1e-8e84a403f430",
+      "source": "read-only wait_threads immediate snapshot",
+      "parent_status": "systemError",
+      "latest_turn_status": "failed",
+      "error": "Selected model is at capacity. Please try a different model.",
+      "last_decision_observed": "D031",
+      "effect": "Final owner78/D031 parent acceptance absent; source seal and independent final audit remain unexecuted.",
+      "resume_work": "Final parent acceptance, final index/report/source fill, single queue seal, independent queue audit.",
+      "superseded_by": "Parent direct delegation confirms resumed work; capacity failure is historical only."
+    }
+  ],
+  "current_dependency": {
+    "updated_at": "2026-10-16T03:35:35.338849+08:00",
+    "status": "all_final_inputs_accepted_and_W3_documents_final",
+    "owner": {
+      "path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+      "sha256": "d87332b22406e9077ab68a44cb02ba14ac611a8fba78447c6498458bf584eddd",
+      "decision": "D033",
+      "status": "accepted_executed_descriptive_partial_qualification_with_offline_supplement"
+    },
+    "tools": {
+      "path": "docs/coordination/vm-followup/contracts/owner-measurement-v1/supplement-tool-acceptance.json",
+      "sha256": "3e748a86ddb2521154c6a6ebde3114aae7ebb9f86dc94a50273274c5d6c263ad",
+      "decision": "D032"
+    },
+    "W3_final_document_turn_completed": true,
+    "seal_authorized_now": true,
+    "seal_attempted": false,
+    "final_audit_executed": false
+  },
+  "prepared_last_increment": {
+    "status": "accepted_and_ready_for_seal",
+    "evidence_index": {
+      "path": "docs/validation/vm-final/evidence-index.json",
+      "reported_sha256": "4c4b550b6aaaa8050efeb07a751865f2d728bafd7b57aea449c54dce5ceb541b"
+    },
+    "verification_matrix": {
+      "path": "docs/validation/vm-final/verification-matrix.json",
+      "reported_sha256": "7c798253d496d131e57f61241187efbb88fdf2649cb07e303dc71a7eb9ad310b",
+      "axes": 50,
+      "owner78_pending": false,
+      "result_classifications_terminal": true
+    },
+    "build_identities": {
+      "path": "docs/validation/vm-final/build-identities.json",
+      "reported_sha256": "c82bc3ed871326d52f08a6792bab9ca636e107c968752270fc83666f084936b0",
+      "suggested_small_metadata_files": 116,
+      "suggested_bytes": 4907929
+    },
+    "expected_owner_acceptance_path": "docs/coordination/vm-followup/owner-measurement-acceptance.json",
+    "parent_will_dispatch_when_ready": false,
+    "seal_and_final_audit_executed": false,
+    "source_increment": {
+      "path": "docs/validation/vm-final/final-increment.json",
+      "sha256": "ff2d5d1b679b37bf70c1be3768a07c05fa477b632a45fa6165bfe380e9657955",
+      "source_files": 9,
+      "source_bytes": 152208,
+      "queue_receipt": "build/vm-final/queue-final-increment-v1"
+    }
+  },
+  "parent_G4_accepted": false,
+  "post_cut_results": {
+    "expected_external_seal": "docs/validation/vm-final/final-seal.json",
+    "expected_external_final_handoff": "docs/validation/vm-final/final-handoff.json",
+    "cut_status": "Input metadata snapshot precedes seal/audit execution; postcut results are external to prevent hash cycles."
+  }
+}

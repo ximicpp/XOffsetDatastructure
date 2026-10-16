@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "scope": "independent read-only native-record/source review; no C++ build/run/timing; only this JSON is a final output",
+  "decision": "static_checker_platform_alignment_error",
+  "package_accepted": false,
+  "frozen_D018_count_capacity_or_event_budget_contradiction": false,
+  "frozen_checker_and_synthetic_fixtures_have_wrong_alignment_assumption": true,
+  "authorization_boundary": {
+    "do_not_edit_auditor_tests_harness_or_frozen_evidence": true,
+    "no_native_retry_or_remaining_matrix_authorized_by_this_review": true,
+    "native_attempts_already_consumed_as_reported_by_root": 1,
+    "parent_steering_required_before_expected_grammar_change": true
+  },
+  "raw_record": {
+    "path": "build/vm-owner-scaling/collection-v1/group-00/diagnostic-r256-o8-t1.stdout",
+    "sha256_before": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+    "sha256_after": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149",
+    "harness_status": "ok",
+    "profile": "diagnostic",
+    "timing_evidence": false,
+    "condition": {
+      "owners": 8,
+      "threads": 1,
+      "requests": 256,
+      "per_owner": 32
+    },
+    "counts": {
+      "threads_started": 1,
+      "threads_joined": 1,
+      "created": 8,
+      "allocated": 256,
+      "freed": 256,
+      "destroyed": 8,
+      "validated": 256
+    },
+    "checksum": "8565427578676381477",
+    "validation": {
+      "values": true,
+      "alignment": true,
+      "ranges": true,
+      "nonoverlap": true,
+      "conservation": true
+    }
+  },
+  "source_identities_sha256": {
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "experiments/vm_owner_scaling/owner_scaling.cpp": "7470e32478027526a79030ee50b6975c37ae1a4e83c96af24cbd6cc82c84cb48",
+    "experiments/vm_owner_scaling/audit_owner_scaling.py": "bfe242ab46383df680e36f1c2c1771db26ac6744b57324bb44f8b741e96f6e8f",
+    "experiments/vm_owner_scaling/test_audit_owner_scaling.py": "36e7d5d755fb484d4248683c5864a1ff8d68159558d0bb2ccf81245421711119",
+    "experiments/vm_owner_scaling/PLAN.md": "779e306a991ad5e7ab9d7bb915518e7105ea3493b537c20bef2bc8602df92784",
+    "docs/coordination/vm-followup/contracts/W1-owner-scaling-v1/acceptance.json": "25b432405e2c2a2e948d104ee9f8a622d80ab74f9016746e22cccee6f28a50c3",
+    "build/vm-owner-scaling/build-v1/result.json": "2c6290e66b2989217db95783839fbd033d4093fe1a8794658a61251493f5aeb6"
+  },
+  "accepted_W2_identity_sha256": {
+    "audit_events.py": "91ac07d1c54f306f965235b156a7ff95f18040c8eb65660434654342a626ee08",
+    "event_kinds.json": "7bc7b0a77d24a8557a601a793daead2690406603fed26d78931cd3b942bb2e2c"
+  },
+  "generic_W2_audit": {
+    "status": "passed",
+    "event_count": 1981,
+    "thread_count": 1,
+    "valid": true,
+    "dropped": 0,
+    "kind_counts": {
+      "core_metadata_capacity": 264,
+      "core_new": 256,
+      "core_return": 256,
+      "grow_zero": 8,
+      "host_allocate": 59,
+      "host_deallocate": 58,
+      "os_enable": 8,
+      "os_reserve": 8,
+      "os_unmap": 8,
+      "registry_erase": 8,
+      "registry_lock": 528,
+      "registry_lookup_hit": 512,
+      "registry_register": 8
+    },
+    "phase_counts": {
+      "create": 61,
+      "allocate": 768,
+      "free": 1112,
+      "destroy": 40
+    },
+    "registry": {
+      "peak_active": 8,
+      "end_active": 0,
+      "complete_generations": 8,
+      "rebinds": 0
+    },
+    "allocation_domains": {
+      "1": {
+        "name": "Core free vector",
+        "allocation_calls": 48,
+        "allocated_requested_bytes": 8064,
+        "deallocation_calls": 48,
+        "deallocated_requested_bytes": 8064,
+        "failed_allocation_calls": 0,
+        "failed_requested_bytes": 0,
+        "current_live_requested_bytes": 0,
+        "peak_live_requested_bytes": 4352,
+        "current_live_allocations": 0,
+        "peak_live_allocations": 9
+      },
+      "2": {
+        "name": "shared registry nodes/buckets",
+        "allocation_calls": 11,
+        "allocated_requested_bytes": 400,
+        "deallocation_calls": 10,
+        "deallocated_requested_bytes": 312,
+        "failed_allocation_calls": 0,
+        "failed_requested_bytes": 0,
+        "current_live_requested_bytes": 88,
+        "peak_live_requested_bytes": 344,
+        "current_live_allocations": 1,
+        "peak_live_allocations": 9
+      },
+      "3": {
+        "name": "pool cached slots",
+        "allocation_calls": 0,
+        "allocated_requested_bytes": 0,
+        "deallocation_calls": 0,
+        "deallocated_requested_bytes": 0,
+        "failed_allocation_calls": 0,
+        "failed_requested_bytes": 0,
+        "current_live_requested_bytes": 0,
+        "peak_live_requested_bytes": 0,
+        "current_live_allocations": 0,
+        "peak_live_allocations": 0
+      },
+      "4": {
+        "name": "pool state/control block",
+        "allocation_calls": 0,
+        "allocated_requested_bytes": 0,
+        "deallocation_calls": 0,
+        "deallocated_requested_bytes": 0,
+        "failed_allocation_calls": 0,
+        "failed_requested_bytes": 0,
+        "current_live_requested_bytes": 0,
+        "peak_live_requested_bytes": 0,
+        "current_live_allocations": 0,
+        "peak_live_allocations": 0
+      },
+      "5": {
+        "name": "wire-validation range vectors",
+        "allocation_calls": 0,
+        "allocated_requested_bytes": 0,
+        "deallocation_calls": 0,
+        "deallocated_requested_bytes": 0,
+        "failed_allocation_calls": 0,
+        "failed_requested_bytes": 0,
+        "current_live_requested_bytes": 0,
+        "peak_live_requested_bytes": 0,
+        "current_live_allocations": 0,
+        "peak_live_allocations": 0
+      }
+    },
+    "outstanding": [
+      {
+        "subject": 4424286416,
+        "domain": 2,
+        "bytes": 88,
+        "origin_owner": 4415684608,
+        "origin_thread": 0,
+        "allocation_sequence": 43,
+        "allocation_phase": "create"
+      }
+    ]
+  },
+  "bucket_lineage": {
+    "observed_allocation_bytes": [
+      16,
+      40,
+      88
+    ],
+    "observed_old_bucket_deallocation_bytes": [
+      16,
+      40
+    ],
+    "observed_final_shared_bucket_bytes": 88,
+    "extra_retained_allocations": 0,
+    "nodes_allocated_and_deallocated": 8,
+    "domain1_allocated_and_deallocated": 48
+  },
+  "source_geometry": {
+    "requested_bytes": 8,
+    "allocation_header_bytes": 16,
+    "initial_used_end": 48,
+    "requested_alignment": 8,
+    "effective_alignment_observed_and_required_by_this_source_path": 8,
+    "derivation": "XArenaAllocator<uint64_t>::allocate(1) passes sizeof(uint64_t)=8 and alignof(uint64_t)=8 (F:93-100); allocate_aligned_impl promotes to max(requested,alignof(max_align_t)) (F:652), then align_up(base+used_end+16,alignment) (F:665-677). First user offset64/end72, next user offset88/end96, with subsequent step24. Requested alignment8 and a successful pointer at base+88 prove the effective power-of-two alignment is8 on this fixed build, rather than16. This is not a new compiler probe. Apple builtin __stddef_max_align_t.h selects long double for max_align_t; the frozen build target is arm64-apple-darwin25.6.0.",
+    "platform8_formula": {
+      "user_offset_j": "64+24*j (zero-based j)",
+      "core_new_value_j": "72+24*j",
+      "used_end_after_n": "48+24*n, including n=0",
+      "free_before": "65536-(48+24*n)",
+      "free_after": "free_before+24*n=65488",
+      "core_return_bytes": 24
+    },
+    "incorrect_platform16_static_formula": {
+      "user_offset_j": "64+32*j",
+      "used_end_after_n_positive": "40+32*n",
+      "first_request_happens_to_match": true
+    },
+    "all_8_owner_checks": [
+      {
+        "index": 0,
+        "worker": 0,
+        "core": "4424277008",
+        "base": "4414963712",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 1,
+        "worker": 0,
+        "core": "4424285472",
+        "base": "4415029248",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 2,
+        "worker": 0,
+        "core": "4424285632",
+        "base": "4415094784",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 3,
+        "worker": 0,
+        "core": "4424285840",
+        "base": "4415160320",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 4,
+        "worker": 0,
+        "core": "4424286032",
+        "base": "4415225856",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 5,
+        "worker": 0,
+        "core": "4424286224",
+        "base": "4415684608",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 6,
+        "worker": 0,
+        "core": "4424286512",
+        "base": "4415750144",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      },
+      {
+        "index": 7,
+        "worker": 0,
+        "core": "4424286672",
+        "base": "4415815680",
+        "allocated": 32,
+        "freed": 32,
+        "used_end": 816,
+        "free_before": 64720,
+        "free_after": 65488,
+        "observed_allocation_and_return_geometry_matches": true
+      }
+    ]
+  },
+  "unchanged_budget_and_capacity": {
+    "actual_event_count": 1981,
+    "condition_conservative_event_limit": 1991,
+    "frozen_hard_process_event_limit": 5631,
+    "runtime_per_thread_event_limit": 16384,
+    "actual_threads": 1,
+    "logical_and_explicit_maximum_bytes_per_owner": 65536,
+    "actual_reserve_enable_unmap_bytes_per_owner": 65536,
+    "actual_grow_zero_bytes_total": 524288,
+    "future_R8192_capacity_source_derivation_only": {
+      "owners8_Q1024_used_end": 24624,
+      "owners64_Q128_used_end": 3120,
+      "owners256_Q32_used_end": 816,
+      "all_less_than_65536": true,
+      "executed_in_this_review": false
+    },
+    "reason": "Alignment changes byte offsets/used_end/free-space expectations, not request counts, registry/metadata/vector-growth event counts, bucket lineage, number of owners/threads, initial zeroing or hard capacity. No new owner growth/reuse path is observed."
+  },
+  "review_limits": [
+    "Generic W2 structure/resource audit and independent byte-geometry checks pass for only the preserved first C8/T1 diagnostic record.",
+    "The frozen workload-specific auditor still correctly reports failure against its own incorrect static platform16 geometry; this review does not relabel the collection successful.",
+    "The existing synthetic positive fixtures encoded the same platform16 assumption, explaining why they did not catch this issue.",
+    "No whole matrix, timing result, production performance or additional native process is established.",
+    "Do not infer and silently accept arbitrary alignment from a trace when correcting the checker; bind a platform8 expectation to the fixed compiler/ABI/source identity, or separately freeze any explicit supported alternative."
+  ],
+  "review_side_effect_note": "The first Python import generated a bytecode cache in the frozen auditor source directory. This review identified its creation timestamp, removed only that generated cache and its then-empty directory, and used PYTHONDONTWRITEBYTECODE=1 thereafter. Frozen source bytes and the raw record were not changed; no final cache remains from this review."
+}

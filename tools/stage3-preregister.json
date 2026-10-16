@@ -1,0 +1,15 @@
+{
+  "schema":1,
+  "baseline_headers":{"xoffsetdatastructure.hpp":"9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2","xoffset_virtual_memory.hpp":"22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"},
+  "variants":["F","A-core","A-wire","B-core","B-wire","C-linear","C-index"],
+  "random_seeds":[324508639,610839777,3735928559,305419896,2654435769,3405691582,826366246,655894552],
+  "normal":{"seeds":8,"operations_per_seed":10000},
+  "deep":{"seeds":32,"operations_per_seed":100000},
+  "smoke":{"seeds":2,"operations_per_seed":1000},
+  "gates":{"simple_time_gain":0.05,"complex_index_time_gain":0.10,"space_gain_in_useful_pressure_bytes":0.15,"space_target_time_regression_max":0.05,"default_time_regression_budget":0.02,"default_repeatable_reject":0.05,"split_host_budget":"2*F+4096 bytes","index_host_budget":"4*F+4096 bytes","confirmation":"at least 3 independent environment windows, 8 balanced pairs/window, A/A; uncertain default anchor => retain F"},
+  "workloads":{"micro":"Core lookup n=8/64/512/4096; forward/reverse/random releases; head,dense,tail,alignment,miss; same work and full value checks","fragmentation":"historical core_split/cache_split/core_coalesce n=1024","integration":"N5 sixteen axes all 3 modes count=1000000; default save first/repeat, verified load, sequential/interleaved vector/string/nested; 128MiB grow; 10M append; explicit pool control"},
+  "schedule":"single coordinator, serial compilation/timing; 1 warmup pair then 8 measured AB/BA pairs (4 each); separate diagnostic binary; record environment before/after",
+  "failure":"real global-new fail-after-N for every observed metadata allocation in Core free and wire transfer plus post-load lazy metadata; split and intrusive bucket linking have no extra allocations",
+  "resources":{"compiler":"/usr/local/bin/clang++","sdk":"/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk","library":"/usr/local/lib","jobs":2,"minimum_free_disk_bytes":3221225472},
+  "scope":"N6 only; D requires independently successful baseline and demonstrated residual adjacency pressure failure; no N7"
+}

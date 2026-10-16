@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-16",
+  "status": "accepted_design_implementation_dispatched",
+  "role": "W1",
+  "purpose": "Fill current F fixed-request owner-index contention scope; parent designs/accepts, W1 implements, W3 alone executes formal timing.",
+  "input_review_sha256": {
+    "experiments/vm_owner_scaling/diagnostic-budget-review.md": "249bb5ef6b989de5e5872d1d52d5b36961e9fbcfe000a6e9ee7c890fab5ce676",
+    "experiments/vm_owner_scaling/old-harness-review.md": "873fe8f14aafd6986692ea15f1849be09245fb23ede32bc715074c21eb48d655",
+    "docs/coordination/vm-followup/W2-G1-acceptance.json": "9c3b5c711cc48378b7ec8744c10faeafb30bcf03eb443842262660d78dd9392b"
+  },
+  "source_sha256": {
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2",
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad"
+  },
+  "conditions": [
+    {
+      "owners": 8,
+      "threads": 1
+    },
+    {
+      "owners": 64,
+      "threads": 1
+    },
+    {
+      "owners": 256,
+      "threads": 1
+    },
+    {
+      "owners": 256,
+      "threads": 2
+    },
+    {
+      "owners": 256,
+      "threads": 4
+    },
+    {
+      "owners": 256,
+      "threads": 8
+    }
+  ],
+  "workload": {
+    "object": "XBufferCore + XArenaAllocator<uint64_t>, no typed root/wire/pool/move/growth candidates",
+    "logical_and_maximum_bytes_per_owner": 65536,
+    "order": "sequential within each fixed worker owner subset; owner i belongs to worker i%T throughout lifetime",
+    "batches": 1,
+    "diagnostic_requests_per_allocate_or_free_phase": 256,
+    "timing_requests_per_allocate_or_free_phase": 8192,
+    "phases": [
+      "create",
+      "allocate",
+      "validate_outside_timing",
+      "free",
+      "destroy"
+    ],
+    "formal_clock": "Original F only; per-phase wall time includes barriers/scheduling, excludes worker startup, payload value writes/checks, evidence output; not individual lookup latency",
+    "live_owner_invariant": "All C owners registered before any allocation; no destroy until all requests released",
+    "metadata_boundary": "Harness metadata preallocated before workers; Core vector/registry work stays in library phase and is separately diagnosed"
+  },
+  "diagnostic": {
+    "source": "Accepted W2 frozen-implementation-v1 generated headers/runtime, unchanged",
+    "max_lifetime_threads": 16,
+    "max_events_per_thread_runtime": 16384,
+    "hard_events_per_process_success": 5631,
+    "reset_sampling_truncation": false,
+    "dump": "After all resource destruction and worker join",
+    "assertions": [
+      "C register and C erase, active peak C/end0; no rebind/miss/fail",
+      "2R lookup hits; 2C+2R registry locks",
+      "R core_new/core_return; C+R metadata snapshots; no reuse/scan/extent/auto/wire/pool events",
+      "C reserve/enable/grow_zero/unmap, all successful; grow_zero bytes 65536*C",
+      "domain1 allocate/free C*(1+log2(R/C)), final0; domains3/4/5 absent",
+      "domain2 node and bucket allocation lineage checked; exactly one final shared bucket, dependent libc++ expectation 88/776/3176B for C8/64/256; no general residual allowance"
+    ]
+  },
+  "bounded_validation": {
+    "successful_processes": 18,
+    "success_details": "Six diagnostic R256, six original F R256 for equivalent semantic reference, six original F R8192 for intended timing workload functionality",
+    "failure_controls": [
+      "partial worker startup",
+      "one worker create failure",
+      "one worker allocation failure",
+      "main-thread between-phase verification failure"
+    ],
+    "failure_processes_max": 8,
+    "total_workload_processes_max": 26,
+    "expected_failures": "Both builds; exact injected cause/progress, drain and join, no published successful sample",
+    "child_timeout_seconds": 30,
+    "queue_job_timeout_seconds": 180,
+    "build_parallelism_max": 2,
+    "new_evidence_bytes_max": 536870912,
+    "execution_entry": "accepted default POSIX queue; original failed attempts preserved, no automatic budget extension"
+  },
+  "implementation_requirements": [
+    "Preserve executable clang++ driver spelling/argv0; resolving for identity must not change executed driver",
+    "Freeze source/tools/contract/flags/compiler/dependency and actual include closure for both builds",
+    "Use minimal runner and workload auditor with positive output and bounded negative checks; no new general framework",
+    "Reject count/phase/owner mapping/byte identity/overflow/missing-case/end-state mismatches",
+    "Semantic values and pointer alignment/ranges/non-overlap verified outside phase clocks; free success checked by conservation/ledger",
+    "Startup/phase failure cannot skip cleanup or strand barriers; return nonzero with precise reason",
+    "Use original F requests256 as diagnostic semantic comparator; requests8192 is separate profile, not same workload for exact cost fractions"
+  ],
+  "formal_timing_authorized": false,
+  "candidate_implementation_authorized": false,
+  "shared_production_edits_authorized": false,
+  "decision": "Proceed with isolated implementation and bounded functionality/diagnostics. No further design permission needed for routine choices inside this contract. Report real contract/budget contradictions before changing them; do not retry noise calibration or execute formal timing."
+}

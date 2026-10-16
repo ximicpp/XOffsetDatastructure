@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "decision": "D026",
+  "date": "2026-10-16",
+  "status": "accepted_executed_noise_unqualified",
+  "reviewer": "/root/orchestration_review",
+  "artifact": "build/vm-network-measurement/network-pool-screening-1m-v1",
+  "reviewed_sha256": {
+    "result.json": "51d23e1b5a161fc78953af9df72ea8932d6429308b6495a5c084c4bab7e2419d",
+    "summary.json": "9c004bdf09fe829dc049e3a049654cfa383b07f93e5d148ffc8f88e02ab86113"
+  },
+  "approval_sha256": "0e35280c7f1ea9702c504db9718614bac9fa682d0e939ab8b1b12e596bd8cbe1",
+  "queue_result_sha256": "111e3c64eede94cfd9f9949927f23f1e6120ccd88356f32c952dfe68063377d9",
+  "queue_started_at": "2026-10-15T17:21:55.033257+00:00",
+  "queue_finished_at": "2026-10-15T17:22:04.783198+00:00",
+  "queue_cleanup": {
+    "live": [],
+    "process_groups": [],
+    "zombies": []
+  },
+  "native_processes": 88,
+  "all_exit_zero": true,
+  "timeouts": 0,
+  "stderr_empty": true,
+  "raw_files": 704,
+  "wire_files": 352,
+  "wire_bytes": 369222656,
+  "iterations_per_process": 4,
+  "pairs_per_contrast": 8,
+  "all_local_aa_qualified": true,
+  "all_stable_windows_qualified": false,
+  "rows": [
+    {
+      "comparison": "none-cold",
+      "workload": "1048576",
+      "local_aa_qualified": true,
+      "stable_window_qualified": false,
+      "anchor_drift": {
+        "anchor_medians_ns": {
+          "mid": 11392437.25,
+          "post": 11186796.875,
+          "pre": 11891614.5
+        },
+        "maximum_over_minimum": 1.0630044178754252,
+        "qualified": false,
+        "relative_limit": 0.01,
+        "side_anchor_medians_ns": {
+          "left": {
+            "mid": 11392437.25,
+            "post": 11185776.0,
+            "pre": 11918078.125
+          },
+          "pooled": {
+            "mid": 11392437.25,
+            "post": 11186796.875,
+            "pre": 11891614.5
+          },
+          "right": {
+            "mid": 11441052.0,
+            "post": 11186796.875,
+            "pre": 11844916.625
+          }
+        },
+        "side_maximum_over_minimum": {
+          "left": 1.0654672617259635,
+          "pooled": 1.0630044178754252,
+          "right": 1.0588300437876683
+        }
+      }
+    },
+    {
+      "comparison": "none-warm",
+      "workload": "1048576",
+      "local_aa_qualified": true,
+      "stable_window_qualified": false,
+      "anchor_drift": {
+        "anchor_medians_ns": {
+          "mid": 11485208.25,
+          "post": 11265369.75,
+          "pre": 11441437.25
+        },
+        "maximum_over_minimum": 1.019514539236495,
+        "qualified": false,
+        "relative_limit": 0.01,
+        "side_anchor_medians_ns": {
+          "left": {
+            "mid": 11465198.0,
+            "post": 11211526.125,
+            "pre": 11489150.875
+          },
+          "pooled": {
+            "mid": 11485208.25,
+            "post": 11265369.75,
+            "pre": 11441437.25
+          },
+          "right": {
+            "mid": 11501828.0,
+            "post": 11378583.125,
+            "pre": 11377817.625
+          }
+        },
+        "side_maximum_over_minimum": {
+          "left": 1.0247624406262532,
+          "pooled": 1.019514539236495,
+          "right": 1.0108993111936966
+        }
+      }
+    }
+  ],
+  "reclamation_adjustment_total_ns": 5816398,
+  "verification": "Independent rawstdout recomputation of all pairs/3metrics/anchors and left,right,pooled drift matched. Fullwire verified by frozen seal/audit; reviewer checked receipt/manifest/size/output-report binding without rereading369222656bytes.",
+  "inference": "BothlocalAApass but none-cold maxdrift6.5467percent and none-warm2.4762percent fail1percent threshold. No performance superiority/equivalence or candidate experimental rejection.",
+  "decision_text": "Accept complete one-shot pooled network research and explicit noise limitation; retainF, no rerun/other sizes/implementation/adoption. G2 scoped measurement/audit gate closes; defaultD/F and actual business adoption remain open.",
+  "portable_archive_acceptance": "Original audited evidence accepted; W3 complete archive/relocation supplement pending.",
+  "further_network_execution_authorized": false,
+  "candidate_adoption_authorized": false
+}

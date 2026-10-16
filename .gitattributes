@@ -1,8 +1,3 @@
-*.sh text eol=lf
-*.bat text eol=crlf
-*.cpp text auto
-*.hpp text auto
-*.h text auto
-*.c text auto
-*.txt text auto
-*.md text auto
+# Preserve the exact accepted source and evidence bytes on every checkout.
+# Dependency submodules have their own attributes; fetch them with autocrlf=false.
+* -text

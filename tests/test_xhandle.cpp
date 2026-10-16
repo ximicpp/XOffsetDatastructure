@@ -1,8 +1,8 @@
 // ============================================================================
 // Test: XHandle<T> — Epoch-Cached Safe Handle (Single-Object Model)
-// Purpose: Verify that XHandle automatically re-resolves pointers after
-//          buffer mutations (grow/shrink/compact) while maintaining O(1)
-//          cached access when no mutation occurs.
+// Purpose: Verify that handles and raw root pointers stay valid across
+//          stable-address grow/shrink, and that handles work on compacted
+//          and deserialized buffers.
 // ============================================================================
 
 #include <iostream>
@@ -74,11 +74,15 @@ bool test_handle_survives_grow() {
     std::cout << "  Before grow: ptr=" << (void*)ptr_before
               << " epoch=" << epoch_before << "\n";
 
-    bool grew = buffer.grow(buffer.reserved_capacity() + 4096);
+    const void* base_before = buffer.get_address();
+    const auto accessible_before = buffer.accessible_bytes();
+    bool grew = buffer.grow(accessible_before + 4096);
     assert(grew);
+    assert(buffer.accessible_bytes() > accessible_before);
+    assert(buffer.get_address() == base_before);
 
     uint64_t epoch_after = buffer.epoch();
-    assert(epoch_after > epoch_before);
+    assert(epoch_after == epoch_before);
     std::cout << "  After grow:  epoch=" << epoch_after << "\n";
 
     assert(player->id == 99);
@@ -88,8 +92,11 @@ bool test_handle_survives_grow() {
     std::cout << "  Test 2.1: data intact after grow() ... [OK]\n";
 
     Player* ptr_after = player.get();
+    assert(ptr_after == ptr_before);
+    assert(&buffer.root<Player>() == ptr_before);
+    assert(ptr_before->id == 99);
     std::cout << "  After grow: ptr=" << (void*)ptr_after << "\n";
-    std::cout << "  Test 2.2: handle auto-resolved ... [OK]\n";
+    std::cout << "  Test 2.2: cached handle and raw pointer stayed valid ... [OK]\n";
 
     return true;
 }
@@ -101,17 +108,27 @@ bool test_handle_survives_shrink() {
     std::cout << "\n[TEST] XHandle survives shrink_to_fit()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBuffer buffer(8192);
+    XBuffer buffer(128 * 1024);
     auto player = buffer.make_handle<Player>();
     player->id = 77;
     player->name = "BeforeShrink";
 
     uint64_t epoch_before = buffer.epoch();
+    Player* ptr_before = player.get();
+    const void* base_before = buffer.get_address();
+    const auto accessible_before = buffer.accessible_bytes();
+    const auto size_before = buffer.get_size();
+    const auto reserved_before = buffer.reserved_bytes();
 
     buffer.shrink_to_fit();
 
     uint64_t epoch_after = buffer.epoch();
-    assert(epoch_after > epoch_before);
+    assert(epoch_after == epoch_before);
+    assert(buffer.get_address() == base_before);
+    assert(player.get() == ptr_before);
+    assert(buffer.get_size() < size_before);
+    assert(buffer.accessible_bytes() == accessible_before);
+    assert(buffer.reserved_bytes() == reserved_before);
 
     assert(player->id == 77);
     assert(std::string(player->name.c_str()) == "BeforeShrink");
@@ -166,10 +183,11 @@ bool test_epoch_cache_efficiency() {
     const void* address_before = buffer.get_address();
     bool grew = buffer.grow(1024);
     assert(grew);
-    assert(buffer.epoch() == epoch + (buffer.get_address() != address_before));
+    assert(buffer.get_address() == address_before);
+    assert(buffer.epoch() == epoch);
 
     assert(player->level == 999);
-    std::cout << "  Test 5.2: re-find after grow, then cached ... [OK]\n";
+    std::cout << "  Test 5.2: grow preserves the cached pointer ... [OK]\n";
 
     return true;
 }

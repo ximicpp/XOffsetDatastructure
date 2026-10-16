@@ -1,0 +1,25 @@
+{
+  "bridge_path": "/Users/fanchensu/XOffsetDatastructure/experiments/vm_network_measurement/default_measurement.py",
+  "bridge_sha256": "f73724c67f310dc71487c7726dc4ea073fd2391fcaa6442f444d5a599e71b510",
+  "command": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "/Users/fanchensu/XOffsetDatastructure/experiments/vm_network_measurement/default_measurement.py",
+    "build",
+    "--frozen",
+    "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/default-frozen-v1",
+    "--out",
+    "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/default-build-v1",
+    "--queue",
+    "/Users/fanchensu/XOffsetDatastructure/build/vm-network-measurement/default-build-v1/queue"
+  ],
+  "interpreter": {
+    "bytes": 52640,
+    "path": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "resolved_path": "/opt/homebrew/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "sha256": "2cbb3ee843d8abcf93ed35bb9102391f18eefccb03d47908547bd8db67bc395c"
+  },
+  "python_version": "3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]",
+  "queue_request_sha256": "363c3a81da91225553ec316788d508fd8dc29fa140dd6111c65c8480357b4d42",
+  "queue_run_id": "bcab711e07884fb3921bc8f01e2c65ed",
+  "requested_interpreter": "/opt/homebrew/opt/python@3.14/bin/python3.14"
+}

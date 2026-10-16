@@ -1,0 +1,103 @@
+{
+  "archive": "docs/validation/vm-owner-scaling/owner-scaling-v1.tar.gz",
+  "archive_bytes": 3151435,
+  "archive_independent_review": "docs/validation/vm-owner-scaling/independent-review.json",
+  "archive_independent_review_sha256": "a9393f54da27684ad6cc09968b53f64b538017cfba25dc475921b36eb21648c3",
+  "archive_regular_files": 462,
+  "archive_sha256": "0f0593a92ba738c919c9fb5f82bcdf8b41735993e715a884faf616ee441852c0",
+  "binaries": {
+    "diagnostic": "a9c176625111d668b501bf6b7a95d44352a27e4380baaa1e171031b001617f8f",
+    "timing": "2ff7b74f1561276c151a4b9323735d06eb9a65f87513317f1000ff3dfe703b45"
+  },
+  "build": "build/vm-owner-scaling/build-v4",
+  "candidate_implementation": false,
+  "contract": "experiments/vm_owner_scaling/contract.json",
+  "decisions": {
+    "functional_build_acceptance": "D027",
+    "implementation": "D018",
+    "native_layout_correction": "D022"
+  },
+  "evidence": "docs/validation/vm-owner-scaling/final-v1",
+  "evidence_budget_bytes": 536870912,
+  "expected_failure_native_processes": 8,
+  "final_audit": "build/vm-owner-scaling/final-audit-v1.json",
+  "first_case_retried": false,
+  "formal_timing": false,
+  "formal_timing_owner": "W3; separately authorized measurement work only",
+  "functional_acceptance": "docs/coordination/vm-followup/W1-owner-functional-acceptance.json",
+  "functional_acceptance_sha256": "9e0ea9ed42921997fbe1f7cf9ace698d5268f0abcc765b4ee47faa9e78f739db",
+  "hard_process_event_budget": 5631,
+  "history": {
+    "original_first_native": {
+      "child_exit": 0,
+      "corrected_offline_audit": "passed via D022 recovery-v2; separateidentity",
+      "historical_collector_and_queue": "failed; exact16bytealignmentassumption error retained",
+      "original_claim_state": "claimed/consumed; notrewritten",
+      "record": "build/vm-owner-scaling/collection-v1/group-00/diagnostic-r256-o8-t1.stdout",
+      "stdout_sha256": "fcbbd56c56124520e187f095e9c294d4160aa8ad877fd49264c4827d3beb1149"
+    },
+    "prior_build_failures": [
+      {
+        "path": "build/vm-owner-scaling/build-v1",
+        "result": "timing compile0; closure lexical alias rejected"
+      },
+      {
+        "path": "build/vm-owner-scaling/build-v2",
+        "result": "timing compile0; SDK symlink alias rejected"
+      },
+      {
+        "path": "build/vm-owner-scaling/build-v3",
+        "result": "timing compile0; diagnostic compile hit introduced8MiB objectfile cap"
+      }
+    ],
+    "zero_native_preflight_failure": {
+      "path": "build/vm-owner-scaling/collection-v1/group-01",
+      "reason": "recover/recovery artifactkind mismatch; zerochildcommands; no claimconsumed",
+      "status": "retained; correctedonlycontinuationtooling"
+    }
+  },
+  "independent_build_review": "experiments/vm_owner_scaling/build-review.json",
+  "independent_queue_receipt": "build/vm-owner-scaling/receipts/independent-audit-v1",
+  "independent_queue_receipt_result_sha256": "9ed9775ba06eb1faa17b66d6db3d8618a918ae32f552c3394d89a9910c7179b0",
+  "manifest_sha256": "a2b07fa547b8663495670b7448d6150a655c5d27932884f1c8d86bdccc35d5fb",
+  "maximum_actual_process_events": 5135,
+  "normal_collection_groups": [
+    "build/vm-owner-scaling/collection-v1/group-02",
+    "build/vm-owner-scaling/collection-v1/group-03",
+    "build/vm-owner-scaling/collection-v1/group-04",
+    "build/vm-owner-scaling/collection-v1/group-05",
+    "build/vm-owner-scaling/collection-v1/group-06",
+    "build/vm-owner-scaling/collection-v1/group-07",
+    "build/vm-owner-scaling/collection-v1/group-08"
+  ],
+  "owned_evidence_bytes_at_independent_review": 205647683,
+  "prepared": "build/vm-owner-scaling/prepared-v6",
+  "production_headers": {
+    "xoffset_virtual_memory.hpp": "22f181b52c11ce442a5576ffc0dc35af1828f77deb4424f387d0acfa658239ad",
+    "xoffsetdatastructure.hpp": "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+  },
+  "real_artifact_negative_checks": 3,
+  "recompiled_after_D022": false,
+  "recovery": "build/vm-owner-scaling/recovery-v2",
+  "remaining_work_in_this_scope": [],
+  "results": "docs/VM_OWNER_SCALING_RESULTS.md",
+  "role": "W1",
+  "schema_version": 1,
+  "shared_production_edits": false,
+  "source_sha256": {
+    "experiments/vm_owner_scaling/audit_owner_scaling.py": "2a380368741b1ecf0261c66d8d19ec463024befee9476e851339897fd1f1c83d",
+    "experiments/vm_owner_scaling/continue_owner_scaling.py": "1e265ba3da04ea3e8cfe94f39a0dcb1c5d88d2f36a8b286678a38eb9761aedf9",
+    "experiments/vm_owner_scaling/contract.json": "8b2bfe3b9f0524a200b5fbf7f5cce51bee37ab7c51abbc5748c5ba1f788b8fcf",
+    "experiments/vm_owner_scaling/owner_scaling.cpp": "7470e32478027526a79030ee50b6975c37ae1a4e83c96af24cbd6cc82c84cb48"
+  },
+  "status": "complete_scoped_delivery",
+  "successful_native_processes": 18,
+  "synthetic_test_modes": [
+    "normal",
+    "optimized"
+  ],
+  "synthetic_tests_per_mode": 13,
+  "toolkit": "build/vm-owner-scaling/tooling-errata-v2",
+  "workload_processes_remaining": 0,
+  "workload_processes_started": 26
+}
