@@ -1,291 +1,194 @@
 # XOffsetDatastructure
 
-[![CI](https://github.com/ximicpp/XOffsetDatastructure/actions/workflows/ci.yml/badge.svg)](https://github.com/ximicpp/XOffsetDatastructure/actions/workflows/ci.yml)
+Development candidate: see [CANDIDATE.md](CANDIDATE.md) and the
+[next-version design](docs/PERFORMANCE_V3_DESIGN.md).
+The alpha version below identifies ancestry; this candidate is not a published release.
 
-XOffsetDatastructure is a C++26/P2996 serialization library built around one idea: keep data in a byte-stable in-memory layout so save/load becomes direct byte transfer instead of encode/decode work.
+**0.1.0-alpha.1** is an experimental C++26/P2996 library for reflected objects
+and offset containers stored in an address-stable virtual-memory arena. It is
+for users who can pin an experimental compiler and validate their own schemas.
+The independent OS storage header can also be used with C++17.
 
-The library stores a single reflected root object inside an address-stable virtual-memory buffer backed by an XOffset-owned arena runtime and uses TypeLayout for compile-time layout signatures and byte-copy safety checks.
+An owning buffer keeps its base address through growth, logical shrink and save.
+Saving produces an owning byte copy; loading validates and copies bytes into a
+new reservation. The format avoids per-field decoding. Save/load are not
+zero-copy operations.
+
+Start with the [package guide](docs/VM_PACKAGING.md) and read the
+[alpha compatibility contract](docs/ALPHA_COMPATIBILITY.md) before persisting or
+accepting wire data. [CHANGELOG.md](CHANGELOG.md) records this prerelease.
 
 ## Requirements
 
-- Clang with P2996 reflection support and `<experimental/meta>`
-- 64-bit little-endian platform
-- Linux, macOS, or Windows virtual-memory APIs
-- Git submodules initialized for `external/typelayout` and `external/boost`
+| Use | Requirements |
+| --- | --- |
+| Full library, `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++; CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
+| OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
+| Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
-The reflected public library requires P2996; its API has no non-reflection fallback.
-The independent `xoffset_virtual_memory.hpp` storage layer requires C++17.
+Ordinary C++26 support does not imply P2996 support. The full API has no
+non-reflection fallback. Native Windows full-library support is not established
+for this alpha; the tested Windows target is storage only.
 
-## Minimal Example
+The source archive includes the locked TypeLayout and ten Boost header modules.
+Full installed packages include the same 851 dependency headers. Neither package
+includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
+recipes are in [toolchains/README.md](toolchains/README.md),
+[toolchains/vm-validation.json](toolchains/vm-validation.json), and the
+[package guide](docs/VM_PACKAGING.md#fixed-inputs).
+
+## Minimal full-library example
 
 ```cpp
 #include "xoffsetdatastructure.hpp"
+#include <cstdint>
 
 using namespace XOffsetDatastructure;
 
 struct Player {
-    int32_t id{0};
-    int32_t level{0};
+    std::int32_t level{};
     XString name;
-    XVector<int32_t> items;
+    XVector<std::int32_t> items;
 };
-
 XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
 int main() {
-    TypedXBuffer<Player> xbuf(4096);
-    auto* player = xbuf.make();
-    player->id = 1;
-    player->level = 10;
-    player->name = "Alice";
-    player->items.push_back(101);
+    constexpr std::size_t limit = 8 * 1024 * 1024;
+    auto buffer = TypedXBuffer<Player>::create(4096,
+        XBuffer::maximum_capacity(limit));
+    buffer.root().level = 10;
+    buffer.root().name = "Alice";
+    buffer.root().items.push_back(101);
 
-    std::string bytes = xbuf.save_verified();
-
-    auto loaded = TypedXBuffer<Player>::load(bytes);
-    auto& restored = loaded.root();
-    return restored.level == 10 ? 0 : 1;
+    auto bytes = buffer.save_verified();
+    auto restored = TypedXBuffer<Player>::load(bytes,
+        XBuffer::maximum_capacity(limit));
+    return restored.root().level == 10 ? 0 : 1;
 }
 ```
 
-More complete examples live in:
+`TypedXBuffer<T>::load()` uses the verified path. Use library containers inside
+the arena, register each root schema, and satisfy both byte-copy safety and V1
+wire admission. A schema name alone does not establish compatibility.
+See `examples/helloworld.cpp`, `examples/stable_storage.cpp` and
+`examples/demo.cpp` for more examples.
 
-- `examples/helloworld.cpp`
-- `examples/demo.cpp`
-- `examples/stable_storage.cpp`
+## Build and consume
 
-## Stable Storage And Capacity
+Extract the versioned source archive; it already contains the required dependency
+headers. In a Git checkout, first initialize the exact submodules using the
+[LF-preserving recipe](docs/VM_PACKAGING.md#fixed-inputs).
 
-Every owning buffer reserves a continuous address range and enables read/write
-pages as its logical length grows. Successful creation/load establishes a base
-address that stays unchanged through `grow()`, logical `shrink_to_fit()`, and
-save. `grow()` at the hard limit or an OS enable failure returns `false`; it never
-falls back to a relocating allocation.
-
-The default maximum is 64 MiB (or the initial length, if larger). Define
-`XOFFSET_DEFAULT_MAXIMUM_CAPACITY` consistently across translation units to
-change it globally, or configure a strict per-buffer maximum:
-
-```cpp
-TypedXBuffer<Player> buffer(4096, XBuffer::maximum_capacity(8 * 1024 * 1024));
-auto* player = buffer.make();
-if (!buffer.grow(64 * 1024)) throw XBadAlloc();
-// player still points to the same root object.
-auto snapshot = buffer.save_verified(); // copies output; base remains unchanged
-auto loaded = TypedXBuffer<Player>::load(snapshot,
-    XBuffer::maximum_capacity(8 * 1024 * 1024));
-```
-
-`maximum_capacity()`/`reserved_capacity()` report the logical hard limit;
-`reserved_bytes()` reports the OS reservation after page rounding;
-`accessible_bytes()` reports enabled read/write pages, not resident physical
-memory; `get_size()`/`segment_size()` report the logical allocator extent.
-Logical shrink retains enabled pages. Regrowth zeroes newly exposed bytes.
-`reclaim_tail_pages()` explicitly discards complete pages beyond the logical end;
-its result distinguishes success, failure, and partial discard/protection success.
-For 10,000 default buffers, reservations consume 625 GiB of virtual address
-space; configure smaller explicit limits for many small buffers. The existing
-offset ceiling remains below 2 GiB.
-
-The old `max_capacity(bytes)` parameter remains a minimum reservation hint,
-raising the default when needed. Use `maximum_capacity(bytes)` for a strict
-limit. `get_buffer()` now returns a borrowed span over logical bytes; use
-`data()` and length queries or `copy_bytes()` for an explicit owning copy.
-Distribute `xoffset_virtual_memory.hpp` alongside the public header.
-
-Growth defaults to `XGrowPolicy::Explicit`. To let allocations grow within a
-fixed limit, use `.with_growth(XGrowPolicy::Automatic)` or call
-`set_growth_policy()`. A shared pool is also opt-in:
-
-```cpp
-constexpr std::size_t limit = 8 * 1024 * 1024;
-XBufferPool pool({4, 4 * limit, 4 * limit}); // idle count, reserved bytes, accessible bytes
-auto options = XBuffer::maximum_capacity(limit)
-    .with_growth(XGrowPolicy::Automatic).with_pool(pool);
-auto buffer = TypedXBuffer<Player>::create(4096, options);
-// Allocations can enable more pages; the configured limit still applies.
-auto wire = buffer.save_verified();
-auto result = buffer.reclaim_tail_pages(); // optional; regrowth may incur page faults
-auto loaded = TypedXBuffer<Player>::load(wire, options);
-pool.clear(); // releases idle reservations; live buffers remain valid
-```
-
-Pool limits cover idle reservations only. Policy and pool configuration follow
-move/swap and are never serialized. See the [follow-up results](docs/VM_MEMORY_REUSE_RESULTS.md)
-for the measured costs of these choices and the rejected allocator prototypes.
-The [pool workload study](docs/VM_POOL_WORKLOAD_RESULTS.md) covers mixed capacities,
-equal total budgets and contention; the [Automatic trace study](docs/VM_AUTOMATIC_TRACE_RESULTS.md)
-explains layout tradeoffs and why the tested cache-flush candidate was rejected.
-See [the migration guide](docs/STABLE_VM_STORAGE_MIGRATION.md),
-[design](docs/STABLE_VM_STORAGE_DESIGN.md), and
-[actual validation](docs/STABLE_VM_STORAGE_VALIDATION.md).
-
-Independent C++17 storage builds and reproducible full-library checks are
-documented in the [maintained validation entry point](docs/VM_VALIDATION_RUNNER.md).
-Pinned compiler/dependency profiles are in [toolchains](toolchains/README.md).
-OS-only platform checks and full P2996 support are reported separately.
-Validation is profile-specific: native Windows execution and independent native
-Linux performance remain unverified. The recorded Linux amd64 full-library
-profile was emulated on an ARM64 host; ARM64 GNU storage results are separate.
-See the [stage 2 delivery and validation](docs/VM_STAGE2_RESULTS.md) for the installable
-package and the current policy decisions.
-
-The [experimental synchronous TCP reference consumer](docs/VM_NETWORK_IMPLEMENTATION.md)
-has accepted native macOS functionality and lifecycle evidence. See
-[network measurement status](docs/VM_NETWORK_PERFORMANCE.md) for per-size calibration
-and pooled-comparison scope. Production transport and representative business
-integration remain open; no new public I/O API has been adopted.
-
-## Safety Rules
-
-- Only store types that satisfy `boost::typelayout::is_byte_copy_safe_v<T>`.
-- For the fixed-schema verified path, root types should also satisfy `is_v1_wire_admitted_v<T>`.
-- Existing live arena allocations retain their addresses through `grow()`, `shrink_to_fit()`, and save. Container expansion, insert/erase, assignment, and replacement may still move or destroy elements. Compaction creates a separate buffer; it does not grow the original storage in place.
-- There is no per-object delete. The buffer owns all contained objects.
-- Writes are not thread-safe. Synchronize externally.
-- `XHandle<T>` follows its C++ buffer object across storage replacement and swap; a moved-from object's handle becomes empty. Checked handles become empty when replaced by unverified data or another root type. The buffer object must outlive its handles.
-- Container objects themselves must live inside their buffer. Pass native strings/views to insertion APIs instead of constructing allocator-bound `XString` temporaries on the stack.
-- The maximum payload is `XBufferCore::MAX_PAYLOAD` (`0x7ffffff8`, below 2 GiB). Oversized container counts are rejected before narrowing or multiplying them.
-- In default Explicit mode, allocation can throw `XBadAlloc` when the current logical extent is exhausted. Automatic mode grows within the configured limit and still throws on hard-limit or OS failure.
-- For Explicit mode, catch `XBadAlloc`, call `grow()`, then retry the failed mutation. The root address stays valid, but a failed or successful container operation may change its internal capacity.
-- Library container mutations preserve their logical contents on allocation failure; capacity and allocator bookkeeping need not be identical. This does not make a sequence of user operations, ordinary record assignment, or external constructor side effects transactional.
-- Prefer `TypedXBuffer<T>::load(...)` or `XBuffer::load_verified<T>(...)`; use `load_unverified()` only for trusted raw payloads.
-- `save()` and `save_verified()` use normalized transport semantics: they preserve the admitted object graph and continued mutation, but they do not promise identical post-load spare capacity or allocator fragmentation state.
-- Save produces an owning byte copy. Load copies input into a new reservation and verifies it as appropriate. This is zero-decode transport, not universally zero-copy transfer.
-
-Example recovery pattern:
-
-```cpp
-try {
-    xbuf.root<GameData>().items.push_back(42);
-} catch (const XBadAlloc&) {
-    if (!xbuf.grow(64 * 1024)) throw;
-    auto& root = xbuf.root<GameData>();
-    root.items.push_back(42);
-}
-```
-
-## Build And Test
-
-Clone with submodules:
-
-```bash
-git clone --recursive https://github.com/ximicpp/XOffsetDatastructure.git
-cd XOffsetDatastructure
-```
-
-Quick path:
-
-```bash
-./build.sh
-```
-
-Useful options:
-
-- `./build.sh --debug`
-- `./build.sh -j 8`
-- `./build.sh --compiler /path/to/clang++`
-- `./build.sh --verbose`
-
-`build.sh` performs configure, build, `ctest`, exact target-matrix signature export, matrix inventory validation, and compatibility self-check.
-
-Manual CMake path:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=/path/to/clang++
-cmake --build build -j
-ctest --test-dir build --output-on-failure -C Release
-build/bin/Release/export_signatures tools/sigs
-build/bin/Release/check_signature_matrix tools/sigs
-build/bin/Release/check_compat
-```
-
-If your generator emits single-config binaries into `build/bin/`, use that path instead of `build/bin/Release/`.
-
-## Installed And Embedded Consumers
-
-Full-library targets require CMake 3.30+ and a matching experimental P2996
-Clang/libc++ toolchain. The independent storage target requires C++17 and CMake
-3.13+. Use `XOffset::xoffset` or `XOffset::storage`; source subprojects default
-their tests, tools and examples to OFF. The full installation bundles both
-public headers and pinned dependency headers with licenses. See the
-[package guide](docs/VM_PACKAGING.md) for install, relocation, component selection
-and external multi-file consumer validation.
-
-## Docker / CI Image
-
-CI uses the registry digest pinned in `toolchains/vm-validation.json`. You can run the same flow locally:
-
-```bash
-XOFFSET_IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
-python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
-docker run --rm --platform linux/amd64 \
-  -v "$PWD":/workspace \
-  -w /workspace \
-  -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-  "$XOFFSET_IMAGE" \
-  bash ./build.sh
-```
-
-The preparation command uses a fresh directory and verifies the official CMake
-archive against the pinned hash. The compiler image itself is unchanged.
-
-## Signature Tools
-
-- `tools/export_signatures.cpp` exports the exact repository target matrix into `tools/sigs/`
-- `tools/check_signature_matrix.cpp` enforces that `tools/sigs/` contains exactly the required target-set baselines
-- `tools/check_signature_regeneration.cmake` re-exports into a temp directory and fails on drift
-- `tools/check_compat.cpp` compares the committed baselines and fails if any exported type stops matching across the matrix
-
-The default `ctest` run includes inventory checking, baseline regeneration
-checking, and compatibility checking. `build.sh` and CI run the same flow as the
-full contract check.
-
-The exact target matrix is:
-
-- `x86_64_windows_clang`
-- `x86_64_linux_clang`
-- `arm64_ios_clang`
-- `arm64_android_clang`
-
-Each `.sig.hpp` file in `tools/sigs/` is a committed repository-managed matrix
-baseline. The current exporter rewrites the exact set from the explicit wire
-catalog plus target ABI metadata and removes stale files. Strong native
-per-target evidence still requires target-native export jobs.
-
-## Dependency Surface
-
-The vendored Boost checkout is still the full superproject, but the active build only exposes the current header subset needed by XOffsetDatastructure and TypeLayout. The runtime buffer backend no longer depends on Boost.Interprocess.
-
-## VM Storage Performance
-
-The [native macOS comparison](docs/VM_PERFORMANCE_COMPARISON_RESULTS.md) measures
-the fixed `07d6499` vector implementation against the initial VM storage, using
-the same P2996 compiler, dependencies and verified-wire checks. It includes all
-18 workloads, raw samples and frozen source snapshots. Growth and first-save
-costs improve; preallocated append is similar, while many small arenas and large
-verified loads regress on the measured host.
-
-The [reviewed improvement plan](docs/VM_STORAGE_IMPROVEMENT_PLAN.md) has now been
-implemented: global shutdown and const-handle repairs, direct load/save copying,
-an exact-base owner index, and bounded vector/string tail expansion. See the
-[follow-up results](docs/VM_STORAGE_IMPROVEMENTS_RESULTS.md) for individual and
-combined measurements, validation, and decisions on optional memory policies.
-The original comparison above remains historical evidence.
-
-Reproduce the comparison with the configured compiler and dependencies:
+For a full source build with an already prepared P2996 toolchain:
 
 ```sh
-python3 tools/run_vm_perf_compare.py --runs 7 --warmups 1
+cmake -S . -B build/alpha-full -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++
+cmake --build build/alpha-full --parallel 2
+ctest --test-dir build/alpha-full --output-on-failure -C Release
 ```
 
-## Repository Layout
+For storage only, use your platform compiler:
 
-- `xoffsetdatastructure.hpp`: public library header
-- `xoffset_virtual_memory.hpp`: independent OS storage layer
-- `tests/`: unit and behavior tests
-- `examples/`: demo programs
-- `tools/`: signature export, compatibility and performance tools
-- `tools/sigs/`: committed signature baselines
-- `external/typelayout/`: type-signature engine
-- `external/boost/`: vendored Boost dependency tree
+```sh
+cmake -S . -B build/alpha-storage -DXOFFSET_STORAGE_ONLY=ON
+cmake --build build/alpha-storage --config Release --parallel 2
+ctest --test-dir build/alpha-storage --output-on-failure -C Release
+```
+
+To install a full package, use a new build directory and your chosen prefix:
+
+```sh
+cmake -S . -B build/alpha-install \
+  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++ \
+  -DCMAKE_INSTALL_PREFIX=/path/to/xoffset-prefix \
+  -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF
+cmake --build build/alpha-install --config Release
+cmake --install build/alpha-install --config Release
+```
+
+An installed full-library consumer uses:
+
+```cmake
+cmake_minimum_required(VERSION 3.30)
+project(MyConsumer LANGUAGES CXX)
+find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.1.0-alpha.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.1.0-alpha.1")
+endif()
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE XOffset::xoffset)
+```
+
+Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
+same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
+`XOffset::storage`, and use CMake 3.13+. Alpha packages reject numeric, `EXACT`
+and range version requests; check the complete version string as above.
+
+For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
+and link the same target. Subprojects default tests, tools, examples and install
+rules to OFF. Set `XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory when
+only storage is needed.
+
+## Validation scope
+
+These are recorded profile-specific results, not a promise for every compiler
+on each OS. The 2026-10-16 continuation kept the accepted production headers
+unchanged. Release-archive validation is reported separately from this baseline.
+
+| Environment | Recorded result | Boundary |
+| --- | --- | --- |
+| Native Windows x64, MSVC 19.44 | storage 2/2; installed 3/3; subproject 3/3 | Windows full P2996, sanitizer and performance unverified |
+| WSL2 Ubuntu 22.04 x86_64, GCC 11.4 | storage 2/2; installed 3/3; subproject 3/3 | Same-architecture virtual machine |
+| WSL2, P2996 `9ffb96e...`, initial restored profile | full 48/48; 3 separate configure checks | `linux-current-20261016` profile |
+| WSL2, same compiler, final runtime/link profile | full installed 3/3 and subproject 3/3; network ASan/UBSan 34 groups / 182 subcases; 2 controlled defects detected | `linux-current-complete-v2-20261016`; this is not a rerun of all 48 full tests |
+| Historical native macOS arm64, pinned P2996 | full 48/48; full and storage installed 3/3 plus subproject 3/3 | Earlier recorded runs, not rerun on this Windows host |
+
+The full development checkout contains `docs/VM_WINDOWS_CURRENT_RESULTS.md`,
+`docs/VM_LINUX_CURRENT_RESULTS.md`, and `docs/VM_FINAL_DELIVERY.md` with evidence
+identities. These research records and their historical archives are omitted
+from the compact source distribution. The maintained full/storage entrypoints
+are described in [VM_VALIDATION_RUNNER.md](docs/VM_VALIDATION_RUNNER.md) and the
+[package guide](docs/VM_PACKAGING.md).
+
+WSL and Docker are acceptable environments for further Linux performance work;
+record their virtualization class and qualify measurement noise. The one current
+WSL F/F calibration ran 78 serial processes, but all four metrics failed the
+predeclared local-anchor and drift qualifications. It establishes no 2% comparison
+capability, speedup, equivalence or regression. No D/F comparison, ablation or
+optimization adoption follows from it. The development checkout records this in
+`docs/VM_N3_CURRENT_RESULTS.md`; the original evidence remains unchanged.
+
+The synchronous TCP loopback reference and separate lifecycle model do not
+establish production asynchronous transport support. The three N7 I/O extensions,
+production business integration and performance attribution are outside this
+alpha's commitments.
+
+## Storage and ownership rules
+
+- A strict per-buffer limit is `XBuffer::maximum_capacity(bytes)`. The default is
+  64 MiB, or the initial length if larger; the payload ceiling is `0x7ffffff8`.
+  `max_capacity(bytes)` is a legacy reservation hint, not a strict limit.
+- Growth defaults to `XGrowPolicy::Explicit`; exhaustion throws `XBadAlloc`.
+  `XGrowPolicy::Automatic` and `XBufferPool` are opt-in. Pool budgets bound idle
+  cached reservations, not live owners or total process memory.
+- `reserved_bytes()` counts page-rounded virtual address space;
+  `accessible_bytes()` counts enabled pages, not RSS. Logical shrink retains
+  enabled pages; `reclaim_tail_pages()` explicitly attempts page reclamation.
+- Arena/root addresses remain stable through growth and save. Container mutation
+  can move or destroy elements. Borrowed spans and handles do not own the buffer;
+  the C++ buffer object must outlive its handles. Synchronize writes externally.
+- Library container mutations preserve logical contents on allocation failure;
+  capacities and allocator bookkeeping need not roll back. User operation
+  sequences and external constructor effects are not transactions.
+- Bound wire size, per-buffer capacity and aggregate in-flight work before
+  accepting untrusted input. Verified validation is not cryptographic
+  authentication; see the [compatibility contract](docs/ALPHA_COMPATIBILITY.md).
+
+Both public headers are required for full consumers. Keep header versions,
+compile-time options and toolchain settings consistent across translation units.
+The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
+wire compatibility.
+
+
+候选扩展：[完整校验后的直接接收与可变访问](docs/VERIFIED_RECEIVE.md)。支持域、完成/取消合同及平台内存成本见说明；最终验收记录随本机证据另行提供。

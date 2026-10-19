@@ -272,14 +272,14 @@ void large_alignment_is_preserved() {
     auto& values = buffer.root<TailAlignedRoot>().values;
     values.reserve(1);
     values.emplace_back().value = 211;
-    auto* ptr = values.data();
-    assert(reinterpret_cast<std::uintptr_t>(ptr) % alignof(TailAlignedValue) == 0);
+    const auto ptr_address = reinterpret_cast<std::uintptr_t>(values.data());
+    assert(ptr_address % alignof(TailAlignedValue) == 0);
     values.reserve(3);
-    assert(values.data() == ptr && values[0].value == 211);
+    assert(reinterpret_cast<std::uintptr_t>(values.data()) == ptr_address && values[0].value == 211);
     values.emplace_back().value = 223;
-    assert(&values[1] == ptr + 1 && values[1].value == 223);
-    assert(allocation_header(ptr).alignment >= alignof(TailAlignedValue));
-    check_allocator_end(buffer, ptr);
+    assert(reinterpret_cast<std::uintptr_t>(&values[1]) == ptr_address + sizeof(TailAlignedValue) && values[1].value == 223);
+    assert(allocation_header(values.data()).alignment >= alignof(TailAlignedValue));
+    check_allocator_end(buffer, values.data());
 }
 
 void transport_and_graph_admission() {

@@ -9,7 +9,7 @@ The local Docker image ID is not used as a remotely pullable reference.
 Stage 2 adds the official CMake 4.2.3 archive as a separate pinned input; the
 compiler image remains unchanged. Its bundled CMake 3.28.3 cannot propagate
 `cxx_std_26`, which was added in CMake 3.30 ([CMake feature reference](https://cmake.org/cmake/help/latest/prop_gbl/CMAKE_CXX_KNOWN_FEATURES.html)).
-`build_tools.cmake` pins Linux x86_64/aarch64 archive hashes from the official
+The `build_tools.cmake` object in `vm-validation.json` pins Linux x86_64/aarch64 archive hashes from the official
 [4.2.3 release](https://github.com/Kitware/CMake/releases/tag/v4.2.3).
 Use `tools/prepare_vm_cmake.py --platform linux-x86_64 --out <fresh-directory>`
 before offline validation, then pass `<fresh-directory>/root` as `--cmake-root`.

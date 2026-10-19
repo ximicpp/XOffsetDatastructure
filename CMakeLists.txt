@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
-project(XOffsetDatastructure LANGUAGES CXX)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/XOffsetVersion.cmake")
+project(XOffsetDatastructure VERSION ${XOFFSET_VERSION_NUMERIC} LANGUAGES CXX)
 
 # A dependency should contribute interface targets, not its developer programs.
 set(XOFFSET_TOP_LEVEL OFF)
@@ -71,6 +72,9 @@ if(NOT XOFFSET_STORAGE_ONLY)
 else()
     message(STATUS "Configuring standalone C++17 OS storage layer")
 endif()
+
+include(cmake/XOffsetFourPathHeaders.cmake)
+include(cmake/XOffsetOptionalRuntimes.cmake)
 
 if(XOFFSET_BUILD_TESTS)
     add_subdirectory(tests)
