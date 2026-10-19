@@ -1,0 +1,15 @@
+# Numeric requests, including EXACT and ranges, cannot select an alpha identity.
+# Use an unversioned find_package(... CONFIG REQUIRED), then compare
+# XOffsetDatastructure_VERSION with the complete VERSION string using STREQUAL.
+# No cross-release API, ABI or wire compatibility is implied.
+set(PACKAGE_VERSION "@XOFFSET_VERSION_FULL@")
+set(PACKAGE_VERSION_EXACT FALSE)
+if(NOT "${PACKAGE_FIND_VERSION}" STREQUAL "" OR NOT "${PACKAGE_FIND_VERSION_RANGE}" STREQUAL "")
+    set(PACKAGE_VERSION_COMPATIBLE FALSE)
+    set(PACKAGE_VERSION_UNSUITABLE TRUE)
+else()
+    # CMake also reads this file for some unversioned lookups. Allow discovery
+    # only; the config exposes the full identifier for the caller's assertion.
+    set(PACKAGE_VERSION_COMPATIBLE TRUE)
+    set(PACKAGE_VERSION_UNSUITABLE FALSE)
+endif()

@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <exception>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -181,6 +182,28 @@ private:
     }
 
 public:
+    // Internal direct-receive owner. All explicit maximum bytes are made
+    // accessible before beginning one byte-array lifetime. This commits virtual
+    // backing/accounting up front, but does not initialize/touch the whole max.
+    // Later grow_to retains that array and zeroes only newly logical bytes.
+    static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
+                                            std::size_t maximum_capacity,
+                                            const VmStoragePool& pool = {}) {
+        if (logical_bytes > maximum_capacity)
+            throw std::invalid_argument("VM receive length exceeds maximum capacity");
+        VirtualMemoryStorage owner(0, maximum_capacity, pool);
+        if (!maximum_capacity) return owner;
+        if (!owner.enable_prefix(maximum_capacity) || consume_vm_failure(VmOperation::Prepare))
+            throw std::bad_alloc();
+        // Standard non-allocating placement array new, with no initializer:
+        // no cookie, value initialization, payload transfer or user constructor.
+        auto* bytes = ::new (static_cast<void*>(owner.base_)) std::byte[maximum_capacity];
+        if (static_cast<void*>(bytes) != static_cast<void*>(owner.base_)) std::terminate();
+        owner.canonical_byte_origin_ = bytes;
+        if (!owner.grow_to(logical_bytes)) throw std::bad_alloc();
+        return owner;
+    }
+
     // Internal fresh-owner load path. A complete copy initializes every logical
     // byte; normal growth (including reused pages after shrink) still zeroes.
     static VirtualMemoryStorage from_bytes(const char* bytes, std::size_t length,
@@ -223,6 +246,7 @@ public:
         return *this;
     }
 
+    std::byte* canonical_byte_origin() const noexcept { return canonical_byte_origin_; }
     char* data() noexcept { return base_; }
     const char* data() const noexcept { return base_; }
     std::size_t size() const noexcept { return logical_bytes_; }
@@ -317,6 +341,7 @@ private:
     void swap_storage(VirtualMemoryStorage& other) noexcept {
         using std::swap;
         swap(base_, other.base_);
+        swap(canonical_byte_origin_, other.canonical_byte_origin_);
         swap(reserved_bytes_, other.reserved_bytes_);
         swap(maximum_capacity_, other.maximum_capacity_);
         swap(accessible_bytes_, other.accessible_bytes_);
@@ -377,11 +402,13 @@ private:
 #endif
         }
         base_ = nullptr;
+        canonical_byte_origin_ = nullptr;
         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         page_size_ = reservation_granularity_ = 0;
     }
 
     char* base_{nullptr};
+    std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};

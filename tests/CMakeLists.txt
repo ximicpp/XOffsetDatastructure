@@ -44,6 +44,17 @@ endforeach()
 
 # Reflection tests (require P2996 Clang)
 set(REFLECTION_TESTS
+    test_assign_range
+    test_scalar_resize
+    test_validation_v8_single_word
+    test_validation_v6_dense_fusion
+    test_validation_v5
+    test_validation_v5_bounds
+    test_validation_v4
+    test_string_replace
+    test_wire_bitmap
+    test_resize_growth
+    test_validation_resource
     test_reflection_core
     test_reflection_advanced
     test_type_signatures
@@ -65,9 +76,15 @@ set(REFLECTION_TESTS
     test_runtime_regressions
     test_mutation_failures
     test_wire_validation
+    test_wire_range_index
+    test_wire_range_failures
+    test_same_arena_move
+    test_freelist_index
+    test_range_hint
     test_stable_storage
     test_vm_lifecycle
     test_vm_transport
+    test_owner_identity
     test_owner_registry
     test_tail_expansion
     test_storage_policies
@@ -78,6 +95,9 @@ set(REFLECTION_TESTS
 foreach(test_name ${REFLECTION_TESTS})
     add_xoffset_test(${test_name} reflection)
 endforeach()
+
+find_package(Threads REQUIRED)
+target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
 
 # Observe process exit after main() returns: these exercise global/static
 # destructor order, which an ordinary in-process assertion cannot cover.
@@ -106,6 +126,8 @@ foreach(failure_mode ${REGISTRY_FAILURE_MODES})
     set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
 endforeach()
 
+# Explicit new common programs; no source glob or handwritten total.
+include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
 # These are mandatory configure-time checks, not runtime test programs.
 xoffset_check_polymorphic_rejection()
 xoffset_write_test_inventory()

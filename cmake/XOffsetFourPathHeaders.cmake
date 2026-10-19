@@ -1,0 +1,13 @@
+set(XOFFSET_FULL_OWN_HEADERS
+    xoffsetdatastructure.hpp
+    receive_future.hpp
+    receive_raw.hpp
+    receive_raw_fwd.hpp
+    validation_scratch.hpp
+    xoffset_core_lifetime.hpp
+    xoffset_snapshot_index.hpp
+    xoffset_snapshot_index_budget.hpp
+    xoffset_validation_scratch.hpp
+    xoffset_verified_paths.hpp
+    xoffset_verified_receive.hpp
+)

@@ -1,0 +1,16 @@
+{
+  "status": "passed_staged_git_blob_identity",
+  "checked_utc": "2026-10-19T12:35:27.512497+00:00",
+  "C14_non_external_members": 154,
+  "C14_production_files": 14,
+  "verified_git_blobs": 158,
+  "capsule_sha256": "313e41f3890042c44cf93a14ddfb6b833d7112d35b23b07c8c5030e5ae149deb",
+  "gitlinks_unchanged": {
+    "external/boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
+    "external/typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"
+  },
+  "fresh_and_existing_restore_integrity_checks": "passed on this Windows checkout",
+  "new_Cpp_platform_tests": 0,
+  "new_performance_samples": 0,
+  "old_machine_development_remains_paused": true
+}

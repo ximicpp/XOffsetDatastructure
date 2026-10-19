@@ -25,6 +25,40 @@ DEPENDENCY_ROOTS = ["external/typelayout/include"] + [
      "container_hash", "type_traits", "winapi", "intrusive", "predef")]
 DEPENDENCY_LICENSES = ["external/boost/LICENSE_1_0.txt", "external/typelayout/LICENSE",
                        "external/typelayout/LICENSE_1_0.txt"]
+RELEASE_FILES = ("VERSION", "CHANGELOG.md", "docs/ALPHA_COMPATIBILITY.md")
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc)\.(0|[1-9][0-9]*)")
+
+
+def read_version(source: Path) -> dict[str, str]:
+    full = (source / "VERSION").read_text(encoding="utf-8").strip()
+    match = VERSION_PATTERN.fullmatch(full)
+    if not match:
+        raise ValueError("VERSION must contain one prerelease identifier without leading zeros")
+    return {"full": full, "numeric": ".".join(match.group(1, 2, 3)),
+            "prerelease": ".".join(match.group(4, 5))}
+
+
+def version_config_assertions(version: dict[str, str]) -> dict[str, str]:
+    return {"XOffsetDatastructure_VERSION": '"' + version["full"] + '"',
+            "XOffsetDatastructure_VERSION_NUMERIC": '"' + version["numeric"] + '"',
+            "XOffsetDatastructure_VERSION_PRERELEASE": '"' + version["prerelease"] + '"',
+            "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
+            "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"'}
+
+
+def version_probe_source(version: dict[str, str]) -> str:
+    """Configure-only checks; numeric requests fail before dependency loading."""
+    checks = "\n".join('if(NOT "${' + name + '}" STREQUAL ' + value + ')\n'
+                       '  message(FATAL_ERROR "XOffset version metadata mismatch: ' + name + '")\nendif()'
+                       for name, value in version_config_assertions(version).items())
+    return ("cmake_minimum_required(VERSION 3.13)\n"
+            "if(XOFFSET_VERSION_REQUEST)\n"
+            "  project(XOffsetVersionRequest LANGUAGES NONE)\n"
+            "else()\n"
+            "  project(XOffsetVersionQuery LANGUAGES CXX)\n"
+            "endif()\n"
+            "find_package(XOffsetDatastructure ${XOFFSET_VERSION_REQUEST} CONFIG REQUIRED COMPONENTS ${XOFFSET_COMPONENT})\n"
+            + checks + '\nmessage(STATUS "XOFFSET_FULL_VERSION=' + version["full"] + '")\n')
 
 
 def digest(path: Path) -> str:
@@ -36,12 +70,26 @@ def manifest(root: Path) -> dict[str, str]:
             for p in sorted(root.rglob("*")) if p.is_file()}
 
 
+FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp')
+
+
 def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path]) -> dict:
     """Check the exact distributed header/license surface and exported interfaces."""
+    version = read_version(source)
     expected = {"include/xoffset_virtual_memory.hpp": digest(source / "xoffset_virtual_memory.hpp"),
                 "share/XOffsetDatastructure/licenses/LICENSE": digest(source / "LICENSE")}
+    for path in RELEASE_FILES:
+        expected["share/XOffsetDatastructure/" + Path(path).name] = digest(source / path)
+    config_dir = "lib/cmake/XOffsetDatastructure/"
+    config = prefix / config_dir / "XOffsetDatastructureConfig.cmake"
+    configured = source.parent / "producer-build/XOffsetDatastructureConfig.cmake"
+    expected[config_dir + configured.name] = digest(configured)
+    template = source / "cmake/XOffsetDatastructureConfigVersion.cmake.in"
+    version_text = template.read_text(encoding="utf-8").replace("@XOFFSET_VERSION_FULL@", version["full"])
+    expected[config_dir + "XOffsetDatastructureConfigVersion.cmake"] = hashlib.sha256(version_text.encode("utf-8")).hexdigest()
     if suite == "full":
-        expected["include/xoffsetdatastructure.hpp"] = digest(source / "xoffsetdatastructure.hpp")
+        for own_header in FULL_OWN_HEADERS:
+            expected["include/" + own_header] = digest(source / own_header)
         for tree in DEPENDENCY_ROOTS:
             for path, checksum in manifest(source / tree).items():
                 key = "include/xoffset-deps/" + path
@@ -55,8 +103,7 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
     for path, checksum in expected.items():
         if actual.get(path) != checksum:
             raise ValueError("Missing or changed installed file: " + path)
-    allowed_extras = {"lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake",
-                      "lib/cmake/XOffsetDatastructure/XOffsetTargets.cmake"}
+    allowed_extras = {"lib/cmake/XOffsetDatastructure/XOffsetTargets.cmake"}
     if suite == "full":
         allowed_extras.add("share/XOffsetDatastructure/xoffset-third-party-manifest.txt")
         metadata = prefix / "share/XOffsetDatastructure/xoffset-third-party-manifest.txt"
@@ -64,8 +111,13 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
             raise ValueError("Dependency manifest does not match configured inputs")
     if set(actual) != set(expected) | allowed_extras:
         raise ValueError("Unexpected or missing package files: " + str(sorted(set(actual) ^ (set(expected) | allowed_extras))))
+    text = config.read_text(encoding="utf-8")
+    for name, value in version_config_assertions(version).items():
+        declarations = re.findall(r"^set\(" + re.escape(name) + r"\s+([^\n]+)\)$", text, re.MULTILINE)
+        if declarations != [value]:
+            raise ValueError("Package version metadata differs from VERSION: " + name)
     for config in (prefix / "lib/cmake/XOffsetDatastructure").glob("*.cmake"):
-        text = config.read_text()
+        text = config.read_text(encoding="utf-8")
         for path in forbidden:
             if str(path) in text or path.as_posix() in text:
                 raise ValueError("Export leaks a build/source/toolchain path: " + str(path))
@@ -75,7 +127,7 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
             for item in payload.split(";"):
                 if item.startswith("/") or re.match(r"^[A-Za-z]:[/\\]", item):
                     raise ValueError("Absolute exported interface: " + item)
-    return {"files": actual, "file_count": len(actual), "dependency_header_count":
+    return {"version": version, "files": actual, "file_count": len(actual), "dependency_header_count":
             sum(path.startswith("include/xoffset-deps/") for path in actual)}
 
 
@@ -168,6 +220,12 @@ def main(argv=None):
             if (source / directory).is_dir():
                 shutil.copytree(source / directory, snapshot / directory,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        # Only the required release document belongs in this source closure;
+        # historical research/measurement archives are not package inputs.
+        release_doc = snapshot / "docs/ALPHA_COMPATIBILITY.md"
+        release_doc.parent.mkdir(exist_ok=True)
+        shutil.copy2(source / "docs/ALPHA_COMPATIBILITY.md", release_doc)
+        record["version"] = read_version(snapshot)
         if args.suite == "full":
             for directory in DEPENDENCY_ROOTS:
                 shutil.copytree(source / directory, snapshot / directory)
@@ -209,6 +267,22 @@ def main(argv=None):
         run("consumer-test", ["ctest", "--test-dir", str(external), "-C", "Release", "--output-on-failure",
                               "--output-junit", str(out / "consumer-tests.xml")])
         record["installed_consumer_tests"] = check_ctest_xml(out / "consumer-tests.xml")
+        version_source = out / "version-consumer-source"
+        version_source.mkdir()
+        (version_source / "CMakeLists.txt").write_text(version_probe_source(record["version"]), encoding="utf-8")
+        version_flags = ["-DXOFFSET_COMPONENT=" + args.suite,
+                         "-DXOffsetDatastructure_DIR=" + str(relocated / "lib/cmake/XOffsetDatastructure"),
+                         "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF", "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"]
+        configure("version-unversioned-accepted", version_source, out / "version-unversioned-build", version_flags)
+        numeric = record["version"]["numeric"]
+        record["version_request_rejections"] = []
+        for name, request in (("same-numeric", numeric), ("different-numeric", "999.0.0"),
+                              ("exact-numeric", numeric + ";EXACT"), ("range", numeric + "...<999.0.0")):
+            output = configure("version-" + name + "-rejected", version_source, out / ("version-" + name + "-build"),
+                               version_flags + ["-DXOFFSET_VERSION_REQUEST=" + request], expected_failure=True)
+            if "not accepted" not in output or record["version"]["full"] not in output:
+                raise ValueError("Numeric version rejection had an unrelated cause: " + name)
+            record["version_request_rejections"].append(request)
         if args.suite == "storage":
             output = configure("missing-full-rejected", consumer, out / "missing-full-build", [
                 "-DXOFFSET_CONSUMER_COMPONENT=full",

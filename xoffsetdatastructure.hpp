@@ -18,6 +18,7 @@
 #include <experimental/meta>
 #include <cstddef>
 #include <concepts>
+#include <functional>
 #include <cstdint>
 #include <span>
 #include <type_traits>
@@ -30,11 +31,14 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <memory_resource>
 #include <new>
 #include <stdexcept>
 #include <exception>
 #include <optional>
 #include <mutex>
+#include <atomic>
+#include <map>
 #include <unordered_map>
 #include "xoffset_virtual_memory.hpp"
 
@@ -65,11 +69,41 @@ namespace XOffsetDatastructure {
     };
 
     namespace detail {
+        template<class T> T* begin_dynamic_array(void*, std::size_t) noexcept;
+        template<class T> T* rebuild_dynamic_array(void*, std::size_t, std::uint32_t) noexcept;
+        template<class T> T* begin_fresh_ordinary_outer(void*) noexcept;
+        template<class T> T* begin_relocated_ordinary_outer(T*, const T&) noexcept;
+        template<class T> consteval bool future_custom_lifetime_supported();
+        template<class T, class Alloc> void future_default_construct(void*, const Alloc&);
+        template<class T, class Src, class Alloc> void future_transfer_construct(void*, Src&&, const Alloc&);
+        template<class T> void future_relocate_construct(T*, T&) noexcept;
+        struct VerifiedPathsAccess;
+        struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
         // One-shot thread-local injection leaves existing owners untouched.
         inline thread_local bool pending_registry_failure = false;
         inline void fail_next_registry_registration() noexcept { pending_registry_failure = true; }
         inline void clear_registry_failures() noexcept { pending_registry_failure = false; }
+
+        // Logical host-identity diagnostics; disabled in ordinary production.
+        struct OwnerLookupStats {
+            std::uint64_t entries = 0, cache_hits = 0, cold_lookups = 0;
+            std::uint64_t dead_records = 0, registrations = 0, owner_updates = 0;
+            std::uint64_t slow_revalidations = 0, reclamation_reserves = 0;
+            std::uint64_t reclamation_restarts = 0, reclamation_abandoned = 0;
+            std::uint64_t record_object_bytes = 0;
+        };
+#if defined(XOFFSET_OWNER_LOOKUP_DIAGNOSTICS) && XOFFSET_OWNER_LOOKUP_DIAGNOSTICS
+        inline thread_local OwnerLookupStats owner_lookup_stats;
+        inline void reset_owner_lookup_stats() noexcept { owner_lookup_stats = {}; }
+        inline void owner_lookup_count(std::uint64_t OwnerLookupStats::* field,
+                                       std::uint64_t count = 1) noexcept {
+            owner_lookup_stats.*field += count;
+        }
+#else
+        inline void owner_lookup_count(std::uint64_t OwnerLookupStats::*,
+                                       std::uint64_t = 1) noexcept {}
+#endif
     }
 
     template <typename T, typename Arena>
@@ -95,9 +129,10 @@ namespace XOffsetDatastructure {
                 throw XException("allocator has no arena");
             }
             if (n > 0x7ffffff8u / sizeof(T)) throw XBadAlloc();
-            return static_cast<T*>(
+            if (n == 0) return nullptr;
+            return detail::begin_dynamic_array<T>(
                 arena_->allocate_aligned(
-                    static_cast<std::uint32_t>(n * sizeof(T)), alignof(T)));
+                    static_cast<std::uint32_t>(n * sizeof(T)), alignof(T)), n);
         }
 
         void deallocate(T* ptr, std::size_t) noexcept {
@@ -140,6 +175,103 @@ namespace XOffsetDatastructure {
     enum class XGrowPolicy { Explicit, Automatic };
     using XBufferPool = detail::VmStoragePool;
 
+
+    namespace detail {
+        // Host-only diagnostics and cache: none of these fields are persisted.
+        struct FreelistIndexStats {
+            std::uint64_t lookup_calls = 0;
+            std::uint64_t node_visits = 0;
+            std::uint64_t skip_jumps = 0;
+            std::uint64_t cache_resets = 0;
+            std::uint64_t query_resets = 0;
+            std::uint64_t maintenance_calls = 0;
+            std::uint64_t maintenance_comparisons = 0;
+            std::uint64_t retire_updates = 0;
+            std::uint64_t runtime_owner_acquisitions = 0;
+        };
+#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
+        inline thread_local FreelistIndexStats freelist_index_stats;
+#endif
+        inline void reset_freelist_index_stats() noexcept {
+#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
+            freelist_index_stats = {};
+#endif
+        }
+        inline FreelistIndexStats snapshot_freelist_index_stats() noexcept {
+#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
+            return freelist_index_stats;
+#else
+            return {};
+#endif
+        }
+        inline void write_freelist_index_stats(std::ostream& out) {
+            const auto value = snapshot_freelist_index_stats();
+            out << "{\"lookup_calls\":\"" << value.lookup_calls
+                << "\",\"node_visits\":\"" << value.node_visits
+                << "\",\"skip_jumps\":\"" << value.skip_jumps
+                << "\",\"cache_resets\":\"" << value.cache_resets
+                << "\",\"query_resets\":\"" << value.query_resets
+                << "\",\"maintenance_calls\":\"" << value.maintenance_calls
+                << "\",\"maintenance_comparisons\":\"" << value.maintenance_comparisons
+                << "\",\"retire_updates\":\"" << value.retire_updates
+                << "\",\"runtime_owner_acquisitions\":\"" << value.runtime_owner_acquisitions << "\"}";
+        }
+        inline void freelist_index_count(std::uint64_t FreelistIndexStats::* member,
+                                         std::uint64_t amount = 1) noexcept {
+#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
+            freelist_index_stats.*member += amount;
+#else
+            (void)member;
+            (void)amount;
+#endif
+        }
+        template <typename A, typename B>
+        inline bool freelist_index_equal(A a, B b) noexcept {
+            freelist_index_count(&FreelistIndexStats::maintenance_comparisons);
+            return a == b;
+        }
+
+        struct FreelistSearchCursor {
+            std::uint32_t bytes = 0;
+            std::uint32_t head = 0;
+            std::uint32_t first = 0;
+            std::uint32_t last = 0;
+            std::size_t alignment = 0;
+        };
+
+        struct FreelistRuntimeCache {
+            const void* state = nullptr; // identity only, never dereferenced
+            std::uint32_t epoch = 0;
+            FreelistSearchCursor cursors[16] = {};
+
+            void reset() noexcept {
+                freelist_index_count(&FreelistIndexStats::cache_resets);
+                // Count the fixed loop's 16 iterations plus its exit test.
+                freelist_index_count(&FreelistIndexStats::maintenance_comparisons, 17);
+                state = nullptr;
+                epoch = 0;
+                for (auto& cursor : cursors) cursor = {};
+            }
+            void synchronize(const void* identity, std::uint32_t current_epoch) noexcept {
+                freelist_index_count(&FreelistIndexStats::maintenance_calls);
+                if (!freelist_index_equal(state, identity) ||
+                    !freelist_index_equal(epoch, current_epoch)) {
+                    reset();
+                    state = identity;
+                    epoch = current_epoch;
+                }
+            }
+        };
+    }
+
+    namespace fixed_detail {
+        struct StableEraseOwnerWitness;
+        struct allocator_ref;
+        inline void* allocate_dynamic_bytes(const allocator_ref&, std::uint32_t, std::size_t);
+        inline void retire_dynamic_bytes(const allocator_ref&, void*, std::uint32_t) noexcept;
+        inline void release_cached_blocks(XAllocatorStateV1*) noexcept;
+    }
+
     class XBufferCore {
     public:
         using size_type = std::size_t;
@@ -172,6 +304,15 @@ namespace XOffsetDatastructure {
                 owner().deallocate_impl(ptr);
             }
 
+            // Host cache access does not add fields to the V1 header.
+            XBufferCore& freelist_runtime_owner() {
+                detail::freelist_index_count(&detail::FreelistIndexStats::runtime_owner_acquisitions);
+                return owner();
+            }
+            void reset_freelist_runtime_cache() noexcept {
+                freelist_runtime_owner().freelist_runtime_cache_.reset();
+            }
+
         private:
             XBufferCore& owner() {
                 return XBufferCore::owner_from_payload_ptr(this);
@@ -179,7 +320,7 @@ namespace XOffsetDatastructure {
         };
 
         XBufferCore() = default;
-        ~XBufferCore() { unregister_registry(); }
+        ~XBufferCore() { freelist_runtime_cache_.reset(); unregister_registry(); }
 
         XBufferCore(const XBufferCore&) = delete;
         XBufferCore& operator=(const XBufferCore&) = delete;
@@ -224,6 +365,84 @@ namespace XOffsetDatastructure {
         };
         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
+        // Host-only canonical address recovery. The exact numeric comparator
+        // uses the declared flat-address ABI for search; dereference pointers
+        // still come only from the retained real placement byte[MAX] array.
+        static std::byte* canonical_bytes_at(const void* anchor,
+                std::uintptr_t target, std::size_t bytes) noexcept {
+            if (canonical_active_count_.load(std::memory_order_acquire) == 0) return nullptr;
+            const auto address = reinterpret_cast<std::uintptr_t>(anchor);
+            auto live = [](const OwnerRecordPtr& r) noexcept {
+                return r && r->owner.load(std::memory_order_acquire);
+            };
+            auto contains_anchor = [&](const OwnerRecordPtr& r) noexcept {
+                if (!live(r)) return false;
+                const auto base = reinterpret_cast<std::uintptr_t>(r->payload);
+                return address >= base && address - base < r->canonical_extent;
+            };
+            auto fits_target = [&](const OwnerRecordPtr& r) noexcept {
+                if (!live(r)) return false;
+                const auto base = reinterpret_cast<std::uintptr_t>(r->payload);
+                return target >= base && target - base <= r->canonical_extent &&
+                    bytes <= r->canonical_extent - (target - base);
+            };
+            auto recover = [&](const OwnerRecordPtr& r) noexcept -> std::byte* {
+                if (!fits_target(r)) std::terminate();
+                if (!r->canonical_origin) return nullptr; // disclosed legacy target domain
+                const auto offset = target - reinterpret_cast<std::uintptr_t>(r->payload);
+                return r->canonical_origin + offset;
+            };
+            OwnerCache* cache = owner_cache_available() ? &owner_cache() : nullptr;
+            if (cache) {
+                // Prefer a containing anchor for a zero-length one-past query;
+                // an adjacent reservation must not replace that array's origin.
+                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
+                    const auto slot = (cache->last + attempt) % 4u;
+                    auto& r = cache->records[slot];
+                    if (contains_anchor(r) && fits_target(r)) {
+                        cache->last = slot; return recover(r);
+                    }
+                }
+                // Independently stored heads may bind another C owner or an
+                // ordinary owner. Address recovery does not impose root ownership.
+                // A zero-length target can equal the next reservation's base.
+                // If its anchor was not cached, resolve that anchor cold before
+                // allowing a target-only hit to select a different array origin.
+                if (bytes != 0) {
+                    for (std::size_t attempt = 0; attempt != 4; ++attempt) {
+                        const auto slot = (cache->last + attempt) % 4u;
+                        auto& r = cache->records[slot];
+                        if (fits_target(r)) { cache->last = slot; return recover(r); }
+                    }
+                }
+            }
+            OwnerRecordPtr record;
+            {
+                auto& state = registry_state();
+                std::lock_guard lock(state.mutex);
+                auto source = state.owners.upper_bound(address);
+                if (source != state.owners.begin()) {
+                    --source;
+                    if (contains_anchor(source->second) && fits_target(source->second)) record = source->second;
+                }
+                if (!record) {
+                    auto candidate = state.owners.upper_bound(target);
+                    if (candidate != state.owners.begin()) {
+                        --candidate;
+                        if (fits_target(candidate->second)) record = candidate->second;
+                    }
+                }
+            }
+            if (!record) return nullptr;
+            // Canonical recovery is called inside raw-owner/cache-reference
+            // critical sections. Never install a cold result in TLS here:
+            // releasing an evicted terminal record can invoke replaceable
+            // delete and move/destroy the caller's saved Core object.
+            // The live registry/owner retain this local record. Without an
+            // eviction there is no internal last-owner release or callback.
+            return recover(record);
+        }
+
         XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
         void set_growth_policy(XGrowPolicy policy) noexcept { growth_policy_ = policy; }
         detail::VmReclaimResult reclaim_tail_pages() noexcept { return buffer_.reclaim_tail(); }
@@ -305,10 +524,11 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
-            auto& state = registry_state();
-            std::lock_guard lock(state.mutex);
             buffer_.swap(other.buffer_);
+            owner_record_.swap(other.owner_record_);
             free_blocks_.swap(other.free_blocks_);
+            freelist_runtime_cache_.reset();
+            other.freelist_runtime_cache_.reset();
             std::swap(growth_policy_, other.growth_policy_);
             std::swap(root_type_identity_, other.root_type_identity_);
             std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
@@ -317,8 +537,8 @@ namespace XOffsetDatastructure {
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
             ++m_epoch;
             ++other.m_epoch;
-            update_registry_owner_locked(state);
-            other.update_registry_owner_locked(state);
+            update_registry_owner();
+            other.update_registry_owner();
         }
 
         friend void swap(XBufferCore& a, XBufferCore& b) noexcept { a.swap(b); }
@@ -415,10 +635,67 @@ namespace XOffsetDatastructure {
             }
         };
 
+        // Host-only identity. A record follows one payload reservation, never a
+        // particular Core object's address, and is never revived after release.
+        inline static std::atomic<std::size_t> canonical_active_count_{0};
+        struct OwnerRecord {
+            const void* const payload;
+            std::atomic<XBufferCore*> owner;
+            std::byte* const canonical_origin;
+            const std::size_t canonical_extent;
+            std::atomic<bool> canonical_registered{false};
+            OwnerRecord(const void* base, XBufferCore* value,
+                    std::byte* origin = nullptr, std::size_t extent = 0) noexcept
+                : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
+        };
+        // Both functions run under the existing registry mutex. No callbacks,
+        // allocations or throws may separate the flag and ledger update.
+        static void mark_canonical_registration(OwnerRecord& record) noexcept {
+            if (record.canonical_origin && !record.canonical_registered.exchange(true, std::memory_order_relaxed))
+                canonical_active_count_.fetch_add(1, std::memory_order_release);
+        }
+        static void retire_canonical_registration(OwnerRecord& record) noexcept {
+            if (record.canonical_registered.exchange(false, std::memory_order_relaxed))
+                canonical_active_count_.fetch_sub(1, std::memory_order_acq_rel);
+        }
+        using OwnerRecordPtr = std::shared_ptr<OwnerRecord>;
+        struct NumericPayloadLess {
+            using is_transparent = void;
+            bool operator()(const void* a, const void* b) const noexcept {
+                return reinterpret_cast<std::uintptr_t>(a) < reinterpret_cast<std::uintptr_t>(b);
+            }
+            bool operator()(const void* a, std::uintptr_t b) const noexcept {
+                return reinterpret_cast<std::uintptr_t>(a) < b;
+            }
+            bool operator()(std::uintptr_t a, const void* b) const noexcept {
+                return a < reinterpret_cast<std::uintptr_t>(b);
+            }
+        };
+        using RegistryOwners = std::map<const void*, OwnerRecordPtr, NumericPayloadLess>;
+
         struct RegistryState {
             std::mutex mutex;
-            std::unordered_map<const void*, XBufferCore*, AddressHash> owners;
+            RegistryOwners owners;
         };
+
+        // This trivial TLS flag outlives the nontrivial cache. Late thread/global
+        // destructors use the cold registry rather than a destroyed TLS object.
+        static bool& owner_cache_available() noexcept {
+            static thread_local bool available = true;
+            return available;
+        }
+
+        struct OwnerCache {
+            OwnerRecordPtr records[4];
+            std::size_t next = 0;
+            std::size_t last = 0;
+            ~OwnerCache() { owner_cache_available() = false; }
+        };
+
+        static OwnerCache& owner_cache() noexcept {
+            static thread_local OwnerCache cache;
+            return cache;
+        }
 
         static RegistryState& registry_state() {
             // Globals may first register in main and unregister after ordinary
@@ -440,11 +717,53 @@ namespace XOffsetDatastructure {
         }
 
         static XBufferCore& owner_from_payload_ptr(const void* ptr) {
-            auto& state = registry_state();
-            std::lock_guard lock(state.mutex);
-            // The sole caller is arena_header::owner(): ptr is exactly the base.
-            const auto found = state.owners.find(ptr);
-            if (found != state.owners.end()) return *found->second;
+            detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
+            OwnerCache* cache = nullptr;
+            if (owner_cache_available()) {
+                cache = &owner_cache();
+                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
+                    const auto slot = (cache->last + attempt) % 4u;
+                    auto& record = cache->records[slot];
+                    if (record && record->payload == ptr) {
+                        if (auto* owner = record->owner.load(std::memory_order_acquire)) {
+                            detail::owner_lookup_count(&detail::OwnerLookupStats::cache_hits);
+                            cache->last = slot;
+                            return *owner;
+                        }
+                        detail::owner_lookup_count(&detail::OwnerLookupStats::dead_records);
+                        record.reset();
+                    }
+                }
+            }
+            detail::owner_lookup_count(&detail::OwnerLookupStats::cold_lookups);
+            OwnerRecordPtr record;
+            {
+                auto& state = registry_state();
+                std::lock_guard lock(state.mutex);
+                const auto found = state.owners.find(ptr);
+                if (found != state.owners.end()) record = found->second;
+            }
+            // Error construction and all shared-owner releases happen unlocked.
+            if (!record) throw XException("arena owner lookup failed");
+            if (cache) {
+                const auto slot = cache->next;
+                // Keep the local lease across release of an evicted record.
+                cache->records[slot] = record;
+                cache->last = slot;
+                cache->next = (slot + 1u) % 4u;
+            }
+            auto* owner = record->owner.load(std::memory_order_acquire);
+            if (!owner) throw XException("arena owner lookup failed");
+            return *owner;
+        }
+
+        static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
+            return record ? record->owner.load(std::memory_order_acquire) : nullptr;
+        }
+
+        static XBufferCore& require_record_owner(const OwnerRecordPtr& record) {
+            detail::owner_lookup_count(&detail::OwnerLookupStats::slow_revalidations);
+            if (auto* owner = record_owner(record)) return *owner;
             throw XException("arena owner lookup failed");
         }
 
@@ -457,6 +776,7 @@ namespace XOffsetDatastructure {
             size = std::max(size, min_payload_size());
             if (size > max_reserved) throw XBadAlloc();
             try {
+                freelist_runtime_cache_.reset();
                 buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
@@ -482,6 +802,7 @@ namespace XOffsetDatastructure {
             }
             if (size > max_reserved) throw XBadAlloc();
             try {
+                freelist_runtime_cache_.reset();
                 buffer_ = detail::VirtualMemoryStorage::from_bytes(data, size, max_reserved, pool);
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
@@ -503,52 +824,71 @@ namespace XOffsetDatastructure {
         }
 
         void move_from(XBufferCore&& other) noexcept {
-            auto& state = registry_state();
-            std::lock_guard lock(state.mutex);
-            unregister_registry_locked(state);
-            buffer_ = std::move(other.buffer_);
-            free_blocks_ = std::move(other.free_blocks_);
-            growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
-            root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
-            typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
-            schema_bound_ = std::exchange(other.schema_bound_, false);
-            bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
-            bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
-            ++m_epoch;
-            ++other.m_epoch;
-            // The source key already exists. Transfer its value in place,
-            // without allocating a new node or triggering a rehash.
-            update_registry_owner_locked(state);
+            const auto target_epoch = m_epoch;
+            const auto source_epoch = other.m_epoch;
+            XBufferCore retired;
+            // Both swaps exchange every storage/schema/free-list member and
+            // publish matching record owners without releasing a host object.
+            // In particular, no old VM pool or vector can call replaceable
+            // operator delete halfway through the incoming owner's transfer.
+            retired.swap(*this);
+            swap(other);
+            // Preserve the existing one-invalidation-per-Core epoch contract.
+            m_epoch = target_epoch + 1u;
+            other.m_epoch = source_epoch + 1u;
+            // Only now destroy retired target resources. Any delete reentry
+            // sees the fully published incoming payload, schema and free cache.
         }
 
-        void update_registry_owner_locked(RegistryState& state) noexcept {
-            if (!buffer_.data()) return;
-            const auto found = state.owners.find(buffer_.data());
-            if (found == state.owners.end()) std::terminate(); // broken internal ownership
-            found->second = this;
+        void update_registry_owner() noexcept {
+            if (!owner_record_) return;
+            owner_record_->owner.store(this, std::memory_order_release);
+            detail::owner_lookup_count(&detail::OwnerLookupStats::owner_updates);
         }
 
         void unregister_registry() noexcept {
-            if (!buffer_.data()) return;
-            auto& state = registry_state();
-            std::lock_guard lock(state.mutex);
-            unregister_registry_locked(state);
-        }
-
-        void unregister_registry_locked(RegistryState& state) noexcept {
-            if (buffer_.data()) state.owners.erase(buffer_.data());
+            auto record = std::move(owner_record_);
+            if (!record) return;
+            record->owner.store(nullptr, std::memory_order_release);
+            RegistryOwners::node_type retired_node;
+            {
+                auto& state = registry_state();
+                std::lock_guard lock(state.mutex);
+                retire_canonical_registration(*record);
+                const auto found = state.owners.find(record->payload);
+                if (found != state.owners.end() && found->second == record)
+                    retired_node = state.owners.extract(found);
+            }
+            // A cache may retain the inert record, never its released mapping.
+            // The node/control block destructor and operator delete are unlocked.
         }
 
         void register_registry() {
             if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
-            auto& state = registry_state();
-            std::lock_guard lock(state.mutex);
             try {
-                const auto result = state.owners.emplace(buffer_.data(), this);
-                if (!result.second) throw XException("duplicate arena owner registration");
+                // Both allocations, including any new_handler reentry, precede
+                // the mutex. std::map inserts this same-allocator node without
+                // allocation, comparison callbacks, rehash or record creation.
+                auto record = std::make_shared<OwnerRecord>(buffer_.data(), this,
+                    buffer_.canonical_byte_origin(), buffer_.maximum_capacity());
+                RegistryOwners prepared;
+                prepared.emplace(record->payload, record);
+                auto node = prepared.extract(prepared.begin());
+                bool inserted = false;
+                {
+                    auto& state = registry_state();
+                    std::lock_guard lock(state.mutex);
+                    if (state.owners.find(record->payload) == state.owners.end()) {
+                        state.owners.insert(std::move(node));
+                        owner_record_ = record;
+                        mark_canonical_registration(*record);
+                        inserted = true;
+                    }
+                }
+                if (!inserted) throw XException("duplicate arena owner registration");
+                detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
+                detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
             } catch (const std::bad_alloc&) {
-                // With nonthrowing hash/equality, failed insertion preserves all
-                // existing entries. The constructor releases its new VM owner.
                 throw XBadAlloc();
             }
         }
@@ -589,13 +929,24 @@ namespace XOffsetDatastructure {
             return arena()->allocator_offset;
         }
 
+        char* payload_byte_address(size_type offset) noexcept {
+            if (auto* bytes = buffer_.canonical_byte_origin())
+                return reinterpret_cast<char*>(bytes + offset);
+            return buffer_.data() + offset;
+        }
+        const char* payload_byte_address(size_type offset) const noexcept {
+            if (auto* bytes = buffer_.canonical_byte_origin())
+                return reinterpret_cast<const char*>(bytes + offset);
+            return buffer_.data() + offset;
+        }
+
         template <typename T>
         T* object_at_offset(std::uint64_t offset) noexcept {
             if (offset == 0 || offset > buffer_.size() ||
                 sizeof(T) > buffer_.size() - offset) {
                 return nullptr;
             }
-            auto* raw = buffer_.data() + static_cast<size_type>(offset);
+            auto* raw = payload_byte_address(static_cast<size_type>(offset));
             if (reinterpret_cast<std::uintptr_t>(raw) % alignof(T) != 0) return nullptr;
             return std::launder(reinterpret_cast<T*>(raw));
         }
@@ -606,7 +957,7 @@ namespace XOffsetDatastructure {
                 sizeof(T) > buffer_.size() - offset) {
                 return nullptr;
             }
-            auto* raw = buffer_.data() + static_cast<size_type>(offset);
+            auto* raw = payload_byte_address(static_cast<size_type>(offset));
             if (reinterpret_cast<std::uintptr_t>(raw) % alignof(T) != 0) return nullptr;
             return std::launder(reinterpret_cast<const T*>(raw));
         }
@@ -628,7 +979,7 @@ namespace XOffsetDatastructure {
                 throw;
             }
             slot = static_cast<std::uint64_t>(
-                reinterpret_cast<const char*>(obj) - buffer_.data());
+                reinterpret_cast<std::uintptr_t>(obj) - reinterpret_cast<std::uintptr_t>(buffer_.data()));
             return obj;
         }
 
@@ -654,7 +1005,7 @@ namespace XOffsetDatastructure {
             for (std::size_t i = 0; i < free_blocks_.size(); ++i) {
                 const auto& block = free_blocks_[i];
                 if (block.user_bytes >= bytes && block.alignment >= alignment) {
-                    void* ptr = buffer_.data() + block.user_offset;
+                    void* ptr = payload_byte_address(block.user_offset);
                     if (reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0) continue;
                     free_blocks_.erase(free_blocks_.begin() + static_cast<std::ptrdiff_t>(i));
                     return ptr;
@@ -677,14 +1028,13 @@ namespace XOffsetDatastructure {
             const size_type block_end = user_offset + bytes;
             if (!ensure_allocation_extent(block_end, allow_growth)) throw XBadAlloc();
 
-            auto* header = std::launder(
-                reinterpret_cast<AllocationHeader*>(buffer_.data() + block_begin));
+            auto* header = ::new (static_cast<void*>(payload_byte_address(block_begin))) AllocationHeader;
             header->total_bytes = static_cast<std::uint32_t>(block_end - block_begin);
             header->user_bytes = bytes;
             header->user_offset = static_cast<std::uint32_t>(user_offset);
             header->alignment = static_cast<std::uint32_t>(alignment);
             sm->used_end = std::max<std::uint64_t>(sm->used_end, block_end);
-            return buffer_.data() + user_offset;
+            return payload_byte_address(user_offset);
         }
 
         bool try_expand_impl(void* ptr, std::uint32_t bytes, std::size_t alignment) {
@@ -698,7 +1048,7 @@ namespace XOffsetDatastructure {
                 (address - sizeof(AllocationHeader)) % alignof(AllocationHeader) != 0) return false;
             const auto offset = static_cast<size_type>(address - base);
             auto* header = std::launder(reinterpret_cast<AllocationHeader*>(
-                buffer_.data() + offset - sizeof(AllocationHeader)));
+                payload_byte_address(offset - sizeof(AllocationHeader))));
             if (header->user_offset != offset || header->user_bytes == 0 ||
                 header->user_bytes > buffer_.size() - offset ||
                 header->total_bytes != std::uint64_t(header->user_bytes) + sizeof(AllocationHeader) ||
@@ -718,19 +1068,50 @@ namespace XOffsetDatastructure {
 
         void deallocate_impl(void* ptr) noexcept {
             if (!ptr || buffer_.empty()) return;
-            auto* raw = reinterpret_cast<char*>(ptr);
-            if (raw < buffer_.data() + static_cast<std::ptrdiff_t>(sizeof(AllocationHeader)) ||
-                raw >= buffer_.data() + static_cast<std::ptrdiff_t>(buffer_.size())) {
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (address < base || address - base < sizeof(AllocationHeader) ||
+                address - base >= buffer_.size()) return;
+            auto* header = std::launder(reinterpret_cast<AllocationHeader*>(
+                payload_byte_address(address - base - sizeof(AllocationHeader))));
+            if (header->total_bytes == 0 || header->user_offset == 0) return;
+            const FreeBlock block{header->user_offset, header->total_bytes,
+                                  header->user_bytes, header->alignment};
+            if (free_blocks_.size() < free_blocks_.capacity()) {
+                free_blocks_.push_back(block); // trivial, no allocation/callback
                 return;
             }
-            auto* header = std::launder(
-                reinterpret_cast<AllocationHeader*>(raw - sizeof(AllocationHeader)));
-            if (header->total_bytes == 0 || header->user_offset == 0) return;
-            try {
-                free_blocks_.push_back(
-                    {header->user_offset, header->total_bytes, header->user_bytes, header->alignment});
-            } catch (const std::bad_alloc&) {
-                // Reclamation is best effort; destructors must not terminate on host OOM.
+            const auto identity = owner_record_;
+            auto required = std::max(free_blocks_.size() + 1u,
+                free_blocks_.capacity() <= free_blocks_.max_size() / 2u
+                    ? free_blocks_.capacity() * 2u : free_blocks_.size() + 1u);
+            std::vector<FreeBlock> prepared;
+            for (;;) {
+                try {
+                    detail::owner_lookup_count(&detail::OwnerLookupStats::reclamation_reserves);
+                    prepared.reserve(required);
+                } catch (const std::bad_alloc&) {
+                    detail::owner_lookup_count(&detail::OwnerLookupStats::reclamation_abandoned);
+                    return; // same best-effort host-OOM reclamation policy
+                }
+                // reserve/new_handler may move/swap/release/reenter the owner.
+                // Never access the original this/vector after that boundary.
+                auto* current = record_owner(identity);
+                if (!current) {
+                    detail::owner_lookup_count(&detail::OwnerLookupStats::reclamation_abandoned);
+                    return;
+                }
+                if (prepared.capacity() <= current->free_blocks_.size()) {
+                    required = std::max(current->free_blocks_.size() + 1u,
+                        current->free_blocks_.capacity() <= current->free_blocks_.max_size() / 2u
+                            ? current->free_blocks_.capacity() * 2u : current->free_blocks_.size() + 1u);
+                    detail::owner_lookup_count(&detail::OwnerLookupStats::reclamation_restarts);
+                    continue;
+                }
+                prepared.assign(current->free_blocks_.begin(), current->free_blocks_.end());
+                prepared.push_back(block);
+                current->free_blocks_.swap(prepared);
+                return;
             }
         }
 
@@ -743,6 +1124,14 @@ namespace XOffsetDatastructure {
         std::uint64_t bound_schema_hash_ = 0;
 
     private:
+        friend struct detail::VerifiedPathsAccess;
+        friend struct detail::VerifiedReceiveAccess;
+        friend struct fixed_detail::StableEraseOwnerWitness;
+        friend void* fixed_detail::allocate_dynamic_bytes(const fixed_detail::allocator_ref&, std::uint32_t, std::size_t);
+        friend void fixed_detail::retire_dynamic_bytes(const fixed_detail::allocator_ref&, void*, std::uint32_t) noexcept;
+        friend void fixed_detail::release_cached_blocks(XAllocatorStateV1*) noexcept;
+        detail::FreelistRuntimeCache freelist_runtime_cache_;
+        OwnerRecordPtr owner_record_;
         detail::VirtualMemoryStorage buffer_;
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
         std::vector<FreeBlock> free_blocks_;
@@ -876,23 +1265,90 @@ namespace XOffsetDatastructure {
             XArena* arena() const noexcept { return segment; }
         };
 
+        // A host identity lease detects a dead/replaced reservation after host
+        // allocation or a predicate callback. It does not pin the VM mapping or
+        // authorize concurrent mutation, target destruction or callback reentry
+        // into this container during the destructive commit.
+        struct StableEraseOwnerWitness {
+            XBufferCore::OwnerRecordPtr record;
+            const void* head{};
+            std::size_t head_bytes{}, head_offset{};
+            bool head_in_payload{};
+
+            StableEraseOwnerWitness(const allocator_ref& alloc,
+                                    const void* address, std::size_t bytes)
+                : head(address), head_bytes(bytes) {
+                auto& owner = XBufferCore::owner_from_payload_ptr(alloc.segment);
+                record = owner.owner_record_; // shared_ptr copy does not allocate
+                const auto base = reinterpret_cast<std::uintptr_t>(record->payload);
+                const auto at = reinterpret_cast<std::uintptr_t>(address);
+                if (at >= base && at - base < owner.buffer_.size()) {
+                    head_in_payload = true;
+                    head_offset = at - base;
+                }
+                validate();
+            }
+
+            void validate() const {
+                auto* owner = XBufferCore::record_owner(record);
+                if (!owner || owner->buffer_.data() != record->payload)
+                    throw XException("stable_erase_if owner is no longer live");
+                if (head_in_payload &&
+                    (head_offset > owner->buffer_.size() ||
+                     head_bytes > owner->buffer_.size() - head_offset))
+                    throw XException("stable_erase_if target is no longer in storage");
+            }
+        };
+
+        // O3: an equal rel32 value is not allocator provenance.
+        inline bool move_assignment_same_allocator(const allocator_ref& a,
+                                                   const allocator_ref& b) noexcept {
+            return a.segment && a.segment == b.segment && a.state == b.state;
+        }
+
+        inline bool move_assignment_contains(const void* storage, std::size_t bytes,
+                                             const void* address) noexcept {
+            if (!storage || bytes == 0) return false;
+            const auto first = reinterpret_cast<std::uintptr_t>(storage);
+            const auto candidate = reinterpret_cast<std::uintptr_t>(address);
+            return candidate >= first && candidate - first < bytes;
+        }
+
+        inline bool move_assignment_head_in_arena(const void* head, std::size_t bytes,
+                                                  const XArena* arena) noexcept {
+            if (!arena) return false;
+            const auto first = reinterpret_cast<std::uintptr_t>(arena);
+            const auto candidate = reinterpret_cast<std::uintptr_t>(head);
+            return candidate >= first && candidate - first <= arena->used_end &&
+                bytes <= arena->used_end - (candidate - first);
+        }
+
+        template <typename T>
+        bool move_assignment_owns_address(const T& value, const void* address) noexcept;
+
+        template <typename T> consteval bool stable_erase_supported();
+        template <typename T> void stable_erase_relocate(T*, T&) noexcept;
         template <typename T> consteval bool can_relocate_without_allocation();
         template <typename T> void relocate_construct(T* dst, T& src) noexcept;
 
         template <typename T>
         T* resolve_rel32(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
+            const auto target = reinterpret_cast<std::uintptr_t>(origin) + delta;
+            if (auto* bytes = XBufferCore::canonical_bytes_at(origin, target, sizeof(T)))
+                return std::launder(reinterpret_cast<T*>(bytes));
             auto* base = reinterpret_cast<const char*>(origin);
-            auto* raw = const_cast<char*>(base + delta);
-            return std::launder(reinterpret_cast<T*>(raw));
+            return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
 
         template <typename T>
         const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
+            const auto target = reinterpret_cast<std::uintptr_t>(origin) + delta;
+            if (auto* bytes = XBufferCore::canonical_bytes_at(origin, target, sizeof(T)))
+                return std::launder(reinterpret_cast<const T*>(bytes));
             auto* base = reinterpret_cast<const char*>(origin);
-            auto* raw = base + delta;
-            return std::launder(reinterpret_cast<const T*>(raw));
+            return std::launder(reinterpret_cast<const T*>(base + delta));
         }
 
         inline void set_rel32(std::int32_t& field, const void* origin, const void* target) {
@@ -959,10 +1415,10 @@ namespace XOffsetDatastructure {
 
         inline std::uint32_t freelist_offset_from_state(
             const XAllocatorStateV1* state, const void* ptr) {
-            auto delta = reinterpret_cast<const char*>(ptr) -
-                         reinterpret_cast<const char*>(state);
-            if (delta <= 0 ||
-                delta > static_cast<std::ptrdiff_t>(std::numeric_limits<std::uint32_t>::max())) {
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            const auto origin = reinterpret_cast<std::uintptr_t>(state);
+            const auto delta = address - origin;
+            if (address <= origin || delta > std::numeric_limits<std::uint32_t>::max()) {
                 throw XException(
                     "allocator state free-list offset out of range");
             }
@@ -972,6 +1428,9 @@ namespace XOffsetDatastructure {
         inline FreeBlockHeader* freelist_block_from_offset(
             XAllocatorStateV1* state, std::uint32_t offset) noexcept {
             if (offset == 0) return nullptr;
+            const auto target = reinterpret_cast<std::uintptr_t>(state) + offset;
+            if (auto* bytes = XBufferCore::canonical_bytes_at(state, target, sizeof(FreeBlockHeader)))
+                return std::launder(reinterpret_cast<FreeBlockHeader*>(bytes));
             auto* raw = reinterpret_cast<char*>(state) + offset;
             return std::launder(reinterpret_cast<FreeBlockHeader*>(raw));
         }
@@ -979,6 +1438,9 @@ namespace XOffsetDatastructure {
         inline const FreeBlockHeader* freelist_block_from_offset(
             const XAllocatorStateV1* state, std::uint32_t offset) noexcept {
             if (offset == 0) return nullptr;
+            const auto target = reinterpret_cast<std::uintptr_t>(state) + offset;
+            if (auto* bytes = XBufferCore::canonical_bytes_at(state, target, sizeof(FreeBlockHeader)))
+                return std::launder(reinterpret_cast<const FreeBlockHeader*>(bytes));
             auto* raw = reinterpret_cast<const char*>(state) + offset;
             return std::launder(reinterpret_cast<const FreeBlockHeader*>(raw));
         }
@@ -993,6 +1455,7 @@ namespace XOffsetDatastructure {
             state.reserved0 = 0;
             std::memset(state.freelist_head, 0, sizeof(state.freelist_head));
             set_rel32(state.segment_delta, &state.segment_delta, segment);
+            if (segment) segment->reset_freelist_runtime_cache();
         }
 
         inline void note_allocator_block(
@@ -1015,18 +1478,30 @@ namespace XOffsetDatastructure {
         inline void release_cached_blocks(XAllocatorStateV1* state) noexcept {
             auto* arena = allocator_arena(state);
             if (!state || !arena) return;
+            auto& initial_owner = arena->freelist_runtime_owner();
+            const auto identity = initial_owner.owner_record_;
+            initial_owner.freelist_runtime_cache_.reset();
+            std::uint32_t detached[freelist_class_count];
+            // Publish a consistent empty cache before any host allocation can
+            // invoke new_handler. Reentrant retires populate a new independent
+            // cache and must not be erased by a final unconditional reset.
             for (std::uint32_t i = 0; i < freelist_class_count; ++i) {
-                std::uint32_t offset = state->freelist_head[i];
-                state->freelist_head[i] = 0;
-                while (offset != 0) {
-                    auto* block = freelist_block_from_offset(state, offset);
-                    auto next = block->next_offset;
-                    arena->deallocate(block);
-                    offset = next;
-                }
+                detached[i] = std::exchange(state->freelist_head[i], 0u);
             }
             state->free_bytes = 0;
             ++state->epoch;
+            for (std::uint32_t i = 0; i < freelist_class_count; ++i) {
+                auto offset = detached[i];
+                while (offset != 0) {
+                    auto* owner = XBufferCore::record_owner(identity);
+                    if (!owner) return; // mapping/state were released in callback
+                    auto* block = freelist_block_from_offset(state, offset);
+                    const auto next = block->next_offset;
+                    std::destroy_at(block);
+                    owner->deallocate_impl(block);
+                    offset = next;
+                }
+            }
         }
 
         inline void* allocate_dynamic_bytes(const allocator_ref& alloc_ref,
@@ -1047,33 +1522,91 @@ namespace XOffsetDatastructure {
             std::uint32_t aligned_bytes = round_up_to_alignment(
                 bytes, static_cast<std::uint32_t>(std::max<std::size_t>(alignment, 8u)));
 
+            XBufferCore* owner = nullptr;
             if (auto* state = alloc_ref.state) {
+                // One registry lookup also serves a later Core allocation.
+                owner = &arena->freelist_runtime_owner();
+                auto& cache = owner->freelist_runtime_cache_;
+                cache.synchronize(state, state->epoch);
+                detail::freelist_index_count(&detail::FreelistIndexStats::lookup_calls);
                 auto class_index = freelist_size_class(aligned_bytes);
                 if (class_index < freelist_class_count) {
                     for (std::uint32_t i = class_index; i < freelist_class_count; ++i) {
+                        auto& cursor = cache.cursors[i];
+                        // Different requests can remove a middle node without
+                        // changing head. Never reuse their old rejected range.
+                        if (!detail::freelist_index_equal(cursor.bytes, aligned_bytes) ||
+                            !detail::freelist_index_equal(cursor.alignment, alignment) ||
+                            !detail::freelist_index_equal(cursor.head, state->freelist_head[i])) {
+                            cursor = {};
+                            cursor.bytes = aligned_bytes;
+                            cursor.alignment = alignment;
+                            cursor.head = state->freelist_head[i];
+                            detail::freelist_index_count(&detail::FreelistIndexStats::query_resets);
+                        }
+                        auto old_first = cursor.first;
+                        auto old_last = cursor.last;
+                        std::uint32_t prefix_first = 0;
+                        std::uint32_t prefix_last = 0;
                         auto* link = &state->freelist_head[i];
                         while (*link) {
-                            auto* block = freelist_block_from_offset(state, *link);
+                            const auto offset = *link;
+                            if (!detail::freelist_index_equal(old_first, std::uint32_t{0}) &&
+                                detail::freelist_index_equal(offset, old_first)) {
+                                // Identity/epoch/request/head were checked
+                                // before reading an offset from the memo.
+                                detail::freelist_index_count(&detail::FreelistIndexStats::skip_jumps);
+                                if (detail::freelist_index_equal(prefix_first, std::uint32_t{0}))
+                                    prefix_first = old_first;
+                                prefix_last = old_last;
+                                link = &freelist_block_from_offset(state, old_last)->next_offset;
+                                old_first = old_last = 0;
+                                continue;
+                            }
+                            auto* block = freelist_block_from_offset(state, offset);
+                            detail::freelist_index_count(&detail::FreelistIndexStats::node_visits);
                             if (block->block_bytes >= aligned_bytes &&
                                 reinterpret_cast<std::uintptr_t>(block) % alignment == 0) {
                                 *link = block->next_offset;
                                 state->free_bytes -= block->block_bytes;
                                 ++state->epoch;
-                                return block;
+                                cache.epoch = state->epoch;
+                                if (detail::freelist_index_equal(prefix_first, std::uint32_t{0})) {
+                                    cursor.first = old_first;
+                                    cursor.last = old_last;
+                                } else {
+                                    cursor.first = prefix_first;
+                                    cursor.last = prefix_last;
+                                }
+                                cursor.head = state->freelist_head[i];
+                                std::destroy_at(block); // last header read precedes reuse
+                                return static_cast<void*>(block);
                             }
+                            if (detail::freelist_index_equal(prefix_first, std::uint32_t{0}))
+                                prefix_first = offset;
+                            prefix_last = offset;
                             link = &block->next_offset;
                         }
+                        cursor.first = prefix_first;
+                        cursor.last = prefix_last;
+                        cursor.head = state->freelist_head[i];
                     }
                 }
             }
 
+            if (!owner) owner = &XBufferCore::owner_from_payload_ptr(arena);
+            const auto identity = owner->owner_record_;
             void* raw = nullptr;
             try {
-                raw = arena->allocate_without_growth(aligned_bytes, alignment);
+                raw = owner->allocate_aligned_impl(aligned_bytes, alignment, false);
             } catch (const XBadAlloc&) {
+                // Even XBadAlloc's diagnostic construction can allocate and call
+                // user new_handler. Validate this reservation before reading state.
+                owner = &XBufferCore::require_record_owner(identity);
                 if (alloc_ref.state && alloc_ref.state->free_bytes != 0)
                     release_cached_blocks(alloc_ref.state);
-                raw = arena->allocate_aligned(aligned_bytes, alignment);
+                owner = &XBufferCore::require_record_owner(identity);
+                raw = owner->allocate_aligned_impl(aligned_bytes, alignment);
             }
             note_allocator_block(alloc_ref.state, raw, aligned_bytes);
             return raw;
@@ -1098,7 +1631,16 @@ namespace XOffsetDatastructure {
                 if (address <= origin || address - origin > std::numeric_limits<std::uint32_t>::max())
                     return false;
                 XBufferCore::AllocationHeader header;
-                std::memcpy(&header, static_cast<const char*>(ptr) - sizeof(header), sizeof(header));
+                const auto target = reinterpret_cast<std::uintptr_t>(ptr) - sizeof(header);
+                const auto* canonical = XBufferCore::canonical_bytes_at(ptr, target, sizeof(header));
+                const void* raw_header = canonical ? static_cast<const void*>(canonical)
+                    : static_cast<const void*>(static_cast<const char*>(ptr) - sizeof(header));
+                std::memcpy(&header, raw_header, sizeof(header));
+                // Valid live allocations cannot expand unless their physical
+                // tail is the arena tail. Reject before the registry lookup;
+                // Core::try_expand_impl still performs every original check.
+                if (std::uint64_t(header.user_offset) + header.user_bytes !=
+                    alloc_ref.segment->used_end) return false;
                 const auto physical_bytes = std::max(aligned_bytes, header.user_bytes);
                 const auto candidate_end = std::uint64_t(address - origin) + physical_bytes;
                 if (candidate_end > std::numeric_limits<std::uint32_t>::max()) return false;
@@ -1129,12 +1671,20 @@ namespace XOffsetDatastructure {
 
             note_allocator_block(state, ptr, aligned_bytes);
             auto offset = freelist_offset_from_state(state, ptr);
-            auto* header = std::launder(reinterpret_cast<FreeBlockHeader*>(ptr));
-            header->block_bytes = aligned_bytes;
-            header->next_offset = state->freelist_head[class_index];
+            auto& cache = arena->freelist_runtime_owner().freelist_runtime_cache_;
+            cache.synchronize(state, state->epoch);
+            detail::freelist_index_count(&detail::FreelistIndexStats::retire_updates);
+            // Retiring the whole allocation intentionally ends its previous
+            // array/object lifetimes. A cast/launder is not header creation.
+            auto* header = std::construct_at(reinterpret_cast<FreeBlockHeader*>(ptr),
+                FreeBlockHeader{state->freelist_head[class_index], aligned_bytes});
             state->freelist_head[class_index] = offset;
             state->free_bytes += aligned_bytes;
             ++state->epoch;
+            cache.epoch = state->epoch;
+            // A new head leaves a known rejected interval intact, even
+            // when it precedes that interval with a fitting block.
+            cache.cursors[class_index].head = offset;
         }
 
         template <typename T>
@@ -1171,7 +1721,9 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void default_construct(T* dst, const Alloc& alloc) {
-            if constexpr (std::is_array_v<T>) {
+            if constexpr (detail::future_custom_lifetime_supported<T>()) {
+                detail::future_default_construct<T>(dst, alloc);
+            } else if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
                 try {
                     for (; built < std::extent_v<T>; ++built) default_construct(&(*dst)[built], alloc);
@@ -1191,7 +1743,11 @@ namespace XOffsetDatastructure {
         template <typename T, typename Src, typename Alloc>
         void transfer_construct(T* dst, Src&& src, const Alloc& alloc) {
             using CleanSrc = std::remove_reference_t<Src>;
-            if constexpr (std::is_array_v<T>) {
+            if constexpr (detail::future_custom_lifetime_supported<T>()) {
+                // Preserve this helper's existing nondestructive copy/fill
+                // contract even when its caller passed a temporary.
+                detail::future_transfer_construct<T>(dst, static_cast<const CleanSrc&>(src), alloc);
+            } else if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
                 try {
                     for (; built < std::extent_v<T>; ++built) transfer_construct(&(*dst)[built], src[built], alloc);
@@ -1371,6 +1927,31 @@ namespace XOffsetDatastructure {
             return *this;
         }
         XFixedString& operator=(XFixedString&& other) {
+            if (this == &other) return *this;
+            if (is_bound() && other.is_bound()) {
+                const auto destination = binding();
+                const auto source = other.binding();
+                if (fixed_detail::move_assignment_same_allocator(destination, source) &&
+                    fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
+                    fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
+                    !fixed_detail::move_assignment_owns_address(*this, &other) &&
+                    !fixed_detail::move_assignment_owns_address(other, this)) {
+                    std::int32_t incoming_delta = 0;
+                    fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
+                    const auto incoming_size = other.size_;
+                    const auto incoming_capacity = other.capacity_;
+                    // Potentially throwing work precedes the ownership commit.
+                    // release() is noexcept; both heads remain in live storage.
+                    release();
+                    data_delta = incoming_delta;
+                    size_ = incoming_size;
+                    capacity_ = incoming_capacity;
+                    other.data_delta = 0;
+                    other.size_ = 0;
+                    other.capacity_ = 0;
+                    return *this;
+                }
+            }
             return (*this = static_cast<const XFixedString&>(other));
         }
 
@@ -1455,13 +2036,15 @@ namespace XOffsetDatastructure {
             if (new_cap <= capacity_) return;
 
             auto alloc = binding();
+            auto* old_storage = data();
             if (fixed_detail::try_expand_dynamic_bytes(
-                    alloc, data(), static_cast<std::uint32_t>(new_cap + 1), alignof(char))) {
+                    alloc, old_storage, static_cast<std::uint32_t>(new_cap + 1), alignof(char))) {
+                (void)detail::rebuild_dynamic_array<char>(old_storage, std::size_t(new_cap) + 1u, size_ + 1u);
                 capacity_ = new_cap;
                 return;
             }
-            auto* new_data = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(
-                alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)));
+            auto* new_data = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
+                alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)), std::size_t(new_cap) + 1u);
 
             if (auto* old_data = data()) {
                 if (size_ != 0) std::memcpy(new_data, old_data, size_);
@@ -1480,12 +2063,56 @@ namespace XOffsetDatastructure {
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
-            reserve(static_cast<std::uint32_t>(rhs.size()));
-            if (!rhs.empty()) {
-                std::memmove(data(), rhs.data(), rhs.size());
+            const auto new_size = static_cast<std::uint32_t>(rhs.size());
+            auto* old_data = data();
+            if (new_size <= capacity_) {
+                std::memmove(old_data, rhs.data(), rhs.size());
+                old_data[new_size] = '\0';
+                size_ = new_size;
+                return;
             }
-            size_ = static_cast<std::uint32_t>(rhs.size());
-            data()[size_] = '\0';
+
+            const auto alloc = binding();
+            const auto old_address = reinterpret_cast<std::uintptr_t>(old_data);
+            const auto rhs_address = reinterpret_cast<std::uintptr_t>(rhs.data());
+            const auto old_extent = std::size_t(capacity_) + 1u;
+            const bool aliases_old = old_data && rhs_address >= old_address &&
+                rhs_address - old_address <= old_extent &&
+                rhs.size() <= old_extent - (rhs_address - old_address);
+            const auto alias_offset = aliases_old ? rhs_address - old_address : 0u;
+            if (fixed_detail::try_expand_dynamic_bytes(
+                    alloc, old_data, static_cast<std::uint32_t>(new_size + 1), alignof(char))) {
+                auto* expanded = detail::rebuild_dynamic_array<char>(
+                    old_data, std::size_t(new_size) + 1u, size_ + 1u);
+                // An old self-view does not automatically retarget through a
+                // differently bounded parent array. Reacquire from new array.
+                const char* input = aliases_old ? expanded + alias_offset : rhs.data();
+                std::memmove(expanded, input, rhs.size());
+                expanded[new_size] = '\0';
+                size_ = new_size;
+                capacity_ = new_size;
+                return;
+            }
+            auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
+                alloc, static_cast<std::uint32_t>(new_size + 1), alignof(char)), std::size_t(new_size) + 1u);
+            std::int32_t incoming_delta = 0;
+            try {
+                fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
+            } catch (...) {
+                fixed_detail::retire_dynamic_bytes(
+                    alloc, fresh, static_cast<std::uint32_t>(new_size + 1));
+                throw;
+            }
+            // rhs may alias the old allocation, including its terminator.
+            // Read it completely before the old bytes become a free-list node.
+            std::memmove(fresh, rhs.data(), rhs.size());
+            fresh[new_size] = '\0';
+            const auto old_capacity = capacity_;
+            data_delta = incoming_delta;
+            size_ = new_size;
+            capacity_ = new_size;
+            fixed_detail::retire_dynamic_bytes(
+                alloc, old_data, static_cast<std::uint32_t>(old_capacity + 1));
         }
 
         XFixedString& operator=(std::string_view rhs) {
@@ -1585,6 +2212,33 @@ namespace XOffsetDatastructure {
             return *this;
         }
         XFixedVector& operator=(XFixedVector&& other) {
+            if (this == &other) return *this;
+            if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
+                if (is_bound() && other.is_bound()) {
+                    const auto destination = binding();
+                    const auto source = other.binding();
+                    if (fixed_detail::move_assignment_same_allocator(destination, source) &&
+                        fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
+                        fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
+                        !fixed_detail::move_assignment_owns_address(*this, &other) &&
+                        !fixed_detail::move_assignment_owns_address(other, this)) {
+                        std::int32_t incoming_delta = 0;
+                        fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
+                        const auto incoming_size = other.size_;
+                        const auto incoming_capacity = other.capacity_;
+                        // Out-of-line elements keep their addresses and bindings.
+                        // Ancestor/descendant ownership has already been excluded.
+                        release();
+                        data_delta = incoming_delta;
+                        size_ = incoming_size;
+                        capacity_ = incoming_capacity;
+                        other.data_delta = 0;
+                        other.size_ = 0;
+                        other.capacity_ = 0;
+                        return *this;
+                    }
+                }
+            }
             return (*this = static_cast<const XFixedVector&>(other));
         }
 
@@ -1670,14 +2324,15 @@ namespace XOffsetDatastructure {
             if (new_cap <= capacity_) return;
             if (fixed_detail::try_expand_dynamic_bytes(
                     binding(), data(), static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T))) {
+                (void)detail::rebuild_dynamic_array<T>(data(), new_cap, size_);
                 capacity_ = new_cap;
                 return;
             }
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 if (new_cap > max_size()) throw XBadAlloc();
                 auto alloc = binding();
-                auto* fresh = static_cast<T*>(fixed_detail::allocate_dynamic_bytes(
-                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)));
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 auto* old = data();
                 auto old_cap = capacity_;
                 for (size_type i = 0; i < size_; ++i) {
@@ -1694,6 +2349,48 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // Replaces all elements from stable live T objects. Self/subrange and
+        // other live containers (including another arena) may overlap. Private
+        // allocator control bytes that allocation itself mutates are not a
+        // stable source range. No default construction or old-prefix copy is
+        // needed for these implicit-lifetime, trivially destructible objects.
+        void assign_range(std::span<const T> values)
+            requires (!std::is_const_v<T> && !std::is_volatile_v<T> &&
+                      std::is_trivially_copyable_v<T> &&
+                      std::is_trivially_copy_constructible_v<T> &&
+                      std::is_trivially_destructible_v<T>) {
+            const auto count = checked_count(values.size());
+            if (count == 0) { clear(); return; }
+            ensure_bound();
+            const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
+            if (count <= capacity_) {
+                std::memmove(data(), values.data(), bytes);
+                size_ = count;
+                return;
+            }
+            auto alloc = binding();
+            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                alloc, bytes, alignof(T)), count);
+            std::int32_t delta = 0;
+            try {
+                fixed_detail::set_rel32(delta, &data_delta, fresh);
+            } catch (...) {
+                fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
+                throw;
+            }
+            // Read the complete source before publishing/retiring old storage.
+            // Retirement is allowed to overwrite its first bytes as free-list
+            // metadata. memmove also covers overlapping live-element ranges.
+            std::memmove(fresh, values.data(), bytes);
+            auto* old = data();
+            const auto old_cap = capacity_;
+            data_delta = delta;
+            size_ = count;
+            capacity_ = count;
+            fixed_detail::retire_dynamic_bytes(
+                alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+        }
+
         void push_back(const T& value) {
             insert_construct(size_, [&](T* dst) {
                 fixed_detail::transfer_construct(dst, value, binding());
@@ -1702,6 +2399,67 @@ namespace XOffsetDatastructure {
 
         void push_back(T&& value) {
             push_back(static_cast<const T&>(value));
+        }
+
+        // Stable, decision-first deletion. Predicate receives const T& exactly
+        // once in original order. It may throw, but must not structurally mutate
+        // this target, end its/its elements' lifetime or release its reservation.
+        // This quiescence covers ALL callbacks from the operation's entry,
+        // including bitmap new_handler, predicates, destructors and deallocation
+        // callbacks. An enclosing vector must not relocate this head meanwhile.
+        // Core move retaining the reservation/head address is permitted.
+        // This does not enlarge erase_index's destructive reentry contract.
+        // User side effects through external aliases are not rolled back.
+        template <typename Predicate>
+            requires (fixed_detail::stable_erase_supported<T>() &&
+                      std::is_invocable_r_v<bool, Predicate&, const T&>)
+        size_type stable_erase_if(Predicate&& predicate) {
+            const auto original_size = size_;
+            if (original_size == 0) return 0;
+            ensure_bound();
+            const auto original_arena_delta = arena_delta;
+            const auto original_data_delta = data_delta;
+            const auto original_capacity = capacity_;
+            auto* const items = data();
+            fixed_detail::StableEraseOwnerWitness witness(binding(), this, sizeof(*this));
+            const auto decision_bytes = (std::size_t(original_size) + 7u) / 8u;
+            auto decisions = std::make_unique<std::uint8_t[]>(decision_bytes);
+            // Preparing host scratch can call new_handler. Recheck reservation
+            // identity before touching the in-arena descriptor or old items.
+            auto validate_target = [&] {
+                witness.validate();
+                if (arena_delta != original_arena_delta || data_delta != original_data_delta ||
+                    size_ != original_size || capacity_ != original_capacity)
+                    throw XException("stable_erase_if target changed during decisions");
+            };
+            validate_target();
+            size_type removed = 0;
+            for (size_type read = 0; read < original_size; ++read) {
+                const bool erase = std::invoke(predicate, std::as_const(items[read]));
+                validate_target();
+                if (erase) {
+                    decisions[read / 8u] |= std::uint8_t(1u << (read % 8u));
+                    ++removed;
+                }
+            }
+            if (removed == 0) return 0;
+            // All potentially throwing library preparation and predicate calls
+            // completed. Every write slot is dead: it was removed earlier or
+            // was the source of an earlier successful relocation.
+            size_type write = 0;
+            for (size_type read = 0; read < original_size; ++read) {
+                if (decisions[read / 8u] & std::uint8_t(1u << (read % 8u))) {
+                    std::destroy_at(items + read);
+                } else {
+                    if (write != read) {
+                        fixed_detail::stable_erase_relocate(items + write, items[read]);
+                        std::destroy_at(items + read);
+                    }
+                    ++write;
+                }
+            }
+            size_ = write; // publication follows the complete no-throw commit
+            return removed;
         }
 
         void pop_back() {
@@ -1748,7 +2506,8 @@ namespace XOffsetDatastructure {
             if (cap == 0) { clear(); return; }
             auto alloc = binding();
             auto bytes = static_cast<std::uint32_t>(cap * sizeof(T));
-            auto* fresh = static_cast<T*>(fixed_detail::allocate_dynamic_bytes(alloc, bytes, alignof(T)));
+            auto* fresh = detail::begin_dynamic_array<T>(
+                fixed_detail::allocate_dynamic_bytes(alloc, bytes, alignof(T)), cap);
             size_type constructed = 0;
             std::int32_t delta = 0;
             try {
@@ -1843,7 +2602,8 @@ namespace XOffsetDatastructure {
         template <typename Construct, typename Commit>
         void with_staged(Construct&& construct, Commit&& commit) {
             auto alloc = binding();
-            auto* staged = static_cast<T*>(fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)));
+            auto* staged = detail::begin_dynamic_array<T>(
+                fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
             bool built = false;
             try {
                 construct(staged);
@@ -1856,6 +2616,39 @@ namespace XOffsetDatastructure {
             }
             std::destroy_at(staged);
             fixed_detail::retire_dynamic_bytes(alloc, staged, sizeof(T));
+        }
+
+        // Only the public default resize of scalar T enters this path.
+        // T{} and destruction cannot run user code; fill/custom construction
+        // keeps the general transactional path below.
+        void resize_default_scalar(size_type count) requires std::is_scalar_v<T> {
+            if (count > max_size()) throw XBadAlloc();
+            if (count <= size_) {
+                size_ = count;
+                return;
+            }
+            const auto old_size = size_;
+            if (count <= capacity_) {
+                std::uninitialized_value_construct_n(data() + old_size, count - old_size);
+                size_ = count;
+                return;
+            }
+            ensure_bound();
+            auto alloc = binding();
+            auto* old = data();
+            const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
+            if (fixed_detail::try_expand_dynamic_bytes(alloc, old, bytes, alignof(T))) {
+                // VM preparation completed before publishing the enlarged
+                // allocation. Required suffix initialization is nonthrowing.
+                auto* expanded = detail::rebuild_dynamic_array<T>(old, count, old_size);
+                std::uninitialized_value_construct_n(expanded + old_size, count - old_size);
+                size_ = count;
+                capacity_ = count;
+                return;
+            }
+            resize_construct(count, [&](T* dst) {
+                fixed_detail::default_construct(dst, binding());
+            });
         }
 
         template <typename Construct>
@@ -1871,6 +2664,41 @@ namespace XOffsetDatastructure {
                     while (size_ > old_size) pop_back();
                     throw;
                 }
+            } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
+                // Stage every potentially throwing operation before touching the
+                // old prefix. In particular, fill arguments may refer to an old
+                // element or one of its owned subobjects.
+                ensure_bound();
+                auto alloc = binding();
+                const auto old_size = size_;
+                const auto old_cap = capacity_;
+                auto* old = data();
+                const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                    alloc, bytes, alignof(T)), count);
+                size_type tail_built = 0;
+                std::int32_t delta = 0;
+                try {
+                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    for (; tail_built < count - old_size; ++tail_built)
+                        construct(fresh + old_size + tail_built);
+                } catch (...) {
+                    fixed_detail::destroy_n(fresh + old_size, tail_built);
+                    fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
+                    throw;
+                }
+                // Existing bounded-arena relocation rebases inline heads,
+                // retains their bindings, and empties source ownership. Its
+                // trait also requires nonthrowing destruction. No fill argument
+                // is read after this point.
+                for (size_type i = 0; i < old_size; ++i)
+                    fixed_detail::relocate_construct(fresh + i, old[i]);
+                fixed_detail::destroy_n(old, old_size);
+                data_delta = delta;
+                size_ = count;
+                capacity_ = count;
+                fixed_detail::retire_dynamic_bytes(
+                    alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
             } else {
                 rebuild(count, count, [&](T* dst, size_type i) {
                     if (i < size_) fixed_detail::transfer_construct(dst, data()[i], binding());
@@ -1993,7 +2821,8 @@ namespace XOffsetDatastructure {
                 return insert(std::forward<Args>(args)...);
             } else {
                 auto alloc = Base::binding();
-                auto* staged = static_cast<T*>(fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)));
+                auto* staged = detail::begin_dynamic_array<T>(
+                fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
                 bool constructed = false;
                 try {
                     fixed_detail::construct_bound(staged, alloc, std::forward<Args>(args)...);
@@ -2220,6 +3049,7 @@ namespace XOffsetDatastructure {
         using Base::empty;
         using Base::clear;
         using Base::reserve;
+        using Base::assign_range;
         using Base::pop_back;
         using Base::emplace_back;
 
@@ -2278,9 +3108,13 @@ namespace XOffsetDatastructure {
 
         void resize(std::size_t count) {
             auto n = Base::checked_count(count);
-            Base::resize_construct(n, [&](T* dst) {
-                fixed_detail::default_construct(dst, Base::binding());
-            });
+            if constexpr (std::is_scalar_v<T>) {
+                Base::resize_default_scalar(n);
+            } else {
+                Base::resize_construct(n, [&](T* dst) {
+                    fixed_detail::default_construct(dst, Base::binding());
+                });
+            }
         }
 
         void resize(std::size_t count, const T& value) {
@@ -2555,21 +3389,541 @@ namespace XOffsetDatastructure {
             return is_v1_wire_admitted_impl<std::remove_cvref_t<T>>::value;
         }
 
-        struct WireValidationRange {
-            const char* begin{};
-            const char* end{};
+        using WireValidationRangeIndex = std::pmr::map<std::size_t, std::size_t>;
+
+        // Entries are nonempty, pairwise disjoint half-open arena-offset ranges.
+        // A validated candidate can overlap only its successor or predecessor.
+        // A successful check also retains the unique lower_bound insertion
+        // position. Neither range set changes before the eventual insertion.
+        inline bool wire_range_overlaps_with_hint(
+                                        const WireValidationRangeIndex& ranges,
+                                        std::size_t begin_offset,
+                                        std::size_t end_offset,
+                                        WireValidationRangeIndex::const_iterator& insertion_hint) {
+            if (begin_offset == end_offset) {
+                insertion_hint = ranges.end();
+                return false;
+            }
+            insertion_hint = ranges.lower_bound(begin_offset);
+            const auto next = insertion_hint;
+            if (next != ranges.end() && next->first < end_offset) return true;
+            if (next != ranges.begin()) {
+                auto previous = next;
+                --previous;
+                if (previous->second > begin_offset) return true;
+            }
+            return false;
+        }
+
+        // Preserve the original three-argument helper and its function type.
+        inline bool wire_range_overlaps(const WireValidationRangeIndex& ranges,
+                                        std::size_t begin_offset,
+                                        std::size_t end_offset) {
+            auto insertion_hint = ranges.cend();
+            return wire_range_overlaps_with_hint(
+                ranges, begin_offset, end_offset, insertion_hint);
+        }
+
+        // XV5: byte-exact ownership with per-page word-any/word-full summaries.
+        // Data words are read only when their any bit is set and full bit is not.
+        class WireValidationByteIndex {
+            static constexpr std::size_t page_bytes = 4096;
+            static constexpr std::size_t word_bits = 64;
+            static constexpr std::size_t words_per_page = 64;
+            static constexpr std::size_t dense_words_per_page = 66;
+            static constexpr std::uint64_t all_bits = (std::numeric_limits<std::uint64_t>::max)();
+            struct alignas(8) Page {
+                std::uint64_t words[64];
+                std::uint64_t any, full;
+                // Scalar data objects have lifetime, but intentionally no value
+                // until written. The initialized metadata guards every read.
+                Page() noexcept : any{}, full{} {}
+            };
+            static_assert(alignof(Page) >= 2);
+            static_assert(sizeof(Page) == 528);
+            static_assert(sizeof(std::uintptr_t) >= sizeof(Page*));
+            static_assert(std::is_nothrow_default_constructible_v<Page>);
+            std::pmr::memory_resource* resource_;
+            bool allow_dense_;
+            std::uint64_t* dense_{};
+            std::size_t dense_pages_{};
+            std::uintptr_t* directory_{};
+            std::size_t directory_size_{}, extent_{}, registrations_{};
+            std::size_t coverage_begin_{}, coverage_end_{};
+
+            bool disjoint_coverage_bounds(std::size_t begin, std::size_t end) const noexcept {
+                return registrations_ == 0 || end <= coverage_begin_ || begin >= coverage_end_;
+            }
+
+            static constexpr std::size_t page_count(std::size_t extent) noexcept {
+                return extent / page_bytes + (extent % page_bytes != 0);
+            }
+            static std::uint64_t low_mask(unsigned bits) noexcept {
+                return bits == 64 ? all_bits : (std::uint64_t{1} << bits) - 1;
+            }
+            static Page* page_pointer(std::uintptr_t value) noexcept {
+                return reinterpret_cast<Page*>(value); // tags0/1 never reach here
+            }
+            std::uintptr_t tail_entry(std::size_t page) const noexcept {
+                if (page < dense_pages_ || page - dense_pages_ >= directory_size_) return 0;
+                return directory_[page - dense_pages_];
+            }
+            struct View {
+                const std::uint64_t* words;
+                std::uint64_t any, full;
+            };
+            View page_view(std::size_t page) const noexcept {
+                if (page < dense_pages_) {
+                    const auto* control = dense_ + dense_pages_ * words_per_page + page * 2;
+                    return {dense_ + page * words_per_page, control[0], control[1]};
+                }
+                const auto entry = tail_entry(page);
+                if (entry == 0) return {nullptr, 0, 0};
+                if (entry == 1) return {nullptr, all_bits, all_bits};
+                const auto* p = page_pointer(entry);
+                return {p->words, p->any, p->full};
+            }
+            static std::uint64_t read_word(const View& view, std::size_t word) noexcept {
+                const auto bit = std::uint64_t{1} << word;
+                if (!(view.any & bit)) {
+                    /* XV5: empty-word-synthesized */
+                    return 0;
+                }
+                if (view.full & bit) {
+                    /* XV5: full-word-synthesized */
+                    return all_bits;
+                }
+                /* XV5: initialized-data-word-read */
+                return view.words[word];
+            }
+            struct Span {
+                std::size_t first, last;
+                std::uint64_t first_mask, last_mask, whole;
+            };
+            static Span page_span(std::size_t lo, std::size_t hi) noexcept {
+                const auto first = lo / word_bits, last = (hi - 1) / word_bits;
+                const auto left = unsigned(lo % word_bits);
+                const auto right = unsigned((hi - 1) % word_bits + 1);
+                const auto a = first == last ? low_mask(right) & ~low_mask(left) : ~low_mask(left);
+                const auto z = first == last ? 0 : low_mask(right);
+                auto whole = low_mask(unsigned(last + 1)) & ~low_mask(unsigned(first));
+                if (a != all_bits) whole &= ~(std::uint64_t{1} << first);
+                if (first != last && z != all_bits) whole &= ~(std::uint64_t{1} << last);
+                return {first, last, a, z, whole};
+            }
+            static bool page_overlaps(const View& view, const Span& span) noexcept {
+                /* XV5: page-summary-query */
+                if (view.any & span.whole) return true;
+                if (span.first_mask != all_bits &&
+                    (read_word(view, span.first) & span.first_mask)) return true;
+                if (span.first != span.last && span.last_mask != all_bits &&
+                    (read_word(view, span.last) & span.last_mask)) return true;
+                return false;
+            }
+            static void mark_boundary(std::uint64_t* words, std::uint64_t& any,
+                                      std::uint64_t& full, std::size_t word,
+                                      std::uint64_t mask,
+                                      const std::uint64_t* cached_word = nullptr) noexcept {
+                const auto bit = std::uint64_t{1} << word;
+                const auto value = (cached_word ? *cached_word : read_word({words, any, full}, word)) | mask;
+                if (value == all_bits) {
+                    full |= bit;
+                    /* XV5: boundary-promoted-full */
+                } else {
+                    words[word] = value;
+                    /* XV5: partial-data-word-written */
+                }
+                any |= bit;
+            }
+            static void mark_page(std::uint64_t* words, std::uint64_t& any,
+                                  std::uint64_t& full, const Span& span,
+                                  const std::uint64_t* cached_first = nullptr,
+                                  const std::uint64_t* cached_last = nullptr) noexcept {
+                // All whole words, including a full page, need only summaries.
+                any |= span.whole;
+                full |= span.whole;
+                /* XV5: whole-word-mask-marked */
+                if (span.first_mask != all_bits)
+                    mark_boundary(words, any, full, span.first, span.first_mask, cached_first);
+                if (span.first != span.last && span.last_mask != all_bits)
+                    mark_boundary(words, any, full, span.last, span.last_mask, cached_last);
+            }
+            Page* allocate_page() {
+                std::pmr::polymorphic_allocator<Page> allocator(resource_);
+                auto* p = allocator.allocate(1);
+                std::construct_at(p);
+                /* XV5: page-prepared */
+                return p;
+            }
+            void release_page(Page* p) noexcept {
+                if (!p) return;
+                std::destroy_at(p);
+                std::pmr::polymorphic_allocator<Page>(resource_).deallocate(p, 1);
+                /* XV5: page-released */
+            }
+            void release_directory(std::uintptr_t* p, std::size_t n) noexcept {
+                if (!p) return;
+                std::destroy_n(p, n);
+                std::pmr::polymorphic_allocator<std::uintptr_t>(resource_).deallocate(p, n);
+                /* XV5: directory-released */
+            }
+            void release_dense(std::uint64_t* p, std::size_t pages) noexcept {
+                if (!p) return;
+                const auto n = pages * dense_words_per_page;
+                std::destroy_n(p, n);
+                std::pmr::polymorphic_allocator<std::uint64_t>(resource_).deallocate(p, n);
+                /* XV5: dense-released */
+            }
+        public:
+            // Preserve the old per-index hard logical dense-byte budget rather
+            // than silently increasing it for the additional word summaries.
+            static constexpr std::size_t dense_byte_budget = 8u * 1024u * 1024u + 2048u;
+            static constexpr std::size_t dense_extent_limit =
+                (dense_byte_budget / (dense_words_per_page * sizeof(std::uint64_t))) * page_bytes;
+            explicit WireValidationByteIndex(std::pmr::memory_resource* resource =
+                    std::pmr::new_delete_resource(), bool allow_dense = true) noexcept
+                : resource_(resource), allow_dense_(allow_dense) {}
+            WireValidationByteIndex(const WireValidationByteIndex&) = delete;
+            WireValidationByteIndex& operator=(const WireValidationByteIndex&) = delete;
+            WireValidationByteIndex(WireValidationByteIndex&&) = delete;
+            WireValidationByteIndex& operator=(WireValidationByteIndex&&) = delete;
+            ~WireValidationByteIndex() {
+                for (std::size_t i = 0; i < directory_size_; ++i)
+                    if (directory_[i] > 1) release_page(page_pointer(directory_[i]));
+                release_directory(directory_, directory_size_);
+                release_dense(dense_, dense_pages_);
+            }
+            std::size_t size() const noexcept { return registrations_; }
+            bool empty() const noexcept { return registrations_ == 0; }
+            std::size_t extent() const noexcept { return extent_; }
+            std::pair<std::size_t, std::size_t> coverage_bounds() const noexcept {
+                return {coverage_begin_, coverage_end_};
+            }
+            std::size_t directory_entries() const noexcept { return directory_size_; }
+            std::size_t dense_prefix_bytes() const noexcept { return dense_pages_ * page_bytes; }
+            std::size_t dense_requested_bytes() const noexcept { return dense_pages_ * dense_words_per_page * 8; }
+            std::pmr::memory_resource* resource() const noexcept { return resource_; }
+            std::size_t allocated_pages() const noexcept {
+                std::size_t result = 0;
+                for (std::size_t i = 0; i < directory_size_; ++i) result += directory_[i] > 1;
+                return result;
+            }
+            std::uint64_t word_at(std::size_t word) const noexcept {
+                if (word >= extent_ / word_bits + (extent_ % word_bits != 0)) return 0;
+                return read_word(page_view(word / words_per_page), word % words_per_page);
+            }
+            bool overlaps(std::size_t begin, std::size_t end) const noexcept {
+                /* XV5: standalone-query */
+                if (begin >= end || begin >= extent_) return false;
+                end = std::min(end, extent_);
+                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
+                for (auto page = first;; ++page) {
+                    /* XV5: standalone-page-tested */
+                    const auto view = page_view(page);
+                    if (view.any) {
+                        const auto lo = page == first ? begin % page_bytes : 0;
+                        const auto hi = page == last ? end - page * page_bytes : page_bytes;
+                        if (page_overlaps(view, page_span(lo, hi))) return true;
+                    }
+                    if (page == last) break;
+                }
+                return false;
+            }
+            //0 none,1 owned,2 free. A free hit never prevents a later owned hit.
+            static unsigned overlap_priority(const WireValidationByteIndex& owned,
+                                             const WireValidationByteIndex& free,
+                                             std::size_t begin, std::size_t end) noexcept {
+                /* XV5: paired-query */
+                const auto limit = std::max(owned.extent_, free.extent_);
+                if (begin >= end || begin >= limit) return 0;
+                end = std::min(end, limit);
+                /* XV5: coverage-bounds-query */
+                if (owned.disjoint_coverage_bounds(begin, end) &&
+                    free.disjoint_coverage_bounds(begin, end)) {
+                    /* XV5: coverage-bounds-fast-return */
+                    return 0;
+                }
+                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
+                bool free_hit = false;
+                for (auto page = first;; ++page) {
+                    /* XV5: paired-page-tested */
+                    const auto live = owned.page_view(page);
+                    const auto dead = free_hit ? View{nullptr, 0, 0} : free.page_view(page);
+                    if (live.any || dead.any) {
+                        const auto lo = page == first ? begin % page_bytes : 0;
+                        const auto hi = page == last ? end - page * page_bytes : page_bytes;
+                        const auto span = page_span(lo, hi);
+                        if (live.any && page_overlaps(live, span)) return 1;
+                        if (dead.any && page_overlaps(dead, span)) free_hit = true;
+                    }
+                    if (page == last) break;
+                }
+                return free_hit ? 2 : 0;
+            }
+            // XV6 draft: prepared dense, one-page registrations need no host
+            // allocation. Check both sets before any mark and retain the target
+            // boundary values, avoiding the second page walk and data reread.
+            // false means the caller must use the unchanged general path.
+            static bool try_insert_dense_single_page(
+                    WireValidationByteIndex& owned,
+                    WireValidationByteIndex& free,
+                    bool incoming_free, std::size_t begin, std::size_t end,
+                    std::size_t validated_extent, unsigned& overlap) noexcept {
+                auto& target = incoming_free ? free : owned;
+                if (begin >= end || end > validated_extent ||
+                    validated_extent > target.extent_ || !target.dense_)
+                    return false;
+                const auto page = begin / page_bytes;
+                if (page != (end - 1) / page_bytes || page >= target.dense_pages_)
+                    return false;
+                // XV8: the existing prepared/dense/page/extent guards above
+                // already hold. One arena byte is one occupancy bit.
+                if (begin / word_bits == (end - 1) / word_bits) {
+                    /* XV8: single-word-probe */
+                    overlap = 0;
+                    const auto word = (begin / word_bits) % words_per_page;
+                    const auto bit = std::uint64_t{1} << word;
+                    const auto mask = low_mask(unsigned((end - 1) % word_bits + 1)) &
+                                      ~low_mask(unsigned(begin % word_bits));
+                    const bool bounds_disjoint = owned.disjoint_coverage_bounds(begin, end) &&
+                                                 free.disjoint_coverage_bounds(begin, end);
+                    std::uint64_t old_target = 0;
+                    if (mask == all_bits) {
+                        // There are no neighboring bits to preserve. A whole
+                        // word uses only initialized summary bits, just as the
+                        // existing general path: never read its data storage.
+                        /* XV8: single-whole-word */
+                        if (!bounds_disjoint) {
+                            if (owned.page_view(page).any & bit) {
+                                overlap = 1;
+                                return true;
+                            }
+                            if (free.page_view(page).any & bit) {
+                                overlap = 2;
+                                return true;
+                            }
+                        }
+                    } else {
+                        /* XV8: single-partial-word */
+                        if (bounds_disjoint) {
+                            // Bounds exclude requested bytes, not other bytes
+                            // in this word. Preserve those exact neighbors.
+                            old_target = read_word(target.page_view(page), word);
+                        } else {
+                            const auto live = read_word(owned.page_view(page), word);
+                            if (live & mask) {
+                                overlap = 1;
+                                return true;
+                            }
+                            const auto dead = read_word(free.page_view(page), word);
+                            if (dead & mask) {
+                                overlap = 2;
+                                return true;
+                            }
+                            old_target = incoming_free ? dead : live;
+                        }
+                    }
+                    // Both complete conflict checks precede this no-throw,
+                    // allocation-free commit. read_word guarded every data read.
+                    const auto value = old_target | mask;
+                    auto* control = target.dense_ + target.dense_pages_ * words_per_page + page * 2;
+                    if (value == all_bits) control[1] |= bit;
+                    else target.dense_[page * words_per_page + word] = value;
+                    control[0] |= bit;
+                    target.coverage_begin_ = target.registrations_ ?
+                        std::min(target.coverage_begin_, begin) : begin;
+                    target.coverage_end_ = std::max(target.coverage_end_, end);
+                    ++target.registrations_;
+                    /* XV8: single-word-committed */
+                    return true;
+                }
+                /* XV6: dense-single-page-probe */
+                overlap = 0;
+                const auto span = page_span(begin % page_bytes,
+                                            end - page * page_bytes);
+                const auto target_view = target.page_view(page);
+                std::uint64_t first_value{}, last_value{};
+                bool first_loaded = false, last_loaded = false;
+                auto first_word = [&]() noexcept {
+                    if (!first_loaded) {
+                        first_value = read_word(target_view, span.first);
+                        first_loaded = true;
+                    }
+                    return first_value;
+                };
+                auto last_word = [&]() noexcept {
+                    if (!last_loaded) {
+                        last_value = read_word(target_view, span.last);
+                        last_loaded = true;
+                    }
+                    return last_value;
+                };
+                auto target_overlaps = [&]() noexcept {
+                    /* XV6: cached-page-summary-query */
+                    if (target_view.any & span.whole) return true;
+                    if (span.first_mask != all_bits &&
+                        (first_word() & span.first_mask)) return true;
+                    return span.first != span.last && span.last_mask != all_bits &&
+                           (last_word() & span.last_mask);
+                };
+                /* XV6: dense-coverage-bounds-query */
+                if (owned.disjoint_coverage_bounds(begin, end) &&
+                    free.disjoint_coverage_bounds(begin, end)) {
+                    /* XV6: dense-coverage-bounds-fast-return */
+                } else {
+                    /* XV6: dense-paired-page-tested */
+                    // The complete range is on this one page: checking owned
+                    // before free preserves the global first-error priority.
+                    const auto live = incoming_free ? owned.page_view(page) : target_view;
+                    if (live.any && (incoming_free ? page_overlaps(live, span) : target_overlaps())) {
+                        overlap = 1;
+                        /* XV6: dense-single-page-rejected */
+                        return true;
+                    }
+                    const auto dead = incoming_free ? target_view : free.page_view(page);
+                    if (dead.any && (incoming_free ? target_overlaps() : page_overlaps(dead, span))) {
+                        overlap = 2;
+                        /* XV6: dense-single-page-free-rejected */
+                        return true;
+                    }
+                }
+                // Preserve bits outside the requested masks even when the
+                // coverage envelope proved the requested bytes disjoint.
+                if (span.first_mask != all_bits) first_word();
+                if (span.first != span.last && span.last_mask != all_bits) last_word();
+                auto* control = target.dense_ + target.dense_pages_ * words_per_page + page * 2;
+                mark_page(target.dense_ + page * words_per_page,
+                          control[0], control[1], span,
+                          first_loaded ? &first_value : nullptr,
+                          last_loaded ? &last_value : nullptr);
+                target.coverage_begin_ = target.registrations_ ?
+                    std::min(target.coverage_begin_, begin) : begin;
+                target.coverage_end_ = std::max(target.coverage_end_, end);
+                ++target.registrations_;
+                /* XV6: dense-single-page-committed */
+                return true;
+            }
+
+            // Checks precede all preparation. No mark, count or extent update
+            // occurs until every needed allocation and object lifetime exists.
+            void insert_disjoint(std::size_t begin, std::size_t end,
+                                 std::size_t validated_extent) {
+                if (begin >= end || end > validated_extent)
+                    throw XException("wire validation bitmap received invalid checked range");
+                const auto requested_extent = std::max(extent_, validated_extent);
+                const bool make_dense = !dense_ && extent_ == 0 && allow_dense_ &&
+                                        requested_extent <= dense_extent_limit;
+                const auto prefix_pages = make_dense ? page_count(requested_extent) : dense_pages_;
+                const auto total_pages = page_count(requested_extent);
+                const auto needed = total_pages - prefix_pages;
+                if (needed > (std::numeric_limits<std::size_t>::max)() / sizeof(std::uintptr_t))
+                    throw std::bad_alloc();
+                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
+                const auto first_lo = begin % page_bytes, last_hi = end - last * page_bytes;
+                const auto tail_first = std::max(first, prefix_pages);
+                const auto tail_lo = tail_first == first ? first_lo : 0;
+                const bool has_tail = last >= prefix_pages;
+                const bool first_partial = has_tail && (tail_first == last ?
+                    (tail_lo != 0 || last_hi != page_bytes) : tail_lo != 0);
+                const bool last_partial = has_tail && tail_first != last && last_hi != page_bytes;
+                std::uint64_t* fresh_dense = nullptr;
+                std::uintptr_t* fresh_directory = nullptr;
+                auto* slots = directory_;
+                Page* fresh_first = nullptr;
+                Page* fresh_last = nullptr;
+                try {
+                    if (make_dense) {
+                        const auto count = prefix_pages * dense_words_per_page;
+                        fresh_dense = std::pmr::polymorphic_allocator<std::uint64_t>(resource_).allocate(count);
+                        // Starts every scalar lifetime, without value-initializing
+                        // data. Only initialized summary bits authorize a read.
+                        std::uninitialized_default_construct_n(fresh_dense, count);
+                        std::fill_n(fresh_dense + prefix_pages * words_per_page, prefix_pages * 2, std::uint64_t{0});
+                        /* XV5: dense-prepared */
+                    }
+                    if (needed > directory_size_) {
+                        fresh_directory = std::pmr::polymorphic_allocator<std::uintptr_t>(resource_).allocate(needed);
+                        std::uninitialized_value_construct_n(fresh_directory, needed);
+                        for (std::size_t i = 0; i < directory_size_; ++i) fresh_directory[i] = directory_[i];
+                        slots = fresh_directory;
+                        /* XV5: directory-prepared */
+                    }
+                    if (first_partial && slots[tail_first - prefix_pages] == 0) fresh_first = allocate_page();
+                    if (last_partial && slots[last - prefix_pages] == 0) fresh_last = allocate_page();
+                } catch (...) {
+                    release_page(fresh_last);
+                    release_page(fresh_first);
+                    release_directory(fresh_directory, needed);
+                    release_dense(fresh_dense, prefix_pages);
+                    throw;
+                }
+                auto* dense_words = fresh_dense ? fresh_dense : dense_;
+                if (fresh_first) slots[tail_first - prefix_pages] = reinterpret_cast<std::uintptr_t>(fresh_first);
+                if (fresh_last) slots[last - prefix_pages] = reinterpret_cast<std::uintptr_t>(fresh_last);
+                for (auto page = first;; ++page) {
+                    const auto lo = page == first ? first_lo : 0;
+                    const auto hi = page == last ? last_hi : page_bytes;
+                    if (page < prefix_pages) {
+                        auto* control = dense_words + prefix_pages * words_per_page + page * 2;
+                        mark_page(dense_words + page * words_per_page, control[0], control[1], page_span(lo, hi));
+                    } else if (lo == 0 && hi == page_bytes) {
+                        auto& entry = slots[page - prefix_pages];
+                        if (entry > 1) {
+                            // Retain a previously allocated Page until destruction.
+                            // Normal disjoint registrations never need this case.
+                            auto* p = page_pointer(entry);p->any = p->full = all_bits;
+                        } else entry = 1;
+                        /* XV5: full-page-tagged */
+                    } else {
+                        auto* p = page_pointer(slots[page - prefix_pages]);
+                        mark_page(p->words, p->any, p->full, page_span(lo, hi));
+                    }
+                    if (page == last) break;
+                }
+                if (fresh_dense) { dense_ = fresh_dense; dense_pages_ = prefix_pages; }
+                if (fresh_directory) {
+                    release_directory(directory_, directory_size_);
+                    directory_ = fresh_directory;
+                    directory_size_ = needed;
+                }
+                extent_ = requested_extent;
+                // Only successful commit publishes covered bounds; scratch
+                // preparation failure must not expand this observed envelope.
+                coverage_begin_ = registrations_ ? std::min(coverage_begin_, begin) : begin;
+                coverage_end_ = std::max(coverage_end_, end);
+                ++registrations_;
+            }
         };
+
+        inline bool wire_range_overlaps(const WireValidationByteIndex& ranges,
+                                        std::size_t begin_offset,
+                                        std::size_t end_offset) noexcept {
+            return ranges.overlaps(begin_offset, end_offset);
+        }
 
         struct WireValidationContext {
             const char* base{};
             const char* end{};
             XArena* segment{};
             const XAllocatorStateV1* allocator_state{};
-            std::vector<WireValidationRange> owned_ranges;
-            std::vector<WireValidationRange> free_ranges;
+            // Host-only, lazy storage; never sized from untrusted wire counts.
+            // Declaration order keeps the resource alive until both indexes die.
+            std::pmr::monotonic_buffer_resource range_resource{
+                std::size_t{4096}, std::pmr::new_delete_resource()};
+            std::pmr::monotonic_buffer_resource free_range_resource{
+                std::size_t{4096}, std::pmr::new_delete_resource()};
+            WireValidationByteIndex owned_ranges{&range_resource};
+            WireValidationByteIndex free_ranges{&free_range_resource};
         };
 
-        inline void validate_storage_range(const void* ptr, std::size_t bytes,
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_V4_INLINE __forceinline
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_V4_INLINE inline __attribute__((always_inline))
+#else
+#define XOFFSET_DETAIL_V4_INLINE inline
+#endif
+        XOFFSET_DETAIL_V4_INLINE void validate_storage_range(const void* ptr, std::size_t bytes,
                                            std::size_t alignment,
                                            const WireValidationContext& ctx,
                                            const char* what) {
@@ -2593,20 +3947,29 @@ namespace XOffsetDatastructure {
                                          const char* what) {
             if (bytes == 0 || !ptr) return;
             validate_storage_range(ptr, bytes, 1, ctx, what);
-            auto* begin = static_cast<const char*>(ptr);
-            auto* end = begin + bytes;
-            for (const auto& range : ctx.owned_ranges) {
-                if (!(end <= range.begin || begin >= range.end)) {
-                    throw XException(
-                        "wire validation detected overlapping dynamic ranges");
-                }
+            const auto begin_offset = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ptr) -
+                reinterpret_cast<std::uintptr_t>(ctx.base));
+            // Validated bounds imply this sum is within the arena extent.
+            const auto end_offset = begin_offset + bytes;
+            const auto extent = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ctx.end) -
+                reinterpret_cast<std::uintptr_t>(ctx.base));
+            unsigned overlap = 0;
+            const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
+                ctx.owned_ranges, ctx.free_ranges, false,
+                begin_offset, end_offset, extent, overlap);
+            if (!handled) overlap = WireValidationByteIndex::overlap_priority(
+                ctx.owned_ranges, ctx.free_ranges, begin_offset, end_offset);
+            if (overlap == 1) {
+                throw XException(
+                    "wire validation detected overlapping dynamic ranges");
             }
-            for (const auto& range : ctx.free_ranges) {
-                if (!(end <= range.begin || begin >= range.end)) {
-                    throw XException("wire validation detected live/free overlap");
-                }
+            if (overlap == 2) {
+                throw XException("wire validation detected live/free overlap");
             }
-            ctx.owned_ranges.push_back({begin, end});
+            if (!handled) ctx.owned_ranges.insert_disjoint(begin_offset, end_offset, extent);
+            /* XBV3: owned-registered */
         }
 
         inline void register_free_range(const void* ptr, std::size_t bytes,
@@ -2614,36 +3977,49 @@ namespace XOffsetDatastructure {
                                         const char* what) {
             if (bytes == 0 || !ptr) return;
             validate_storage_range(ptr, bytes, 1, ctx, what);
-            auto* begin = static_cast<const char*>(ptr);
-            auto* end = begin + bytes;
-            for (const auto& range : ctx.owned_ranges) {
-                if (!(end <= range.begin || begin >= range.end)) {
-                    throw XException(
-                        "wire validation detected free-list overlap with live ranges");
-                }
+            const auto begin_offset = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ptr) -
+                reinterpret_cast<std::uintptr_t>(ctx.base));
+            const auto end_offset = begin_offset + bytes;
+            const auto extent = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ctx.end) -
+                reinterpret_cast<std::uintptr_t>(ctx.base));
+            unsigned overlap = 0;
+            const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
+                ctx.owned_ranges, ctx.free_ranges, true,
+                begin_offset, end_offset, extent, overlap);
+            if (!handled) overlap = WireValidationByteIndex::overlap_priority(
+                ctx.owned_ranges, ctx.free_ranges, begin_offset, end_offset);
+            if (overlap == 1) {
+                throw XException(
+                    "wire validation detected free-list overlap with live ranges");
             }
-            for (const auto& range : ctx.free_ranges) {
-                if (!(end <= range.begin || begin >= range.end)) {
-                    throw XException(
-                        "wire validation detected overlapping free-list ranges");
-                }
+            if (overlap == 2) {
+                throw XException(
+                    "wire validation detected overlapping free-list ranges");
             }
-            ctx.free_ranges.push_back({begin, end});
+            if (!handled) ctx.free_ranges.insert_disjoint(begin_offset, end_offset, extent);
+            /* XBV3: free-registered */
         }
 
-        inline const char* checked_relative(const std::int32_t& delta,
+        XOFFSET_DETAIL_V4_INLINE const char* checked_relative(const std::int32_t& delta,
                                             const WireValidationContext& ctx) {
             auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
             auto* ptr = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(address));
             validate_storage_range(ptr, 1, 1, ctx, "wire validation: relative pointer out of bounds");
+            if (auto* bytes = XBufferCore::canonical_bytes_at(&delta,
+                    static_cast<std::uintptr_t>(address), 1))
+                return reinterpret_cast<const char*>(bytes);
             return ptr;
         }
 
-        inline void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
+        XOFFSET_DETAIL_V4_INLINE void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
             if (delta == 0 || checked_relative(delta, ctx) != reinterpret_cast<const char*>(ctx.allocator_state)) {
                 throw XException("wire validation: invalid allocator binding");
             }
         }
+
+#undef XOFFSET_DETAIL_V4_INLINE
 
         inline void register_allocation(const void* ptr, std::size_t bytes,
                                          std::size_t alignment, WireValidationContext& ctx,
@@ -2657,12 +4033,15 @@ namespace XOffsetDatastructure {
             validate_storage_range(header_ptr, sizeof(Header), alignof(Header), ctx,
                                    "wire validation: invalid allocation header address");
             Header header;
-            std::memcpy(&header, header_ptr, sizeof(header));
+            const auto* canonical = XBufferCore::canonical_bytes_at(ctx.base,
+                address - sizeof(Header), sizeof(Header));
+            std::memcpy(&header, canonical ? static_cast<const void*>(canonical)
+                : static_cast<const void*>(header_ptr), sizeof(header));
             if (header.user_offset != address - base || header.user_bytes < bytes ||
                 header.total_bytes != std::uint64_t(header.user_bytes) + sizeof(Header) ||
                 header.alignment < alignment || header.alignment > XBufferCore::MAX_PAYLOAD ||
                 (header.alignment & (header.alignment - 1)) != 0 ||
-                address % header.alignment != 0) {
+                (address & (header.alignment - 1u)) != 0) {
                 throw XException("wire validation: invalid allocation metadata");
             }
             if (free) register_free_range(header_ptr, header.total_bytes, ctx, "wire validation: invalid free allocation");
@@ -2671,6 +4050,51 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         void validate_wire_value(const T& value, WireValidationContext& ctx);
+        // True means that visiting a value can reject wire bytes or validate a
+        // binding/range. False is permitted only for an admitted representation
+        // whose old recursive validator has no observable checks at all.
+        template <typename T> struct wire_value_needs_validation;
+
+        template <typename T, std::size_t N = 0>
+        consteval bool reflected_member_needs_validation() {
+            if constexpr (N >= reflected_member_count<T>()) {
+                return false;
+            } else {
+                using namespace std::meta;
+                constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+                using Member = [:type_of(member):];
+                return wire_value_needs_validation<Member>::value ||
+                    reflected_member_needs_validation<T, N + 1>();
+            }
+        }
+        template <typename T>
+        struct wire_value_needs_validation {
+            using CleanT = std::remove_cv_t<T>;
+            static constexpr bool value = []() consteval {
+                if constexpr (!v1_wire_admitted<CleanT>()) {
+                    return true; // conservative for non-admitted/detail callers
+                } else if constexpr (std::is_same_v<CleanT, bool>) {
+                    return true; // representation bytes must still be checked
+                } else if constexpr (std::is_array_v<CleanT>) {
+                    return wire_value_needs_validation<std::remove_extent_t<CleanT>>::value;
+                } else if constexpr (fixed_size_scalar<CleanT> || std::is_enum_v<CleanT>) {
+                    return false; // enum values were not range-checked by V1
+                } else if constexpr (is_fixed_string_v<CleanT> || is_fixed_vector_v<CleanT> ||
+                                     is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT>) {
+                    return true; // also covers sorted-key checks and empty bindings
+                } else if constexpr (std::is_class_v<CleanT>) {
+                    // Admitted classes have no bases. Non-admitted classes took
+                    // the conservative branch above, retaining their old walk.
+                    return reflected_member_needs_validation<CleanT>();
+                } else {
+                    return true;
+                }
+            }();
+        };
+        template <typename T>
+        inline constexpr bool wire_value_needs_validation_v = wire_value_needs_validation<T>::value;
+
+
 
         inline void validate_wire_value(const XFixedString& value,
                                         WireValidationContext& ctx) {
@@ -2720,8 +4144,13 @@ namespace XOffsetDatastructure {
             validate_storage_range(data, bytes, alignof(T), ctx,
                                    "wire validation failed: XFixedVector payload out of bounds");
             register_allocation(data, (bytes + 7u) & ~std::size_t(7u), std::max<std::size_t>(alignof(T), 8), ctx);
-            for (std::uint32_t i = 0; i < value.size_; ++i) {
-                validate_wire_value(data[i], ctx);
+            if constexpr (wire_value_needs_validation_v<T>) {
+                for (std::uint32_t i = 0; i < value.size_; ++i) {
+                    /* XV4: checked-element-visited */
+                    validate_wire_value(data[i], ctx);
+                }
+            } else {
+                /* XV4: no-op-elements-elided */
             }
         }
 
@@ -2738,7 +4167,9 @@ namespace XOffsetDatastructure {
             using namespace std::meta;
             constexpr auto member =
                 nonstatic_data_members_of(^^T, access_context::unchecked())[N];
-            validate_wire_value(value.[:member:], ctx);
+            using Member = [:type_of(member):];
+            if constexpr (wire_value_needs_validation_v<Member>)
+                validate_wire_value(value.[:member:], ctx);
         }
 
         template <typename T>
@@ -2749,7 +4180,8 @@ namespace XOffsetDatastructure {
                 std::memcpy(&bits, &value, 1);
                 if (bits > 1) throw XException("wire validation: invalid bool representation");
             } else if constexpr (std::is_array_v<CleanT>) {
-                for (const auto& elem : value) validate_wire_value(elem, ctx);
+                if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
+                    for (const auto& elem : value) validate_wire_value(elem, ctx);
             } else if constexpr (is_fixed_string_v<CleanT>) {
                 validate_wire_value(static_cast<const XFixedString&>(value), ctx);
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
@@ -2769,7 +4201,7 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_fixed_vector_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
-            } else if constexpr (std::is_class_v<CleanT>) {
+            } else if constexpr (std::is_class_v<CleanT> && wire_value_needs_validation_v<CleanT>) {
                 for_each_reflected_subobject<CleanT>(
                     [&](auto index) {
                         validate_base_at<CleanT, decltype(index)::value>(value, ctx);
@@ -2793,7 +4225,7 @@ namespace XOffsetDatastructure {
             }
 
             auto arena_limit = static_cast<std::size_t>(
-                ctx.end - reinterpret_cast<const char*>(state));
+                reinterpret_cast<std::uintptr_t>(ctx.end) - reinterpret_cast<std::uintptr_t>(state));
             if (state->arena_begin < sizeof(XAllocatorStateV1) ||
                 state->arena_begin > state->arena_end ||
                 state->arena_end > arena_limit) {
@@ -2835,12 +4267,25 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        void verify_structural_wire_graph(const T& root, XBufferCore& xbuf) {
+        void verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
+                                          std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+            const auto used = xbuf.arena()->used_end;
+            const char* validated_end;
+            if (XBufferCore::canonical_bytes_at(xbuf.get_address(),
+                    reinterpret_cast<std::uintptr_t>(xbuf.get_address()), 1)) {
+                if (used > xbuf.segment_size())
+                    throw XException("wire validation: payload extent out of bounds");
+                validated_end = reinterpret_cast<const char*>(XBufferCore::canonical_bytes_at(
+                    xbuf.get_address(), reinterpret_cast<std::uintptr_t>(xbuf.get_address()) + used, 0));
+            } else validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             WireValidationContext ctx{
                 .base = static_cast<const char*>(xbuf.get_address()),
-                .end = static_cast<const char*>(xbuf.get_address()) + xbuf.arena()->used_end,
+                .end = validated_end,
                 .segment = xbuf.arena(),
-                .allocator_state = xbuf.template find_allocator_storage<XAllocatorStateV1>()
+                .allocator_state = xbuf.template find_allocator_storage<XAllocatorStateV1>(),
+                .range_resource{std::size_t{4096}, upstream},
+                .free_range_resource{std::size_t{4096}, upstream}
             };
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0) {
                 throw XException("wire validation: unsupported arena header flags");
@@ -2885,6 +4330,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         consteval bool can_relocate_without_allocation() {
             if constexpr (std::is_const_v<T> || !std::is_nothrow_destructible_v<T>) return false;
+            else if constexpr (detail::future_custom_lifetime_supported<T>()) return true;
             else if constexpr (std::is_array_v<T>) return can_relocate_without_allocation<std::remove_extent_t<T>>();
             else if constexpr (std::is_trivially_copyable_v<T> || is_owning_head<T>::value) return true;
             else if constexpr (std::is_class_v<T> && boost::typelayout::is_byte_copy_safe_v<T>) {
@@ -2898,12 +4344,63 @@ namespace XOffsetDatastructure {
             } else return false;
         }
 
+        // O3: detect a head embedded anywhere in the other's owned tree.
+        // No allocation, object relocation, or source mutation occurs here.
+        template <typename T>
+        bool move_assignment_owns_address(const T& value, const void* address) noexcept {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (std::is_trivially_copyable_v<CleanT>) {
+                return false;
+            } else if constexpr (std::is_array_v<CleanT>) {
+                for (const auto& child : value) {
+                    if (move_assignment_owns_address(child, address)) return true;
+                }
+                return false;
+            } else if constexpr (is_owning_head<CleanT>::value) {
+                if constexpr (detail::is_fixed_string_v<CleanT>) {
+                    return move_assignment_contains(value.data(),
+                        value.capacity_ ? std::size_t(value.capacity_) + 1u : 0u, address);
+                } else {
+                    if (move_assignment_contains(value.data(),
+                        std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address))
+                        return true;
+                    if constexpr (!std::is_trivially_copyable_v<typename CleanT::value_type>) {
+                        for (const auto& child : value) {
+                            if (move_assignment_owns_address(child, address)) return true;
+                        }
+                    }
+                    return false;
+                }
+            } else if constexpr (std::is_class_v<CleanT> &&
+                                 boost::typelayout::is_byte_copy_safe_v<CleanT>) {
+                bool found = false;
+                detail::for_each_reflected_subobject<CleanT>([&](auto index) {
+                    constexpr auto base = std::meta::bases_of(^^CleanT,
+                        std::meta::access_context::unchecked())[decltype(index)::value];
+                    using Base = [:std::meta::type_of(base):];
+                    if (!found) found = move_assignment_owns_address(
+                        static_cast<const Base&>(value), address);
+                }, [&](auto index) {
+                    constexpr auto member = std::meta::nonstatic_data_members_of(^^CleanT,
+                        std::meta::access_context::unchecked())[decltype(index)::value];
+                    if constexpr (!std::meta::is_bit_field(member)) {
+                        if (!found) found = move_assignment_owns_address(value.[:member:], address);
+                    }
+                });
+                return found;
+            } else {
+                return false;
+            }
+        }
+
         // Both slots must be in the same bounded arena. Only inline ownership
         // heads move; out-of-line payloads keep their addresses and ownership.
         template <typename T>
         void relocate_construct(T* dst, T& src) noexcept {
             static_assert(can_relocate_without_allocation<T>());
-            if constexpr (std::is_array_v<T>) {
+            if constexpr (detail::future_custom_lifetime_supported<T>()) {
+                detail::future_relocate_construct<T>(dst, src);
+            } else if constexpr (std::is_array_v<T>) {
                 for (std::size_t i = 0; i < std::extent_v<T>; ++i) relocate_construct(&(*dst)[i], src[i]);
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memcpy(dst, &src, sizeof(T));
@@ -2916,6 +4413,7 @@ namespace XOffsetDatastructure {
                 src.size_ = 0;
                 src.capacity_ = 0;
             } else {
+                dst = detail::begin_relocated_ordinary_outer<T>(dst, src);
                 detail::for_each_reflected_subobject<T>([&](auto index) {
                     constexpr auto base = std::meta::bases_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
                     using Base = [:std::meta::type_of(base):];
@@ -2924,6 +4422,115 @@ namespace XOffsetDatastructure {
                     constexpr auto member = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
                     relocate_construct(&((*dst).[:member:]), src.[:member:]);
                 });
+            }
+        }
+    } // namespace fixed_detail
+
+    // Customization is opt-in only. It must explicitly begin the COMPLETE T
+    // lifetime at a dead destination, transfer/rebase all inline ownership
+    // heads without allocating, and empty source ownership before destruction.
+    // Both slots belong to the same bounded arena. Nothrow syntax is checked;
+    // the semantic lifetime/ownership obligations remain the author's contract.
+    template<class T> struct StableEraseRelocator { static constexpr bool enabled = false; };
+    // Explicit SOURCE contract, not a reflection guess: T has only ordinary
+    // non-overlapping members, no [[no_unique_address]], union or bases. The
+    // mechanical gate also requires aggregate/implicit/standard layout, no
+    // bases/bit-fields and recursive support. Do not specialize for a type
+    // whose source layout has not been audited against these obligations.
+    template<class T> struct StableEraseOrdinaryMembers : std::false_type {};
+
+    namespace fixed_detail {
+        // [class.prop]: an aggregate whose destructor is not user-provided is
+        // implicit-lifetime, even when that destructor is nontrivial because a
+        // member owns storage. This independent standard branch does not
+        // specialize std traits or alter V1/TypeLayout admission. The fixed
+        // SDK's std trait is not used as a necessary condition for this branch.
+        template<class T> consteval bool stable_erase_implicit_lifetime() {
+            if constexpr (std::is_const_v<T> || std::is_volatile_v<T>) return false;
+            else if constexpr (std::is_implicit_lifetime_v<T>) return true;
+            else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> &&
+                               StableEraseOrdinaryMembers<T>::value) {
+                for (auto member : std::meta::members_of(^^T, std::meta::access_context::unchecked())) {
+                    if (std::meta::is_destructor(member)) {
+                        if (std::meta::is_user_provided(member)) return false;
+                    }
+                }
+                return true;
+            } else return false;
+        }
+        template<class T> consteval bool stable_erase_supported();
+        template<class T, std::size_t I> consteval bool stable_erase_member_supported() {
+            constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
+                std::meta::access_context::unchecked())[I];
+            if constexpr (std::meta::is_bit_field(member)) return false;
+            else {
+                using Member = [:std::meta::type_of(member):];
+                return stable_erase_supported<Member>();
+            }
+        }
+        template<class T> consteval bool stable_erase_supported() {
+            if constexpr (std::is_const_v<T> || std::is_volatile_v<T> ||
+                          !can_relocate_without_allocation<T>()) return false;
+            else if constexpr (StableEraseRelocator<T>::enabled) {
+                return requires(T* destination, T& source) {
+                    { StableEraseRelocator<T>::relocate_construct(destination, source) } noexcept -> std::same_as<void>;
+                };
+            } else if constexpr (is_owning_head<T>::value) return true;
+            else if constexpr (!stable_erase_implicit_lifetime<T>()) return false;
+            else if constexpr (std::is_array_v<T>) return stable_erase_supported<std::remove_extent_t<T>>();
+            else if constexpr (std::is_scalar_v<T>) return true;
+            else if constexpr (std::is_class_v<T> &&
+                               StableEraseOrdinaryMembers<T>::value &&
+                               std::is_aggregate_v<T> && std::is_standard_layout_v<T> &&
+                               (std::is_trivially_copyable_v<T> || boost::typelayout::is_byte_copy_safe_v<T>)) {
+                constexpr auto bases = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
+                constexpr auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
+                // A placement into an owning base is not by itself a proof of
+                // a base-subobject lifetime in a newly begun enclosing T.
+                if constexpr (bases != 0) return false;
+                else return []<std::size_t... I>(std::index_sequence<I...>) {
+                    return (stable_erase_member_supported<T, I>() && ...);
+                }(std::make_index_sequence<members>{});
+            } else return false;
+        }
+
+        template<class T> void stable_erase_relocate(T* destination, T& source) noexcept;
+        // The outer memcpy already began every eligible implicit subobject's
+        // lifetime. Only nontrivial ownership/custom subobjects need rebuilding.
+        template<class T> void stable_erase_rebase_subobjects(T* destination, T& source) noexcept {
+            if constexpr (StableEraseRelocator<T>::enabled || is_owning_head<T>::value) {
+                stable_erase_relocate(destination, source);
+            } else if constexpr (std::is_array_v<T>) {
+                for (std::size_t i = 0; i < std::extent_v<T>; ++i)
+                    stable_erase_rebase_subobjects(&(*destination)[i], source[i]);
+            } else if constexpr (!std::is_trivially_copyable_v<T> && std::is_class_v<T>) {
+                static_assert(std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size() == 0);
+                detail::for_each_reflected_subobject<T>([&](auto) {}, [&](auto index) {
+                    constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
+                        std::meta::access_context::unchecked())[decltype(index)::value];
+                    stable_erase_rebase_subobjects(&((*destination).[:member:]), source.[:member:]);
+                });
+            }
+        }
+        template<class T> void stable_erase_relocate(T* destination, T& source) noexcept {
+            static_assert(stable_erase_supported<T>());
+            if constexpr (StableEraseRelocator<T>::enabled) {
+                StableEraseRelocator<T>::relocate_construct(destination, source);
+            } else if constexpr (is_owning_head<T>::value) {
+                // These explicit constructors begin owning-head lifetimes even
+                // when they were not created by an enclosing implicit copy.
+                std::construct_at(destination, source.binding());
+                set_rel32(destination->data_delta, &destination->data_delta, source.data());
+                destination->size_ = source.size_;
+                destination->capacity_ = source.capacity_;
+                source.data_delta = 0; source.size_ = 0; source.capacity_ = 0;
+            } else {
+                static_assert(stable_erase_implicit_lifetime<T>());
+                // This copies only sizeof(T) INLINE bytes, never its dynamic
+                // payload. memcpy explicitly supplies implicit object creation;
+                // member-only construction would not begin a nonimplicit T.
+                std::memcpy(destination, &source, sizeof(T));
+                stable_erase_rebase_subobjects(destination, source);
             }
         }
     } // namespace fixed_detail
@@ -3239,6 +4846,9 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void reflect_init_all_impl(void* raw, Alloc alloc) {
+            if constexpr (future_custom_lifetime_supported<T>()) {
+                future_default_construct<T>(raw, alloc);
+            } else {
             std::size_t built = 0;
             try {
                 for_each_reflected_subobject<T>(
@@ -3254,12 +4864,18 @@ namespace XOffsetDatastructure {
                 destroy_reflected_prefix<T>(raw, built);
                 throw;
             }
+            }
         }
 
         template <typename T, typename Alloc>
         void reflect_init_all(void* raw, Alloc alloc) {
+            if constexpr (future_custom_lifetime_supported<T>()) {
+                future_default_construct<T>(raw, alloc);
+            } else {
             std::memset(raw, 0, sizeof(T));  // zero ONCE at top level
+            raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
             reflect_init_all_impl<T>(raw, alloc);
+            }
         }
 
         // ── Reflection Transfer (move/copy with allocator injection) ──
@@ -3296,6 +4912,9 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all_impl(void* dst, Src&& src, Alloc alloc) {
+            if constexpr (future_custom_lifetime_supported<T>()) {
+                future_transfer_construct<T>(dst, std::forward<Src>(src), alloc);
+            } else {
             std::size_t built = 0;
             try {
                 for_each_reflected_subobject<T>(
@@ -3311,12 +4930,18 @@ namespace XOffsetDatastructure {
                 destroy_reflected_prefix<T>(dst, built);
                 throw;
             }
+            }
         }
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all(void* dst, Src&& src, Alloc alloc) {
+            if constexpr (future_custom_lifetime_supported<T>()) {
+                future_transfer_construct<T>(dst, std::forward<Src>(src), alloc);
+            } else {
             std::memset(dst, 0, sizeof(T));  // zero ONCE at top level
+            dst = static_cast<void*>(begin_fresh_ordinary_outer<T>(dst));
             reflect_transfer_init_all_impl<T>(dst, std::forward<Src>(src), alloc);
+            }
         }
 
         // Internal wrapper: constructs T via reflection on raw storage.
@@ -3426,6 +5051,22 @@ namespace XOffsetDatastructure {
 
     // XBuffer — Single root object per buffer (make/root/has_root).
     // ========================================================================
+    namespace detail {
+        // Internal friend bridge; no Core/container/wire field is added.
+        struct VerifiedPathsAccess {
+            using Identity = XBufferCore::OwnerRecordPtr;
+            static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
+            static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
+            template<class T> static XWireHeaderV1 header(XBufferCore&, bool);
+            template<class T> static void save_into(XBufferCore&, std::string&);
+            static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
+            static void check_received_payload(XBufferCore&, const XWireHeaderV1&);
+            static void attach_owner(XBufferCore&);
+            static void rollback_storage(XBufferCore&, VirtualMemoryStorage&) noexcept;
+            template<class T> static void publish_received(XBufferCore&) noexcept;
+        };
+    }
+
     class XBuffer : public XBufferCore {
     public:
         XBuffer() = default;
@@ -3616,6 +5257,11 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
+        void save_verified_into(std::string& out) {
+            detail::VerifiedPathsAccess::save_into<T>(*this, out);
+        }
+
+        template <typename T>
         std::string save_verified() {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires a v1-admitted fixed-schema wire type.");
@@ -3646,11 +5292,11 @@ namespace XOffsetDatastructure {
             // Keep transport normalized. OS reservations are process-local metadata.
             header.reserved_bytes = header.used_bytes;
             header.root_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<const char*>(root_ptr) -
-                static_cast<const char*>(this->get_address()));
+                reinterpret_cast<std::uintptr_t>(root_ptr) -
+                reinterpret_cast<std::uintptr_t>(this->get_address()));
             header.allocator_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<const char*>(allocator_state) -
-                static_cast<const char*>(this->get_address()));
+                reinterpret_cast<std::uintptr_t>(allocator_state) -
+                reinterpret_cast<std::uintptr_t>(this->get_address()));
             header.root_type_id = detail::wire_root_type_id<T>();
             header.schema_hash_lo = detail::wire_schema_hash<T>();
             header.schema_hash_hi = 0;
@@ -3719,6 +5365,17 @@ namespace XOffsetDatastructure {
         template <typename T>
         static XBuffer load_verified(std::span<const std::byte> data,
                                      std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_verified_with_resource<T>(data, cap, std::pmr::new_delete_resource());
+        }
+
+        // Explicit host-only upstream. A fresh context and two fresh membership
+        // indexes are constructed for every invocation, including cached blocks.
+        // The upstream must outlive this synchronous call and be non-null.
+        template <typename T>
+        static XBuffer load_verified_with_resource(std::span<const std::byte> data,
+                                                  std::optional<MaximumCapacity> cap,
+                                                  std::pmr::memory_resource* upstream) {
+            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
             static_assert(is_v1_wire_admitted_v<T>,
                 "load_verified<T>() requires a v1-admitted fixed-schema wire type.");
             if (data.size_bytes() < sizeof(XWireHeaderV1)) {
@@ -3792,8 +5449,8 @@ namespace XOffsetDatastructure {
                     "load_verified<T>(): root not found");
             }
             auto actual_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<const char*>(root_ptr) -
-                static_cast<const char*>(xbuf.get_address()));
+                reinterpret_cast<std::uintptr_t>(root_ptr) -
+                reinterpret_cast<std::uintptr_t>(xbuf.get_address()));
             if (actual_offset != header.root_offset) {
                 throw XException(
                     "load_verified<T>(): root offset mismatch");
@@ -3804,13 +5461,13 @@ namespace XOffsetDatastructure {
                     "load_verified<T>(): allocator state not found");
             }
             auto actual_allocator_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<const char*>(allocator_state) -
-                static_cast<const char*>(xbuf.get_address()));
+                reinterpret_cast<std::uintptr_t>(allocator_state) -
+                reinterpret_cast<std::uintptr_t>(xbuf.get_address()));
             if (actual_allocator_offset != header.allocator_offset) {
                 throw XException(
                     "load_verified<T>(): allocator offset mismatch");
             }
-            detail::verify_structural_wire_graph(*root_ptr, xbuf);
+            detail::verify_structural_wire_graph(*root_ptr, xbuf, upstream);
             xbuf.typed_root_access_allowed_ = true;
             xbuf.bind_schema<T>();
             return xbuf;
@@ -3926,6 +5583,8 @@ namespace XOffsetDatastructure {
         }
 
         std::string save_verified() { return XBuffer::save_verified<T>(); }
+
+        void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
@@ -4227,5 +5886,9 @@ XOFFSET_REGISTER_MIGRATION_TYPE(XFixedString, AllocatorAware)
 XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedVector, Container)
 XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedFlatSet, Container)
 XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
+
+#include "xoffset_verified_paths.hpp"
+#include "xoffset_verified_receive.hpp"
+#include "xoffset_core_lifetime.hpp"
 
 #endif
