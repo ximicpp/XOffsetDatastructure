@@ -20,10 +20,10 @@ consteval bool future_custom_lifetime_supported() {
     else return false;
 }
 
+// W9: every destination is used as given (flat address model for ordinary and
+// receive storage alike); no canonical receive-array lookup.
 template<class T>
 void* future_custom_destination(void* storage) noexcept {
-    if (auto* bytes = XBufferCore::canonical_bytes_at(storage,
-            reinterpret_cast<std::uintptr_t>(storage), sizeof(T))) return bytes;
     return storage;
 }
 
@@ -68,8 +68,7 @@ T* begin_dynamic_array(void* storage, std::size_t capacity) noexcept {
     if (capacity == 0) return nullptr;
     assert(storage && capacity <= (std::numeric_limits<std::size_t>::max)() / sizeof(T));
     assert(reinterpret_cast<std::uintptr_t>(storage) % alignof(T) == 0);
-    if (auto* bytes = XBufferCore::canonical_bytes_at(storage,
-            reinterpret_cast<std::uintptr_t>(storage), capacity * sizeof(T))) storage = bytes;
+    // W9: flat storage address (no canonical receive-array lookup).
     // An explicit nonallocating allocation-function invocation implicitly
     // creates the ARRAY, even when its element is nonimplicit-lifetime.
     // Unknown-bound array pointer conversion/decay preserves that array
@@ -86,8 +85,7 @@ T* rebuild_dynamic_array(void* storage, std::size_t capacity,
     assert(storage && live_size <= capacity &&
            capacity <= (std::numeric_limits<std::size_t>::max)() / sizeof(T));
     assert(reinterpret_cast<std::uintptr_t>(storage) % alignof(T) == 0);
-    if (auto* bytes = XBufferCore::canonical_bytes_at(storage,
-            reinterpret_cast<std::uintptr_t>(storage), capacity * sizeof(T))) storage = bytes;
+    // W9: flat storage address (no canonical receive-array lookup).
     if constexpr (receive_raw::future_supported<T>()) {
         // memmove's temporary character copy preserves the live representation
         // around implicit object creation. This is NOT start_lifetime_as_array:
@@ -119,8 +117,7 @@ consteval bool ordinary_outer_lifetime_supported() {
 template<class T>
 T* begin_fresh_ordinary_outer(void* zeroed) noexcept {
     if constexpr (ordinary_outer_lifetime_supported<T>()) {
-        if (auto* bytes = XBufferCore::canonical_bytes_at(zeroed,
-                reinterpret_cast<std::uintptr_t>(zeroed), sizeof(T))) zeroed = bytes;
+        // W9: flat slot address (no canonical receive-array lookup).
         // The original caller already zeroed this whole fresh/dead slot.
         // A supported implicit ordinary T is actually created before forming
         // member addresses. Nonimplicit heads still use the original walk.
@@ -131,9 +128,7 @@ T* begin_fresh_ordinary_outer(void* zeroed) noexcept {
 template<class T>
 T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
     if constexpr (ordinary_outer_lifetime_supported<T>()) {
-        void* storage = destination;
-        if (auto* bytes = XBufferCore::canonical_bytes_at(destination,
-                reinterpret_cast<std::uintptr_t>(destination), sizeof(T))) storage = bytes;
+        void* storage = destination; // W9: flat slot address
         // Disjoint live source -> dead slot, only sizeof(T) INLINE bytes.
         // The following original walk rebases heads and empties source owns.
         return static_cast<T*>(std::memcpy(storage, &source, sizeof(T)));

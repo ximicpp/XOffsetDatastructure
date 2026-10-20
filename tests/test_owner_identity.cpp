@@ -242,15 +242,33 @@ void transfers_and_deterministic_reused_payload_base() {
 }
 
 void callback_during_allocation_diagnostic() {
+    // G: the failed no-growth attempt no longer constructs a diagnostic
+    // XBadAlloc, so with an empty state cache growth reaches no host
+    // allocation and gives new_handler no callback point at all.
+    {
+        auto from = make_buffer(); from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
+        source = &from; target = &from; auxiliary = &from; active = ref;
+        HandlerScope handler(Action::reenter); host::fail_after = 0;
+        void* raw = fd::allocate_dynamic_bytes(ref, 65536, 8);
+        need(host::calls == 0 && host::fail_after == 0, "growth probe reached a host allocation/new_handler");
+        host::fail_after = -1;
+        need(raw && from.root<OwnerRoot>().numbers[0] == 29, "growth probe allocation failed");
+        std::memset(raw, 0x43, 65536); fd::retire_dynamic_bytes(ref, raw, 65536);
+    }
+    // The recovery path's remaining callback point, release_cached_blocks'
+    // host reservation, still sees owner transfer/release/reentry and the
+    // original revalidation outcomes.
     for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
         auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
         from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
+        auto* cached = fd::allocate_dynamic_bytes(ref, 32, 8); fd::retire_dynamic_bytes(ref, cached, 32);
+        need(ref.state->free_bytes == 32, "fixture cached block missing");
         source = &from; target = &to; auxiliary = &unrelated; active = ref;
         HandlerScope handler(which); host::fail_after = 0;
         void* raw = nullptr; bool caught = false;
         try { raw = fd::allocate_dynamic_bytes(ref, 65536, 8); }
         catch (const xo::XException&) { caught = true; }
-        need(host::calls == 1, "allocation diagnostic new_handler not exercised");
+        need(host::calls == 1, "allocation recovery new_handler not exercised");
         if (which == Action::release) {
             need(caught && from.data() == nullptr, "released payload identity revived/read");
         } else {

@@ -9,6 +9,7 @@
 #include <memory>
 #include <new>
 #include <stdexcept>
+#include <span>
 #include <string>
 #include <utility>
 #ifdef _WIN32
@@ -311,6 +312,60 @@ void parent_child_alias_guards() {
     ++cases;
 }
 
+// MV: the inline leaf owns evaluation, the reused source binding and the
+// split release/set_rel32 paths must be result-identical to the generic code.
+template <typename Head>
+void owns_equivalence_for(const Head& head, const unsigned char* lo, const unsigned char* hi) {
+    for (const unsigned char* p = lo; p <= hi; ++p) {
+        const bool generic = fixed_detail::move_assignment_owns_address(head, p);
+        const bool fast = fixed_detail::move_assignment_owns_address_fast(head, p);
+        require(generic == fast, "inline leaf owns differs from generic owns");
+    }
+}
+void leaf_owns_and_binding_reuse() {
+    auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
+    // Exhaustive containment around storage edges: string (capacity+1 bytes),
+    // u32 vector (capacity*4 bytes), empty, zero-capacity-with-storage and
+    // a non-leaf vector (generic path through the wrapper).
+    r.left.assign("edge-string-payload"); r.a.resize(9, 3u); r.records.resize(2); fill(r.records[0], 1);
+    auto window = [](const void* data, std::size_t n) {
+        auto* p = static_cast<const unsigned char*>(data);
+        return std::pair{p - 24, p + n + 24};
+    };
+    { auto [lo, hi] = window(r.left.data(), r.left.capacity() + 1u); owns_equivalence_for(r.left, lo, hi); }
+    { auto [lo, hi] = window(r.a.data(), r.a.capacity() * 4u); owns_equivalence_for(r.a, lo, hi); }
+    { auto [lo, hi] = window(r.records.data(), r.records.capacity() * sizeof(MoveRecord));
+      owns_equivalence_for(r.records, lo, hi); }
+    { auto [lo, hi] = window(r.records[0].labels[0].data(), 32); owns_equivalence_for(r.records, lo, hi); }
+    owns_equivalence_for(r.right, reinterpret_cast<const unsigned char*>(&r), reinterpret_cast<const unsigned char*>(&r) + 64);
+    r.b.reserve(8); r.b.clear();
+    { auto [lo, hi] = window(r.b.data(), 32); owns_equivalence_for(r.b, lo, hi); }
+    // Alias guard on a leaf vector: a destination head placed inside the
+    // source's own element storage must still take the copy fallback.
+    r.b.resize(8, 0x11111111u); auto* storage = r.b.data();
+    auto* inner = std::construct_at(reinterpret_cast<XFixedVector<std::uint32_t>*>(storage + 4), r.b.binding());
+    *inner = std::move(r.b);
+    require(r.b.data() == storage && r.b.size() == 8 && inner->data() != storage && inner->size() == 8,
+        "leaf descendant destination stole its own owning allocation");
+    std::destroy_at(inner);
+    // Two distinct allocator states in one arena: never the same allocator,
+    // so the reused-binding shortcut must not apply (copy fallback).
+    auto* second = static_cast<XAllocatorStateV1*>(buffer.arena()->allocate_aligned(sizeof(XAllocatorStateV1), alignof(XAllocatorStateV1)));
+    std::construct_at(second); fixed_detail::initialize_allocator_state(*second, buffer.arena());
+    r.right.bind(fixed_detail::allocator_ref_of(second)); r.right.assign("other-state");
+    auto* text = r.right.data();
+    r.left = std::move(r.right);
+    require(r.left.view() == "other-state" && r.left.data() != text && r.right.data() == text,
+        "distinct allocator states were treated as one allocator");
+    require(r.left.allocator_state() != second && r.right.allocator_state() == second, "bindings changed");
+    // Same state: transfer, live destination retires through the out-of-line path.
+    r.b.resize(0); r.a.assign_range(std::span<const std::uint32_t>(std::array<std::uint32_t,3>{1,2,3}));
+    r.b.resize(5, 9u); auto* values = r.b.data();
+    r.a = std::move(r.b);
+    require(r.a.data() == values && r.a.size() == 5 && r.b.data() == nullptr, "same-state transfer");
+    ++cases;
+}
+
 void reloaded_moves() {
     auto original = make_buffer(); auto& r = original.root<MoveRoot>();
     r.left.assign("replace"); r.right.assign("loaded-value"); r.a.push_back(1); r.b.push_back(55);
@@ -388,6 +443,7 @@ int main() {
         same_arena_and_self(); empty_capacity_transfer(); cross_arena_and_provenance();
         unbound_fallback(); nested_compaction_and_rebuild(); parent_child_alias_guards();
         reloaded_moves(); retire_metadata_failure(); cross_arena_failure_guarantees();
+        leaf_owns_and_binding_reuse();
         std::cout << "{\"status\":\"passed\",\"cases\":" << cases
                   << ",\"small_fast_new_attempts\":" << fast_new_attempts
                   << ",\"retire_new_attempts\":" << retire_new_attempts

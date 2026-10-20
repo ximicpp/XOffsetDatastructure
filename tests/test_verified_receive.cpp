@@ -12,6 +12,10 @@
 #include <string>
 #include <array>
 #include <optional>
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #if defined(XOFFSET_VERIFIED_RECEIVE_API)
 #include "receive_custom_future_examples.hpp"
 #endif
@@ -453,6 +457,31 @@ void custom_future_lifetimes(){
 }
 #endif
 }
+#if !defined(_WIN32)
+// Fork policy (registry and VM pool have no atfork handlers): with no other
+// thread inside the library at fork time, a child can load ordinary buffers,
+// receive, and read buffers received before the fork; the parent's buffer is
+// unaffected. A child of a parent with concurrent library activity may only exec.
+void fork_after_receive(){
+    auto source=make_source();const auto wire=source.save_verified();
+    auto token=receive(wire);auto parent=xo::finish_verified(token);check(parent.root());
+    const pid_t pid=::fork();need(pid>=0,"fork failed");
+    if(pid==0){
+        int code=0;
+        try{
+            auto loaded=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);check(loaded.root());
+            const auto cap=xo::XBuffer::maximum_capacity(wire.size()+65536).with_growth(xo::XGrowPolicy::Automatic);
+            auto child_token=receive(wire,cap);auto child=xo::finish_verified(child_token);check(child.root());
+            check(parent.root());exercise_edit(child);
+            if(child.get_address()==parent.get_address())code=2;
+        }catch(...){code=1;}
+        std::_Exit(code);
+    }
+    int status=0;
+    need(::waitpid(pid,&status,0)==pid&&WIFEXITED(status)&&WEXITSTATUS(status)==0,"forked child could not load or receive");
+    check(parent.root());
+}
+#endif
 int main(int argc,char**argv){try{
     if(argc==3&&std::string_view(argv[1])=="--write-wire"){
         auto source=make_source();auto wire=source.save_verified();std::ofstream f(argv[2],std::ios::binary);f.write(wire.data(),wire.size());need(bool(f),"write failed");return 0;
@@ -471,6 +500,9 @@ int main(int argc,char**argv){try{
     stage="rollback-rejection";rollback_and_rejection();stage="VM-newhandler";vm_failures_and_new_handler();
     stage="canonical-external-many";canonical_external_heads_and_many_owners();
     stage="custom-future";custom_future_lifetimes();
+#if !defined(_WIN32)
+    stage="fork";fork_after_receive();
+#endif
     std::cout<<"verified receive: six groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V1 passed\n";
 #else
     throw std::runtime_error("full tests need receive API; baseline supports V1 CLI only");
