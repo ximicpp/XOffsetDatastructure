@@ -1,0 +1,67 @@
+{
+  "algorithm": "SHA256(UTF-8 json.dumps(production_files, sort_keys=True, separators=(\",\",\":\"))) with bytes as int (combined_full/business/prepare.py)",
+  "candidate_id": "xoffset-mac-w9-flat-v1",
+  "commit_label": "7539433ab96d69c4a07b1db5c0a13786da85cdcd",
+  "kind": "mac-business-xoffset-identity",
+  "name": "w9a",
+  "note": "W9a = W9 + #undef of MV helper macros (machine code of the bench driver identical to W9).",
+  "production_files": {
+    "receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "receive_raw.hpp": {
+      "bytes": 50706,
+      "sha256": "71086f831423897974c4e17150ce59cb9cf742fd61de9f53e2a65165782bb537"
+    },
+    "receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "xoffset_core_lifetime.hpp": {
+      "bytes": 6868,
+      "sha256": "e4571e132369d0fb305275e78ff39f7c90a21669a6e7f93a0ca264762a526821"
+    },
+    "xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "bytes": 22532,
+      "sha256": "5ce20e40dd5561e642a8ab3b35baa12e8e1d4ce0fb8bc4d12341404d5c396458"
+    },
+    "xoffsetdatastructure.hpp": {
+      "bytes": 284151,
+      "sha256": "a1593020d4a928086f7788ed4ff06c0a32ce2ee777c15fbbbf875f3999273f5d"
+    }
+  },
+  "source_content_sha256": "6ce627e5bae69329ac928b6c80b9920930b693b6543449464998778cdfcc89fb"
+}

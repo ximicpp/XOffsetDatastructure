@@ -95,6 +95,18 @@ void run(const Opts& o){
     field("major_faults",std::to_string(primary_usage.ru_majflt-initial_usage.ru_majflt));field("record_count",std::to_string(record_count));result<<"}\n";
     write(arg(o,"--wire-out"),sc::wire_view(final_wire));write(arg(o,"--canonical-out"),canonical);write(arg(o,"--queries-out"),queries);write(arg(o,"--result"),result.str());
 }
+void stagecount(const Opts& o){
+    // DIAGNOSTIC ONLY (build with XOFFSET_FREELIST_INDEX_DIAGNOSTICS=1): per-stage freelist counters + minor faults.
+    allow(o,{"--wire","--trace"});auto input=read(arg(o,"--wire"));const auto trace=sc::decode_trace(read(arg(o,"--trace")));
+    auto state=A::load(input);sc::Bytes{}.swap(input);std::size_t next=0;
+    for(std::size_t si=0;si<trace.stages.size();++si){const auto& e=trace.stages[si];auto start=next;
+        while(next<trace.mutations.size()&&trace.mutations[next].stage==e.stage)++next;
+        XOffsetDatastructure::detail::reset_freelist_index_stats();auto u0=usage();auto a=Clock::now();
+        A::mutate(state,std::span(trace.mutations).subspan(start,next-start));
+        auto b=Clock::now();auto u1=usage();
+        std::cout<<"{\"stage\":"<<si+1<<",\"ns\":"<<duration(a,b)<<",\"minflt\":"<<(u1.ru_minflt-u0.ru_minflt)<<",\"freelist\":";
+        XOffsetDatastructure::detail::write_freelist_index_stats(std::cout);std::cout<<"}\n";}
+}
 void loadloop(const Opts& o){
     // DIAGNOSTIC ONLY: repeat verified load of the input wire for profilers.
     allow(o,{"--wire","--iters"});const auto input=read(arg(o,"--wire"));const auto iters=std::stoul(arg(o,"--iters"));std::uint64_t total=0;
@@ -150,6 +162,7 @@ int main(int argc,char** argv){
         else if(command=="stageloop")stageloop(o);
         else if(command=="stagesnap")stagesnap(o);
         else if(command=="loadloop")loadloop(o);
+        else if(command=="stagecount")stagecount(o);
         else throw std::runtime_error("unknown command");
         return 0;
     }catch(const std::exception& e){std::cerr<<"serialization comparison rejected: "<<e.what()<<'\n';return 2;}

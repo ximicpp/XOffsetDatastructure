@@ -39,6 +39,7 @@ source_for() {
   case "$1" in
     c14) echo /Volumes/XOffsetCS/results/full-native-c14-p2996d77-20261020/source ;;
     r1m2) echo /Volumes/XOffsetCS/candidate-r1m2-20261020 ;;
+    w9a) echo /Volumes/XOffsetCS/candidates/w9a ;;
     *) echo "bad source $1" >&2; exit 2 ;;
   esac
 }

@@ -1,0 +1,56 @@
+input: file=13119264 used_end=13119176 segment_size(after load)=13119176
+initial blocks=196611
+events=114689  stray_core_alloc=0 core_dealloc=0 core_free_reuse=0 release_cached_blocks=0 growths=1 segment_size(after mutate)=26238352
+final canonical digest matches trace
+real final: used_end=17215176 emitted wire=17215264 sha256=26832b5c69156dc127a124b88c4e2bd80c5b9a9704595596ef7a6a734f25bcdb
+real final free lists: blocks=8192 sum(block_bytes)=1440576 free_bytes=1440576
+stream: alloc=53248 (free-list 36864, core 16384)  retire=45056  expand=16384 (ok 0)  fallback-allocs=16384  no-growth-probe-fail=1  rcb=0  retire/capacity mismatch=0  events between fallback alloc and old retire=0  max align=8
+
+policy                           wire      saved  saved% | live_slack  freeblk free_bytes maxfree    splits  merges  capped  fl_hit  bumps  divA  divB
+[P0 check] shadow used_end=17215176 real=17215176 offset mismatches=0 free blocks=8192/8192 free bytes=1440576/1440576 gaps=0 rcb=0
+[P4] live blocks=204803 live_req=11773552 -> lower-bound wire=15050536
+P0 current                   17215264          0   0.00% |     593080     8192    1440576     384         0       0       0   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P1 split-on-reuse            17215264          0   0.00% |      43088    14240    1893800     384      6048       0       0   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P1' split+phys-retire        17215264          0   0.00% |      43088    14240    1893800     384      6048       0       0   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P2 coalesce(cap 256K)        18063304    -848040  -4.93% |    3012768        0          0       0         0   22473       3   22583  30665     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P3 split+coalesce            17215264          0   0.00% |     101680     1617    2037176  230384     17568   24143       3   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P2u coalesce uncapped        18063384    -848120  -4.93% |    3012848        0          0       0         0   22476       0   22580  30668     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P3u split+coal uncapped      17215264          0   0.00% |     101680     1614    2037224  819184     17568   24146       0   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=1 gaps=0
+P2T coalesce+tail-trim       18063304    -848040  -4.93% |    3012768        0          0       0         0   22473       3   22583  30665     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+P3T split+coal+trim          17215264          0   0.00% |     101680     1617    2037176  230384     17568   24143       3   36864  16384     0     0  rcb=0 corefree=0/0 trims=0 overcap_free=0 gaps=0
+
+-- per stage: P0 current --
+ stg  bumps    bump_B req_min req_max  fl_hit   retires   used_end    free_B maxfree mxf@bump  splits  merges
+   1      0         0       0       0       0         0   13119176         0       0        0       0       0
+   2   4096    622592     136     136       0      4096   13741768    165424      72       72       0       0
+   3   4096   1114112     256     256       0      4096   14855880    689712     128      128       0       0
+   4   4096   1638400     384     384       0      4096   16494280   1214000     128      128       0       0
+   5      0         0       0       0    4096      4096   16494280    983168     128        0       0       0
+   6   4096    720896     160     160    8192      4096   17215176    917632     128      128       0       0
+   7      0         0       0       0       0     24576   17215176   2508256     384        0       0       0
+   8      0         0       0       0   24576         0   17215176   1440576     384        0       0       0
+   9      0         0       0       0       0         0   17215176   1440576     384        0       0       0
+
+-- per stage: P2 coalesce(cap 256K) --
+ stg  bumps    bump_B req_min req_max  fl_hit   retires   used_end    free_B maxfree mxf@bump  splits  merges
+   1      0         0       0       0       0         0   13119176         0       0        0       0       0
+   2   4096    622592     136     136       0      4096   13741768    165424      72       72       0       0
+   3   4096   1114112     256     256       0      4096   14855880    689712     128      128       0       0
+   4   4096   1638400     384     384       0      4096   16494280   1214000     128      128       0       0
+   5      0         0       0       0    4096      4096   16494280    983168     128        0       0       0
+   6   4096    720896     160     160    8192      4096   17215176    917632     128      128       0       0
+   7      0         0       0       0       0     24576   17215176   2867824  230384        0       0   22473
+   8  14281    848040       8     128   10295         0   18063216         0       0        0       0   22473
+   9      0         0       0       0       0         0   18063216         0       0        0       0   22473
+
+-- per stage: P3u split+coal uncapped --
+ stg  bumps    bump_B req_min req_max  fl_hit   retires   used_end    free_B maxfree mxf@bump  splits  merges
+   1      0         0       0       0       0         0   13119176         0       0        0       0       0
+   2   4096    622592     136     136       0      4096   13741768    165424      72       72       0       0
+   3   4096   1114112     256     256       0      4096   14855880    689712     128      128       0       0
+   4   4096   1638400     384     384       0      4096   16494280   1214000     128      128       0       0
+   5      0         0       0       0    4096      4096   16494280   1103440     128        0    1947       0
+   6   4096    720896     160     160    8192      4096   17215176   1370016     128      128    6042       0
+   7      0         0       0       0       0     24576   17215176   3346976  819184        0    6042   24146
+   8      0         0       0       0   24576         0   17215176   2037224  819184        0   17568   24146
+   9      0         0       0       0       0         0   17215176   2037224  819184        0   17568   24146
