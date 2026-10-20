@@ -1,0 +1,13 @@
+primary passed 7 /12  aa_valid True
+cista:read_sum           geo 0.936 ub 0.954 thr 1.05 PASS
+cista:mutate             geo 0.994 ub 1.011 thr 1.05 PASS
+cista:emit_after         geo 0.210 ub 0.214 thr 0.20 fail
+flatbuffers:read_sum     geo 0.748 ub 0.759 thr 1.05 PASS
+flatbuffers:mutate       geo 0.865 ub 0.883 thr 1.05 PASS
+flatbuffers:emit_after   geo 0.196 ub 0.200 thr 0.20 fail
+capnproto:read_sum       geo 0.265 ub 0.268 thr 1.05 PASS
+capnproto:mutate         geo 0.351 ub 0.357 thr 1.05 PASS
+capnproto:emit_after     geo 0.552 ub 0.563 thr 0.20 fail
+cereal:read_sum          geo 1.026 ub 1.040 thr 1.05 PASS
+cereal:mutate            geo 1.437 ub 1.464 thr 1.05 fail
+cereal:emit_after        geo 0.272 ub 0.278 thr 0.20 fail

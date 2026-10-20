@@ -1,0 +1,35 @@
+{
+ "schema": "xoffset-mac-formal-v1",
+ "name": "W9-formal-mac-v1",
+ "candidate": "W9 = R1+M2 + G1 (receive keeps full zeroing) + G + MV, no canonical window, flat-address resolution for all storage (user chose degraded receive provenance); source /Volumes/XOffsetCS/candidates/w9",
+ "binaries": {
+  "xoffset_cand": "fdd030b513a313ac06071a9eac2c0ac40ee00ae76b68e8a17749567d0b747765",
+  "xoffset_cand_aa": "fdd030b513a313ac06071a9eac2c0ac40ee00ae76b68e8a17749567d0b747765",
+  "xoffset_c14": "4febd3c359d51c9dc7520c2865e7d62b328e966a44f17ecf56116ef52f3b76fc",
+  "xoffset_r1m2": "e2beea21f3f50a57b5855bf3f7f94204ae8af60463615aef8bb244f2ca375fc8",
+  "cista": "13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31",
+  "flatbuffers": "684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade",
+  "capnproto": "5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a",
+  "cereal": "c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565"
+ },
+ "formal_py_sha256": "19b9ea0c31f8785a72face5c3a07853f687df5ad50e65b03a7d943c36983cc5b",
+ "metadata": "restore alpha-era serialization_comparison adapters/driver (final-v4 C++ side not transferred); competitors cista 0.16 / FlatBuffers 25.12.19 / Cap'n Proto 1.5.0 / cereal 1.3.2 at locked commits, modes unchanged, built natively on Mac",
+ "fixture": "M from prepared-v1 regenerated on Mac (S equals golden); each library uses its own M input wire from the Mac functional run",
+ "design": "65 macro cycles x 3 rounds; each round runs all 8 binaries once in an order shuffled by random.Random(20261020+round); first 1 cycle discarded (pre-registered); inference on per-cycle mean log ratios, df=63",
+ "primary": {
+  "family": "12 = {cista,flatbuffers,capnproto,cereal} x {read_sum<=1.05, mutate<=1.05, emit_after<=0.20}; ratio xoffset_cand/competitor",
+  "rule": "joint one-sided 95% upper bound, critical t(1-0.05/12, df); an item passes iff upper bound <= its threshold"
+ },
+ "aa": {
+  "pair": "xoffset_cand_aa/xoffset_cand",
+  "rule": "two-sided t(1-0.05/(2*8), df) intervals for 8 phases must lie within [1/1.05, 1.05]; failure invalidates the batch (reported, not rerun)"
+ },
+ "auxiliary": {
+  "items": "reload ratio vs each competitor; cand/C14 and cand/R1M2 for read_sum, mutate, emit_after, reload, total",
+  "rule": "two-sided t(1-0.05/(2*14), df); report only, no gate"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or rerun; any child failure aborts the batch as failed; child timeout 30 s",
+ "host": "macOS-26.3-arm64-arm-64bit-Mach-O",
+ "frozen_epoch": 1792491462.1242251,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}
