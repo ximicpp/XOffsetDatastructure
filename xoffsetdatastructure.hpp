@@ -365,12 +365,31 @@ namespace XOffsetDatastructure {
         };
         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
-        // Host-only canonical address recovery. The exact numeric comparator
-        // uses the declared flat-address ABI for search; dereference pointers
-        // still come only from the retained real placement byte[MAX] array.
+        // Host-only canonical address recovery (public API kept unchanged from
+        // R1+M2 for source compatibility). The exact numeric comparator uses
+        // the declared flat-address ABI for search; returned pointers come
+        // from the retained real placement byte[MAX] array of a receive owner.
+        // W9: the library's OWN resolution (rel32 heads, free lists, headers,
+        // wire validation, lifetime helpers) no longer calls this: receive data
+        // is resolved by flat origin + delta exactly like ordinary loads, i.e.
+        // it relies on the same disclosed implementation-defined
+        // pointer-from-address behaviour, not on the receive byte array.
         static std::byte* canonical_bytes_at(const void* anchor,
                 std::uintptr_t target, std::size_t bytes) noexcept {
             if (canonical_active_count_.load(std::memory_order_acquire) == 0) return nullptr;
+            return canonical_bytes_at_active(anchor, target, bytes);
+        }
+
+    private:
+        // Keep the inactive acquire-load/return in the small public helper.
+        // The active path retains all original owner/TLS/registry semantics.
+#if defined(_MSC_VER)
+        __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+        __attribute__((noinline))
+#endif
+        static std::byte* canonical_bytes_at_active(const void* anchor,
+                std::uintptr_t target, std::size_t bytes) noexcept {
             const auto address = reinterpret_cast<std::uintptr_t>(anchor);
             auto live = [](const OwnerRecordPtr& r) noexcept {
                 return r && r->owner.load(std::memory_order_acquire);
@@ -443,6 +462,7 @@ namespace XOffsetDatastructure {
             return recover(record);
         }
 
+    public:
         XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
         void set_growth_policy(XGrowPolicy policy) noexcept { growth_policy_ = policy; }
         detail::VmReclaimResult reclaim_tail_pages() noexcept { return buffer_.reclaim_tail(); }
@@ -701,6 +721,10 @@ namespace XOffsetDatastructure {
             // Globals may first register in main and unregister after ordinary
             // function statics have been destroyed. The index and mutex share
             // process lifetime; its nodes are erased as owners are destroyed.
+            // Fork policy: no atfork handlers (VmStoragePool follows the same
+            // policy). A child forked while another thread was inside the
+            // library may only exec; forking while no other thread is inside
+            // the library is supported.
             alignas(RegistryState) static std::byte storage[sizeof(RegistryState)];
             static auto* state = ::new (static_cast<void*>(storage)) RegistryState;
             return *state;
@@ -996,9 +1020,22 @@ namespace XOffsetDatastructure {
             return true;
         }
 
-        void* allocate_aligned_impl(std::uint32_t bytes, std::size_t alignment, bool allow_growth = true) {
+        template <bool Probe>
+        static void* allocation_failure() {
+            if constexpr (Probe) return nullptr;
+            else throw XBadAlloc();
+        }
+
+        // G: one body for the throwing entry and a non-throwing no-growth
+        // probe. Probe=true returns nullptr at EXACTLY the points where
+        // allocate_aligned_impl(bytes, alignment, false) throws XBadAlloc, and
+        // performs the same state changes otherwise. With allow_growth=false,
+        // ensure_allocation_extent cannot grow or throw, and nothing else in
+        // the body can throw, so the probe is noexcept and allocates nothing.
+        template <bool Probe>
+        void* allocate_aligned_body(std::uint32_t bytes, std::size_t alignment, bool allow_growth) {
             if (bytes > MAX_PAYLOAD || alignment == 0 ||
-                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
+                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) return allocation_failure<Probe>();
             if (bytes == 0) bytes = 1;
             alignment = std::max<std::size_t>(alignment, alignof(std::max_align_t));
 
@@ -1017,16 +1054,16 @@ namespace XOffsetDatastructure {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto limit = (std::numeric_limits<std::uintptr_t>::max)();
             if (current_end > limit - base || sizeof(AllocationHeader) > limit - base - current_end)
-                throw XBadAlloc();
+                return allocation_failure<Probe>();
             const auto first_address = base + current_end + sizeof(AllocationHeader);
-            if (alignment - 1u > limit - first_address) throw XBadAlloc();
+            if (alignment - 1u > limit - first_address) return allocation_failure<Probe>();
             const auto user_address = align_up(first_address, alignment);
             const size_type user_offset = user_address - base;
             if (user_offset > MAX_PAYLOAD || bytes > MAX_PAYLOAD - user_offset)
-                throw XBadAlloc();
+                return allocation_failure<Probe>();
             const size_type block_begin = user_offset - sizeof(AllocationHeader);
             const size_type block_end = user_offset + bytes;
-            if (!ensure_allocation_extent(block_end, allow_growth)) throw XBadAlloc();
+            if (!ensure_allocation_extent(block_end, allow_growth)) return allocation_failure<Probe>();
 
             auto* header = ::new (static_cast<void*>(payload_byte_address(block_begin))) AllocationHeader;
             header->total_bytes = static_cast<std::uint32_t>(block_end - block_begin);
@@ -1035,6 +1072,14 @@ namespace XOffsetDatastructure {
             header->alignment = static_cast<std::uint32_t>(alignment);
             sm->used_end = std::max<std::uint64_t>(sm->used_end, block_end);
             return payload_byte_address(user_offset);
+        }
+
+        void* allocate_aligned_impl(std::uint32_t bytes, std::size_t alignment, bool allow_growth = true) {
+            return allocate_aligned_body<false>(bytes, alignment, allow_growth);
+        }
+
+        void* try_allocate_aligned_without_growth(std::uint32_t bytes, std::size_t alignment) noexcept {
+            return allocate_aligned_body<true>(bytes, alignment, false);
         }
 
         bool try_expand_impl(void* ptr, std::uint32_t bytes, std::size_t alignment) {
@@ -1325,18 +1370,34 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         bool move_assignment_owns_address(const T& value, const void* address) noexcept;
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_MOVE_INLINE __forceinline
+#define XOFFSET_DETAIL_MOVE_COLD __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_MOVE_INLINE inline __attribute__((always_inline))
+#define XOFFSET_DETAIL_MOVE_COLD __attribute__((noinline, cold))
+#else
+#define XOFFSET_DETAIL_MOVE_INLINE inline
+#define XOFFSET_DETAIL_MOVE_COLD
+#endif
+        // MV: result-identical to move_assignment_owns_address; leaf heads are
+        // evaluated inline at the move-assignment call site.
+        template <typename T>
+        XOFFSET_DETAIL_MOVE_INLINE bool move_assignment_owns_address_fast(
+            const T& value, const void* address) noexcept;
 
         template <typename T> consteval bool stable_erase_supported();
         template <typename T> void stable_erase_relocate(T*, T&) noexcept;
         template <typename T> consteval bool can_relocate_without_allocation();
         template <typename T> void relocate_construct(T* dst, T& src) noexcept;
 
+        // W9: flat resolution for every storage kind (ordinary and receive):
+        // origin + delta, with no canonical lookup, atomic or window compare.
+        // Receive data no longer derives pointers from the receive byte array;
+        // it uses the same disclosed flat-address model as ordinary loads.
         template <typename T>
         T* resolve_rel32(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
-            const auto target = reinterpret_cast<std::uintptr_t>(origin) + delta;
-            if (auto* bytes = XBufferCore::canonical_bytes_at(origin, target, sizeof(T)))
-                return std::launder(reinterpret_cast<T*>(bytes));
             auto* base = reinterpret_cast<const char*>(origin);
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
@@ -1344,14 +1405,18 @@ namespace XOffsetDatastructure {
         template <typename T>
         const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
-            const auto target = reinterpret_cast<std::uintptr_t>(origin) + delta;
-            if (auto* bytes = XBufferCore::canonical_bytes_at(origin, target, sizeof(T)))
-                return std::launder(reinterpret_cast<const T*>(bytes));
             auto* base = reinterpret_cast<const char*>(origin);
             return std::launder(reinterpret_cast<const T*>(base + delta));
         }
 
-        inline void set_rel32(std::int32_t& field, const void* origin, const void* target) {
+        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void throw_rel32_range() {
+            throw XException(
+                "relative offset exceeds rel32 range");
+        }
+
+        // MV: identical checks and store; only the throw is out of line, so
+        // the range test inlines at every call site.
+        XOFFSET_DETAIL_MOVE_INLINE void set_rel32(std::int32_t& field, const void* origin, const void* target) {
             if (!target) {
                 field = 0;
                 return;
@@ -1359,9 +1424,8 @@ namespace XOffsetDatastructure {
             auto delta = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(target)) -
                          static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(origin));
             if (delta < static_cast<std::ptrdiff_t>(std::numeric_limits<std::int32_t>::min()) ||
-                delta > static_cast<std::ptrdiff_t>(std::numeric_limits<std::int32_t>::max())) {
-                throw XException(
-                    "relative offset exceeds rel32 range");
+                delta > static_cast<std::ptrdiff_t>(std::numeric_limits<std::int32_t>::max())) [[unlikely]] {
+                throw_rel32_range();
             }
             field = static_cast<std::int32_t>(delta);
         }
@@ -1428,20 +1492,14 @@ namespace XOffsetDatastructure {
         inline FreeBlockHeader* freelist_block_from_offset(
             XAllocatorStateV1* state, std::uint32_t offset) noexcept {
             if (offset == 0) return nullptr;
-            const auto target = reinterpret_cast<std::uintptr_t>(state) + offset;
-            if (auto* bytes = XBufferCore::canonical_bytes_at(state, target, sizeof(FreeBlockHeader)))
-                return std::launder(reinterpret_cast<FreeBlockHeader*>(bytes));
-            auto* raw = reinterpret_cast<char*>(state) + offset;
+            auto* raw = reinterpret_cast<char*>(state) + offset; // W9: flat
             return std::launder(reinterpret_cast<FreeBlockHeader*>(raw));
         }
 
         inline const FreeBlockHeader* freelist_block_from_offset(
             const XAllocatorStateV1* state, std::uint32_t offset) noexcept {
             if (offset == 0) return nullptr;
-            const auto target = reinterpret_cast<std::uintptr_t>(state) + offset;
-            if (auto* bytes = XBufferCore::canonical_bytes_at(state, target, sizeof(FreeBlockHeader)))
-                return std::launder(reinterpret_cast<const FreeBlockHeader*>(bytes));
-            auto* raw = reinterpret_cast<const char*>(state) + offset;
+            auto* raw = reinterpret_cast<const char*>(state) + offset; // W9: flat
             return std::launder(reinterpret_cast<const FreeBlockHeader*>(raw));
         }
 
@@ -1596,12 +1654,14 @@ namespace XOffsetDatastructure {
 
             if (!owner) owner = &XBufferCore::owner_from_payload_ptr(arena);
             const auto identity = owner->owner_record_;
-            void* raw = nullptr;
-            try {
-                raw = owner->allocate_aligned_impl(aligned_bytes, alignment, false);
-            } catch (const XBadAlloc&) {
-                // Even XBadAlloc's diagnostic construction can allocate and call
-                // user new_handler. Validate this reservation before reading state.
+            // G: nullptr exactly where allocate_aligned_impl(..., false) threw
+            // XBadAlloc. No diagnostic exception object (and so no host
+            // allocation, new_handler call or unwinding) separates the failed
+            // no-growth attempt from the unchanged recovery below.
+            void* raw = owner->try_allocate_aligned_without_growth(aligned_bytes, alignment);
+            if (!raw) {
+                // Revalidation kept: release_cached_blocks below can still
+                // reach host allocation and new_handler.
                 owner = &XBufferCore::require_record_owner(identity);
                 if (alloc_ref.state && alloc_ref.state->free_bytes != 0)
                     release_cached_blocks(alloc_ref.state);
@@ -1631,10 +1691,8 @@ namespace XOffsetDatastructure {
                 if (address <= origin || address - origin > std::numeric_limits<std::uint32_t>::max())
                     return false;
                 XBufferCore::AllocationHeader header;
-                const auto target = reinterpret_cast<std::uintptr_t>(ptr) - sizeof(header);
-                const auto* canonical = XBufferCore::canonical_bytes_at(ptr, target, sizeof(header));
-                const void* raw_header = canonical ? static_cast<const void*>(canonical)
-                    : static_cast<const void*>(static_cast<const char*>(ptr) - sizeof(header));
+                // W9: flat header address.
+                const void* raw_header = static_cast<const void*>(static_cast<const char*>(ptr) - sizeof(header));
                 std::memcpy(&header, raw_header, sizeof(header));
                 // Valid live allocations cannot expand unless their physical
                 // tail is the arena tail. Reject before the registry lookup;
@@ -1930,19 +1988,33 @@ namespace XOffsetDatastructure {
             if (this == &other) return *this;
             if (is_bound() && other.is_bound()) {
                 const auto destination = binding();
-                const auto source = other.binding();
+                // MV: binding() is {allocator_state(), arena()}, and for a state
+                // binding arena() == allocator_arena(allocator_state()). Equal
+                // non-null states therefore give the identical binding (same field
+                // read, no intervening write); otherwise compute it as before.
+                const auto source_state = other.allocator_state();
+                const auto source = source_state && source_state == destination.state
+                    ? destination : other.binding();
                 if (fixed_detail::move_assignment_same_allocator(destination, source) &&
                     fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
                     fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
-                    !fixed_detail::move_assignment_owns_address(*this, &other) &&
-                    !fixed_detail::move_assignment_owns_address(other, this)) {
+                    !fixed_detail::move_assignment_owns_address_fast(*this, &other) &&
+                    !fixed_detail::move_assignment_owns_address_fast(other, this)) {
                     std::int32_t incoming_delta = 0;
                     fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
                     const auto incoming_size = other.size_;
                     const auto incoming_capacity = other.capacity_;
                     // Potentially throwing work precedes the ownership commit.
                     // release() is noexcept; both heads remain in live storage.
-                    release();
+                    // MV: release()'s empty-destination case inline (data() is
+                    // null exactly when data_delta == 0, and release() then only
+                    // clears the descriptor); otherwise the unchanged release().
+                    if (data_delta == 0) {
+                        size_ = 0;
+                        capacity_ = 0;
+                    } else {
+                        release();
+                    }
                     data_delta = incoming_delta;
                     size_ = incoming_size;
                     capacity_ = incoming_capacity;
@@ -2216,19 +2288,33 @@ namespace XOffsetDatastructure {
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 if (is_bound() && other.is_bound()) {
                     const auto destination = binding();
-                    const auto source = other.binding();
+                    // MV: binding() is {allocator_state(), arena()}, and for a state
+                    // binding arena() == allocator_arena(allocator_state()). Equal
+                    // non-null states therefore give the identical binding (same field
+                    // read, no intervening write); otherwise compute it as before.
+                    const auto source_state = other.allocator_state();
+                    const auto source = source_state && source_state == destination.state
+                        ? destination : other.binding();
                     if (fixed_detail::move_assignment_same_allocator(destination, source) &&
                         fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
                         fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
-                        !fixed_detail::move_assignment_owns_address(*this, &other) &&
-                        !fixed_detail::move_assignment_owns_address(other, this)) {
+                        !fixed_detail::move_assignment_owns_address_fast(*this, &other) &&
+                        !fixed_detail::move_assignment_owns_address_fast(other, this)) {
                         std::int32_t incoming_delta = 0;
                         fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
                         const auto incoming_size = other.size_;
                         const auto incoming_capacity = other.capacity_;
                         // Out-of-line elements keep their addresses and bindings.
                         // Ancestor/descendant ownership has already been excluded.
-                        release();
+                        // MV: release()'s empty-destination case inline (data()
+                        // is null exactly when data_delta == 0, and release()
+                        // then only clears the descriptor); otherwise unchanged.
+                        if (data_delta == 0) {
+                            size_ = 0;
+                            capacity_ = 0;
+                        } else {
+                            release();
+                        }
                         data_delta = incoming_delta;
                         size_ = incoming_size;
                         capacity_ = incoming_capacity;
@@ -4007,10 +4093,7 @@ namespace XOffsetDatastructure {
             auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
             auto* ptr = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(address));
             validate_storage_range(ptr, 1, 1, ctx, "wire validation: relative pointer out of bounds");
-            if (auto* bytes = XBufferCore::canonical_bytes_at(&delta,
-                    static_cast<std::uintptr_t>(address), 1))
-                return reinterpret_cast<const char*>(bytes);
-            return ptr;
+            return ptr; // W9: flat (validated range), no canonical lookup
         }
 
         XOFFSET_DETAIL_V4_INLINE void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
@@ -4033,10 +4116,7 @@ namespace XOffsetDatastructure {
             validate_storage_range(header_ptr, sizeof(Header), alignof(Header), ctx,
                                    "wire validation: invalid allocation header address");
             Header header;
-            const auto* canonical = XBufferCore::canonical_bytes_at(ctx.base,
-                address - sizeof(Header), sizeof(Header));
-            std::memcpy(&header, canonical ? static_cast<const void*>(canonical)
-                : static_cast<const void*>(header_ptr), sizeof(header));
+            std::memcpy(&header, static_cast<const void*>(header_ptr), sizeof(header)); // W9: flat
             if (header.user_offset != address - base || header.user_bytes < bytes ||
                 header.total_bytes != std::uint64_t(header.user_bytes) + sizeof(Header) ||
                 header.alignment < alignment || header.alignment > XBufferCore::MAX_PAYLOAD ||
@@ -4271,14 +4351,14 @@ namespace XOffsetDatastructure {
                                           std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
             if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
-            const char* validated_end;
-            if (XBufferCore::canonical_bytes_at(xbuf.get_address(),
-                    reinterpret_cast<std::uintptr_t>(xbuf.get_address()), 1)) {
-                if (used > xbuf.segment_size())
-                    throw XException("wire validation: payload extent out of bounds");
-                validated_end = reinterpret_cast<const char*>(XBufferCore::canonical_bytes_at(
-                    xbuf.get_address(), reinterpret_cast<std::uintptr_t>(xbuf.get_address()) + used, 0));
-            } else validated_end = static_cast<const char*>(xbuf.get_address()) + used;
+            // W9: flat end for every storage kind. The extent check that R1+M2
+            // applied only to canonical (receive) storage now applies to all;
+            // it cannot fire for a valid ordinary arena (used_end <= size is an
+            // allocator/load invariant), so it only turns a corrupted extent
+            // into this error instead of an out-of-bounds validation context.
+            if (used > xbuf.segment_size())
+                throw XException("wire validation: payload extent out of bounds");
+            const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             WireValidationContext ctx{
                 .base = static_cast<const char*>(xbuf.get_address()),
                 .end = validated_end,
@@ -4309,6 +4389,28 @@ namespace XOffsetDatastructure {
         template <typename T> struct is_owning_head<XSet<T>> : std::true_type {};
         template <typename K, typename V> struct is_owning_head<XFixedFlatMap<K, V>> : std::true_type {};
         template <typename K, typename V> struct is_owning_head<XMap<K, V>> : std::true_type {};
+
+        // MV: for a string head, or a vector head whose elements are trivially
+        // copyable, the generic function evaluates exactly one containment
+        // test (no recursion); this is that test, inline. Every other type
+        // calls the generic function, so results are identical for all T.
+        template <typename T>
+        XOFFSET_DETAIL_MOVE_INLINE bool move_assignment_owns_address_fast(
+                const T& value, const void* address) noexcept {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (std::is_trivially_copyable_v<CleanT> || std::is_array_v<CleanT> ||
+                          !is_owning_head<CleanT>::value) {
+                return move_assignment_owns_address(value, address);
+            } else if constexpr (detail::is_fixed_string_v<CleanT>) {
+                return move_assignment_contains(value.data(),
+                    value.capacity_ ? std::size_t(value.capacity_) + 1u : 0u, address);
+            } else if constexpr (std::is_trivially_copyable_v<typename CleanT::value_type>) {
+                return move_assignment_contains(value.data(),
+                    std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address);
+            } else {
+                return move_assignment_owns_address(value, address);
+            }
+        }
 
         template <typename T, std::size_t I>
         consteval bool member_can_relocate() {
@@ -4361,11 +4463,15 @@ namespace XOffsetDatastructure {
                     return move_assignment_contains(value.data(),
                         value.capacity_ ? std::size_t(value.capacity_) + 1u : 0u, address);
                 } else {
-                    if (move_assignment_contains(value.data(),
+                    const auto* elements = value.data();
+                    if (move_assignment_contains(elements,
                         std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address))
                         return true;
                     if constexpr (!std::is_trivially_copyable_v<typename CleanT::value_type>) {
-                        for (const auto& child : value) {
+                        const auto count = value.size();
+                        const auto* last = elements ? elements + count : nullptr;
+                        for (auto* item = elements; item != last; ++item) {
+                            const auto& child = *item;
                             if (move_assignment_owns_address(child, address)) return true;
                         }
                     }
@@ -5886,6 +5992,9 @@ XOFFSET_REGISTER_MIGRATION_TYPE(XFixedString, AllocatorAware)
 XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedVector, Container)
 XOFFSET_REGISTER_MIGRATION_CONTAINER(XFixedFlatSet, Container)
 XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
+
+#undef XOFFSET_DETAIL_MOVE_INLINE
+#undef XOFFSET_DETAIL_MOVE_COLD
 
 #include "xoffset_verified_paths.hpp"
 #include "xoffset_verified_receive.hpp"
