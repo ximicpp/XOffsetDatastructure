@@ -1,0 +1,548 @@
+Analysis of sampling sc_xoffset (pid 34869) every 1 millisecond
+Process:         sc_xoffset [34869]
+Path:            /Volumes/VOLUME/*/sc_xoffset
+Load Address:    0x100e2c000
+Identifier:      sc_xoffset
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  zsh [34706]
+Target Type:     live task
+
+Date/Time:       2026-10-19 21:54:54.788 -0700
+Launch Time:     2026-10-19 21:54:54.245 -0700
+OS Version:      macOS 26.3 (25D125)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+----
+
+Call graph:
+    1822 Thread_2354635   DispatchQueue_1: com.apple.main-thread  (serial)
+      1822 start  (in dyld) + 7184  [0x195065d54]
+        1822 main  (in sc_xoffset) + 1544  [0x100e2d9c0]
+          1177 (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset) + 868  [0x100e3370c]
+          + 236 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 360,2680,...  [0x100e4413c,0x100e44a4c,...]
+          + 161 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 2748  [0x100e44a90]
+          + ! 154 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 448  [0x100e3c8e4]
+          + ! : 62 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 416  [0x100e3cb24]
+          + ! : | 53 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : | + 53 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 40,4,...  [0x100e3a090,0x100e3a06c,...]
+          + ! : | 5 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 100,12,...  [0x100e397a4,0x100e3974c,...]
+          + ! : | 3 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40,80  [0x100e38e80,0x100e38ea8]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | +   1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + ! : | 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 852  [0x100e391ac]
+          + ! : 35 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 312  [0x100e3cabc]
+          + ! : | 32 _platform_memset  (in libsystem_platform.dylib) + 160,108,...  [0x195439150,0x19543911c,...]
+          + ! : | 2 __bzero  (in libsystem_platform.dylib) + 0,8  [0x195439050,0x195439058]
+          + ! : | 1 DYLD-STUB$$bzero  (in sc_xoffset) + 4  [0x100e4ccb0]
+          + ! : 30 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 488,496,...  [0x100e3cb6c,0x100e3cb74,...]
+          + ! : 27 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 232  [0x100e3ca6c]
+          + ! :   18 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 464,320,...  [0x100e3a454,0x100e3a3c4,...]
+          + ! :   3 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! :   + 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! :   + ! 2 _tlv_get_addr  (in libdyld.dylib) + 0,12  [0x19502f2f8,0x19502f304]
+          + ! :   + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 32  [0x100e38e78]
+          + ! :   3 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 300  [0x100e3a3b0]
+          + ! :   + 3 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 8,12,...  [0x100e38510,0x100e38514,...]
+          + ! :   2 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 320  [0x100e3a3c4]
+          + ! :   + 2 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 16,20  [0x100e3a078,0x100e3a07c]
+          + ! :   1 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 476  [0x100e386e4]
+          + ! 6 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 152,24,...  [0x100e3c7bc,0x100e3c73c,...]
+          + ! 1 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 432  [0x100e3cb34]
+          + 150 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 836  [0x100e44318]
+          + ! 57 XOffsetDatastructure::XFixedVector<unsigned int>::reserve(unsigned long)  (in sc_xoffset) + 496  [0x100e4b534]
+          + ! : 46 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 436,452,...  [0x100e3a438,0x100e3a448,...]
+          + ! : 5 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! : | 3 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 60,112,...  [0x100e38e94,0x100e38ec8,...]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : |   2 _tlv_get_addr  (in libdyld.dylib) + 12,20  [0x19502f304,0x19502f30c]
+          + ! : 4 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 300  [0x100e3a3b0]
+          + ! : | 4 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 444,288,...  [0x100e386c4,0x100e38628,...]
+          + ! : 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 320  [0x100e3a3c4]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 32  [0x100e3a088]
+          + ! : 1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 92  [0x100e3a0c4]
+          + ! 56 XOffsetDatastructure::XFixedVector<unsigned int>::reserve(unsigned long)  (in sc_xoffset) + 592  [0x100e4b594]
+          + ! : 56 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 52,68,...  [0x100e39774,0x100e39784,...]
+          + ! 37 XOffsetDatastructure::XFixedVector<unsigned int>::reserve(unsigned long)  (in sc_xoffset) + 540,532,...  [0x100e4b560,0x100e4b558,...]
+          + 149 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 2812  [0x100e44ad0]
+          + ! 88 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 740  [0x100e3c090]
+          + ! : 63 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | 32 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : | + 32 _tlv_get_addr  (in libdyld.dylib) + 0  [0x19502f2f8]
+          + ! : | 16 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72,60,...  [0x100e38ea0,0x100e38e94,...]
+          + ! : | 15 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+          + ! : |   15 _tlv_get_addr  (in libdyld.dylib) + 0,12  [0x19502f2f8,0x19502f304]
+          + ! : 20 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 68,52,...  [0x100e39784,0x100e39774,...]
+          + ! : 5 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! :   5 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 36  [0x100e3a08c]
+          + ! 37 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 600  [0x100e3c004]
+          + ! : 24 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 424,224,...  [0x100e3a42c,0x100e3a364,...]
+          + ! : 9 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 300  [0x100e3a3b0]
+          + ! : | 6 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 252,316,...  [0x100e38604,0x100e38644,...]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 604  [0x100e38764]
+          + ! : | + 2 __cxa_throw  (in libc++abi.1.0.dylib) + 80  [0x100f17050]
+          + ! : | +   1 _Unwind_RaiseException  (in libunwind.1.0.dylib) + 116  [0x100e865d4]
+          + ! : | +   ! 1 unw_init_local  (in libunwind.1.0.dylib) + 272  [0x100e80ee0]
+          + ! : | +   !   1 libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_arm64>::setInfoBasedOnIPRegister(bool)  (in libunwind.1.0.dylib) + 76  [0x100e82a2c]
+          + ! : | +   !     1 dyld4::APIs::_dyld_find_unwind_sections(void*, dyld_unwind_sections*)  (in dyld) + 128  [0x19509e9d8]
+          + ! : | +   !       1 dyld4::APIs::findImageMappedAt(void const*, dyld3::MachOLoaded const**, bool*, char const**, void const**, unsigned long long*, unsigned char*, dyld4::Loader const**)  (in dyld) + 444  [0x19509a654]
+          + ! : | +   !         1 dyld4::RuntimeState::inPermanentRange(unsigned long, unsigned long, unsigned char*, dyld4::Loader const**)  (in dyld) + 32  [0x195072750]
+          + ! : | +   1 _Unwind_RaiseException  (in libunwind.1.0.dylib) + 180  [0x100e86614]
+          + ! : | +     1 libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_arm64>::step(bool)  (in libunwind.1.0.dylib) + 36  [0x100e828bc]
+          + ! : | +       1 libunwind::CompactUnwinder_arm64<libunwind::LocalAddressSpace>::stepWithCompactEncodingFrame(unsigned int, unsigned long long, libunwind::LocalAddressSpace&, libunwind::Registers_arm64&)  (in libunwind.1.0.dylib) + 128  [0x100e85ad4]
+          + ! : | 1 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 404  [0x100e3869c]
+          + ! : |   1 XOffsetDatastructure::XBufferCore::ensure_allocation_extent(unsigned long, bool)  (in sc_xoffset) + 12  [0x100e38ad4]
+          + ! : 2 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 60,708  [0x100e38e94,0x100e3911c]
+          + ! : 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 320  [0x100e3a3c4]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 4  [0x100e3a06c]
+          + ! : 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 928  [0x100e3a624]
+          + ! :   1 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 404  [0x100e3869c]
+          + ! :     1 XOffsetDatastructure::XBufferCore::ensure_allocation_extent(unsigned long, bool)  (in sc_xoffset) + 116  [0x100e38b3c]
+          + ! :       1 XOffsetDatastructure::detail::VirtualMemoryStorage::grow_to(unsigned long)  (in sc_xoffset) + 212  [0x100e381b8]
+          + ! :         1 __mprotect  (in libsystem_kernel.dylib) + 8  [0x1953f0af0]
+          + ! 15 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 708  [0x100e3c070]
+          + ! : 15 _platform_memmove  (in libsystem_platform.dylib) + 204,168,...  [0x19543944c,0x195439428,...]
+          + ! 8 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 708,400,...  [0x100e3c070,0x100e3bf3c,...]
+          + ! 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 352  [0x100e398a0]
+          + 122 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4160  [0x100e45014]
+          + ! 53 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 300  [0x100e4a7cc]
+          + ! : 53 XOffsetDatastructure::fixed_detail::move_assignment_owns_address<XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, void const*)  (in sc_xoffset) + 136,180,...  [0x100e4a8c0,0x100e4a8ec,...]
+          + ! 51 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 364  [0x100e4a80c]
+          + ! : 34 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::release()  (in sc_xoffset) + 152  [0x100e39bd8]
+          + ! : | 16 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 144  [0x100e39c98]
+          + ! : | + 8 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + ! 7 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 100,120,...  [0x100e38ebc,0x100e38ed0,...]
+          + ! : | + ! 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : | + !   1 _tlv_get_addr  (in libdyld.dylib) + 12  [0x19502f304]
+          + ! : | + 7 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 168,56,...  [0x100e397e8,0x100e39778,...]
+          + ! : | + 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : | +   1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 32  [0x100e3a088]
+          + ! : | 13 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 276  [0x100e39d1c]
+          + ! : | + 7 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 4,104,...  [0x100e39744,0x100e397a8,...]
+          + ! : | + 5 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + ! 3 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 60,80,...  [0x100e38e94,0x100e38ea8,...]
+          + ! : | + ! 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | + ! : 1 _tlv_get_addr  (in libdyld.dylib) + 12  [0x19502f304]
+          + ! : | + ! 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+          + ! : | + !   1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + ! : | + 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : | +   1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 40  [0x100e3a090]
+          + ! : | 3 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 0,116,...  [0x100e39c08,0x100e39c7c,...]
+          + ! : | 2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 352  [0x100e398a0]
+          + ! : 7 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 364  [0x100e4a80c]
+          + ! : | 7 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::release()  (in sc_xoffset) + 124,116,...  [0x100e39bbc,0x100e39bb4,...]
+          + ! : 6 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::release()  (in sc_xoffset) + 20,188,...  [0x100e39b54,0x100e39bfc,...]
+          + ! : 4 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::release()  (in sc_xoffset) + 180  [0x100e39bf4]
+          + ! :   2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! :   + 2 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 16,72  [0x100e3a078,0x100e3a0b0]
+          + ! :   1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! :   + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! :   +   1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + ! :   1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 68  [0x100e39784]
+          + ! 11 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 196,28,...  [0x100e4a764,0x100e4a6bc,...]
+          + ! 4 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 352  [0x100e4a800]
+          + ! : 4 XOffsetDatastructure::fixed_detail::set_rel32(int&, void const*, void const*)  (in sc_xoffset) + 16,4  [0x100e38de4,0x100e38dd8]
+          + ! 3 XOffsetDatastructure::fixed_detail::set_rel32(int&, void const*, void const*)  (in sc_xoffset) + 40,36  [0x100e38dfc,0x100e38df8]
+          + 107 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 2964  [0x100e44b68]
+          + ! 60 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 380  [0x100e3ce4c]
+          + ! : 45 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 424,240,...  [0x100e3a42c,0x100e3a374,...]
+          + ! : 8 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! : | 4 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | + 4 _tlv_get_addr  (in libdyld.dylib) + 28,0,...  [0x19502f314,0x19502f2f8,...]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+          + ! : | + 2 _tlv_get_addr  (in libdyld.dylib) + 20,28  [0x19502f30c,0x19502f314]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 32  [0x100e38e78]
+          + ! : 5 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 300  [0x100e3a3b0]
+          + ! : | 5 XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 36,88,...  [0x100e3852c,0x100e38560,...]
+          + ! : 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 852  [0x100e391ac]
+          + ! : 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 320  [0x100e3a3c4]
+          + ! :   1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 60  [0x100e3a0a4]
+          + ! 18 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 480,440,...  [0x100e3ceb0,0x100e3ce88,...]
+          + ! 10 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 680  [0x100e3cf78]
+          + ! : 5 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152,64,...  [0x100e397d8,0x100e39780,...]
+          + ! : 3 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : | 3 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 16,24,...  [0x100e3a078,0x100e3a080,...]
+          + ! : 2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! :   2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 32,840  [0x100e38e78,0x100e391a0]
+          + ! 8 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 604  [0x100e3cf2c]
+          + ! : 6 XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XString>(XOffsetDatastructure::XString*, XOffsetDatastructure::XString&)  (in sc_xoffset) + 20  [0x100e3ac80]
+          + ! : 2 XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XString>(XOffsetDatastructure::XString*, XOffsetDatastructure::XString&)  (in sc_xoffset) + 116  [0x100e3ace0]
+          + ! :   2 XOffsetDatastructure::XFixedString::bind(XOffsetDatastructure::fixed_detail::allocator_ref)  (in sc_xoffset) + 4  [0x100e3ad84]
+          + ! 4 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 640  [0x100e3cf50]
+          + ! : 4 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 116,248  [0x100e39c7c,0x100e39d00]
+          + ! 3 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 556  [0x100e3cefc]
+          + ! : 2 XOffsetDatastructure::fixed_detail::default_construct<sc::xo_detail::Attr, XOffsetDatastructure::fixed_detail::allocator_ref>(sc::xo_detail::Attr*, XOffsetDatastructure::fixed_detail::allocator_ref const&)  (in sc_xoffset) + 32  [0x100e3d138]
+          + ! : 1 XOffsetDatastructure::XFixedVector<unsigned char>::bind(XOffsetDatastructure::fixed_detail::allocator_ref)  (in sc_xoffset) + 36  [0x100e3b17c]
+          + ! 3 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset) + 616  [0x100e3cf38]
+          + ! : 2 XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XVector<unsigned char>>(XOffsetDatastructure::XVector<unsigned char>*, XOffsetDatastructure::XVector<unsigned char>&)  (in sc_xoffset) + 32,120  [0x100e3b064,0x100e3b0bc]
+          + ! : 1 XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XVector<unsigned char>>(XOffsetDatastructure::XVector<unsigned char>*, XOffsetDatastructure::XVector<unsigned char>&)  (in sc_xoffset) + 116  [0x100e3b0b8]
+          + ! :   1 XOffsetDatastructure::XFixedVector<unsigned char>::bind(XOffsetDatastructure::fixed_detail::allocator_ref)  (in sc_xoffset) + 4  [0x100e3b15c]
+          + ! 1 XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XString>(XOffsetDatastructure::XString*, XOffsetDatastructure::XString&)  (in sc_xoffset) + 244  [0x100e3ad60]
+          + 96 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3236  [0x100e44c78]
+          + ! 91 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 448  [0x100e3c8e4]
+          + ! : 59 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 232  [0x100e3ca6c]
+          + ! : | 51 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 464,132,...  [0x100e3a454,0x100e3a308,...]
+          + ! : | 6 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! : | + 4 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 708,40,...  [0x100e3911c,0x100e38e80,...]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | + ! 1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : | +   1 _tlv_get_addr  (in libdyld.dylib) + 16  [0x19502f308]
+          + ! : | 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 852  [0x100e391ac]
+          + ! : 17 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 416  [0x100e3cb24]
+          + ! : | 17 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : |   8 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 56,60,...  [0x100e38e90,0x100e38e94,...]
+          + ! : |   6 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : |   + 6 _tlv_get_addr  (in libdyld.dylib) + 28,20,...  [0x19502f314,0x19502f30c,...]
+          + ! : |   2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : |   + 2 _tlv_get_addr  (in libdyld.dylib) + 0  [0x19502f2f8]
+          + ! : |   1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+          + ! : |     1 _tlv_get_addr  (in libdyld.dylib) + 12  [0x19502f304]
+          + ! : 13 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 76,20,...  [0x100e3c9d0,0x100e3c998,...]
+          + ! : 1 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 312  [0x100e3cabc]
+          + ! : | 1 DYLD-STUB$$bzero  (in sc_xoffset) + 4  [0x100e4ccb0]
+          + ! : 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 716  [0x100e3a550]
+          + ! 5 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 152,68,...  [0x100e3c7bc,0x100e3c768,...]
+          + 32 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4136  [0x100e44ffc]
+          + ! 20 XOffsetDatastructure::XFixedVector<unsigned int>::operator=(XOffsetDatastructure::XFixedVector<unsigned int>&&)  (in sc_xoffset) + 380  [0x100e49ce0]
+          + ! : 11 XOffsetDatastructure::XFixedVector<unsigned int>::release()  (in sc_xoffset) + 148  [0x100e39f0c]
+          + ! : | 6 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + 4 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 52,64,...  [0x100e38e8c,0x100e38e98,...]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | + ! 1 _tlv_get_addr  (in libdyld.dylib) + 0  [0x19502f2f8]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : | +   1 _tlv_get_addr  (in libdyld.dylib) + 28  [0x19502f314]
+          + ! : | 3 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 52,68,...  [0x100e39774,0x100e39784,...]
+          + ! : | 2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : |   2 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 48  [0x100e3a098]
+          + ! : 7 XOffsetDatastructure::XFixedVector<unsigned int>::operator=(XOffsetDatastructure::XFixedVector<unsigned int>&&)  (in sc_xoffset) + 380  [0x100e49ce0]
+          + ! : | 7 XOffsetDatastructure::XFixedVector<unsigned int>::release()  (in sc_xoffset) + 116,112,...  [0x100e39eec,0x100e39ee8,...]
+          + ! : 2 XOffsetDatastructure::XFixedVector<unsigned int>::release()  (in sc_xoffset) + 8,20  [0x100e39e80,0x100e39e8c]
+          + ! 11 XOffsetDatastructure::XFixedVector<unsigned int>::operator=(XOffsetDatastructure::XFixedVector<unsigned int>&&)  (in sc_xoffset) + 176,0,...  [0x100e49c14,0x100e49b64,...]
+          + ! 1 XOffsetDatastructure::XFixedVector<unsigned int>::operator=(XOffsetDatastructure::XFixedVector<unsigned int>&&)  (in sc_xoffset) + 368  [0x100e49cd4]
+          + !   1 XOffsetDatastructure::fixed_detail::set_rel32(int&, void const*, void const*)  (in sc_xoffset) + 16  [0x100e38de4]
+          + 22 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4124  [0x100e44ff0]
+          + ! 13 XOffsetDatastructure::XFixedString::operator=(XOffsetDatastructure::XFixedString&&)  (in sc_xoffset) + 132,268,...  [0x100e49940,0x100e499c8,...]
+          + ! 9 XOffsetDatastructure::XFixedString::operator=(XOffsetDatastructure::XFixedString&&)  (in sc_xoffset) + 372  [0x100e49a30]
+          + !   6 XOffsetDatastructure::XFixedString::release()  (in sc_xoffset) + 148  [0x100e3a05c]
+          + !   | 4 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 12,72,...  [0x100e3974c,0x100e39788,...]
+          + !   | 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 852  [0x100e391ac]
+          + !   | 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + !   |   1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+          + !   |     1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + !   3 XOffsetDatastructure::XFixedString::operator=(XOffsetDatastructure::XFixedString&&)  (in sc_xoffset) + 372  [0x100e49a30]
+          + !     3 XOffsetDatastructure::XFixedString::release()  (in sc_xoffset) + 116  [0x100e3a03c]
+          + 20 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 2912  [0x100e44b34]
+          + ! 11 _platform_memcmp  (in libsystem_platform.dylib) + 272,0,...  [0x195437000,0x195436ef0,...]
+          + ! 9 DYLD-STUB$$memcmp  (in sc_xoffset) + 4,0  [0x100e4ccec,0x100e4cce8]
+          + 16 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4224  [0x100e45054]
+          + ! 15 XOffsetDatastructure::XFixedVector<sc::xo_detail::Record>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Record>::resize(unsigned long)::'lambda'(sc::xo_detail::Record*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Record>::resize(unsigned long)::'lambda'(sc::xo_detail::Record*)&&)  (in sc_xoffset) + 148  [0x100e4af40]
+          + ! : 10 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 148  [0x100e3999c]
+          + ! : | 5 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 276  [0x100e39d1c]
+          + ! : | + 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 852  [0x100e391ac]
+          + ! : | + 2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + ! 2 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 100  [0x100e38ebc]
+          + ! : | + 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 340  [0x100e39894]
+          + ! : | 4 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 144  [0x100e39c98]
+          + ! : | + 3 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + ! 3 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 100  [0x100e38ebc]
+          + ! : | + 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+          + ! : | +   1 XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 20  [0x100e3a07c]
+          + ! : | 1 sc::xo_detail::Attr::~Attr()  (in sc_xoffset) + 152  [0x100e39ca0]
+          + ! : 2 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 128,516  [0x100e39988,0x100e39b0c]
+          + ! : 1 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 176  [0x100e399b8]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : 1 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 420  [0x100e39aac]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 296  [0x100e39868]
+          + ! : 1 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 544  [0x100e39b28]
+          + ! :   1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 52  [0x100e39774]
+          + ! 1 sc::xo_detail::Record::~Record()  (in sc_xoffset) + 556  [0x100e39b34]
+          + 15 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4148  [0x100e45008]
+          + ! 8 XOffsetDatastructure::XFixedVector<unsigned char>::operator=(XOffsetDatastructure::XFixedVector<unsigned char>&&)  (in sc_xoffset) + 132,176,...  [0x100e4a1d0,0x100e4a1fc,...]
+          + ! 6 XOffsetDatastructure::XFixedVector<unsigned char>::operator=(XOffsetDatastructure::XFixedVector<unsigned char>&&)  (in sc_xoffset) + 372  [0x100e4a2c0]
+          + ! : 3 XOffsetDatastructure::XFixedVector<unsigned char>::release()  (in sc_xoffset) + 144  [0x100e39e6c]
+          + ! : | 2 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! : | + ! 1 _tlv_get_addr  (in libdyld.dylib) + 12  [0x19502f304]
+          + ! : | + 1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 88  [0x100e38eb0]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 68  [0x100e39784]
+          + ! : 2 XOffsetDatastructure::XFixedVector<unsigned char>::operator=(XOffsetDatastructure::XFixedVector<unsigned char>&&)  (in sc_xoffset) + 372  [0x100e4a2c0]
+          + ! : | 2 XOffsetDatastructure::XFixedVector<unsigned char>::release()  (in sc_xoffset) + 116,120  [0x100e39e50,0x100e39e54]
+          + ! : 1 XOffsetDatastructure::XFixedVector<unsigned char>::release()  (in sc_xoffset) + 20  [0x100e39df0]
+          + ! 1 XOffsetDatastructure::fixed_detail::set_rel32(int&, void const*, void const*)  (in sc_xoffset) + 36  [0x100e38df8]
+          + 14 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3848  [0x100e44edc]
+          + ! 12 std::__hash_table<unsigned long long>::__emplace_unique_key_args<unsigned long long, unsigned long long const&>(unsigned long long const&, unsigned long long const&)  (in sc_xoffset) + 272  [0x100e496bc]
+          + ! : 10 operator new(unsigned long)  (in libc++abi.1.0.dylib) + 28  [0x100f18498]
+          + ! : | 8 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 396,232,...  [0x19525330c,0x195253268,...]
+          + ! : | 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 160  [0x19524ecc0]
+          + ! : | 1 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 120  [0x19525be7c]
+          + ! : 1 DYLD-STUB$$operator new(unsigned long)  (in sc_xoffset) + 4  [0x100e4cc2c]
+          + ! : 1 operator new(unsigned long)  (in libc++abi.1.0.dylib) + 56  [0x100f184b4]
+          + ! 1 operator new(unsigned long)  (in libc++abi.1.0.dylib) + 60  [0x100f184b8]
+          + ! 1 std::__hash_table<unsigned long long>::__emplace_unique_key_args<unsigned long long, unsigned long long const&>(unsigned long long const&, unsigned long long const&)  (in sc_xoffset) + 204  [0x100e49678]
+          + 13 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3080  [0x100e44bdc]
+          + ! 6 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 600  [0x100e3c004]
+          + ! : 4 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 424,252,...  [0x100e3a42c,0x100e3a380,...]
+          + ! : 2 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! :   1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+          + ! :   + 1 _tlv_get_addr  (in libdyld.dylib) + 0  [0x19502f2f8]
+          + ! :   1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 88  [0x100e38eb0]
+          + ! 3 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 708  [0x100e3c070]
+          + ! : 3 _platform_memmove  (in libsystem_platform.dylib) + 0,428,...  [0x195439380,0x19543952c,...]
+          + ! 2 XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset) + 84,332  [0x100e3be00,0x100e3bef8]
+          + ! 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 716  [0x100e3a550]
+          + ! 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 352  [0x100e398a0]
+          + 11 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3124  [0x100e44c08]
+          + ! 9 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 448  [0x100e3c8e4]
+          + ! : 4 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 232  [0x100e3ca6c]
+          + ! : | 3 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 404,424,...  [0x100e3a418,0x100e3a42c,...]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+          + ! : |   1 XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+          + ! : |     1 _tlv_get_addr  (in libdyld.dylib) + 20  [0x19502f30c]
+          + ! : 3 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 312  [0x100e3cabc]
+          + ! : | 3 _platform_memset  (in libsystem_platform.dylib) + 208,188  [0x195439180,0x19543916c]
+          + ! : 1 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 416  [0x100e3cb24]
+          + ! : | 1 XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 12  [0x100e3974c]
+          + ! : 1 XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset) + 240  [0x100e3ca74]
+          + ! 2 XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset) + 48  [0x100e3c754]
+          + 5 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3160  [0x100e44c2c]
+          + ! 4 _platform_memmove  (in libsystem_platform.dylib) + 180,188,...  [0x195439434,0x19543943c,...]
+          + ! 1 DYLD-STUB$$memmove  (in sc_xoffset) + 8  [0x100e4cd08]
+          + 3 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 4248  [0x100e4506c]
+          + ! 2 _xzm_free  (in libsystem_malloc.dylib) + 28,348  [0x19524f760,0x19524f8a0]
+          + ! 1 _free  (in libsystem_malloc.dylib) + 108  [0x19525ca98]
+          + 2 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 888  [0x100e4434c]
+          + ! 1 DYLD-STUB$$memmove  (in sc_xoffset) + 4  [0x100e4cd04]
+          + ! 1 _platform_memmove  (in libsystem_platform.dylib) + 12  [0x19543938c]
+          + 1 XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset) + 396  [0x100e4a82c]
+          + 1 XOffsetDatastructure::XFixedVector<unsigned int>::reserve(unsigned long)  (in sc_xoffset) + 608  [0x100e4b5a4]
+          + 1 sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset) + 3268  [0x100e44c98]
+          +   1 _platform_memmove  (in libsystem_platform.dylib) + 428  [0x19543952c]
+          538 (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset) + 684  [0x100e33654]
+          + 538 sc::XOffsetAdapter::load(std::span<unsigned char const, 18446744073709551615ul>)  (in sc_xoffset) + 92  [0x100e308fc]
+          +   538 XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>::load(std::span<std::byte const, 18446744073709551615ul>, std::optional<XOffsetDatastructure::XBufferCore::MaximumCapacity>)  (in sc_xoffset) + 188  [0x100e3dad0]
+          +     385 XOffsetDatastructure::XBuffer::load_verified_with_resource<sc::xo_detail::Snapshot>(std::span<std::byte const, 18446744073709551615ul>, std::optional<XOffsetDatastructure::XBufferCore::MaximumCapacity>, std::pmr::memory_resource*)  (in sc_xoffset) + 568  [0x100e3df74]
+          +     ! 385 XOffsetDatastructure::detail::verify_structural_wire_graph<sc::xo_detail::Snapshot>(sc::xo_detail::Snapshot const&, XOffsetDatastructure::XBufferCore&, std::pmr::memory_resource*)  (in sc_xoffset) + 324  [0x100e3e570]
+          +     !   282 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Record>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Record> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 256  [0x100e40fec]
+          +     !   : 123 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 204  [0x100e41a2c]
+          +     !   : | 104 XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 176  [0x100e41290]
+          +     !   : | + 55 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | + ! 51 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 80,636,...  [0x100e3f6cc,0x100e3f8f8,...]
+          +     !   : | + ! 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 1096  [0x100e3fac4]
+          +     !   : | + ! : 2 XOffsetDatastructure::detail::WireValidationByteIndex::page_view(unsigned long) const  (in sc_xoffset) + 0  [0x100e408f4]
+          +     !   : | + ! 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : | + ! : 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 4  [0x100e40bc8]
+          +     !   : | + ! 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+          +     !   : | + !   1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 4  [0x100e40c58]
+          +     !   : | + 28 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 4,172,...  [0x100e3f034,0x100e3f0dc,...]
+          +     !   : | + 17 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 16,12,...  [0x100e3eecc,0x100e3eec8,...]
+          +     !   : | + 4 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312  [0x100e3f7b4]
+          +     !   : | 19 XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 68,112,...  [0x100e41224,0x100e41250,...]
+          +     !   : 119 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 216  [0x100e41a38]
+          +     !   : | 50 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | + 45 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 80,60,...  [0x100e3f6cc,0x100e3f6b8,...]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+          +     !   : | + ! 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 4,104  [0x100e40c58,0x100e40cbc]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 1096  [0x100e3fac4]
+          +     !   : | + ! 2 XOffsetDatastructure::detail::WireValidationByteIndex::page_view(unsigned long) const  (in sc_xoffset) + 0,32  [0x100e408f4,0x100e40914]
+          +     !   : | + 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : | +   1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 56  [0x100e40bfc]
+          +     !   : | 25 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 192,116,...  [0x100e3f0f0,0x100e3f0a4,...]
+          +     !   : | 21 XOffsetDatastructure::detail::validate_wire_value<unsigned char>(XOffsetDatastructure::XFixedVector<unsigned char> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 64,92,...  [0x100e41748,0x100e41764,...]
+          +     !   : | 19 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 40,104,...  [0x100e3eee4,0x100e3ef24,...]
+          +     !   : | 4 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312,296  [0x100e3f7b4,0x100e3f7a4]
+          +     !   : 29 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 180  [0x100e41a14]
+          +     !   : | 17 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | + 13 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 984,20,...  [0x100e3fa54,0x100e3f690,...]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : | + ! 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 44,132  [0x100e40bf0,0x100e40c48]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+          +     !   : | +   2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 44,104  [0x100e40c80,0x100e40cbc]
+          +     !   : | 6 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 116,20,...  [0x100e3f0a4,0x100e3f044,...]
+          +     !   : | 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312  [0x100e3f7b4]
+          +     !   : | 2 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 184  [0x100e3ef74]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::insert_disjoint(unsigned long, unsigned long, unsigned long)  (in sc_xoffset) + 744,928  [0x100e40470,0x100e40528]
+          +     !   : | 2 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 40,160  [0x100e3eee4,0x100e3ef5c]
+          +     !   : 7 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 60,24,...  [0x100e4199c,0x100e41978,...]
+          +     !   : 2 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 196  [0x100e3ef80]
+          +     !   : 2 XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 228  [0x100e412c4]
+          +     !   43 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Record>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Record> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 220  [0x100e40fc8]
+          +     !   : 32 XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 176  [0x100e41290]
+          +     !   : | 19 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | + 15 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 128,60,...  [0x100e3f6fc,0x100e3f6b8,...]
+          +     !   : | + 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+          +     !   : | + ! 2 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 44,104  [0x100e40c80,0x100e40cbc]
+          +     !   : | + 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : | + ! 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 132  [0x100e40c48]
+          +     !   : | + 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 1096  [0x100e3fac4]
+          +     !   : | +   1 XOffsetDatastructure::detail::WireValidationByteIndex::page_view(unsigned long) const  (in sc_xoffset) + 0  [0x100e408f4]
+          +     !   : | 5 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 76,20,...  [0x100e3f07c,0x100e3f044,...]
+          +     !   : | 5 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 16,40,...  [0x100e3eecc,0x100e3eee4,...]
+          +     !   : | 3 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312  [0x100e3f7b4]
+          +     !   : 10 XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 12,36,...  [0x100e411ec,0x100e41204,...]
+          +     !   : 1 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 196  [0x100e3ef80]
+          +     !   30 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Record>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Record> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 232  [0x100e40fd4]
+          +     !   : 14 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | 12 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 552,636,...  [0x100e3f8a4,0x100e3f8f8,...]
+          +     !   : | 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : | + 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 132  [0x100e40c48]
+          +     !   : | 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+          +     !   : |   1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 108  [0x100e40cc0]
+          +     !   : 5 XOffsetDatastructure::detail::validate_wire_value<unsigned int>(XOffsetDatastructure::XFixedVector<unsigned int> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 32,64,...  [0x100e41494,0x100e414b4,...]
+          +     !   : 4 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 16,56,...  [0x100e3f040,0x100e3f068,...]
+          +     !   : 4 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 16,40,...  [0x100e3eecc,0x100e3eee4,...]
+          +     !   : 1 XOffsetDatastructure::detail::WireValidationByteIndex::insert_disjoint(unsigned long, unsigned long, unsigned long)  (in sc_xoffset) + 1680  [0x100e40818]
+          +     !   : 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312  [0x100e3f7b4]
+          +     !   : 1 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 184  [0x100e3ef74]
+          +     !   :   1 XOffsetDatastructure::detail::WireValidationByteIndex::insert_disjoint(unsigned long, unsigned long, unsigned long)  (in sc_xoffset) + 928  [0x100e40528]
+          +     !   24 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Record>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Record> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 244  [0x100e40fe0]
+          +     !   : 11 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+          +     !   : | 10 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 20,668,...  [0x100e3f690,0x100e3f918,...]
+          +     !   : | 1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+          +     !   : |   1 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 56  [0x100e40bfc]
+          +     !   : 5 XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 312  [0x100e3f7b4]
+          +     !   : 3 XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 4,76,...  [0x100e3f034,0x100e3f07c,...]
+          +     !   : 3 XOffsetDatastructure::detail::validate_wire_value<unsigned char>(XOffsetDatastructure::XFixedVector<unsigned char> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 20,32,...  [0x100e4171c,0x100e41728,...]
+          +     !   : 1 XOffsetDatastructure::detail::WireValidationByteIndex::insert_disjoint(unsigned long, unsigned long, unsigned long)  (in sc_xoffset) + 1680  [0x100e40818]
+          +     !   : 1 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 40  [0x100e3eee4]
+          +     !   3 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Record>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Record> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 260  [0x100e40ff0]
+          +     !   2 XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset) + 256  [0x100e41a60]
+          +     !   1 XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 196  [0x100e3ef80]
+          +     152 XOffsetDatastructure::XBuffer::load_verified_with_resource<sc::xo_detail::Snapshot>(std::span<std::byte const, 18446744073709551615ul>, std::optional<XOffsetDatastructure::XBufferCore::MaximumCapacity>, std::pmr::memory_resource*)  (in sc_xoffset) + 348  [0x100e3de98]
+          +     ! 152 XOffsetDatastructure::XBuffer::XBuffer(char const*, unsigned long, XOffsetDatastructure::XBufferCore::MaximumCapacity)  (in sc_xoffset) + 224  [0x100e3e724]
+          +     !   151 XOffsetDatastructure::XBufferCore::init_from_bytes(char const*, unsigned long, unsigned long, XOffsetDatastructure::detail::VmStoragePool const&)  (in sc_xoffset) + 156  [0x100e3e860]
+          +     !   : 150 XOffsetDatastructure::detail::VirtualMemoryStorage::from_bytes(char const*, unsigned long, unsigned long, XOffsetDatastructure::detail::VmStoragePool const&)  (in sc_xoffset) + 268  [0x100e3ec00]
+          +     !   : | 150 _platform_memmove  (in libsystem_platform.dylib) + 88,76,...  [0x1954393d8,0x1954393cc,...]
+          +     !   : 1 XOffsetDatastructure::detail::VirtualMemoryStorage::from_bytes(char const*, unsigned long, unsigned long, XOffsetDatastructure::detail::VmStoragePool const&)  (in sc_xoffset) + 228  [0x100e3ebd8]
+          +     !   :   1 __mprotect  (in libsystem_kernel.dylib) + 8  [0x1953f0af0]
+          +     !   1 XOffsetDatastructure::XBufferCore::init_from_bytes(char const*, unsigned long, unsigned long, XOffsetDatastructure::detail::VmStoragePool const&)  (in sc_xoffset) + 300  [0x100e3e8f0]
+          +     !     1 XOffsetDatastructure::XBufferCore::register_registry()  (in sc_xoffset) + 76  [0x100e375c8]
+          +     !       1 operator new(unsigned long)  (in libc++abi.1.0.dylib) + 28  [0x100f18498]
+          +     !         1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 460  [0x19525334c]
+          +     1 XOffsetDatastructure::XBuffer::load_verified_with_resource<sc::xo_detail::Snapshot>(std::span<std::byte const, 18446744073709551615ul>, std::optional<XOffsetDatastructure::XBufferCore::MaximumCapacity>, std::pmr::memory_resource*)  (in sc_xoffset) + 328  [0x100e3de84]
+          57 (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset) + 648  [0x100e33630]
+          + 57 _platform_memmove  (in libsystem_platform.dylib) + 88,100,...  [0x1954393d8,0x1954393e4,...]
+          30 (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset) + 788,800,...  [0x100e336bc,0x100e336c8,...]
+          20 (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset) + 908  [0x100e33734]
+            20 XOffsetDatastructure::XBufferCore::~XBufferCore()  (in sc_xoffset) + 144  [0x100e361b0]
+              20 XOffsetDatastructure::detail::VirtualMemoryStorage::release()  (in sc_xoffset) + 172  [0x100e36a44]
+                20 __munmap  (in libsystem_kernel.dylib) + 8  [0x1953f0714]
+
+Total number in stack (recursive counted multiple, when >=5):
+        22       _tlv_get_addr  (in libdyld.dylib) + 0  [0x19502f2f8]
+        21       XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 0  [0x100e38e58]
+        18       XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 0  [0x100e39740]
+        13       XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset) + 0  [0x100e3a068]
+        12       XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 0  [0x100e3f67c]
+        12       XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 152  [0x100e397d8]
+        10       XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 40  [0x100e38e80]
+        9       XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 0  [0x100e3eebc]
+        9       XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 0  [0x100e3a284]
+        8       XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset) + 128  [0x100e397c0]
+        7       XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 72  [0x100e38ea0]
+        7       XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset) + 120  [0x100e3a2fc]
+        7       _platform_memmove  (in libsystem_platform.dylib) + 0  [0x195439380]
+        6       XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 928  [0x100e3fa1c]
+        6       XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset) + 0  [0x100e40bc4]
+        6       XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset) + 0  [0x100e3f030]
+        6       XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset) + 104  [0x100e3ef24]
+        5       XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset) + 0  [0x100e38508]
+        5       XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset) + 96  [0x100e38eb8]
+        5       XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset) + 972  [0x100e3fa48]
+        5       XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset) + 0  [0x100e40c54]
+
+Sort by top of stack, same collapsed (when >= 5):
+        sc::XOffsetAdapter::mutate(std::unique_ptr<XOffsetDatastructure::TypedXBuffer<sc::xo_detail::Snapshot>>&, std::span<sc::Mutation const, 18446744073709551615ul>)  (in sc_xoffset)        236
+        _platform_memmove  (in libsystem_platform.dylib)        231
+        XOffsetDatastructure::fixed_detail::allocate_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, unsigned int, unsigned long)  (in sc_xoffset)        193
+        XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)  (in sc_xoffset)        165
+        XOffsetDatastructure::fixed_detail::retire_dynamic_bytes(XOffsetDatastructure::fixed_detail::allocator_ref const&, void*, unsigned int)  (in sc_xoffset)        118
+        _tlv_get_addr  (in libdyld.dylib)        79
+        XOffsetDatastructure::fixed_detail::note_allocator_block(XOffsetDatastructure::XAllocatorStateV1*, void const*, unsigned int)  (in sc_xoffset)        74
+        XOffsetDatastructure::detail::register_allocation(void const*, unsigned long, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, bool)  (in sc_xoffset)        71
+        XOffsetDatastructure::XBufferCore::owner_from_payload_ptr(void const*)  (in sc_xoffset)        68
+        XOffsetDatastructure::fixed_detail::move_assignment_owns_address<XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, void const*)  (in sc_xoffset)        53
+        XOffsetDatastructure::detail::register_owned_range(void const*, unsigned long, XOffsetDatastructure::detail::WireValidationContext&, char const*)  (in sc_xoffset)        52
+        XOffsetDatastructure::XFixedVector<unsigned char>::resize_construct<XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>::'lambda'(unsigned char*)>(unsigned int, T&&)  (in sc_xoffset)        45
+        XOffsetDatastructure::XFixedVector<unsigned int>::reserve(unsigned long)  (in sc_xoffset)        38
+        _platform_memset  (in libsystem_platform.dylib)        35
+        XOffsetDatastructure::detail::validate_wire_value(XOffsetDatastructure::XFixedString const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset)        31
+        (anonymous namespace)::stageloop(std::map<std::basic_string<char>, std::basic_string<char>> const&)  (in sc_xoffset)        30
+        XOffsetDatastructure::detail::validate_wire_value<unsigned char>(XOffsetDatastructure::XFixedVector<unsigned char> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset)        24
+        __munmap  (in libsystem_kernel.dylib)        20
+        XOffsetDatastructure::XBufferCore::allocate_aligned_impl(unsigned int, unsigned long, bool)  (in sc_xoffset)        19
+        XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::resize_construct<XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)>(unsigned int, XOffsetDatastructure::XVector<sc::xo_detail::Attr>::resize(unsigned long)::'lambda'(sc::xo_detail::Attr*)&&)  (in sc_xoffset)        18
+        XOffsetDatastructure::XFixedString::operator=(XOffsetDatastructure::XFixedString&&)  (in sc_xoffset)        13
+        XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::release()  (in sc_xoffset)        13
+        XOffsetDatastructure::XFixedVector<unsigned char>::resize_default_scalar(unsigned int) requires std::is_scalar_v<T>  (in sc_xoffset)        13
+        XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>::operator=(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr>&&)  (in sc_xoffset)        12
+        XOffsetDatastructure::XFixedVector<unsigned int>::operator=(XOffsetDatastructure::XFixedVector<unsigned int>&&)  (in sc_xoffset)        11
+        _platform_memcmp  (in libsystem_platform.dylib)        11
+        XOffsetDatastructure::XFixedString::assign(std::basic_string_view<char>)  (in sc_xoffset)        10
+        DYLD-STUB$$memcmp  (in sc_xoffset)        9
+        XOffsetDatastructure::XFixedVector<unsigned int>::release()  (in sc_xoffset)        9
+        XOffsetDatastructure::detail::validate_wire_value<sc::xo_detail::Attr>(XOffsetDatastructure::XFixedVector<sc::xo_detail::Attr> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset)        9
+        XOffsetDatastructure::fixed_detail::set_rel32(int&, void const*, void const*)  (in sc_xoffset)        9
+        _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib)        9
+        XOffsetDatastructure::XFixedVector<unsigned char>::operator=(XOffsetDatastructure::XFixedVector<unsigned char>&&)  (in sc_xoffset)        8
+        XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda0'()::operator()() const  (in sc_xoffset)        8
+        sc::xo_detail::Attr::~Attr()  (in sc_xoffset)        8
+        XOffsetDatastructure::detail::WireValidationByteIndex::try_insert_dense_single_page(XOffsetDatastructure::detail::WireValidationByteIndex&, XOffsetDatastructure::detail::WireValidationByteIndex&, bool, unsigned long, unsigned long, unsigned long, unsigned int&)::'lambda'()::operator()() const  (in sc_xoffset)        7
+        XOffsetDatastructure::fixed_detail::relocate_construct<XOffsetDatastructure::XString>(XOffsetDatastructure::XString*, XOffsetDatastructure::XString&)  (in sc_xoffset)        7
+        XOffsetDatastructure::detail::WireValidationByteIndex::insert_disjoint(unsigned long, unsigned long, unsigned long)  (in sc_xoffset)        5
+        XOffsetDatastructure::detail::WireValidationByteIndex::page_view(unsigned long) const  (in sc_xoffset)        5
+        XOffsetDatastructure::detail::validate_wire_value<unsigned int>(XOffsetDatastructure::XFixedVector<unsigned int> const&, XOffsetDatastructure::detail::WireValidationContext&)  (in sc_xoffset)        5
+
+Binary Images:
+       0x100e2c000 -        0x100e50fb7 +sc_xoffset (0) <FAFB5DA4-3289-32FE-A9E1-E709E3AF94EF> /Volumes/*/sc_xoffset
+       0x100e80000 -        0x100e8a147 +libunwind.1.0.dylib (0) <B0B303E7-FE5D-3A62-B2C1-D43C703ABE2C> /Volumes/*/libunwind.1.0.dylib
+       0x100ef0000 -        0x100f1cacf +libc++abi.1.0.dylib (0) <81F78ECC-95D7-356F-B348-D9E594ED1558> /Volumes/*/libc++abi.1.0.dylib
+       0x100f80000 -        0x1010330cf +libc++.1.0.dylib (0) <4EA65B20-8100-3A16-BE2B-250F6546DD0B> /Volumes/*/libc++.1.0.dylib
+       0x194fd8000 -        0x19502b4bb  libobjc.A.dylib (951.1) <9E66CFF2-3EBD-3242-8166-D5D0C204755B> /usr/lib/libobjc.A.dylib
+       0x19502c000 -        0x19505cbcb  libdyld.dylib (1340) <D0CBB392-9301-3174-8904-D869F1D973CF> /usr/lib/system/libdyld.dylib
+       0x19505d000 -        0x1950fc713  dyld (1.0.0 - 1340) <BC4DB5F4-1C64-3706-8006-73B78C3E1F1A> /usr/lib/dyld
+       0x1950fd000 -        0x1951001d0  libsystem_blocks.dylib (96) <F1D9FC62-B5CE-3FB6-B264-B1933396C05F> /usr/lib/system/libsystem_blocks.dylib
+       0x195101000 -        0x19515607f  libxpc.dylib (3089.80.10) <3B264F68-2825-3790-8796-4B49581D6425> /usr/lib/system/libxpc.dylib
+       0x195157000 -        0x19517795f  libsystem_trace.dylib (1815.80.2) <2CE5667A-97C5-35F3-8124-BB48185D0D3D> /usr/lib/system/libsystem_trace.dylib
+       0x195178000 -        0x195224ccf  libcorecrypto.dylib (1922.80.7) <A6FB5220-05F1-36A3-93CA-E45F15C98D3A> /usr/lib/system/libcorecrypto.dylib
+       0x195225000 -        0x195270c67  libsystem_malloc.dylib (792.80.2) <221D1476-49F1-3370-A1DE-82991ACDB932> /usr/lib/system/libsystem_malloc.dylib
+       0x195271000 -        0x1952b7e5f  libdispatch.dylib (1542.0.4) <4C58AB31-F363-3E75-A8F8-302105812DBF> /usr/lib/system/libdispatch.dylib
+       0x1952b8000 -        0x1952bafeb  libsystem_featureflags.dylib (101) <36BE75BA-0B53-3ACA-ABAF-C639D711C90B> /usr/lib/system/libsystem_featureflags.dylib
+       0x1952bb000 -        0x19533d047  libsystem_c.dylib (1725.40.4) <EB569350-0696-3397-838E-0344948107C0> /usr/lib/system/libsystem_c.dylib
+       0x19533e000 -        0x1953d0ea3  libc++.1.dylib (2000.67) <2DCB82A8-F83C-3656-B99E-B22415EA2AAA> /usr/lib/libc++.1.dylib
+       0x1953d1000 -        0x1953eb92f  libc++abi.dylib (2000.67) <581F1CC9-CE04-30EF-AB06-1638E36161A7> /usr/lib/libc++abi.dylib
+       0x1953ec000 -        0x19542849f  libsystem_kernel.dylib (12377.81.4) <B809799C-0EC9-3EE1-B730-342BDBF14E03> /usr/lib/system/libsystem_kernel.dylib
+       0x195429000 -        0x195435acb  libsystem_pthread.dylib (539.80.3) <0596A7B6-BCE2-3F06-A2E8-3EAAB5371ED8> /usr/lib/system/libsystem_pthread.dylib
+       0x195436000 -        0x19543e4af  libsystem_platform.dylib (359.80.2) <62C9CD37-272D-3D2D-9A1C-6F4EF24F7EC7> /usr/lib/system/libsystem_platform.dylib
+       0x19543f000 -        0x19546ee23  libsystem_info.dylib (600) <05CCB208-0B54-38D8-B736-6C7043F446AA> /usr/lib/system/libsystem_info.dylib
+       0x1993e8000 -        0x1993f2397  libsystem_darwin.dylib (1725.40.4) <EAC9A3D8-2048-3E6A-BA11-77D1C25C0EF3> /usr/lib/system/libsystem_darwin.dylib
+       0x199859000 -        0x19986aff3  libsystem_notify.dylib (344.0.1) <73D7BFA7-9433-3ECD-929F-06220C37F214> /usr/lib/system/libsystem_notify.dylib
+       0x19bb34000 -        0x19bb4efdb  libsystem_networkextension.dylib (2205.81.1) <645A9697-79B5-3E35-A642-5FFDD53CB6A7> /usr/lib/system/libsystem_networkextension.dylib
+       0x19bbd2000 -        0x19bbe9ff3  libsystem_asl.dylib (406) <2A30FE38-5014-334B-941B-579054EA8C1E> /usr/lib/system/libsystem_asl.dylib
+       0x19d78e000 -        0x19d7963b7  libsystem_symptoms.dylib (2158.80.11) <ED7EEE1F-0CA6-30CF-9A27-7440EE0661BC> /usr/lib/system/libsystem_symptoms.dylib
+       0x1a174b000 -        0x1a17832bb  libsystem_containermanager.dylib (725.80.5) <9FC7766C-6828-3EA2-9C9A-B209892A0186> /usr/lib/system/libsystem_containermanager.dylib
+       0x1a2ba1000 -        0x1a2ba566f  libsystem_configuration.dylib (1385.80.4) <E5837A49-4BF9-3D25-8671-A6174223010A> /usr/lib/system/libsystem_configuration.dylib
+       0x1a2ba6000 -        0x1a2bac6a7  libsystem_sandbox.dylib (2680.80.20) <8875D51A-D22D-3A6B-9A17-8D565C96262C> /usr/lib/system/libsystem_sandbox.dylib
+       0x1a413f000 -        0x1a41421fb  libquarantine.dylib (196.40.3) <84049E82-ACDC-39F3-A2D7-6ECB912B825A> /usr/lib/system/libquarantine.dylib
+       0x1a48cf000 -        0x1a48d600b  libsystem_coreservices.dylib (191.3.3) <94151A03-8600-3318-8719-103E2D5E83A5> /usr/lib/system/libsystem_coreservices.dylib
+       0x1a4e29000 -        0x1a4e668b7  libsystem_m.dylib (3309) <60DE08CC-AE4B-33E5-85E6-8E96D95ED4D8> /usr/lib/system/libsystem_m.dylib
+       0x1a4e68000 -        0x1a4e6b537  libmacho.dylib (1030.6.3) <D84C5B4C-6EE5-3B2D-8B96-DCA5B83EC11D> /usr/lib/system/libmacho.dylib
+       0x1a4e85000 -        0x1a4e9261f  libcommonCrypto.dylib (600035) <04C03765-D34A-311F-AE1E-CFBB1E627E54> /usr/lib/system/libcommonCrypto.dylib
+       0x1a4e93000 -        0x1a4e9cb0b  libunwind.dylib (1900.125) <8DC5F6C2-CDA9-3B93-AC35-ED584D2C9550> /usr/lib/system/libunwind.dylib
+       0x1a4ea5000 -        0x1a4eaf6ff  libcopyfile.dylib (230.0.1.0.1) <BCF5BEF5-BC4A-3CCE-9D0D-89C57F45CBFB> /usr/lib/system/libcopyfile.dylib
+       0x1a4eb0000 -        0x1a4eb395f  libcompiler_rt.dylib (103.3) <85CAE852-081B-3124-89C1-4C4A21830160> /usr/lib/system/libcompiler_rt.dylib
+       0x1a4eb4000 -        0x1a4eb8a1b  libsystem_collections.dylib (1725.40.4) <17BD45DA-1D82-3A90-9F18-5D569A5693B5> /usr/lib/system/libsystem_collections.dylib
+       0x1a4eb9000 -        0x1a4ebc4bf  libsystem_secinit.dylib (168.40.2) <0928D7E4-5DB0-3B75-9DF5-08EC8E9C033B> /usr/lib/system/libsystem_secinit.dylib
+       0x1a4ebd000 -        0x1a4ebfb57  libremovefile.dylib (84) <D854E7F8-C351-331B-9A26-BE66F9B8996D> /usr/lib/system/libremovefile.dylib
+       0x1a4ec0000 -        0x1a4ec0f27  libkeymgr.dylib (31) <18ED97A3-6DD7-3EC2-AB38-E16A862BE1A7> /usr/lib/system/libkeymgr.dylib
+       0x1a4ec1000 -        0x1a4ec9f8f  libsystem_dnssd.dylib (2881.80.4.0.1) <EB84C040-D153-37D3-A933-8AD3CFD893BA> /usr/lib/system/libsystem_dnssd.dylib
+       0x1a4eca000 -        0x1a4ecf0b3  libcache.dylib (95) <EA56E91F-7683-3AA5-AF72-185994622502> /usr/lib/system/libcache.dylib
+       0x1a4ed0000 -        0x1a4ed1cf3  libSystem.B.dylib (1356) <6AE3A2BD-839C-3DEA-854C-1C4A10567C26> /usr/lib/libSystem.B.dylib
+       0x293359000 -        0x293360319  libRosetta.dylib (367.3) <5315C55D-09E5-394B-A9E5-672B23847BF7> /usr/lib/libRosetta.dylib
+       0x294a66000 -        0x294a69deb  libsystem_darwindirectory.dylib (122) <9AD833C7-D009-39FF-8D04-D57C937D9EAC> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x294a6a000 -        0x294a7334b  libsystem_eligibility.dylib (289.80.56) <0E973CB5-A124-3716-9841-1EA67809AF06> /usr/lib/system/libsystem_eligibility.dylib
+       0x294a74000 -        0x294a7b873  libsystem_sanitizers.dylib (25) <90C45178-3954-3108-9F2F-44E528DF5E44> /usr/lib/system/libsystem_sanitizers.dylib
+       0x294a7c000 -        0x294a7cbb7  libsystem_trial.dylib (474.2.0.5.2) <E776BAEB-B36B-3EA2-BEFE-3E2F7999E235> /usr/lib/system/libsystem_trial.dylib

@@ -1,0 +1,978 @@
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/tests/CMakeLists.txt diag/src-w1b/tests/CMakeLists.txt
+--- candidate-r1m2-20261020/tests/CMakeLists.txt	2026-10-19 21:02:56
++++ diag/src-w1b/tests/CMakeLists.txt	2026-10-19 22:35:08
+@@ -126,6 +126,27 @@
+     set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
+ endforeach()
+ 
++# Process-wide canonical receive window (W-fixed). The reservation is made at
++# most once per process, so failure injection runs in its own process; window
++# size variants are separate programs compiled with the configuration macros.
++add_xoffset_test(test_canonical_window reflection)
++add_test(NAME test_canonical_window_reserve_failure
++    COMMAND $<TARGET_FILE:test_canonical_window> --reserve-failure)
++set_tests_properties(test_canonical_window_reserve_failure PROPERTIES LABELS "reflection;canonical-window")
++foreach(window_variant small disabled)
++    set(window_target test_canonical_window_${window_variant})
++    add_executable(${window_target} test_canonical_window.cpp)
++    configure_xoffset_target(${window_target})
++    xoffset_enable_test_assertions(${window_target})
++    add_test(NAME ${window_target} COMMAND $<TARGET_FILE:${window_target}>)
++    set_tests_properties(${window_target} PROPERTIES LABELS "reflection;canonical-window")
++endforeach()
++target_compile_definitions(test_canonical_window_small PRIVATE
++    XOFFSET_TEST_WINDOW_SMALL=1 XOFFSET_CANONICAL_WINDOW_BYTES=0x400000)
++target_compile_definitions(test_canonical_window_disabled PRIVATE
++    XOFFSET_TEST_WINDOW_DISABLED=1 XOFFSET_CANONICAL_WINDOW_BYTES=0)
++target_link_libraries(test_canonical_window PRIVATE Threads::Threads)
++
+ # Explicit new common programs; no source glob or handwritten total.
+ include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
+ # These are mandatory configure-time checks, not runtime test programs.
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/tests/test_canonical_registry_v2.cpp diag/src-w1b/tests/test_canonical_registry_v2.cpp
+--- candidate-r1m2-20261020/tests/test_canonical_registry_v2.cpp	2026-10-19 21:02:56
++++ diag/src-w1b/tests/test_canonical_registry_v2.cpp	2026-10-19 22:35:08
+@@ -54,6 +54,7 @@
+     const auto base=reinterpret_cast<std::uintptr_t>(b.get_address());
+     const auto target=reinterpret_cast<std::uintptr_t>(r.values.data());
+     auto* recovered=xo::XBufferCore::canonical_bytes_at(&r.values,target,5*sizeof(std::uint32_t));
++    need(recovered==xo::XBufferCore::canonical_bytes_at_active(&r.values,target,5*sizeof(std::uint32_t)),"window and registry recovery differ");
+     need(recovered&&reinterpret_cast<std::uintptr_t>(recovered)==target,"canonical exact array address differs");
+     auto* end=xo::XBufferCore::canonical_bytes_at(&r,base+b.maximum_capacity(),0);
+     need(end&&reinterpret_cast<std::uintptr_t>(end)==base+b.maximum_capacity(),"canonical one-past extent recovery differs");
+@@ -80,7 +81,13 @@
+     auto moved=std::move(*owners[0]);owners[0].reset();std::swap(moved,*owners[1]);owners[0].emplace(std::move(moved));
+     const void* retired_anchor=owners[3]->get_address();const auto retired_number=reinterpret_cast<std::uintptr_t>(retired_anchor);
+     owners[3].reset();
+-    need(xo::XBufferCore::canonical_bytes_at(retired_anchor,retired_number,1)==nullptr,"terminal cached record resurrected");
++    // Retired-record liveness is a registry property: query the registry path.
++    // The window hot path (canonical_bytes_at) is a provenance-only range test;
++    // for an in-window freed slot it returns the window-array pointer whose
++    // value equals the flat address (never a different object or origin).
++    need(xo::XBufferCore::canonical_bytes_at_active(retired_anchor,retired_number,1)==nullptr,"terminal cached record resurrected");
++    {auto* w=xo::XBufferCore::canonical_bytes_at(retired_anchor,retired_number,1);
++     need(!w||reinterpret_cast<std::uintptr_t>(w)==retired_number,"window pointer for retired slot differs numerically");}
+     {auto token=receive(input);owners[3].emplace(xo::finish_verified(token));}
+     for(auto& item:owners)check(*item);
+ 
+@@ -99,7 +106,7 @@
+     out=Buffer{};recovered=Buffer{};for(auto& item:owners)item.reset();
+     // Inert TLS shared records can remain, but no active C registration or VM
+     // owner remains. Do not require final global C++ live requested bytes zero.
+-    need(xo::XBufferCore::canonical_bytes_at(retired_anchor,retired_number,1)==nullptr,"retired C anchor found after all owners released");
++    need(xo::XBufferCore::canonical_bytes_at_active(retired_anchor,retired_number,1)==nullptr,"retired C anchor found after all owners released");
+     auto normal=Buffer::create(8192,policy());normal.root().marker=91;normal.root().values.resize(4);normal.root().values[3]=71;
+     need(normal.root().marker==91&&normal.root().values[3]==71,"normal reads after last C owner differ");
+     need(xo::XBufferCore::canonical_bytes_at(&normal.root(),reinterpret_cast<std::uintptr_t>(normal.root().values.data()),sizeof(std::uint32_t))==nullptr,"ordinary VM falsely claimed canonical origin");
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/tests/test_canonical_window.cpp diag/src-w1b/tests/test_canonical_window.cpp
+--- candidate-r1m2-20261020/tests/test_canonical_window.cpp	1969-12-31 16:00:00
++++ diag/src-w1b/tests/test_canonical_window.cpp	2026-10-19 22:35:08
+@@ -0,0 +1,291 @@
++// Process-wide canonical receive window ("W-fixed"): receive storage lives in
++// one compile-time-addressed reservation whose single std::byte[] array is the
++// provenance root of every canonical pointer.
++//
++// Variants (same source, separate targets):
++//   default                         full window; optional --reserve-failure
++//   XOFFSET_TEST_WINDOW_SMALL       window of 4 granules (exhaustion)
++//   XOFFSET_TEST_WINDOW_DISABLED    XOFFSET_CANONICAL_WINDOW_BYTES == 0
++#include "xoffsetdatastructure.hpp"
++#include <cstdint>
++#include <cstring>
++#include <iostream>
++#include <new>
++#include <optional>
++#include <stdexcept>
++#include <string>
++#include <string_view>
++#include <thread>
++#include <vector>
++
++namespace xo = XOffsetDatastructure;
++namespace xd = XOffsetDatastructure::detail;
++using Window = xd::CanonicalWindow;
++using Storage = xd::VirtualMemoryStorage;
++
++struct WindowRoot {
++    std::uint64_t marker{};
++    xo::XString label;
++    xo::XVector<std::uint32_t> values;
++};
++XOFFSET_REGISTER_SCHEMA_NAME(WindowRoot, "receive.canonical-window.fixture")
++namespace XOffsetDatastructure {
++template <> struct wire_record_layout<WindowRoot> { static constexpr bool ordinary_members = true; };
++}
++using Buffer = xo::TypedXBuffer<WindowRoot>;
++
++namespace {
++void need(bool p, const char* why) { if (!p) throw std::runtime_error(why); }
++
++std::uintptr_t addr(const void* p) { return reinterpret_cast<std::uintptr_t>(p); }
++bool in_window(const void* p, std::size_t n) {
++    const auto off = addr(p) - Window::base;
++    return Window::enabled && off <= Window::bytes && n <= Window::bytes - off;
++}
++template <class F> bool throws_bad_alloc(F&& f) {
++    try { f(); } catch (const std::bad_alloc&) { return true; } catch (const xo::XBadAlloc&) { return true; }
++    return false;
++}
++
++auto policy() { return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic); }
++std::string wire() {
++    auto b = Buffer::create(32768, policy());
++    auto& r = b.root();
++    r.marker = 0x5eed;
++    r.label = "canonical window";
++    r.values.resize(6);
++    for (unsigned i = 0; i < 6; ++i) r.values[i] = 11 + i;
++    return b.save_verified();
++}
++Buffer receive(const std::string& bytes) {
++    const auto body = bytes.size() - sizeof(xo::XWireHeaderV1);
++    auto t = xo::begin_verified_receive<WindowRoot>(body, policy());
++    auto op = t.acquire_operation();
++    auto h = op.header_bytes(), p = op.payload_bytes();
++    std::memcpy(h.data(), bytes.data(), h.size());
++    std::memcpy(p.data(), bytes.data() + h.size(), p.size());
++    op.complete(h.size(), p.size());
++    return xo::finish_verified(t);
++}
++void check(Buffer& b) {
++    auto& r = b.root();
++    need(r.marker == 0x5eed && r.label == "canonical window" && r.values.size() == 6 && r.values[5] == 16,
++         "received values differ");
++}
++
++void ordinary_outside_window() {
++    auto b = Buffer::create(8192, policy());
++    b.root().marker = 3;
++    b.root().values.resize(3);
++    b.root().values[2] = 9;
++    need(!in_window(b.get_address(), 1), "ordinary buffer placed inside the canonical window");
++    need(xo::XBufferCore::canonical_bytes_at(b.get_address(), addr(b.root().values.data()), 4) == nullptr,
++         "ordinary buffer resolved canonically");
++    Storage plain(4096, 1 << 20);
++    need(!plain.in_canonical_window() && !in_window(plain.data(), 1) && !plain.canonical_byte_origin(),
++         "ordinary storage placed inside the canonical window");
++}
++
++#if defined(XOFFSET_TEST_WINDOW_DISABLED)
++static_assert(!Window::enabled);
++void run() {
++    auto empty = Storage::for_receive(0, 0);
++    need(!empty.data() && !empty.in_canonical_window(), "empty receive storage changed");
++    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "disabled window did not reject receive storage");
++    need(throws_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
++         "disabled window did not reject verified receive");
++    need(xo::XBufferCore::canonical_bytes_at(nullptr, 0x580000000000ull, 1) == nullptr,
++         "disabled window resolved an address");
++    ordinary_outside_window();
++    std::cout << "canonical window disabled: receive rejected, ordinary storage unaffected\n";
++}
++#elif defined(XOFFSET_TEST_WINDOW_SMALL)
++static_assert(Window::enabled && Window::slots == 4);
++void run() {
++    const std::size_t g = Window::granule;
++    need(Window::used_granules() == 0, "fresh small window not empty");
++    std::vector<Storage> live;
++    for (int i = 0; i < 4; ++i) live.push_back(Storage::for_receive(0, g));
++    need(Window::used_granules() == 4, "four granule slots not accounted");
++    for (auto& s : live) need(s.in_canonical_window() && in_window(s.data(), g), "slot outside small window");
++    need(throws_bad_alloc([&] { auto s = Storage::for_receive(0, g); (void)s; }), "exhausted window accepted receive");
++    need(throws_bad_alloc([&] { auto s = Storage::for_receive(0, 5 * g); (void)s; }), "oversized receive accepted");
++    const void* freed = live[1].data();
++    live[1] = Storage{};
++    need(Window::used_granules() == 3, "release did not return the slot");
++    need(throws_bad_alloc([&] { auto s = Storage::for_receive(0, 2 * g); (void)s; }),
++         "fragmented window returned a non-contiguous slot");
++    auto again = Storage::for_receive(0, g);
++    need(again.data() == freed, "freed slot was not reused");
++    live.clear();
++    again = Storage{};
++    need(Window::used_granules() == 0, "small window not empty after release");
++    auto big = Storage::for_receive(0, 4 * g);
++    need(addr(big.data()) == Window::base, "whole-window slot misplaced");
++    big = Storage{};
++    ordinary_outside_window();
++    std::cout << "canonical window small: exhaustion, fragmentation and reuse passed\n";
++}
++#else
++void boundaries() {
++    auto* root = xd::canonical_window_array.load(std::memory_order_acquire);
++    need(root && addr(root) == Window::base, "window array differs from base");
++    using Core = xo::XBufferCore;
++    need(Core::canonical_bytes_at(nullptr, Window::base - 1, 1) == nullptr, "below-window address resolved");
++    need(Core::canonical_bytes_at(nullptr, Window::base, 1) == root, "window base not resolved");
++    need(Core::canonical_bytes_at(nullptr, Window::base + Window::bytes, 0) == root + Window::bytes,
++         "window one-past-end not resolved");
++    need(Core::canonical_bytes_at(nullptr, Window::base + Window::bytes - 1, 2) == nullptr,
++         "range crossing window end resolved");
++    need(Core::canonical_bytes_at(nullptr, Window::base + Window::bytes, 1) == nullptr, "past-window address resolved");
++    need(Core::canonical_bytes_at(nullptr, 0, 1) == nullptr && Core::canonical_bytes_at(nullptr, ~std::uintptr_t{0}, 1) == nullptr,
++         "extreme addresses resolved");
++}
++
++void storage_in_window_and_reuse() {
++    const auto baseline = Window::used_granules();
++    auto a = Storage::for_receive(100, 3 << 20);
++    auto b = Storage::for_receive(10, 4096);
++    need(a.in_canonical_window() && in_window(a.data(), a.maximum_capacity()) &&
++         reinterpret_cast<char*>(a.canonical_byte_origin()) == a.data(), "receive storage outside window");
++    need(a.canonical_byte_origin() == xd::canonical_window_array.load() + (addr(a.data()) - Window::base),
++         "receive origin not derived from the window array");
++    need(b.in_canonical_window() && in_window(b.data(), b.maximum_capacity()), "second receive outside window");
++    need(addr(a.data()) + a.reserved_bytes() <= addr(b.data()) || addr(b.data()) + b.reserved_bytes() <= addr(a.data()),
++         "receive slots overlap");
++    need(a.accessible_bytes() == a.reserved_bytes() && a.size() == 100, "receive accessible extent changed");
++    need(Window::used_granules() == baseline + 3 + 1, "granule accounting differs");
++    const auto* old = a.data();
++    const auto max = a.maximum_capacity();
++    std::memset(a.data(), 0xab, max); // dirty the whole slot, including beyond logical
++    a = Storage{};
++    need(Window::used_granules() == baseline + 1, "release did not return granules");
++    auto c = Storage::for_receive(0, max);
++    need(c.data() == old, "first-fit did not reuse the freed slot");
++    for (std::size_t i = 0; i < max; i += 1024)
++        need(c.data()[i] == 0, "reused slot exposed stale bytes");
++    // Moves keep the slot; pools never cache window slots and receive never
++    // takes pooled ordinary storage.
++    xd::VmStoragePool pool({4, 64u << 20, 64u << 20});
++    {
++        auto d = Storage::for_receive(0, 1 << 20, pool);
++        need(d.in_canonical_window(), "pooled receive left the window");
++    }
++    need(pool.stats().cached_blocks == 0 && pool.stats().hits == 0 && pool.stats().misses == 0,
++         "window slot interacted with a storage pool");
++    {
++        Storage ordinary(0, 1 << 20, pool);
++    }
++    need(pool.stats().cached_blocks == 1, "ordinary pooled storage not cached");
++    auto e = Storage::for_receive(0, 1 << 20, pool);
++    need(e.in_canonical_window() && pool.stats().cached_blocks == 1 && pool.stats().hits == 0,
++         "receive took pooled ordinary storage");
++    Storage moved(std::move(e));
++    need(moved.in_canonical_window() && !e.in_canonical_window(), "move lost the window slot");
++    // Tail reclamation stays inside the slot and keeps it a window slot.
++    auto f = Storage::for_receive(16, 1 << 20);
++    need(f.reclaim_tail().complete() && f.accessible_bytes() < f.reserved_bytes() && f.in_canonical_window(),
++         "receive tail reclamation differs");
++    need(f.grow_to(f.maximum_capacity()) && f.data()[f.maximum_capacity() - 1] == 0, "receive regrowth differs");
++}
++
++void live_equivalence(const std::string& input) {
++    std::vector<Buffer> owners;
++    for (int i = 0; i < 5; ++i) owners.push_back(receive(input));
++    for (auto& b : owners) {
++        check(b);
++        const auto* base = static_cast<const char*>(b.get_address());
++        need(in_window(base, b.maximum_capacity()), "received payload outside window");
++        using Core = xo::XBufferCore;
++        const auto values = addr(b.root().values.data());
++        const std::pair<std::uintptr_t, std::size_t> probes[] = {
++            {addr(base), 1}, {addr(base) + 64, 8}, {values, 6 * sizeof(std::uint32_t)},
++            {addr(base) + b.maximum_capacity(), 0}, {addr(base) + b.maximum_capacity() - 1, 1},
++            {addr(&b.root()), sizeof(WindowRoot)}};
++        for (auto [target, n] : probes) {
++            auto* hot = Core::canonical_bytes_at(&b.root(), target, n);
++            auto* reg = Core::canonical_bytes_at_active(&b.root(), target, n);
++            need(hot && hot == reg && addr(hot) == target, "window and registry recovery differ for a live record");
++        }
++        auto binding = b.root().values.binding();
++        auto* p = xo::fixed_detail::allocate_dynamic_bytes(binding, 24, 8);
++        xo::fixed_detail::retire_dynamic_bytes(binding, p, 24);
++        auto* q = xo::fixed_detail::allocate_dynamic_bytes(binding, 24, 8);
++        need(p == q, "window free-list reuse differs");
++        xo::fixed_detail::retire_dynamic_bytes(binding, q, 24);
++        b.root().values.push_back(17);
++        need(b.root().values.size() == 7 && b.root().values[6] == 17, "received mutation differs");
++    }
++}
++
++void concurrent_slots() {
++    constexpr int threads = 6, rounds = 200;
++    std::vector<std::thread> pool;
++    std::vector<int> failures(threads, 0);
++    for (int t = 0; t < threads; ++t) {
++        pool.emplace_back([t, &failures] {
++            try {
++                for (int i = 0; i < rounds; ++i) {
++                    auto s = Storage::for_receive(64, std::size_t(1 + (i + t) % 3) << 20);
++                    if (!s.in_canonical_window()) { ++failures[t]; continue; }
++                    std::memset(s.data(), t + 1, 64);
++                    for (int k = 0; k < 64; ++k) if (s.data()[k] != char(t + 1)) ++failures[t];
++                }
++            } catch (...) { ++failures[t]; }
++        });
++    }
++    for (auto& th : pool) th.join();
++    for (int f : failures) need(f == 0, "concurrent window slot use failed");
++}
++
++void reserve_failure_mode() {
++    // First window use in this process: inject the one-time reservation failure.
++    need(!xd::canonical_window_array.load(), "window reserved before injection");
++    xd::fail_next_vm_operation(xd::VmOperation::WindowReserve);
++    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "reservation failure did not reject receive");
++    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "reservation was retried after failure");
++    need(throws_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
++         "verified receive accepted an unavailable window");
++    need(xo::XBufferCore::canonical_bytes_at(nullptr, Window::base, 1) == nullptr,
++         "unreserved window resolved an address");
++    ordinary_outside_window();
++    const auto bytes = wire(); // ordinary create/save path still works
++    need(!bytes.empty(), "ordinary save failed");
++    std::cout << "canonical window reservation failure: receive rejected once and for all, ordinary unaffected\n";
++}
++
++void run() {
++    static_assert(Window::enabled);
++    const auto input = wire();
++    need(!xd::canonical_window_array.load(), "window reserved before first receive");
++    {
++        auto first = receive(input);
++        check(first);
++    }
++    boundaries();
++    storage_in_window_and_reuse();
++    live_equivalence(input);
++    concurrent_slots();
++    ordinary_outside_window();
++    std::cout << "canonical window: placement, equivalence, reuse, pool isolation, concurrency passed\n";
++}
++#endif
++} // namespace
++
++int main(int argc, char** argv) {
++    try {
++#if !defined(XOFFSET_TEST_WINDOW_SMALL) && !defined(XOFFSET_TEST_WINDOW_DISABLED)
++        if (argc == 2 && std::string_view(argv[1]) == "--reserve-failure") { reserve_failure_mode(); return 0; }
++#endif
++        if (argc != 1) throw std::runtime_error("unsupported arguments");
++        (void)argv;
++        run();
++        return 0;
++    } catch (const std::exception& e) {
++        std::cerr << e.what() << '\n';
++        return 1;
++    }
++}
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/tests/test_canonical_zero_target.cpp diag/src-w1b/tests/test_canonical_zero_target.cpp
+--- candidate-r1m2-20261020/tests/test_canonical_zero_target.cpp	2026-10-19 21:02:56
++++ diag/src-w1b/tests/test_canonical_zero_target.cpp	2026-10-19 22:35:08
+@@ -133,7 +133,7 @@
+     need(target==reinterpret_cast<std::uintptr_t>(bytes.b),"flat numeric adjacent member boundary differs");
+     Scope scope(bytes,identity_a,identity_b,b_canonical);scope.install();
+     need(scope.only_b(),"cache accidentally contained cold anchor A");
+-    auto* result=Core::canonical_bytes_at(bytes.a+N/2,target,0);
++    auto* result=Core::canonical_bytes_at_active(bytes.a+N/2,target,0);
+     if(expect_old_bug){
+         need(scope.selected(scope.b),"old source did not reproduce target-only B selection");
+         if(b_canonical)need(result!=nullptr&&reinterpret_cast<std::uintptr_t>(result)==target,"old C/C numeric result differs");
+@@ -143,13 +143,13 @@
+     }
+     // A positive-width independent target must still select its own domain.
+     scope.seed(scope.b);
+-    auto* positive=Core::canonical_bytes_at(bytes.a+N/2,target,1);
++    auto* positive=Core::canonical_bytes_at_active(bytes.a+N/2,target,1);
+     need(scope.selected(scope.b)&&positive==(b_canonical?bytes.b:nullptr),"nonzero cross-domain hot path changed");
+     // An actually hot fitting anchor already had correct priority in v2.
+     scope.seed(scope.a);
+-    need(Core::canonical_bytes_at(bytes.a+1,target,0)==bytes.a+N&&scope.selected(scope.a),"hot anchor one-past changed");
++    need(Core::canonical_bytes_at_active(bytes.a+1,target,0)==bytes.a+N&&scope.selected(scope.a),"hot anchor one-past changed");
+     scope.seed(scope.b);
+-    need(Core::canonical_bytes_at(bytes.b+1,target,0)==(b_canonical?bytes.b:nullptr)&&scope.selected(scope.b),"B's own zero-length domain changed");
++    need(Core::canonical_bytes_at_active(bytes.b+1,target,0)==(b_canonical?bytes.b:nullptr)&&scope.selected(scope.b),"B's own zero-length domain changed");
+ }
+ } // namespace fixture
+ 
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/tests/test_verified_receive.cpp diag/src-w1b/tests/test_verified_receive.cpp
+--- candidate-r1m2-20261020/tests/test_verified_receive.cpp	2026-10-19 21:02:56
++++ diag/src-w1b/tests/test_verified_receive.cpp	2026-10-19 22:35:08
+@@ -342,6 +342,23 @@
+              rel32(head+4,base)&&rel32(head+4,last),
+              "external-head fixture mapping does not satisfy checked rel32 domain");
+     };
++    // Received payloads live in the process-wide canonical window, ordinary
++    // arenas outside it. An ordinary-arena head can bind a received allocator
++    // only when the platform happens to place both within rel32 range; with
++    // the default window it never does, and the checked head constructor must
++    // then fail closed instead of forming an out-of-range binding.
++    auto within_domain=[&](const void* slot,const auto& owner,const void* state){
++        const auto head=reinterpret_cast<std::uintptr_t>(slot);
++        const auto base=reinterpret_cast<std::uintptr_t>(owner.get_address());
++        const auto last=base+owner.maximum_capacity()-1;
++        return rel32(head,reinterpret_cast<std::uintptr_t>(state))&&rel32(head+4,base)&&rel32(head+4,last);
++    };
++    if(!within_domain(text_slot,target,binding.state)||!within_domain(vector_slot,target,binding.state)){
++        bool rejected=false;
++        try{auto* t=::new(text_slot) xo::XString(binding);std::destroy_at(t);}
++        catch(const xo::XException& e){rejected=std::string_view(e.what())=="relative offset exceeds rel32 range";}
++        need(rejected,"out-of-range normal-arena head binding was not rejected");
++    }else{
+     require_head_domain(text_slot,target,binding.state);
+     require_head_domain(vector_slot,target,binding.state);
+     // Both constructors check the real rel32 distance. These heads are live in
+@@ -361,6 +378,7 @@
+     const auto before=binding.state->free_bytes;
+     std::destroy_at(values);std::destroy_at(text);
+     need(binding.state->free_bytes>before,"external head destruction did not retire received allocations");
++    }
+ 
+     // Distinct C anchor A must not force target B through A's byte origin.
+     const auto second_binding=owners[5]->root().name.binding();
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/xoffset_virtual_memory.hpp diag/src-w1b/xoffset_virtual_memory.hpp
+--- candidate-r1m2-20261020/xoffset_virtual_memory.hpp	2026-10-19 21:02:56
++++ diag/src-w1b/xoffset_virtual_memory.hpp	2026-10-19 22:35:08
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <atomic>
+ #include <cstddef>
+ #include <cstdint>
+ #include <cstring>
+@@ -20,16 +21,108 @@
+ #elif defined(__linux__) || defined(__APPLE__)
+ #  include <sys/mman.h>
+ #  include <unistd.h>
++#  if defined(__APPLE__)
++#    include <TargetConditionals.h>
++#  endif
+ #else
+ #  error "XOffset virtual memory storage requires Windows, Linux, or macOS"
+ #endif
+ 
++// ---------------------------------------------------------------------------
++// Process-wide canonical receive window (design "W-fixed").
++//
++// Direct-receive storage (VirtualMemoryStorage::for_receive) is placed inside
++// ONE process-wide reservation at a compile-time constant virtual address.
++// One std::byte[XOFFSET_CANONICAL_WINDOW_BYTES] array is started over the
++// whole reservation exactly once; every receive payload pointer and every
++// canonical rel32 resolution derives from that single array. Because the
++// bounds are compile-time constants, the hot-path membership test is two
++// compares against immediates and needs no atomic ledger load.
++//
++// Configuration (all three are plain integer macros, defined identically in
++// every translation unit of a program, like any other ABI macro):
++//   XOFFSET_CANONICAL_WINDOW_BASE    virtual address (granule aligned)
++//   XOFFSET_CANONICAL_WINDOW_BYTES   window size; 0 disables the window, and
++//                                    then non-empty receive storage creation
++//                                    throws std::bad_alloc (ordinary storage
++//                                    is unaffected)
++//   XOFFSET_CANONICAL_WINDOW_GRANULE slot granularity (power of two, multiple
++//                                    of the runtime page size)
++//
++// Default rationale (all defaults are 256 GiB of PROT_NONE / MEM_RESERVE
++// address space, which costs no memory or commit charge until a slot's pages
++// are enabled exactly as ordinary storage enables them):
++//  * macOS arm64/x86_64: 0x5800'0000'0000. User VA is 47 bits. Below it are
++//    __PAGEZERO, the image, dyld shared cache, stacks and malloc (low GiBs) and
++//    ASan's dynamic shadow (first 16 TiB gap above 4 GiB); above it are the
++//    nano malloc zone and ASan's allocator (0x6000'0000'0000). It lies inside
++//    TSan's Mapping48AddressSpace "mid app" range [0x5500.., 0x5a00..), so the
++//    same address works without sanitizers, with ASan and with TSan (probed).
++//  * Linux x86_64: 0x4000'0000'0000 (64 TiB). Above ASan's high shadow
++//    (ends 0x1000'7fff'7fff), below PIE images (0x5555.. + up to 2^32 pages of
++//    randomization) and the top-down mmap area. Under TSan, whose app ranges
++//    exclude that address, 0x5800'0000'0000 (TSan "mid app"; TSan re-execs
++//    without ASLR when the PIE range would not fit).
++//  * Linux aarch64 (48-bit VA): 0x4000'0000'0000, above ASan's high shadow
++//    (ends 0x2010'0000'0000) and below PIE (0xaaaa..); under TSan
++//    0x0800'0000'0000 (TSan "lo app" range). 39/42-bit VA kernels cannot
++//    reserve it: receive then throws std::bad_alloc unless overridden.
++//  * Windows x64: 0x5800'0000'0000 (128 TiB user VA since Windows 8.1).
++//  * Everything else (32-bit, iOS, other OSes): disabled (bytes 0).
++// A reservation that cannot be placed exactly at the base (address already in
++// use, sanitizer rejection, VA too small) fails once and permanently: receive
++// storage creation then throws std::bad_alloc, ordinary storage is unaffected.
++// ---------------------------------------------------------------------------
++#if defined(__has_feature)
++#  if __has_feature(thread_sanitizer)
++#    define XOFFSET_DETAIL_WINDOW_TSAN 1
++#  endif
++#endif
++#if !defined(XOFFSET_DETAIL_WINDOW_TSAN) && defined(__SANITIZE_THREAD__)
++#  define XOFFSET_DETAIL_WINDOW_TSAN 1
++#endif
++
++#if !defined(XOFFSET_CANONICAL_WINDOW_BASE)
++#  if defined(__APPLE__) && defined(TARGET_OS_OSX) && TARGET_OS_OSX && \
++      (defined(__aarch64__) || defined(__x86_64__))
++#    define XOFFSET_CANONICAL_WINDOW_BASE 0x580000000000ull
++#  elif defined(__linux__) && defined(__x86_64__) && !defined(__ILP32__)
++#    if defined(XOFFSET_DETAIL_WINDOW_TSAN)
++#      define XOFFSET_CANONICAL_WINDOW_BASE 0x580000000000ull
++#    else
++#      define XOFFSET_CANONICAL_WINDOW_BASE 0x400000000000ull
++#    endif
++#  elif defined(__linux__) && defined(__aarch64__) && !defined(__ILP32__)
++#    if defined(XOFFSET_DETAIL_WINDOW_TSAN)
++#      define XOFFSET_CANONICAL_WINDOW_BASE 0x080000000000ull
++#    else
++#      define XOFFSET_CANONICAL_WINDOW_BASE 0x400000000000ull
++#    endif
++#  elif defined(_WIN64)
++#    define XOFFSET_CANONICAL_WINDOW_BASE 0x580000000000ull
++#  else
++#    define XOFFSET_CANONICAL_WINDOW_BASE 0
++#  endif
++#endif
++#if !defined(XOFFSET_CANONICAL_WINDOW_BYTES)
++#  if XOFFSET_CANONICAL_WINDOW_BASE
++#    define XOFFSET_CANONICAL_WINDOW_BYTES (256ull << 30)
++#  else
++#    define XOFFSET_CANONICAL_WINDOW_BYTES 0
++#  endif
++#endif
++#if !defined(XOFFSET_CANONICAL_WINDOW_GRANULE)
++#  define XOFFSET_CANONICAL_WINDOW_GRANULE (1ull << 20)
++#endif
++
+ namespace XOffsetDatastructure {
+ namespace detail {
+ 
+ // Deterministic, thread-local, one-shot failure injection. Enable is consumed
+ // only when additional pages are required; Prepare precedes logical publication.
+-enum class VmOperation : std::uint8_t { Reserve, Enable, Prepare, Reclaim, Protect };
++// WindowReserve models failure of the one-time canonical receive window
++// reservation (see CanonicalWindow below); it is consumed only by that attempt.
++enum class VmOperation : std::uint8_t { Reserve, Enable, Prepare, Reclaim, Protect, WindowReserve };
+ 
+ inline thread_local unsigned vm_pending_failures = 0;
+ 
+@@ -40,6 +133,7 @@
+         case VmOperation::Prepare: return 4u;
+         case VmOperation::Reclaim: return 8u;
+         case VmOperation::Protect: return 16u;
++        case VmOperation::WindowReserve: return 32u;
+     }
+     return 0;
+ }
+@@ -67,6 +161,216 @@
+     return true;
+ }
+ 
++// Provenance root of the canonical window: the single std::byte[] array begun
++// over the whole reservation. Written once (null -> array) under the window
++// mutex and never reset. Readers only form pointers for addresses inside the
++// window; any live in-window address was obtained from storage created after
++// that store, so a relaxed load observes it (write-read coherence). A null
++// value means the window is not (or can never be) reserved: nothing in the
++// address range belongs to this library, and resolution returns nullptr.
++inline std::atomic<std::byte*> canonical_window_array{nullptr};
++// DIAGNOSTIC W1b: plain mirror for the hot path (written once, before any in-window storage exists).
++inline std::byte* canonical_window_array_plain = nullptr;
++
++class CanonicalWindow {
++public:
++    static constexpr std::uintptr_t base =
++        static_cast<std::uintptr_t>(XOFFSET_CANONICAL_WINDOW_BASE);
++    static constexpr std::size_t bytes =
++        static_cast<std::size_t>(XOFFSET_CANONICAL_WINDOW_BYTES);
++    static constexpr std::size_t granule =
++        static_cast<std::size_t>(XOFFSET_CANONICAL_WINDOW_GRANULE);
++    static constexpr bool enabled = bytes != 0;
++    static constexpr std::size_t slots = enabled ? bytes / granule : 0;
++
++    static_assert(granule != 0 && (granule & (granule - 1)) == 0,
++                  "XOFFSET_CANONICAL_WINDOW_GRANULE must be a power of two");
++    static_assert(!enabled || base != 0, "XOFFSET_CANONICAL_WINDOW_BASE must be nonzero");
++    static_assert(!enabled || (base % granule == 0 && bytes % granule == 0),
++                  "canonical window base/bytes must be granule multiples");
++    static_assert(!enabled || base <= (std::numeric_limits<std::uintptr_t>::max)() - bytes,
++                  "canonical window wraps the address space");
++    static_assert(bytes <= static_cast<std::size_t>((std::numeric_limits<std::ptrdiff_t>::max)()),
++                  "canonical window exceeds pointer difference range");
++
++    // Hot path. Two compares against immediates; the array pointer is loaded
++    // only for in-window targets. [target, target+n] must lie in the window
++    // (target+n may be the window's one-past-end address).
++    static std::byte* bytes_at(std::uintptr_t target, std::size_t n) noexcept {
++        if constexpr (enabled) {
++            const std::uintptr_t offset = target - base;
++            if (offset <= bytes && n <= bytes - offset) {
++                std::byte* const origin = canonical_window_array_plain;
++                if (origin) return origin + offset;
++            }
++        } else {
++            (void)target;
++            (void)n;
++        }
++        return nullptr;
++    }
++
++    // True when [p, p+n) lies inside the reserved window.
++    static bool contains(const void* p, std::size_t n) noexcept {
++        if (!enabled || !canonical_window_array.load(std::memory_order_acquire)) return false;
++        const std::uintptr_t offset = reinterpret_cast<std::uintptr_t>(p) - base;
++        return offset <= bytes && n <= bytes - offset;
++    }
++
++    // Reserves the window on first use (once per process, success or failure)
++    // and takes a first-fit run of granules covering `reserved` bytes. Returns
++    // the slot's first byte as an element of the window array, or nullptr if
++    // the window is disabled/unavailable/exhausted. No C++ allocation occurs,
++    // locked or not, so new_handler reentry cannot deadlock on this mutex.
++    static std::byte* acquire(std::size_t reserved) noexcept {
++        if constexpr (!enabled) {
++            (void)reserved;
++            return nullptr;
++        } else {
++            if (reserved == 0 || reserved > bytes) return nullptr;
++            const std::size_t count = reserved / granule + (reserved % granule != 0);
++            State& s = state();
++            std::lock_guard<std::mutex> lock(s.mutex);
++            if (!reserve_locked(s)) return nullptr;
++            std::size_t first = 0;
++            if (!find_locked(s, count, first)) return nullptr;
++            for (std::size_t i = first; i != first + count; ++i)
++                s.used[i / 64] |= std::uint64_t{1} << (i % 64);
++            if (first == s.lowest_free) s.lowest_free = first + count;
++            s.used_slots += count;
++            return s.array + first * granule;
++        }
++    }
++
++    // Returns a slot. Never unmaps (that would open a hole another mapping
++    // could claim): accessible pages are replaced/decommitted back to an
++    // inaccessible, fresh state first. If that fails the slot is quarantined
++    // (kept allocated) so stale pages are never handed out again.
++    static void release(std::byte* slot, std::size_t reserved, std::size_t accessible) noexcept {
++        if constexpr (!enabled) {
++            (void)slot; (void)reserved; (void)accessible;
++        } else {
++            if (!slot || reserved == 0) return;
++            if (accessible != 0 && !make_inaccessible(slot, accessible)) return;
++            State& s = state();
++            std::lock_guard<std::mutex> lock(s.mutex);
++            const std::size_t first = static_cast<std::size_t>(slot - s.array) / granule;
++            const std::size_t count = reserved / granule + (reserved % granule != 0);
++            for (std::size_t i = first; i != first + count; ++i)
++                s.used[i / 64] &= ~(std::uint64_t{1} << (i % 64));
++            if (first < s.lowest_free) s.lowest_free = first;
++            s.used_slots -= count;
++        }
++    }
++
++    // Diagnostics for tests: granules currently allocated or quarantined.
++    static std::size_t used_granules() noexcept {
++        if constexpr (!enabled) return 0;
++        else {
++            State& s = state();
++            std::lock_guard<std::mutex> lock(s.mutex);
++            return s.used_slots;
++        }
++    }
++
++private:
++    static constexpr std::size_t words = slots == 0 ? 1 : (slots + 63) / 64;
++    enum : unsigned char { Untried, Reserved, Unavailable };
++    struct State {
++        std::mutex mutex;
++        unsigned char status = Untried;
++        std::byte* array = nullptr;
++        std::size_t lowest_free = 0; // no free granule below this index
++        std::size_t used_slots = 0;
++        std::uint64_t used[words] = {};
++    };
++
++    // Never destroyed: receive owners may be released during static/thread
++    // destruction. Magic-static initialization takes no allocation.
++    static State& state() noexcept {
++        alignas(State) static unsigned char storage[sizeof(State)];
++        static State* const instance = ::new (static_cast<void*>(storage)) State();
++        return *instance;
++    }
++
++    static bool reserve_locked(State& s) noexcept {
++        if (s.status != Untried) return s.status == Reserved;
++        s.status = Unavailable; // exactly one attempt per process
++        if (consume_vm_failure(VmOperation::WindowReserve)) return false;
++        void* const address = reinterpret_cast<void*>(base);
++#if defined(_WIN32)
++        SYSTEM_INFO info{};
++        ::GetSystemInfo(&info);
++        if (info.dwPageSize == 0 || granule % info.dwPageSize != 0 ||
++            base % info.dwAllocationGranularity != 0) return false;
++        void* mapping = ::VirtualAlloc(address, bytes, MEM_RESERVE, PAGE_NOACCESS);
++        if (!mapping) return false;
++        if (mapping != address) { ::VirtualFree(mapping, 0, MEM_RELEASE); return false; }
++#else
++        const long page = ::sysconf(_SC_PAGESIZE);
++        if (page <= 0 || granule % static_cast<std::size_t>(page) != 0) return false;
++        int flags = MAP_PRIVATE | MAP_ANONYMOUS;
++#  if defined(__linux__) && defined(MAP_FIXED_NOREPLACE)
++        // Fails with EEXIST instead of replacing; kernels before 4.17 ignore
++        // the flag and treat the address as a hint (verified below).
++        flags |= MAP_FIXED_NOREPLACE;
++#  endif
++        // Darwin: hint without MAP_FIXED. The kernel honours a free hint and
++        // otherwise picks another address, which is rejected below.
++        void* mapping = ::mmap(address, bytes, PROT_NONE, flags, -1, 0);
++        if (mapping == MAP_FAILED) return false;
++        if (mapping != address) { ::munmap(mapping, bytes); return false; }
++#endif
++        // Standard non-allocating placement array new, no initializer: no
++        // cookie, no access to the (inaccessible) pages, no user code.
++        auto* array = ::new (mapping) std::byte[bytes];
++        if (static_cast<void*>(array) != mapping) std::terminate();
++        s.array = array;
++        s.status = Reserved;
++        canonical_window_array_plain = array;
++        canonical_window_array.store(array, std::memory_order_release);
++        return true;
++    }
++
++    static bool find_locked(const State& s, std::size_t count, std::size_t& first) noexcept {
++        std::size_t run = 0, start = 0;
++        for (std::size_t i = s.lowest_free; i < slots;) {
++            const std::uint64_t word = s.used[i / 64];
++            if (i % 64 == 0 && word == ~std::uint64_t{0}) { run = 0; i += 64; continue; }
++            if (i % 64 == 0 && word == 0) {
++                const std::size_t span = (slots - i < 64) ? slots - i : 64;
++                if (run == 0) start = i;
++                run += span;
++                i += span;
++            } else if (word & (std::uint64_t{1} << (i % 64))) {
++                run = 0;
++                ++i;
++                continue;
++            } else {
++                if (run == 0) start = i;
++                ++run;
++                ++i;
++            }
++            if (run >= count) { first = start; return true; }
++        }
++        return false;
++    }
++
++    static bool make_inaccessible(std::byte* slot, std::size_t accessible) noexcept {
++        void* const address = static_cast<void*>(slot);
++#if defined(_WIN32)
++        return ::VirtualFree(address, accessible, MEM_DECOMMIT) != 0;
++#elif defined(__APPLE__)
++        // Atomic fixed anonymous replacement, as reclaim_tail does.
++        return ::mmap(address, accessible, PROT_NONE,
++                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) != MAP_FAILED;
++#else
++        return ::madvise(address, accessible, MADV_DONTNEED) == 0 &&
++               ::mprotect(address, accessible, PROT_NONE) == 0;
++#endif
++    }
++};
++
+ enum class VmReclaimStatus : std::uint8_t {
+     NoOp,
+     Reclaimed,
+@@ -182,24 +486,28 @@
+     }
+ 
+ public:
+-    // Internal direct-receive owner. All explicit maximum bytes are made
+-    // accessible before beginning one byte-array lifetime. This commits virtual
+-    // backing/accounting up front, but does not initialize/touch the whole max.
+-    // Later grow_to retains that array and zeroes only newly logical bytes.
++    // Internal direct-receive owner. The reservation is a slot of the
++    // process-wide canonical window (CanonicalWindow); the payload's
++    // canonical byte origin is the window array element at the slot, so every
++    // canonical pointer derives from the one window std::byte[] array. All
++    // explicit maximum bytes are made accessible up front. This commits
++    // virtual backing/accounting, but does not initialize/touch the whole max.
++    // Later grow_to zeroes only newly logical bytes. Window slots are never
++    // taken from or returned to a VmStoragePool (the pool argument is accepted
++    // for source compatibility and ignored), so receive never adopts ordinary
++    // storage and ordinary storage never adopts a window slot. A disabled,
++    // unreservable or exhausted window throws std::bad_alloc.
+     static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
+                                             std::size_t maximum_capacity,
+-                                            const VmStoragePool& pool = {}) {
++                                            [[maybe_unused]] const VmStoragePool& pool = {}) {
+         if (logical_bytes > maximum_capacity)
+             throw std::invalid_argument("VM receive length exceeds maximum capacity");
+-        VirtualMemoryStorage owner(0, maximum_capacity, pool);
++        VirtualMemoryStorage owner;
++        owner.reserve_window_slot(maximum_capacity);
+         if (!maximum_capacity) return owner;
+         if (!owner.enable_prefix(maximum_capacity) || consume_vm_failure(VmOperation::Prepare))
+             throw std::bad_alloc();
+-        // Standard non-allocating placement array new, with no initializer:
+-        // no cookie, value initialization, payload transfer or user constructor.
+-        auto* bytes = ::new (static_cast<void*>(owner.base_)) std::byte[maximum_capacity];
+-        if (static_cast<void*>(bytes) != static_cast<void*>(owner.base_)) std::terminate();
+-        owner.canonical_byte_origin_ = bytes;
++        owner.canonical_byte_origin_ = owner.window_slot_;
+         if (!owner.grow_to(logical_bytes)) throw std::bad_alloc();
+         return owner;
+     }
+@@ -228,6 +536,7 @@
+         }
+         std::memcpy(owner.base_, bytes, length);
+         owner.logical_bytes_ = length;
++        if (owner.zero_from_ < length) owner.zero_from_ = length;
+         return owner;
+     }
+ 
+@@ -247,6 +556,7 @@
+     }
+ 
+     std::byte* canonical_byte_origin() const noexcept { return canonical_byte_origin_; }
++    bool in_canonical_window() const noexcept { return window_slot_ != nullptr; }
+     char* data() noexcept { return base_; }
+     const char* data() const noexcept { return base_; }
+     std::size_t size() const noexcept { return logical_bytes_; }
+@@ -268,8 +578,12 @@
+         if (new_logical_bytes == logical_bytes_) return true;
+         if (!enable_prefix(new_logical_bytes)) return false;
+         if (consume_vm_failure(VmOperation::Prepare)) return false;
+-        std::memset(base_ + logical_bytes_, 0, new_logical_bytes - logical_bytes_);
++        const std::size_t dirty_end = (std::min)(new_logical_bytes,
++            (std::max)(zero_from_, logical_bytes_));
++        if (dirty_end > logical_bytes_)
++            std::memset(base_ + logical_bytes_, 0, dirty_end - logical_bytes_);
+         logical_bytes_ = new_logical_bytes;
++        if (zero_from_ < new_logical_bytes) zero_from_ = new_logical_bytes;
+         return true;
+     }
+ 
+@@ -322,6 +636,7 @@
+         }
+ #endif
+         accessible_bytes_ = retained;
++        if (zero_from_ > retained) zero_from_ = retained;
+         result.status = VmReclaimStatus::Reclaimed;
+         result.discarded_bytes = bytes;
+         result.inaccessible_bytes = bytes;
+@@ -342,14 +657,40 @@
+         using std::swap;
+         swap(base_, other.base_);
+         swap(canonical_byte_origin_, other.canonical_byte_origin_);
++        swap(window_slot_, other.window_slot_);
+         swap(reserved_bytes_, other.reserved_bytes_);
+         swap(maximum_capacity_, other.maximum_capacity_);
+         swap(accessible_bytes_, other.accessible_bytes_);
+         swap(logical_bytes_, other.logical_bytes_);
++        swap(zero_from_, other.zero_from_);
+         swap(page_size_, other.page_size_);
+         swap(reservation_granularity_, other.reservation_granularity_);
+     }
+ 
++    // Same validation, rounding and Reserve failure point as the ordinary
++    // constructor, but the reservation is a canonical window slot.
++    void reserve_window_slot(std::size_t maximum_capacity) {
++        if (maximum_capacity > static_cast<std::size_t>(
++                (std::numeric_limits<std::ptrdiff_t>::max)())) {
++            throw std::length_error("VM capacity exceeds pointer difference range");
++        }
++        query_page_geometry();
++        std::size_t reserved = 0;
++        if (!checked_vm_round_up(maximum_capacity, page_size_, reserved) ||
++            reserved > static_cast<std::size_t>(
++                (std::numeric_limits<std::ptrdiff_t>::max)())) {
++            throw std::length_error("VM reservation page rounding overflows");
++        }
++        maximum_capacity_ = maximum_capacity;
++        if (reserved == 0) return;
++        if (consume_vm_failure(VmOperation::Reserve)) throw std::bad_alloc();
++        std::byte* const slot = CanonicalWindow::acquire(reserved);
++        if (!slot) throw std::bad_alloc();
++        window_slot_ = slot;
++        base_ = reinterpret_cast<char*>(slot);
++        reserved_bytes_ = reserved;
++    }
++
+     bool acquire_from_pool() noexcept;
+     void release() noexcept;
+     // Publish permissions separately from logical bytes. Both initialization
+@@ -394,7 +735,9 @@
+     }
+ 
+     void release_mapping() noexcept {
+-        if (base_) {
++        if (window_slot_) {
++            CanonicalWindow::release(window_slot_, reserved_bytes_, accessible_bytes_);
++        } else if (base_) {
+ #if defined(_WIN32)
+             ::VirtualFree(base_, 0, MEM_RELEASE);
+ #else
+@@ -403,16 +746,22 @@
+         }
+         base_ = nullptr;
+         canonical_byte_origin_ = nullptr;
++        window_slot_ = nullptr;
+         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
++        zero_from_ = 0;
+         page_size_ = reservation_granularity_ = 0;
+     }
+ 
+     char* base_{nullptr};
+     std::byte* canonical_byte_origin_{nullptr};
++    // Non-null exactly when this owner's reservation is a canonical window
++    // slot (an element of canonical_window_array); such owners are never pooled.
++    std::byte* window_slot_{nullptr};
+     std::size_t reserved_bytes_{0};
+     std::size_t maximum_capacity_{0};
+     std::size_t accessible_bytes_{0};
+     std::size_t logical_bytes_{0};
++    std::size_t zero_from_{0};
+     std::size_t page_size_{0};
+     std::size_t reservation_granularity_{0};
+     VmStoragePool pool_;
+@@ -472,7 +821,7 @@
+     // Keep the state alive until its mutex is released, even when this is the
+     // final external reference. Idle owners never retain their pool's state.
+     auto state = std::move(pool_.state_);
+-    if (base_ && state) {
++    if (base_ && state && !window_slot_) {
+         std::lock_guard<std::mutex> lock(state->mutex);
+         const auto& limits = state->limits;
+         auto& statistics = state->statistics;
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/xoffsetdatastructure.hpp diag/src-w1b/xoffsetdatastructure.hpp
+--- candidate-r1m2-20261020/xoffsetdatastructure.hpp	2026-10-19 21:02:56
++++ diag/src-w1b/xoffsetdatastructure.hpp	2026-10-19 22:35:08
+@@ -366,17 +366,27 @@
+         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
+         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
+         // Host-only canonical address recovery. The exact numeric comparator
+-        // uses the declared flat-address ABI for search; dereference pointers
+-        // still come only from the retained real placement byte[MAX] array.
++        // uses the declared flat-address ABI; dereference pointers come only
++        // from the retained real placement byte[] array of the process-wide
++        // canonical window (detail::CanonicalWindow). Every canonical owner
++        // (direct-receive storage) is a window slot and every window slot is
++        // canonical, so a range test against the COMPILE-TIME window bounds
++        // replaces the ledger load and registry search: for every target that
++        // fits a live canonical record the result equals
++        // canonical_bytes_at_active(). The anchor is no longer needed for
++        // disambiguation (one array covers all slots, so a zero-length
++        // one-past target has a single origin). In-window targets of freed or
++        // never-used slots also yield window-array pointers (numerically equal
++        // to the flat address); this is not a liveness query.
+         static std::byte* canonical_bytes_at(const void* anchor,
+                 std::uintptr_t target, std::size_t bytes) noexcept {
+-            if (canonical_active_count_.load(std::memory_order_acquire) == 0) return nullptr;
+-            return canonical_bytes_at_active(anchor, target, bytes);
++            (void)anchor;
++            return detail::CanonicalWindow::bytes_at(target, bytes);
+         }
+ 
+-    private:
+-        // Keep the inactive acquire-load/return in the small public helper.
+-        // The active path retains all original owner/TLS/registry semantics.
++        // Registry-based recovery (live-record semantics, original owner/TLS/
++        // registry behaviour). Kept for explicit use and tests; resolution
++        // call sites no longer depend on it or on canonical_active_count_.
+ #if defined(_MSC_VER)
+         __declspec(noinline)
+ #elif defined(__clang__) || defined(__GNUC__)
+@@ -456,7 +466,6 @@
+             return recover(record);
+         }
+ 
+-    public:
+         XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
+         void set_growth_policy(XGrowPolicy policy) noexcept { growth_policy_ = policy; }
+         detail::VmReclaimResult reclaim_tail_pages() noexcept { return buffer_.reclaim_tail(); }

@@ -1,0 +1,1 @@
+INVALID CONFIG: static libc++.a on Darwin coexists with libSystem's /usr/lib/libc++.1.dylib; ostream numeric output fails even without sanitizers (repro scratchpad os.cpp). The 75/76 result (check_signature_regeneration failed: exporter stream write failed) is not a valid SAN result.

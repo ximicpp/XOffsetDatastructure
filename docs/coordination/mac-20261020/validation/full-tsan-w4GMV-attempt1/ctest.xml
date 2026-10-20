@@ -1,0 +1,1139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="77"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="114"
+	timestamp="2026-10-20T00:50:37"
+	>
+	<testcase name="test_virtual_memory_storage" classname="test_virtual_memory_storage" time="2.43946" status="run">
+		<properties>
+			<property name="cmake_labels" value="storage"/>
+		</properties>
+		<system-out>Virtual memory storage tests passed (page_size=16384, reservation_granularity=16384)
+</system-out>
+	</testcase>
+	<testcase name="test_vm_pool" classname="test_vm_pool" time="1.16816" status="run">
+		<properties>
+			<property name="cmake_labels" value="storage"/>
+		</properties>
+		<system-out>Virtual memory pool tests passed (page_size=16384)
+</system-out>
+	</testcase>
+	<testcase name="test_basic_types" classname="test_basic_types" time="0.704223" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Basic Types
+--------------------------------------------------
+[PASS] All basic type tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_vector" classname="test_vector" time="0.664652" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Vector Operations
+--------------------------------------------------
+Test 1: push_back operations... [OK]
+Test 2: Element access... [OK]
+Test 3: String vector operations... [OK]
+Test 4: Iterator operations... [OK]
+Test 5: Clear operations... [OK]
+Test 6: Persistence test... [OK]
+[PASS] All vector tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_map_set" classname="test_map_set" time="0.622572" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Map and Set Operations
+--------------------------------------------------
+Test 1: Set insertion... [OK]
+Test 2: Set find operations... [OK]
+Test 3: String set operations... [OK]
+Test 4: Map insertion... [OK]
+Test 5: Map access... [OK]
+Test 6: String key map... [OK]
+Test 7: Map iteration... [OK]
+Test 8: Persistence test... [OK]
+[PASS] All map/set tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_nested" classname="test_nested" time="1.43681" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Nested Structures
+--------------------------------------------------
+Test 1: Initialize nested objects... [OK]
+Test 2: Verify nested data... [OK]
+Test 3: Vector of nested objects... [OK]
+Test 4: Deep access patterns... [OK]
+Test 5: Persistence of nested structures... [OK]
+[PASS] All nested structure tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_compaction" classname="test_compaction" time="0.768136" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Memory Compaction
+--------------------------------------------------
+Test 1: Fill buffer with data... [OK]
+Test 2: Memory stats before compaction... 
+  Total size: 16384 bytes
+  Used:       2304 bytes
+  Free:       14080 bytes
+  Efficiency: 14.0625%
+[OK]
+Test 3: Compact memory (automatic)... [OK]
+Test 4: Memory stats after compaction... 
+  Total size: 1600 bytes
+  Used:       1600 bytes
+  Free:       0 bytes
+  Efficiency: 100%
+  Reduction:  90.2344%
+[OK]
+Test 5: Verify data integrity... [OK]
+Test 6: Verify all elements... [OK]
+[PASS] All compaction tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_modify" classname="test_modify" time="0.713987" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>
+[TEST] Modify Basic Types
+--------------------------------------------------
+Test 1: Initialize basic values... [OK]
+Test 2: Modify int value... [OK]
+Test 3: Modify float value... [OK]
+Test 4: Toggle bool value... [OK]
+Test 5: Verify persistence... [OK]
+[PASS] All basic type modification tests passed!
+
+[TEST] Modify Vector Contents
+--------------------------------------------------
+Test 1: Add elements to vector... [OK]
+Test 2: Modify elements by index... [OK]
+Test 3: Modify via iterator... [OK]
+Test 4: Remove elements... [OK]
+Test 5: Clear and refill... [OK]
+[PASS] All vector modification tests passed!
+
+[TEST] Modify Vector of Strings
+--------------------------------------------------
+Test 1: Add string elements... [OK]
+Test 2: Modify string element... [OK]
+Test 3: Append to strings via iterator... [OK]
+Test 4: Insert new element... [OK]
+Test 5: Erase element... [OK]
+[PASS] All string vector modification tests passed!
+
+[TEST] Modify Map Contents
+--------------------------------------------------
+Test 1: Add...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_xbuffer_api" classname="test_xbuffer_api" time="0.617922" status="run">
+		<properties>
+			<property name="cmake_labels" value="basic"/>
+		</properties>
+		<system-out>=== XBuffer API Tests (Single-Object Model) ===
+
+[TEST] make&lt;T&gt;() + root&lt;T&gt;() + has_root&lt;T&gt;()
+--------------------------------------------------
+  has_root before make: false ... [OK]
+  make&lt;TestData&gt;() ... [OK]
+  root&lt;TestData&gt;() matches ... [OK]
+
+[TEST] save / load_unverified
+--------------------------------------------------
+  Serialized: 272 bytes ... [OK]
+  load round-trip ... [OK]
+
+[TEST] stats()
+--------------------------------------------------
+  total=4096 used=240 free=3856 (5.85938%) ... [OK]
+
+[TEST] arena_allocator&lt;T&gt;()
+--------------------------------------------------
+  arena_allocator&lt;int32_t&gt;() created ... [OK]
+
+[TEST] grow() + root() re-acquire
+--------------------------------------------------
+  root() valid after grow() ... [OK]
+
+[TEST] create&lt;T&gt;()
+--------------------------------------------------
+  XBuffer::create / TypedXBuffer::create ... [OK]
+
+[TEST] explicit grow() retry contract
+--------------------------------------------------
+  mutation hit XBadAlloc at size=64 ... [OK]
+  grow() +...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_assign_range" classname="test_assign_range" time="0.722947" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>bulk gate: 4096 replacements, skipped_zero_bytes=65536 skipped_old_copy_bytes=65536; mechanism counts, no timing
+6 bulk assignment groups passed; no timing
+</system-out>
+	</testcase>
+	<testcase name="test_scalar_resize" classname="test_scalar_resize" time="0.579559" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>6 scalar resize groups passed; no timing
+</system-out>
+	</testcase>
+	<testcase name="test_validation_v8_single_word" classname="test_validation_v8_single_word" time="1.69636" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"groups":6,"endpoint_cases":16640,"registration_cases":1888,"actual_upstream_failures":6,"typed_rejections":2,"timing_sample":false}
+</system-out>
+	</testcase>
+	<testcase name="test_validation_v6_dense_fusion" classname="test_validation_v6_dense_fusion" time="7.63061" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"groups":3,"independent_operations":2396,"successful_prepared":2,"actual_upstream_failures":6,"timing_sample":false}
+</system-out>
+	</testcase>
+	<testcase name="test_validation_v5" classname="test_validation_v5" time="2.81966" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"pairwise_oracle_operations":2562,"PMR_failure_points":8,"dense_extent_limit":65089536,"dense_logical_byte_budget":8390656,"groups":5,"timing_sample":false}
+</system-out>
+	</testcase>
+	<testcase name="test_validation_v5_bounds" classname="test_validation_v5_bounds" time="0.95503" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"groups":3,"independent_interval_operations":1563,"actual_resource_failure_points":7,"metadata_cases":32,"timing_sample":false}
+</system-out>
+	</testcase>
+	<testcase name="test_validation_v4" classname="test_validation_v4" time="8.0766" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"status":"passed","independent_oracle_operations":8192,"global_owned_priority_cases":4,"actual_global_new_failure_points":8,"extent_threshold_cases":6,"typed_bool_binding_order_rejections":5,"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_string_replace" classname="test_string_replace" time="1.00108" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>operation gate: replacements=4096 old_bytes_not_copied=147260 rhs_bytes=524288 (logical bytes, no timer)
+string full-replacement: 8 semantic/failure/operation groups passed; no timer
+</system-out>
+	</testcase>
+	<testcase name="test_wire_bitmap" classname="test_wire_bitmap" time="0.683199" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"status":"passed","bitmap_cases":6,"actual_host_failure_points":7,"second_boundary_failures":3,"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_resize_growth" classname="test_resize_growth" time="0.932561" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"case":"stage6-resize-mechanism","operations":4096,"dynamic_allocate_calls":12288,"expected":12288,"old_prefix_nested_payload_addresses_preserved":true,"performance_sample":false}
+P2 resize growth cases=9 passed (no timing)
+</system-out>
+	</testcase>
+	<testcase name="test_validation_resource" classname="test_validation_resource" time="8.00771" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"status":"passed","oracle":"unsorted-pairwise","oracle_operations":2048,"real_global_new_chunk_failures":4,"upstream_resource_failure_boundaries":1,"logical_bitmap_object_requests":2,"logical_requested_bytes":4224,"actual_upstream_chunk_requests":1,"actual_upstream_requested_bytes":8224,"all_scopes_live_zero":true,"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_reflection_core" classname="test_reflection_core" time="1.69549" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>========================================
+  Reflection Core Test
+========================================
+
+[Test 1] Type &amp; Member Reflection
+----------------------------------------
+  GameItem: GameItem
+  item_id type:  unsigned int
+  name type:     XString
+  int:     int
+  double:  double
+  uint32:  uint32_t
+  XVector&lt;int&gt;:       XVector&lt;int&gt;
+  XMap&lt;int,double&gt;:   XMap&lt;int, double&gt;
+[PASS]
+
+[Test 2] Member Iteration
+----------------------------------------
+  GameItem members:     4
+  SimpleStruct members: 3
+  GameItem details:
+    [0] item_id : unsigned int
+    [1] item_type : unsigned int
+    [2] quantity : unsigned int
+    [3] name : XString
+  item_id is uint32_t: 1
+  name is XString:     1
+[PASS]
+
+[Test 3] Splice Operations [: :]
+----------------------------------------
+  Direct splice:  (100, 200) [OK]
+  Pointer splice: (300, 400) [OK]
+  Type splice:    (50, 60) [OK]
+  Expr splice:    sum=40 prod=375 [OK]
+  Const splice:   normal=20 const=42 [OK]
+[PASS]
+
+[Test 4] Reflection with XBuffer
+-------------------...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_reflection_advanced" classname="test_reflection_advanced" time="0.598906" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>========================================
+  Reflection Advanced Test
+========================================
+
+[Test 1] Structure to Text
+----------------------------------------
+  SerializableData (3 fields):
+    id : int
+    value : double
+    flags : unsigned int
+  ComplexData (3 fields):
+    type : unsigned int
+    name : XString
+    items : XVector&lt;int&gt;
+[PASS]
+
+[Test 2] Binary Serialization Round-Trip
+----------------------------------------
+  Serialized: 192 bytes
+  id=999 value=123.456 flags=0xdeadbeef [OK]
+[PASS]
+
+[Test 3] Complex Structure Analysis
+----------------------------------------
+  type=100 name=TestObj items=[1,2,3]
+  Round-trip: type=100 items.size=3 [OK]
+[PASS]
+
+[Test 4] Compile-Time Member Count &amp; Type Checks
+----------------------------------------
+  SerializableData: 3 members
+  Point3D:          3 members (all float: 1)
+[PASS]
+
+[Test 5] Member-Wise Comparison &amp; Diff
+----------------------------------------
+  Equal:     id=10 value=20.5 [OK]
+  Diff:      flags 30 vs 31 [OK]
+  Point3D:  ...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_type_signatures" classname="test_type_signatures" time="0.915613" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>========================================
+  Type Signatures Test
+========================================
+
+[Test 1] Basic Struct / Class Signatures
+--------------------------------------------------
+  SimpleStruct: [64-le]record[s:8,a:4]{@0:i32[s:4,a:4],@4:f32[s:4,a:4]}  (size=8, align=4)
+  SimpleClass: [64-le]record[s:8,a:4]{@0:i32[s:4,a:4],@4:f32[s:4,a:4]}  (size=8, align=4)
+  AlignedClass(16): [64-le]record[s:16,a:16]{@0:i32[s:4,a:4],@8:f64[s:8,a:8]}  (size=16, align=16)
+  ClassWithPrivate: [64-le]record[s:8,a:4]{@0:i32[s:4,a:4],@4:f32[s:4,a:4]}  (size=8, align=4)
+  ClassWithMethods: [64-le]record[s:4,a:4]{@0:i32[s:4,a:4]}  (size=4, align=4)
+  struct==class layout: 1 [OK]
+[PASS]
+
+[Test 2] Template / Nested / Inheritance Signatures
+--------------------------------------------------
+  Template&lt;i32&gt;: [64-le]record[s:8,a:4]{@0:i32[s:4,a:4],@4:i32[s:4,a:4]}  (size=8, align=4)
+  Template&lt;f32&gt;: [64-le]record[s:8,a:4]{@0:f32[s:4,a:4],@4:i32[s:4,a:4]}  (size=8, align=4)
+  Template&lt;f64&gt;: [64-le]record[s:16,a:8]{@0:f6...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_field_limit_fix" classname="test_field_limit_fix" time="1.21919" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>========================================
+  Field Count Limit Fix Test
+========================================
+
+[INFO] Testing structures with &gt; 10 fields
+[INFO] Old limit was 10 fields (macro-based)
+[INFO] New limit is unlimited (index-sequence-based)
+
+[Test 1] Type Signature Generation
+------------------------------------
+
+  LargeStruct (15 fields):
+    Signature: [64-le]record[s:60,a:4]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@12:i32[s:4,a:4],@16:i32[s:4,a:4],@20:i32[s:4,a:4],@24:i32[s:4,a:4],@28:i32[s:4,a:4],@32:i32[s:4,a:4],@36:i32[s:4,a:4],@40:i32[s:4,a:4],@44:i32[s:4,a:4],@48:i32[s:4,a:4],@52:i32[s:4,a:4],@56:i32[s:4,a:4]}
+    [OK] No 'TOO_MANY_FIELDS' error
+
+  BoundaryStruct (10 fields):
+    Signature: [64-le]record[s:40,a:4]{@0:i32[s:4,a:4],@4:i32[s:4,a:4],@8:i32[s:4,a:4],@12:i32[s:4,a:4],@16:i32[s:4,a:4],@20:i32[s:4,a:4],@24:i32[s:4,a:4],@28:i32[s:4,a:4],@32:i32[s:4,a:4],@36:i32[s:4,a:4]}
+    [OK] Boundary case works
+
+  VeryLargeStruct (20 fields):
+    Signature: [64-le]record[s:80,a:4]{@0:i...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_type_safety" classname="test_type_safety" time="0.949653" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>
+=== Type Safety Tests ===
+
+[TEST] Signature comparison
+  [OK]
+
+[TEST] classify_signature
+  [OK]
+
+[TEST] Nested container recursive safety
+  [OK]
+
+[PASS] All type safety tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_wire_admission" classname="test_wire_admission" time="0.601948" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>
+=== V1 Wire Admission Tests ===
+
+[TEST] v1 admission round-trip
+  [OK]
+
+[TEST] raw load requires unsafe_root()
+  [OK]
+
+[TEST] raw span load requires unsafe_root()
+  [OK]
+
+[PASS] All v1 wire admission tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_enum_support" classname="test_enum_support" time="0.745539" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== Enum Type Support Tests ===
+
+[TEST] Enum Safety Checks
+--------------------------------------------------
+  WeaponType (enum class : uint8_t) ... [SAFE]
+  QuestStatus (enum class : int32_t) ... [SAFE]
+  Color (enum : uint16_t) ... [SAFE]
+  PlayerStats (struct with enums) ... [SAFE]
+
+[TEST] Enum Type Signatures
+--------------------------------------------------
+  WeaponType:  [64-le]enum[s:1,a:1]&lt;u8[s:1,a:1]&gt;
+  QuestStatus: [64-le]enum[s:4,a:4]&lt;i32[s:4,a:4]&gt;
+  Color:       [64-le]enum[s:2,a:2]&lt;u16[s:2,a:2]&gt;
+  PlayerStats: [64-le]record[s:20,a:4]{@0:i32[s:4,a:4],@4:enum[s:1,a:1]&lt;u8[s:1,a:1]&gt;,@8:enum[s:4,a:4]&lt;i32[s:4,a:4]&gt;,@12:enum[s:2,a:2]&lt;u16[s:2,a:2]&gt;,@16:i32[s:4,a:4]}
+
+[TEST] Enum in XBuffer
+--------------------------------------------------
+  Create PlayerStats in XBuffer... [OK]
+  Read back enum fields... [OK]
+  WeaponType = Staff (2) [OK]
+  QuestStatus = InProgress (1) [OK]
+  Color = Blue (2) [OK]
+
+[TEST] Enum Without Explicit Underlying Type
+--------------------------------------------------
+  Direct...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_xstring_direct_assign" classname="test_xstring_direct_assign" time="1.67852" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>========================================
+  XString Direct Assignment Test
+========================================
+
+[TEST] XString operator=(const char*)
+--------------------------------------------------
+Test 1: Basic operator=(const char*)... [OK]
+Test 2: Char data is in the buffer arena... [OK]
+Test 3: Reassignment... [OK]
+Test 4: Multiple fields... [OK]
+
+[TEST] Serialization roundtrip with direct assign
+--------------------------------------------------
+Test 5: Serialize after direct assign... [OK]
+Test 6: Modify deserialized data... [OK]
+Test 7: Re-serialize and verify... [OK]
+
+[TEST] XVector&lt;XString&gt; element direct assign
+--------------------------------------------------
+Test 8: Populate vector... [OK]
+Test 9: Direct assign to vector elements... [OK]
+Test 10: Serialize vector of strings... [OK]
+
+[TEST] Player struct with direct assign (replaces verbose pattern)
+--------------------------------------------------
+Test 11: Direct assign on Player... [OK]
+Test 12: Serialize Player... [OK]
+Test 13: Reassign...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_xhandle" classname="test_xhandle" time="1.87763" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== XHandle&lt;T&gt; Epoch-Cached Safe Handle Tests ===
+
+[TEST] Basic XHandle creation and access
+--------------------------------------------------
+  Test 1.1: make_handle + read/write ... [OK]
+  Test 1.2: operator bool (valid) ... [OK]
+  Test 1.3: default handle is null ... [OK]
+
+[TEST] XHandle survives grow()
+--------------------------------------------------
+  Before grow: ptr=0x10c9000a8 epoch=0
+  After grow:  epoch=0
+  Test 2.1: data intact after grow() ... [OK]
+  After grow: ptr=0x10c9000a8
+  Test 2.2: cached handle and raw pointer stayed valid ... [OK]
+
+[TEST] XHandle survives shrink_to_fit()
+--------------------------------------------------
+  Test 3.1: data intact after shrink_to_fit() ... [OK]
+
+[TEST] XHandle with compact()
+--------------------------------------------------
+  Test 4.1: handle on compacted buffer ... [OK]
+
+[TEST] Epoch cache O(1) efficiency
+--------------------------------------------------
+  Test 5.1: 1000 cached accesses (no re-find) ... [OK]
+  Test 5.2: grow preserves the cached pointe...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_schema_envelope" classname="test_schema_envelope" time="0.747237" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== Schema Wire Header Tests ===
+
+[TEST] verified round-trip
+  [OK]
+
+[TEST] invalid magic rejected
+  [OK]
+
+[TEST] schema mismatch rejected
+  [OK]
+
+[TEST] invalid endian tag rejected
+  [OK]
+
+[TEST] invalid allocator offset rejected
+  [OK]
+
+[TEST] TypedXBuffer verified API
+  [OK]
+
+[TEST] verified span API
+  [OK]
+
+[TEST] TypedXBuffer load() defaults to verified
+  [OK]
+
+[TEST] verified save normalizes buffer slack but preserves mutation
+  [OK]
+
+[PASS] All schema envelope tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_fixed_layout_containers" classname="test_fixed_layout_containers" time="1.17425" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== Fixed Layout Container Tests ===
+
+[TEST] fixed containers basic mutation
+  [OK]
+
+[TEST] fixed containers raw round-trip
+  [OK]
+
+[TEST] fixed containers verified round-trip
+  [OK]
+
+[TEST] fixed containers survive grow()
+  [OK]
+
+[TEST] fixed vector supports reflected record elements
+  [OK]
+
+[TEST] fixed nested records survive save/load
+  [OK]
+
+[TEST] fixed nested records survive compaction
+  [OK]
+
+[TEST] verified load rejects corrupt fixed string
+  [OK]
+
+[TEST] verified load rejects corrupt nested fixed record
+  [OK]
+
+[TEST] fixed flat set/map basic operations
+  [OK]
+
+[TEST] fixed flat set/map round-trip and compaction
+  [OK]
+
+[TEST] verified load rejects corrupt fixed flat map
+  [OK]
+
+[PASS] All fixed layout container tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_error_paths" classname="test_error_paths" time="0.974623" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== Error Paths &amp; Untested APIs ===
+
+[TEST] make&lt;T&gt;() throws on duplicate call
+--------------------------------------------------
+  Caught expected exception: make&lt;T&gt;(): root object already exists. Call root&lt;T&gt;() to access the existing object.
+  [OK] Duplicate make&lt;T&gt;() correctly throws
+
+[TEST] root&lt;T&gt;() throws on empty buffer
+--------------------------------------------------
+  Caught expected exception: root&lt;T&gt;(): no root object in buffer. Call make&lt;T&gt;() first or check with has_root&lt;T&gt;().
+  [OK] root&lt;T&gt;() on empty buffer correctly throws
+
+[TEST] save() produces compact output
+--------------------------------------------------
+  save: 224 bytes
+  [OK] save() output is compact (&lt; 8192 original)
+  [OK] Round-trip verified
+
+[TEST] has_root&lt;T&gt;() on various states
+--------------------------------------------------
+  Before make: has_root = false ... [OK]
+  After make: has_root = true ... [OK]
+  After grow: has_root = true ... [OK]
+  After shrink: has_root = true ... [OK]
+
+[PASS] All error path &amp; untested API test...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_memory_efficiency" classname="test_memory_efficiency" time="0.987121" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>================================================================
+  XOffset Memory Efficiency — Realistic Game Character Data
+================================================================
+
+[sizeof Summary] Game Data Types
+----------------------------------------------------------------------
+  native pointer:      8B
+  XString:             16B  (std::string=24B)
+  XVector&lt;int&gt;:        16B  (std::vector=24B)
+
+  Game structs:
+    EquipSlot:         24B
+    Skill:             32B
+    QuestProgress:     48B
+    InventoryItem:     32B
+    FriendEntry:       24B
+    Achievement:       32B
+
+  Top-level characters:
+    CharacterMinimal:  88B
+    CharacterMidGame:  224B
+    CharacterEndGame:  360B
+  [PASS]
+
+[Profile 1] New Player — Minimal Character
+----------------------------------------------------------------------
+  Fields: id, level, exp, 3 floats, 3 doubles, 2 strings
+  Collections: none
+
+New Player (no collections)               xbuf=288      logical=65      eff=22.6 %  overhead=223  B  vs_proto≈3.89x
+...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_zero_boilerplate" classname="test_zero_boilerplate" time="0.743162" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>=== Zero-Boilerplate Test Suite ===
+
+[TEST] POD zero-boilerplate
+  [OK]
+
+[TEST] SimplePlayer (XString + XVector)
+  [OK]
+
+[TEST] GameState (all container types)
+  [OK]
+
+[TEST] Legacy constructor backward compat
+  [OK]
+
+[TEST] grow() with zero-boilerplate
+  [OK]
+
+[TEST] XVector&lt;Item&gt; — simple aggregate
+  [OK]
+
+[TEST] XVector&lt;Item&gt; reallocation — 50 elements
+  [OK]
+
+[TEST] XVector&lt;PlayerEntry&gt; — nested containers
+  [OK]
+
+[TEST] XVector&lt;Item&gt; persistence
+  [OK]
+
+[TEST] Deeply nested — Team &gt; TeamMember &gt; stats
+  [OK]
+
+[PASS] All zero-boilerplate tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_complex_nesting" classname="test_complex_nesting" time="0.629936" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>===================================================
+  Complex Nesting Stress Test
+===================================================
+
+[TEST] 4-level deep nesting: World &gt; Guild &gt; Character &gt; Skill &gt; Tag
+  Structure verified (3 guilds × 4 chars × 3 skills × 2 tags) [OK]
+  Persistence round-trip verified [OK]
+
+[TEST] Heavy reallocation with nested structs
+  50 characters × 5 skills, all survived realloc [OK]
+
+[TEST] Compaction of deeply nested pure aggregates
+  Compacted 65536 → 2064 bytes, data verified [OK]
+
+[TEST] Struct with only container members (no POD)
+  ContainerOnly struct + persistence [OK]
+
+[TEST] Struct with only POD members (trivially copyable)
+  PodOnly struct + persistence [OK]
+
+[TEST] XVector&lt;ContainerOnly&gt; — struct with no POD as element
+  20 ContainerOnly elements with realloc [OK]
+
+[TEST] XHandle with deep nesting + grow()
+  XHandle + grow() on 4-level nesting [OK]
+
+[TEST] Direct composite struct member (Address inside ContactInfo inside PersonRecord)
+  Direct composite make + write...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_inheritance" classname="test_inheritance" time="0.644745" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>============================================
+  XOffsetDatastructure — Inheritance Tests  
+============================================
+
+[TEST] Single Inheritance (Entity -&gt; Player)
+--------------------------------------------------
+  Player id=42 name=Alice level=10 items=3
+  Test: Single inheritance... [OK]
+
+[TEST] Multi-level Inheritance (Entity -&gt; Character -&gt; Warrior)
+--------------------------------------------------
+  Warrior id=7 name=Conan hp=500 mp=50 str=99 skills=2
+  Test: Multi-level inheritance... [OK]
+
+[TEST] Multiple Inheritance (HasId + HasName + HasLevel -&gt; MixinPlayer)
+--------------------------------------------------
+  MixinPlayer id=100 name=MixinBob level=55 inventory=3
+  Test: Multiple inheritance... [OK]
+
+[TEST] Mixed Composition + Inheritance (Entity -&gt; FullCharacter with Stats)
+--------------------------------------------------
+  FullCharacter id=999 name=HybridHero atk=80 def=60 abilities=2
+  Test: Mixed composition + inheritance... [OK]
+
+[TEST] Inheritance + Compaction
+----------...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_adaptive_reservation" classname="test_adaptive_reservation" time="0.973773" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>
+[TEST] Default virtual address reservation
+[PASS] Default reservation and initial-size floor
+
+[TEST] Legacy hints and explicit maximum capacity
+[PASS] Hint compatibility and hard-limit admission
+
+[TEST] 10,000 buffers with explicit 64 KiB limits
+[PASS] Reserved=625 MiB, accessible=156 MiB; subset objects verified
+
+[TEST] Stable growth, continued mutation, and save/load
+[PASS] Raw pointers, handles, and all serialized values intact
+
+[TEST] Growth stops at the hard maximum
+[PASS] Failed growth preserves size, mapping, and live data
+
+[TEST] TypedXBuffer capacity policies
+[PASS] Typed buffers preserve hint and hard-limit semantics
+
+[SUCCESS] All reservation policy tests passed!
+</system-out>
+	</testcase>
+	<testcase name="test_main_containers" classname="test_main_containers" time="1.06307" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>
+[TEST] main containers basic mutation
+  [OK]
+
+[TEST] main containers save/load + verified load
+  [OK]
+
+[TEST] main containers compaction
+  [OK]
+
+[TEST] main containers map/set basic mutation
+  [OK]
+
+[TEST] main containers map/set verified load + compaction
+  [OK]
+
+[TEST] main containers verified load rejects corrupt map payload
+  [OK]
+
+[PASS] Frozen main container tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_runtime_regressions" classname="test_runtime_regressions" time="1.01408" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Runtime regressions passed
+</system-out>
+	</testcase>
+	<testcase name="test_mutation_failures" classname="test_mutation_failures" time="2.34931" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Mutation sweep: 169 failures recovered, 546 successes
+</system-out>
+	</testcase>
+	<testcase name="test_wire_validation" classname="test_wire_validation" time="0.858938" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Wire mutation sweep: 939 rejected, 373 mutable
+</system-out>
+	</testcase>
+	<testcase name="test_wire_range_index" classname="test_wire_range_index" time="6.61342" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"schema":"wire-range-index-differential-v1","status":"passed","operations":813938,"helper_checks":362154,"valid_insertion_permutations":4635,"random_streams":512,"first_rejections":173268,"result_counts_accepted_bounds_ownown_ownfree_freeown_freefree":[599924,12576,64214,36556,64167,36501],"seed":"0x6a09e667f3bcc909","oracle":"unsorted-pairwise","compares_rejected_state":true,"complete_wire_audit_each_operation":false,"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_wire_range_failures" classname="test_wire_range_failures" time="7.9544" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"schema":"wire-range-real-new-failure-bitmap-v3","status":"passed","direct_empty_nonempty_owned_free_points":4,"first_upstream_chunk_request_bytes":8224,"isolated_structural_graph_new_calls":2,"typed_load_observed_new_points":4,"typed_std_bad_alloc":2,"typed_XBadAlloc":2,"chunk_sized_requests_not_stack_attribution":2,"original_wire_unchanged_and_reloaded_after_each_failure":true,"CXX_allocation_scope_leaks":0,"does_not_cover":["all_malloc","all_OS_VM_failures","multi_operation_transactions"],"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_same_arena_move" classname="test_same_arena_move" time="2.24913" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"status":"passed","cases":12,"small_fast_new_attempts":0,"retire_new_attempts":1,"retire_new_hits":1,"scope":"C++new retirement and VM Enable; no universal OS/transaction guarantee"}
+</system-out>
+	</testcase>
+	<testcase name="test_freelist_index" classname="test_freelist_index" time="21.0877" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"case":"mixed-static","n":512,"baseline_node_visits":131328,"node_visits":1023,"skip_jumps":510,"lookup_calls":512,"retire_updates":0,"cache_resets":0,"query_resets":0,"maintenance_calls":512,"maintenance_comparisons":6136,"runtime_owner_acquisitions":512,"sizeof_core":584,"sizeof_runtime_cache":400}
+{"case":"mixed-same-bucket-retire","n":512,"baseline_node_visits":262656,"node_visits":1535,"skip_jumps":511,"lookup_calls":512,"retire_updates":512,"cache_resets":0,"query_resets":1,"maintenance_calls":1024,"maintenance_comparisons":8696,"runtime_owner_acquisitions":1024,"sizeof_core":584,"sizeof_runtime_cache":400}
+{"case":"mixed-static","n":1024,"baseline_node_visits":524800,"node_visits":2047,"skip_jumps":1022,"lookup_calls":1024,"retire_updates":0,"cache_resets":0,"query_resets":0,"maintenance_calls":1024,"maintenance_comparisons":12280,"runtime_owner_acquisitions":1024,"sizeof_core":584,"sizeof_runtime_cache":400}
+{"case":"mixed-same-bucket-retire","n":1024,"baseline_node_visits":1049600,"node_visits":3071...
+[This part of the test output was removed since it exceeds the threshold of 1024 bytes.]
+</system-out>
+	</testcase>
+	<testcase name="test_range_hint" classname="test_range_hint" time="3.41121" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"o1_range_hint":"passed","operations":9232,"hint_checks":3321,"real_bad_alloc_points":16,"typed_alias_rejections":1,"performance_samples":0}
+</system-out>
+	</testcase>
+	<testcase name="test_stable_storage" classname="test_stable_storage" time="0.275977" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Large-alignment mappings with non-aligned bases: 14
+Stable storage integration tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle" classname="test_vm_lifecycle" time="0.225384" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_vm_transport" classname="test_vm_transport" time="0.319559" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_owner_identity" classname="test_owner_identity" time="0.316977" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>11 owner identity groups passed; TLS delete and late global destructor armed; Core bytes 584; no timing
+</system-out>
+	</testcase>
+	<testcase name="test_owner_registry" classname="test_owner_registry" time="0.315616" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_tail_expansion" classname="test_tail_expansion" time="0.250225" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Tail expansion tests passed
+</system-out>
+	</testcase>
+	<testcase name="test_storage_policies" classname="test_storage_policies" time="0.231707" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Storage policies passed
+</system-out>
+	</testcase>
+	<testcase name="test_allocator_model" classname="test_allocator_model" time="1.79227" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>seed=324508639 ops=1000
+seed=610839777 ops=1000
+{"status":"passed","seeds":2,"operations":2000,"negative_controls":10}
+</system-out>
+	</testcase>
+	<testcase name="test_allocator_failures" classname="test_allocator_failures" time="0.262" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>{"status":"passed","actual_failure_points":17,"max_unreclaimed_bytes":272}
+</system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle_empty-globals" classname="test_vm_lifecycle_empty-globals" time="0.115425" status="run">
+		<properties>
+			<property name="cmake_labels" value="lifecycle;reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle_global-assigned" classname="test_vm_lifecycle_global-assigned" time="0.116036" status="run">
+		<properties>
+			<property name="cmake_labels" value="lifecycle;reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle_static-before-registry" classname="test_vm_lifecycle_static-before-registry" time="0.115719" status="run">
+		<properties>
+			<property name="cmake_labels" value="lifecycle;reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle_static-after-registry" classname="test_vm_lifecycle_static-after-registry" time="0.115957" status="run">
+		<properties>
+			<property name="cmake_labels" value="lifecycle;reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_vm_lifecycle_shutdown-transfers" classname="test_vm_lifecycle_shutdown-transfers" time="0.115809" status="run">
+		<properties>
+			<property name="cmake_labels" value="lifecycle;reflection"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_owner_registry_fail_node" classname="test_owner_registry_fail_node" time="0.114179" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection;registry"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_owner_registry_fail_rehash" classname="test_owner_registry_fail_rehash" time="0.116359" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection;registry"/>
+		</properties>
+		<system-out></system-out>
+	</testcase>
+	<testcase name="test_canonical_window" classname="test_canonical_window" time="0.278557" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>canonical window: eager reservation, placement, equivalence, reuse, pool isolation, concurrency, G1 passed
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_window_reserve_failure" classname="test_canonical_window_reserve_failure" time="0.203396" status="run">
+		<properties>
+			<property name="cmake_labels" value="canonical-window;reflection"/>
+		</properties>
+		<system-out>canonical window reservation failure: receive rejected once and for all, ordinary unaffected
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_window_small" classname="test_canonical_window_small" time="0.247254" status="run">
+		<properties>
+			<property name="cmake_labels" value="canonical-window;reflection"/>
+		</properties>
+		<system-out>canonical window small: exhaustion, fragmentation and reuse passed
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_window_disabled" classname="test_canonical_window_disabled" time="0.238683" status="run">
+		<properties>
+			<property name="cmake_labels" value="canonical-window;reflection"/>
+		</properties>
+		<system-out>canonical window disabled: receive rejected, ordinary storage and G1 zeroing unaffected
+</system-out>
+	</testcase>
+	<testcase name="test_verified_paths" classname="test_verified_paths" time="0.247632" status="run">
+		<properties>
+			<property name="cmake_labels" value="four-paths;reflection"/>
+		</properties>
+		<system-out>verified paths: five groups, exact/hot/OOM/owner callbacks/alias/freeze/lifetime/V1 passed
+</system-out>
+	</testcase>
+	<testcase name="test_stable_erase_if" classname="test_stable_erase_if" time="0.229654" status="run">
+		<properties>
+			<property name="cmake_labels" value="four-paths;reflection"/>
+		</properties>
+		<system-out>stable_erase_if: decision OOM/17 predicate failures,5 stable patterns,payload/lifetime/alias/reload/Core-move passed
+</system-out>
+	</testcase>
+	<testcase name="test_locator_soundness" classname="test_locator_soundness" time="0.216114" status="run">
+		<properties>
+			<property name="cmake_labels" value="four-paths;reflection"/>
+		</properties>
+		<system-out>locator soundness: unchanged local parents/epoch and byte-placement counterexamples passed
+</system-out>
+	</testcase>
+	<testcase name="test_snapshot_index_header_only" classname="test_snapshot_index_header_only" time="0.213224" status="run">
+		<properties>
+			<property name="cmake_labels" value="four-paths;reflection"/>
+		</properties>
+		<system-out>header-only disabled optimization/no optional runtime link passed
+</system-out>
+	</testcase>
+	<testcase name="test_core_lifetime" classname="test_core_lifetime" time="0.221257" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>core lifetime: six semantic groups passed; no timing claim
+</system-out>
+	</testcase>
+	<testcase name="test_custom_future_lifetime" classname="test_custom_future_lifetime" time="0.221804" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>custom future lifetime: three semantic groups passed; no timing claim
+</system-out>
+	</testcase>
+	<testcase name="test_receive_raw" classname="test_receive_raw" time="0.233816" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>receive raw: source tests completed
+</system-out>
+	</testcase>
+	<testcase name="test_verified_receive" classname="test_verified_receive" time="0.238113" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>verified receive: six groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V1 passed
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_registry_v2" classname="test_canonical_registry_v2" time="0.223969" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>canonical-v2: seven domains, retire/move/swap, cold OOM/new_handler and final normal reads passed
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_cold_no_callback" classname="test_canonical_cold_no_callback" time="0.218056" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>canonical-v4: cold no-eviction/no-C++-allocation; real two-block drain and exact terminal-delete owner-move controls passed
+</system-out>
+	</testcase>
+	<testcase name="test_canonical_zero_target" classname="test_canonical_zero_target" time="0.214442" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>canonical zero-target regression passed; two deterministic adjacent-array registry fixtures; no VM/platform result
+</system-out>
+	</testcase>
+</testsuite>

@@ -1,0 +1,1 @@
+flags=-fsanitize=address,undefined -fno-sanitize-recover=all; libc++/libc++abi static (Darwin sanitizer runtime interposes operator new for dylib callers; see diag-asan-static-libcxx-c14-20261020). All registered CTest cases.

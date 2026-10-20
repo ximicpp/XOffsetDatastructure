@@ -1,0 +1,14 @@
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/xoffsetdatastructure.hpp diag/src-d1/xoffsetdatastructure.hpp
+--- candidate-r1m2-20261020/xoffsetdatastructure.hpp	2026-10-19 21:02:56
++++ diag/src-d1/xoffsetdatastructure.hpp	2026-10-19 21:45:41
+@@ -370,8 +370,8 @@
+         // still come only from the retained real placement byte[MAX] array.
+         static std::byte* canonical_bytes_at(const void* anchor,
+                 std::uintptr_t target, std::size_t bytes) noexcept {
+-            if (canonical_active_count_.load(std::memory_order_acquire) == 0) return nullptr;
+-            return canonical_bytes_at_active(anchor, target, bytes);
++            // DIAGNOSTIC D1 ONLY (never shipped): ablate the canonical guard.
++            (void)anchor; (void)target; (void)bytes; return nullptr;
+         }
+ 
+     private:

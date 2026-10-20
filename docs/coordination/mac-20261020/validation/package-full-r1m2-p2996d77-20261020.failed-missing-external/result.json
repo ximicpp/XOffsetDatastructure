@@ -1,0 +1,13 @@
+{
+  "status": "failed",
+  "suite": "full",
+  "commands": [],
+  "started": "2026-10-20T04:03:09.442778+00:00",
+  "version": {
+    "full": "0.1.0-alpha.1",
+    "numeric": "0.1.0",
+    "prerelease": "alpha.1"
+  },
+  "error": "[Errno 2] No such file or directory: '/Volumes/XOffsetCS/candidate-r1m2-20261020/external/typelayout/include'",
+  "finished": "2026-10-20T04:03:09.467681+00:00"
+}

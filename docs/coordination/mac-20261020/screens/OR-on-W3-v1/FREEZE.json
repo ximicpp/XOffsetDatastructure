@@ -1,0 +1,37 @@
+{
+ "schema": "xoffset-mac-screen-v1",
+ "name": "OR-on-W3-v1",
+ "description": "mechanism OR alone on W3",
+ "base_source": "/Volumes/XOffsetCS/candidates/w3",
+ "candidate_source": "/Volumes/XOffsetCS/candidates/w3-OR",
+ "base_binary_sha256": "5927bcb28da23d165f2e7f65f8078a7a4ab9c42b0d286a85b8da4d56d893821d",
+ "candidate_binary_sha256": "4a7df0f276905df23150e8c0b65af0553b7e97f9d105be5deb497f3d9c844f92",
+ "screen_py_sha256": "66e58ff85c0903ea72312fe1ef6e38135dce3870aa0d23e4ddee415e04ea646a",
+ "fixture": "M (prepared-v1, regenerated on Mac; S matches golden)",
+ "pairs": 72,
+ "order": "36 AB + 36 BA shuffled by random.Random(20261020)",
+ "primary": {
+  "metrics": [
+   "mutate"
+  ],
+  "rule": "one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4,71); promotion requires every primary upper bound < 1"
+ },
+ "auxiliary": {
+  "metrics": [
+   "load",
+   "query_before",
+   "emit_after",
+   "retire_modified_state",
+   "reload",
+   "query_after",
+   "cleanup",
+   "read_sum",
+   "total"
+  ],
+  "rule": "two-sided intervals with t(1-0.05/72,71); any lower bound > 1 vetoes promotion"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or re-run; child timeout 20 s; any child failure aborts the screen as failed",
+ "host": "macOS-26.3-arm64-arm-64bit-Mach-O",
+ "frozen_epoch": 1792485956.799977,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}

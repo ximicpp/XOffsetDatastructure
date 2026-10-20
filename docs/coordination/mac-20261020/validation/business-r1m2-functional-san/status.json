@@ -1,0 +1,650 @@
+{
+  "attempted": [
+    {
+      "action": "describe",
+      "id": "xoffset-describe",
+      "library": "xoffset",
+      "size": null
+    },
+    {
+      "action": "encode",
+      "id": "xoffset-S-encode",
+      "library": "xoffset",
+      "size": "S"
+    },
+    {
+      "action": "inspect-input",
+      "id": "xoffset-S-inspect-input",
+      "library": "xoffset",
+      "size": "S"
+    },
+    {
+      "action": "validate",
+      "id": "xoffset-S-validate",
+      "library": "xoffset",
+      "size": "S"
+    },
+    {
+      "action": "run",
+      "id": "xoffset-S-run",
+      "library": "xoffset",
+      "size": "S"
+    },
+    {
+      "action": "inspect-final",
+      "id": "xoffset-S-inspect-final",
+      "library": "xoffset",
+      "size": "S"
+    },
+    {
+      "action": "encode",
+      "id": "xoffset-M-encode",
+      "library": "xoffset",
+      "size": "M"
+    },
+    {
+      "action": "inspect-input",
+      "id": "xoffset-M-inspect-input",
+      "library": "xoffset",
+      "size": "M"
+    },
+    {
+      "action": "validate",
+      "id": "xoffset-M-validate",
+      "library": "xoffset",
+      "size": "M"
+    },
+    {
+      "action": "run",
+      "id": "xoffset-M-run",
+      "library": "xoffset",
+      "size": "M"
+    },
+    {
+      "action": "inspect-final",
+      "id": "xoffset-M-inspect-final",
+      "library": "xoffset",
+      "size": "M"
+    },
+    {
+      "action": "encode",
+      "id": "xoffset-L-encode",
+      "library": "xoffset",
+      "size": "L"
+    },
+    {
+      "action": "inspect-input",
+      "id": "xoffset-L-inspect-input",
+      "library": "xoffset",
+      "size": "L"
+    },
+    {
+      "action": "validate",
+      "id": "xoffset-L-validate",
+      "library": "xoffset",
+      "size": "L"
+    },
+    {
+      "action": "run",
+      "id": "xoffset-L-run",
+      "library": "xoffset",
+      "size": "L"
+    },
+    {
+      "action": "inspect-final",
+      "id": "xoffset-L-inspect-final",
+      "library": "xoffset",
+      "size": "L"
+    },
+    {
+      "action": "describe",
+      "id": "cista-describe",
+      "library": "cista",
+      "size": null
+    },
+    {
+      "action": "encode",
+      "id": "cista-S-encode",
+      "library": "cista",
+      "size": "S"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cista-S-inspect-input",
+      "library": "cista",
+      "size": "S"
+    },
+    {
+      "action": "validate",
+      "id": "cista-S-validate",
+      "library": "cista",
+      "size": "S"
+    },
+    {
+      "action": "run",
+      "id": "cista-S-run",
+      "library": "cista",
+      "size": "S"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cista-S-inspect-final",
+      "library": "cista",
+      "size": "S"
+    },
+    {
+      "action": "encode",
+      "id": "cista-M-encode",
+      "library": "cista",
+      "size": "M"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cista-M-inspect-input",
+      "library": "cista",
+      "size": "M"
+    },
+    {
+      "action": "validate",
+      "id": "cista-M-validate",
+      "library": "cista",
+      "size": "M"
+    },
+    {
+      "action": "run",
+      "id": "cista-M-run",
+      "library": "cista",
+      "size": "M"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cista-M-inspect-final",
+      "library": "cista",
+      "size": "M"
+    },
+    {
+      "action": "encode",
+      "id": "cista-L-encode",
+      "library": "cista",
+      "size": "L"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cista-L-inspect-input",
+      "library": "cista",
+      "size": "L"
+    },
+    {
+      "action": "validate",
+      "id": "cista-L-validate",
+      "library": "cista",
+      "size": "L"
+    },
+    {
+      "action": "run",
+      "id": "cista-L-run",
+      "library": "cista",
+      "size": "L"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cista-L-inspect-final",
+      "library": "cista",
+      "size": "L"
+    },
+    {
+      "action": "describe",
+      "id": "flatbuffers-describe",
+      "library": "flatbuffers",
+      "size": null
+    },
+    {
+      "action": "encode",
+      "id": "flatbuffers-S-encode",
+      "library": "flatbuffers",
+      "size": "S"
+    },
+    {
+      "action": "inspect-input",
+      "id": "flatbuffers-S-inspect-input",
+      "library": "flatbuffers",
+      "size": "S"
+    },
+    {
+      "action": "validate",
+      "id": "flatbuffers-S-validate",
+      "library": "flatbuffers",
+      "size": "S"
+    },
+    {
+      "action": "run",
+      "id": "flatbuffers-S-run",
+      "library": "flatbuffers",
+      "size": "S"
+    },
+    {
+      "action": "inspect-final",
+      "id": "flatbuffers-S-inspect-final",
+      "library": "flatbuffers",
+      "size": "S"
+    },
+    {
+      "action": "encode",
+      "id": "flatbuffers-M-encode",
+      "library": "flatbuffers",
+      "size": "M"
+    },
+    {
+      "action": "inspect-input",
+      "id": "flatbuffers-M-inspect-input",
+      "library": "flatbuffers",
+      "size": "M"
+    },
+    {
+      "action": "validate",
+      "id": "flatbuffers-M-validate",
+      "library": "flatbuffers",
+      "size": "M"
+    },
+    {
+      "action": "run",
+      "id": "flatbuffers-M-run",
+      "library": "flatbuffers",
+      "size": "M"
+    },
+    {
+      "action": "inspect-final",
+      "id": "flatbuffers-M-inspect-final",
+      "library": "flatbuffers",
+      "size": "M"
+    },
+    {
+      "action": "encode",
+      "id": "flatbuffers-L-encode",
+      "library": "flatbuffers",
+      "size": "L"
+    },
+    {
+      "action": "inspect-input",
+      "id": "flatbuffers-L-inspect-input",
+      "library": "flatbuffers",
+      "size": "L"
+    },
+    {
+      "action": "validate",
+      "id": "flatbuffers-L-validate",
+      "library": "flatbuffers",
+      "size": "L"
+    },
+    {
+      "action": "run",
+      "id": "flatbuffers-L-run",
+      "library": "flatbuffers",
+      "size": "L"
+    },
+    {
+      "action": "inspect-final",
+      "id": "flatbuffers-L-inspect-final",
+      "library": "flatbuffers",
+      "size": "L"
+    },
+    {
+      "action": "describe",
+      "id": "capnproto-describe",
+      "library": "capnproto",
+      "size": null
+    },
+    {
+      "action": "encode",
+      "id": "capnproto-S-encode",
+      "library": "capnproto",
+      "size": "S"
+    },
+    {
+      "action": "inspect-input",
+      "id": "capnproto-S-inspect-input",
+      "library": "capnproto",
+      "size": "S"
+    },
+    {
+      "action": "validate",
+      "id": "capnproto-S-validate",
+      "library": "capnproto",
+      "size": "S"
+    },
+    {
+      "action": "run",
+      "id": "capnproto-S-run",
+      "library": "capnproto",
+      "size": "S"
+    },
+    {
+      "action": "inspect-final",
+      "id": "capnproto-S-inspect-final",
+      "library": "capnproto",
+      "size": "S"
+    },
+    {
+      "action": "encode",
+      "id": "capnproto-M-encode",
+      "library": "capnproto",
+      "size": "M"
+    },
+    {
+      "action": "inspect-input",
+      "id": "capnproto-M-inspect-input",
+      "library": "capnproto",
+      "size": "M"
+    },
+    {
+      "action": "validate",
+      "id": "capnproto-M-validate",
+      "library": "capnproto",
+      "size": "M"
+    },
+    {
+      "action": "run",
+      "id": "capnproto-M-run",
+      "library": "capnproto",
+      "size": "M"
+    },
+    {
+      "action": "inspect-final",
+      "id": "capnproto-M-inspect-final",
+      "library": "capnproto",
+      "size": "M"
+    },
+    {
+      "action": "encode",
+      "id": "capnproto-L-encode",
+      "library": "capnproto",
+      "size": "L"
+    },
+    {
+      "action": "inspect-input",
+      "id": "capnproto-L-inspect-input",
+      "library": "capnproto",
+      "size": "L"
+    },
+    {
+      "action": "validate",
+      "id": "capnproto-L-validate",
+      "library": "capnproto",
+      "size": "L"
+    },
+    {
+      "action": "run",
+      "id": "capnproto-L-run",
+      "library": "capnproto",
+      "size": "L"
+    },
+    {
+      "action": "inspect-final",
+      "id": "capnproto-L-inspect-final",
+      "library": "capnproto",
+      "size": "L"
+    },
+    {
+      "action": "describe",
+      "id": "cereal-describe",
+      "library": "cereal",
+      "size": null
+    },
+    {
+      "action": "encode",
+      "id": "cereal-S-encode",
+      "library": "cereal",
+      "size": "S"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cereal-S-inspect-input",
+      "library": "cereal",
+      "size": "S"
+    },
+    {
+      "action": "validate",
+      "id": "cereal-S-validate",
+      "library": "cereal",
+      "size": "S"
+    },
+    {
+      "action": "run",
+      "id": "cereal-S-run",
+      "library": "cereal",
+      "size": "S"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cereal-S-inspect-final",
+      "library": "cereal",
+      "size": "S"
+    },
+    {
+      "action": "encode",
+      "id": "cereal-M-encode",
+      "library": "cereal",
+      "size": "M"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cereal-M-inspect-input",
+      "library": "cereal",
+      "size": "M"
+    },
+    {
+      "action": "validate",
+      "id": "cereal-M-validate",
+      "library": "cereal",
+      "size": "M"
+    },
+    {
+      "action": "run",
+      "id": "cereal-M-run",
+      "library": "cereal",
+      "size": "M"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cereal-M-inspect-final",
+      "library": "cereal",
+      "size": "M"
+    },
+    {
+      "action": "encode",
+      "id": "cereal-L-encode",
+      "library": "cereal",
+      "size": "L"
+    },
+    {
+      "action": "inspect-input",
+      "id": "cereal-L-inspect-input",
+      "library": "cereal",
+      "size": "L"
+    },
+    {
+      "action": "validate",
+      "id": "cereal-L-validate",
+      "library": "cereal",
+      "size": "L"
+    },
+    {
+      "action": "run",
+      "id": "cereal-L-run",
+      "library": "cereal",
+      "size": "L"
+    },
+    {
+      "action": "inspect-final",
+      "id": "cereal-L-inspect-final",
+      "library": "cereal",
+      "size": "L"
+    }
+  ],
+  "completed": [
+    {
+      "input_wire": "commands/xoffset-S.input.wire",
+      "library": "xoffset",
+      "result": "commands/xoffset-S.native.json",
+      "size": "S"
+    },
+    {
+      "input_wire": "commands/xoffset-M.input.wire",
+      "library": "xoffset",
+      "result": "commands/xoffset-M.native.json",
+      "size": "M"
+    },
+    {
+      "input_wire": "commands/xoffset-L.input.wire",
+      "library": "xoffset",
+      "result": "commands/xoffset-L.native.json",
+      "size": "L"
+    },
+    {
+      "input_wire": "commands/cista-S.input.wire",
+      "library": "cista",
+      "result": "commands/cista-S.native.json",
+      "size": "S"
+    },
+    {
+      "input_wire": "commands/cista-M.input.wire",
+      "library": "cista",
+      "result": "commands/cista-M.native.json",
+      "size": "M"
+    },
+    {
+      "input_wire": "commands/cista-L.input.wire",
+      "library": "cista",
+      "result": "commands/cista-L.native.json",
+      "size": "L"
+    },
+    {
+      "input_wire": "commands/flatbuffers-S.input.wire",
+      "library": "flatbuffers",
+      "result": "commands/flatbuffers-S.native.json",
+      "size": "S"
+    },
+    {
+      "input_wire": "commands/flatbuffers-M.input.wire",
+      "library": "flatbuffers",
+      "result": "commands/flatbuffers-M.native.json",
+      "size": "M"
+    },
+    {
+      "input_wire": "commands/flatbuffers-L.input.wire",
+      "library": "flatbuffers",
+      "result": "commands/flatbuffers-L.native.json",
+      "size": "L"
+    },
+    {
+      "input_wire": "commands/capnproto-S.input.wire",
+      "library": "capnproto",
+      "result": "commands/capnproto-S.native.json",
+      "size": "S"
+    },
+    {
+      "input_wire": "commands/capnproto-M.input.wire",
+      "library": "capnproto",
+      "result": "commands/capnproto-M.native.json",
+      "size": "M"
+    },
+    {
+      "input_wire": "commands/capnproto-L.input.wire",
+      "library": "capnproto",
+      "result": "commands/capnproto-L.native.json",
+      "size": "L"
+    },
+    {
+      "input_wire": "commands/cereal-S.input.wire",
+      "library": "cereal",
+      "result": "commands/cereal-S.native.json",
+      "size": "S"
+    },
+    {
+      "input_wire": "commands/cereal-M.input.wire",
+      "library": "cereal",
+      "result": "commands/cereal-M.native.json",
+      "size": "M"
+    },
+    {
+      "input_wire": "commands/cereal-L.input.wire",
+      "library": "cereal",
+      "result": "commands/cereal-L.native.json",
+      "size": "L"
+    }
+  ],
+  "descriptions": {
+    "capnproto": {
+      "capabilities": {
+        "borrowed_read": "not_established",
+        "native_graph": "not_established",
+        "trusted_mutable": true,
+        "untrusted_mutable": "not_established"
+      },
+      "commit": "373e61ec89e2359f1c362e9b2eadc552f4779306",
+      "library": "capnproto-v1.5.0",
+      "load_contract": "detached",
+      "schema_version": 1,
+      "trust_mode": "T-trusted-bounded-reader-builder-detached;U-not-established"
+    },
+    "cereal": {
+      "capabilities": {
+        "borrowed_read": "not_established",
+        "native_graph": "not_established",
+        "trusted_mutable": true,
+        "untrusted_mutable": "not_established"
+      },
+      "commit": "ebef1e929807629befafbb2918ea1a08c7194554",
+      "library": "cereal-v1.3.2",
+      "load_contract": "detached",
+      "schema_version": 1,
+      "trust_mode": "T-trusted-binary-native-std-detached;U-not-established"
+    },
+    "cista": {
+      "capabilities": {
+        "borrowed_read": "not_established",
+        "native_graph": "not_established",
+        "trusted_mutable": true,
+        "untrusted_mutable": "not_established"
+      },
+      "commit": "015b94e66c4c0d7c1ef29742383a024c84fbbba1",
+      "library": "cista-v0.16",
+      "load_contract": "detached",
+      "schema_version": 1,
+      "trust_mode": "T-trusted-offset-mode-NONE-structural-checks-private-blob;U-not-established"
+    },
+    "flatbuffers": {
+      "capabilities": {
+        "borrowed_read": "not_established",
+        "native_graph": "not_established",
+        "trusted_mutable": true,
+        "untrusted_mutable": "not_established"
+      },
+      "commit": "7e163021e59cca4f8e1e35a7c828b5c6b7915953",
+      "library": "flatbuffers-v25.12.19",
+      "load_contract": "detached",
+      "schema_version": 1,
+      "trust_mode": "trusted-object-api-no-upfront-verifier"
+    },
+    "xoffset": {
+      "capabilities": {
+        "borrowed_read": "not_established",
+        "native_graph": "not_established",
+        "trusted_mutable": true,
+        "untrusted_mutable": "not_established"
+      },
+      "commit": "7539433ab96d69c4a07b1db5c0a13786da85cdcd",
+      "library": "xoffset-c14-r1-m2-combined-v1",
+      "load_contract": "detached",
+      "schema_version": 1,
+      "trust_mode": "T-trusted-typed-verified-owning-copy-Automatic;U-not-established"
+    }
+  },
+  "error": null,
+  "kind": "sc-functional",
+  "p4_complete": false,
+  "performance_accepted": false,
+  "schema_version": 1,
+  "status": "complete",
+  "unexecuted": []
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="2"
+	failures="0"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="0"
+	timestamp="2026-10-19T20:05:28"
+	>
+	<testcase name="test_virtual_memory_storage" classname="test_virtual_memory_storage" time="0.115991" status="run">
+		<properties>
+			<property name="cmake_labels" value="storage"/>
+		</properties>
+		<system-out>Virtual memory storage tests passed (page_size=16384, reservation_granularity=16384)
+</system-out>
+	</testcase>
+	<testcase name="test_vm_pool" classname="test_vm_pool" time="0.0913815" status="run">
+		<properties>
+			<property name="cmake_labels" value="storage"/>
+		</properties>
+		<system-out>Virtual memory pool tests passed (page_size=16384)
+</system-out>
+	</testcase>
+</testsuite>
