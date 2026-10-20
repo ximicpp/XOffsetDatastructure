@@ -1,0 +1,152 @@
+{
+  "schema": "delivery-implementation-acceptance-v1",
+  "status": "passed_narrow_implementation_and_existing_functional_acceptance",
+  "reviewer": "phase_c_source_review",
+  "date_Asia_Shanghai": "2026-10-20",
+  "candidate": "r1-m2-combined-v1",
+  "baseline_commit": "1904b9c71230026ac6f2d58f919a9ab76447d264",
+  "blockers": [],
+  "pins": {
+    "default_main": {
+      "path": "xoffsetdatastructure.hpp",
+      "identity": {
+        "bytes": 278262,
+        "sha256": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3"
+      }
+    },
+    "candidate_main": {
+      "path": "build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp",
+      "identity": {
+        "bytes": 279066,
+        "sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501"
+      }
+    },
+    "candidate_identity": {
+      "path": "build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json",
+      "identity": {
+        "bytes": 45694,
+        "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+      }
+    },
+    "delivery_patch": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/delivery/COMBINED.patch",
+      "identity": {
+        "bytes": 2520,
+        "sha256": "02273bdee63a43031183a370ad19f18b3af5e1910e483711c0e27573e3dc8ccb"
+      }
+    },
+    "original_candidate_patch": {
+      "path": "build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/COMBINED.patch",
+      "identity": {
+        "bytes": 2520,
+        "sha256": "02273bdee63a43031183a370ad19f18b3af5e1910e483711c0e27573e3dc8ccb"
+      }
+    },
+    "source_acceptance": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 8470,
+        "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+      }
+    },
+    "source_composition_proof": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/core/COMBINED_SOURCE_PROOF.json",
+      "identity": {
+        "bytes": 1797,
+        "sha256": "7b217ec4e2a87978179e4fef4f964e0f76ed42f71bbba07ebdf31d10d3430b9d"
+      }
+    },
+    "combined_full_acceptance": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 10321,
+        "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+      }
+    },
+    "typed_gate_composition": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_TYPED_GATE_COMPOSITION_ACCEPTANCE_v1.json",
+      "identity": {
+        "bytes": 25995,
+        "sha256": "a33493ba4a5c214fdcb8649fc2d26b4b55a5fcecc16539b4393186015d842ea2"
+      }
+    }
+  },
+  "checks": {
+    "delivery_patch2520_equals_reviewed_candidate_patch_byte_exact": true,
+    "candidate_main_actual155f_unchanged": true,
+    "default_main_actual66818_unchanged": true,
+    "default_source_integrated": false,
+    "source154_production14_exact_union_proof_reused": true,
+    "previously_independently_proved_only_main_changed": true,
+    "previously_proved_both_R1_M2_application_orders_equal": true,
+    "M1_L1_or_other_delta_present": false,
+    "production14_content_digest": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+    "all14_or_full_tree_rehashed_in_this_narrow_check": false,
+    "new_patch_replay_in_this_narrow_check": false
+  },
+  "implementation": {
+    "R1": "Inline-eligible inactive canonical hot path; every remaining actual call retains acquire. Original active cold body is noinline, with original checks and release; no cross-call negative/result cache.",
+    "M2": "One current nonstring owning-vector data capture. Original capacity containment first, miss-only size afterwards, null-safe end. Original recursion/ADL/early-return and public bidirectional owns remain.",
+    "unchanged_contracts": [
+      "existing demo public calls and query algorithm",
+      "complete validation",
+      "V1 layout/schema/reader compatibility",
+      "independent owning output"
+    ],
+    "codegen_scope": "Own combined actual compiler success accepted. Retained component codegen/mechanism plus exact source union; no claim of new combined ASM/dynamic diagnosis/independent72 screen."
+  },
+  "existing_accepted_own_functional_results": {
+    "normal": 73,
+    "SAN": 73,
+    "business_normal_native_commands": 80,
+    "business_SAN_native_commands": 80,
+    "business_libraries": 5,
+    "business_SML_and_original_complete_body_audits": true,
+    "V1_main": 84,
+    "V1_extra": 8,
+    "AB_native_actions": 4,
+    "C_native_actions": 4,
+    "actual_consumer_cases": 29,
+    "lifecycle_finite_cases": 52,
+    "actual_own_results_reused_not_solo_substitution": true,
+    "validation_scope": "Fixed recorded WSL/P2996 toolchain; normal and recorded address/undefined sanitizer scope. No native Windows/ARM/cross-platform or arbitrary custom lifetime claim."
+  },
+  "documentation": {
+    "source_change": {
+      "path": "docs/coordination/c14-iteration-20261020-v2/delivery/SOURCE_CHANGE.md",
+      "identity": {
+        "bytes": 3172,
+        "sha256": "09e6eda0b4dd083bda5f1bc40880122e4788d97f1608c889df59f2aa816de9d5"
+      }
+    },
+    "source_change_before": {
+      "bytes": 1727,
+      "sha256": "63c2758947d983095310ba6fa93a655f14fceaeefef966da56a3c95076fb6df8"
+    },
+    "obsolete_business_pending_removed": true,
+    "performance_report": "RESULTS.md",
+    "performance_report_scope": "Only root-created delivery/RESULTS.md after original complete audit closure carries full performance conclusions. No Q/F result or performance goal claim is made by this implementation document."
+  },
+  "scope_limits": [
+    "Stable implementation and already accepted own functional results only. Actual original formal audit and final performance report are separate.",
+    "Existing source/prod14/complete body audit and functional closures are referenced without repeated full-tree/body verification or native execution.",
+    "No default C14 integration, code/patch edit, user commit/push or new native platform qualification."
+  ],
+  "activity": {
+    "modified_existing_files": [
+      "delivery/SOURCE_CHANGE.md"
+    ],
+    "new_files": [
+      "delivery/IMPLEMENTATION_ACCEPTANCE.json"
+    ],
+    "source_patch_edits": 0,
+    "compile": 0,
+    "native": 0,
+    "lease": 0,
+    "large_body_hashes": 0,
+    "commit": 0,
+    "push": 0
+  },
+  "performance_accepted_by_this_record": false,
+  "formal_goal_claimed": false
+}

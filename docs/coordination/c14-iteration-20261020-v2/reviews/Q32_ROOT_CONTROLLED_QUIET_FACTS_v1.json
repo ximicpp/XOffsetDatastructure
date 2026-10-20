@@ -1,0 +1,22 @@
+{
+  "observed_utc": "2026-10-19T21:11:43.724457+00:00",
+  "scope": "All controlled project sessions/root agents and shared heavy executor; not an assertion that unrelated user apps or all app-account chats are inactive.",
+  "core": {
+    "threadId": "01a15479-b18c-7233-9336-20df97b3fe47",
+    "status": "idle",
+    "cursor": "67766441-970d-4c33-9db8-dc2a8d4ab165:96"
+  },
+  "sole_validation": {
+    "threadId": "01a15479-36f3-72d3-8c17-6630a51f854b",
+    "status": "active_authoring_only_ready_no_timing",
+    "cursor": "619f3d7c-c61f-4623-96b1-9f05e4491e9b:415"
+  },
+  "root_agents_completed_idle": [
+    "phase_c_source_review",
+    "runtime_observer_review",
+    "v2_stats_review"
+  ],
+  "source": "Actual direct wait_threads timeout0 and collaboration.list_agents; root stops other work at admission. All project heavy work is additionally serialized by the original lease.",
+  "uncontrolled_host_activity": "Live UnrealEditor/zenserver/Code activity is recorded; no permission inferred to pause them. No whole-machine quiet or physical-core isolation claim.",
+  "root_during_timing": "Only bounded status waits and concise user progress; no source edits/scans/compilers/native/agent work."
+}

@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "freeze_sha256": "e57468ed00157a0154f220b4c67a29879c3fc14bebb9ff04d65f621e4ed11685",
+  "ready_monotonic_ns": "113812296199",
+  "power_before": {
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "plan": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/host/process-plan-final.json",
+    "identity": {
+      "bytes": 1522,
+      "sha256": "bc036187a86487c2b0108d59b1caa4bfe1c0a111b089f57ce3aa8274ede765aa"
+    }
+  },
+  "guard_ready": {
+    "bytes": 1359,
+    "sha256": "2c3f46c6d5d3854f0ec2d70189e55225511b0f63fbb7bf31d67d96fb802c21f8"
+  },
+  "guard_module": {
+    "bytes": 16259,
+    "sha256": "a48417c6764186efdffd0a7f24d17890d67620b33404f4cc88a6c02f360d93da"
+  },
+  "guard_helper": {
+    "bytes": 12668,
+    "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+  },
+  "controller": {
+    "bytes": 7590,
+    "sha256": "32b59d287ae2b43a30e4741958801882df55a16587b7e7ffcc165d09d42baa0c"
+  },
+  "standalone_bounded_watchdog_seconds": 780
+}

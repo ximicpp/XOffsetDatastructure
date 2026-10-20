@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/combined_full/business/workers/dispatch.py",
+    "--inputs",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/business/inputs.json"
+  ],
+  "tool_manifest": {
+    "bytes": 9774,
+    "sha256": "4fcbc2cbcb516fc76be48984ec8139b6abea6c805440f49f2f6f04d85a9b99d8"
+  },
+  "scope": "COMBINED correctness only; zero timing"
+}

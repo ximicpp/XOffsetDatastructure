@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "kind": "cursor-process-pause-prerequisites-v1",
+  "C_compilation_active": false,
+  "all_agents_quiet": true,
+  "controlled_queues_drained": true,
+  "prelude_lease_owner": "W1",
+  "prelude_lease_kind": "validation",
+  "prelude_queue": "/root/xoffset-c14-iteration/20261019/v1/validation/leases/m1-screen-host-prelude-v1",
+  "authority": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/host/prelude-authority.json",
+    "identity": {
+      "bytes": 702,
+      "sha256": "78a5f7bb515266d380c7c2abd559055773cd12903a5bf4547cc5baa6482094ff"
+    }
+  },
+  "quiet_evidence": {
+    "bytes": 2730,
+    "sha256": "6047e167952ba90eac51533fa638aa31483661c608f364fd46210c1da7564b2b"
+  }
+}

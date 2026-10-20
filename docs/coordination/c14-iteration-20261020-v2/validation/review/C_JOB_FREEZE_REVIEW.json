@@ -1,0 +1,359 @@
+{
+  "schema": "c14-independent-phase-c-job-freeze-review-v1",
+  "kind": "independent-phase-c-coordinator-freeze-review",
+  "status": "passed",
+  "reviewer": "screen_review",
+  "reviewed_utc": "2026-10-19T17:47:32.474798+00:00",
+  "freeze_sha256": "250ce7daf7e1fb20513c8977928524c008aa6079211dbb66b9f5ef7efc4c7f0c",
+  "freeze": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_FREEZE_DRAFT.json",
+    "identity": {
+      "bytes": 1321251,
+      "sha256": "250ce7daf7e1fb20513c8977928524c008aa6079211dbb66b9f5ef7efc4c7f0c"
+    }
+  },
+  "resources": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_RESOURCES_DRAFT.json",
+    "identity": {
+      "bytes": 1562,
+      "sha256": "c542130c32939553062dac3f24cee991ce40098892b83844bdd17991a36bca79"
+    }
+  },
+  "coordinator": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/phase_c_job.py",
+    "identity": {
+      "bytes": 38059,
+      "sha256": "9d7b3585cdc05a2c3444b931702da27bad9c914944478fcf0b61a878f86e60bb"
+    }
+  },
+  "scope": "Static coordinator plus actual source-only freeze identity review. Recommendation to root only; this is not C_ADMISSION and starts no process.",
+  "recommendation": "eligible for root final exact-freeze admission",
+  "self_authorized_execution": false,
+  "R1_B_passed": true,
+  "interface36_scope_accepted": true,
+  "resources_passed": true,
+  "final_source_and_tools_passed": true,
+  "fixed_files_audit": {
+    "case_sensitive_parser": "Python JSON with duplicate-key rejection",
+    "count": 6459,
+    "all_actual_file_identities_match": true,
+    "declared_apparent_bytes_with_aliases": 569941771,
+    "identity_map_sha256": "31589133038797d85da4c2feda13f3fd300193cfe84bac9e33d411cbd829a1dc",
+    "runtime_draft_members": 381,
+    "all381_runtime_SHA_match": true,
+    "compiler_launcher61B_and_actual_chain_pinned": true,
+    "lexical_and_resolved_aliases_pinned": true,
+    "include_roots_count": 22,
+    "all_current_include_members_pre_frozen": true,
+    "linker_CRT_scripts_libraries_explicitly_pinned": true,
+    "Python_PATH_ps_bridge_pinned": true
+  },
+  "roles": {
+    "c14": {
+      "source": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14",
+      "source154_count": 154,
+      "production14_count": 14,
+      "source154_inventory_sha256": "8ee7bb422ff5f2a3bf311c1f3fb7db94d3c7ba70e14cc43cc1ad595d362b0161",
+      "compile_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+        "-std=gnu++26",
+        "-freflection",
+        "-fexpansion-statements",
+        "-stdlib=libc++",
+        "-pthread",
+        "-O3",
+        "-DNDEBUG",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/typelayout/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/config/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container_hash/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/core/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/intrusive/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/predef/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/static_assert/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/throw_exception/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/type_traits/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/winapi/include",
+        "-I/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/source",
+        "-I/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/experiment",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include",
+        "-DSC_ADAPTER_HEADER=\"adapters/xoffset/adapter.hpp\"",
+        "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/experiment/driver.cpp",
+        "-o",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/diagnostic",
+        "-MD",
+        "-MF",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/dependencies.d"
+      ],
+      "native_argv": [
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/diagnostic",
+        "run",
+        "--wire",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/old-V8-initial-wire.bin",
+        "--trace",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/fixed-M/trace.bin",
+        "--wire-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/bodies/final-wire.bin",
+        "--canonical-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/bodies/final-canonical.bin",
+        "--queries-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/bodies/queries.bin",
+        "--result",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/bodies/native.json"
+      ],
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/tmp",
+        "TZ": "UTC"
+      }
+    },
+    "r1": {
+      "source": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1",
+      "source154_count": 154,
+      "production14_count": 14,
+      "source154_inventory_sha256": "d01fa5a3224be207af97f6f27ace2e5a7d9c53b7af49a3846d203e185f4ece2f",
+      "compile_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+        "-std=gnu++26",
+        "-freflection",
+        "-fexpansion-statements",
+        "-stdlib=libc++",
+        "-pthread",
+        "-O3",
+        "-DNDEBUG",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/typelayout/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/config/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container_hash/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/core/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/intrusive/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/predef/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/static_assert/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/throw_exception/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/type_traits/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/winapi/include",
+        "-I/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/source",
+        "-I/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/experiment",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include",
+        "-DSC_ADAPTER_HEADER=\"adapters/xoffset/adapter.hpp\"",
+        "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/experiment/driver.cpp",
+        "-o",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/diagnostic",
+        "-MD",
+        "-MF",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/dependencies.d"
+      ],
+      "native_argv": [
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/diagnostic",
+        "run",
+        "--wire",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/old-V8-initial-wire.bin",
+        "--trace",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/fixed-M/trace.bin",
+        "--wire-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/bodies/final-wire.bin",
+        "--canonical-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/bodies/final-canonical.bin",
+        "--queries-out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/bodies/queries.bin",
+        "--result",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/bodies/native.json"
+      ],
+      "environment": {
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/tmp",
+        "TZ": "UTC"
+      }
+    }
+  },
+  "M2_source_bound_without_execution_role": true,
+  "M2_control_predeclared": {
+    "all_three_actual_sources_bound": true,
+    "draft": {
+      "conditions": "Exact final driver/adapter/observer/profile/input/audit shared; future M2 candidate only. No stitching if validation changes the hook/profile between roles.",
+      "control_role": "c14",
+      "declared_before_any_C_run": true,
+      "metrics": [
+        "owns",
+        "vectors",
+        "capacity_hits",
+        "nontrivial_misses",
+        "nonempty_misses",
+        "vector_data_reads"
+      ],
+      "observable_hook_sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+    },
+    "unchanged_driver_adapter_hook_event_header": true
+  },
+  "source_only_prepare": {
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-freeze-v1-lease/request.json",
+      "identity": {
+        "bytes": 1670,
+        "sha256": "2d980a2b8988f7d8f48af2af0e84b6a19dbb1e6d3b343c2175f7e25880537db3"
+      }
+    },
+    "result": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-freeze-v1-lease/result.json",
+      "identity": {
+        "bytes": 449,
+        "sha256": "5b68b6e65a5037de04f87ad7187e98798af1df4f67c249e7f07da15f14a1ad7b"
+      }
+    },
+    "manifest": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-freeze-v1-lease/manifest.json",
+      "identity": {
+        "bytes": 912,
+        "sha256": "95bda5f23b602fa92cbe6d007c21ed04a9d53122a713f7b3dcb997421d0ae344"
+      }
+    },
+    "run_id": "ad28ea8a095848eebdf75aeaa80dbfe5",
+    "elapsed_seconds": 6.118776185999877,
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "all_six_manifest_members_match": true,
+    "compile_count": 0,
+    "native_count": 0
+  },
+  "resource_review": {
+    "projection_seconds": 505,
+    "job_seconds": 600,
+    "engineering_admission_peak_bytes": 4294967296,
+    "declared_bounded_items_bytes": 805306368,
+    "guest_and_backing_reserve_each_bytes": 2147483648,
+    "frozen_observation": {
+      "C_backing_free_bytes": 54748459008,
+      "guest_free_bytes": 603326906368,
+      "memory_bytes": {
+        "MemAvailable": 66074288128,
+        "MemTotal": 67264143360,
+        "SwapFree": 17179869184
+      },
+      "observed_monotonic_ns": "1096948159245"
+    },
+    "read_only_current_free_bytes": {
+      "/root": 603308175360,
+      "/mnt/c": 54633848832
+    },
+    "native_role_producer_body_cap_bytes": 67108864,
+    "two_role_producer_body_cap_bytes": 134217728,
+    "AS_hard_and_observed_RSS_limit_bytes": 17179869184,
+    "limits": "4GiB is an engineering admission/observed allocated ceiling, not a kernel aggregate disk quota; role audit60s is an observed check within original600s supervision, not a separate audit watchdog."
+  },
+  "reviewed_execution_properties": [
+    "Exact original600s W3 diagnostic lease, parent/runid/held-lock/session/cwd/argv; no nested lease.",
+    "Only C14 then R1, at most two120s compiles and two20s native processes; fresh single prefix, no retry/warmup/extra validate/emit.",
+    "Compiler selector constructed before fork; protected registration/log/open/read failures signal verified owned PIDs and reap WNOHANG; original-session descendants cleanup.",
+    "Each actual compiler dependency must be pre-frozen and driver/event/core hook must appear before any native. Binary/build/source hashes bound across child.",
+    "Full role budget checked, and110.5s native/audit/seal reserve rechecked after heavy identity verification. Absolute job deadline passed to accepted observer.",
+    "Strict raw/parsed36 order/seq/nondecreasing same-domain clocks with child times <=true wait4 return; exactly3 stdout JSON records, native stderr empty.",
+    "Emit9 samples exact schemas/status0/monotone clocks and cumulative resources, seen511/invocations1, wire byte ledger and external POD cross-check.",
+    "Counter exact integer schemas/classification/subsets, P0=M0=0/M9=P3, stage1=M1-P2, nine stage deltas conserve mutate.",
+    "Independent full9-stage replay truth/workload/resource bounds plus original campaign.native_result audit; actual original audit function AST matches previously reviewed implementation.",
+    "native_result receives finished_monotonic_ns=wait4 returned, retains wrapper seal end separately; wrapper/resource/hash time remains within total job.",
+    "First role failure blocks next; final identity/resource/allocated/deadline checks preserve failure. Missing RESULT after outer kill is failure evidence and never permits retry."
+  ],
+  "runtime_audit_closure": {
+    "campaign": {
+      "path": "/root/xoffset-receive-completion/20261019/v1/functional-tools-v2/campaign.py",
+      "identity": {
+        "bytes": 54171,
+        "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+      }
+    },
+    "core": {
+      "path": "/root/xoffset-receive-completion/20261019/v1/functional-tools-v2/core.py",
+      "identity": {
+        "bytes": 7845,
+        "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+      }
+    },
+    "protocol": {
+      "path": "/root/xoffset-receive-completion/20261019/v1/functional-tools-v2/protocol.py",
+      "identity": {
+        "bytes": 11167,
+        "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+      }
+    },
+    "native_result_same_AST_as_previously_reviewed": true
+  },
+  "references": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/R1_NATIVE_RESULT.json",
+      "identity": {
+        "bytes": 47494,
+        "sha256": "c451e37927763432cc94265bf1a95edf5c7063d724b6cd8413d14ba1d6351ee8"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_SOURCE_REVIEW.json",
+      "identity": {
+        "bytes": 25228,
+        "sha256": "51f70c5e1886045174e98061bc5dde53e5dd993a6c25a3e24b6116692335c5b7"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_ASSEMBLED_REVIEW.json",
+      "identity": {
+        "bytes": 21584,
+        "sha256": "924768e7508dc22b18b9dadffa1908f687b91232a0b161cbe69438ac1636d856"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_OBSERVER_SCOPE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 2117,
+        "sha256": "ac7a10185d61c4133252533137478715c878a10705e55a7e0886385603340ee5"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_COORDINATOR_REVIEW.md",
+      "identity": {
+        "bytes": 10187,
+        "sha256": "f133707af808e989a627df36df259fdecbb78effa5c988813eea7e3cc0a9a645"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_COORDINATOR_READY.json",
+      "identity": {
+        "bytes": 1794,
+        "sha256": "884e5b13d02cdbe35685980da5a64b06d0adf21146bca221391711d063ea5145"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/REQUEST_ADMISSION.json",
+      "identity": {
+        "bytes": 1266,
+        "sha256": "c40873be5e3eb6778961fe1ccdb86a07a7d0fa55298f539842db90ce6c2161bf"
+      }
+    }
+  ],
+  "unresolved_blockers": [],
+  "root_final_admission_and_postrun_obligations": [
+    "Root must issue its own same-freeze C_ADMISSION with actual R1_B/interface/source/resource evidence identities and exact frozen inheritedPATH/Python dispatch. This review is not that authorization file.",
+    "After execution root must independently require original queue complete/exit0/actual600s/empty live-group-zombie cleanup, exact source/runtime/binary and sealed receipts; internal RESULT alone is insufficient.",
+    "Offline dynamic mechanism checker remains separate and must use preregistered exact externally pinned role audits. C execution/audit status does not claim mechanism gate success.",
+    "No timings, speed ratios, confidence intervals, screening/promotion or closed M1 cause inference; any failure preserves the sole prefix with zero retries."
+  ],
+  "limitations": [
+    "Diagnostic hooks/events/syscalls and stdout allocation contaminate these timings; no speed, AB, confidence, screening or Q/F claim.",
+    "The t4-post-emit flush is charged to its adjacent diagnostic segment and is only attributable as observer work.",
+    "peak_rss_after_audit_kib includes added replay and observer allocations; it is not the bare driver peak.",
+    "Emit samples are nested intervals; preparation includes string/allocator/observer work, not pure malloc; overlapping faults must not be added twice.",
+    "A retained last boundary localizes an interval; it does not prove that boundary caused a timeout.",
+    "No current observation can retrospectively establish why the closed M1 window timed out."
+  ],
+  "new_materializer_dummy_compiler_native_executions_by_reviewer": 0,
+  "performance_inference": null
+}

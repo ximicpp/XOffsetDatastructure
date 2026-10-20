@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/r1-business-matrix-v1/queues/production-C-matrix-v2",
+    "--timeout-seconds",
+    "3600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/r1_business_job.py",
+    "worker",
+    "lifecycle",
+    "--admission-sha",
+    "845b9f1246def97cedc2ae0b9952da39115092b32b9d8f1ae07fb6f3a66e4d8a"
+  ],
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_FULL_ENTRY_BUSINESS_LIFECYCLE_ADMISSION.json",
+    "identity": {
+      "bytes": 1121805,
+      "sha256": "845b9f1246def97cedc2ae0b9952da39115092b32b9d8f1ae07fb6f3a66e4d8a"
+    }
+  },
+  "nested_lease": false
+}

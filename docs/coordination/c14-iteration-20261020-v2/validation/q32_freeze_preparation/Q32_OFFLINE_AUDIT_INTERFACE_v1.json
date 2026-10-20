@@ -1,0 +1,34 @@
+{
+  "status": "interface_only_requires_actualsealedrun_andpostrunpin",
+  "owner": "W3",
+  "kind": "functional",
+  "timeout_seconds": 3600,
+  "wait_seconds": 0,
+  "report": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json",
+  "command_template": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "audit",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1",
+    "--frozen-sha256",
+    "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+    "--postrun-pin",
+    "ACTUAL_COMPOSITE_POSTRUN_SHA_REQUIRED",
+    "--report",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json"
+  ],
+  "postrun_pin": "SHA256(SC-POST-RUN-PIN-v1 followed by NUL then bytes.fromhex(actualrunmanifestSHA) then bytes.fromhex(actualqueuemanifestSHA));actualpinsnotavailablebeforetiming",
+  "prerequisites": [
+    "Actualownedtwo-nameprocessresume and originalPowerWindowrestore completed first.",
+    "Actualrun/queue sealedmetadata and postrunpin; no native samples/retries/extension.",
+    "Originalshareddefaultlease acquiredonceafterrestoration, no nesting."
+  ],
+  "native": 0,
+  "new_capture": 0,
+  "source_or_math_changes": 0,
+  "new_large_body_audit": "The original maintainedfullaudit is mandatory afteractualQ, with own3600 budget; not run duringprocesspause ororiginal2700 sampling."
+}

@@ -1,0 +1,49 @@
+{
+  "kind": "v2-screen-host-admission",
+  "status": "pending_independent_parent_review",
+  "candidate": "m2-exact-owns-v1",
+  "freeze_sha256": null,
+  "allowed_names": [
+    "client_ue4-Win64-Shipping",
+    "TGitCache"
+  ],
+  "fresh_plan_required": true,
+  "no_old_pid_or_state": true,
+  "watchdog_seconds": 780,
+  "restoration_before_audit": true,
+  "standing_human_authorization": {
+    "identity": {
+      "bytes": 1532,
+      "sha256": "b97fa5871d35687119f41ddb576386dd4f4210f08aa9cd0068ff50ba78203b92"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/standing-process-pause-human-authorization-v1.json"
+  },
+  "original_human_authorization": {
+    "identity": {
+      "bytes": 775,
+      "sha256": "504243b5cdcf609ad3e5bd70b4bbd0893279b17b3085bb28240efc8d554fc8c0"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/process-pause-authorization-v1.json"
+  },
+  "watchdog_derivation": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/host/WATCHDOG_DERIVATION.json",
+    "identity": {
+      "bytes": 3877,
+      "sha256": "5378f4f6ad108aaa8bffbaec24a63431de00d77fefe662460e5660cc7e25db0f"
+    }
+  },
+  "power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "change_power": false,
+  "actual_readonly_host": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/host/HOST_OBSERVATION.json",
+    "identity": {
+      "bytes": 2552,
+      "sha256": "fb6bec03803b931b67e1dbd8efbfec39d42bbefc47505075d17102fe718bc092"
+    }
+  },
+  "pre_review_plan": null,
+  "all_chat_quiet": "not yet established; orchestrator must arrange factual fresh quiet after source/freeze reviews",
+  "pause_actions_already_executed": 0,
+  "guard_already_started": false,
+  "screen_admitted": false
+}

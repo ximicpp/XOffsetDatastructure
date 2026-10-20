@@ -1,0 +1,399 @@
+{
+  "status": "passed",
+  "scope": "S1 fixed16 owning materialization only; one fixed-M trajectory distinct from candidate-specific S2 counter pair",
+  "inputs": {
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/receive_raw.hpp": {
+      "bytes": 50646,
+      "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_core_lifetime.hpp": {
+      "bytes": 7269,
+      "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffset_virtual_memory.hpp": {
+      "bytes": 20900,
+      "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/xoffsetdatastructure.hpp": {
+      "bytes": 278262,
+      "sha256": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/output16_job.py": {
+      "bytes": 7318,
+      "sha256": "cee9cf4bb210720448105b2dcfd3c4cf7f6bb8f5ca3f43a051aa062094d0a965"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/output16_observe.hpp": {
+      "bytes": 1339,
+      "sha256": "28f771bac0f147c663cf078f366c0bb4a8841675011944784c6bf44a9cc530a1"
+    },
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py": {
+      "bytes": 16898,
+      "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx": {
+      "bytes": 61,
+      "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/CMakeLists.txt": {
+      "bytes": 9427,
+      "sha256": "bf762507a29dc95d4035f897f3c0439b6a598a316406a563e112dc72d22ce559"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/README.md": {
+      "bytes": 3583,
+      "sha256": "9aac779a583b1acae34c204944824db1a1067b86262f9d76cbc4ed361ae37a26"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/capnproto/README.md": {
+      "bytes": 1316,
+      "sha256": "529c71618a1dd39754e36686a7cde7de65f2653fc4a2317d99285186034070d8"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/capnproto/adapter.hpp": {
+      "bytes": 10307,
+      "sha256": "6d96bc14991919369992c79ad98ec967cf63030ab90fcb648929dce2de2cd24e"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/capnproto/snapshot.capnp": {
+      "bytes": 399,
+      "sha256": "947d9ca54239778c68d3e68035a3dcb394778279006e3f038e9b68819cff4232"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/cereal/README.md": {
+      "bytes": 1291,
+      "sha256": "6630b09ea375d78414de9c4d18b471ccef53324b4111c58e14d36ec5b9852f44"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/cereal/adapter.hpp": {
+      "bytes": 5712,
+      "sha256": "fd21392c4f577ed69ee94354da588afc4929c4ac35e666246f70aa0bda0ab629"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/cista/README.md": {
+      "bytes": 1897,
+      "sha256": "5c19091d4125ead6b475dbd0b8a75309bd2b23f041e188af77c58010915daa2d"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/cista/adapter.hpp": {
+      "bytes": 10523,
+      "sha256": "f3b21647a0c46ad1a4c85160edde9855755441ccac8d3680f09b81dfc6926923"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/cista/capabilities.cpp": {
+      "bytes": 5555,
+      "sha256": "3f0842a686f96ac4469b21071e3f18c3980603584bb6986dceb27560bd4bc059"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/flatbuffers/adapter.hpp": {
+      "bytes": 6140,
+      "sha256": "05aff021ac5afcf4a66a454fcb0e77562a29174d43368655ded99abc1d8b4aba"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/flatbuffers/snapshot.fbs": {
+      "bytes": 317,
+      "sha256": "382fccb60a07ac46f50b502f80efe3511d375777841619df5a4b91fe7648b308"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/xoffset/README.md": {
+      "bytes": 1522,
+      "sha256": "b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/adapters/xoffset/adapter.hpp": {
+      "bytes": 9418,
+      "sha256": "f1901685bd78e0348d63ab129749272aebb3d71c39538933eb60b86f55073578"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/driver.cpp": {
+      "bytes": 9457,
+      "sha256": "11aa76107eedb0fcdc1ffcf79893d2cdaf2a844f95f9a49d8682bbc434b80380"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/final.canonical.bin": {
+      "bytes": 28,
+      "sha256": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/fixture.json": {
+      "bytes": 2633,
+      "sha256": "393561d3d3087c7bfd405ebbe1a1b29b4c17de17ed5e36f570447cc6ea63b025"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/input.canonical.bin": {
+      "bytes": 28,
+      "sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/query-after.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/query-before.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-0/trace.bin": {
+      "bytes": 1023,
+      "sha256": "3fd23f7abe064e1d3c464974740ea8cc94feac76f83cfd60dcf6997b84020870"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/final.canonical.bin": {
+      "bytes": 505,
+      "sha256": "8b94da6d2a783bb80d70d80a495fdac480cc517afba670ca6b3e914564c6a085"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/fixture.json": {
+      "bytes": 2635,
+      "sha256": "de20365979af43dfb582757e7b4e8b604d5522af2049868fb9d0a33e05ed0bfa"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/input.canonical.bin": {
+      "bytes": 505,
+      "sha256": "361a199ae5eba48d6cfd962875a907799eb9d8245b4c9de17dd14a9cfba213c9"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/query-after.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/query-before.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-1/trace.bin": {
+      "bytes": 1546,
+      "sha256": "0d4410461aa02cb7b76bb10c7027e5ca74798395b152096385c36eb089bfdaa9"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/final.canonical.bin": {
+      "bytes": 10272,
+      "sha256": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/fixture.json": {
+      "bytes": 2644,
+      "sha256": "aafb9648180b8abb9189e5ccfa4726243fbd30374a4843943c65c1723181016d"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/input.canonical.bin": {
+      "bytes": 8354,
+      "sha256": "214846fb2114e65cb7e765d1dccfaf2b34c565de372223a93952c50884b8a25e"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/query-after.bin": {
+      "bytes": 4400,
+      "sha256": "89c23c0d58999a85ecf8f80b7d3cadba1875d29d7d60ba8b8ef81f46da4b21e8"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/query-before.bin": {
+      "bytes": 4400,
+      "sha256": "1a023c9d443156b28dee301d8e78729a76acffb4dbc907a15a156888d9803d1c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-17/trace.bin": {
+      "bytes": 15682,
+      "sha256": "ed00787c1c92f3b3128495bc3851513affcd9d89c2b83cb3c874a1b814ed0f59"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/final.canonical.bin": {
+      "bytes": 153316,
+      "sha256": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/fixture.json": {
+      "bytes": 2661,
+      "sha256": "e51917e6c34d0d7015d3be3f881c3c274e168f5e73247bc5606fde00199ec509"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/input.canonical.bin": {
+      "bytes": 126503,
+      "sha256": "30de5a2766c2b07e508133403536b2c1cb02c920f6060bf648171e3420784634"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/query-after.bin": {
+      "bytes": 63530,
+      "sha256": "9fed16da182ab24d500344eace80a567b153bcb51cbc46040ba8a0a20014fa37"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/query-before.bin": {
+      "bytes": 63530,
+      "sha256": "6185fe3e58dea4f757a5d5b030f01feb8afe7fc9ebefbdc49cbe9aa743166c45"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-257/trace.bin": {
+      "bytes": 227835,
+      "sha256": "aa25dc9db02295bad2453f1a66b29f9a16bbfb9797cdc6bf066bef2aef7bbf58"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/final.canonical.bin": {
+      "bytes": 76545,
+      "sha256": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/fixture.json": {
+      "bytes": 2659,
+      "sha256": "186da64c3e58c845b4eab52de803895b442ff8442692fb8c2f55b72a383a2f05"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/input.canonical.bin": {
+      "bytes": 63028,
+      "sha256": "ac6c05bd3b3d25afa252db48e8ffff93e4060cf151cd57bcb638f2f9e1468427"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/query-after.bin": {
+      "bytes": 31775,
+      "sha256": "98ea09ec8e050a7faf24d45057b8ccc9658fcfaa03b5f8bbf305cf1a0c6e6b82"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/query-before.bin": {
+      "bytes": 31775,
+      "sha256": "acb553006c498fc20f1522fbab1669689a6479c8b2d73e7e286bd05eacd027d2"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/fixtures/golden-S/trace.bin": {
+      "bytes": 114292,
+      "sha256": "6a8ef1cb303f9338a94b7364169753a8dffb4610287ec3161596e2dcd62f5296"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include/adapter.hpp": {
+      "bytes": 1771,
+      "sha256": "65cc39900c999f7c43fcf907ead4175ec895ad1bf35a8e7a18e0a8961d32b2f0"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include/model.hpp": {
+      "bytes": 18951,
+      "sha256": "96bce64d0a3366c39052162f05e0a3ce3d1c28b0689fbc0dc3879e0ffeb1b124"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include/sha256.hpp": {
+      "bytes": 3545,
+      "sha256": "b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include/views.hpp": {
+      "bytes": 4240,
+      "sha256": "106fd01b02efd831cb0d1812a4e75e1b6f18d0d9387fdb4581528c2206e7ef35"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/locks/environment-p1-v1.json": {
+      "bytes": 44675,
+      "sha256": "6dc8be983893a617ec71a315c7d24871ab530d371d02ba3c0d15ae648d618546"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/model/SPEC.md": {
+      "bytes": 7075,
+      "sha256": "6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/model/reference.py": {
+      "bytes": 21135,
+      "sha256": "2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/protocols/contract-v1.json": {
+      "bytes": 3483,
+      "sha256": "678c0535e383ad9faf918410a3fd564543c61b4ac5b77cc7fd2ba5a89bde7245"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/protocols/native-result.schema.json": {
+      "bytes": 1983,
+      "sha256": "97520e07a07931780fd94952b16ee14b74e5cdd3e944a304ff518ea2e9fbb9aa"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/contracts/adapter_contract.cpp": {
+      "bytes": 3800,
+      "sha256": "5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/contracts/capability_capnproto_cereal.cpp": {
+      "bytes": 8420,
+      "sha256": "1234e07d282cf9f980ba879417145d720c53ad92c3555397bc1be0c7915da757"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/contracts/model_contract.cpp": {
+      "bytes": 6042,
+      "sha256": "ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/contracts/resource_failure.cpp": {
+      "bytes": 6550,
+      "sha256": "e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/contracts/test_reference.py": {
+      "bytes": 8369,
+      "sha256": "eb74bf4cab50bf80c791fbbedcef83d291f46912545fbaa02cbe20b037a80098"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/flatbuffers_capabilities.cpp": {
+      "bytes": 1996,
+      "sha256": "6fa359f4781ae62e3793928aeca9fffe544483577ce9feca2a79a1123ae7ecb7"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/sanitizer_controls.cpp": {
+      "bytes": 740,
+      "sha256": "4b5b4c2acf82fcba33b34f4f60e9076ad9cf0082c5c3fc98fdeceaf1e27b5977"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/tests/view_contract.cpp": {
+      "bytes": 1578,
+      "sha256": "e0b97022dfe9ab2495f45981596d8bad5828471f72b90a37bf7d00c08596493f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/m1_codegen_job.py": {
+      "bytes": 6091,
+      "sha256": "ca1fc66461c613c1f26376c8a7e9d9938fc49295ef6e268a3c44b20a53b2ab00"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/core/run_m1.py": {
+      "bytes": 9584,
+      "sha256": "e036028d43d292bf8826e23b773a52bb7544e4932af0fee0aefaf297f06c2875"
+    },
+    "/opt/p2996-toolchain/bin/clang++": {
+      "bytes": 148204096,
+      "sha256": "c7fa55437d34c43201da37960251d7d3dab1e06fc92273efe6f6d88f6dae7c6e"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++": {
+      "bytes": 1462,
+      "sha256": "b970d582c872afbdc6095c56ad235c5f8cf65245ac53b0a51194d6b46fd27ee8"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2": {
+      "bytes": 236616,
+      "sha256": "1d7133d7b9f94465978b2ae8d21ca3751c8dfaaecaa2d462aeaf1ec50e5c3a90"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6": {
+      "bytes": 2125328,
+      "sha256": "269ffadc51484e5e2cbcb9100a5e1cd78a72493c0e3e7b0611a5a4778718d8e9"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so": {
+      "bytes": 443,
+      "sha256": "a6d49a8934c29efd1f853c0f16f52100167fa01037020b6d7c4537c6096b79c3"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc_nonshared.a": {
+      "bytes": 5594,
+      "sha256": "3341391290ddd596521a61152b4e2612f4625cc85f737d875b918f6cfb2b2786"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so": {
+      "bytes": 290,
+      "sha256": "a2298995b45a3775a42b2c0d86dc5dcaf0a7a5663152aba8f46cbac5a6d02a2e"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6": {
+      "bytes": 952616,
+      "sha256": "4e7324196b5d12cc5040d71b17fefb9891d103611f5e66debc7225d1884b0505"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1": {
+      "bytes": 1018144,
+      "sha256": "fc4955f08671736ac3bfef9c2c00f83600b66251adf68ba3889eaeb5e148ed58"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libstdc++.so.6": {
+      "bytes": 2592144,
+      "sha256": "f7a4a80945521165ee52c335f04205dd930c46157b24e8e8689e0089326151f7"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1": {
+      "bytes": 182944,
+      "sha256": "4f502dd464a54d841973a22d6f2585ec548c1950507ab1c89e3efae4f542b2cd"
+    },
+    "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1.0": {
+      "bytes": 1340256,
+      "sha256": "63cff563a2fbd508551fc8051bfada2b93928e8822093cd5ef3409808e6dd9c6"
+    },
+    "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1.0": {
+      "bytes": 401848,
+      "sha256": "a8cc5ffb0160493a57521ea32ed22ade5db9e5c371fb89d0a14c1e79d0fb744c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/old-V8-initial-wire.bin": {
+      "bytes": 13702104,
+      "sha256": "9cd8ab46cea310b19f7617bca29a7f1afcd7dc9c45888704ce058df0c60efe84"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/portable-inputs/fixed-M/trace.bin": {
+      "bytes": 14482121,
+      "sha256": "a7751706365dfb48ff9e1570773a5f6e1bdd62b06982c39ae4466c477527533a"
+    }
+  },
+  "compile_budget": 1,
+  "native_budget": 1,
+  "emits": 16,
+  "deadline_seconds": 600,
+  "limitations": "No clocks or speed claim. Global new observes string allocation requests; allocation page faults are a subset of emit page faults. Copy pages cannot be separated from normalization fault events; no prefault/touch/hotcopy interventions."
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "m2-seal-source-review-v1",
+  "status": "changes_requested_before_seal_execution",
+  "scope": "Only seal_m2_result.py and directly referenced frozen M2 coordinator, observer schema, freeze/request/resources, and existing checker source; no R1 raw reads.",
+  "source": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/seal_m2_result.py",
+    "identity": {
+      "bytes": 8541,
+      "sha256": "bbc0434e797ab46ea2a1be0990eb1c9b12458f6bbcc1d209e319ce91b6a282af"
+    }
+  },
+  "fixed_context": {
+    "M2_freeze_sha256": "001ddddf7bf6e83ca6e68dc0de095c517b127d094d2168157c68c7a1084a018b",
+    "M2_frozen_files": 6492,
+    "M2_coordinator_sha256": "60b0ca20be8fdd0cd5455485e09cc8ddc8d7c63b769e662e5ee147598d21b562",
+    "C_coordinator_sha256": "9d7b3585cdc05a2c3444b931702da27bad9c914944478fcf0b61a878f86e60bb"
+  },
+  "valid_checks": [
+    "Pinned freeze and exact archived freeze/admission byte copies; all6492 fixed files rehashed and before/after maps compared.",
+    "Original queue exact six-file manifest content and inventory; returncode0, outer300 and empty live/group/zombie cleanup.",
+    "Native returned_monotonic_ns is used for20s, not later wrapper finished; compile120 and actual binary hash are checked.",
+    "Existing MECHANISM file is copied/referenced without executing checker again; no compilation/native/queue call in sealer.",
+    "All referenced observer/compile/audit/result field names exist in frozen producers; no guaranteed missing-field exception identified."
+  ],
+  "findings": [
+    {
+      "id": "B1",
+      "priority": 1,
+      "lines": "28-37,57-58",
+      "issue": "No direct binding from successful native receipt to this original queue. observer.queue_request and OUT/lease.json.request are never compared with q; mutable request draft alone supplies expected command/owner/cap.",
+      "required_fix": "Assert exact original W3 diagnostic300 wait0 command with fixed tool/freeze PIN/admission/queue/lock/cwd; compare observer.queue_request and recorded lease.request with q, and matching run_id/owner/kind in result/holder. No child or checker rerun is needed."
+    },
+    {
+      "id": "B2",
+      "priority": 1,
+      "lines": "65-68",
+      "issue": "Body and binding loops accept missing entries, including empty mappings. A seal can omit one or all four bodies or the compile/source bindings and still pass these loops.",
+      "required_fix": "Require audit.body_identities keys exactly wire/canonical/queries/native and match every declared role body. Require the six frozen-coordinator binding keys source_identity/driver/binary/compile_receipt/hook/event_channel with exact expected paths and identities; bind native-attempt.json binding to observer.binding. Preserve all raw evidence."
+    },
+    {
+      "id": "B3",
+      "priority": 2,
+      "lines": "69-74",
+      "issue": "MECHANISM status is only compared with an unconstrained RESULT string, so an unknown outcome can be sealed as passed; fixed checker scope flags are not validated.",
+      "required_fix": "Require mechanism status in mechanism_hit/closed_no_dynamic_hit, exact current checker result schema and predeclared false flags execution_admission_checked/bare_codegen_checked/speed_inferred/screen_admitted/QF_admitted; verify result.control equals frozen control and exact external audit pins. Do not rerun compare/checker."
+    }
+  ],
+  "execution": {
+    "target_imports": 0,
+    "sealer_runs": 0,
+    "prepare": 0,
+    "compile": 0,
+    "native": 0,
+    "checker": 0,
+    "queue": 0,
+    "R1_raw144_reads": 0,
+    "frozen_tool_edits": 0
+  },
+  "notes": [
+    "This is prospective source review, not an M2 execution success or a mechanism result.",
+    "Unused import importlib.util is harmless and not a blocking field/API issue.",
+    "Successful execution/full truth and mechanism_hit remain separate outcomes."
+  ]
+}

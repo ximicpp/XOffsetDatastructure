@@ -1,0 +1,73 @@
+{
+  "schema": "formal-zero-native-source-freeze-admission-v1",
+  "status": "conditionally_admitted_exact_once_original_formal_freeze",
+  "observed_at": "2026-10-19T22:11:04.270094+00:00",
+  "basis": "Actual currentQ fullaudit/all30AA/independent statistics and engineering accepted, exact unchanged bound11 and combo full closure; fixed12 resource Fprojection4670.057587s<5400 is planning evidence, not tail guarantee. Reversible zero-native F preparation only.",
+  "qualification_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-acceptance.json",
+    "identity": {
+      "bytes": "2827",
+      "sha256": "4aa3c2ce7eb3e1566e5eaee5fdfe5a664a26661f2f7d71a057f20e93e49e5fd1"
+    }
+  },
+  "Q32_root_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_FINAL_QUALIFICATION_ACCEPTANCE.json",
+    "identity": {
+      "bytes": "2183",
+      "sha256": "44255a3b2824252b2916e247ceba85f7323823f6099407a234ea28e8d5d01abe"
+    }
+  },
+  "entry": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "identity": {
+      "bytes": "118612",
+      "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8"
+    }
+  },
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/formal-freeze-v1",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "formal",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1"
+  ],
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "output": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1",
+  "prerequisites": [
+    "Verify exact current acceptedQ record/refs, original bound11/profiles/registration/combined-gates status and fixture unchanged. No replacementQ or oldQ acceptance.",
+    "Sole original shared lease available, fresh F output and queue absent, actual guest/backing and host free checked; guest/backing at least8GiB+2GiB.",
+    "No new compiler/native/capture, protocol or mode change, host pause/power action, timing or inference. If any mismatch diagnose before invocation."
+  ],
+  "budget": {
+    "outer_seconds": 600,
+    "native": 0,
+    "compile": 0,
+    "capture": 0,
+    "timing_samples": 0,
+    "host_pause": 0,
+    "power_change": false
+  },
+  "finite_rule": "One exact source freeze. Preserve any failure/prefix; no overwrite/retry. Original require_qualified_q must execute and original verify_frozen must pass. Do not modify bound11 or immutable Q.",
+  "after": "Index actual original queue/source/frozen218+Qacceptance members/manifest, original F schedule9264/4632/4608/64 and exact policy, real base/allocated/staging, logical/wire/peak/reserve and both free margins. Prepare actual F timing request and root-field templates; independent source/resource/freeze/host/root quiet admission still required.",
+  "F64_timing_admitted": false
+}

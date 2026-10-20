@@ -1,0 +1,569 @@
+{
+  "schema": "c14-independent-final-diag-source-review-v1",
+  "kind": "independent-final-diag-source-component-review",
+  "status": "passed",
+  "scope": "static source components; assembled-source identity bridge pending root source-only stage",
+  "reviewer": "screen_review",
+  "reviewed_utc": "2026-10-19T17:26:39.528394+00:00",
+  "tools": {
+    "event_channel.hpp": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/event_channel.hpp",
+      "identity": {
+        "bytes": 4576,
+        "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+      }
+    },
+    "diag_wrapper.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/diag_wrapper.py",
+      "identity": {
+        "bytes": 24110,
+        "sha256": "48ddd6262b371a96ec1eabd2c57c57aa392e909e831869c5dae634de1d92fc34"
+      }
+    },
+    "dummy_child.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/dummy_child.py",
+      "identity": {
+        "bytes": 2224,
+        "sha256": "01cd1edb6379f9a3454855b5358d8596c7696848d2d9c5769575e375c102b2db"
+      }
+    },
+    "dummy_selfcheck.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/dummy_selfcheck.py",
+      "identity": {
+        "bytes": 5222,
+        "sha256": "cdcaa06338c7c9d247aa1a4af080738658d1aef4d6919063c951b2ef1f9aa130"
+      }
+    },
+    "prepare_final_driver.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/prepare_final_driver.py",
+      "identity": {
+        "bytes": 17439,
+        "sha256": "1af8d7329d39aede0454f11c4da455b60d18c173d9db6d533ef22225fcc82b29"
+      }
+    },
+    "INTERFACE.json": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/INTERFACE.json",
+      "identity": {
+        "bytes": 2922,
+        "sha256": "7bbba10ea8351e6a3af576de7cbe8963c9733b5e144075444427b0fe7cddf20c"
+      }
+    }
+  },
+  "references": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/SOURCE_READY.json",
+      "identity": {
+        "bytes": 90563,
+        "sha256": "b5619305ad36e9f7c3aaece61fea1baa66867f4231a7b9bd922abd78c8099118"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_PHASE_C_DRAFT.json",
+      "identity": {
+        "bytes": 114215,
+        "sha256": "4111ae0fe3ef07dd9ae638a0187eb6725fb4f59f9dee8280a7c0aa3c52bf9279"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/github-20261019/C14_MATERIALIZATION.json",
+      "identity": {
+        "bytes": 26147,
+        "sha256": "2ccb94204305ff51d5df2cea345e2e10067d342336ef226906ec847414362081"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/COMMON_DIAG_DESIGN.md",
+      "identity": {
+        "bytes": 6098,
+        "sha256": "8d980703b4522ff8c3ea655a7310ea0ea2d5922304715a715019c9b02ecfc980"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REVIEW_DIAG_HOOK.md",
+      "identity": {
+        "bytes": 14847,
+        "sha256": "4417eebeb04036fe894779d78e745aa6ce1db83fa214e25242c0a6d58c667dd1"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_OBSERVER_SCOPE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 2117,
+        "sha256": "ac7a10185d61c4133252533137478715c878a10705e55a7e0886385603340ee5"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/DIAG_WRAPPER_REVIEW.json",
+      "identity": {
+        "bytes": 27720,
+        "sha256": "db6800931666f507b2e2e15fe34c33de4fa088465a2aacf506c814cd61e07dd9"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_SOURCE_REVIEW.md",
+      "identity": {
+        "bytes": 4565,
+        "sha256": "95efcb1872bfc479820b63a952d93c75e82de56ed220359de1d7a527a284dea2"
+      }
+    }
+  ],
+  "reviewed_prepared_roles": {
+    "r1": {
+      "prepared": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2",
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1291,
+          "sha256": "5fa7a877e185f146af3c0c1191e7f9cb5538b3855754381ef51ee630cb21cc19"
+        }
+      },
+      "source_ready_file_count": 158,
+      "all158_actual_identities_match": true,
+      "source154_actual_inventory_sha256": "d01fa5a3224be207af97f6f27ace2e5a7d9c53b7af49a3846d203e185f4ece2f",
+      "production14_actual_inventory": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 286000,
+          "sha256": "230e23e6d2fc7a005c6e84a4bb70baaf6dc364b32065e551782434dab87c49c2"
+        }
+      },
+      "source_origin": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261019-v1/candidates/r1-canonical-hotcold-v1/source",
+      "source_origin154_actual_inventory_sha256": "644a5e07abfdba7bcb60c943de3d0e08214719653fb3f7408333b226b78dbb9d",
+      "source_origin_main": {
+        "bytes": 278801,
+        "sha256": "b4c61b2d286d6d4ffdfbd44af3ff7151b1640dd07f8b9a2c9bfcfa01a6a9c23f"
+      },
+      "instrumented_main": {
+        "bytes": 286000,
+        "sha256": "230e23e6d2fc7a005c6e84a4bb70baaf6dc364b32065e551782434dab87c49c2"
+      },
+      "unchanged_origin_members": 153,
+      "unexpected_files": [],
+      "prepared_driver": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2/experiment/driver.cpp",
+        "identity": {
+          "bytes": 9797,
+          "sha256": "5c6aa00b666a2f998318af731a87e67bb5fec89c264f77fe87df2690e019f2db"
+        }
+      },
+      "prepared_adapter": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "prepared_hook": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      }
+    },
+    "m2": {
+      "prepared": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2",
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1284,
+          "sha256": "045c1a9f8a7b5e7b398985e0aad73bebaa63dfe7b491216232353b3f99c0082b"
+        }
+      },
+      "source_ready_file_count": 158,
+      "all158_actual_identities_match": true,
+      "source154_actual_inventory_sha256": "5f8f63f03b1945dd83dfd532f791a086fd1d426ee5ca8dc7513f6fa3e5f5fbb6",
+      "production14_actual_inventory": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 285716,
+          "sha256": "089036e7f8f3e94144d7c41f2e2fae38eec54066175216ad359a233bdb01bfa3"
+        }
+      },
+      "source_origin": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/m2-exact-owns-v1/source",
+      "source_origin154_actual_inventory_sha256": "c0ba88fd821f9e96f4ced4b3b4fb4acb9235988d35527bcbc7be7e15870a968e",
+      "source_origin_main": {
+        "bytes": 278527,
+        "sha256": "3e347612c1a62299bb910c68dd6b1411663f3165e18e298a51e7ba2e062c201f"
+      },
+      "instrumented_main": {
+        "bytes": 285716,
+        "sha256": "089036e7f8f3e94144d7c41f2e2fae38eec54066175216ad359a233bdb01bfa3"
+      },
+      "unchanged_origin_members": 153,
+      "unexpected_files": [],
+      "prepared_driver": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2/experiment/driver.cpp",
+        "identity": {
+          "bytes": 9797,
+          "sha256": "5c6aa00b666a2f998318af731a87e67bb5fec89c264f77fe87df2690e019f2db"
+        }
+      },
+      "prepared_adapter": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "prepared_hook": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      }
+    },
+    "c14": {
+      "prepared": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2",
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1215,
+          "sha256": "3e9c150d7e1e41c79b3b25dd5f24a8f7778ddd652745706cf1af72d73a59a770"
+        }
+      },
+      "source_ready_file_count": 158,
+      "all158_actual_identities_match": true,
+      "source154_actual_inventory_sha256": "8ee7bb422ff5f2a3bf311c1f3fb7db94d3c7ba70e14cc43cc1ad595d362b0161",
+      "production14_actual_inventory": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 285447,
+          "sha256": "1abf4095345f93913aa905fe0faa1448ea5128832e635d6bdd9cd23566694b9b"
+        }
+      },
+      "source_origin": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+      "source_origin154_actual_inventory_sha256": "d22212d43f8145f5f9a439027d931b8da78fa302a24c840a61ef821d481bbe30",
+      "source_origin_main": {
+        "bytes": 278262,
+        "sha256": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3"
+      },
+      "instrumented_main": {
+        "bytes": 285447,
+        "sha256": "1abf4095345f93913aa905fe0faa1448ea5128832e635d6bdd9cd23566694b9b"
+      },
+      "unchanged_origin_members": 153,
+      "unexpected_files": [],
+      "prepared_driver": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2/experiment/driver.cpp",
+        "identity": {
+          "bytes": 9797,
+          "sha256": "5c6aa00b666a2f998318af731a87e67bb5fec89c264f77fe87df2690e019f2db"
+        }
+      },
+      "prepared_adapter": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "prepared_hook": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      }
+    }
+  },
+  "primary_run": {
+    "public_sequence": [
+      "load",
+      "query_before",
+      "nine_group_mutate",
+      "one_owning_emit",
+      "retire",
+      "reload",
+      "query_after",
+      "cleanup"
+    ],
+    "owning_emit_calls": 1,
+    "pre_t0_native_export_or_DTO_or_validate_or_emit": false,
+    "sample_flush": "after t4 and outside emit",
+    "count_flush": "after t8 with c14_diag disabled",
+    "original_post_audit_and_queries_preserved": true,
+    "native_result_keys_preserved": true
+  },
+  "truth_replay": {
+    "position": "after t8 and original final-wire post-audit, before four body writes",
+    "separate_events": [
+      "truth.replay.before",
+      "truth.replay.after"
+    ],
+    "original_input_reread": true,
+    "initial_canonical_and_reference_queries_checked": true,
+    "adapter_query_before_after_checked": true,
+    "consecutive_stages_required": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "each_stage_operation_count_and_canonical_digest_checked": true,
+    "all_mutations_consumed": true,
+    "owning_emit_calls": 0,
+    "primary_counts_disabled": true,
+    "workload_and_resource_record_separate": true
+  },
+  "channel": {
+    "fixed_stack_bytes": 128,
+    "maximum_attempted_events": 64,
+    "actual_success_sequence": [
+      "main.begin",
+      "input.read.before",
+      "input.read.after",
+      "input.decode.before",
+      "input.decode.after",
+      "input.hash.before",
+      "input.hash.after",
+      "t0",
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+      "emit.pod0",
+      "emit.pod1",
+      "emit.pod2",
+      "t5",
+      "t6",
+      "t7",
+      "t8",
+      "postaudit.load.before",
+      "postaudit.load.after",
+      "postaudit.export.before",
+      "postaudit.export.after",
+      "postaudit.hash.before",
+      "postaudit.hash.after",
+      "truth.replay.before",
+      "truth.replay.after",
+      "write.wire.before",
+      "write.wire.after",
+      "write.canonical.before",
+      "write.canonical.after",
+      "write.queries.before",
+      "write.queries.after",
+      "write.result.before",
+      "write.result.after",
+      "main.end"
+    ],
+    "one_nonblocking_write_no_retry": true,
+    "caller_errno_preserved": true,
+    "process_SIGPIPE_disposition_changed": false,
+    "current_thread_mask_restored": true,
+    "preexisting_pending_SIGPIPE_not_consumed": true,
+    "new_EPIPE_signal_zero_timeout_consumption": true,
+    "stdout_record_max_bytes": 65536,
+    "stdout_attempted_total_max_bytes": 1048576,
+    "partial_EAGAIN_EINTR_EPIPE_invalid_fd_error_bits": true,
+    "errors_reject_at_flush_and_main_end": true
+  },
+  "producer_body_bound": {
+    "per_role_bytes": 67108864,
+    "both_C_roles_bytes": 134217728,
+    "maximum_files_per_role": 4,
+    "overflow_safe_cumulative_guard_before_fopen": true,
+    "string_overload_delegates_to_span_guard": true,
+    "all_body_writes_after_t8": true,
+    "not_derived_from_periodic_wrapper_monitoring": true
+  },
+  "interface_bridge": {
+    "before": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/revisions/targeted-v2/INTERFACE.json",
+      "identity": {
+        "bytes": 2873,
+        "sha256": "d551ac98c06e582e58ab6570ec3bbe43382b52e6a6ce6b18d41b32fd5d873ab9"
+      }
+    },
+    "after": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/INTERFACE.json",
+      "identity": {
+        "bytes": 2922,
+        "sha256": "7bbba10ea8351e6a3af576de7cbe8963c9733b5e144075444427b0fe7cddf20c"
+      }
+    },
+    "only_added_labels": [
+      "truth.replay.before",
+      "truth.replay.after"
+    ],
+    "all_other_JSON_values_identical": true,
+    "wrapper_and_dummy_code_unchanged": true,
+    "extra_dummy_or_native_requested": false,
+    "historical_dummy_scope": "18 old d6 cases plus 6 targeted current wrapper cases; no retroactive 36-label execution claim"
+  },
+  "unresolved_component_blockers": [],
+  "assembled_identity_bridge": {
+    "status": "pending_root_materialization",
+    "expected_root": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1",
+    "must_match": "actual final driver/adapter/hook/event header and all source154/production14, exact registered inputs/tools, before/after materialization checks"
+  },
+  "before_executable_admission": [
+    "Freeze and check exact36-label causal order and nondecreasing child event timestamps after each role, before any next role.",
+    "Validate every required sample status0, nonzero monotone clocks, cumulative resource monotonicity, emit seen511/invocations1, mutation_seen1022 and exact record schemas.",
+    "Bind actual final sources, compiler/runtime/dependency/binary/input/argv, distinct fresh body paths, semantic audit and original lease cleanup; preregister C14 shared M2 control before execution.",
+    "Enforce original two C roles control then R1, child20s/job600s, zero retries, stop on observer/semantic/resource/cleanup failure. No diagnostic artifact qualifies for bare performance or M1 reopening."
+  ],
+  "diagnostic_admitted": false,
+  "compiled_or_executed_by_reviewer": false,
+  "new_dummy_requested": false,
+  "performance_inference": null
+}

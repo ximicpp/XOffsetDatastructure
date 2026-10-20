@@ -1,0 +1,68 @@
+{
+  "observed_utc": "2026-10-19T14:06:55.1949411Z",
+  "wsl_distribution": "Ubuntu-22.04",
+  "os": {
+    "Caption": "Microsoft Windows 11 企业版",
+    "Version": "10.0.26200",
+    "OSArchitecture": "64 位"
+  },
+  "wsl_backing": {
+    "DistributionName": "Ubuntu-22.04",
+    "BasePath": "C:\\Users\\gzsufanchen\\AppData\\Local\\wsl\\{b8271e20-62f1-4294-a108-7620ad9e82ef}"
+  },
+  "gitlinks": [
+    "160000 da041154c6bac1a4aa98254a7d6819059e8ac0b0 0\texternal/boost",
+    "160000 9a6de1d73617631a9612ba9f572d6c0844a90b19 0\texternal/typelayout"
+  ],
+  "head": "1904b9c71230026ac6f2d58f919a9ab76447d264",
+  "disks": [
+    {
+      "Name": "C",
+      "Used": 1920703496192,
+      "Free": 79035834368,
+      "Root": "C:\\"
+    },
+    {
+      "Name": "D",
+      "Used": 4764341809152,
+      "Free": 1236814872576,
+      "Root": "D:\\"
+    },
+    {
+      "Name": "E",
+      "Used": 3340444192768,
+      "Free": 756343283712,
+      "Root": "E:\\"
+    },
+    {
+      "Name": "F",
+      "Used": 1750310187008,
+      "Free": 250085507072,
+      "Root": "F:\\"
+    },
+    {
+      "Name": "G",
+      "Used": 1896236646400,
+      "Free": 152153419776,
+      "Root": "G:\\"
+    },
+    {
+      "Name": "H",
+      "Used": 3981077266432,
+      "Free": 115710210048,
+      "Root": "H:\\"
+    },
+    {
+      "Name": "T",
+      "Used": null,
+      "Free": null,
+      "Root": "T:\\"
+    },
+    {
+      "Name": "Temp",
+      "Used": 1920703496192,
+      "Free": 79035834368,
+      "Root": "C:\\Users\\gzsufanchen\\AppData\\Local\\Temp\\"
+    }
+  ]
+}

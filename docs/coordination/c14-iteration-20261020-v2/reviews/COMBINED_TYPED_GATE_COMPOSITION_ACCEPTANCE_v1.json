@@ -1,0 +1,508 @@
+{
+  "schema": "independent-combined-current-eleven-gate-composition-acceptance-v1",
+  "status": "passed_scoped_eleven_gate_composition",
+  "composition_accepted": true,
+  "reviewer": "phase_c_source_review",
+  "date_Asia_Shanghai": "2026-10-20",
+  "candidate": "r1-m2-combined-v1",
+  "candidate_identity": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json",
+    "identity": {
+      "bytes": 45694,
+      "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+    }
+  },
+  "composition_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/COMBINED_TYPED_GATE_COMPOSITION_REQUEST_v1.json",
+    "identity": {
+      "bytes": "19472",
+      "sha256": "a109946400dc2e27cb8d21ee774dc742aab9eed452679105b7480b91518bcd17"
+    }
+  },
+  "accepted_gate_names": [
+    "codegen",
+    "mechanism",
+    "targeted",
+    "full_normal",
+    "full_san",
+    "business_SML",
+    "v1_bidirectional",
+    "consumers",
+    "lifecycle",
+    "safety",
+    "engineering"
+  ],
+  "blockers": [],
+  "scope": "Accept the actual eleven-gate evidence composition for finite metadata preparation only. Nine gates use own combined functional/source closure; codegen and mechanism explicitly retain component scope plus exact source union and own compiler proof.",
+  "registration_reader_contract": {
+    "source_path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/q32_registration_v1/register_current.py",
+    "source_identity": {
+      "bytes": 11990,
+      "sha256": "49bd41fd30c9c35e0b930eda7c4f90444156092d21c5e059f7caf67c99ad0381"
+    },
+    "lines": "91-102",
+    "status_startswith_passed": true,
+    "composition_accepted_is_true": true,
+    "candidate_identity_exact_actual_inputs_object": true,
+    "composition_request_exact_producer_ref": true,
+    "composition_request_bytes_is_decimal_string": true,
+    "gate_names_exact_eleven": true,
+    "producer_executed": false
+  },
+  "review_pins": {
+    "docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_ADAPTATION_PLAN_v1.json": {
+      "bytes": 12110,
+      "sha256": "c7df1224c8254c4ac4c95d4f6c5b6481ad1ad9e531fd24c67fa91ade05f334a5"
+    },
+    "docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_SOURCE_READY_v2.json": {
+      "bytes": 4759,
+      "sha256": "7ac99be872c03ae78681c9c6db47357fc881996a8abd0bb26bcec8b90a14b74d"
+    },
+    "tools/c14_iteration_20261020_v2/validation/q32_registration_v1/register_current.py": {
+      "bytes": 11990,
+      "sha256": "49bd41fd30c9c35e0b930eda7c4f90444156092d21c5e059f7caf67c99ad0381"
+    }
+  },
+  "unique_gate_evidence_files": 16,
+  "gate_evidence_reference_instances": 37,
+  "gate_evidence_actual_path_size_sha256_checked": true,
+  "gates": {
+    "codegen": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Actual combined compiler success in own73+73/full business closure; retained component codegen plus exact patch union. No new combined ASM run or claimed combined machine-code mechanism.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 8470,
+            "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 31040,
+            "sha256": "b24068223eb60184295b863258522eff8e7e2aef3562c5e34ff80d459701524a"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES_v2/codegen.json"
+        },
+        {
+          "identity": {
+            "bytes": 28269,
+            "sha256": "37410c92b82071e7969d6dacfb56896ade6a6a2c4f83656f5b3f2944f8cbe4aa"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_GATES_v1/codegen.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "provenance": "Own combined compiler success under accepted normal73/SAN73 and business profiles, plus retained R1 and M2 codegen with exact source union; not a combined assembly observation",
+      "combined_asm_executed": false
+    },
+    "mechanism": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Both retained component mechanisms plus independently accepted exact source union and interaction precheck. Component observations are not an executed combined dynamic mechanism or speed result.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 8470,
+            "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 30583,
+            "sha256": "24a921ac6c02e784fa291f89c47a0f96ec9edef2eda236a8b4074d4af1a39912"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/gate-receipts-v1/mechanism.json"
+        },
+        {
+          "identity": {
+            "bytes": 29346,
+            "sha256": "334714dd402a910c00a2f3912edfb3f5ff22467a8c759ecb69ad9efaf0a4087b"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_GATES_v1/mechanism.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "provenance": "Retained original R1 logical inactive mechanism and M2 current-node exact conservation/eligible-miss mechanism, plus accepted exact source union/interaction; not an executed combined mechanism",
+      "combined_dynamic_mechanism_executed": false
+    },
+    "targeted": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined six repository scopes each normal/SAN and corrective four external native checks; original failed compile preserved.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 59015,
+            "sha256": "2b1391eea3531f4173e9eadacdad296259f9f9c4a0f65cbcb9062a1dbc6b1e85"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_INITIAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "full_normal": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined actual73 normal tests, assertions/toolchain scope retained.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 63426,
+            "sha256": "a0c7e59308c3784368b6d79f692ba3c8f39f7c84e6832fd027860e36e49bbc1b"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/receipt.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "full_san": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined actual73 SAN tests, fixed address+undefined toolchain scope retained.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 63620,
+            "sha256": "4ee804a4ff79262c425152f15c57a5ed78c159165a4e54d794a3792335f16abe"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/receipt.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "business_SML": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined80 normal+80 SAN including all S/M/L cells and original full-body offline audits; no performance inference.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 4524,
+            "sha256": "88e4ba208365e36abf377f57dbdc5cc422a421d131a2d1c63598676a444c5682"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/final-business-functional-v2/result.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "v1_bidirectional": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined V1 main84+extra8, AB4/C4 native actions; retained old controls only in compatibility.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 2697,
+            "sha256": "678eab1c48b26460c906a1d424c36f9aebcd84c3d6858b798306e60956833b86"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/business-compatibility-driver-v2/result.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "consumers": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined installed/subproject/relocated/archive consumers and both shared runtime consumers.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 3579,
+            "sha256": "e3209aed79ea5cdbd8db587239cee3e2467e16fe38d17a054c31e1647f18f89a"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/package-standard-v2/result.json"
+        },
+        {
+          "identity": {
+            "bytes": 3398,
+            "sha256": "f39749a76d85ab3cfc3003e56ded16fb93d765541c760f7172ff48d93354fe69"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/package-runtime-v2/result.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "lifecycle": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own combined52 finite lifecycle/pool cases; no arbitrary custom lifetime or RSS proof.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 887820,
+            "sha256": "807663c52f1f14d610add7c281f6379bda8073bdfe1e027f8d70a0c3f71a610c"
+          },
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-matrix-v1/production-C-matrix-v2/result.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "safety": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Independent exact patch union/interaction source review plus own complete correctness closure and existing lifetime/callback/ADL preconditions.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 8470,
+            "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    },
+    "engineering": {
+      "status": "passed_scoped_composition",
+      "accepted_scope": "Own complete source154/provider/runtime/61B compiler guards, consumer/archive closure and original clean queues. No native Windows/platform qualification.",
+      "evidence": [
+        {
+          "identity": {
+            "bytes": 38610,
+            "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+        },
+        {
+          "identity": {
+            "bytes": 10321,
+            "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+        },
+        {
+          "identity": {
+            "bytes": 16367,
+            "sha256": "1f387e36043c2e08d979ee399c994676ed9d2b35473f53d5d6cde34debd324f7"
+          },
+          "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_VALIDATION_COMPLETION_INDEX.json"
+        }
+      ],
+      "new_execution_by_this_review": false,
+      "functional_evidence_is_own_combined": true
+    }
+  },
+  "retained_component_independent_review_refs": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 3509,
+        "sha256": "74d9b8f32e6b45efbfee4e5e3ed2361fcbc603645a796e192d3d56ccb778a0a2"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_SOURCE_GATE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 4735,
+        "sha256": "93c02e56199a6cb8b5c2119a1eabb605b57131a1107cb6ca43ee12b1264666dd"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_EXECUTION_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 1861,
+        "sha256": "130af2f47fdf56bfceb8c294437f331f6d120de285f7051f6bbbe792ccd7dea9"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_EXECUTION_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 1778,
+        "sha256": "4d8deaf53cfbaf22c244a7ec3f1d738b1191e5b34dfa96f81f46166bc4866e70"
+      }
+    }
+  ],
+  "composition_basis": {
+    "combined_identity_sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67",
+    "combined_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+    "combined_production14_content_sha256": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+    "source_union_acceptance_reused": true,
+    "source154_and_production14_not_rehashed_again": true,
+    "only_R1_M2_exact_union_no_M1_L1_or_other_delta": true,
+    "own_normal_tests": 73,
+    "own_SAN_tests": 73,
+    "own_full_receipts_all_three_commands_each_returncode_zero": true,
+    "own_business_normal": 80,
+    "own_business_SAN": 80,
+    "own_business_cells_each": 15,
+    "own_V1_main": 84,
+    "own_V1_extra": 8,
+    "own_AB_native_actions": 4,
+    "own_C_native_actions": 4,
+    "own_targeted_repository_each_mode": 6,
+    "own_targeted_external_corrective_native": 4,
+    "own_lifecycle_cases": 52,
+    "own_full_acceptance_and_original_body_audits_reused": true,
+    "solo_functional_results_substituted_for_combined": false,
+    "retained_R1_read_sum_inactive": 2439240,
+    "retained_R1_read_sum_active": 0,
+    "retained_R1_logical_work_equal": true,
+    "retained_M2_mechanism_hit_and_call_conservation": true,
+    "retained_M2_asm_scope": "Observed nonempty Attr capacity miss current parent parsing4-to1 only; child recursion retained. Counts are not elapsed-time proportions.",
+    "existing_lifetime_ADL_callback_preconditions_retained": true
+  },
+  "limits": [
+    "Composition is explicitly scoped evidence reuse, not a claim that the combination repeated dynamic diagnosis, assembly analysis or an independent72-pair screen.",
+    "No component speed ratios or timing gains are transferred or added to the combination.",
+    "Own functional closure and original body audits are reused;160 native receipts, large wire/canonical bodies and binaries are not rehashed or executed again.",
+    "Lifecycle52 is finite model/pool evidence; it does not prove arbitrary custom lifetimes, OS RSS, global VM retention, real I/O or cross-platform behavior.",
+    "Registration producer and hostguard source reviews are separate. This record does not execute, freeze or admit maxC/P/Q32/F64, and does not establish any competitor threshold."
+  ],
+  "review_activity": {
+    "project_python": 0,
+    "project_CLI": 0,
+    "compiler": 0,
+    "native": 0,
+    "queue": 0,
+    "probe": 0,
+    "new_tests": 0,
+    "new_measurements": 0,
+    "large_body_or_binary_rehashes": 0,
+    "production_or_tool_edits": false
+  },
+  "combined_asm_executed": false,
+  "combined_dynamic_mechanism_executed": false,
+  "combined_independent72_screen_executed": false,
+  "combined_performance_accepted": false,
+  "preparation_execution_admitted": false,
+  "source_freeze_admitted": false,
+  "maxC_admitted": false,
+  "P_admitted": false,
+  "QF_admitted": false,
+  "performance_goal_complete": false
+}

@@ -1,0 +1,73 @@
+{
+  "kind": "v2-screen-host-admission",
+  "status": "passed",
+  "candidate": "r1-canonical-hotcold-v1",
+  "freeze_sha256": "c168eed40879c5339e91a390506eb6c32cce73fc47ea407ab7ae51cb6a437cf3",
+  "allowed_names": [
+    "client_ue4-Win64-Shipping",
+    "TGitCache"
+  ],
+  "fresh_plan_required": true,
+  "no_old_pid_or_state": true,
+  "watchdog_seconds": 780,
+  "restoration_before_audit": true,
+  "standing_human_authorization": {
+    "identity": {
+      "bytes": 1532,
+      "sha256": "b97fa5871d35687119f41ddb576386dd4f4210f08aa9cd0068ff50ba78203b92"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/standing-process-pause-human-authorization-v1.json"
+  },
+  "original_human_authorization": {
+    "identity": {
+      "bytes": 775,
+      "sha256": "504243b5cdcf609ad3e5bd70b4bbd0893279b17b3085bb28240efc8d554fc8c0"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/process-pause-authorization-v1.json"
+  },
+  "watchdog_derivation": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/WATCHDOG_DERIVATION.json",
+    "identity": {
+      "sha256": "e95ce2af597270decf4573930f0790eecfea904f2938c682fe7b3cde6c5a5ca3",
+      "bytes": 3801
+    }
+  },
+  "power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "change_power": false,
+  "actual_readonly_host": {
+    "identity": {
+      "bytes": 2552,
+      "sha256": "a280484d11f01ab94f1b11f8202403918ecc759f7ba4756e7c3658dfd13fc267"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/HOST_OBSERVATION.json"
+  },
+  "pre_review_plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "e8cc71259f69690c1af6715390de139b0c73315b2a549010763412d7601d1a95"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/pre-review-process-plan-v1.json"
+  },
+  "all_chat_quiet": "See companion same-freeze factual GLOBAL_QUIET.json; actual prelude must recheck fresh identities",
+  "pause_actions_already_executed": 0,
+  "guard_already_started": false,
+  "screen_admitted": true,
+  "source_request_preserved": "HOST_ADMISSION_REQUEST.json remains original pending pre-freeze request",
+  "observed_utc": "2026-10-19T18:29:44+00:00",
+  "root_scope_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_HOST_SCOPE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 3817,
+      "sha256": "7650d5271ede4422f47a925a46e5b19ae4056f17981db78a750989e93c23fab7"
+    }
+  },
+  "root_static_host_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_HOST_PRELUDE_REVIEW.md",
+    "identity": {
+      "bytes": 4661,
+      "sha256": "5376dee85d404f8000f36db3f6b06c13014db9d1f80bd5997343015cbdf0eca9"
+    }
+  },
+  "actual_readonly_plan_is_not_guard_plan": true,
+  "root_checked_original_question_answer": true
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-10-20T01:34:45+08:00",
+  "scope": "M2 exact own finite full functional request; no diagnostic/screen/QF authorization",
+  "status": "admitted_conditionally_on_each_actual_current_host_resource_runtime_and_real_lease_preflight",
+  "request": {
+    "path": "core/REQUESTS_M2_FULL.json",
+    "bytes": 77818,
+    "sha256": "9fe1735d1e1bb4e0f3a7afde43f1ae9257176a61a485e0879374f85a9dc3d1c8"
+  },
+  "independent_executor_review": {
+    "path": "validation/review/M2_FULL_ENTRY_REVIEW.json",
+    "bytes": 4893,
+    "sha256": "678e15a93652959b66864ec7e3803921141803faf6acc4fc3f25b3444899d1b8"
+  },
+  "root_checks": {
+    "local_bound_tools": 73,
+    "mismatches": [],
+    "entry_full_sha256": "2fd6a071ee34913497df2972397d6049fc28fbaad7b60a443d8ce7fbee608997",
+    "entry_business_sha256": "9efb2a133696f1604453a8de0ebcccd8394c4c7041f6c0c5293060a99b1de18d",
+    "current_external_launcher_sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87",
+    "external_launcher_current_observation_not_old_targeted_pin": true
+  },
+  "execution": "Nine listed jobs in order after current R1 job; retained dispatchers acquire the original global lease outside any parent held lease. No R1 result substitution; retain actual budgets, no new timing children. Actual full/business results remain pending.",
+  "C_gate": "Independent correctness may proceed before C; dynamic mechanism still required before timing.",
+  "native_or_compiler_executions_by_root": 0,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

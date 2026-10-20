@@ -1,0 +1,47 @@
+{
+  "status": "admitted_exact_corrective_execution_and_original_remaining_full_pipeline",
+  "observed_at": "2026-10-19T19:55:53.647021+00:00",
+  "candidate": "r1-m2-combined-v1",
+  "candidate_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+  "request": {
+    "path": "core/REQUESTS_COMBINED_EXTERNAL_v2.json",
+    "bytes": 190834,
+    "sha256": "70f4e4a8a12b246fe5ae03294328e5aa1c86271ffe157f00102a519c80a9734f"
+  },
+  "corrective_addendum": {
+    "path": "core/REQUESTS_COMBINED_FULL_CORRECTIVE_v2.json",
+    "bytes": 14797,
+    "sha256": "16cf01135fdf789ed82cbfe005310767e26ffef11f4431c082ad8c69c871045e"
+  },
+  "independent_review": {
+    "path": "reviews/COMBINED_EXTERNAL_V2_ADMISSION_REVIEW.json",
+    "bytes": 6679,
+    "sha256": "77785f76033f411e177fbbefb3a2d22f8d26c77a3084c053a57fc99b91b710a2"
+  },
+  "authorization": "User implementation instruction; existing COMBINED_FUNCTIONAL_EXECUTION_AUTHORIZATION and one bounded environment-only path correction. No further stagewise confirmation.",
+  "corrective_budget": {
+    "compiles": 4,
+    "compile_seconds_each": 120,
+    "native": 4,
+    "native_seconds_each": 20,
+    "outer_seconds": 900,
+    "original_shared_lease": true
+  },
+  "then": "Upon four external actual pass and exact same-source proof, execute original seven remaining full jobs via corrective addendum. All original separate subqueue/native timeouts retained.",
+  "reuse": "Actual own normal73 and SAN73 unchanged; no rerun.",
+  "preserved_failure": {
+    "initial_failed_compile_attempts": 1,
+    "initial_native_attempts": 0,
+    "original_initial_external_full_requests_immutable": true
+  },
+  "prohibited": [
+    "source/fixture/standard changes",
+    "extra probes",
+    "new72",
+    "Q32/F64 before final own full acceptance",
+    "commit/push/merge"
+  ],
+  "external_actual_pass_claimed": false,
+  "full_gate_pass_claimed": false,
+  "performance_goal_complete": false
+}

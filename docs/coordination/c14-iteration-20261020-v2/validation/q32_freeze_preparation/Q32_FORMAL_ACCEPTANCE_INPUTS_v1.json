@@ -1,0 +1,45 @@
+{
+  "F64_admitted": false,
+  "actual_result_index": {
+    "identity": {
+      "bytes": "26704",
+      "sha256": "4be7e7096e11adbfe51bea998570f3352431d405a26f2e94f039b32b7dafa06f"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_ACTUAL_RESULT_INDEX_v1.json"
+  },
+  "all30_AA_currently_actual_passed": true,
+  "freeze": 0,
+  "native": 0,
+  "new_audit": 0,
+  "proposed_after_independent_Q_acceptance": {
+    "audit_report": {
+      "identity": {
+        "bytes": "441839",
+        "sha256": "c704b28b8227f550522e3054f9f7ed56f36afb9dc171b3757897cffd45785814"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json"
+    },
+    "complete": true,
+    "measurement_qualified": true,
+    "postrun_pin": "b3db8adafebb4079f65f7557e00917ac108a71184dfcb93ed7bfc2df992449ce",
+    "queue_request": {
+      "identity": {
+        "bytes": "1740",
+        "sha256": "27517fc70174ff9619847f57059e2c833d11b70b3cfd5893ebbafd3a064704e0"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/request.json"
+    },
+    "queue_result": {
+      "identity": {
+        "bytes": "442",
+        "sha256": "5a3c972974f39764903b06790f01aee9962c777467eb6f1756f729660d21d1ad"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/result.json"
+    },
+    "status": "passed"
+  },
+  "root_destination": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-acceptance.json",
+  "source_contract": "Accepted bound six-role-campaign.py require_qualified_q; bytes values MUST be decimal strings because exact K.file_id equality is required.",
+  "source_function_scope": "Original function independently checks actual complete4656/2328, all30AA against unchanged Qpolicy, exactqueue6metadata/manifest/wholewall<=2700/cleanup, actualrun+frozenmanifest/postrunpin and fullsource/tool closure. Root must first independently accept Q; this file is not read by formalfreeze and does not create authorization.",
+  "status": "exact_actual_inputs_only_not_root_acceptance_or_F_admission"
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "m2-seal-source-review-v2",
+  "status": "source_review_passed_not_runtime_admission",
+  "source": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/seal_m2_result.py",
+    "identity": {
+      "bytes": 8541,
+      "sha256": "bbc0434e797ab46ea2a1be0990eb1c9b12458f6bbcc1d209e319ce91b6a282af"
+    }
+  },
+  "prior_review_correction": {
+    "preserved_file": "M2_SEAL_SOURCE_REVIEW.json",
+    "findings_actually_reviewed_source_sha256": "55d1550e304f8bdb1a7c76224f83c9e5405ac65d11478e42aca6c47b92c6b67f",
+    "first_review_recorded_sha256": "bbc0434e797ab46ea2a1be0990eb1c9b12458f6bbcc1d209e319ce91b6a282af",
+    "reason": "Concurrent source revision between first code read and first review receipt hash capture. First findings applied to55d155; first recorded identity accidentally captured the new revision. First review is preserved and is not execution admission evidence."
+  },
+  "closed_findings": [
+    {
+      "id": "B1",
+      "status": "closed",
+      "evidence": "Exact fixed direct argv/PIN/W3/diagnostic300/wait0/cwd/out/lock verified independently of draft; lease.request+request_identity+holder run_id/out/owner/kind/session and observer.queue_request tied to actual q. Original runner source confirms holder.out is a valid field."
+    },
+    {
+      "id": "B2",
+      "status": "closed",
+      "evidence": "Exactly four body keys required and all hashes checked; exactly six binding keys required with exact expected source/driver/binary/compile/hook/channel paths; native-attempt.binding equals observer.binding."
+    },
+    {
+      "id": "B3",
+      "status": "closed",
+      "evidence": "Outcome restricted to mechanism_hit or closed_no_dynamic_hit; candidate M2/diagnostic_only and five false scope flags checked; existing external control/candidate audit SHA pins checked. Original mechanism JSON is preserved, checker is not rerun."
+    }
+  ],
+  "additional_source_checks": [
+    "Pinned freeze001dddd and6492-file identity verification plus exact before/after maps remain intact.",
+    "Original queue six-file exact manifest and inventory, status/returncode/cap300/empty cleanup remain checked.",
+    "All referenced frozen producer fields exist, including observer.binding/queue_request and original runner holder.out.",
+    "Native20 uses returned_monotonic_ns; compile120 and compiled binary, audited observer hash and declared bodies are bound.",
+    "Only existing evidence is read and exclusive new result files are written; no child/compile/native/checker/queue invocation appears.",
+    "No remaining blocking field/API mismatch identified in this finite sealing scope. Execution/fulltruth and mechanism outcome remain separate."
+  ],
+  "scope_limit": "Prospective static source review only. Future actual receipts, original runner cleanup and actual resources must pass the sealer and parent acceptance; this does not claim M2 diagnostic ran.",
+  "execution": {
+    "target_imports": 0,
+    "sealer_runs": 0,
+    "prepare": 0,
+    "compile": 0,
+    "native": 0,
+    "checker": 0,
+    "queue": 0,
+    "R1_raw144_reads": 0,
+    "frozen_tool_edits": 0
+  }
+}

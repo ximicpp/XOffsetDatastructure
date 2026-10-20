@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "candidate": "r1-m2-combined-v1",
+  "freeze_sha256": "5c5a81530b808ff5420bfed36b00b838ef6c147987542012acb4057f9af132d8",
+  "observed_utc": "2026-10-19T22:21:49.641177+00:00",
+  "kind": "c14-f64-global-quiet",
+  "all_other_chats_and_agents_quiet": true,
+  "no_other_heavy_jobs": true,
+  "C_compilation_active": false,
+  "evidence": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/F64_ROOT_CONTROLLED_QUIET_FACTS_v1.json",
+      "identity": {
+        "bytes": "1265",
+        "sha256": "d1f6d898f8d360e21493b96ef4c3afa0fe34c17fae9f31101f6a149e21033f0d"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/F64_ROOT_PRELAUNCH_WINDOWS_FACTS_v1.json",
+      "identity": {
+        "bytes": "566",
+        "sha256": "bd6819976d9d6b5e5c1ba714abdbd79d2f7a8d6ca2be71e56b5f60daa9342a67"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/F64_ROOT_PRELAUNCH_GUEST_FACTS_v1.json",
+      "identity": {
+        "bytes": "1440",
+        "sha256": "bc1975514be48f2823938704c0a6a25eb6dcd5bb40cef9740f0fc6d6bcac52e5"
+      }
+    }
+  ],
+  "scope": "Current project core/validation chats and current root agent tree only. Not an inventory or claim about unrelated user chats/apps. Root does not compile/benchmark/audit during sole timing. Original shared lease serializes controlled heavy work.",
+  "background_apps_disclosed": "Existing UnrealEditor/zenserver/Code remain outside two-name pause authority; no whole-machine quiet/core exclusivity/frequency-lock claim.",
+  "physical_core_exclusive_or_frequency_locked_claimed": false
+}

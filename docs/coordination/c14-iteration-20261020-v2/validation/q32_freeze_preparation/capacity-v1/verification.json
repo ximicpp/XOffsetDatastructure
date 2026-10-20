@@ -1,0 +1,21 @@
+{
+  "backing_free_bytes": 27352440832,
+  "captured_at": "2026-10-19T20:52:49.343848+00:00",
+  "delta_tolerance_bytes": 1073741824,
+  "guest_free_bytes": 578929491968,
+  "initial_minimum_required_bytes": 10737418240,
+  "observer": {
+    "bytes": "3787",
+    "sha256": "2663ae3fbeae694e7739da70bdd22bbd9a2459f7ff4a3d5db2e9913b9e984f2f"
+  },
+  "scope": "Fresh dual-volume observation, not a promise of future free capacity. Freeze and every actual child must separately recheck caps/peak/guest/backing admission.",
+  "status": "passed",
+  "windows_helper": {
+    "bytes": "2570",
+    "sha256": "92e71fa94567ecb2c70063604df2fa343cfc6b92dd0db4e19aecd838d9200ceb"
+  },
+  "windows_snapshot": {
+    "bytes": "906",
+    "sha256": "6993943896a958b5b77e987efeaa2d05de2d83cebdb821f7ae39bc9fac9a2ea6"
+  }
+}

@@ -1,0 +1,124 @@
+--- verify_combined_initial.py
++++ verify_combined_initial_v2.py
+@@ -5,6 +5,7 @@
+ D=R/'docs/coordination/c14-iteration-20261020-v2/validation/combined_full'
+ Q=R/'docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_INITIAL.json'
+ V=Path('/root/xoffset-c14-iteration/20261020/v2/validation')
++CORRECTIVE=Q.with_name('REQUESTS_COMBINED_FULL_CORRECTIVE_v2.json')
+ def read(p):return json.loads(Path(p).read_text(encoding='utf-8'))
+ def fid(p):
+  b=Path(p).read_bytes();return {'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()}
+@@ -16,7 +17,9 @@
+ def passed(p):
+  v=read(p);need(v['status']=='passed','actual pass absent: '+str(p));return v
+ def verify():
+- q=read(Q);prod=q['production14']
++ q=read(Q);prod=q['production14'];correction=read(CORRECTIVE)
++ for p,v in correction['tool_files'].items():need(fid(p)==v,'corrective tool/proof changed: '+p)
++ need(fid(Q)==correction['original_initial']['identity'],'original INITIAL changed')
+  for p,v in q['tool_files'].items():need(fid(p)==v,'initial frozen tool/input changed: '+p)
+  identity=R/'build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json'
+  need(fid(identity)==q['candidate_identity'],'combined identity changed')
+@@ -55,14 +58,30 @@
+      'dialect_scope':'Original project CMake supported C++26 policy; effective '+dialects[-1]+'. Manual targeted requests used gnu++26; actual full project adds c++26. Both retain P2996, O3, assertions and identical fixture/hook source. This explicit scope is for independent review, not byte-identical argv claim.'}
+   need(v['environment']['ASAN_OPTIONS']=='detect_leaks=1:halt_on_error=1:allocator_may_return_null=1' and v['environment']['UBSAN_OPTIONS']=='halt_on_error=1:print_stacktrace=1','full failpoint/SAN environment differs')
+   coverage[mode]=rows;checked[mode]={'receipt':ref(path),'request':ref(req),'junit':ref(base/'ctest.xml'),'inventory':ref(build/'test-inventory.json'),'compileDB':ref(build/'compile_commands.json'),'CTestfile':ref(ctestpath)}
+- ep=exact(q['external_request']);eq=read(ep);external=V/'combined-external-v1/receipt.json';ev=passed(external)
++ ep=exact(correction['corrective_external_request']);eq=read(ep);external=Path(correction['corrective_external_receipt']);ev=passed(external)
++ original_external=read(exact(q['external_request']))
++ proof=read(exact(correction['validator_snapshot_equivalence']))
++ need(proof['status']=='passed_source_equivalence_only' and proof['candidate_and_snapshot154_exact_equal'] and proof['production14']==prod and eq['source']==proof['verified_linux_snapshot'],'corrective provider equivalence differs')
++ expected_source={n:{'bytes':v['bytes'],'sha256':v['candidate_sha256']} for n,v in q['source_members'].items()}
++ need(proof['source154']==expected_source,'corrective full154 differs')
++ core_proof=read(exact(correction['core_snapshot_equivalence']));need(core_proof['source154']==expected_source and core_proof['corrective_source']==eq['source'],'core provider proof differs')
++ need(eq['source_members']==q['source_members'] and eq['candidate']==q['candidate'],'corrective candidate differs')
++ for oldjob,newjob in zip(original_external['commands'],eq['commands']):
++  want=[a.replace(original_external['source'],eq['source']).replace(original_external['output'],eq['output']) for a in oldjob['argv']]
++  need(newjob['argv']==want and all(newjob[k]==oldjob[k] for k in ('kind','label','timeout_seconds')),'corrective flags/fixture/standard changed')
++  if newjob['kind']=='compile':
++   includes=[a[2:] for a in newjob['argv'] if a.startswith('-I')]
++   need(len(includes)==13 and all(p.startswith('/root/') and not (Path(p)/'version').exists() for p in includes),'case-insensitive project include or shadowing version remains')
++ failure=read(exact(correction['preserved_failure']))
++ need(failure['compile_attempts']==1 and failure['successful_compiles']==failure['native_attempts']==0,'historical attempt accounting differs')
++ failed_receipt=read(exact(failure['receipt']));need(failed_receipt['status']=='failed' and len(failed_receipt['commands'])==1 and failed_receipt['commands'][0]['kind']=='compile' and failed_receipt['commands'][0]['returncode']!=0,'failed original receipt differs')
+  need(ev['request']['path']==str(ep) and {k:ev['request'][k] for k in ('bytes','sha256')}==fid(ep),'external actual request differs')
+  need(ev['candidate']==q['candidate'] and len(ev['commands'])==len(eq['commands'])==8,'external inventory differs')
+  for actual,job in zip(ev['commands'],eq['commands']):need(actual['label']==job['label'] and actual['argv']==job['argv'] and actual['kind']==job['kind'] and actual['returncode']==0,'external command differed/failed')
+  for name,v in eq['source_members'].items():need(fid(Path(eq['source'])/name)=={'bytes':v['bytes'],'sha256':v['candidate_sha256']},'external combined source changed')
+  return {'status':'passed','candidate':q['candidate'],'scope':'Actual combined full73x2 plus six repository targeted source/assertions/SAN/CTest scopes and two external fixtures each normal/SAN; no independent candidate substitutions',
+   'initial_request':ref(Q),'production_files':prod,'full':ref(D/'COMBINED_FULL_RESULT.json'),'full_closure':checked,'repository_targeted':coverage,'repository_programs_each_mode':6,
+-  'external':ref(external),'external_request':ref(ep),'external_programs':4,'unique_targeted_sources':8,'performance_accepted':False,'QF_admitted':False}
++  'external':ref(external),'external_request':ref(ep),'corrective_addendum':ref(CORRECTIVE),'preserved_external_v1_failure':correction['preserved_failure'],'provider_equivalence':correction['validator_snapshot_equivalence'],'historical_failed_compile_attempts':1,'historical_failed_native_attempts':0,'external_programs':4,'unique_targeted_sources':8,'performance_accepted':False,'QF_admitted':False}
+ if __name__=='__main__':
+  import argparse
+  p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);a=p.parse_args();v=verify()
+--- prepare_combined_business.py
++++ prepare_combined_business_v2.py
+@@ -2,7 +2,7 @@
+ import importlib.util,json,subprocess,sys
+ from pathlib import Path
+ H=Path(__file__).resolve().parent
+-s=importlib.util.spec_from_file_location('combined_initial_binding',H/'verify_combined_initial.py');M=importlib.util.module_from_spec(s);s.loader.exec_module(M)
++s=importlib.util.spec_from_file_location('combined_initial_binding',H/'verify_combined_initial_v2.py');M=importlib.util.module_from_spec(s);s.loader.exec_module(M)
+ R,D,INITIAL,verify,read,fid,ref,need=M.R,M.D,M.Q,M.verify,M.read,M.fid,M.ref,M.need
+ Q=R/'docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_FULL.json'
+ def write_once(p,v):
+@@ -12,12 +12,12 @@
+  q=read(Q)
+  for p,v in q['tool_files'].items():need(fid(p)==v,'combined final tool changed: '+p)
+  need(fid(INITIAL)==q['initial_request']['identity'],'initial request changed')
+- gates=verify();gp=D/'COMBINED_INITIAL_GATES.json';write_once(gp,gates)
++ gates=verify();gp=D/'COMBINED_INITIAL_GATES_v2.json';write_once(gp,gates)
+  ident=R/'build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json';i=read(ident)
+  source_acceptance=R/'docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json'
+  bridge={'status':'passed','scope':'Honest combined source/input bridge to actual own initial gates and root selected source; no independent R1/M2 native/codegen substitute',
+   'candidate_identity_file':fid(ident),'candidate_members':i['members'],'production_files':{'candidate':q['production14']},'request_identity':fid(Q),'initial_request_identity':fid(INITIAL),
+-  'initial_gates':ref(gp),'source_acceptance':ref(source_acceptance),'selection':q['selection'],'current_A':ref(D/'S0_RESULT.json'),'compiler_launcher':q['compiler_launcher']}
++  'initial_gates':ref(gp),'corrective_addendum':ref(M.CORRECTIVE),'source_acceptance':ref(source_acceptance),'selection':q['selection'],'current_A':ref(D/'S0_RESULT.json'),'compiler_launcher':q['compiler_launcher']}
+  write_once(D/'COMBINED_FULL_SOURCE_BINDING.json',bridge)
+  result=subprocess.run(['/usr/bin/python3','-I','-B',str(H/'combined_full/business/dispatch.py'),'prepare'],cwd=R)
+  if result.returncode:raise SystemExit(result.returncode)
+--- finalize_combined_full.py
++++ finalize_combined_full_v2.py
+@@ -9,7 +9,7 @@
+ Q=R/'docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_FULL.json'
+ INITIAL=Q.with_name('REQUESTS_COMBINED_INITIAL.json')
+ import importlib.util
+-spec=importlib.util.spec_from_file_location('combined_initial_binding',Path(__file__).with_name('verify_combined_initial.py'));G=importlib.util.module_from_spec(spec);spec.loader.exec_module(G)
++spec=importlib.util.spec_from_file_location('combined_initial_binding',Path(__file__).with_name('verify_combined_initial_v2.py'));G=importlib.util.module_from_spec(spec);spec.loader.exec_module(G)
+ def read(p):return json.loads(Path(p).read_text(encoding='utf-8'))
+ def fid(p):
+     p=Path(p);b=p.read_bytes();return {'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()}
+@@ -43,13 +43,13 @@
+         checked[mode]={'receipt':ref(path),'request':ref(req),'junit':ref(path.parent/'ctest.xml'),'inventory':ref(invpath)}
+     bridge=read(D/'COMBINED_FULL_SOURCE_BINDING.json')
+     need(bridge['request_identity']==fid(Q) and bridge['candidate_members']==q['source_members'] and bridge['production_files']['candidate']==prod,'COMBINED source bridge changed')
+-    for name in ('initial_gates','source_acceptance','selection','current_A','compiler_launcher'):exact_ref(bridge[name])
++    for name in ('initial_gates','corrective_addendum','source_acceptance','selection','current_A','compiler_launcher'):exact_ref(bridge[name])
+     need(bridge['initial_request_identity']==fid(INITIAL) and read(exact_ref(bridge['initial_gates']))==G.verify(),'combined own initial/targeted closure changed')
+     prepared=read(D/'business/PREPARED.json')
+     need(prepared['status']=='prepared' and prepared['production_files']==prod and prepared['requests']==fid(Q),'COMBINED prepared source/request differs')
+     for p,v in prepared['bindings'].items():need(fid(p)==v,'COMBINED prepared input changed: '+p)
+     for mode,value in prepared['full_receipts'].items():need(exact_ref(value)==Path(full['normal_receipt' if mode=='normal' else 'sanitized_receipt']['path']),'COMBINED business full ref differs')
+-    targeted=passed(D/'COMBINED_INITIAL_GATES.json');need(targeted['external_programs']==4 and targeted['repository_programs_each_mode']==6 and targeted['unique_targeted_sources']==8,'combined targeted scope incomplete')
++    targeted=passed(D/'COMBINED_INITIAL_GATES_v2.json');need(targeted['external_programs']==4 and targeted['repository_programs_each_mode']==6 and targeted['unique_targeted_sources']==8,'combined targeted scope incomplete')
+     business=passed(B/'final-business-functional-v2/result.json');compat=passed(B/'business-compatibility-driver-v2/result.json')
+     passed(B/'package-standard-v2/result.json');passed(B/'package-runtime-v2/result.json');matrix=passed(M/'result.json')
+     need(business['native_business_children_each']==80 and business['main_V1_cases']==84 and business['extra_cases']==8,'COMBINED SML/V1 inventory differs')
+@@ -60,7 +60,7 @@
+         need({n:fid(source/n) for n in prod}==prod,'COMBINED source14 changed: '+str(source))
+     result={'status':'passed','candidate':'r1-m2-combined-v1','scope':'Actual own combined functional/source closure; no independent candidate substitution and no combination performance evidence',
+         'request':ref(Q),'candidate_identity':ref(identity),'production_files':prod,'full':ref(D/'COMBINED_FULL_RESULT.json'),'full_closure':checked,
+-        'targeted':ref(D/'COMBINED_INITIAL_GATES.json'),'business':ref(B/'final-business-functional-v2/result.json'),
++        'targeted':ref(D/'COMBINED_INITIAL_GATES_v2.json'),'corrective_addendum':ref(G.CORRECTIVE),'preserved_external_v1_failure':targeted['preserved_external_v1_failure'],'external_v2_actual':targeted['external'],'source_provider_equivalence':targeted['provider_equivalence'],'historical_failed_compile_attempts':1,'historical_failed_native_attempts':0,'business':ref(B/'final-business-functional-v2/result.json'),
+         'V1_bidirectional':ref(B/'business-compatibility-driver-v2/result.json'),'consumers':ref(B/'package-standard-v2/result.json'),
+         'shared_runtimes':ref(B/'package-runtime-v2/result.json'),'lifecycle52':ref(M/'result.json'),
+         'source_review':ref(D.parent.parent/'core/COMBINED_SOURCE_REVIEW.md'),'prepared':ref(D/'business/PREPARED.json'),
+@@ -69,6 +69,6 @@
+         'source_safety':'Exact root-selected R1+M2 patch union; acquire each remaining call, byte-identical active body and current-node data/capacity/miss-only-size/null/ADL/bidirectional invariants. No new pointer lifetime or callback boundary.',
+         'historical_text_residue':'Inherited prepare description of M1 r2/preflight remains historical explanatory text only; actual COMBINED references above are authoritative.',
+         'performance_accepted':False,'screen_admitted':False,'QF_admitted':False}
+-    with (D/'COMBINED_FUNCTIONAL_GATES.json').open('x',encoding='utf-8') as f:json.dump(result,f,indent=2);f.write('\n')
++    with (D/'COMBINED_FUNCTIONAL_GATES_v2.json').open('x',encoding='utf-8') as f:json.dump(result,f,indent=2);f.write('\n')
+     print('COMBINED full73/73 + targeted six repo scopes each mode/external4 + SML80/80 + V1/consumers/lifecycle52 bound; no QF admission')
+ if __name__=='__main__':main()

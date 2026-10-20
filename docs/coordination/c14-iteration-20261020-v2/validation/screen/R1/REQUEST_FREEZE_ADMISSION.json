@@ -1,0 +1,36 @@
+{
+  "status": "actual_freeze_waiting_independent_orchestrator_admission",
+  "candidate": "r1-canonical-hotcold-v1",
+  "freeze": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/frozen-v1/freeze.json",
+  "freeze_identity": {
+    "sha256": "c168eed40879c5339e91a390506eb6c32cce73fc47ea407ab7ae51cb6a437cf3",
+    "bytes": 1827170
+  },
+  "actual_all11_gates": "GATES_v2.json",
+  "gates_sha256": "a04a9e686e8da43ccf55b236ec0f676450618c9a17c346ccd05386ae0ca7034d",
+  "source_only_freeze_run_id": "80d53e35699c44f2bca8e6904b0a442d",
+  "source_only_freeze_seconds": 16.311676712,
+  "source_only_freeze_cleanup": "live/groups/zombies empty",
+  "compile": 0,
+  "native": 0,
+  "timing_children": 0,
+  "source_only_preflight_issue": "FREEZE_PREFLIGHT_ISSUE.json: metadata error/failedsourcequeue retained; no actualwindow opened",
+  "source_resource_reviews": [
+    "reviews/SCREEN_WORKER_REVISION2_REVIEW.md",
+    "validation/review/SCREEN_SOURCE_REVIEW.json",
+    "reviews/R1_RESOURCE_CAPTURE_ACCEPTANCE.json",
+    "validation/review/R1_RESOURCE_CAPTURE_REVIEW.json",
+    "reviews/R1_SCREEN_GATE_ACCEPTANCE.json",
+    "reviews/R1_HOST_SCOPE_ACCEPTANCE.json"
+  ],
+  "projected_online_seconds": 166.75389404699882,
+  "physical_peak_bytes": 2915420513,
+  "host_request": "host/HOST_ADMISSION_REQUEST_v2.json",
+  "requirements": [
+    "same-freeze REVIEW.json independent-screen-admission",
+    "same-freeze HOST_REVIEW.json v2-screen-host-admission",
+    "fresh factual same-freeze GLOBAL_QUIET.json v2-screen-global-quiet",
+    "prelude must acquire new current PID/image/creation/SID/handles/token; restoration before audit"
+  ],
+  "actual_timing_dispatch_started": false
+}

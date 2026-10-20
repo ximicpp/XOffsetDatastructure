@@ -1,0 +1,55 @@
+{
+  "request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_EXTERNAL.json",
+    "bytes": 202565,
+    "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+  },
+  "candidate": "r1-m2-combined-v1",
+  "status": "failed",
+  "lease": {
+    "kind": "validation",
+    "out": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1-lease",
+    "owner": "W1",
+    "run_id": "b36d3bebb6a34954b296daa2adf4d4f9",
+    "started_at": "2026-10-19T19:42:47.730788+00:00",
+    "status": "running",
+    "supervisor_pid": 362
+  },
+  "commands": [
+    {
+      "label": "normal-test_r1_thread_handoff_v2-compile",
+      "argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+        "-std=gnu++26",
+        "-freflection",
+        "-fexpansion-statements",
+        "-stdlib=libc++",
+        "-pthread",
+        "-O3",
+        "-DNDEBUG",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/typelayout/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/config/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container_hash/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/core/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/intrusive/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/predef/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/static_assert/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/throw_exception/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/type_traits/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/winapi/include",
+        "-UNDEBUG",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/tests",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp",
+        "-o",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1/normal-test_r1_thread_handoff_v2"
+      ],
+      "kind": "compile",
+      "returncode": 1,
+      "elapsed_seconds": 1.3722428799999875
+    }
+  ],
+  "timing_samples": 0,
+  "error": "normal-test_r1_thread_handoff_v2-compile failed; diagnose before any new revision"
+}

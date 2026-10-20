@@ -1,0 +1,57 @@
+{
+  "status": "metadata_envelope_corrected",
+  "observed_at": "2026-10-20T02:23:26+08:00",
+  "cause": "Root initially used directpath+identity for gate.independent_review; existing freeze contract requires status+record envelope. No fact/assertion/evidence payload changed.",
+  "new_gate_refs": {
+    "codegen": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES_v2/codegen.json",
+      "identity": {
+        "bytes": 31040,
+        "sha256": "b24068223eb60184295b863258522eff8e7e2aef3562c5e34ff80d459701524a"
+      }
+    },
+    "safety": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES_v2/safety.json",
+      "identity": {
+        "bytes": 29577,
+        "sha256": "f33ba31ee33243603d2daa37e0434f9d42216518aee1744c04907c0370f15ef1"
+      }
+    },
+    "engineering": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES_v2/engineering.json",
+      "identity": {
+        "bytes": 33135,
+        "sha256": "142c072d0875ba046e0bdd8ca1b98a864a0fd2c9d87c97abc861b2f5a5f96fe8"
+      }
+    }
+  },
+  "preserved_original_gate_refs": {
+    "codegen": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES/codegen.json",
+      "identity": {
+        "bytes": 30981,
+        "sha256": "f1b6c7a9bb73435455f5cfd754602bbc8188bf099fd1e439a9c5b3f360f33113"
+      }
+    },
+    "safety": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES/safety.json",
+      "identity": {
+        "bytes": 29518,
+        "sha256": "5bb695b40367f69ea7190a5e1e1ebedea5b8f91b568a73783c90bc3b8bfe04a2"
+      }
+    },
+    "engineering": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES/engineering.json",
+      "identity": {
+        "bytes": 33076,
+        "sha256": "01fb78949744b5d06a76473856c1591944efdca7f8fbb506d3a166ef12ac18ce"
+      }
+    }
+  },
+  "codegen_safety_engineering_conclusion": "Same existing R1_SCREEN_GATE_ACCEPTANCE.json; source154/14 and all actual evidence hashes unchanged",
+  "source_worker_modified": false,
+  "new_compile_native": 0,
+  "window_started": false,
+  "timing_samples_consumed": 0,
+  "failure_evidence": "Retain failed source-only assembly and r1-screen-freeze-v1-lease1e0c59cf...; retry only after schema correction with a fresh metadata lease. No output frozen-v1 directory was created."
+}

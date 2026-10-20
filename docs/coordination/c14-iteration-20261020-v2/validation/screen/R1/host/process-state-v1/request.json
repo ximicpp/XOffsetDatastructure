@@ -1,0 +1,31 @@
+{
+  "background_window_style": "Hidden",
+  "benchmark_argv_modified": false,
+  "helper": {
+    "bytes": 12668,
+    "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+  },
+  "kind": "cursor-process-pause-request-v1",
+  "maximum_seconds": 780,
+  "module": {
+    "bytes": 16269,
+    "sha256": "ce898a67023bdc0ad69057f3cc9a2558b9090e1818689f9bef99983ffc6f48ec"
+  },
+  "plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "8b84ea89cc6d67cd99c092d656be4bcf959eb3cffd6a2aa6cfeb408cbf4d5995"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/process-plan-v1.json"
+  },
+  "prerequisites": {
+    "identity": {
+      "bytes": 1060,
+      "sha256": "776a612696427bc5c1cd59cc65c928d800c46d03aa40790b5f3fa1d60047b3c2"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/prelude-prerequisites.json"
+  },
+  "run_token": "970abf2233c2462f98aea141207af066",
+  "schema_version": 1,
+  "state_dir": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/process-state-v1"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "M1_targeted_and_mechanism_passed_R1_codegen_ready",
+  "requests": "REQUESTS.json",
+  "identity": "M1_IDENTITY.json",
+  "review": "REVIEW_M1.md",
+  "design": "M1_DESIGN.md",
+  "independent_designs": "INDEPENDENT_DESIGNS.md",
+  "root_C14_modified": false,
+  "core_native_executions": 0,
+  "core_cpp_compiles": 0,
+  "timing_admitted": false,
+  "S2_passed": false,
+  "M1_observed_receipts": "M1_VALIDATION_OBSERVED.json",
+  "L1": "Context-cache design rejected; L1_DECISION.md and REVIEW_L1.md; no L1 candidate or sample window",
+  "R1_requests": "REQUESTS_R1_CODEGEN.json",
+  "R1_review": "REVIEW_R1.md: no blocking source defect; codegen only",
+  "next": "Validation consumes new R1 codegen-only registration under the existing shared lease: hash-stage independent R1 then one original-driver candidate -S compile, reusing bound C14 control assembly. M1 full business/V1/consumer gates and separate screen freeze remain pending; no screening admitted."
+}

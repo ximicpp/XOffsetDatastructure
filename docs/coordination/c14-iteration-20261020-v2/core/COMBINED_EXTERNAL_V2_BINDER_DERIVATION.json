@@ -1,0 +1,62 @@
+{
+  "status": "source_only_corrective_derivation",
+  "three_helpers": {
+    "verify_combined_initial_v2.py": {
+      "before": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/verify_combined_initial.py",
+        "identity": {
+          "bytes": 7209,
+          "sha256": "d5f9116dff482bce761ddf7809c125dbee6bf64ea48160f4018f4f82744d5d73"
+        }
+      },
+      "after": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/verify_combined_initial_v2.py",
+        "identity": {
+          "bytes": 9791,
+          "sha256": "2f2f478051e9f54c4abebe73e3793854543dcbdbfd11dee011e6f1f6d045dad9"
+        }
+      }
+    },
+    "prepare_combined_business_v2.py": {
+      "before": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business.py",
+        "identity": {
+          "bytes": 1963,
+          "sha256": "249c8dcc2762f49f51f4640d78ec0f30fd979566ffba8e378c0827ff3dd896a3"
+        }
+      },
+      "after": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business_v2.py",
+        "identity": {
+          "bytes": 2033,
+          "sha256": "cae061b588892b915d59e49e7552920651933b071e1508f03a8d3abf94449f29"
+        }
+      }
+    },
+    "finalize_combined_full_v2.py": {
+      "before": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/finalize_combined_full.py",
+        "identity": {
+          "bytes": 7578,
+          "sha256": "e4b8b608052b79cf1ae2f65f463975fcaa41653e05a07ed64552f0dff7150c03"
+        }
+      },
+      "after": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/finalize_combined_full_v2.py",
+        "identity": {
+          "bytes": 7908,
+          "sha256": "9f5fcac8c808c5373a2e25e858b45c9ee0dabe9d41b7f2b3adc9467eb81a0377"
+        }
+      }
+    }
+  },
+  "patch": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/COMBINED_EXTERNAL_V2_BINDER.patch",
+    "identity": {
+      "bytes": 13659,
+      "sha256": "f9d29e39bd9717d7fa1c23368188129d71c8202743f1e6e5abc1c297f662adc5"
+    }
+  },
+  "changes": "Only new external corrective request/receipt and same-source proof/failure history references; original full73x2/remaining business/runtime/lifecycle tools, source, fixtures, standard and caps unchanged. New gate/final result filenames v2; bridge keeps original d535 request identity and adds corrective addendum.",
+  "new_compile_native_queue": 0
+}

@@ -1,0 +1,13 @@
+{
+  "schema":"c14-v2-stage-A-independent-acceptance-v1",
+  "status":"passed",
+  "evidence":"../validation/A_RESULT.json",
+  "A_result_sha256":"9c8ce5c993ad5bf1af6fa3b6879aa647e09a5d25f821a26ebe27802d3f528aa4",
+  "S0_result_sha256":"f211ee28b1ac7b163b97205472a753e6e8ceee68759ea33b999adcce43ab9672",
+  "SOURCE_MANIFEST_sha256":"bf2209111f826b6ea98e26f9ac5e63ccb94bdbcb4f8152026abee9f7e185fb88",
+  "orchestrator_independent_hash_check":{"non_external_manifested_files":153,"manifest_self_additional":1,"missing_or_changed":[],"production14_in_S0":14},
+  "validation_checks":{"baseline154":true,"production14":true,"HEAD":true,"gitlinks":true,"fixed_ABI_compiler_runtime":true,"compatible_SAN_resource":true,"original_runner":true,"guest_reserve":true,"backing_reserve":true,"11_include_trees_and_3_licenses":true},
+  "new_platform_or_functional_result":false,
+  "R1_native_execution":"Only the exact independently safe targeted request may proceed under original lease; no automatic diagnostic/screen admission.",
+  "diagnostic_screen_QF_admitted":false
+}

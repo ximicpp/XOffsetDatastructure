@@ -1,0 +1,385 @@
+{
+  "kind": "limited-combined-corrective-addendum-and-guard-v2-source-review",
+  "status": "core_addendum_source_consistent_guard_source_ready_external_actual_pending",
+  "observed_utc": "2026-10-19T19:54:53.184238+00:00",
+  "addendum": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_FULL_CORRECTIVE_v2.json",
+    "identity": {
+      "bytes": 14797,
+      "sha256": "16cf01135fdf789ed82cbfe005310767e26ffef11f4431c082ad8c69c871045e"
+    }
+  },
+  "original_recipe": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_FULL.json",
+    "identity": {
+      "bytes": 84671,
+      "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+    }
+  },
+  "initial": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_INITIAL.json",
+    "identity": {
+      "bytes": 53428,
+      "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+    }
+  },
+  "preserved_external_v1": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_EXTERNAL.json",
+    "identity": {
+      "bytes": 202565,
+      "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+    }
+  },
+  "corrective_external_v2": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_EXTERNAL_v2.json",
+    "identity": {
+      "bytes": 190834,
+      "sha256": "70f4e4a8a12b246fe5ae03294328e5aa1c86271ffe157f00102a519c80a9734f"
+    }
+  },
+  "prior_CTest_misreport_retracted": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\review\\COMBINED_PREPARE_CTEST_FINDING_CORRECTION.json",
+    "identity": {
+      "bytes": 19949,
+      "sha256": "db98f644fc8e9c9f50c4b60b850718e2762a6f3fdd6eb7c446ba44f99756200a"
+    }
+  },
+  "source_review_correction": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\review\\COMBINED_BUSINESS_SOURCE_REVIEW_CORRECTION_v2.json",
+    "identity": {
+      "bytes": 2839,
+      "sha256": "a41a4c21d31646ffaa9b0031eb3535942737e2f2b112122b634cd11485b51090"
+    }
+  },
+  "all_addendum_tool_refs_match": true,
+  "tool_ref_checks": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_FULL.json",
+      "expected": {
+        "bytes": 84671,
+        "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+      },
+      "actual": {
+        "bytes": 84671,
+        "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_INITIAL.json",
+      "expected": {
+        "bytes": 53428,
+        "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+      },
+      "actual": {
+        "bytes": 53428,
+        "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_EXTERNAL.json",
+      "expected": {
+        "bytes": 202565,
+        "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+      },
+      "actual": {
+        "bytes": 202565,
+        "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_EXTERNAL_v2.json",
+      "expected": {
+        "bytes": 190834,
+        "sha256": "70f4e4a8a12b246fe5ae03294328e5aa1c86271ffe157f00102a519c80a9734f"
+      },
+      "actual": {
+        "bytes": 190834,
+        "sha256": "70f4e4a8a12b246fe5ae03294328e5aa1c86271ffe157f00102a519c80a9734f"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/COMBINED_EXTERNAL_V2_SOURCE_EQUIVALENCE.json",
+      "expected": {
+        "bytes": 38521,
+        "sha256": "6e9e7dd7cb31e807c828434b9ee155a37e248db6f322ebc5a9cd11694b903c3c"
+      },
+      "actual": {
+        "bytes": 38521,
+        "sha256": "6e9e7dd7cb31e807c828434b9ee155a37e248db6f322ebc5a9cd11694b903c3c"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/EXTERNAL_CORRECTION_SNAPSHOT_PROOF.json",
+      "expected": {
+        "bytes": 48713,
+        "sha256": "baae8bb4cf26497bf8cd3f48bc3b705902c52544dc56e9ad1144cc18a68cfbd1"
+      },
+      "actual": {
+        "bytes": 48713,
+        "sha256": "baae8bb4cf26497bf8cd3f48bc3b705902c52544dc56e9ad1144cc18a68cfbd1"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/EXTERNAL_V1_FAILURE_DIAGNOSIS.json",
+      "expected": {
+        "bytes": 4232,
+        "sha256": "187b3179ebf7034f78be8bf314a52054cc7d77f674dd7689c00dcacd8a188456"
+      },
+      "actual": {
+        "bytes": 4232,
+        "sha256": "187b3179ebf7034f78be8bf314a52054cc7d77f674dd7689c00dcacd8a188456"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/COMBINED_EXTERNAL_V2_BINDER_DERIVATION.json",
+      "expected": {
+        "bytes": 3103,
+        "sha256": "c7bb4068915b7a0a7eee7d6969a58cc6d0b8ca50454bb3b3e1feb956a2c4cbf4"
+      },
+      "actual": {
+        "bytes": 3103,
+        "sha256": "c7bb4068915b7a0a7eee7d6969a58cc6d0b8ca50454bb3b3e1feb956a2c4cbf4"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/COMBINED_EXTERNAL_V2_BINDER.patch",
+      "expected": {
+        "bytes": 13659,
+        "sha256": "f9d29e39bd9717d7fa1c23368188129d71c8202743f1e6e5abc1c297f662adc5"
+      },
+      "actual": {
+        "bytes": 13659,
+        "sha256": "f9d29e39bd9717d7fa1c23368188129d71c8202743f1e6e5abc1c297f662adc5"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/verify_combined_initial_v2.py",
+      "expected": {
+        "bytes": 9791,
+        "sha256": "2f2f478051e9f54c4abebe73e3793854543dcbdbfd11dee011e6f1f6d045dad9"
+      },
+      "actual": {
+        "bytes": 9791,
+        "sha256": "2f2f478051e9f54c4abebe73e3793854543dcbdbfd11dee011e6f1f6d045dad9"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business_v2.py",
+      "expected": {
+        "bytes": 2033,
+        "sha256": "cae061b588892b915d59e49e7552920651933b071e1508f03a8d3abf94449f29"
+      },
+      "actual": {
+        "bytes": 2033,
+        "sha256": "cae061b588892b915d59e49e7552920651933b071e1508f03a8d3abf94449f29"
+      },
+      "matches": true
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/finalize_combined_full_v2.py",
+      "expected": {
+        "bytes": 7908,
+        "sha256": "9f5fcac8c808c5373a2e25e858b45c9ee0dabe9d41b7f2b3adc9467eb81a0377"
+      },
+      "actual": {
+        "bytes": 7908,
+        "sha256": "9f5fcac8c808c5373a2e25e858b45c9ee0dabe9d41b7f2b3adc9467eb81a0377"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1-lease/request.json",
+      "expected": {
+        "bytes": 1450,
+        "sha256": "4731c36343226a5cf43473b5acf96dd4dc48815ade50094239244f187fba24c8"
+      },
+      "actual": {
+        "bytes": 1450,
+        "sha256": "4731c36343226a5cf43473b5acf96dd4dc48815ade50094239244f187fba24c8"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1-lease/result.json",
+      "expected": {
+        "bytes": 448,
+        "sha256": "0a877668f8766bbf5166725d94a00abf53f543abc4f0627878e158620e531b25"
+      },
+      "actual": {
+        "bytes": 448,
+        "sha256": "0a877668f8766bbf5166725d94a00abf53f543abc4f0627878e158620e531b25"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1-lease/manifest.json",
+      "expected": {
+        "bytes": 912,
+        "sha256": "6e7b2ae36f5feebd744ad21e945551ff6f6da7596cd1fc4f0a7e6b77b7f88292"
+      },
+      "actual": {
+        "bytes": 912,
+        "sha256": "6e7b2ae36f5feebd744ad21e945551ff6f6da7596cd1fc4f0a7e6b77b7f88292"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1/receipt.json",
+      "expected": {
+        "bytes": 3228,
+        "sha256": "e69d1c5a4ce665b1dddedc095f8f220149063e512ac6818aa97fea41f9db14fd"
+      },
+      "actual": {
+        "bytes": 3228,
+        "sha256": "e69d1c5a4ce665b1dddedc095f8f220149063e512ac6818aa97fea41f9db14fd"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-external-v1/normal-test_r1_thread_handoff_v2-compile.log",
+      "expected": {
+        "bytes": 18541,
+        "sha256": "d1e60413de6aba4d9b9abc7fb3f003506b3edd02000fdc889c2bd68e8edd30db"
+      },
+      "actual": {
+        "bytes": 18541,
+        "sha256": "d1e60413de6aba4d9b9abc7fb3f003506b3edd02000fdc889c2bd68e8edd30db"
+      },
+      "matches": true
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/VERSION",
+      "expected": {
+        "bytes": 14,
+        "sha256": "ed41d33f787456abe92ea03b820e4c832b1e2b9e6867242eaea03258bae8d119"
+      },
+      "actual": {
+        "bytes": 14,
+        "sha256": "ed41d33f787456abe92ea03b820e4c832b1e2b9e6867242eaea03258bae8d119"
+      },
+      "matches": true
+    }
+  ],
+  "job_argv_changes": [
+    {
+      "job": "COMBINED-BUSINESS-prepare-v1",
+      "old_argv": [
+        "/usr/bin/python3",
+        "-I",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business.py"
+      ],
+      "new_argv": [
+        "/usr/bin/python3",
+        "-I",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business_v2.py"
+      ]
+    },
+    {
+      "job": "COMBINED-FINAL-FUNCTIONAL-v1",
+      "old_argv": [
+        "/usr/bin/python3",
+        "-I",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/finalize_combined_full.py"
+      ],
+      "new_argv": [
+        "/usr/bin/python3",
+        "-I",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/finalize_combined_full_v2.py"
+      ]
+    }
+  ],
+  "all_job_ids_and_caps_preserved": true,
+  "core_helper_diff_scope": [
+    "verify_v2 adds exact corrective request/source154/provider equivalence and preserved failed1compile/0native proof, retains all original full73x2/six repo CTest checks.",
+    "prepare_v2 imports verify_v2 and outputs INITIAL_GATES_v2; bridge recipe request identity remains d535 with separate corrective_addendum16cf. Existing leased business prepare unchanged.",
+    "finalize_v2 imports verify_v2, checks v2 targeted proof and corrective_addendum; outputs FUNCTIONAL_GATES_v2 preserving full/source/business/consumer/matrix counts and old recipe identity."
+  ],
+  "guard_v2": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\combined_business_guard_v2.py",
+    "identity": {
+      "bytes": 20919,
+      "sha256": "fa91958c33512227f47be18fb5efa515a7d6f41fe86ff5848460573da4bb3835"
+    }
+  },
+  "guard_v1_unchanged": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\combined_business_guard.py",
+    "identity": {
+      "bytes": 16609,
+      "sha256": "95f835a280d619831cde01de53e017b125059e182d2b931e7b62599d7e13e07e"
+    }
+  },
+  "guard_diff": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\review\\COMBINED_BUSINESS_GUARD_v2.patch",
+    "identity": {
+      "bytes": 13782,
+      "sha256": "19d0974595ea60d759596d1338bc257a1478239cab832aa464a9d0eb938deee1"
+    }
+  },
+  "guard_source_review_status": "pending_independent_executor_review_not_run",
+  "guard_delta": "Separate output prefix business_guard_v2; bind original recipe d535 plus exact parameterized addendum; only prepare/final dispatcher helper names change; require EXTERNAL_V2_VERIFIED exact actual before/receipt/queue/commands8/caps and counts4+4 plus preserved1+0, original normal/SAN verified, both provider equivalence proofs. PREPARED.requests stays old recipe d535; final result path is FUNCTIONAL_GATES_v2.",
+  "before_argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/combined_business_guard_v2.py",
+    "before",
+    "STAGE",
+    "--request-sha256",
+    "16cf01135fdf789ed82cbfe005310767e26ffef11f4431c082ad8c69c871045e",
+    "--windows-observation",
+    "ABSOLUTE_FRESH_STAGE_WINDOWS_FILE.json"
+  ],
+  "between": "Root executes the matching addendum.jobs[].argv directly outside any lease. Guard never dispatches or acquires lock.",
+  "after_argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/combined_business_guard_v2.py",
+    "after",
+    "STAGE",
+    "--request-sha256",
+    "16cf01135fdf789ed82cbfe005310767e26ffef11f4431c082ad8c69c871045e"
+  ],
+  "stages": [
+    "prepare",
+    "bench",
+    "functional",
+    "package",
+    "runtime",
+    "lifecycle",
+    "final"
+  ],
+  "external_proof_required": "validation/combined_full/EXTERNAL_V2_VERIFIED.json must be actual statuspassed, stageexternal_corrective_v2 and exact70f4/before/receipt/queue, source/runtime/provider booleans, preserved normal73SAN73 and counts corrective4compile4native/previous1compile0native. No old INITIAL_EXTERNAL_VERIFIED substitute.",
+  "actual_external_v2_evidence_created_by_this_task": false,
+  "limitations": [
+    "This task executed no guard, prepare, verifier, project import, AST, compiler, native or queue.",
+    "Source preparation does not pass a combined functional gate or admit execution. Root must independently review this exact new guard before use; actual external corrective receipt is mandatory.",
+    "No fixture/oracle/protocol/business worker/lease/old guard or old source-ready bytes were modified. Original d535/3006/88e8 failed output and own full normal73SAN73 remain preserved."
+  ],
+  "actions": {
+    "entry_execution": 0,
+    "compiler": 0,
+    "native": 0,
+    "queue": 0,
+    "project_import": 0,
+    "AST": 0,
+    "core_worker_edits": 0
+  },
+  "combined_gate_accepted": false,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

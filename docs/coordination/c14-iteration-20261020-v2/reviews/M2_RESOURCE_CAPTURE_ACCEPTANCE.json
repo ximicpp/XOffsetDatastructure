@@ -1,0 +1,188 @@
+{
+  "kind": "parent-m2-resource-capture-acceptance",
+  "status": "passed",
+  "observed_at": "2026-10-19T19:11:10.749332+00:00",
+  "candidate": "m2-exact-owns-v1",
+  "request_sha256": "63bb375f657092b4511c3292b502fb1c5094798cee92243ff0cf80a7d2b66e82",
+  "queue": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/queue/result.json",
+    "identity": {
+      "bytes": 444,
+      "sha256": "8db1f938ea942810d6b66306bcb087b75383f5487a4ed32c5484083516f5e3e2"
+    }
+  },
+  "queue_run_id": "56132ff4241745ee8a7d7738fdc636bd",
+  "actual_outer_seconds": 11.256241688,
+  "cleanup": {
+    "live": [],
+    "process_groups": [],
+    "zombies": []
+  },
+  "capture_status": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/status.json",
+    "identity": {
+      "bytes": 1711,
+      "sha256": "07d593d23edff7b0586c6202b79ffa410cddb5ed4a53e37c9690e9c933bb0094"
+    }
+  },
+  "capture_manifest": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/manifest.json",
+    "identity": {
+      "bytes": 3115,
+      "sha256": "116c8d10525a2183a98799797c1ec3b6b2470580ef0326cde4f411f0699946e3"
+    }
+  },
+  "verified_small_metadata": [
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/capture-request.json",
+      "identity": {
+        "bytes": 1145634,
+        "sha256": "63bb375f657092b4511c3292b502fb1c5094798cee92243ff0cf80a7d2b66e82"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/capture-review.json",
+      "identity": {
+        "bytes": 4783,
+        "sha256": "45d25e450cf0c5ad577c26de1fd51d001a1dce088546b02ff92787cbfa5fff7b"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/candidate.native.json",
+      "identity": {
+        "bytes": 1106,
+        "sha256": "366bb32d2a5d5108dd58c7670cd88f8ff1429ad59db18ae831362edc81053c44"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/candidate.receipt.json",
+      "identity": {
+        "bytes": 1291,
+        "sha256": "1fdf771de608eff22d2b071c2fe7b86869c0a85cf7be7be127ab531cc244f4e1"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/candidate.stderr",
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/candidate.stdout",
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/control.native.json",
+      "identity": {
+        "bytes": 1110,
+        "sha256": "80d43c3655a8f2d4b600812d20acc4196e8a358047baca5dc8c6ee8f4f619547"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/control.receipt.json",
+      "identity": {
+        "bytes": 1261,
+        "sha256": "bc3e727ba1a9f6ce09bb02ad23157cd18cbc05adfdda343f5ca52b1a15c3b166"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/control.stderr",
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/commands/control.stdout",
+      "identity": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/config.json",
+      "identity": {
+        "bytes": 605727,
+        "sha256": "4833240e84162073a61ea636cf984c425d32c863e19ba3ba5e9a39e8c837c0cf"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/lease.json",
+      "identity": {
+        "bytes": 2730,
+        "sha256": "a10b6b39736db30d93db27680bdf9e6f15704e2243a30b5fa220830713662f91"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/runtime-after.json",
+      "identity": {
+        "bytes": 1072240,
+        "sha256": "238ac9f7179e79ebd39198abd7a48726dbbf99836b293452ea735579ff10d201"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/runtime-before.json",
+      "identity": {
+        "bytes": 1072240,
+        "sha256": "238ac9f7179e79ebd39198abd7a48726dbbf99836b293452ea735579ff10d201"
+      }
+    },
+    {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-resource-capture-v1/status.json",
+      "identity": {
+        "bytes": 1711,
+        "sha256": "07d593d23edff7b0586c6202b79ffa410cddb5ed4a53e37c9690e9c933bb0094"
+      }
+    }
+  ],
+  "large_body_rehash_by_root": 0,
+  "body_audit_scope": "Reuse actual full truth/hash/oracle performed by independently source-reviewed unchanged capture worker before sealing; do not reinterpret as new independent full-body audit.",
+  "body_files_not_rehashed_again": [
+    "commands/candidate.canonical",
+    "commands/candidate.queries",
+    "commands/candidate.wire",
+    "commands/control.canonical",
+    "commands/control.queries",
+    "commands/control.wire"
+  ],
+  "runtime_before_after_equal_request": true,
+  "own_complete_gates_and_mechanism": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_FULL_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 15117,
+        "sha256": "312d7d965f2c039d89eada390de7cf2c10b8a15c1599961c1297d4226ee793b7"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 4727,
+        "sha256": "7ca0a36ed401a3c8769774cb70e3a201bebd6e5259225c2fcb28e3e9aab6891e"
+      }
+    }
+  ],
+  "projection": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/RESOURCE_PROJECTION.json",
+    "identity": {
+      "bytes": 8718,
+      "sha256": "69f91840d2b6f6ceef3d6301ec84e4e2e35c915e1f88b8c93d2ecd26a838ab5e"
+    }
+  },
+  "projected_online_seconds": 176.08999206299993,
+  "physical_peak_bytes": 2915424609,
+  "retained_capture_allocated_bytes": 75341824,
+  "staging_allocated_bytes": 62218240,
+  "staging_seconds": 1.275457023,
+  "cost_policy": "Full-process plus online full-byte audit plus fixed0.25s tail/child; actual all144 wire unique/7temporaryslots/64MiB metadata/staging/capture charged. No new persistent library metadata or maintenance cost.",
+  "new_compiles": 0,
+  "resource_native_runs": 2,
+  "timing_inference_samples": 0,
+  "retry": 0,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

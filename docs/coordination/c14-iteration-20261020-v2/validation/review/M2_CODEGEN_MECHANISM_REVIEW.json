@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "scope": "Independent actual emitted-assembly opportunity review only; not dynamic hit, correctness completion or speed",
+  "candidate": "m2-exact-owns-v1",
+  "reviewed_date_Asia_Shanghai": "2026-10-20",
+  "candidate_assembly": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-codegen-v1/candidate-driver.s",
+    "identity": {
+      "bytes": 1778371,
+      "sha256": "5551c11a4e7b4ae379e61bb499047795021f2bf9f3f7e12dc7e6b0a33b69da0f"
+    }
+  },
+  "control_assembly": {
+    "path": "/root/xoffset-c14-iteration/20261019/v1/validation/m1-v2/codegen/control-driver.s",
+    "identity": {
+      "bytes": 1779270,
+      "sha256": "110bc1bc494a1d731c563660d5760a630d5bb0da39531eb6e43e83bd04479640"
+    }
+  },
+  "request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_M2_CODEGEN.json",
+    "identity": {
+      "bytes": 146703,
+      "sha256": "16cf5688e44d752602509547095ed2401f277b9e84a3baf709aba8cd5590851b"
+    }
+  },
+  "compile_admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_CODEGEN_ADMISSION.json",
+    "identity": {
+      "bytes": 212881,
+      "sha256": "37716e47a9058e047b2c4bfbc0d7e3bac51aa5d765289f2b8dbe97987904ab27"
+    }
+  },
+  "compile_worker_receipt": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_CODEGEN_WORKER_RECEIPT.json",
+    "identity": {
+      "bytes": 53040,
+      "sha256": "f9a57799f89da9b70de044176fce1f7dd81e3e9da452d5315b8e534948125d0b"
+    }
+  },
+  "compile_result": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_CODEGEN_RESULT.json",
+    "identity": {
+      "bytes": 3660,
+      "sha256": "0042b8dab333546891e3ce8812b1aacef1f498fddf0e1f2add5a1e17a57af2cc"
+    }
+  },
+  "queue_request": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-codegen-v1-lease/request.json",
+    "identity": {
+      "bytes": 1350,
+      "sha256": "106d7ef6b6e8c92306c9dfa3d435733ad8feb79d42339790303314c52e2b41eb"
+    }
+  },
+  "queue_result": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-codegen-v1-lease/result.json",
+    "identity": {
+      "bytes": 450,
+      "sha256": "233261c24ef3e8dc339ed866d13e668648872fbafb5405275764bffe4e41a95f"
+    }
+  },
+  "queue_run_id": "bdee66f95ee7431da5c43a628164868e",
+  "compile_command": [
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+    "-std=gnu++26",
+    "-freflection",
+    "-fexpansion-statements",
+    "-stdlib=libc++",
+    "-pthread",
+    "-O3",
+    "-DNDEBUG",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/typelayout/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/config/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container_hash/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/core/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/intrusive/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/predef/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/static_assert/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/throw_exception/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/type_traits/include",
+    "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/winapi/include",
+    "-I/root/xoffset-c14-iteration/20261020/v2/validation/m2-v1/source",
+    "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison",
+    "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include",
+    "-DSC_ADAPTER_HEADER=\"adapters/xoffset/adapter.hpp\"",
+    "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
+    "-S",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/driver.cpp",
+    "-o",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-codegen-v1/candidate-driver.s"
+  ],
+  "candidate_identity": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/M2_IDENTITY.json",
+    "identity": {
+      "bytes": 44233,
+      "sha256": "4a62016c53b103964d4a0b14ce56e3b717b59b54b011efbd52c021b7114b944c"
+    }
+  },
+  "source_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REVIEW_M2.md",
+    "identity": {
+      "bytes": 16470,
+      "sha256": "0981720db0c638718361e11d7d9b1ccadc7be79b7a4ee00df41f0d2830ce475f"
+    }
+  },
+  "source_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 1509,
+      "sha256": "264c04a7d17b8f301d0dc0d49134174eaa7f453d2dedcc4ce713ca15213c6bb3"
+    }
+  },
+  "source154": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-v1/source",
+    "count": 154,
+    "canonical_file_identity_map_sha256": "c0ba88fd821f9e96f4ced4b3b4fb4acb9235988d35527bcbc7be7e15870a968e",
+    "actual_equals_admitted_and_compile_before_after": true,
+    "full_map_in_compile_admission": "source_before"
+  },
+  "production_files": {
+    "receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "receive_raw.hpp": {
+      "bytes": 50646,
+      "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+    },
+    "receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "xoffset_core_lifetime.hpp": {
+      "bytes": 7269,
+      "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+    },
+    "xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "bytes": 20900,
+      "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+    },
+    "xoffsetdatastructure.hpp": {
+      "bytes": 278527,
+      "sha256": "3e347612c1a62299bb910c68dd6b1411663f3165e18e298a51e7ba2e062c201f"
+    }
+  },
+  "production14_identity_map_sha256": "2810fca77c737987a0d48af518a214c04dba57468744d171824c6496afd5f128",
+  "compiler_and_libcxx_actual_now_equal_admission": {
+    "/opt/p2996-toolchain/bin/clang++": {
+      "bytes": 148204096,
+      "sha256": "c7fa55437d34c43201da37960251d7d3dab1e06fc92273efe6f6d88f6dae7c6e"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++": {
+      "bytes": 1462,
+      "sha256": "b970d582c872afbdc6095c56ad235c5f8cf65245ac53b0a51194d6b46fd27ee8"
+    },
+    "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1.0": {
+      "bytes": 1340256,
+      "sha256": "63cff563a2fbd508551fc8051bfada2b93928e8822093cd5ef3409808e6dd9c6"
+    },
+    "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1.0": {
+      "bytes": 401848,
+      "sha256": "a8cc5ffb0160493a57521ea32ed22ade5db9e5c371fb89d0a14c1e79d0fb744c"
+    }
+  },
+  "outer_compiler_wrapper": {
+    "current": {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+      "identity": {
+        "bytes": 61,
+        "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+      }
+    },
+    "equals_historical_sealed_v1": true,
+    "historical_pin": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/R1_CODEGEN_JOB_ADMISSION.json",
+      "identity": {
+        "bytes": 72262,
+        "sha256": "4613086d4eb3d07c7ba5f89457d3bc40370bf3095f1beeb82f904fad7272563c"
+      }
+    },
+    "explicitly_in_M2_admission_inputs": false,
+    "limitation": "This61-byte forwarding wrapper was not explicitly captured in M2 before/after inputs. Current bytes match the sealed accepted v1 wrapper; this review does not invent a missing earlier observation. Subsequent jobs must explicitly bind it."
+  },
+  "owning_vector_symbol": "_ZN20XOffsetDatastructure12fixed_detail28move_assignment_owns_addressINS_12XFixedVectorIN2sc9xo_detail4AttrEEEEEbRKT_PKv",
+  "path_review": {
+    "domain": "Valid nonempty Attr owning vector, nonzero descriptor, capacity-containment miss; same initial descriptor unchanged until original iterator capture",
+    "control_function_lines": [
+      50724,
+      50871
+    ],
+    "candidate_function_lines": [
+      50724,
+      50833
+    ],
+    "control_basic_blocks": [
+      "entry/BB229_1",
+      "BB229_4",
+      "BB229_5",
+      "BB229_6",
+      "BB229_7",
+      "BB229_12",
+      "BB229_14"
+    ],
+    "candidate_basic_blocks": [
+      "entry/BB229_1",
+      "BB229_4",
+      "BB229_5",
+      "BB229_6"
+    ],
+    "control_parent_data_canonical_calls": [
+      50761,
+      50785,
+      50795,
+      50804
+    ],
+    "candidate_parent_data_canonical_calls": [
+      50760
+    ],
+    "parent_resolutions_before_child_loop": {
+      "control": 4,
+      "candidate": 1
+    },
+    "removed_parent_resolutions_on_this_path": 3,
+    "claim_is_not_per_element_or_all_program_canonical_calls": true,
+    "capacity_hit": {
+      "control_lines": [
+        50762,
+        50775
+      ],
+      "candidate_lines": [
+        50763,
+        50774
+      ],
+      "preserved": "capacity32B unsigned containment test and early true; no size read or recursion on hit"
+    },
+    "null": {
+      "candidate_lines": [
+        50750,
+        50757
+      ],
+      "zero_target_exit_lines": [
+        50808,
+        50809
+      ],
+      "preserved": "zero descriptor branches to false before relative target addition, end arithmetic, size load or child access"
+    },
+    "live_size_after_miss": {
+      "candidate_lines": [
+        50775,
+        50781
+      ],
+      "preserved": "load32-bit live size at offset8 after capacity miss; zero size exits; counter=(size*32)-32 for positive size"
+    },
+    "loop": {
+      "candidate_lines": [
+        50786,
+        50807
+      ],
+      "preserved": "visit each32-byte Attr in order; early true before advancement; exactly size children on all misses; test old count before flag-preserving LEA decrement"
+    },
+    "canonical_fallback": {
+      "candidate_lines": [
+        50756,
+        50762
+      ],
+      "preserved": "same anchor4-byte offset, width32 canonical lookup and nonnull result selection, otherwise original numeric/launder fallback"
+    },
+    "extra_work": "counted-loop termination has test plus LEA instead of end-pointer cmp; per-child result-address LEA replaces a preheld pointer while target stack reload is eliminated. These are costs to retain in measurement, not a speed calculation."
+  },
+  "unchanged_actual_callees": [
+    {
+      "name": "XBufferCore::canonical_bytes_at",
+      "control_lines": [
+        19278,
+        19859
+      ],
+      "candidate_lines": [
+        19278,
+        19859
+      ],
+      "exact_text_equal": true,
+      "body_sha256": "606de80678a60db37d90fab446744ce59a48f57dde7b956eccf2f0f2a3756d0e"
+    },
+    {
+      "name": "Attr reflected static_for<2> ownership child visitor",
+      "control_lines": [
+        50902,
+        51007
+      ],
+      "candidate_lines": [
+        50864,
+        50969
+      ],
+      "exact_text_equal": true,
+      "body_sha256": "bcef7df53f2fa347d6d858e6e3dd7f7d8e59e1eb2b22f95e9f76ef67d885bdf9",
+      "candidate_key_lookup_line": 50899,
+      "candidate_value_lookup_line": 50938,
+      "note": "Child key/value canonical lookups and key-first short-circuit remain. These calls are not included in parent4to1 claim."
+    }
+  ],
+  "public_assignment_sites": {
+    "lines_same_both": [
+      50638,
+      50648
+    ],
+    "first_call_line": 50640,
+    "reverse_call_line": 50646,
+    "exact_prefix_text_equal": true,
+    "preserved": "both owns directions and short circuit retained"
+  },
+  "register_stack_observation": {
+    "control_pushes": 6,
+    "candidate_pushes": 6,
+    "control_local_frame_bytes": 56,
+    "candidate_local_frame_bytes": 56,
+    "no_new_stack_frame_or_allocation_call_in_reviewed_helper": true,
+    "candidate_target_in_rbx_instead_of_stack_slot8": true
+  },
+  "whole_assembly_outside_reviewed_helper_exact_text_equal": true,
+  "static_mechanism_gate": "4-to-1 parent data/canonical resolution opportunity demonstrated on the actual nonempty containment-miss path",
+  "dynamic_fixed_M_hit_and_truth": "not established by this review",
+  "performance_claim": null,
+  "speedup_from_text_size_or_counts": false,
+  "screen_admitted": false,
+  "new_compiler_executions_by_reviewer": 0,
+  "new_native_executions_by_reviewer": 0,
+  "new_timing_samples_by_reviewer": 0,
+  "next": "Bind the forwarding wrapper in future exact requests; run only a separately admitted fixed-M mechanism request. Own full correctness/function/V1/consumer gates and screen freeze remain separate."
+}

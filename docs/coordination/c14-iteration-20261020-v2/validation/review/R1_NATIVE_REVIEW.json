@@ -1,0 +1,163 @@
+{
+  "M1_combined": false,
+  "QF_admitted": false,
+  "active_body_identical_characters": 3973,
+  "blocking_findings": [],
+  "candidate": "r1-canonical-hotcold-v1",
+  "candidate_changed_members": [
+    "xoffsetdatastructure.hpp"
+  ],
+  "candidate_identity_sha256": "52570679ffd1a479bdf39d3854c8424aa8b29a51e67339d2f93e6fd3c6072948",
+  "candidate_main_sha256": "b4c61b2d286d6d4ffdfbd44af3ff7151b1640dd07f8b9a2c9bfcfa01a6a9c23f",
+  "compiles_by_reviewer": 0,
+  "core_review": {
+    "identity": {
+      "bytes": 9905,
+      "sha256": "fabe8f031143eb87516475c44338b0780c6897b3992f108fdd2bfaafcab702a1"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REVIEW_R1_NATIVE.md"
+  },
+  "corrections_preserved": [
+    {
+      "finding": "Root entry compared complete fid with13 SHA-only registered runtime identities",
+      "id": "R1N1",
+      "resolution": "SHA mandatory, bytes checked when registered, both pre/post paths; final core worker already used matching schema"
+    },
+    {
+      "finding": "Repeated cold canonical reads were described as warming TLS",
+      "id": "R1N2",
+      "resolution": "Final v2 fixture comment/output and final core-review appendix withdraw heat claim; existing assertions/synchronization unchanged; four legacy programs retain explicit hot/cold controls"
+    }
+  ],
+  "diagnostics_by_reviewer": 0,
+  "execution_admitted": true,
+  "finite_budget": {
+    "SAN_programs": 5,
+    "codegen_recompile": 0,
+    "compile_commands": 10,
+    "each_compile_seconds": 120,
+    "each_native_seconds": 20,
+    "extra_describe_or_warmup": 0,
+    "native_commands": 10,
+    "normal_programs": 5,
+    "outer_task_seconds": 1500,
+    "retries": 0,
+    "sum_of_child_caps_seconds": 1400,
+    "total_commands": 20
+  },
+  "input_files_verified": 390,
+  "kind": "independent-r1-native-admission",
+  "lifetime_review": {
+    "SAN_replaces_lifetime_proof": false,
+    "exception_cancel_notify_join_reviewed": true,
+    "foreign_active_with_ordinary_noncanonical": true,
+    "hot_cold_boundary_and_reentry_coverage_from_four_legacy_programs": true,
+    "legacy_many_owner_retire_while_others_active": true,
+    "mutex_CV_exclusive_handoff": true,
+    "no_new_unrelated_test_expansion": true,
+    "payload_reader_finished_before_worker_retire": true,
+    "real_verified_receive_owner": true,
+    "repeated_reads_do_not_prove_TLS_hot": true,
+    "two_synchronized_zero_one_zero_cycles": true
+  },
+  "native_correctness": "not_run",
+  "native_runs_by_reviewer": 0,
+  "old_v1_records_modified": false,
+  "output": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-native-v2",
+  "preexecution_conditions": [
+    "Root compares this exact request/core-review/entry identity; fresh unchanged source154 and input closure",
+    "Run only through the actual original supervisor W1 validation1500s fixed lease output; a different process holding queue.lock is not sufficient",
+    "Use fresh guest/backing observation plus retained A_RESULT ABI/SAN/dependency admission and one fresh output",
+    "Native worker descendants remain in the original supervisor session for cleanup; no second scheduler/lock",
+    "Postrun check all154 source members and all inputs, exact actual queue request/result identity/out/run_id and six-file manifest/cleanup before claiming pass",
+    "Stop on first failure, preserve partial receipt/output; no blind retry or added native/diag"
+  ],
+  "production_members_verified": 14,
+  "references": {
+    "A_result": {
+      "identity": {
+        "bytes": 4824,
+        "sha256": "9c8ce5c993ad5bf1af6fa3b6879aa647e09a5d25f821a26ebe27802d3f528aa4"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/A_RESULT.json"
+    },
+    "old_v1_R1_review": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/core/REVIEW_R1.md",
+    "plan": {
+      "identity": {
+        "bytes": 10234,
+        "sha256": "e9e5c1bfb9c9246bfc0410f3fea4eae59d06b2e63757d910647940415a7316ed"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/PLAN.md"
+    },
+    "source_coverage_review": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_SOURCE_COVERAGE.md"
+  },
+  "request": {
+    "identity": {
+      "bytes": 167092,
+      "sha256": "edcf2fb2d29f5d5249d8d1ebc2d7727bafcd2d44a503ff1bacd839018edf7d4a"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_NATIVE_v2.json"
+  },
+  "request_sha256": "edcf2fb2d29f5d5249d8d1ebc2d7727bafcd2d44a503ff1bacd839018edf7d4a",
+  "required_outer_lease": {
+    "PATH": "/usr/bin:/bin",
+    "interpreter": "/usr/bin/python3",
+    "kind": "validation",
+    "lock": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination/queue.lock",
+    "output": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-native-v2-lease",
+    "owner": "W1",
+    "runner": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+    "timeout_seconds": 1500,
+    "wait_seconds": 0,
+    "worker_argv": [
+      "python3",
+      "-I",
+      "-B",
+      "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/run_native_targets.py",
+      "--request",
+      "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_NATIVE_v2.json"
+    ]
+  },
+  "reviewed_test": {
+    "identity": {
+      "bytes": 6867,
+      "sha256": "4ede309cf78c7e62faa16960470298c174ac4418512897a2a6d8b42994ff2cd6"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp"
+  },
+  "reviewed_validation_entry": {
+    "identity": {
+      "bytes": 8140,
+      "sha256": "bca349f8be2b32a31c23b59055e9717b48575a78ebc174351d57364459dde88c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/r1_native_job.py"
+  },
+  "reviewed_validation_import": {
+    "identity": {
+      "bytes": 4196,
+      "sha256": "0c79b59b3c55a37db66a7e47b769b084574b1ce229faa090e0526ca9ccecd476"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/verify_current.py"
+  },
+  "reviewed_worker": {
+    "identity": {
+      "bytes": 3835,
+      "sha256": "35b8d1928b2cb166935fa83e438970b22ce1e8eab7d87f8ae7521b4d5ded6f2a"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/run_native_targets.py"
+  },
+  "reviewer": "screen_review",
+  "schema": "r1-native-request-review-v2",
+  "scope": "Only Phase B: the exact ten compilations and ten targeted native executions registered by the final v2 request, through the reviewed original-lease entry. This is permission to execute, not a native correctness result. No C diagnostics, full suite, timing, screen or Q/F admitted.",
+  "screen_admitted": false,
+  "source": "/root/xoffset-c14-iteration/20261019/v1/validation/r1-v1/source",
+  "source_members_verified": 154,
+  "status": "passed",
+  "superseded_unexecuted_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_NATIVE.json",
+    "reason": "wording-only fixture revision plus fresh output; B budget not renewed",
+    "sha256": "bcdef196cb2e7f3baa6439c16a145ac79528afd972f544207ef6785269de6833"
+  },
+  "timing_samples_by_reviewer": 0
+}

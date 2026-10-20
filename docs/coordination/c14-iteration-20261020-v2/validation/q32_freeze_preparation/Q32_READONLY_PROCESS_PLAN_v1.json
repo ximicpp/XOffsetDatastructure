@@ -1,0 +1,31 @@
+{
+    "schema_version":  1,
+    "kind":  "cursor-process-pause-plan-v1",
+    "read_only":  true,
+    "allowed_names":  [
+                          "client_ue4-Win64-Shipping",
+                          "TGitCache"
+                      ],
+    "controller_owner_sid":  "S-1-5-21-4175325682-2436190947-2784970811-7045",
+    "created_utc":  "2026-10-19T20:57:24.0159695+00:00",
+    "targets":  [
+                    {
+                        "pid":  49116,
+                        "name":  "TGitCache",
+                        "image_path":  "C:\\Program Files\\TortoiseGit\\bin\\TGitCache.exe",
+                        "owner_sid":  "S-1-5-21-4175325682-2436190947-2784970811-7045",
+                        "creation_filetime":  "134359155653323608",
+                        "start_time_utc":  "2026-10-08T06:46:05.3323608Z"
+                    },
+                    {
+                        "pid":  133148,
+                        "name":  "client_ue4-Win64-Shipping",
+                        "image_path":  "D:\\WhLauncher\\games\\wh\\client_ue4\\Binaries\\Win64\\client_ue4-Win64-Shipping.exe",
+                        "owner_sid":  "S-1-5-21-4175325682-2436190947-2784970811-7045",
+                        "creation_filetime":  "134368861706454844",
+                        "start_time_utc":  "2026-10-19T12:22:50.6454844Z"
+                    }
+                ],
+    "helper_sha256":  "1015ace2e6abe0aa1407edcf29d264bf9ba8f3b7391279a9d0d25a72071e0989",
+    "processes_suspended":  0
+}

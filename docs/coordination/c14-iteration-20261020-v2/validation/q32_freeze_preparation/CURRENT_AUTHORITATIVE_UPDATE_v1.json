@@ -1,0 +1,91 @@
+{
+  "schema": "q32-freeze-current-authoritative-update-v1",
+  "status": "exact_source_only_freeze_request_proposed_input_closure_still_pending",
+  "supersedes_budget_only": {
+    "preserved_root_draft": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_FREEZE_REQUEST_DRAFT_v1.json",
+      "identity": {
+        "bytes": 4752,
+        "sha256": "bc45cf87456a0241034acdec0ccb106eb03d50765fa8740380004f9329bb1c39"
+      }
+    },
+    "old300_must_not_execute": true,
+    "early_W3_suggestion_superseded": true
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1"
+  ],
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-freeze-v1",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1"
+  ],
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "owner": "W1",
+  "kind": "validation",
+  "timeout_seconds": 600,
+  "wait_seconds": 0,
+  "original_runner": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+  "default_shared_lock_only": true,
+  "nested_runner": false,
+  "queue": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-freeze-v1",
+  "output": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1",
+  "actual_future_window": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1",
+  "bound_source_sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8",
+  "resource_actual_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_SIX_ROLE_RESOURCE_ACTUAL_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 8220,
+      "sha256": "b8974fec07acafc071e10c9b2a6c4a04d6191f7590f7516429b8e4f6782f441f"
+    }
+  },
+  "Q32_timing_admitted": false,
+  "F64_admitted": false,
+  "freeze_executed": false,
+  "native": 0,
+  "compile": 0,
+  "capture": 0,
+  "queue_dispatched": 0,
+  "host_probe": 0,
+  "processes_paused": 0,
+  "power_changed": false,
+  "preparation_power": "Balanced unchanged; original future sampling selects temporary existing HighPerformance/restores, only separately accepted by exactHOST_REVIEW.",
+  "remaining": [
+    "Root small registration/proposal producer materializes current exact7 coordinator refs and immutable-bound proposal schema.",
+    "Own combined11 typed gate acceptance and prerequisite refs, exact current capacity/backing/power capability chain.",
+    "Exact source-only frozen input review/admission before originallease once; then actualfrozen base andmanifest pin acceptance.",
+    "Timing remains separately blocked pending REVIEW/HOST_REVIEW/GLOBAL_QUIET/fresh current host/authorized guard and originalQthenF chain."
+  ],
+  "adapation_plan": "REGISTRATION_ADAPTATION_PLAN_v1.json",
+  "interface_report": "INTERFACES_AND_GAPS_v1.md"
+}

@@ -1,0 +1,561 @@
+{
+  "schema_version": 1,
+  "kind": "read-only-cross-chat-status-evidence",
+  "observed_at": "2026-10-19 14:57:16 UTC",
+  "scope": "Current C14 orchestrator and core chats, every agent referenced by their recent C14 turns, and three older referenced agents; local executor agents checked separately immediately before timing.",
+  "source_api": "mcp__codex_app__read_thread",
+  "root": [
+    {
+      "thread": {
+        "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419809
+      },
+      "page": {
+        "order": "newest_first",
+        "limit": 5,
+        "nextCursor": "{\"requestedThreadId\":\"01a14d62-bc8e-7580-a12b-368196e6e08a\",\"rolloutOrdinal\":6608,\"includeAnchor\":false,\"scope\":{\"kind\":\"turns\"}}",
+        "hasMore": true
+      },
+      "turns": [
+        {
+          "id": "01a15476-c927-7b10-9f7a-9bb59612a760",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            }
+          ]
+        },
+        {
+          "id": "01a1546f-8541-7241-a5ba-d52eab9eb72f",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            }
+          ]
+        },
+        {
+          "id": "01a15466-c33d-7991-b3bb-9bb4c4d9c009",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "started",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "started",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "started",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+              "path": "/root/plan_delivery_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+              "path": "/root/plan_core_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+              "path": "/root/plan_evidence_review"
+            }
+          ]
+        },
+        {
+          "id": "01a1541c-1181-7311-a656-1d1f175a8f7b",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+              "path": "/root/tail_alias_design"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+              "path": "/root/tail_alias_design"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            }
+          ]
+        },
+        {
+          "id": "01a1540b-891a-7810-b41c-1625d44f8b4e",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a1526b-850b-7541-b2ce-d1679ec6cdac",
+              "path": "/root/remaining_performance_work"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+              "path": "/root/tail_alias_design"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526b-850b-7541-b2ce-d1679ec6cdac",
+              "path": "/root/remaining_performance_work"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+              "path": "/root/tail_alias_design"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+              "path": "/root/capacity_array_proof"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "core": [
+    {
+      "thread": {
+        "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419716
+      },
+      "page": {
+        "order": "newest_first",
+        "limit": 10,
+        "nextCursor": null,
+        "hasMore": false
+      },
+      "turns": [
+        {
+          "id": "01a15485-a57b-7932-a387-bc841181f897",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "started",
+              "id": "01a15486-6eaa-74a0-a6df-17a8bea076c1",
+              "path": "/root/l1_boundary_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a15486-6eaa-74a0-a6df-17a8bea076c1",
+              "path": "/root/l1_boundary_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            }
+          ]
+        },
+        {
+          "id": "01a15479-bb53-7c21-80a5-91f079c641b4",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "started",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            },
+            {
+              "kind": "completed",
+              "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+              "path": "/root/m1_safety_review"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "other_referenced_agents": [
+    {
+      "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+      "thread": {
+        "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+        "title": null,
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792418880
+      },
+      "turn": [
+        {
+          "id": "01a1547c-497e-7d61-a029-908ebf8c2ac8",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+      "thread": {
+        "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+        "title": null,
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792418292
+      },
+      "turn": [
+        {
+          "id": "01a1546f-ae32-7f43-9c1e-7fb6885f0afc",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+      "thread": {
+        "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+        "title": null,
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419549
+      },
+      "turn": [
+        {
+          "id": "01a15483-6d22-7081-a621-b4dea428f8c0",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+              "path": "/root"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a15486-6eaa-74a0-a6df-17a8bea076c1",
+      "thread": {
+        "id": "01a15486-6eaa-74a0-a6df-17a8bea076c1",
+        "title": null,
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419633
+      },
+      "turn": [
+        {
+          "id": "01a15486-7584-78f2-8f65-a5945c4f4d9e",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+              "path": "/root"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+              "path": "/root"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+      "thread": {
+        "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+        "title": null,
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419685
+      },
+      "turn": [
+        {
+          "id": "01a15488-81ab-7aa0-b1f0-d95e2312e4ca",
+          "status": "completed",
+          "children": [
+            {
+              "kind": "interacted",
+              "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+              "path": "/root"
+            },
+            {
+              "kind": "interacted",
+              "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+              "path": "/root"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+      "thread": {
+        "id": "01a1526a-f326-71b3-abc9-d3935f04de01",
+        "title": null,
+        "status": {
+          "type": "notLoaded"
+        },
+        "updatedAt": 1792413276
+      },
+      "turn": [
+        {
+          "id": "01a15427-3d1b-7543-a346-6ca1e074d0aa",
+          "status": "completed",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+      "thread": {
+        "id": "01a1526b-21fb-7b20-876a-811760a14afe",
+        "title": null,
+        "status": {
+          "type": "notLoaded"
+        },
+        "updatedAt": 1792412730
+      },
+      "turn": [
+        {
+          "id": "01a1541e-0b6f-7f81-a974-0e760f29fcf6",
+          "status": "completed",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "01a1526b-850b-7541-b2ce-d1679ec6cdac",
+      "thread": {
+        "id": "01a1526b-850b-7541-b2ce-d1679ec6cdac",
+        "title": null,
+        "status": {
+          "type": "notLoaded"
+        },
+        "updatedAt": 1792411649
+      },
+      "turn": [
+        {
+          "id": "01a1540c-1582-7240-b6e9-ec64cf9b6d0a",
+          "status": "completed",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "all_listed_statuses_quiet": true,
+  "not_a_human_authorization_record": true,
+  "limitation": "Read-only current state observations; not a guarantee against future user activity. Executor starts no other work during timing. Unrelated projects are outside this declaration."
+}

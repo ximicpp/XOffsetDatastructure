@@ -1,0 +1,93 @@
+{
+  "kind": "M2-exact-screen-freeze-admission-request",
+  "status": "pending_independent_exact_freeze_host_global_quiet",
+  "candidate": "m2-exact-owns-v1",
+  "freeze": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/frozen-v1/freeze.json",
+    "identity": {
+      "bytes": 1827701,
+      "sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2"
+    }
+  },
+  "actual_source_freeze_queue": {
+    "out": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-screen-freeze-v1-lease",
+    "run_id": "bdb1a061e5d74986ae29f49cb9c3ce74",
+    "status": "complete",
+    "seconds": 18.15633145000001,
+    "exitcode": 0,
+    "cleanup_empty": true,
+    "compile": 0,
+    "native": 0
+  },
+  "gate_admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_COMPLETE_GATES_ADMISSION.json",
+    "identity": {
+      "bytes": 4738,
+      "sha256": "bfce36241fce5611ed361c92ece363f83a1a819a0deaf92ad175b217bc80ac44"
+    }
+  },
+  "capture_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_RESOURCE_CAPTURE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 7482,
+      "sha256": "389339a3f7b1349a0fce37e16b6d10024c88a3271650adf189034bfd0d68bf45"
+    }
+  },
+  "resource_projection": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/RESOURCE_PROJECTION.json",
+    "identity": {
+      "bytes": 8718,
+      "sha256": "69f91840d2b6f6ceef3d6301ec84e4e2e35c915e1f88b8c93d2ecd26a838ab5e"
+    }
+  },
+  "exact_host_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/host/HOST_ADMISSION_REQUEST_v3.json",
+    "identity": {
+      "bytes": 3209,
+      "sha256": "1a989a2ca44c9eb417d9c978e735f1f8486a2555222546f54fdf82b1d4b5a11a"
+    }
+  },
+  "own_quiet": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/OWN_QUIET_OBSERVATION.json",
+    "identity": {
+      "bytes": 1215,
+      "sha256": "97238baaac8fab9eec269a7a86da98e8dabdbfd99f79d060d3b6da2e8600bc77"
+    }
+  },
+  "required_new_records": [
+    "REVIEW.json independent-screen-admission",
+    "HOST_REVIEW.json v2-screen-host-admission",
+    "GLOBAL_QUIET.json v2-screen-global-quiet"
+  ],
+  "intended_controller": {
+    "tool": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/execute.py",
+      "identity": {
+        "bytes": 10288,
+        "sha256": "9b4aad4e26aa6c403c847e8dfd818f381fa193705e4a52e7641db9441359af66"
+      }
+    },
+    "action": "run",
+    "freeze_sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2",
+    "fresh_actual_plan_handles_token": true,
+    "watchdog_seconds": 780,
+    "restore_before_audit": true
+  },
+  "screen": {
+    "pairs": 72,
+    "children": 144,
+    "primary": "mutate",
+    "AB": 36,
+    "BA": 36,
+    "child_seconds": 20,
+    "outer_seconds": 600,
+    "retry": 0,
+    "replacement": 0,
+    "warmup": 0,
+    "performance_accepted": false,
+    "QF_admitted": false
+  },
+  "actual_screen_children": 0,
+  "paused_processes": 0,
+  "guard_started": false
+}

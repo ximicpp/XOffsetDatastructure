@@ -1,0 +1,34 @@
+{
+  "error": null,
+  "freeze_sha256": "c168eed40879c5339e91a390506eb6c32cce73fc47ea407ab7ae51cb6a437cf3",
+  "guard_completed": {
+    "identity": {
+      "bytes": 2616,
+      "sha256": "e50f534e4b6697ee23bcbf59bbf216a1c4e808e6226a5af97e8c8416a648365b"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/process-state-v1/completed.json"
+  },
+  "power_after": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "power_after_evidence": {
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "power_before": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "power_before_evidence": {
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "power_changed": false,
+  "power_error": null,
+  "resumed_monotonic_ns": "102575204869",
+  "status": "passed",
+  "user_processes_restored": true
+}

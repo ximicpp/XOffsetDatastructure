@@ -1,0 +1,40 @@
+{
+  "files": {
+    "measurement-decision-v2.json": {
+      "identity": {
+        "bytes": 2529,
+        "sha256": "b5aaef8ec24275c1cc9d7bd7ab0ca2bede01414f0da6d738eeca78e95ca9ce78"
+      },
+      "path": "/root/xoffset-four-paths/20261018/v1/frozen-qualification-v1/registration/measurement-decision-v2.json"
+    },
+    "power-capability-v2.json": {
+      "identity": {
+        "bytes": 710,
+        "sha256": "5b209d4e16f389d118319819f09d8f5d484d3419e21a56d69e6d26058d6753ce"
+      },
+      "path": "/root/xoffset-four-paths/20261018/v1/frozen-qualification-v1/registration/power-capability-v2.json"
+    },
+    "power-capability-v3.json": {
+      "identity": {
+        "bytes": 797,
+        "sha256": "1967456dbb7209326ff827fe8ff14d5792296df9fe7d728454d3202190ef2c65"
+      },
+      "path": "/root/xoffset-four-paths/20261018/v1/frozen-qualification-v1/registration/power-capability-v3.json"
+    },
+    "proposal": {
+      "identity": {
+        "bytes": 65177,
+        "sha256": "7e17bf9d9d178226cabe61a13567e1ee5a14b685f34e41d05277975e195ff1f7"
+      },
+      "path": "/root/xoffset-four-paths/20261018/v1/frozen-qualification-v1/proposal.json"
+    },
+    "resources-pure-tests-v3.json": {
+      "identity": {
+        "bytes": 551,
+        "sha256": "bee28ffa60d30053ffcd8217ca5c00f1527ea7444f0b4429c03a99f342ea115c"
+      },
+      "path": "/root/xoffset-four-paths/20261018/v1/frozen-qualification-v1/registration/resources-pure-tests-v3.json"
+    }
+  },
+  "scope": "Exact archived policy JSON and capability receipts. No historical stage identity is imported."
+}

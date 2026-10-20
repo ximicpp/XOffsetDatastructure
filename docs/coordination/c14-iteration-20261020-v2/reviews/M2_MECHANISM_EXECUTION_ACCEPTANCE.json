@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "candidate": "m2-exact-owns-v1",
+  "observed_at": "2026-10-19T19:00:51.436558+00:00",
+  "mismatches": [],
+  "adaptation_scope": "Typed schema bridge to already independently verified exact evidence. Original reviews and native evidence unchanged. No new testing or performance inference.",
+  "new_compile": 0,
+  "new_native": 0,
+  "new_queue": 0,
+  "screen_admitted": false,
+  "QF_admitted": false,
+  "kind": "parent-m2-capture-mechanism-review-schema-bridge",
+  "mechanism_result": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/M2_MECHANISM_RESULT.json",
+    "identity": {
+      "bytes": 6376,
+      "sha256": "dc2251e098905fae938029685b4f7b7e058bc0c927d843d168e08007acb836cd"
+    }
+  },
+  "dynamic_result": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/M2_DYNAMIC_RESULT.json",
+    "identity": {
+      "bytes": 7221,
+      "sha256": "4474686024c8b588de1647cea86c3ddacf32f20c7b47b7b07e058af4154f0489"
+    }
+  },
+  "actual_candidate_diagnostic_native": 1,
+  "new_control_compiles": 0,
+  "new_control_runs": 0,
+  "mechanism_hit": true,
+  "logical_work_and_call_conservation_passed": true,
+  "independent_underlying_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 4727,
+      "sha256": "7ca0a36ed401a3c8769774cb70e3a201bebd6e5259225c2fcb28e3e9aab6891e"
+    }
+  }
+}

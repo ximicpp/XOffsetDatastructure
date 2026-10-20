@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "functional",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-normal-v2/queue",
+    "--timeout-seconds",
+    "1800",
+    "--wait-seconds",
+    "3600",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-tools-v2/campaign.py",
+    "functional",
+    "--prepared",
+    "/root/xoffset-serialization-comparison/20261017/implementation/prepared-v1",
+    "--profile",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/profile-normal-v2.json",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-normal-v2",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-normal-v2/queue"
+  ],
+  "tool": {
+    "bytes": 54171,
+    "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+  }
+}

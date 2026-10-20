@@ -1,0 +1,26 @@
+{
+  "observed_at": "2026-10-20T01:55:55+08:00",
+  "status": "accepted_for_new_screen_environment_policy_only",
+  "staging_result": {
+    "path": "validation/screen/INPUT_STAGING_RESULT.json",
+    "identity": {
+      "bytes": 5632,
+      "sha256": "349fb0e577e5d9e61f46c9b6d827b593e55447fe0b19150f34ae0fc9517940ff"
+    }
+  },
+  "root_actual_source_and_target_hashes_checked": 18,
+  "mismatches": 0,
+  "basis": "Predeclared conditional response to actual C input.read wall887.414ms/1101.559ms. Byte-identical WSL local fixture/wire for every new screen role; input/API/model/trace/eight measured phase boundaries unchanged. No claim about historical M1 cause or performance gains from this environment change.",
+  "engineering_staging_seconds": 1.275457023,
+  "retained_allocated_bytes": 62218240,
+  "new_preview_native": 0,
+  "conditions": [
+    "All control/candidate roles use the same staged bytes in finite captures and the new frozen screen.",
+    "Frozen manifests/argv bind actual copies before and after; staging time/retained bytes remain reported.",
+    "Future formal comparisons must stage every role consistently with its own immutable wire/fixtures.",
+    "Keep historical frozen windows and old input paths unchanged."
+  ],
+  "screen_admitted": false,
+  "resource_capture_admitted": false,
+  "QF_admitted": false
+}

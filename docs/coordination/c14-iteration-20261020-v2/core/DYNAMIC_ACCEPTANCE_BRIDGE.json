@@ -1,0 +1,195 @@
+{
+  "schema": "core-dynamic-acceptance-source-bridge-v1",
+  "status": "source_bridge_and_predicates_prepared_not_execution_admission",
+  "materialization": {
+    "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\common-diag-final-v1\\MATERIALIZATION.json",
+    "identity": {
+      "bytes": 255150,
+      "sha256": "ca28fec8e0cf8119d6d73fb28e74dc4d2a97f9dae3d60a048c7de66925c82f38"
+    }
+  },
+  "independent_assembled_review": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\review\\C_ASSEMBLED_REVIEW.json",
+    "identity": {
+      "bytes": 21584,
+      "sha256": "924768e7508dc22b18b9dadffa1908f687b91232a0b161cbe69438ac1636d856"
+    }
+  },
+  "core_C_draft": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_PHASE_C_DRAFT.json",
+    "identity": {
+      "bytes": 114215,
+      "sha256": "4111ae0fe3ef07dd9ae638a0187eb6725fb4f59f9dee8280a7c0aa3c52bf9279"
+    }
+  },
+  "core_M2_draft": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_M2_MECHANISM_DRAFT.json",
+    "identity": {
+      "bytes": 13048,
+      "sha256": "1ad9b4223627e331106cc71201db0c3fc58fb2662131b28b97186a1c0b1717ab"
+    }
+  },
+  "final_materializer": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\diag\\prepare_final_driver.py",
+    "identity": {
+      "bytes": 17439,
+      "sha256": "1af8d7329d39aede0454f11c4da455b60d18c173d9db6d533ef22225fcc82b29"
+    }
+  },
+  "observer_wrapper": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\diag\\diag_wrapper.py",
+    "identity": {
+      "bytes": 24110,
+      "sha256": "48ddd6262b371a96ec1eabd2c57c57aa392e909e831869c5dae634de1d92fc34"
+    }
+  },
+  "phase_C_job_current_snapshot_only": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\diag\\phase_c_job.py",
+    "identity": {
+      "bytes": 34727,
+      "sha256": "2b47de043f08be8eb32420843bf3ee045aca02d274d95c498e6c08624d7cb26f"
+    }
+  },
+  "specification": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\DYNAMIC_ACCEPTANCE.md",
+    "identity": {
+      "bytes": 7977,
+      "sha256": "4a0be688c34f1af2d35dd9db3b18fe99632a49494ca6c5af62fc295f73c935bd"
+    }
+  },
+  "offline_checker": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\check_dynamic_acceptance.py",
+    "identity": {
+      "bytes": 7389,
+      "sha256": "7315074f7cd37f60c893d5a22e71574324bb80194ac86fb217940b62e96cf48c"
+    }
+  },
+  "roles": {
+    "c14": {
+      "actual_final_identity": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\common-diag-final-v1\\c14\\FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85166,
+          "sha256": "1d609d6bf3751b38289b74a03cf1511d5ffbc3baef32e88fea96abb278741592"
+        }
+      },
+      "selected_actual_files": {
+        "source/xoffsetdatastructure.hpp": {
+          "bytes": 285447,
+          "sha256": "1abf4095345f93913aa905fe0faa1448ea5128832e635d6bdd9cd23566694b9b"
+        },
+        "source/c14_common_diag.hpp": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        },
+        "experiment/adapters/xoffset/adapter.hpp": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        },
+        "experiment/driver.cpp": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        },
+        "experiment/event_channel.hpp": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "final_driver_exact_materializer_derivation": true,
+      "main_header_adapter_hook_byte_exact_to_prepared": true,
+      "source154_production14_maps_bound_by_materialization": true
+    },
+    "m2": {
+      "actual_final_identity": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\common-diag-final-v1\\m2\\FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85299,
+          "sha256": "1814408b04b80c180be68ccee5fc8f21f19d0746723f165900d312aea16a8fb4"
+        }
+      },
+      "selected_actual_files": {
+        "source/xoffsetdatastructure.hpp": {
+          "bytes": 285716,
+          "sha256": "089036e7f8f3e94144d7c41f2e2fae38eec54066175216ad359a233bdb01bfa3"
+        },
+        "source/c14_common_diag.hpp": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        },
+        "experiment/adapters/xoffset/adapter.hpp": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        },
+        "experiment/driver.cpp": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        },
+        "experiment/event_channel.hpp": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "final_driver_exact_materializer_derivation": true,
+      "main_header_adapter_hook_byte_exact_to_prepared": true,
+      "source154_production14_maps_bound_by_materialization": true
+    },
+    "r1": {
+      "actual_final_identity": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\common-diag-final-v1\\r1\\FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85313,
+          "sha256": "6e801a9914ee987d89f8f4df1df98ce414f9f61d4f89bc2bc94d91eb4e4094b2"
+        }
+      },
+      "selected_actual_files": {
+        "source/xoffsetdatastructure.hpp": {
+          "bytes": 286000,
+          "sha256": "230e23e6d2fc7a005c6e84a4bb70baaf6dc364b32065e551782434dab87c49c2"
+        },
+        "source/c14_common_diag.hpp": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        },
+        "experiment/adapters/xoffset/adapter.hpp": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        },
+        "experiment/driver.cpp": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        },
+        "experiment/event_channel.hpp": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "final_driver_exact_materializer_derivation": true,
+      "main_header_adapter_hook_byte_exact_to_prepared": true,
+      "source154_production14_maps_bound_by_materialization": true
+    }
+  },
+  "metadata_synthetic_checks": [
+    "R1_hit",
+    "R1_nohit",
+    "M2_hit",
+    "stage1_baseline",
+    "last_stage_boundary_error",
+    "event_error",
+    "wrong_count_equation",
+    "R1_changed_work",
+    "boolean_count_error"
+  ],
+  "metadata_synthetic_status": "passed",
+  "scope_limits": [
+    "No stable tool/request/candidate modified",
+    "Final C executable freeze remains root/validation responsibility; this supplement must not delay it",
+    "M2 candidate-only run remains conditional on exact admitted C14 control and independent M2 registration",
+    "No actual diagnostic result was consumed; no compile/native/timing was executed",
+    "Positive counts prove only dynamic logical mechanism under instrumentation; no speed inference"
+  ],
+  "core_compiles": 0,
+  "core_native": 0,
+  "actual_mechanism_accepted": false,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

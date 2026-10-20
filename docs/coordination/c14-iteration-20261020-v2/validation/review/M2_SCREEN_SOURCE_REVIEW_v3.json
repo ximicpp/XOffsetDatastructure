@@ -1,0 +1,274 @@
+{
+  "QF_admitted": false,
+  "actions_performed": {
+    "R1_raw144_files_read": 0,
+    "actual_distinct_hashed_files": 223,
+    "broad_filesystem_scan": false,
+    "capture_or_config_or_prepare_entry": 0,
+    "checker_or_truth_calls": 0,
+    "compile": 0,
+    "host": 0,
+    "metadata_read_hash_AST_only": true,
+    "native": 0,
+    "queue": 0
+  },
+  "actual_bare": {
+    "binary": {
+      "identity": {
+        "bytes": 225856,
+        "sha256": "f155d5fd360eea38f38b99a7ca45c63a4342c1a136d5ad5b260f57f22c83710e"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/bench-normal-v2/bin/sc_xoffset"
+    },
+    "compile_argv": [
+      "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+      "-DSC_ADAPTER_HEADER=\"adapters/xoffset/adapter.hpp\"",
+      "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
+      "-I/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/metadata/experiments/serialization_comparison/include",
+      "-I/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/metadata/experiments/serialization_comparison",
+      "-I/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/container/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/core/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/config/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/winapi/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/boost/libs/predef/include",
+      "-isystem",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source/external/typelayout/include",
+      "-stdlib=libc++",
+      "-pthread",
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++26",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-o",
+      "CMakeFiles/sc_xoffset.dir/driver.cpp.o",
+      "-c",
+      "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/metadata/experiments/serialization_comparison/driver.cpp"
+    ],
+    "compiled_source_binding": {
+      "identity": {
+        "bytes": 71140,
+        "sha256": "e669fd557d8097dcd788b2f891130beaf171385f652af84064f35d6465486417"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/compiled-source-binding-normal-v2.json"
+    },
+    "dependency_file_bytes_rehashed_as_full_frozen_runtime": false,
+    "dependency_profile_key_prefix": "new-xoffset-actual-dependency-",
+    "launcher61": {
+      "identity": {
+        "bytes": 61,
+        "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+      },
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx"
+    },
+    "legacy_commit_policy": "7539433... is inherited benchmark base metadata, not current M2 Git identity. Exact actual154/14/deps/profile/binary determine code identity.",
+    "legacy_shared_header_dependency_group_entries": 1445,
+    "production14_checked": 14,
+    "production_content_digest": "2810fca77c737987a0d48af518a214c04dba57468744d171824c6496afd5f128",
+    "profile": {
+      "identity": {
+        "bytes": 276192,
+        "sha256": "2cd7e9b61d59157e85cbf5e9da98948efc6bc5f6c05fd11bb3d7f28f0bca8846"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/profile-normal-v2.json"
+    },
+    "recorded_dependency_paths_checked": 1004,
+    "recorded_dependency_paths_exact_profile_group_match": true,
+    "source154_checked": 154
+  },
+  "candidate": "m2-exact-owns-v1",
+  "capture_admitted": false,
+  "checks": [
+    {
+      "area": "actual M2 bare identity",
+      "details": "Current profile/binary/compile_commands/compiled-source-binding,154 actual compiled members and production14 all match exact M2 design/identity. Main header3e347612..., production digest2810fca7...; existing bare binary can be reused without an added compile. Actual -O3/-DNDEBUG/P2996 flags, no -UNDEBUG/SAN/diag/forced include; detached owning load.",
+      "status": "passed"
+    },
+    {
+      "area": "driver and actual dependency scope",
+      "details": "Original driver bytes equal C14 control, adapter differs only in library_id/source_content_sha256 literals.1004 unique recorded Ninja dependencies exactly equal the1004 new-xoffset-actual-dependency-* profile entries and all exist; driver,actual adapter and actual M2 main header are present. The1445 actual-header-dependency-* entries are an additional inherited shared group, not the M2-only actual driver dependency set. Compiled-source binding pins matching current profile/new binary/14 files. Optional runtime cpp/addons remain production closure files and are not falsely claimed linked into this driver. Full runtime/compiler/header byte closure still must be captured in the future exact config/request, not certified from path membership alone.",
+      "status": "passed"
+    },
+    {
+      "area": "M2 metadata isolation",
+      "details": "All9 M2 runtime tool identities equal prior v2 manifest; producer adds no runtime action/import. Exclusive new M2_*_v3.json writes and resolved-parent checks prohibit overwriting old docs or R1/shared files.14 selected protected shared/R1 metadata/tool file IDs still equal recorded before/after IDs. This is selected identity evidence plus write isolation; no R1 raw144/freeze/disposition rescan was performed.",
+      "status": "passed"
+    },
+    {
+      "area": "approved inputs and resource cost",
+      "details": "Same parent-approved WSL staged9 files,18 original/target IDs rechecked; both future roles use identical paths. Existing copy1.275457023s and62218240 allocated bytes remain engineering cost. Prior own M0.417081838s receipt is only an observation and is explicitly not a staged-capture projection/admission or speed comparison.",
+      "status": "passed"
+    },
+    {
+      "area": "finite capture versus screen",
+      "details": "Proposal is control then candidate each once,child20/outer120,0compile/warmup/retry/replacement/inferential samples. Future resource projection must use actual whole-process plus complete native_result/body byte truth audit and positive predeclared tail,copy cost,144children+nonchild60+seal30,4GiB/7temporary slots/retained material.144 unique wire files count; canonical/query dedup only after full byte oracle truth. Projection fails closed, no selecting another capture. Existing R1 capture/raw144,diagnostic replay and M1failed prefix cannot substitute.",
+      "status": "passed"
+    },
+    {
+      "area": "pending functional/engineering gates",
+      "details": "Own full73+73 and business80+80/V1/AB/C result facts are correctly pinned but none automatically populate typed gates. All11 typed gate records and exact functional binding, source/cost/mechanism acceptance, fresh observation/config/request, capture, projection, freeze and host/quiet/restoration remain pending. Source-ready does not admit execution.",
+      "status": "passed"
+    }
+  ],
+  "exact_capture_materials_absent": [
+    "PRECONDITIONS.json",
+    "config.json",
+    "RESOURCE_CAPTURE_REQUEST.json",
+    "RESOURCE_CAPTURE_ADMISSION.json"
+  ],
+  "kind": "independent-M2-screen-source-ready-review-v3",
+  "new_bare_compile_required": false,
+  "observed_utc": "2026-10-19T18:52:55.680433+00:00",
+  "pending_refs": {
+    "M2_parent_source_cost_gate_acceptance": null,
+    "actual_global_quiet": null,
+    "actual_resource_capture": null,
+    "actual_restoration": null,
+    "all11_typed_gate_receipts": null,
+    "complete_process_allocated_projection": null,
+    "config": null,
+    "exact_resource_capture_request": null,
+    "freeze": null,
+    "fresh_M2_affinity_resource_observation": null,
+    "fresh_M2_power_observation": null,
+    "fresh_host_review": null,
+    "independent_freeze_admission": null,
+    "independent_resource_capture_admission": null,
+    "own_final_functional_binding": null,
+    "preconditions": null
+  },
+  "pending_typed_gates": {
+    "business_SML": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "codegen": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "consumers": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "engineering": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "full_normal": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "full_san": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "lifecycle": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "mechanism": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "safety": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "targeted": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    },
+    "v1_bidirectional": {
+      "receipt": null,
+      "status": "pending_actual_typed_receipt_and_independent_acceptance"
+    }
+  },
+  "producer": {
+    "identity": {
+      "bytes": 14565,
+      "sha256": "650dd589516f7d05494e464cf89a7563d0e5740cfb8e24a72295f328d5c8beb2"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/prepare_metadata_v3.py"
+  },
+  "protected_shared_R1_selected_file_count": 14,
+  "required_before_capture": [
+    "Bind final own M2 functional/full-request aggregate and explicit parent mechanism/source/cost decisions; convert available actual facts into independently reviewed same-candidate typed receipts without manufacturing pending passes.",
+    "Prepare fresh M2 power/affinity/resource observation and predeclared cost policy, explicit control metadata exception provenance, approved staged input policy; write M2-only PRECONDITIONS.json with actual own refs. A narrow M2-specific source-only preparer may be added; do not run old shared/R1 publisher or change frozen workers.",
+    "Use already available own screen.py config and request-capture source-only entry points to produce exact config.json/RESOURCE_CAPTURE_REQUEST.json and original W3functional120 dispatch. Bind both current profiles/binaries,full154/14,actual effective argv/deps,61Blauncher/real compiler/runtime/header/input/tool closure and before/after checks. No additional bare compile is needed.",
+    "Independently review actual request/config SHA and admit only2 children(control,candidate),each20s/outer120,no warmup/retry/timing inference before any native. This review is not that admission.",
+    "After sole admitted capture, preserve complete process/full-body truth receipts/manifest/queue cleanup; recompute conservative144-child time+allocated projection with full audit/tail/staging/retained costs. Then assemble actual same-candidate11 typed gates/freeze and obtain exact independent freeze plus fresh M2 quiet/host/PID/watchdog/restoration readiness admission."
+  ],
+  "reviewed": {
+    "M2_BARE_PROFILE_OBSERVATION_v3.json": {
+      "identity": {
+        "bytes": 34695,
+        "sha256": "813b9133450f8cc2a6eb3780007973ede72ec7114e13fe606551d9b647dd2747"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_BARE_PROFILE_OBSERVATION_v3.json"
+    },
+    "M2_DEPENDENCY_SCOPE_v3.md": {
+      "identity": {
+        "bytes": 3850,
+        "sha256": "fcbe30f2dee67fc5f2587b10119f5d86b002f831d439a4199b8b40ee139ca9b7"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_DEPENDENCY_SCOPE_v3.md"
+    },
+    "M2_REQUEST_DRAFT_v3.json": {
+      "identity": {
+        "bytes": 102159,
+        "sha256": "371a0b32a070c86b514c26c8e6331f6d663dcdbf269704aeb0d1b2e62c6ca9eb"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_REQUEST_DRAFT_v3.json"
+    },
+    "M2_RESOURCE_CAPTURE_PLAN_v3.json": {
+      "identity": {
+        "bytes": 5016,
+        "sha256": "da4b8a188e1dfd89ecbb6da9b724ab9dd1b8e8af1b7f6c0efa8b432e16aa885a"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_RESOURCE_CAPTURE_PLAN_v3.json"
+    },
+    "M2_SOURCE_READY_v3.json": {
+      "identity": {
+        "bytes": 6715,
+        "sha256": "32ae583beaf392666d18f9c389f42e37159bee5dcfc12bd89dc0812493e17a52"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_SOURCE_READY_v3.json"
+    },
+    "M2_TOOL_MANIFEST_v3.json": {
+      "identity": {
+        "bytes": 4721,
+        "sha256": "3f1104ceab40f2cbe119a3efd17b47bafa67d500d35867fecb9da06d229c6044"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_TOOL_MANIFEST_v3.json"
+    }
+  },
+  "reviewer": "screen_review",
+  "runtime_worker_changed": false,
+  "scope": "Only six M2 v3 metadata artifacts and source-only producer, with selected actual bare/profile/source/input identity checks. No actual capture/config/freeze/host execution approval.",
+  "screen_admitted": false,
+  "self_authorized_execution": false,
+  "source_blockers": [],
+  "status": "passed"
+}

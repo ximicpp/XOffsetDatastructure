@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "mode": "normal",
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_FULL_ENTRY_NORMAL_ADMISSION.json",
+    "identity": {
+      "bytes": 590577,
+      "sha256": "8df39c64d0f837f6f1d966d6b6ca4c6c197fccaab34cd86e74bc15a413da8205"
+    }
+  },
+  "lease_proof": {
+    "holder": {
+      "kind": "validation",
+      "out": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal-lease",
+      "owner": "W1",
+      "run_id": "0881f315f37d4add9a89f1a5515d7f24",
+      "started_at": "2026-10-19T17:18:31.926434+00:00",
+      "status": "running",
+      "supervisor_pid": 388
+    },
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal-lease/request.json",
+      "identity": {
+        "bytes": 1359,
+        "sha256": "b5bfaa81be218acbaff317812b11056c2379e860531c46d76471df330fcbb437"
+      }
+    }
+  },
+  "compiler_wrapper_before": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  },
+  "new_timing_samples": 0,
+  "full_receipt": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal/receipt.json",
+    "identity": {
+      "bytes": 63379,
+      "sha256": "9c0ea28dd6ea8e7525055e42a28e031186a3968541604c4d475acc6f4616e00a"
+    }
+  },
+  "compiler_wrapper_after": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "kind": "cross-chat-quiet-factual-admission",
+  "freeze_sha256": "e57468ed00157a0154f220b4c67a29879c3fc14bebb9ff04d65f621e4ed11685",
+  "observed_at": "2026-10-19 14:58:17 UTC",
+  "all_other_chats_and_agents_quiet": true,
+  "no_other_heavy_jobs": true,
+  "evidence": {
+    "source": "Actual read_thread snapshots plus collaboration.list_agents current result; only executor active, no work dispatched until restoration",
+    "scope": "Current C14 orchestrator/core and all their referenced current agents; three historical referenced agents notLoaded with completed final turns in CHAT_QUIET_OBSERVATION.json",
+    "actual_thread_snapshots": [
+      {
+        "id": "01a14d62-bc8e-7580-a12b-368196e6e08a",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419809,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419716,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a15469-b9cf-7062-a2d4-7aa96037f40c",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792418880,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a15469-de0e-7142-bfe5-f7c634758fe5",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792418292,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a1546a-028d-7cf3-ac7d-4ffe9e06da25",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419549,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a15486-6eaa-74a0-a6df-17a8bea076c1",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419633,
+        "last_turn_status": "completed"
+      },
+      {
+        "id": "01a1547a-edb9-7520-b182-ae5bf22f4a5d",
+        "status": {
+          "type": "idle"
+        },
+        "updatedAt": 1792419685,
+        "last_turn_status": "completed"
+      }
+    ],
+    "local_agents": [
+      {
+        "name": "business_gates_review",
+        "status": "completed"
+      },
+      {
+        "name": "m1_screen_tools",
+        "status": "completed"
+      },
+      {
+        "name": "screen_review",
+        "status": "completed",
+        "explicit_quiet_message_received": true
+      }
+    ],
+    "global_lease": "Actual original queue.lock complete e4a2da437ef847e4a244ec9b1e63eece; will verify idle again immediately before prelude; old run_job real flock remains authority",
+    "additional_evidence": "CHAT_QUIET_OBSERVATION.json"
+  },
+  "not_new_human_permission": true,
+  "unrelated_projects_outside_scope": true
+}

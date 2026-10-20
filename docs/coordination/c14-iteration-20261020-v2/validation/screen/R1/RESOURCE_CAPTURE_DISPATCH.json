@@ -1,0 +1,54 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "functional",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/r1-screen-resource-capture-v1/queue",
+    "--timeout-seconds",
+    "120",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/screen.py",
+    "capture",
+    "--config",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/config.json",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/r1-screen-resource-capture-v1",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/r1-screen-resource-capture-v1/queue",
+    "--request",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/RESOURCE_CAPTURE_REQUEST.json",
+    "--request-sha256",
+    "07ebe1dcc9933faff07a3fa438a4a484c1026be1db536043acc310781cb2bdfa",
+    "--review",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/RESOURCE_CAPTURE_ADMISSION.json"
+  ],
+  "compile": 0,
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "native_budget": 2,
+  "request": {
+    "identity": {
+      "bytes": 1145648,
+      "sha256": "07ebe1dcc9933faff07a3fa438a4a484c1026be1db536043acc310781cb2bdfa"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/RESOURCE_CAPTURE_REQUEST.json"
+  },
+  "required_review": {
+    "candidate": "r1-canonical-hotcold-v1",
+    "kind": "independent-resource-capture-admission",
+    "request_sha256": "07ebe1dcc9933faff07a3fa438a4a484c1026be1db536043acc310781cb2bdfa",
+    "status": "pending"
+  },
+  "screen_not_admitted": true,
+  "status": "pending_independent_parent_admission",
+  "timing_inference_samples": 0
+}

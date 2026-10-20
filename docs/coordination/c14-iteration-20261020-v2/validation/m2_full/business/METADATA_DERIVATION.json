@@ -1,0 +1,568 @@
+{
+  "original_source": "/root/xoffset-receive-completion/20261019/v1/final-v4/source",
+  "before": {
+    "experiments/serialization_comparison/CMakeLists.txt": {
+      "bytes": 9427,
+      "sha256": "bf762507a29dc95d4035f897f3c0439b6a598a316406a563e112dc72d22ce559"
+    },
+    "experiments/serialization_comparison/driver.cpp": {
+      "bytes": 9708,
+      "sha256": "9bb22e39cb4d6a76ad85e06895c069e324df7300ccf576a89722caa37e8a84d3"
+    },
+    "experiments/serialization_comparison/README.md": {
+      "bytes": 3583,
+      "sha256": "9aac779a583b1acae34c204944824db1a1067b86262f9d76cbc4ed361ae37a26"
+    },
+    "experiments/serialization_comparison/include/adapter.hpp": {
+      "bytes": 1771,
+      "sha256": "65cc39900c999f7c43fcf907ead4175ec895ad1bf35a8e7a18e0a8961d32b2f0"
+    },
+    "experiments/serialization_comparison/include/views.hpp": {
+      "bytes": 4240,
+      "sha256": "106fd01b02efd831cb0d1812a4e75e1b6f18d0d9387fdb4581528c2206e7ef35"
+    },
+    "experiments/serialization_comparison/include/sha256.hpp": {
+      "bytes": 3545,
+      "sha256": "b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727"
+    },
+    "experiments/serialization_comparison/include/model.hpp": {
+      "bytes": 18951,
+      "sha256": "96bce64d0a3366c39052162f05e0a3ce3d1c28b0689fbc0dc3879e0ffeb1b124"
+    },
+    "experiments/serialization_comparison/protocols/native-result.schema.json": {
+      "bytes": 2017,
+      "sha256": "221328c5241b95d893b743813c051c396ccc979e96e78e612ee8ebdf96fa8bf3"
+    },
+    "experiments/serialization_comparison/protocols/contract-v1.json": {
+      "bytes": 3926,
+      "sha256": "ec6540f3f47561901bf4178e73f2d7ed4f46bae3e6e29d06f9aefc3d12fe994a"
+    },
+    "experiments/serialization_comparison/model/SPEC.md": {
+      "bytes": 7075,
+      "sha256": "6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef"
+    },
+    "experiments/serialization_comparison/model/reference.py": {
+      "bytes": 21135,
+      "sha256": "2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f"
+    },
+    "experiments/serialization_comparison/tests/sanitizer_controls.cpp": {
+      "bytes": 740,
+      "sha256": "4b5b4c2acf82fcba33b34f4f60e9076ad9cf0082c5c3fc98fdeceaf1e27b5977"
+    },
+    "experiments/serialization_comparison/tests/flatbuffers_capabilities.cpp": {
+      "bytes": 1996,
+      "sha256": "6fa359f4781ae62e3793928aeca9fffe544483577ce9feca2a79a1123ae7ecb7"
+    },
+    "experiments/serialization_comparison/tests/view_contract.cpp": {
+      "bytes": 1578,
+      "sha256": "e0b97022dfe9ab2495f45981596d8bad5828471f72b90a37bf7d00c08596493f"
+    },
+    "experiments/serialization_comparison/tests/contracts/resource_failure.cpp": {
+      "bytes": 6550,
+      "sha256": "e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908"
+    },
+    "experiments/serialization_comparison/tests/contracts/test_reference.py": {
+      "bytes": 8369,
+      "sha256": "eb74bf4cab50bf80c791fbbedcef83d291f46912545fbaa02cbe20b037a80098"
+    },
+    "experiments/serialization_comparison/tests/contracts/capability_capnproto_cereal.cpp": {
+      "bytes": 8420,
+      "sha256": "1234e07d282cf9f980ba879417145d720c53ad92c3555397bc1be0c7915da757"
+    },
+    "experiments/serialization_comparison/tests/contracts/model_contract.cpp": {
+      "bytes": 6042,
+      "sha256": "ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9"
+    },
+    "experiments/serialization_comparison/tests/contracts/adapter_contract.cpp": {
+      "bytes": 3800,
+      "sha256": "5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a"
+    },
+    "experiments/serialization_comparison/adapters/cista/adapter.hpp": {
+      "bytes": 10423,
+      "sha256": "39c0cc4befae2e1882423202175b905942cb6895709cfee63941769e37210052"
+    },
+    "experiments/serialization_comparison/adapters/cista/README.md": {
+      "bytes": 1897,
+      "sha256": "5c19091d4125ead6b475dbd0b8a75309bd2b23f041e188af77c58010915daa2d"
+    },
+    "experiments/serialization_comparison/adapters/cista/capabilities.cpp": {
+      "bytes": 5555,
+      "sha256": "3f0842a686f96ac4469b21071e3f18c3980603584bb6986dceb27560bd4bc059"
+    },
+    "experiments/serialization_comparison/adapters/flatbuffers/adapter.hpp": {
+      "bytes": 6140,
+      "sha256": "05aff021ac5afcf4a66a454fcb0e77562a29174d43368655ded99abc1d8b4aba"
+    },
+    "experiments/serialization_comparison/adapters/flatbuffers/snapshot.fbs": {
+      "bytes": 317,
+      "sha256": "382fccb60a07ac46f50b502f80efe3511d375777841619df5a4b91fe7648b308"
+    },
+    "experiments/serialization_comparison/adapters/xoffset/adapter.hpp": {
+      "bytes": 9619,
+      "sha256": "95df972f04326fc659e7743175a9a8ff3ad5b501948db5f1785708e7e0e6344a"
+    },
+    "experiments/serialization_comparison/adapters/xoffset/README.md": {
+      "bytes": 1522,
+      "sha256": "b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7"
+    },
+    "experiments/serialization_comparison/adapters/cereal/adapter.hpp": {
+      "bytes": 5712,
+      "sha256": "fd21392c4f577ed69ee94354da588afc4929c4ac35e666246f70aa0bda0ab629"
+    },
+    "experiments/serialization_comparison/adapters/cereal/README.md": {
+      "bytes": 1291,
+      "sha256": "6630b09ea375d78414de9c4d18b471ccef53324b4111c58e14d36ec5b9852f44"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/snapshot.capnp": {
+      "bytes": 399,
+      "sha256": "947d9ca54239778c68d3e68035a3dcb394778279006e3f038e9b68819cff4232"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/adapter.hpp": {
+      "bytes": 10307,
+      "sha256": "6d96bc14991919369992c79ad98ec967cf63030ab90fcb648929dce2de2cd24e"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/README.md": {
+      "bytes": 1316,
+      "sha256": "529c71618a1dd39754e36686a7cde7de65f2653fc4a2317d99285186034070d8"
+    },
+    "experiments/serialization_comparison/locks/environment-p1-v1.json": {
+      "bytes": 44675,
+      "sha256": "6dc8be983893a617ec71a315c7d24871ab530d371d02ba3c0d15ae648d618546"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/fixture.json": {
+      "bytes": 2633,
+      "sha256": "393561d3d3087c7bfd405ebbe1a1b29b4c17de17ed5e36f570447cc6ea63b025"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/final.canonical.bin": {
+      "bytes": 28,
+      "sha256": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/trace.bin": {
+      "bytes": 1023,
+      "sha256": "3fd23f7abe064e1d3c464974740ea8cc94feac76f83cfd60dcf6997b84020870"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/input.canonical.bin": {
+      "bytes": 28,
+      "sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/query-before.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/query-after.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/fixture.json": {
+      "bytes": 2635,
+      "sha256": "de20365979af43dfb582757e7b4e8b604d5522af2049868fb9d0a33e05ed0bfa"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/final.canonical.bin": {
+      "bytes": 505,
+      "sha256": "8b94da6d2a783bb80d70d80a495fdac480cc517afba670ca6b3e914564c6a085"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/trace.bin": {
+      "bytes": 1546,
+      "sha256": "0d4410461aa02cb7b76bb10c7027e5ca74798395b152096385c36eb089bfdaa9"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/input.canonical.bin": {
+      "bytes": 505,
+      "sha256": "361a199ae5eba48d6cfd962875a907799eb9d8245b4c9de17dd14a9cfba213c9"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/query-before.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/query-after.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/fixture.json": {
+      "bytes": 2644,
+      "sha256": "aafb9648180b8abb9189e5ccfa4726243fbd30374a4843943c65c1723181016d"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/final.canonical.bin": {
+      "bytes": 10272,
+      "sha256": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/trace.bin": {
+      "bytes": 15682,
+      "sha256": "ed00787c1c92f3b3128495bc3851513affcd9d89c2b83cb3c874a1b814ed0f59"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/input.canonical.bin": {
+      "bytes": 8354,
+      "sha256": "214846fb2114e65cb7e765d1dccfaf2b34c565de372223a93952c50884b8a25e"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/query-before.bin": {
+      "bytes": 4400,
+      "sha256": "1a023c9d443156b28dee301d8e78729a76acffb4dbc907a15a156888d9803d1c"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/query-after.bin": {
+      "bytes": 4400,
+      "sha256": "89c23c0d58999a85ecf8f80b7d3cadba1875d29d7d60ba8b8ef81f46da4b21e8"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/fixture.json": {
+      "bytes": 2659,
+      "sha256": "186da64c3e58c845b4eab52de803895b442ff8442692fb8c2f55b72a383a2f05"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/final.canonical.bin": {
+      "bytes": 76545,
+      "sha256": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/trace.bin": {
+      "bytes": 114292,
+      "sha256": "6a8ef1cb303f9338a94b7364169753a8dffb4610287ec3161596e2dcd62f5296"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/input.canonical.bin": {
+      "bytes": 63028,
+      "sha256": "ac6c05bd3b3d25afa252db48e8ffff93e4060cf151cd57bcb638f2f9e1468427"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/query-before.bin": {
+      "bytes": 31775,
+      "sha256": "acb553006c498fc20f1522fbab1669689a6479c8b2d73e7e286bd05eacd027d2"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/query-after.bin": {
+      "bytes": 31775,
+      "sha256": "98ea09ec8e050a7faf24d45057b8ccc9658fcfaa03b5f8bbf305cf1a0c6e6b82"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/fixture.json": {
+      "bytes": 2661,
+      "sha256": "e51917e6c34d0d7015d3be3f881c3c274e168f5e73247bc5606fde00199ec509"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/final.canonical.bin": {
+      "bytes": 153316,
+      "sha256": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/trace.bin": {
+      "bytes": 227835,
+      "sha256": "aa25dc9db02295bad2453f1a66b29f9a16bbfb9797cdc6bf066bef2aef7bbf58"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/input.canonical.bin": {
+      "bytes": 126503,
+      "sha256": "30de5a2766c2b07e508133403536b2c1cb02c920f6060bf648171e3420784634"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/query-before.bin": {
+      "bytes": 63530,
+      "sha256": "6185fe3e58dea4f757a5d5b030f01feb8afe7fc9ebefbdc49cbe9aa743166c45"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/query-after.bin": {
+      "bytes": 63530,
+      "sha256": "9fed16da182ab24d500344eace80a567b153bcb51cbc46040ba8a0a20014fa37"
+    },
+    "tools/serialization_comparison/campaign.py": {
+      "bytes": 54171,
+      "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+    },
+    "tools/serialization_comparison/core.py": {
+      "bytes": 7845,
+      "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+    },
+    "tools/serialization_comparison/README.md": {
+      "bytes": 12156,
+      "sha256": "9c6b775cce9af5ce6108f22ddd115ff7d757ad80b30e3d999aa9deca5869f221"
+    },
+    "tools/serialization_comparison/protocol.py": {
+      "bytes": 11167,
+      "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+    },
+    "tools/serialization_comparison/tests/test_core.py": {
+      "bytes": 43671,
+      "sha256": "5b089af6ab059f3a8ceeedaa366a3af4ce739e586bc90561f88baf83babc0462"
+    }
+  },
+  "after": {
+    "experiments/serialization_comparison/CMakeLists.txt": {
+      "bytes": 9427,
+      "sha256": "bf762507a29dc95d4035f897f3c0439b6a598a316406a563e112dc72d22ce559"
+    },
+    "experiments/serialization_comparison/driver.cpp": {
+      "bytes": 9708,
+      "sha256": "9bb22e39cb4d6a76ad85e06895c069e324df7300ccf576a89722caa37e8a84d3"
+    },
+    "experiments/serialization_comparison/README.md": {
+      "bytes": 3583,
+      "sha256": "9aac779a583b1acae34c204944824db1a1067b86262f9d76cbc4ed361ae37a26"
+    },
+    "experiments/serialization_comparison/include/adapter.hpp": {
+      "bytes": 1771,
+      "sha256": "65cc39900c999f7c43fcf907ead4175ec895ad1bf35a8e7a18e0a8961d32b2f0"
+    },
+    "experiments/serialization_comparison/include/views.hpp": {
+      "bytes": 4240,
+      "sha256": "106fd01b02efd831cb0d1812a4e75e1b6f18d0d9387fdb4581528c2206e7ef35"
+    },
+    "experiments/serialization_comparison/include/sha256.hpp": {
+      "bytes": 3545,
+      "sha256": "b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727"
+    },
+    "experiments/serialization_comparison/include/model.hpp": {
+      "bytes": 18951,
+      "sha256": "96bce64d0a3366c39052162f05e0a3ce3d1c28b0689fbc0dc3879e0ffeb1b124"
+    },
+    "experiments/serialization_comparison/protocols/native-result.schema.json": {
+      "bytes": 2017,
+      "sha256": "221328c5241b95d893b743813c051c396ccc979e96e78e612ee8ebdf96fa8bf3"
+    },
+    "experiments/serialization_comparison/protocols/contract-v1.json": {
+      "bytes": 3926,
+      "sha256": "ec6540f3f47561901bf4178e73f2d7ed4f46bae3e6e29d06f9aefc3d12fe994a"
+    },
+    "experiments/serialization_comparison/model/SPEC.md": {
+      "bytes": 7075,
+      "sha256": "6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef"
+    },
+    "experiments/serialization_comparison/model/reference.py": {
+      "bytes": 21135,
+      "sha256": "2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f"
+    },
+    "experiments/serialization_comparison/tests/sanitizer_controls.cpp": {
+      "bytes": 740,
+      "sha256": "4b5b4c2acf82fcba33b34f4f60e9076ad9cf0082c5c3fc98fdeceaf1e27b5977"
+    },
+    "experiments/serialization_comparison/tests/flatbuffers_capabilities.cpp": {
+      "bytes": 1996,
+      "sha256": "6fa359f4781ae62e3793928aeca9fffe544483577ce9feca2a79a1123ae7ecb7"
+    },
+    "experiments/serialization_comparison/tests/view_contract.cpp": {
+      "bytes": 1578,
+      "sha256": "e0b97022dfe9ab2495f45981596d8bad5828471f72b90a37bf7d00c08596493f"
+    },
+    "experiments/serialization_comparison/tests/contracts/resource_failure.cpp": {
+      "bytes": 6550,
+      "sha256": "e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908"
+    },
+    "experiments/serialization_comparison/tests/contracts/test_reference.py": {
+      "bytes": 8369,
+      "sha256": "eb74bf4cab50bf80c791fbbedcef83d291f46912545fbaa02cbe20b037a80098"
+    },
+    "experiments/serialization_comparison/tests/contracts/capability_capnproto_cereal.cpp": {
+      "bytes": 8420,
+      "sha256": "1234e07d282cf9f980ba879417145d720c53ad92c3555397bc1be0c7915da757"
+    },
+    "experiments/serialization_comparison/tests/contracts/model_contract.cpp": {
+      "bytes": 6042,
+      "sha256": "ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9"
+    },
+    "experiments/serialization_comparison/tests/contracts/adapter_contract.cpp": {
+      "bytes": 3800,
+      "sha256": "5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a"
+    },
+    "experiments/serialization_comparison/adapters/cista/adapter.hpp": {
+      "bytes": 10423,
+      "sha256": "39c0cc4befae2e1882423202175b905942cb6895709cfee63941769e37210052"
+    },
+    "experiments/serialization_comparison/adapters/cista/README.md": {
+      "bytes": 1897,
+      "sha256": "5c19091d4125ead6b475dbd0b8a75309bd2b23f041e188af77c58010915daa2d"
+    },
+    "experiments/serialization_comparison/adapters/cista/capabilities.cpp": {
+      "bytes": 5555,
+      "sha256": "3f0842a686f96ac4469b21071e3f18c3980603584bb6986dceb27560bd4bc059"
+    },
+    "experiments/serialization_comparison/adapters/flatbuffers/adapter.hpp": {
+      "bytes": 6140,
+      "sha256": "05aff021ac5afcf4a66a454fcb0e77562a29174d43368655ded99abc1d8b4aba"
+    },
+    "experiments/serialization_comparison/adapters/flatbuffers/snapshot.fbs": {
+      "bytes": 317,
+      "sha256": "382fccb60a07ac46f50b502f80efe3511d375777841619df5a4b91fe7648b308"
+    },
+    "experiments/serialization_comparison/adapters/xoffset/adapter.hpp": {
+      "bytes": 9618,
+      "sha256": "c6a54774162d5e2e2e4e6343bc94400531220d64b6132fce630579f2fcc93e60"
+    },
+    "experiments/serialization_comparison/adapters/xoffset/README.md": {
+      "bytes": 1522,
+      "sha256": "b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7"
+    },
+    "experiments/serialization_comparison/adapters/cereal/adapter.hpp": {
+      "bytes": 5712,
+      "sha256": "fd21392c4f577ed69ee94354da588afc4929c4ac35e666246f70aa0bda0ab629"
+    },
+    "experiments/serialization_comparison/adapters/cereal/README.md": {
+      "bytes": 1291,
+      "sha256": "6630b09ea375d78414de9c4d18b471ccef53324b4111c58e14d36ec5b9852f44"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/snapshot.capnp": {
+      "bytes": 399,
+      "sha256": "947d9ca54239778c68d3e68035a3dcb394778279006e3f038e9b68819cff4232"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/adapter.hpp": {
+      "bytes": 10307,
+      "sha256": "6d96bc14991919369992c79ad98ec967cf63030ab90fcb648929dce2de2cd24e"
+    },
+    "experiments/serialization_comparison/adapters/capnproto/README.md": {
+      "bytes": 1316,
+      "sha256": "529c71618a1dd39754e36686a7cde7de65f2653fc4a2317d99285186034070d8"
+    },
+    "experiments/serialization_comparison/locks/environment-p1-v1.json": {
+      "bytes": 44675,
+      "sha256": "6dc8be983893a617ec71a315c7d24871ab530d371d02ba3c0d15ae648d618546"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/fixture.json": {
+      "bytes": 2633,
+      "sha256": "393561d3d3087c7bfd405ebbe1a1b29b4c17de17ed5e36f570447cc6ea63b025"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/final.canonical.bin": {
+      "bytes": 28,
+      "sha256": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/trace.bin": {
+      "bytes": 1023,
+      "sha256": "3fd23f7abe064e1d3c464974740ea8cc94feac76f83cfd60dcf6997b84020870"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/input.canonical.bin": {
+      "bytes": 28,
+      "sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/query-before.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "experiments/serialization_comparison/fixtures/golden-0/query-after.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/fixture.json": {
+      "bytes": 2635,
+      "sha256": "de20365979af43dfb582757e7b4e8b604d5522af2049868fb9d0a33e05ed0bfa"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/final.canonical.bin": {
+      "bytes": 505,
+      "sha256": "8b94da6d2a783bb80d70d80a495fdac480cc517afba670ca6b3e914564c6a085"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/trace.bin": {
+      "bytes": 1546,
+      "sha256": "0d4410461aa02cb7b76bb10c7027e5ca74798395b152096385c36eb089bfdaa9"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/input.canonical.bin": {
+      "bytes": 505,
+      "sha256": "361a199ae5eba48d6cfd962875a907799eb9d8245b4c9de17dd14a9cfba213c9"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/query-before.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "experiments/serialization_comparison/fixtures/golden-1/query-after.bin": {
+      "bytes": 458,
+      "sha256": "e8d9cef70baab3a4ea04273148a60b3aba6f6588ba7040f08921575f8a21bbdc"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/fixture.json": {
+      "bytes": 2644,
+      "sha256": "aafb9648180b8abb9189e5ccfa4726243fbd30374a4843943c65c1723181016d"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/final.canonical.bin": {
+      "bytes": 10272,
+      "sha256": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/trace.bin": {
+      "bytes": 15682,
+      "sha256": "ed00787c1c92f3b3128495bc3851513affcd9d89c2b83cb3c874a1b814ed0f59"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/input.canonical.bin": {
+      "bytes": 8354,
+      "sha256": "214846fb2114e65cb7e765d1dccfaf2b34c565de372223a93952c50884b8a25e"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/query-before.bin": {
+      "bytes": 4400,
+      "sha256": "1a023c9d443156b28dee301d8e78729a76acffb4dbc907a15a156888d9803d1c"
+    },
+    "experiments/serialization_comparison/fixtures/golden-17/query-after.bin": {
+      "bytes": 4400,
+      "sha256": "89c23c0d58999a85ecf8f80b7d3cadba1875d29d7d60ba8b8ef81f46da4b21e8"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/fixture.json": {
+      "bytes": 2659,
+      "sha256": "186da64c3e58c845b4eab52de803895b442ff8442692fb8c2f55b72a383a2f05"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/final.canonical.bin": {
+      "bytes": 76545,
+      "sha256": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/trace.bin": {
+      "bytes": 114292,
+      "sha256": "6a8ef1cb303f9338a94b7364169753a8dffb4610287ec3161596e2dcd62f5296"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/input.canonical.bin": {
+      "bytes": 63028,
+      "sha256": "ac6c05bd3b3d25afa252db48e8ffff93e4060cf151cd57bcb638f2f9e1468427"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/query-before.bin": {
+      "bytes": 31775,
+      "sha256": "acb553006c498fc20f1522fbab1669689a6479c8b2d73e7e286bd05eacd027d2"
+    },
+    "experiments/serialization_comparison/fixtures/golden-S/query-after.bin": {
+      "bytes": 31775,
+      "sha256": "98ea09ec8e050a7faf24d45057b8ccc9658fcfaa03b5f8bbf305cf1a0c6e6b82"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/fixture.json": {
+      "bytes": 2661,
+      "sha256": "e51917e6c34d0d7015d3be3f881c3c274e168f5e73247bc5606fde00199ec509"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/final.canonical.bin": {
+      "bytes": 153316,
+      "sha256": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/trace.bin": {
+      "bytes": 227835,
+      "sha256": "aa25dc9db02295bad2453f1a66b29f9a16bbfb9797cdc6bf066bef2aef7bbf58"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/input.canonical.bin": {
+      "bytes": 126503,
+      "sha256": "30de5a2766c2b07e508133403536b2c1cb02c920f6060bf648171e3420784634"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/query-before.bin": {
+      "bytes": 63530,
+      "sha256": "6185fe3e58dea4f757a5d5b030f01feb8afe7fc9ebefbdc49cbe9aa743166c45"
+    },
+    "experiments/serialization_comparison/fixtures/golden-257/query-after.bin": {
+      "bytes": 63530,
+      "sha256": "9fed16da182ab24d500344eace80a567b153bcb51cbc46040ba8a0a20014fa37"
+    },
+    "tools/serialization_comparison/campaign.py": {
+      "bytes": 54171,
+      "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+    },
+    "tools/serialization_comparison/core.py": {
+      "bytes": 7845,
+      "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+    },
+    "tools/serialization_comparison/README.md": {
+      "bytes": 12156,
+      "sha256": "9c6b775cce9af5ce6108f22ddd115ff7d757ad80b30e3d999aa9deca5869f221"
+    },
+    "tools/serialization_comparison/protocol.py": {
+      "bytes": 11155,
+      "sha256": "eab800080b8eb45e028a5b1c411bf2d115933341715e06099ceba481c9fafb61"
+    },
+    "tools/serialization_comparison/tests/test_core.py": {
+      "bytes": 43671,
+      "sha256": "5b089af6ab059f3a8ceeedaa366a3af4ce739e586bc90561f88baf83babc0462"
+    }
+  },
+  "changes": {
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/metadata/experiments/serialization_comparison/adapters/xoffset/adapter.hpp": {
+      "before": {
+        "bytes": 9619,
+        "sha256": "95df972f04326fc659e7743175a9a8ff3ad5b501948db5f1785708e7e0e6344a"
+      },
+      "after": {
+        "bytes": 9618,
+        "sha256": "c6a54774162d5e2e2e4e6343bc94400531220d64b6132fce630579f2fcc93e60"
+      },
+      "allowed": "candidate library_id/source_content_sha256 literals only"
+    },
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/metadata/tools/serialization_comparison/protocol.py": {
+      "before": {
+        "bytes": 11167,
+        "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+      },
+      "after": {
+        "bytes": 11155,
+        "sha256": "eab800080b8eb45e028a5b1c411bf2d115933341715e06099ceba481c9fafb61"
+      },
+      "allowed": "IDENTITIES.xoffset label, content hash, complete 15-file closure literals only"
+    }
+  },
+  "note": "source_archive_sha256 is inherited historical metadata and is not asserted to be a new M2 archive; current identity is the exact154/14 source and request binding."
+}

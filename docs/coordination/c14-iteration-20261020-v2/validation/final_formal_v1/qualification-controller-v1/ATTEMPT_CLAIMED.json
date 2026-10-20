@@ -1,0 +1,32 @@
+{
+  "freeze_sha256": "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+  "host_review": {
+    "identity": {
+      "bytes": 6364,
+      "sha256": "aebcb88753d3118d2e77a86e26b1bbb6308526fdc9f7287a29cdf10e50924118"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_HOST_REVIEW_v1.json"
+  },
+  "quiet": {
+    "identity": {
+      "bytes": 1674,
+      "sha256": "aea6610b56812072262d10adc3adfd214315c4325c20e3f8e3b3cfc479f5f40d"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_GLOBAL_QUIET_v1.json"
+  },
+  "request": {
+    "identity": {
+      "bytes": 4159,
+      "sha256": "7e9875518d84cbc2fd0a8c3e7cc0480778989c4dd3338d336ed6bb91f68286ba"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_TIMING_REQUEST_v1.json"
+  },
+  "review": {
+    "identity": {
+      "bytes": 2792,
+      "sha256": "52f08f87b386e9b0bf81ecc7a8e5d9063fef0c8d4234dd34058750bd08ce932c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_REVIEW_v1.json"
+  },
+  "status": "claimed_before_prelude_no_retry"
+}

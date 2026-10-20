@@ -1,0 +1,244 @@
+{
+  "actual_checker": {
+    "identity": {
+      "bytes": 6101,
+      "sha256": "e10f8749c7935247962759002f92192a2cd47440cdf3d2420c44a1fee52d6fc6"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-mechanism-original-run-v1/MECHANISM.json"
+  },
+  "checker": {
+    "identity": {
+      "bytes": 7389,
+      "sha256": "7315074f7cd37f60c893d5a22e71574324bb80194ac86fb217940b62e96cf48c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/check_dynamic_acceptance.py"
+  },
+  "new_checker_runs": 0,
+  "new_diagnostic_native": 0,
+  "result": {
+    "QF_admitted": false,
+    "bare_codegen_checked": false,
+    "candidate": "M2",
+    "diagnostic_only": true,
+    "execution_admission_checked": false,
+    "external_audit_sha256": {
+      "candidate": "fd6fea08be2a29dc4ae58ce1fdb63c51009a24dfd7027503656f42282d49adaa",
+      "control": "7b834986bd69ea3c8ca0eb0fe0e6940da3bf44f52abc8d69922f5e2a0b9af503"
+    },
+    "predicate": "positive primary-mutate nonempty eligible nodes with conserved traversal and fewer actual observed data/canonical calls",
+    "scopes": [
+      {
+        "candidate_data_reads": 154575,
+        "canonical_calls_removed": 48393,
+        "control_data_reads": 228010,
+        "data_reads_removed": 73435,
+        "nonempty_misses": 16131,
+        "nonnull_misses_derived": 16131,
+        "nontrivial_misses": 28652,
+        "scope": "primary",
+        "vectors": 154575
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "read_sum",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "load",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "query_before",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 154575,
+        "canonical_calls_removed": 48393,
+        "control_data_reads": 228010,
+        "data_reads_removed": 73435,
+        "nonempty_misses": 16131,
+        "nonnull_misses_derived": 16131,
+        "nontrivial_misses": 28652,
+        "scope": "mutate",
+        "vectors": 154575
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "emit_after",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "retire_modified_state",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "reload",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "query_after",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "cleanup",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_1",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_2",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_3",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_4",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_5",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_6",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 154575,
+        "canonical_calls_removed": 48393,
+        "control_data_reads": 228010,
+        "data_reads_removed": 73435,
+        "nonempty_misses": 16131,
+        "nonnull_misses_derived": 16131,
+        "nontrivial_misses": 28652,
+        "scope": "mutation_7",
+        "vectors": 154575
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_8",
+        "vectors": 0
+      },
+      {
+        "candidate_data_reads": 0,
+        "canonical_calls_removed": 0,
+        "control_data_reads": 0,
+        "data_reads_removed": 0,
+        "nonempty_misses": 0,
+        "nonnull_misses_derived": 0,
+        "nontrivial_misses": 0,
+        "scope": "mutation_9",
+        "vectors": 0
+      }
+    ],
+    "screen_admitted": false,
+    "speed_inferred": false,
+    "status": "mechanism_hit"
+  }
+}

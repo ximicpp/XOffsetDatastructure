@@ -1,0 +1,292 @@
+{
+  "schema": "independent-final-formal-source-acceptance-v1",
+  "status": "passed_source_only_authoring_incomplete",
+  "reviewer": "phase_c_source_review",
+  "date": "2026-10-20 Asia/Shanghai",
+  "source_derivation_review": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\reviews\\FINAL_FORMAL_SOURCE_DERIVATION.json",
+    "identity": {
+      "bytes": 29942,
+      "sha256": "75b0b8332612d43295c6146287dc8c70ec7e74b099d54a88c926d31aaf316132"
+    }
+  },
+  "source_only_accepted": true,
+  "source_pins": [
+    {
+      "name": "six-role-campaign.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\six-role-campaign.py",
+        "identity": {
+          "bytes": 115800,
+          "sha256": "7e7bdebf06bc58df4a645d1b04fe237e807b2cb46447d7c276fc1bd1377857d3"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\six-role-campaign.py",
+        "identity": {
+          "bytes": 89763,
+          "sha256": "92c79e792f666b8700981d05bbc71c52045cebc8090716484e2c2ef57d6f451f"
+        }
+      }
+    },
+    {
+      "name": "phase_protocol.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\four-path-plan-support-20261018\\statistics\\phase_protocol.py",
+        "identity": {
+          "bytes": 17354,
+          "sha256": "4be28ab149726a5dafef9ebbcc572a2462748ab58a74ae45e7ea98e7ad0b3a7f"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\four-path-plan-support-20261018\\statistics\\phase_protocol.py",
+        "identity": {
+          "bytes": 17354,
+          "sha256": "4be28ab149726a5dafef9ebbcc572a2462748ab58a74ae45e7ea98e7ad0b3a7f"
+        }
+      }
+    },
+    {
+      "name": "comparison_protocol.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\performance-v5\\measurement\\comparison_protocol.py",
+        "identity": {
+          "bytes": 13491,
+          "sha256": "444095c1d6640dd05e11b71e8f75ec2cbf7f3d150734623d015e9a4d7ec16852"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\performance-v5\\measurement\\comparison_protocol.py",
+        "identity": {
+          "bytes": 13491,
+          "sha256": "444095c1d6640dd05e11b71e8f75ec2cbf7f3d150734623d015e9a4d7ec16852"
+        }
+      }
+    },
+    {
+      "name": "conditioning_envelope.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\conditioning_envelope.py",
+        "identity": {
+          "bytes": 2915,
+          "sha256": "c1ab6d1ad275b716500e269942969abb4ace4a4550a5eb890758fa1b9f1b6fa1"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\conditioning_envelope.py",
+        "identity": {
+          "bytes": 2915,
+          "sha256": "c1ab6d1ad275b716500e269942969abb4ace4a4550a5eb890758fa1b9f1b6fa1"
+        }
+      }
+    },
+    {
+      "name": "runtime_resources.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\runtime_resources.py",
+        "identity": {
+          "bytes": 14438,
+          "sha256": "11888f0dfbf398749eb5a5c730d35e7ce138a2fdd49070e7005562847dba5fff"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\runtime_resources.py",
+        "identity": {
+          "bytes": 14438,
+          "sha256": "11888f0dfbf398749eb5a5c730d35e7ce138a2fdd49070e7005562847dba5fff"
+        }
+      }
+    },
+    {
+      "name": "power_environment.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\power_environment.py",
+        "identity": {
+          "bytes": 5008,
+          "sha256": "c907215b74800e552c153ac1bd072ace0c5b3d45e86ca54ecf98701d4ac02e09"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\power_environment.py",
+        "identity": {
+          "bytes": 5008,
+          "sha256": "c907215b74800e552c153ac1bd072ace0c5b3d45e86ca54ecf98701d4ac02e09"
+        }
+      }
+    },
+    {
+      "name": "power-control.ps1",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\power-control.ps1",
+        "identity": {
+          "bytes": 3617,
+          "sha256": "db9691fe2a6b21dfdf9be6b985f549e551638ac14d19575f41baba7ffff290a9"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\power-control.ps1",
+        "identity": {
+          "bytes": 3617,
+          "sha256": "db9691fe2a6b21dfdf9be6b985f549e551638ac14d19575f41baba7ffff290a9"
+        }
+      }
+    },
+    {
+      "name": "campaign.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\campaign.py",
+        "identity": {
+          "bytes": 54171,
+          "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\native_helpers\\campaign.py",
+        "identity": {
+          "bytes": 54171,
+          "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+        }
+      }
+    },
+    {
+      "name": "core.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\core.py",
+        "identity": {
+          "bytes": 7845,
+          "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\native_helpers\\core.py",
+        "identity": {
+          "bytes": 7845,
+          "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+        }
+      }
+    },
+    {
+      "name": "protocol.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\protocol.py",
+        "identity": {
+          "bytes": 10497,
+          "sha256": "2a134dfe05b593f66f7b0b6f40501dcefd103fe0b97e6f1e1004a57cf9ee26d9"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\native_helpers\\protocol.py",
+        "identity": {
+          "bytes": 11739,
+          "sha256": "8a1a6cf4cf32d8a7ea4d2c29e938b0afe82e26f3a7945c6706898c5c587e1c3a"
+        }
+      }
+    },
+    {
+      "name": "run_job.py",
+      "original": {
+        "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\frozen-qualification-v1\\tools\\run_job.py",
+        "identity": {
+          "bytes": 16898,
+          "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+        }
+      },
+      "derived": {
+        "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\final_formal_v1\\run_job.py",
+        "identity": {
+          "bytes": 16898,
+          "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+        }
+      }
+    }
+  ],
+  "source_changes": {
+    "derived": 2,
+    "unchanged": 9,
+    "executor_changed_top_functions": [
+      "configure",
+      "freeze",
+      "registration_source"
+    ],
+    "executor_total_functions": 47,
+    "executor_44_other_functions_byte_identical": true,
+    "protocol_all8_functions_byte_identical": true,
+    "executor_global_change_scope": [
+      "assign:B",
+      "assign:BASELINE_FIXTURE",
+      "assign:BASELINE_ORIGIN_PROFILE",
+      "assign:CANDIDATE_ORIGIN_PROFILE",
+      "assign:COORD",
+      "assign:LIVE_RUNNER",
+      "assign:PREVIOUS",
+      "assign:R",
+      "assign:RESOURCE_TEST_RECEIPT",
+      "assign:STAGE_BINDINGS",
+      "function:configure",
+      "function:freeze",
+      "function:registration_source"
+    ],
+    "protocol_global_change_scope": [
+      "assign:CANDIDATE_CLOSURE_IDS",
+      "assign:CANDIDATE_CONTENT_SHA256",
+      "assign:IDENTITIES"
+    ],
+    "author_AST_report_consistent_with_independent_text_and_diff": true,
+    "independent_project_Python_AST_executed": false,
+    "both_exact_unified_diffs_reproduce_actual_sources_in_memory": true
+  },
+  "identity_metadata_checks": {
+    "actual_singleton_source_and_identity_files_hashed": 30,
+    "control_main": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3",
+    "candidate_main": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+    "control_content": "26299f796e2ba289ab15b38b000a785ad1877fbc65ce29cf3071d2118804c3b4",
+    "candidate_content": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+    "candidate_adapter": "xoffset-c14-r1-m2-combined-v1",
+    "normal_SAN_profiles_actual_small_metadata_match": true,
+    "compiled_bindings_match_declared_control_candidate_binary_identities": true,
+    "competitor_versions_modes_preserved": true,
+    "actual_binary_hash_performed": false,
+    "full_dependency_alias_inventory_not_collapsed": true
+  },
+  "preserved": {
+    "Q_macrocycles": 32,
+    "F_macrocycles": 64,
+    "AA": 30,
+    "primary": 12,
+    "auxiliary": 40,
+    "Q_seconds": 2700,
+    "F_seconds": 5400,
+    "audit_seconds": 3600,
+    "child_seconds": 20,
+    "H_Q": 300,
+    "H_F": 300,
+    "Q_allocated_GiB": 4,
+    "F_allocated_GiB": 8,
+    "free_margin_GiB_each": 2,
+    "locked_math_schedule_conditioner_resource_pooling": "all original bytes unchanged"
+  },
+  "unchanged_mechanisms": [
+    "Six-role original model/fixture/public calls and fixed competitor modes.",
+    "Original statistics, schedule/seed, conditioner/primary timing boundaries,30A/A,12primary+40auxiliary,early error and first-error rules.",
+    "All original resource/power/lease/recovery/deadline and child/audit/window caps.",
+    "Fresh independently generated wire/canonical/query, full validation before verified pooling; logical/generated/allocated/transient costs retained separately."
+  ],
+  "authoring_gap": {
+    "sole_unbound_STAGE_BINDINGS_field": "fixed_input_captures",
+    "configure_fails_closed_before_project_import": true,
+    "interpretation": "Intentional unbound authoring state, not executable freeze/run/audit acceptance or a reason to rewrite the framework.",
+    "future_capture_binding": "Use original complete record schema and exact sealed inputs/profile/argv/environment/ordering; no body or binary was read or hashed in this review.",
+    "other_execution_prerequisites": "Own final combined gates/current registration/quiet/resource/power and six-role complete-process maxC/maxP remain independently required."
+  },
+  "blocker_count": 0,
+  "new_project_Python_executions": 0,
+  "new_compiler_executions": 0,
+  "new_native_executions": 0,
+  "new_queue_dispatches": 0,
+  "new_probe_executions": 0,
+  "body_or_binary_hashes": 0,
+  "execution_freeze_accepted": false,
+  "qualification_passed": false,
+  "formal_passed": false,
+  "performance_goal_complete": false
+}

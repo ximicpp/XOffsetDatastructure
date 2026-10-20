@@ -1,0 +1,46 @@
+{
+  "candidate_identity": {
+    "identity": {
+      "bytes": 45694,
+      "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json"
+  },
+  "evidence": [
+    {
+      "identity": {
+        "bytes": 38610,
+        "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+    },
+    {
+      "identity": {
+        "bytes": 10321,
+        "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+    },
+    {
+      "identity": {
+        "bytes": 63620,
+        "sha256": "4ee804a4ff79262c425152f15c57a5ed78c159165a4e54d794a3792335f16abe"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/receipt.json"
+    }
+  ],
+  "gate": "full_san",
+  "independent_review": {
+    "record": {
+      "identity": {
+        "bytes": "25995",
+        "sha256": "a33493ba4a5c214fdcb8649fc2d26b4b55a5fcecc16539b4393186015d842ea2"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_TYPED_GATE_COMPOSITION_ACCEPTANCE_v1.json"
+    },
+    "status": "passed"
+  },
+  "own_new_execution_here": false,
+  "scope": "Own combined actual73 SAN tests, fixed address+undefined toolchain scope retained.",
+  "status": "passed"
+}

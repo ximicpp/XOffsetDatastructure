@@ -1,0 +1,26 @@
+{
+  "kind": "f64-root-controlled-quiet-facts-v1",
+  "observed_utc": "2026-10-19T22:21:49.641177+00:00",
+  "core_thread": {
+    "id": "01a15479-b18c-7233-9336-20df97b3fe47",
+    "cursor": "67766441-970d-4c33-9db8-dc2a8d4ab165:103",
+    "status": "idle",
+    "turn": "completed"
+  },
+  "validation_thread": {
+    "id": "01a15479-36f3-72d3-8c17-6630a51f854b",
+    "cursor": "619f3d7c-c61f-4623-96b1-9f05e4491e9b:548",
+    "status": "idle",
+    "turn": "completed",
+    "next": "sole exact F64 executor"
+  },
+  "root_agents": {
+    "phase_c_source_review": "completed_idle",
+    "runtime_observer_review": "completed_idle",
+    "v2_stats_review": "completed_idle"
+  },
+  "observed_by": "Root actual direct known-thread snapshot timeout0 plus collaboration.list_agents immediately before this record",
+  "heavy_jobs_in_controlled_scope": [],
+  "scope": "Current project core/validation chats and current root agent tree only. Not an inventory or claim about unrelated user chats/apps. Root does not compile/benchmark/audit during sole timing. Original shared lease serializes controlled heavy work.",
+  "unrelated_host_apps": "Existing UnrealEditor/zenserver/Code remain outside two-name pause authority; no whole-machine quiet/core exclusivity/frequency-lock claim."
+}

@@ -1,0 +1,175 @@
+{
+  "QF_admitted": false,
+  "actions_performed": {
+    "R1_raw144_read": 0,
+    "checker_or_truth_calls": 0,
+    "compile": 0,
+    "host": 0,
+    "native": 0,
+    "prepare_or_observer_entry": 0,
+    "queue": 0,
+    "small_JSON_hash_arithmetic_and_source_review_only": true
+  },
+  "candidate": "m2-exact-owns-v1",
+  "capture_admitted": false,
+  "historical_scope_note": "Original FULL_ACCEPTANCE/MECHANISM_ACCEPTANCE remain their original schemas and do not directly satisfy v4 review_file/validate_reviews. New independently authored parent bridge records explicitly map the already accepted exact evidence; no original review/evidence/tool bytes were edited, no absent-field fallback or fabricated passing count is used. requirements.suggested full-review path remains descriptive; prepare must use the explicit functional bridge path/SHA shown here.",
+  "host_observer_static_review": {
+    "behavior": "Checks original W1 validation holder/out/supervisor PID; creates only M2 observation metadata, calls already reviewed prepare_plan(...Mode Plan) read-only enumeration and current power /getactivescheme, writes HOST_OBSERVATION. Does not construct ProcessPause,start guard,suspend/resume processes or change power. prepare_plan uses Hidden PowerShell,30s cap, fresh plan and actual identity validation. No action occurs on import except module loading; main is guarded.",
+    "changes": [
+      "module path r1 -> m2",
+      "own observation lease r1-screen-host-observe-v1-lease -> m2-screen-host-observe-v1-lease",
+      "controller/pause-module/helper references use m2 directory"
+    ],
+    "exact_R1_to_M2_text_derivation": true,
+    "observer_executed_by_reviewer": false,
+    "pause_authorized_by_this_review": false,
+    "runtime_requirements": [
+      "Actual independent original W1 validation lease and current M2 config must exist before the observer is invoked.",
+      "Plan remains a pre-review observation; fresh held handles/token/actual quiet and new plan are still required at actual host prelude.",
+      "This source result does not attest that an observer or any host action has run."
+    ],
+    "sha256": "73c8e013bd435aa27811a553770bb9ea4b41525ca8ee90e074541a01b3a50346",
+    "status": "passed"
+  },
+  "host_pause_admitted": false,
+  "kind": "independent-M2-capture-preparation-source-review-v4-bridge",
+  "new_functional_bridge": {
+    "identity": {
+      "bytes": 1880,
+      "sha256": "dc43c3e27c650d241d1dbb4ef002635fe99280277a9866431eb07d2d9eec5dca"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_CAPTURE_FUNCTIONAL_ACCEPTANCE.json"
+  },
+  "new_mechanism_bridge": {
+    "identity": {
+      "bytes": 1778,
+      "sha256": "4d8deaf53cfbaf22c244a7ec3f1d738b1191e5b34dfa96f81f46166bc4866e70"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_EXECUTION_ACCEPTANCE.json"
+  },
+  "observed_utc": "2026-10-19T19:02:43.217994+00:00",
+  "prior_blocked_review_preserved": {
+    "identity": {
+      "bytes": 11892,
+      "sha256": "e832dec0edf430d166a64415aeeec9e5ce7adfd555e01185dded9fa09fef412a"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_CAPTURE_PREPARATION_SOURCE_REVIEW_v4.json"
+  },
+  "remaining_before_any_native": [
+    "Parent chooses source-only prepare using exact bridge arguments and current M2-only power/CPU/resource observation.",
+    "Independently review actual emitted M2 PRECONDITIONS/config/RESOURCE_CAPTURE_REQUEST/dispatch and full source/runtime/input/tool closures, then give exact request SHA capture admission.",
+    "Finite capture budget remains at most1control+1candidate/20seach/120souter/no compile/warmup/retry/timing inference;144 timing samples are a later distinct parent-reviewed freeze with11 gates/current host/quiet."
+  ],
+  "required_prepare_arguments": {
+    "full_review": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_CAPTURE_FUNCTIONAL_ACCEPTANCE.json",
+    "full_review_sha256": "dc43c3e27c650d241d1dbb4ef002635fe99280277a9866431eb07d2d9eec5dca",
+    "mechanism_review": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_EXECUTION_ACCEPTANCE.json",
+    "mechanism_review_sha256": "4d8deaf53cfbaf22c244a7ec3f1d738b1191e5b34dfa96f81f46166bc4866e70",
+    "power_observation": "A current M2-only actual power observation,age<=900s,unchangedGUID,no paused processes; existing file age is not waived by this source review."
+  },
+  "reviewer": "screen_review",
+  "schema_checks": {
+    "actual_full_raw_aggregate_counts73_73_80_80_84_8_4_4_52": true,
+    "before_after_original_queue_cleanup_backed": true,
+    "full_count_mapping": {
+      "AB_native_actions": {
+        "underlying_field": "AB_native_actions",
+        "value": 4
+      },
+      "C_native_actions": {
+        "underlying_field": "C_native_actions",
+        "value": 4
+      },
+      "V1_extras": {
+        "underlying_field": "V1_extras",
+        "value": 8
+      },
+      "V1_main": {
+        "underlying_field": "V1_main",
+        "value": 84
+      },
+      "business_SAN": {
+        "underlying_field": "business_children_sanitized",
+        "value": 80
+      },
+      "business_normal": {
+        "underlying_field": "business_children_normal",
+        "value": 80
+      },
+      "full_SAN": {
+        "underlying_field": "sanitized_library",
+        "value": 73
+      },
+      "full_normal": {
+        "underlying_field": "normal_library",
+        "value": 73
+      },
+      "lifecycle_children": {
+        "underlying_field": "lifecycle_native_children",
+        "value": 52
+      }
+    },
+    "logical_work_and_call_conservation_backed_by_original_acceptance": true,
+    "mechanism_exact_result_and_dynamic_pins": true,
+    "mechanism_hit_backed_by_actual_raw_mutate_and_underlying_review": true,
+    "one_candidate_compile_and_diagnostic_native_no_new_control": true,
+    "positive_mutate_scope": {
+      "candidate_data_reads": 154575,
+      "canonical_calls_removed": 48393,
+      "control_data_reads": 228010,
+      "data_reads_removed": 73435,
+      "nonempty_misses": 16131,
+      "nonnull_misses_derived": 16131,
+      "nontrivial_misses": 28652,
+      "scope": "mutate",
+      "vectors": 154575
+    },
+    "review_domain_paths_and_exact_SHA": true,
+    "review_file_passed_status_same_candidate_empty_mismatches": true,
+    "source154_each_full_bound_backed_by_actual_gate_and_original_review": true,
+    "v4_full_functional_gates_and_candidate_identity_refs": true
+  },
+  "scope": "New actual parent schema bridges are verified against original accepted evidence and the unchanged v4 source. This resolves the prior schema incompatibility for these exact bridge arguments only; source-only preparation may be considered by parent, native capture remains separately unadmitted.",
+  "screen_admitted": false,
+  "self_authorized_execution": false,
+  "source_blockers": [],
+  "status": "passed",
+  "tool": {
+    "identity": {
+      "bytes": 16055,
+      "sha256": "3b922974dbc6b0b97b57a157a4520107e13e3868733caff0d2ee78eaa44b0f79"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/prepare_capture_v4.py"
+  },
+  "unchanged_static_findings": [
+    {
+      "area": "actual M2 facts",
+      "details": "actual_facts pins final M2_FUNCTIONAL_GATES SHA6af220..., own candidate identity154/production14, full73+73,80+80,V1/AB/C,consumers/shared/lifecycle52 and one-candidate diagnostic mechanism. Positive mutate raw scope requires nonempty_misses,data_reads_removed,canonical_calls_removed>0, checks complete original mechanism runbf6d7ffe... and empty cleanup. Actual facts are separate from the incompatible independent acceptance consumer.",
+      "status": "satisfactory_at_static_scope"
+    },
+    {
+      "area": "source-only M2 metadata",
+      "details": "Only known fixed metadata names under M2 OUT are written exclusively with open(x), resolved-parent enforced. Neither mode dispatches a queue, compiles or runs native. prepare imports only previously reviewed unchanged M2 worker for config/request-capture after its intended independent gates. No R1/shared/v3 write or reset exists in call paths; capture prefix and screen output are distinct fresh M2 domains.",
+      "status": "satisfactory_at_static_scope"
+    },
+    {
+      "area": "profile/input/compiler/CPU/power/resource binding",
+      "details": "On successful compatible prerequisites, original S.config/S.request_capture freshly bind actual own profile/binary/effective bare argv/154/14/dependencies/61Blauncher/real compiler/runtime/input/tools; v4 does not waive these checks. CPU2 must be actually allowed, with current affinity recorded. Power observation must be M2-only, unchanged/no paused processes, GUID valid and age<=900s in prepare. Cost policy fixed2resources20/120,144screen600,60nonchild+30seal+.25tail,16GiB RSS/4GiBallocated/2GiBreserve;staged1.275457023s/62218240B remains charged. Future exactrequest admission remains mandatory, neither engineering nor screen passes here.",
+      "status": "conditional_source_path_only"
+    }
+  ],
+  "underlying_full_acceptance": {
+    "identity": {
+      "bytes": 15117,
+      "sha256": "312d7d965f2c039d89eada390de7cf2c10b8a15c1599961c1297d4226ee793b7"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_FULL_ACCEPTANCE.json"
+  },
+  "underlying_mechanism_acceptance": {
+    "identity": {
+      "bytes": 4727,
+      "sha256": "7ca0a36ed401a3c8769774cb70e3a201bebd6e5259225c2fcb28e3e9aab6891e"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_ACCEPTANCE.json"
+  }
+}

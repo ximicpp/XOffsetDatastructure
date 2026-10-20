@@ -1,0 +1,52 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/formal-host-prelude-v1",
+    "--timeout-seconds",
+    "60",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/formal_host_v1/execute.py",
+    "prelude",
+    "--frozen",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1",
+    "--review",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_REVIEW_v1.json",
+    "--quiet",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_GLOBAL_QUIET_v1.json",
+    "--host-review",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_HOST_REVIEW_v1.json",
+    "--request",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/f64_preparation/F64_TIMING_REQUEST_v1.json",
+    "--freeze-sha256",
+    "5c5a81530b808ff5420bfed36b00b838ef6c147987542012acb4057f9af132d8",
+    "--request-sha256",
+    "1b1c3162fa66a3a24eee3b3455f38e96f0bf93831540c624c2c4d02f2a62cc1c"
+  ],
+  "host_review": {
+    "identity": {
+      "bytes": 3906,
+      "sha256": "16a1308a964d887a99b0991c7f5cc6cff35f95c7dee291cb086200336ffe70ab"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_HOST_REVIEW_v1.json"
+  },
+  "quiet": {
+    "identity": {
+      "bytes": 1940,
+      "sha256": "3bb17dcc81fa5a4baede2d132bfc3fcf7d75540cd794770b3940b5748c4a23f9"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_GLOBAL_QUIET_v1.json"
+  },
+  "watchdog_budget": "5520 total; actual conservative remaining>=5460 immediately before5400 timing; no audit inside pause."
+}

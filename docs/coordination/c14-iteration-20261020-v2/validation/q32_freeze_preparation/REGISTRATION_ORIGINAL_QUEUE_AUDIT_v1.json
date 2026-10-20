@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "audit",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/registration-prepare-v1"
+  ],
+  "returncode": 0,
+  "stderr": "",
+  "stdout": "{\"job_status\": \"complete\", \"run_id\": \"2e1332061ace49e49b997cc4bcac2842\", \"status\": \"audit_passed\"}\n"
+}

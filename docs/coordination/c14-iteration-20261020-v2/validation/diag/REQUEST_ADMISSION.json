@@ -1,0 +1,29 @@
+{
+  "status": "awaiting_independent_actual_freeze_admission",
+  "freeze": "validation/diag/C_FREEZE_DRAFT.json",
+  "freeze_sha256": "250ce7daf7e1fb20513c8977928524c008aa6079211dbb66b9f5ef7efc4c7f0c",
+  "resources": "validation/diag/C_RESOURCES_DRAFT.json",
+  "resources_sha256": "c542130c32939553062dac3f24cee991ce40098892b83844bdd17991a36bca79",
+  "coordinator_sha256": "9d7b3585cdc05a2c3444b931702da27bad9c914944478fcf0b61a878f86e60bb",
+  "source_only_prepare_run_id": "ad28ea8a095848eebdf75aeaa80dbfe5",
+  "source_only_prepare_elapsed_seconds": 6.118776186,
+  "source_only_prepare_cleanup": "empty",
+  "compile_count": 0,
+  "native_count": 0,
+  "cpp_native_budget": 2,
+  "role_order": [
+    "c14",
+    "r1"
+  ],
+  "compiler_budget": 2,
+  "per_compile_seconds": 120,
+  "per_native_seconds": 20,
+  "whole_job_seconds": 600,
+  "body_bytes": 134217728,
+  "log_bytes": 1048576,
+  "no_further_dummy_required": true,
+  "current_backing_free_bytes": 54748459008,
+  "actual_assembled_review": "validation/review/C_ASSEMBLED_REVIEW.json",
+  "scope_review": "reviews/C_COORDINATOR_REVIEW.md",
+  "read_note": "Linux fixed_files contains case-sensitive headers. PowerShell ConvertFrom-Json needs -AsHashtable; Python JSON preserves exact keys."
+}

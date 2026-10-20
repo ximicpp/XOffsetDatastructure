@@ -1,0 +1,514 @@
+{
+  "status": "passed",
+  "candidate": "m2-exact-owns-v1",
+  "scope": "Actual M2 functional/source gates only; not dynamic-hit or performance evidence",
+  "request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_M2_FULL.json",
+    "identity": {
+      "bytes": 77818,
+      "sha256": "9fe1735d1e1bb4e0f3a7afde43f1ae9257176a61a485e0879374f85a9dc3d1c8"
+    }
+  },
+  "candidate_identity": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/build/c14-iteration-20261020-v2/candidates/m2-exact-owns-v1/IDENTITY.json",
+    "identity": {
+      "bytes": 44233,
+      "sha256": "4a62016c53b103964d4a0b14ce56e3b717b59b54b011efbd52c021b7114b944c"
+    }
+  },
+  "production_files": {
+    "receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "receive_raw.hpp": {
+      "bytes": 50646,
+      "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+    },
+    "receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "xoffset_core_lifetime.hpp": {
+      "bytes": 7269,
+      "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+    },
+    "xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "bytes": 20900,
+      "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+    },
+    "xoffsetdatastructure.hpp": {
+      "bytes": 278527,
+      "sha256": "3e347612c1a62299bb910c68dd6b1411663f3165e18e298a51e7ba2e062c201f"
+    }
+  },
+  "full": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/m2_full/M2_FULL_RESULT.json",
+    "identity": {
+      "bytes": 3109,
+      "sha256": "e28280c05b03f84f195a1f498b09444327c9ddbc21b798a6ec2289cc7861fb7a"
+    }
+  },
+  "full_closure": {
+    "normal": {
+      "receipt": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/receipt.json",
+        "identity": {
+          "bytes": 63377,
+          "sha256": "e889e1664bc8489f30356a9203a487314eb3929812a5d004580816787850c873"
+        }
+      },
+      "request": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/m2_full/M2_FULL_NORMAL_REQUEST_v1.json",
+        "identity": {
+          "bytes": 8344,
+          "sha256": "cbfda27d5628822d8ebb4d78515e7e155031c61458d43678efc799881654ab28"
+        }
+      },
+      "junit": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/ctest.xml",
+        "identity": {
+          "bytes": 42942,
+          "sha256": "43b7af4a312a9b131057947b83b2267e68b2cef659e2b515eb9112d9bd7239a2"
+        }
+      },
+      "inventory": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/build/test-inventory.json",
+        "identity": {
+          "bytes": 2227,
+          "sha256": "ea4ee8688cb7387f1232a6e300a67c51aa028adaa99bd34e5a3b83726cce2c73"
+        }
+      }
+    },
+    "sanitized": {
+      "receipt": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-sanitized/receipt.json",
+        "identity": {
+          "bytes": 63560,
+          "sha256": "dcab7683086e0b469e790514a7fe6cc3314a3c37a363bb20148214e4bd2c2d64"
+        }
+      },
+      "request": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/m2_full/M2_FULL_SANITIZED_REQUEST_v1.json",
+        "identity": {
+          "bytes": 8350,
+          "sha256": "9de114d2b55621426b0740a3d69c7f1074b5a80ed911d983dc2847022b298777"
+        }
+      },
+      "junit": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-sanitized/ctest.xml",
+        "identity": {
+          "bytes": 42897,
+          "sha256": "fdc0f6b158a1b59b24fcd214f376957ad0b791b94dd660765c90168097a17bfb"
+        }
+      },
+      "inventory": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-sanitized/build/test-inventory.json",
+        "identity": {
+          "bytes": 2227,
+          "sha256": "ea4ee8688cb7387f1232a6e300a67c51aa028adaa99bd34e5a3b83726cce2c73"
+        }
+      }
+    }
+  },
+  "targeted": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_NATIVE_RESULT.json",
+    "identity": {
+      "bytes": 3487,
+      "sha256": "f86319ebed7245a53805f93809d85a0c25e5d613d5d2621954b9105cd52c1931"
+    }
+  },
+  "business": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/final-business-functional-v2/result.json",
+    "identity": {
+      "bytes": 4512,
+      "sha256": "b55f9b9eea8cc10e3b904480303f9cc83f22d2e09933a151418aea2921b460fa"
+    }
+  },
+  "V1_bidirectional": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/business-compatibility-driver-v2/result.json",
+    "identity": {
+      "bytes": 2685,
+      "sha256": "d6c3a4f42f0e2dd7e75793fa3a3d83cbf657d35ee664e586766dea39b56a2069"
+    }
+  },
+  "consumers": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/package-standard-v2/result.json",
+    "identity": {
+      "bytes": 3573,
+      "sha256": "5bb793716ccdc7a228debe01aeae834842cc5255e2875b4889d6252f82c164b4"
+    }
+  },
+  "shared_runtimes": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/package-runtime-v2/result.json",
+    "identity": {
+      "bytes": 3392,
+      "sha256": "cd7cf0b889e3b0d6370bb5e393f7a83ca1545aae0f62ff23008d4c268cd7e8f2"
+    }
+  },
+  "lifecycle52": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-matrix-v1/production-C-matrix-v2/result.json",
+    "identity": {
+      "bytes": 884994,
+      "sha256": "7144754902eb092d2ce4b96a9bd0bd166042d2fa6f39399721caa37ff4f7756a"
+    }
+  },
+  "source_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/core/REVIEW_M2.md",
+    "identity": {
+      "bytes": 16470,
+      "sha256": "0981720db0c638718361e11d7d9b1ccadc7be79b7a4ee00df41f0d2830ce475f"
+    }
+  },
+  "prepared": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/m2_full/business/PREPARED.json",
+    "identity": {
+      "bytes": 111877,
+      "sha256": "99a27964cc02ca8490ba1de6d616922c5f26fdc41c26c6211ab0f38eb5afbec1"
+    }
+  },
+  "tool_files": {
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/derive_m2_full.py": {
+      "bytes": 3159,
+      "sha256": "983fbdac94f34ca08f18333af66b6fed7a46af0be35899ef19ae2b1e69833628"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/finalize_m2_full.py": {
+      "bytes": 6711,
+      "sha256": "6107143c426a75561b94f3ff1a106573021c0d1f9b8d125611380ef491f9ace7"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/dispatch.py": {
+      "bytes": 3749,
+      "sha256": "dc45ed6af04267d414206744c8490bc5974853378861a89b86d8933a5e6c3fef"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/prepare.py": {
+      "bytes": 9687,
+      "sha256": "5f2113ab80081a5278d4e83e9c6844b22f3f0e5cde177ba00049ccbd5a070e28"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/TOOL_MANIFEST.json": {
+      "bytes": 9774,
+      "sha256": "074afc77400eb8e0ff21ba9caadfbad7fc81ea3078b32b496ebe514fcc884aa6"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/AB-compatibility.py": {
+      "bytes": 2905,
+      "sha256": "ae5f0f1d615c678b25f192be94541ac2da3aaff6ebe9ccd9822af6668e0fbd80"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/alpha-S-compatibility.py": {
+      "bytes": 2464,
+      "sha256": "a2e1d3f025210e48dcde5506e389e3d6b7b5b46f9aabd45e7820321997ee6add"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/bench-gates.py": {
+      "bytes": 4391,
+      "sha256": "5e2e8626624def1f1b621ea5b494339ebd67db046e433168a458444cc3581b7b"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/bench-profiles-worker.py": {
+      "bytes": 1598,
+      "sha256": "43e4c630112ec37501a9e1fc057079ae468464f90fcd76ceb4509e31f7d93953"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/business_common.py": {
+      "bytes": 9821,
+      "sha256": "2e9006e18a3b53d2920321e410dd9e6923da0dcefa235090816a6863fe5e5142"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/C-compatibility.py": {
+      "bytes": 4663,
+      "sha256": "3fbf964cc3618142142618f63d5523c33e4e8eadae8f94e736952105b044ef38"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/common.py": {
+      "bytes": 1675,
+      "sha256": "6aa693089ceb90aa895835d12d1a2caae2a026b2f54b00a524527e680e79f2c5"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/compatibility-worker.py": {
+      "bytes": 3935,
+      "sha256": "9b6920bf9d7d3108840b3dcb01e37867aab4bc2ef4ba26ca8e9c94243d9e5603"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/dispatch.py": {
+      "bytes": 1622,
+      "sha256": "e9c4b59bafd99c590facfe19662ff74125b961d14db5e8b0503fd05a1bd55673"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/functional-coordinator.py": {
+      "bytes": 6556,
+      "sha256": "e73a182d80cf5ecb7400396a13f7b9b3ef5a38eca587fa887bc3f53999fb9c3f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/new-API-compatibility.py": {
+      "bytes": 2346,
+      "sha256": "b0d3aac76427670306847d0ca8b426a4956f1a297dc716849ce72815cca0aab3"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/ancestor-archive-repair-v2-receipt.json": {
+      "bytes": 9054,
+      "sha256": "09ae5648b6c530b0cb55b59491c6eab0cad9c7470cd587ec71ed4361da294e92"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/ancestor-execution-receipt.json": {
+      "bytes": 7835,
+      "sha256": "876e10aadddb57b569302f641eb16503238c29ca6f7bd267ec67dd6506342141"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/ancestor-package-receipt.json": {
+      "bytes": 6530,
+      "sha256": "de9a9c0c345ffa737b1b8a41ced86f998a000057c1742aec8edc3a9289f03b61"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/archive-worker.py": {
+      "bytes": 7837,
+      "sha256": "b55bd62aafa87440f1a911bdd4aeaf45f89552f338cc29419c0848b016371732"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/CMakeLists.txt": {
+      "bytes": 1118,
+      "sha256": "1b2dfb5cce8f87a60e89b5da675030005e20aa3e26ef980354f607a1a7334303"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/core_first.cpp": {
+      "bytes": 143,
+      "sha256": "8c082095e123b814f16588ba76b325ba6212712fe1d56f9a7c6199014f5c9e09"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/future_first.cpp": {
+      "bytes": 138,
+      "sha256": "06579255b06c61565f4b782e847dad4783286cb0c888647cdcce3d4b1efc0034"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/main.cpp": {
+      "bytes": 2797,
+      "sha256": "eadbcd4a4e79f332671da376d523a6fde35900a577937596d4bae9c17bbe8ec4"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/raw_first.cpp": {
+      "bytes": 132,
+      "sha256": "0baa45085f92948f9f83105981b97992237242d8c2c45d6bffd4f9b2c94e001c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/consumer/root.hpp": {
+      "bytes": 917,
+      "sha256": "6849bb26a9174030fbcf44a31c51a58475477ac6dab1470123fe3752b8789762"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/deps_audit.py": {
+      "bytes": 3495,
+      "sha256": "f339e11c031c7c45becca616c7e55d406ae4b44f862f8d9ec658e569c5526518"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/dispatch.py": {
+      "bytes": 4349,
+      "sha256": "a1ec3284c04158d1a200c6924d9747d0a84ac014f5b5e1251d1d1c614244f2bf"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/exact-delta.patch": {
+      "bytes": 58880,
+      "sha256": "e126f0f0a1cfacf09c875f4fba55fd284957f9bc024231472072953b71de47a5"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/EXECUTION.md": {
+      "bytes": 5029,
+      "sha256": "c118334f4b7b3c78226ef6f7769b1f1e96898f2a48f42fe7c2324d89685c4353"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/header-probe/CMakeLists.txt": {
+      "bytes": 1202,
+      "sha256": "bb0245e926007590b73b91efb3cd0ba3a839a19dfdd1d0abeced3ec5fabd7dba"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/header_probe.py": {
+      "bytes": 4519,
+      "sha256": "7edc865bd5b5e877f7b31b26b7f43932426acb3188561e7ee4415dca3ec466a6"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/package-worker.py": {
+      "bytes": 4063,
+      "sha256": "f7140e9889535e1bd310c13f1e872ef18e633fb0673ef5ccbc804979c21b795a"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/patch.py": {
+      "bytes": 2340,
+      "sha256": "43fb9ec3737b0a0632741d39e4113a159d919bdc13051b02335720f379a0165e"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/prepare-spec.py": {
+      "bytes": 6406,
+      "sha256": "a5a2259d06e9e8850f66602e15036828b825a4590857082299cd2ce9f431a14f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/receipt.json": {
+      "bytes": 9375,
+      "sha256": "bb156a87baef9264a10d5bffbc64370cf87c9366419c27792ea71697ba4dbd46"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/budget_peer_one.cpp": {
+      "bytes": 644,
+      "sha256": "21a0ab3259ca5175efe0f083965f630bc6321f55f7545d9e11df516bc43c8a8c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/budget_peer_two.cpp": {
+      "bytes": 644,
+      "sha256": "1330ef42a3643d6c4b60774d10f1da0e13cf2240eaae5fb0e0754e7cbe5e7977"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/CMakeLists.txt": {
+      "bytes": 2975,
+      "sha256": "c6e054c91b496d0a8c83c8a45c5ef397fa9fc48eec7cff97d1a12ef7911f18f5"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/index_host_failpoint.hpp": {
+      "bytes": 3680,
+      "sha256": "5e7bb08c0947139820de6b6b90fec5b27bb9279baf05d827d875daa2037a1eb1"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/registry_module_api.hpp": {
+      "bytes": 400,
+      "sha256": "f1fd996b20d14880bb93477f2064c3a1617e24aaec3fab82fee3faa3b1a108cf"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/registry_probe_module.cpp": {
+      "bytes": 1847,
+      "sha256": "655d7e028337094d539477fe89b556bda763facd6d3eb1b61e2bb0b15f669deb"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/registry_two_tu_probe.cpp": {
+      "bytes": 303,
+      "sha256": "1136ef17d0b5ecc4ac1728112908a35b30061ab01becd66dba0c38e7ba6266d9"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/registry_two_tu_probe.hpp": {
+      "bytes": 139,
+      "sha256": "13118de3eb2dcd984e08b2bfeaceff43575950f6c4c049a56b04650df48d1bbb"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_registry_modules.cpp": {
+      "bytes": 3675,
+      "sha256": "19695e9d710783efd77a105632d67688865785f018b138397b0a6190766c98c7"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_registry_two_tu.cpp": {
+      "bytes": 1522,
+      "sha256": "4e380e453343f89a32f412fd24cc2b10248e3553a06e2a35898fc8ac922d229c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_scratch_integration.cpp": {
+      "bytes": 3646,
+      "sha256": "da7407187031978cb580bc7a9c200869ed302da36f6fdb38d0b6f693f42dd01d"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_snapshot_array_index.cpp": {
+      "bytes": 8170,
+      "sha256": "63f38ec35a2fae87345250191444968274b136f2b8fdc8e34b3de25b87b03a4f"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_snapshot_budget_shared.cpp": {
+      "bytes": 1654,
+      "sha256": "791f756abe946c3604104175648527a84046d915cf14627cee1a45fdc90c1809"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-fixtures/test_validation_scratch.cpp": {
+      "bytes": 19865,
+      "sha256": "f7639067076715ebe26cf638c786b83faeb6758cfab2b1844e6a2ff04fbcf239"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/runtime-worker.py": {
+      "bytes": 4543,
+      "sha256": "8c6ab65827292897c091565288fb0efb04bebfba3f29df31d38da38b21c8fe5b"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/SCHEMA.md": {
+      "bytes": 2727,
+      "sha256": "ef2d814c54196ee610868c46535111741be87c931ccb77237f932411727aa25c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/source-delta.json": {
+      "bytes": 12472,
+      "sha256": "307a45c4eb5c1b5f5753837feafaeb69fd0b22c89278338a454141594cc86df0"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/support.py": {
+      "bytes": 4534,
+      "sha256": "b985177a8fa0d893adaa2680353e24be46b86e0922194a63f38fab652a3f1bc5"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/test_deps_audit.py": {
+      "bytes": 3524,
+      "sha256": "5337d063e394278d08844d375e3ea5b7d9b6c58cfded035523d05472beebda59"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/v2a-delta.json": {
+      "bytes": 995,
+      "sha256": "fad141821ca9ad27517c9ddc3ce8b534ba753410396ee5ff56d8f75a25f7c46c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/package/v2a-exact-delta.patch": {
+      "bytes": 3817,
+      "sha256": "fce5f435bb871d324f96b858e0034b137f787552950dc9b3133df9000e239b00"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/prepare-functional-tools.py": {
+      "bytes": 2324,
+      "sha256": "0844797323a88c6d3aadb7ca4cae177b77625d76e5f3af5d50f0e25272f42f9b"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/profiles-reuse-v1.py": {
+      "bytes": 11939,
+      "sha256": "d377704e63b48142eb9f4039a0cfe679c6f4eb8e9dbd7d439ea9b382050af8c4"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/resize-compatibility.py": {
+      "bytes": 2058,
+      "sha256": "9c34576a9c1fb6f94286a27422de75e7d61635d3c92a4908762eb3f02e19f3bf"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/string-compatibility.py": {
+      "bytes": 2084,
+      "sha256": "4acdeb4b12013153dfb2d674a889299ba64bbb634e1a1f09951b8f1e1e1b365a"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/v1-compatibility.py": {
+      "bytes": 6573,
+      "sha256": "4c09c404f2b94289cfd743efb5bee27ef90096d5d670f8827aae375e07bf4bc6"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business/workers/v8-direct-compatibility.py": {
+      "bytes": 4675,
+      "sha256": "f301952dc8430696174abe16746d8deb2b01abc8c1eaffac031cb531d424ebec"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business_matrix/checks.py": {
+      "bytes": 15094,
+      "sha256": "e591434d291993f1e066fddb4479968a9f2cb49d36428d771f87f3ccfcd71496"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business_matrix/common.py": {
+      "bytes": 949,
+      "sha256": "dec3e2453db5fdf66ff8979cd2c997f5d8936b5ce309ab74531dea58efbc2391"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business_matrix/dispatch.py": {
+      "bytes": 4030,
+      "sha256": "198183d370efb950e3301bafaf5be67560fefe0eed5787fb4d49c45c3d82d43c"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business_matrix/TOOL_MANIFEST.json": {
+      "bytes": 587,
+      "sha256": "240e6af56594086fe8840ac78c134e391d4683b80b80181db0c41f3506df6edd"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/business_matrix/worker.py": {
+      "bytes": 19367,
+      "sha256": "8e1f2f1622ccd47950aa4bd00d8bd991e1036da8683a35b0bf998675b5d0c3c0"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/DERIVATION.json": {
+      "bytes": 37496,
+      "sha256": "5a31e83aa0e45bbb27592c8876e2087421e330c18400253ddef2de4f74209a7b"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/full_entry.py": {
+      "bytes": 11146,
+      "sha256": "b7abd0368a7dc8b09f2a315ec7d02d36d5c59d6de246c74db7776fa181200d45"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full/TOOLS.patch": {
+      "bytes": 20109,
+      "sha256": "11d19730480f978ba6d90934ef0b2de7ac4b4d1dda06ba637cc0d9d8d52f4df6"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/m2_full_jobs.py": {
+      "bytes": 5857,
+      "sha256": "fecad9dfd8b0ae3caa12a8a30629ce625e167307b7fd302922010ad5c99647fb"
+    },
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/write_m2_full_request.py": {
+      "bytes": 4792,
+      "sha256": "e04845859e430cde522cf034207e923e872fe50dea20ef19881c33e79f21d7bb"
+    },
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx": {
+      "bytes": 61,
+      "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+    }
+  },
+  "compiler_launcher": {
+    "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+    "identity": {
+      "bytes": 61,
+      "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+    }
+  },
+  "source154_each_full_rechecked": true,
+  "dynamic_mechanism": "Still separate: predeclared exact common C14 control plus one M2 candidate observation; static4-to-1 is not a dynamic hit or performance result.",
+  "source_safety": "One current-node data capture, original capacity containment, miss-only size and null-safe end, same recursive expression/order and bidirectional caller checks. No owns predicate cache or new pointer lifetime boundary.",
+  "historical_text_residue": "Inherited prepare description of M1 r2/preflight remains historical explanatory text only; actual M2 references above are authoritative.",
+  "performance_accepted": false,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

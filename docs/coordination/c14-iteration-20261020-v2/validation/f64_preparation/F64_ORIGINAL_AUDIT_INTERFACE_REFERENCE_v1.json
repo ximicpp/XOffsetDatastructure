@@ -1,0 +1,16 @@
+{
+  "F_timing_admitted": false,
+  "actual_F_freeze_pin": "5c5a81530b808ff5420bfed36b00b838ef6c147987542012acb4057f9af132d8",
+  "native": 0,
+  "original_W3_functional_seconds": 3600,
+  "original_interface": {
+    "identity": {
+      "bytes": "2673",
+      "sha256": "d2ac48a94fe12f1967a4a371659d7f729ee8d72a82d7998b30bf9aedc0070169"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/core/formal_host_v1/F64_ORIGINAL_AUDIT_INTERFACE_DRAFT_v1.json"
+  },
+  "report_parent_must_exist_before_later_conditional_audit": true,
+  "restoration_before_audit_required": true,
+  "status": "unexecuted_original_interface_reference_no_postrun_pin_available"
+}

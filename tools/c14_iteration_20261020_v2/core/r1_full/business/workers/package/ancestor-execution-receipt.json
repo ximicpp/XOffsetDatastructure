@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "kind": "R6-final-v3-package-execution-source-author-receipt",
+  "status": "prepared_source_only_root_execution_pending",
+  "ancestor": {
+    "path": "../package-v1/receipt.json",
+    "bytes": 6530,
+    "sha256": "de9a9c0c345ffa737b1b8a41ced86f998a000057c1742aec8edc3a9289f03b61",
+    "preserved_unchanged": true
+  },
+  "source": "/root/xoffset-receive-completion/20261019/v1/final-v3/source",
+  "materialization": "/root/xoffset-receive-completion/20261019/v1/final-source-identity-v3.json",
+  "candidate_identity": "C/candidate-source-identity-v1.json",
+  "entries": {
+    "prepare": "/usr/bin/python3 -B H/package-execution-v1/prepare-spec.py",
+    "dispatch": "/usr/bin/python3 -B H/package-execution-v1/dispatch.py --stage package|runtime|archive|all",
+    "spec": "C/package-execution-spec-v1.json",
+    "calling_context": "dispatcher outside lease; original common.queue then workers inside exact W1 validation leases"
+  },
+  "fixed_stages": {
+    "package": {
+      "out": "B/package-standard-v1",
+      "queue": "B/queues/package-standard-v1",
+      "outer_seconds": 2400
+    },
+    "runtime": {
+      "out": "B/package-runtime-v1",
+      "queue": "B/queues/package-runtime-v1",
+      "outer_seconds": 2400
+    },
+    "archive": {
+      "out": "B/package-clean-archive-v1",
+      "queue": "B/queues/package-clean-archive-v1",
+      "outer_seconds": 3600
+    }
+  },
+  "delta": [
+    "frozen ancestor copied after all26 identity checks; original unchanged",
+    "support path prerequisite final-v1 to accepted final-v3",
+    "support binds complete execution/source-tool/helper closure and exact14 fixture files before/after existing production checks",
+    "new small spec constructor audits actual14 production/11 own and package AST/CMake header lists/full71 normal+SAN metadata",
+    "new dispatcher reuses original root queue and publishes no pass before actual worker result"
+  ],
+  "preserved_checks": {
+    "header_only_storage_full_consumers": "old3+3 each",
+    "numeric_version_rejections_per_suite": 4,
+    "dependency_headers": 851,
+    "optional_shared_runtime_consumers": "same original6+6/DSO fixtures",
+    "new_C_consumers": "same ancestor installed/subproject/moved-install/clean-source include-order and receive behavior",
+    "archive": "same maintained tar audit plus exact ZIP/full normal+SAN",
+    "formal_performance_budget_added": 0,
+    "new_production_functionality": false,
+    "native_scope_expanded": false
+  },
+  "author_execution": {
+    "imports": 0,
+    "spec_construction": 0,
+    "tests": 0,
+    "configures": 0,
+    "compilations": 0,
+    "native_processes": 0,
+    "queues": 0,
+    "measurements": 0
+  },
+  "files": [
+    {
+      "path": "ancestor-package-receipt.json",
+      "bytes": 6530,
+      "sha256": "de9a9c0c345ffa737b1b8a41ced86f998a000057c1742aec8edc3a9289f03b61"
+    },
+    {
+      "path": "archive-worker.py",
+      "bytes": 7405,
+      "sha256": "44ade8415d65fe2aebd2d7519e5991d5b88c4d19a9ebe7b6c823a2bc3adbc8d6"
+    },
+    {
+      "path": "consumer/CMakeLists.txt",
+      "bytes": 1118,
+      "sha256": "1b2dfb5cce8f87a60e89b5da675030005e20aa3e26ef980354f607a1a7334303"
+    },
+    {
+      "path": "consumer/core_first.cpp",
+      "bytes": 143,
+      "sha256": "8c082095e123b814f16588ba76b325ba6212712fe1d56f9a7c6199014f5c9e09"
+    },
+    {
+      "path": "consumer/future_first.cpp",
+      "bytes": 138,
+      "sha256": "06579255b06c61565f4b782e847dad4783286cb0c888647cdcce3d4b1efc0034"
+    },
+    {
+      "path": "consumer/main.cpp",
+      "bytes": 2797,
+      "sha256": "eadbcd4a4e79f332671da376d523a6fde35900a577937596d4bae9c17bbe8ec4"
+    },
+    {
+      "path": "consumer/raw_first.cpp",
+      "bytes": 132,
+      "sha256": "0baa45085f92948f9f83105981b97992237242d8c2c45d6bffd4f9b2c94e001c"
+    },
+    {
+      "path": "consumer/root.hpp",
+      "bytes": 917,
+      "sha256": "6849bb26a9174030fbcf44a31c51a58475477ac6dab1470123fe3752b8789762"
+    },
+    {
+      "path": "dispatch.py",
+      "bytes": 2710,
+      "sha256": "cf2ae2d0956e04d6a4c3c68ee387d1e5ecca18730fe1f566768b7645d9fe4e69"
+    },
+    {
+      "path": "EXECUTION.md",
+      "bytes": 4731,
+      "sha256": "feff750057b48634916fd2b4808667ccf4a5df94f2b0d253e8361f3a31c0c5bd"
+    },
+    {
+      "path": "package-worker.py",
+      "bytes": 4063,
+      "sha256": "f7140e9889535e1bd310c13f1e872ef18e633fb0673ef5ccbc804979c21b795a"
+    },
+    {
+      "path": "patch.py",
+      "bytes": 2340,
+      "sha256": "43fb9ec3737b0a0632741d39e4113a159d919bdc13051b02335720f379a0165e"
+    },
+    {
+      "path": "prepare-spec.py",
+      "bytes": 5117,
+      "sha256": "f5660c653a5b0327af1be2ce9430e0f4de33b2d21452a4f95adb412d8e982596"
+    },
+    {
+      "path": "runtime-fixtures/budget_peer_one.cpp",
+      "bytes": 644,
+      "sha256": "21a0ab3259ca5175efe0f083965f630bc6321f55f7545d9e11df516bc43c8a8c"
+    },
+    {
+      "path": "runtime-fixtures/budget_peer_two.cpp",
+      "bytes": 644,
+      "sha256": "1330ef42a3643d6c4b60774d10f1da0e13cf2240eaae5fb0e0754e7cbe5e7977"
+    },
+    {
+      "path": "runtime-fixtures/CMakeLists.txt",
+      "bytes": 2975,
+      "sha256": "c6e054c91b496d0a8c83c8a45c5ef397fa9fc48eec7cff97d1a12ef7911f18f5"
+    },
+    {
+      "path": "runtime-fixtures/index_host_failpoint.hpp",
+      "bytes": 3680,
+      "sha256": "5e7bb08c0947139820de6b6b90fec5b27bb9279baf05d827d875daa2037a1eb1"
+    },
+    {
+      "path": "runtime-fixtures/registry_module_api.hpp",
+      "bytes": 400,
+      "sha256": "f1fd996b20d14880bb93477f2064c3a1617e24aaec3fab82fee3faa3b1a108cf"
+    },
+    {
+      "path": "runtime-fixtures/registry_probe_module.cpp",
+      "bytes": 1847,
+      "sha256": "655d7e028337094d539477fe89b556bda763facd6d3eb1b61e2bb0b15f669deb"
+    },
+    {
+      "path": "runtime-fixtures/registry_two_tu_probe.cpp",
+      "bytes": 303,
+      "sha256": "1136ef17d0b5ecc4ac1728112908a35b30061ab01becd66dba0c38e7ba6266d9"
+    },
+    {
+      "path": "runtime-fixtures/registry_two_tu_probe.hpp",
+      "bytes": 139,
+      "sha256": "13118de3eb2dcd984e08b2bfeaceff43575950f6c4c049a56b04650df48d1bbb"
+    },
+    {
+      "path": "runtime-fixtures/test_registry_modules.cpp",
+      "bytes": 3675,
+      "sha256": "19695e9d710783efd77a105632d67688865785f018b138397b0a6190766c98c7"
+    },
+    {
+      "path": "runtime-fixtures/test_registry_two_tu.cpp",
+      "bytes": 1522,
+      "sha256": "4e380e453343f89a32f412fd24cc2b10248e3553a06e2a35898fc8ac922d229c"
+    },
+    {
+      "path": "runtime-fixtures/test_scratch_integration.cpp",
+      "bytes": 3646,
+      "sha256": "da7407187031978cb580bc7a9c200869ed302da36f6fdb38d0b6f693f42dd01d"
+    },
+    {
+      "path": "runtime-fixtures/test_snapshot_array_index.cpp",
+      "bytes": 8170,
+      "sha256": "63f38ec35a2fae87345250191444968274b136f2b8fdc8e34b3de25b87b03a4f"
+    },
+    {
+      "path": "runtime-fixtures/test_snapshot_budget_shared.cpp",
+      "bytes": 1654,
+      "sha256": "791f756abe946c3604104175648527a84046d915cf14627cee1a45fdc90c1809"
+    },
+    {
+      "path": "runtime-fixtures/test_validation_scratch.cpp",
+      "bytes": 19865,
+      "sha256": "f7639067076715ebe26cf638c786b83faeb6758cfab2b1844e6a2ff04fbcf239"
+    },
+    {
+      "path": "runtime-worker.py",
+      "bytes": 4543,
+      "sha256": "8c6ab65827292897c091565288fb0efb04bebfba3f29df31d38da38b21c8fe5b"
+    },
+    {
+      "path": "SCHEMA.md",
+      "bytes": 3475,
+      "sha256": "b74626c37fabf500cbd627d6cf9162cb51370b16f33fe1fee7e92e87c3cf6109"
+    },
+    {
+      "path": "support.py",
+      "bytes": 6766,
+      "sha256": "636083243d256ab44507481710db05903d1a839870fb38b6b496d5439625969e"
+    }
+  ],
+  "source_stop_writing": true
+}

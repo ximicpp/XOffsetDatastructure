@@ -1,0 +1,26 @@
+{
+  "actual_runtime_json_metadata_bytes": 2389247,
+  "cause": "Postindex generic2MiB read guard rejected actual2.389MB runtime metadata before parsing it; allbody/source verification was already completed by maintained freeze, and no queue audit/outputindex had yet been produced.",
+  "correction": "Only explicit frozen/runtime.json metadata read limit3MiB; all other2MiB and body-no-rehash constraints unchanged. Full original index runtime/tool/projection checks retained.",
+  "corrective_index": {
+    "identity": {
+      "bytes": 8017,
+      "sha256": "c811d509310da4d84adaef746e455b4d085e6c88bc784e3b098fdb49006ef3cc"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/q32_registration_v1/index_freeze_actual_v2.py"
+  },
+  "failed_index": {
+    "identity": {
+      "bytes": 7946,
+      "sha256": "bdf36741ed94977e1f836239d5edd555233c5006738e948ec3b784052af83262"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/q32_registration_v1/index_freeze_actual.py"
+  },
+  "freeze_repeated": false,
+  "frozen_or_bound_sources_edited": false,
+  "large_body_rehash": 0,
+  "native": 0,
+  "original_failed_index_preserved": true,
+  "queue": 0,
+  "status": "diagnosed_index_only_metadata_cap_failure_no_freeze_failure"
+}

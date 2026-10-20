@@ -1,0 +1,12 @@
+{
+  "observed_utc": "2026-10-19T18:55:52.172657Z",
+  "command": [
+    "powercfg.exe",
+    "/getactivescheme"
+  ],
+  "active_scheme_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "raw_output": "电源方案 GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (平衡)",
+  "power_changed": false,
+  "processes_paused": 0,
+  "scope": "Read-only fresh M2 preparation observation; formal host prelude and actual pause coverage require later same-freeze independent admission."
+}

@@ -1,0 +1,17 @@
+{
+  "status": "diagnosed_metadata_authoring_variable_collision_only",
+  "cause": "PowerShell case-insensitive Host is reserved; attempted local metadata host variable assignment failed. No system variable changed.",
+  "preserved_output": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_TIMING_REQUEST_v1.json",
+    "identity": {
+      "bytes": 4159,
+      "sha256": "7e9875518d84cbc2fd0a8c3e7cc0480778989c4dd3338d336ed6bb91f68286ba"
+    }
+  },
+  "correction": "Continue remaining new metadata documents with taskHostReview variable; existing request not overwritten or regenerated.",
+  "native": 0,
+  "queue": 0,
+  "project_entry": 0,
+  "pause": 0,
+  "power_change": 0
+}

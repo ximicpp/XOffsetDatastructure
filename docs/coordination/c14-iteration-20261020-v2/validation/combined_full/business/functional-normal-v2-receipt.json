@@ -1,0 +1,5 @@
+{
+  "returncode": 0,
+  "stdout": "{\"cleanup\": {\"live\": [], \"process_groups\": [], \"zombies\": []}, \"command_elapsed_seconds\": 76.69392984799998, \"command_pid\": 813, \"command_returncode\": 0, \"finished_at\": \"2026-10-19T20:00:23.600740+00:00\", \"kind\": \"functional\", \"owner\": \"W3\", \"reason\": \"command_exit\", \"run_id\": \"23298e6edbce4772863f84a513c86bab\", \"schema_version\": 1, \"started_at\": \"2026-10-19T19:59:06.903416+00:00\", \"status\": \"complete\"}\n",
+  "stderr": ""
+}

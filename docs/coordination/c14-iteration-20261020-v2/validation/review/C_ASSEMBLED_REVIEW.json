@@ -1,0 +1,549 @@
+{
+  "schema": "c14-independent-assembled-diag-source-review-v1",
+  "kind": "independent-assembled-diag-source-review",
+  "status": "passed",
+  "scope": "actual assembled source and original source-only queue identity bridge; no executable admission",
+  "reviewer": "screen_review",
+  "reviewed_utc": "2026-10-19T17:28:23.051787+00:00",
+  "static_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_SOURCE_REVIEW.json",
+    "identity": {
+      "bytes": 25228,
+      "sha256": "51f70c5e1886045174e98061bc5dde53e5dd993a6c25a3e24b6116692335c5b7"
+    }
+  },
+  "static_review_unchanged": true,
+  "materialization": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/MATERIALIZATION.json",
+    "identity": {
+      "bytes": 255150,
+      "sha256": "ca28fec8e0cf8119d6d73fb28e74dc4d2a97f9dae3d60a048c7de66925c82f38"
+    }
+  },
+  "source_ready": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/SOURCE_READY.json",
+    "identity": {
+      "bytes": 90563,
+      "sha256": "b5619305ad36e9f7c3aaece61fea1baa66867f4231a7b9bd922abd78c8099118"
+    }
+  },
+  "queue": {
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-materialize-v1-lease/request.json",
+      "identity": {
+        "bytes": 1673,
+        "sha256": "680a6efb80b11edf232509720b26873ec3ec3b451d9d49cb711fa98bd07cd758"
+      }
+    },
+    "result": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-materialize-v1-lease/result.json",
+      "identity": {
+        "bytes": 450,
+        "sha256": "491552d81ec59b0ea3fc57406a28e9a7e99f4517ea9edc2f7a6344d880166eaa"
+      }
+    },
+    "manifest": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-materialize-v1-lease/manifest.json",
+      "identity": {
+        "bytes": 912,
+        "sha256": "5e967f44b908610172ba531b5d4b0d58d5e2259f1f7c1ea4d870ad48f80c68c9"
+      }
+    },
+    "all_manifest_members_match": true,
+    "run_id": "4c2f9fa7121b4b589aa175339b812a99",
+    "owner": "W1",
+    "kind": "validation",
+    "elapsed_seconds": 23.157012728999998,
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "original_runner": {
+      "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+      "identity": {
+        "bytes": 16898,
+        "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+      }
+    },
+    "compile_count": 0,
+    "native_count": 0
+  },
+  "roles": {
+    "c14": {
+      "source": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14",
+      "final_identity": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85166,
+          "sha256": "1d609d6bf3751b38289b74a03cf1511d5ffbc3baef32e88fea96abb278741592"
+        }
+      },
+      "actual_files_without_final_identity": 160,
+      "all_recorded_file_identities_match": true,
+      "source_154_count": 154,
+      "source_154_inventory_sha256": "8ee7bb422ff5f2a3bf311c1f3fb7db94d3c7ba70e14cc43cc1ad595d362b0161",
+      "production_14": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 285447,
+          "sha256": "1abf4095345f93913aa905fe0faa1448ea5128832e635d6bdd9cd23566694b9b"
+        }
+      },
+      "origin_154_inventory_sha256": "d22212d43f8145f5f9a439027d931b8da78fa302a24c840a61ef821d481bbe30",
+      "unchanged_origin_members": 153,
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/c14-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1215,
+          "sha256": "3e9c150d7e1e41c79b3b25dd5f24a8f7778ddd652745706cf1af72d73a59a770"
+        }
+      },
+      "driver": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/experiment/driver.cpp",
+        "identity": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        }
+      },
+      "adapter": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "hook": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      },
+      "event_header": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/experiment/event_channel.hpp",
+        "identity": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "driver_diff": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/c14/DRIVER_DIFF.patch",
+        "identity": {
+          "bytes": 16463,
+          "sha256": "8c17c2c870fc2914fc9e0f04ec0287cddf4562532e76e7a74ae666f884510df4"
+        }
+      },
+      "actual_source_event_order": [
+        "main.begin",
+        "input.read.before",
+        "input.read.after",
+        "input.decode.before",
+        "input.decode.after",
+        "input.hash.before",
+        "input.hash.after",
+        "t0",
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "emit.pod0",
+        "emit.pod1",
+        "emit.pod2",
+        "t5",
+        "t6",
+        "t7",
+        "t8",
+        "postaudit.load.before",
+        "postaudit.load.after",
+        "postaudit.export.before",
+        "postaudit.export.after",
+        "postaudit.hash.before",
+        "postaudit.hash.after",
+        "truth.replay.before",
+        "truth.replay.after",
+        "write.wire.before",
+        "write.wire.after",
+        "write.canonical.before",
+        "write.canonical.after",
+        "write.queries.before",
+        "write.queries.after",
+        "write.result.before",
+        "write.result.after",
+        "main.end"
+      ]
+    },
+    "m2": {
+      "source": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2",
+      "final_identity": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85299,
+          "sha256": "1814408b04b80c180be68ccee5fc8f21f19d0746723f165900d312aea16a8fb4"
+        }
+      },
+      "actual_files_without_final_identity": 160,
+      "all_recorded_file_identities_match": true,
+      "source_154_count": 154,
+      "source_154_inventory_sha256": "5f8f63f03b1945dd83dfd532f791a086fd1d426ee5ca8dc7513f6fa3e5f5fbb6",
+      "production_14": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 285716,
+          "sha256": "089036e7f8f3e94144d7c41f2e2fae38eec54066175216ad359a233bdb01bfa3"
+        }
+      },
+      "origin_154_inventory_sha256": "c0ba88fd821f9e96f4ced4b3b4fb4acb9235988d35527bcbc7be7e15870a968e",
+      "unchanged_origin_members": 153,
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/m2-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1284,
+          "sha256": "045c1a9f8a7b5e7b398985e0aad73bebaa63dfe7b491216232353b3f99c0082b"
+        }
+      },
+      "driver": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/experiment/driver.cpp",
+        "identity": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        }
+      },
+      "adapter": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "hook": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      },
+      "event_header": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/experiment/event_channel.hpp",
+        "identity": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "driver_diff": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/m2/DRIVER_DIFF.patch",
+        "identity": {
+          "bytes": 16463,
+          "sha256": "8c17c2c870fc2914fc9e0f04ec0287cddf4562532e76e7a74ae666f884510df4"
+        }
+      },
+      "actual_source_event_order": [
+        "main.begin",
+        "input.read.before",
+        "input.read.after",
+        "input.decode.before",
+        "input.decode.after",
+        "input.hash.before",
+        "input.hash.after",
+        "t0",
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "emit.pod0",
+        "emit.pod1",
+        "emit.pod2",
+        "t5",
+        "t6",
+        "t7",
+        "t8",
+        "postaudit.load.before",
+        "postaudit.load.after",
+        "postaudit.export.before",
+        "postaudit.export.after",
+        "postaudit.hash.before",
+        "postaudit.hash.after",
+        "truth.replay.before",
+        "truth.replay.after",
+        "write.wire.before",
+        "write.wire.after",
+        "write.canonical.before",
+        "write.canonical.after",
+        "write.queries.before",
+        "write.queries.after",
+        "write.result.before",
+        "write.result.after",
+        "main.end"
+      ]
+    },
+    "r1": {
+      "source": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1",
+      "final_identity": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/FINAL_SOURCE_IDENTITY.json",
+        "identity": {
+          "bytes": 85313,
+          "sha256": "6e801a9914ee987d89f8f4df1df98ce414f9f61d4f89bc2bc94d91eb4e4094b2"
+        }
+      },
+      "actual_files_without_final_identity": 160,
+      "all_recorded_file_identities_match": true,
+      "source_154_count": 154,
+      "source_154_inventory_sha256": "d01fa5a3224be207af97f6f27ace2e5a7d9c53b7af49a3846d203e185f4ece2f",
+      "production_14": {
+        "receive_future.hpp": {
+          "bytes": 3052,
+          "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+        },
+        "receive_raw.hpp": {
+          "bytes": 50646,
+          "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+        },
+        "receive_raw_fwd.hpp": {
+          "bytes": 4997,
+          "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+        },
+        "snapshot_index_runtime.cpp": {
+          "bytes": 525,
+          "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+        },
+        "validation_scratch.cpp": {
+          "bytes": 408,
+          "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+        },
+        "validation_scratch.hpp": {
+          "bytes": 15756,
+          "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+        },
+        "xoffset_core_lifetime.hpp": {
+          "bytes": 7269,
+          "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+        },
+        "xoffset_snapshot_index.hpp": {
+          "bytes": 11831,
+          "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+        },
+        "xoffset_snapshot_index_budget.hpp": {
+          "bytes": 3042,
+          "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+        },
+        "xoffset_validation_scratch.hpp": {
+          "bytes": 1094,
+          "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+        },
+        "xoffset_verified_paths.hpp": {
+          "bytes": 10209,
+          "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+        },
+        "xoffset_verified_receive.hpp": {
+          "bytes": 15907,
+          "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+        },
+        "xoffset_virtual_memory.hpp": {
+          "bytes": 20900,
+          "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+        },
+        "xoffsetdatastructure.hpp": {
+          "bytes": 286000,
+          "sha256": "230e23e6d2fc7a005c6e84a4bb70baaf6dc364b32065e551782434dab87c49c2"
+        }
+      },
+      "origin_154_inventory_sha256": "644a5e07abfdba7bcb60c943de3d0e08214719653fb3f7408333b226b78dbb9d",
+      "unchanged_origin_members": 153,
+      "prepared_identity": {
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/diag-prepared/r1-v2/DIAGNOSTIC_IDENTITY.json",
+        "identity": {
+          "bytes": 1291,
+          "sha256": "5fa7a877e185f146af3c0c1191e7f9cb5538b3855754381ef51ee630cb21cc19"
+        }
+      },
+      "driver": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/experiment/driver.cpp",
+        "identity": {
+          "bytes": 14370,
+          "sha256": "399282a2f5eb7cb85b6e89ba5de6b3380074c2d5e0cdc1ad17ff0048508dd15c"
+        }
+      },
+      "adapter": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/experiment/adapters/xoffset/adapter.hpp",
+        "identity": {
+          "bytes": 9681,
+          "sha256": "335114f010466a453bf56cf9aed23c77bebd48b7288828e5df41753e5c1d4766"
+        }
+      },
+      "hook": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/source/c14_common_diag.hpp",
+        "identity": {
+          "bytes": 2654,
+          "sha256": "55221d97734679cfda69cef3f590b80574e54b313afbfa6918316d6d477ed689"
+        }
+      },
+      "event_header": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/experiment/event_channel.hpp",
+        "identity": {
+          "bytes": 4576,
+          "sha256": "c4dd064b5bc97fbc8e093790dad862ee0de6a453b40acab6e5a126e8623fbf6f"
+        }
+      },
+      "driver_diff": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/common-diag-final-v1/r1/DRIVER_DIFF.patch",
+        "identity": {
+          "bytes": 16463,
+          "sha256": "8c17c2c870fc2914fc9e0f04ec0287cddf4562532e76e7a74ae666f884510df4"
+        }
+      },
+      "actual_source_event_order": [
+        "main.begin",
+        "input.read.before",
+        "input.read.after",
+        "input.decode.before",
+        "input.decode.after",
+        "input.hash.before",
+        "input.hash.after",
+        "t0",
+        "t1",
+        "t2",
+        "t3",
+        "t4",
+        "emit.pod0",
+        "emit.pod1",
+        "emit.pod2",
+        "t5",
+        "t6",
+        "t7",
+        "t8",
+        "postaudit.load.before",
+        "postaudit.load.after",
+        "postaudit.export.before",
+        "postaudit.export.after",
+        "postaudit.hash.before",
+        "postaudit.hash.after",
+        "truth.replay.before",
+        "truth.replay.after",
+        "write.wire.before",
+        "write.wire.after",
+        "write.canonical.before",
+        "write.canonical.after",
+        "write.queries.before",
+        "write.queries.after",
+        "write.result.before",
+        "write.result.after",
+        "main.end"
+      ]
+    }
+  },
+  "common_driver_adapter_hook_event_header_byte_exact": true,
+  "actual36_event_sequence_confirmed": true,
+  "source_or_tool_identity_mismatches": [],
+  "component_blockers": [],
+  "executable_admission_obligations": [
+    "Freeze and check exact36-label causal order and nondecreasing child event timestamps after each role, before any next role.",
+    "Validate every required sample status0, nonzero monotone clocks, cumulative resource monotonicity, emit seen511/invocations1, mutation_seen1022 and exact record schemas.",
+    "Bind actual final sources, compiler/runtime/dependency/binary/input/argv, distinct fresh body paths, semantic audit and original lease cleanup; preregister C14 shared M2 control before execution.",
+    "Enforce original two C roles control then R1, child20s/job600s, zero retries, stop on observer/semantic/resource/cleanup failure. No diagnostic artifact qualifies for bare performance or M1 reopening."
+  ],
+  "diagnostic_admitted": false,
+  "performance_inference": null,
+  "materializer_compiler_dummy_native_executions_by_reviewer": 0
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "m2-mechanism-independent-admission",
+  "status": "passed",
+  "observed_at": "2026-10-19T18:49:39.230632+00:00",
+  "freeze_sha256": "001ddddf7bf6e83ca6e68dc0de095c517b127d094d2168157c68c7a1084a018b",
+  "M2_business_gates_passed": true,
+  "shared_C14_control_accepted": true,
+  "resources_passed": true,
+  "source_tools_passed": true,
+  "evidence": {
+    "M2_business": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_BUSINESS_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 22242,
+        "sha256": "5fbc628e38bec7e959df03e7d3d77aaff9c3af509e53f5447278ebc6159afec2"
+      }
+    },
+    "shared_control": {
+      "identity": {
+        "bytes": 5897,
+        "sha256": "c13e761ba41a67a7abcac600fbcea2a1edfe517032c782ccc98f1d41cbeab2c4"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_RESULT.json"
+    },
+    "source_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_ACTUAL_MECHANISM_FREEZE_REVIEW.md",
+      "identity": {
+        "bytes": 4764,
+        "sha256": "62eeb9660ef583681afc67223616b4268c35ba2eaff6b3fc31e3edbcc5a94008"
+      }
+    },
+    "resource_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_RESOURCE_SOURCE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 3001,
+        "sha256": "ad3e5f28bea509231f69107486b882e4c2fc82a255958edc73aeb649514b1d9d"
+      }
+    },
+    "original_control_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_EXECUTION_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 1861,
+        "sha256": "130af2f47fdf56bfceb8c294437f331f6d120de285f7051f6bbbe792ccd7dea9"
+      }
+    },
+    "M2_source_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SOURCE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 1509,
+        "sha256": "264c04a7d17b8f301d0dc0d49134174eaa7f453d2dedcc4ce713ca15213c6bb3"
+      }
+    }
+  },
+  "limits": {
+    "new_control_runs": 0,
+    "compiles": 1,
+    "native_runs": 1,
+    "compile_seconds": 120,
+    "native_seconds": 20,
+    "outer_seconds": 300,
+    "retry": 0,
+    "performance_samples": 0
+  },
+  "scope": "Only the sole exact M2 mechanism request. Result status alone cannot replace mechanism_hit, own complete gates or sole72 screen.",
+  "full_gates_accepted": false,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

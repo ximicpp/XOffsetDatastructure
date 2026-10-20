@@ -1,0 +1,11 @@
+{
+  "manifest": {
+    "bytes": 61507,
+    "sha256": "c866b295c17d7854ba1bafde56c88fe6e967a47497fd31864d9b7c5327efa193"
+  },
+  "queue_manifest": {
+    "bytes": 911,
+    "sha256": "3af0106951529d1ce385ecbe1eac2b24cd783d58bd59fc6edeb01f37ead73ecd"
+  },
+  "composite_pin": "5d8a0da58a3d53b8492f243d2a118524a61f5c8f02b4c2f7fbb9854dac50e174"
+}

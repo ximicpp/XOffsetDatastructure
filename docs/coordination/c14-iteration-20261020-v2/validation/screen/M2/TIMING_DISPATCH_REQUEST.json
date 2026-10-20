@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "timing",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/M2-screen-20261020-v2-v1/queue",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/screen.py",
+    "run",
+    "--frozen",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/frozen-v1/freeze.json",
+    "--freeze-sha256",
+    "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2",
+    "--review",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/REVIEW.json",
+    "--host",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/HOST.json",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/M2-screen-20261020-v2-v1",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/M2-screen-20261020-v2-v1/queue"
+  ],
+  "freeze_sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2",
+  "host": {
+    "identity": {
+      "bytes": 2330,
+      "sha256": "ef297b5512d59c246805e94e027f2b655cb8b955a8953b32551fdffd46853b79"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/HOST.json"
+  },
+  "review": {
+    "identity": {
+      "bytes": 4598,
+      "sha256": "c3d08b62f3fa7012e26f5e3e0ee079bf08e809844a8dabbc2b9edf245e2476f2"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/REVIEW.json"
+  }
+}

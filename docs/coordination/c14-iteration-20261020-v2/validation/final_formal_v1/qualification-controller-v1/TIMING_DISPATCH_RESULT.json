@@ -1,0 +1,27 @@
+{
+  "error": null,
+  "offline_audit_started": false,
+  "power_error": null,
+  "qualification_attempts": 1,
+  "restored": true,
+  "retries": 0,
+  "returncode": 0,
+  "timing_result": {
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "command_elapsed_seconds": 2308.301671385,
+    "command_pid": 402,
+    "command_returncode": 0,
+    "finished_at": "2026-10-19T21:50:53.669373+00:00",
+    "kind": "timing",
+    "owner": "W3",
+    "reason": "command_exit",
+    "run_id": "15a33d5e75014b3e85019eebccf0712d",
+    "schema_version": 1,
+    "started_at": "2026-10-19T21:12:25.364293+00:00",
+    "status": "complete"
+  }
+}

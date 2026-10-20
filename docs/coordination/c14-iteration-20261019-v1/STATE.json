@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "iteration": "c14-iteration-20261019-v1",
+  "status": "executing_phased_iteration",
+  "active_stage": "S1 scoped attribution / S2 M1 full-gate preparation",
+  "S0": {"gate_outcome": "pass", "evidence": "validation/S0_RESULT.json", "scope": "Source/profile/dependency and evidence reuse admission only; no new platform/native/timing result."},
+  "source_root": "C:/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "original_workspace_production": "historical F, do not mutate",
+  "baseline_commit": "1904b9c71230026ac6f2d58f919a9ab76447d264",
+  "production_main_sha256": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3",
+  "baseline_production_changed": false,
+  "M1": {"candidate": "m1-default-scalar-v2", "source_review": "pass; core/REVIEW_M1.md", "codegen": "independently reviewed actual original-driver uint8/uint32 fresh call closure; reviews/M1_CODEGEN.md", "targeted_normal_programs_passed": 4, "targeted_SAN_programs_passed": 4, "fixed_M_each_role_once": "pass; all9 truth and both query results", "fresh_resize_calls": 24576, "per_element_bindings_removed": 1703936, "full_gates": "pending", "screen_admitted": false, "speed_claim": "none"},
+  "new_measurement_children": 0,
+  "L1": {"status": "rejected_context_long_cache", "evidence": "core/L1_DECISION.md", "reason": "scratch/new_handler reentry may retire mapping; record retention does not keep storage live", "native_or_timing": 0, "budget_reassigned": false},
+  "R1": {"status": "independent_source_and_review_prepared", "evidence": "core/REQUESTS_R1_CODEGEN.json", "timing_admitted": false},
+  "new_native_children": 11,
+  "new_cpp_compiles": 13,
+  "execution_count_scope": "validation/M1_FINITE_EXECUTION_RESULT.json fixed batch; later continuation results are separate",
+  "output16": {"status": "warm allocation/copy/fault observation completed", "bytes_each": 17830872, "owning_strings": 16, "observed_minor_faults": 0, "latency_or_cold_budget_established": false, "repeat_not_admitted": true},
+  "performance_goal_complete": false,
+  "persistent_threads": {
+    "core": {"threadId": "01a15479-b18c-7233-9336-20df97b3fe47", "hostId": "local", "title": "C14 核心性能迭代"},
+    "validation": {"threadId": "01a15479-36f3-72d3-8c17-6630a51f854b", "hostId": "local", "title": "C14 阶段验证与性能实验"}
+  },
+  "next": "Complete M1 full correctness/business/V1/consumer gates and independent fixed-screen/resource freeze before its sole 72-pair screen; continue separate L1/R1/M2 design. Q/F remains deferred and no formal comparison admitted.",
+  "closed_candidate_windows_preserved": true,
+  "no_commit_push_merge_publish_remoteCI": true
+}

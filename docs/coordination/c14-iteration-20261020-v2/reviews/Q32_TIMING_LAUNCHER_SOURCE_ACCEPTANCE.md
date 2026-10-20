@@ -1,0 +1,15 @@
+# Q32 timing launcher source acceptance
+
+Passed the finite source call-closure review with no substantive blocker. Start and final-end SHA256 are identical: `2ae2f22053fdd50cf7cbfdceb22e11d04284cc4fcf70811a203e8edf6f3722b6`, 17,558 bytes, unchanged mtime `2026-10-19T21:00:23.6472709Z`. AST parsing did not import or execute the source. Original M2 launcher `9b4aad4e…` and accepted guard source review `693344ac…` are reused.
+
+The launcher requires exact current quiet, REVIEW, HOST_REVIEW, request and once-only ledger identities for the combined candidate and freeze `b8e2eaa5…`. The actual small frozen manifest matches that pin and its status names the fixed qualification output. The future external records remain pending; this source review does not supply them.
+
+The original W1 validation60 prelude checks its actual holder/run ID, parent/supervisor argv, cwd/out and runner pin. Only after its synchronous subprocess returns does the controller dispatch the original W3 timing2700/wait0 lease. The benchmark command remains direct `/usr/bin/python3 -B` without `-I`, using the original bound `run --campaign qualification` CLI. No nested lease, new native wrapper, fixture, capture, diagnostic, warmup, retry or statistical source change is added.
+
+The W1 prelude creates a fresh plan and starts the accepted two-name guard with2820 seconds. It records a controller monotonic timestamp before guard startup and the boot identity. Before timing, the controller requires same boot, handoff≤30 seconds, guard not completed and conservative remaining coverage≥2760 seconds; it repeats the remaining check immediately before dispatch. PID/creation/image/SID, held-handle/token and one-owned-resume rules stay in the accepted guard. Started requests receive an owned-stop attempt in the outer finally; accepted guard startup failure restoration is retained.
+
+The finally path resumes owned processes first, then waits for the original PowerWindow completion and queries the actual restored original GUID. The launcher itself only queries power; the unchanged bound run owns temporary selection of existing HighPerformance and restoration. Successful timing additionally requires actual pause coverage plus real power-ready/completed records, target GUID, original GUID and2760-second PowerWindow identity.
+
+No audit is launched here. The separate original3600 audit must be registered and executed after actual process and power restoration. Future acceptance must inspect raw prelude/timing results, cleanup, full pause/power coverage and restoration; launcher exit status alone is insufficient. No actual host/timing/qualification pass is claimed.
+
+No project Python entry/import, PowerShell, host plan/prerequisite/start/stop/coverage operation, probe, native program or queue was executed by this reviewer. Guard and PowerWindow sources, registration and typed gates were not reaudited or changed. Exact request/reviews/quiet/host admission and actual execution evidence remain separate work.

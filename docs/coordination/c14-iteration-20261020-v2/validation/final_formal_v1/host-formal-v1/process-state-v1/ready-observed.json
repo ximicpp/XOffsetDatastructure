@@ -1,0 +1,9 @@
+{
+  "observed_utc": "2026-10-19T22:22:40.060017+00:00",
+  "ready": {
+    "bytes": 1359,
+    "sha256": "3a0d64b39be02bd0941c29a79020fc7ff668dbdf5465ce0d9807d6345aa80876"
+  },
+  "run_token": "e7867323d5ef46dea58e2710ec155cc9",
+  "scope": "WSL controller observed all-target ready before returning; no timing child launched here"
+}

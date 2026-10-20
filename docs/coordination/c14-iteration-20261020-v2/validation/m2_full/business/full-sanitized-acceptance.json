@@ -1,0 +1,144 @@
+{
+  "status": "passed",
+  "source": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal/source",
+  "production_files": {
+    "receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "receive_raw.hpp": {
+      "bytes": 50646,
+      "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+    },
+    "receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "xoffset_core_lifetime.hpp": {
+      "bytes": 7269,
+      "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+    },
+    "xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "bytes": 20900,
+      "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+    },
+    "xoffsetdatastructure.hpp": {
+      "bytes": 278527,
+      "sha256": "3e347612c1a62299bb910c68dd6b1411663f3165e18e298a51e7ba2e062c201f"
+    }
+  },
+  "ctest_count": 73,
+  "receipt": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-sanitized/receipt.json",
+    "identity": {
+      "bytes": 63560,
+      "sha256": "dcab7683086e0b469e790514a7fe6cc3314a3c37a363bb20148214e4bd2c2d64"
+    }
+  },
+  "runtime_test_programs": [
+    "test_adaptive_reservation",
+    "test_allocator_failures",
+    "test_allocator_model",
+    "test_assign_range",
+    "test_basic_types",
+    "test_canonical_cold_no_callback",
+    "test_canonical_registry_v2",
+    "test_canonical_zero_target",
+    "test_compaction",
+    "test_complex_nesting",
+    "test_core_lifetime",
+    "test_custom_future_lifetime",
+    "test_enum_support",
+    "test_error_paths",
+    "test_field_limit_fix",
+    "test_fixed_layout_containers",
+    "test_freelist_index",
+    "test_inheritance",
+    "test_locator_soundness",
+    "test_main_containers",
+    "test_map_set",
+    "test_memory_efficiency",
+    "test_modify",
+    "test_mutation_failures",
+    "test_nested",
+    "test_owner_identity",
+    "test_owner_registry",
+    "test_range_hint",
+    "test_receive_raw",
+    "test_reflection_advanced",
+    "test_reflection_core",
+    "test_resize_growth",
+    "test_runtime_regressions",
+    "test_same_arena_move",
+    "test_scalar_resize",
+    "test_schema_envelope",
+    "test_snapshot_index_header_only",
+    "test_stable_erase_if",
+    "test_stable_storage",
+    "test_storage_policies",
+    "test_string_replace",
+    "test_tail_expansion",
+    "test_type_safety",
+    "test_type_signatures",
+    "test_validation_resource",
+    "test_validation_v4",
+    "test_validation_v5",
+    "test_validation_v5_bounds",
+    "test_validation_v6_dense_fusion",
+    "test_validation_v8_single_word",
+    "test_vector",
+    "test_verified_paths",
+    "test_verified_receive",
+    "test_virtual_memory_storage",
+    "test_vm_lifecycle",
+    "test_vm_pool",
+    "test_vm_transport",
+    "test_wire_admission",
+    "test_wire_bitmap",
+    "test_wire_range_failures",
+    "test_wire_range_index",
+    "test_wire_validation",
+    "test_xbuffer_api",
+    "test_xhandle",
+    "test_xstring_direct_assign",
+    "test_zero_boilerplate"
+  ],
+  "configure_checks": [
+    "polymorphic_expected_rejection",
+    "polymorphic_positive_compile_link",
+    "reflection_compile_link"
+  ],
+  "configure_checks_are_not_ctest_cases": true
+}

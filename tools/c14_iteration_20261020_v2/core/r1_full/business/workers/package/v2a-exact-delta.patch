@@ -1,0 +1,43 @@
+diff --git "a/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2\\deps_audit.py" "b/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2a\\deps_audit.py"
+index e78316fd..aa9c0d64 100644
+--- "a/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2\\deps_audit.py"
++++ "b/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2a\\deps_audit.py"
+@@ -13,7 +13,9 @@ def sections(text):
+     def close():
+         if current is not None:
+             need(len(result[current])==expected,'Ninja dependency count differs: '+current)
+-            need(len(set(result[current]))==expected,'duplicate Ninja dependency: '+current)
++            # Ninja's declared count describes raw entries, not distinct paths.
++            # A repeated header remains a real entry; membership is set-based
++            # only when the caller checks required includes.
+     for line in text.splitlines():
+         if not line.strip():continue
+         match=HEADER.fullmatch(line)
+diff --git "a/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2\\test_deps_audit.py" "b/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2a\\test_deps_audit.py"
+index fac22da4..bd01b17f 100644
+--- "a/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2\\test_deps_audit.py"
++++ "b/C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure\345\274\200\345\217\221\\build\\receive-completion-20261019\\package-archive-repair-v2a\\test_deps_audit.py"
+@@ -30,8 +30,21 @@ class ParserTests(unittest.TestCase):
+         with self.assertRaisesRegex(ValueError,'duplicate Ninja object'):sections(sample()+sample())
+     def test_declared_count_must_match(self):
+         with self.assertRaisesRegex(ValueError,'count differs'):sections(sample().replace('#deps 9,','#deps 10,'))
+-    def test_duplicate_dependency_rejected(self):
+-        with self.assertRaisesRegex(ValueError,'duplicate Ninja dependency'):sections(sample((DEFAULT[0],DEFAULT[0])))
++    def test_repeated_dependency_is_counted_raw(self):
++        result=sections(sample((DEFAULT[0],DEFAULT[0])))
++        entries=result['CMakeFiles/test.dir/test.cpp.o']
++        self.assertEqual(len(entries),2)
++        self.assertEqual(len(set(entries)),1)
++    def test_real_ninja_schema_946_raw_945_unique(self):
++        # The actual test_xstring_direct_assign object lists main twice.
++        # Keep that schema, without importing/reading the original project.
++        names=(*DEFAULT,*(f'external/dependency_{i}.hpp' for i in range(936)),DEFAULT[0])
++        text=sample(names,object_name='tests/CMakeFiles/test_xstring_direct_assign.dir/test_xstring_direct_assign.cpp.o')
++        objects=sections(text);entries=next(iter(objects.values()))
++        self.assertEqual(len(entries),946)
++        self.assertEqual(len(set(entries)),945)
++        self.assertEqual(entries.count('/clean/xoffsetdatastructure.hpp'),2)
++        self.assertEqual(audit_default(text,'/clean',OWN)['required_default_count'],9)
+     def test_original_source_rejected(self):
+         with self.assertRaisesRegex(ValueError,'original source'):audit_default(sample(),'/clean',OWN,('/clean',))
+     def test_orphan_or_empty_rejected(self):

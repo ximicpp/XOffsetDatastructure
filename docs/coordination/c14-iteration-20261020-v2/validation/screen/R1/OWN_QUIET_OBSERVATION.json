@@ -1,0 +1,27 @@
+{
+  "actual_original_global_lease_idle": true,
+  "freeze_sha256": "c168eed40879c5339e91a390506eb6c32cce73fc47ea407ab7ae51cb6a437cf3",
+  "guard_started": false,
+  "kind": "validation-owned-quiet-observation",
+  "last_holder": {
+    "finished_at": "2026-10-19T18:24:58.195351+00:00",
+    "out": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-screen-freeze-v2-lease",
+    "owner": "W1",
+    "run_id": "80d53e35699c44f2bca8e6904b0a442d",
+    "status": "complete"
+  },
+  "no_current_controlled_heavy_job": true,
+  "observed_utc": "2026-10-19T18:26:28.778674+00:00",
+  "orchestrator_still_must_arrange_other_chats_and_write_fresh_GLOBAL_QUIET": true,
+  "own_agents_completed": [
+    "/root/business_gates_review",
+    "/root/m1_screen_tools",
+    "/root/screen_review"
+  ],
+  "own_agents_standby_instructed": true,
+  "own_compilation_active": false,
+  "paused_processes": 0,
+  "scope": "Executor own three collaborating agents and actual original global lease; not an assertion that all other app chats/agents are quiet.",
+  "screen_started": false,
+  "status": "passed_with_limited_scope"
+}
