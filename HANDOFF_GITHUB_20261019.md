@@ -1,5 +1,9 @@
 # XOffset：GitHub 跨机器接续入口
 
+> **2026-10-20 更新：** 默认实现现为 **W9a**（提交 `14b57637d6fa57f8521138a0997fb3c8736db4f1`，经 PR #2 合并，`next_cpp26` = `9e3602f`）。
+> 下文以 C14 为默认的描述均为历史记录。下文引用的证据路径（`handoff/`、`docs/coordination/`、`tools/c14_*` 等）已移出工作树，
+> 保存在 tag `archive/codex-mac-continuation-20261020`，恢复方法见 [docs/ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)。
+
 仓库：<https://github.com/ximicpp/XOffsetDatastructure>
 
 交接分支：`codex/cross-machine-handoff-20261019`。使用用户启动提示词给定的提交确认 `git rev-parse HEAD`，不要误用默认分支。

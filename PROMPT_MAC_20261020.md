@@ -1,5 +1,9 @@
 # 可直接复制到 Mac 新会话的启动提示词
 
+> **2026-10-20 更新：** 默认实现现为 **W9a**（提交 `14b57637d6fa57f8521138a0997fb3c8736db4f1`，经 PR #2 合并，`next_cpp26` = `9e3602f`）。
+> 下文以 C14 为默认的描述均为历史记录。下文引用的证据路径（`handoff/`、`docs/coordination/`、`tools/c14_*` 等）已移出工作树，
+> 保存在 tag `archive/codex-mac-continuation-20261020`，恢复方法见 [docs/ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)。
+
 请在这台 Mac 上以新的工程和会话接续 XOffsetDatastructure 开发，并使用子 agent 分担独立审查/实施。请直接推进可执行工作，不停在计划等待“继续”，也不要要求我手工搬文件或运行命令。不要加载 Superpowers，除非我在当前请求明确点名。
 
 仓库是 `https://github.com/ximicpp/XOffsetDatastructure.git`，交接分支是 `codex/mac-continuation-20261020`。如我另外提供了实际推送提交 SHA，以该提交为准；否则先取得该分支真实 tip 并记录 Git/文件身份。不要使用默认分支或把历史基线 `1904b9c71230026ac6f2d58f919a9ab76447d264` 当作最新交接。已有检出先读状态并保护我的修改，新建工程则由你自行 clone 到合适的新目录；不要 reset 或覆盖既有工作。
