@@ -1,0 +1,387 @@
+diff -ruN --exclude=external --exclude=*.orig w7/tests/CMakeLists.txt w8/tests/CMakeLists.txt
+--- w7/tests/CMakeLists.txt	2026-10-20 02:10:19
++++ w8/tests/CMakeLists.txt	2026-10-20 02:41:42
+@@ -133,6 +133,15 @@
+ add_test(NAME test_canonical_window_reserve_failure
+     COMMAND $<TARGET_FILE:test_canonical_window> --reserve-failure)
+ set_tests_properties(test_canonical_window_reserve_failure PROPERTIES LABELS "reflection;canonical-window")
++# W8: lazy reservation retry after a transient foreign overlap, and its bound.
++if(NOT WIN32)
++    foreach(window_mode transient-overlap overlap-retries-bounded)
++        string(REPLACE "-" "_" window_mode_name "${window_mode}")
++        add_test(NAME test_canonical_window_${window_mode_name}
++            COMMAND $<TARGET_FILE:test_canonical_window> --${window_mode})
++        set_tests_properties(test_canonical_window_${window_mode_name} PROPERTIES LABELS "reflection;canonical-window")
++    endforeach()
++endif()
+ foreach(window_variant small disabled)
+     set(window_target test_canonical_window_${window_variant})
+     add_executable(${window_target} test_canonical_window.cpp)
+diff -ruN --exclude=external --exclude=*.orig w7/tests/test_canonical_window.cpp w8/tests/test_canonical_window.cpp
+--- w7/tests/test_canonical_window.cpp	2026-10-20 02:14:22
++++ w8/tests/test_canonical_window.cpp	2026-10-20 02:42:38
+@@ -4,7 +4,8 @@
+ //
+ // Variants (same source, separate targets):
+ //   default                         full window (reserved lazily by the first
+-//                                   receive); optional --reserve-failure
++//                                   receive); optional --reserve-failure,
++//                                   --transient-overlap, --overlap-retries-bounded
+ //   XOFFSET_TEST_WINDOW_SMALL       window of 4 granules (exhaustion)
+ //   XOFFSET_TEST_WINDOW_DISABLED    XOFFSET_CANONICAL_WINDOW_BYTES == 0
+ #include "xoffsetdatastructure.hpp"
+@@ -17,7 +18,13 @@
+ #include <string>
+ #include <string_view>
+ #include <thread>
++#include <typeinfo>
+ #include <vector>
++#if !defined(_WIN32)
++#include <sys/mman.h>
++#include <sys/wait.h>
++#include <unistd.h>
++#endif
+ 
+ namespace xo = XOffsetDatastructure;
+ namespace xd = XOffsetDatastructure::detail;
+@@ -47,6 +54,15 @@
+     try { f(); } catch (const std::bad_alloc&) { return true; } catch (const xo::XBadAlloc&) { return true; }
+     return false;
+ }
++// W8: receive-storage failures throw exactly std::bad_alloc (never XBadAlloc,
++// which derives from XException/std::runtime_error, not from std::bad_alloc).
++template <class F> bool throws_exact_std_bad_alloc(F&& f) {
++    try { f(); }
++    catch (const xo::XBadAlloc&) { return false; }
++    catch (const std::bad_alloc& e) { return typeid(e) == typeid(std::bad_alloc); }
++    catch (...) { return false; }
++    return false;
++}
+ 
+ auto policy() { return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic); }
+ std::string wire() {
+@@ -184,10 +200,10 @@
+ void run() {
+     auto empty = Storage::for_receive(0, 0);
+     need(!empty.data() && !empty.in_canonical_window(), "empty receive storage changed");
+-    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
+-         "disabled window did not reject receive storage");
+-    need(throws_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
+-         "disabled window did not reject verified receive");
++    need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "disabled window did not reject receive storage with exactly std::bad_alloc");
++    need(throws_exact_std_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
++         "disabled window did not reject verified receive with exactly std::bad_alloc");
+     need(xo::XBufferCore::canonical_bytes_at(nullptr, 0x580000000000ull, 1) == nullptr,
+          "disabled window resolved an address");
+     ordinary_outside_window();
+@@ -206,7 +222,10 @@
+     for (int i = 0; i < 4; ++i) live.push_back(Storage::for_receive(0, g));
+     need(Window::used_granules() == 4, "four granule slots not accounted");
+     for (auto& s : live) need(s.in_canonical_window() && in_window(s.data(), g), "slot outside small window");
+-    need(throws_bad_alloc([&] { auto s = Storage::for_receive(0, g); (void)s; }), "exhausted window accepted receive");
++    need(throws_exact_std_bad_alloc([&] { auto s = Storage::for_receive(0, g); (void)s; }),
++         "exhausted window did not reject receive with exactly std::bad_alloc");
++    need(throws_exact_std_bad_alloc([&] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
++         "exhausted window did not reject verified receive with exactly std::bad_alloc");
+     need(throws_bad_alloc([&] { auto s = Storage::for_receive(0, 5 * g); (void)s; }), "oversized receive accepted");
+     const void* freed = live[1].data();
+     live[1] = Storage{};
+@@ -395,12 +414,13 @@
+     // First window use in this process: inject the one-time reservation failure.
+     need(!xd::canonical_window_array.load(), "window reserved before injection");
+     xd::fail_next_vm_operation(xd::VmOperation::WindowReserve);
+-    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
+-         "reservation failure did not reject receive");
+-    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
+-         "reservation was retried after failure");
+-    need(throws_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
+-         "verified receive accepted an unavailable window");
++    need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "reservation failure did not reject receive with exactly std::bad_alloc");
++    // The injected failure models a permanent refusal: never retried.
++    need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "reservation was retried after a permanent failure");
++    need(throws_exact_std_bad_alloc([] { auto t = xo::begin_verified_receive<WindowRoot>(64, policy()); (void)t; }),
++         "verified receive did not reject an unavailable window with exactly std::bad_alloc");
+     need(xd::canonical_window_attempted.load() && !xd::canonical_window_array.load(),
+          "failed reservation not final");
+     need(xo::XBufferCore::canonical_bytes_at(nullptr, Window::base, 1) == nullptr &&
+@@ -453,6 +473,87 @@
+ }
+ #endif
+ 
++// W8 (item: G1 and receive): receive storage is read/write over its whole
++// maximum before any transport write, so bytes beyond the logical length may
++// be dirty; growth must zero them (zero_from_ = maximum), unlike G1's
++// pristine-page shortcut for ordinary storage.
++void receive_growth_zeroes_beyond_logical() {
++    auto s = Storage::for_receive(100, 1 << 20);
++    need(s.in_canonical_window() && s.accessible_bytes() == s.reserved_bytes(), "receive slot not fully accessible");
++    std::memset(s.data() + 100, 0xab, 8192);              // a transport writing past the logical length
++    need(s.grow_to(100 + 8192), "receive growth failed");
++    need(all_zero(s.data() + 100, 8192), "receive growth exposed bytes written beyond the logical length");
++}
++
++#if !defined(_WIN32)
++// W8: a NON-library mapping occupying the window base makes the lazy
++// reservation fail for that request only; once it is gone a later receive
++// retries and succeeds. Ordinary library storage never blocks it.
++void* place_blocker() {
++    void* blocker = ::mmap(reinterpret_cast<void*>(Window::base), Window::granule, PROT_NONE,
++                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++    need(blocker != MAP_FAILED && blocker == reinterpret_cast<void*>(Window::base),
++         "test could not place a foreign mapping at the window base");
++    return blocker;
++}
++void transient_overlap_mode() {
++    need(window_untouched(), "window touched before any VM storage existed");
++    void* blocker = place_blocker();
++    ordinary_only_leaves_window_unreserved(wire());
++    need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "occupied window base did not reject receive with exactly std::bad_alloc");
++    need(xd::canonical_window_attempted.load() && !xd::canonical_window_array.load(), "refused attempt not recorded");
++    need(::munmap(blocker, Window::granule) == 0, "blocker unmap failed");
++    {
++        auto first = receive(wire());
++        check(first);
++        need(xd::canonical_window_array.load() && in_window(first.get_address(), 1),
++             "later receive did not retry the refused reservation");
++    }
++    ordinary_outside_window();
++    std::cout << "canonical window transient overlap: refused once, retried and reserved by a later receive\n";
++}
++void overlap_retries_bounded_mode() {
++    need(window_untouched(), "window touched before any VM storage existed");
++    void* blocker = place_blocker();
++    for (unsigned i = 0; i != Window::max_reservation_attempts + 2; ++i)
++        need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++             "occupied window base did not reject receive with exactly std::bad_alloc");
++    need(::munmap(blocker, Window::granule) == 0, "blocker unmap failed");
++    need(throws_exact_std_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "reservation retried beyond max_reservation_attempts");
++    need(!xd::canonical_window_array.load(), "window reserved after retries were exhausted");
++    ordinary_outside_window();
++    collision_relocates("window collision hook was not exercised after exhausted retries");
++    std::cout << "canonical window overlap: retries bounded by max_reservation_attempts, then final\n";
++}
++// W8 fork policy: no atfork handlers (like the registry and VM pool). With no
++// other thread inside the library at fork time, a child can load ordinary
++// buffers and receive into a new slot; inherited receive buffers stay valid.
++void fork_after_receive(const std::string& input) {
++    need(xd::canonical_window_array.load(), "window must be reserved before fork");
++    auto parent_receive = receive(input);
++    const pid_t pid = ::fork();
++    need(pid >= 0, "fork failed");
++    if (pid == 0) {
++        int code = 0;
++        try {
++            auto loaded = Buffer::load_verified(input, policy());
++            check(loaded);
++            auto r = receive(input);
++            check(r);
++            check(parent_receive);
++            if (!in_window(r.get_address(), 1) || r.get_address() == parent_receive.get_address()) code = 2;
++        } catch (...) { code = 1; }
++        std::_Exit(code);
++    }
++    int status = 0;
++    need(::waitpid(pid, &status, 0) == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0,
++         "forked child could not load or receive");
++    check(parent_receive);
++}
++#endif
++
+ void run() {
+     static_assert(Window::enabled);
+     need(window_untouched(), "window touched before any VM storage existed");
+@@ -483,12 +584,16 @@
+     default_capacity_receives();
+ #endif
+     storage_in_window_and_reuse();
++    receive_growth_zeroes_beyond_logical();
+     live_equivalence(input);
+     concurrent_slots();
+     ordinary_outside_window();
+     ordinary_full_lifecycle();
+     g1_zeroing();
+-    std::cout << "canonical window: lazy reservation at first receive, placement, equivalence, reuse, pool isolation, concurrency, G1 passed\n";
++#if !defined(_WIN32)
++    fork_after_receive(input);
++#endif
++    std::cout << "canonical window: lazy reservation at first receive, placement, equivalence, reuse, pool isolation, concurrency, G1, fork passed\n";
+ }
+ #endif
+ } // namespace
+@@ -497,6 +602,10 @@
+     try {
+ #if !defined(XOFFSET_TEST_WINDOW_SMALL) && !defined(XOFFSET_TEST_WINDOW_DISABLED)
+         if (argc == 2 && std::string_view(argv[1]) == "--reserve-failure") { reserve_failure_mode(); return 0; }
++#  if !defined(_WIN32)
++        if (argc == 2 && std::string_view(argv[1]) == "--transient-overlap") { transient_overlap_mode(); return 0; }
++        if (argc == 2 && std::string_view(argv[1]) == "--overlap-retries-bounded") { overlap_retries_bounded_mode(); return 0; }
++#  endif
+ #endif
+         if (argc != 1) throw std::runtime_error("unsupported arguments");
+         (void)argv;
+diff -ruN --exclude=external --exclude=*.orig w7/xoffset_virtual_memory.hpp w8/xoffset_virtual_memory.hpp
+--- w7/xoffset_virtual_memory.hpp	2026-10-20 02:13:01
++++ w8/xoffset_virtual_memory.hpp	2026-10-20 02:42:23
+@@ -77,10 +77,13 @@
+ //  * Windows x64: 0x5800'0000'0000 (128 TiB user VA since Windows 8.1).
+ //  * Everything else (32-bit, iOS, other OSes): disabled (bytes 0).
+ // The window is reserved lazily by the first receive storage request; ordinary
+-// storage never reserves it and never touches its address range.
+-// A reservation that cannot be placed exactly at the base (address already in
+-// use, sanitizer rejection, VA too small) fails once and permanently: receive
+-// storage creation then throws std::bad_alloc, ordinary storage is unaffected.
++// storage never reserves it and never keeps a mapping in its address range.
++// A reservation that the OS refuses at the base (address already in use,
++// sanitizer rejection, VA too small) fails that request with std::bad_alloc
++// and is retried by later receive requests, at most
++// CanonicalWindow::max_reservation_attempts times per process; after that
++// (or after a configuration error) receive storage creation always throws
++// std::bad_alloc. Ordinary storage is unaffected either way.
+ // ---------------------------------------------------------------------------
+ #if defined(__has_feature)
+ #  if __has_feature(thread_sanitizer)
+@@ -187,8 +190,8 @@
+ // value means the window is not (or can never be) reserved: nothing in the
+ // address range belongs to this library, and resolution returns nullptr.
+ inline std::atomic<std::byte*> canonical_window_array{nullptr};
+-// Set (release) once the single (lazy, first-receive) reservation attempt has
+-// finished, whatever its result. Ordinary storage does not read it: its
++// Set (release) once the first (lazy, receive-triggered) reservation attempt
++// has finished, whatever its result. Ordinary storage does not read it: its
+ // overlap guard is unconditional.
+ inline std::atomic<bool> canonical_window_attempted{false};
+ // Diagnostics: ordinary reservations moved out of the window address range.
+@@ -289,9 +292,9 @@
+         return offset <= bytes && n <= bytes - offset;
+     }
+ 
+-    // Reserves the window lazily, at the first receive slot request (once per
+-    // process, success or failure; ordinary storage never triggers it) and
+-    // takes a first-fit run of granules covering `reserved` bytes. Returns
++    // Reserves the window lazily, at a receive slot request (ordinary storage
++    // never triggers it; see reserve_locked for the bounded retry) and takes
++    // a first-fit run of granules covering `reserved` bytes. Returns
+     // the slot's first byte as an element of the window array, or nullptr if
+     // the window is disabled/unavailable/exhausted. No C++ allocation occurs,
+     // locked or not, so new_handler reentry cannot deadlock on this mutex.
+@@ -346,12 +349,25 @@
+         }
+     }
+ 
++    // Upper bound on reservation attempts per process. An attempt that the OS
++    // refuses at the base (address in use, mapping placed elsewhere, EEXIST,
++    // mmap/VirtualAlloc failure) leaves the window retryable by a LATER receive
++    // request until this many attempts have failed. Configuration errors and
++    // the injected WindowReserve failure end the attempts at once.
++    static constexpr unsigned max_reservation_attempts = 4;
++
+ private:
+     static constexpr std::size_t words = slots == 0 ? 1 : (slots + 63) / 64;
+     enum : unsigned char { Untried, Reserved, Unavailable };
++    // Fork policy (same as the owner registry and VmStoragePool, which have
++    // no atfork handlers either): this mutex may be copied in a locked state
++    // into a child forked while another thread was inside the window code. A
++    // child of a parent with concurrent library activity may only exec;
++    // forking while no other thread is inside the library is supported.
+     struct State {
+         std::mutex mutex;
+-        unsigned char status = Untried;
++        unsigned char status = Untried; // Untried: no success yet, retryable
++        unsigned char failed_attempts = 0;
+         std::byte* array = nullptr;
+         std::size_t lowest_free = 0; // no free granule below this index
+         std::size_t used_slots = 0;
+@@ -366,25 +382,34 @@
+         return *instance;
+     }
+ 
++    // Called under the window mutex by acquire() only (lazy reservation at a
++    // receive request). Success is final; the window array is begun only on
++    // success and is never ended. A failure is final for configuration
++    // errors and the injected WindowReserve failure; an OS refusal at the
++    // base is retryable by later requests up to max_reservation_attempts.
+     static bool reserve_locked(State& s) noexcept {
+         if (s.status != Untried) return s.status == Reserved;
+-        s.status = Unavailable; // exactly one attempt per process
+         struct Publish {
+             ~Publish() { canonical_window_attempted.store(true, std::memory_order_release); }
+         } publish;
+-        if (consume_vm_failure(VmOperation::WindowReserve)) return false;
++        const auto permanent = [&s]() noexcept { s.status = Unavailable; return false; };
++        const auto refused = [&s]() noexcept {
++            if (++s.failed_attempts >= max_reservation_attempts) s.status = Unavailable;
++            return false;
++        };
++        if (consume_vm_failure(VmOperation::WindowReserve)) return permanent();
+         void* const address = reinterpret_cast<void*>(base);
+ #if defined(_WIN32)
+         SYSTEM_INFO info{};
+         ::GetSystemInfo(&info);
+         if (info.dwPageSize == 0 || granule % info.dwPageSize != 0 ||
+-            base % info.dwAllocationGranularity != 0) return false;
++            base % info.dwAllocationGranularity != 0) return permanent();
+         void* mapping = ::VirtualAlloc(address, bytes, MEM_RESERVE, PAGE_NOACCESS);
+-        if (!mapping) return false;
+-        if (mapping != address) { ::VirtualFree(mapping, 0, MEM_RELEASE); return false; }
++        if (!mapping) return refused();
++        if (mapping != address) { ::VirtualFree(mapping, 0, MEM_RELEASE); return refused(); }
+ #else
+         const long page = ::sysconf(_SC_PAGESIZE);
+-        if (page <= 0 || granule % static_cast<std::size_t>(page) != 0) return false;
++        if (page <= 0 || granule % static_cast<std::size_t>(page) != 0) return permanent();
+         int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+ #  if defined(__linux__) && defined(MAP_FIXED_NOREPLACE)
+         // Fails with EEXIST instead of replacing; kernels before 4.17 ignore
+@@ -394,8 +419,8 @@
+         // Darwin: hint without MAP_FIXED. The kernel honours a free hint and
+         // otherwise picks another address, which is rejected below.
+         void* mapping = ::mmap(address, bytes, PROT_NONE, flags, -1, 0);
+-        if (mapping == MAP_FAILED) return false;
+-        if (mapping != address) { ::munmap(mapping, bytes); return false; }
++        if (mapping == MAP_FAILED) return refused();
++        if (mapping != address) { ::munmap(mapping, bytes); return refused(); }
+ #endif
+         // Standard non-allocating placement array new, no initializer: no
+         // cookie, no access to the (inaccessible) pages, no user code.
+@@ -573,8 +598,12 @@
+     // Later grow_to zeroes only newly logical bytes. Window slots are never
+     // taken from or returned to a VmStoragePool (the pool argument is accepted
+     // for source compatibility and ignored), so receive never adopts ordinary
+-    // storage and ordinary storage never adopts a window slot. A disabled,
+-    // unreservable or exhausted window throws std::bad_alloc.
++    // storage and ordinary storage never adopts a window slot. Every failure
++    // to obtain receive storage throws exactly std::bad_alloc: a disabled,
++    // unreservable (now or finally) or exhausted/fragmented window, and the
++    // Reserve/Enable/Prepare VM failures. begin_verified_receive propagates it
++    // unchanged (its tested contract); XBadAlloc there is reserved for its own
++    // size-limit checks, as for XBuffer's MAX_PAYLOAD checks.
+     static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
+                                             std::size_t maximum_capacity,
+                                             [[maybe_unused]] const VmStoragePool& pool = {}) {
+@@ -589,6 +618,8 @@
+         // The whole maximum is read/write before the transport writes: bytes
+         // beyond the logical length may be written by a transport, so G1's
+         // pristine-page assumption does not apply. Every later growth zeroes.
++        // (A G1-only build without this line -- the early diagnostic variant --
++        // is NOT shippable: it could expose transport-written stale bytes.)
+         owner.zero_from_ = maximum_capacity;
+         if (!owner.grow_to(logical_bytes)) throw std::bad_alloc();
+         return owner;
+diff -ruN --exclude=external --exclude=*.orig w7/xoffsetdatastructure.hpp w8/xoffsetdatastructure.hpp
+--- w7/xoffsetdatastructure.hpp	2026-10-20 02:12:40
++++ w8/xoffsetdatastructure.hpp	2026-10-20 02:42:23
+@@ -736,6 +736,9 @@
+             // Globals may first register in main and unregister after ordinary
+             // function statics have been destroyed. The index and mutex share
+             // process lifetime; its nodes are erased as owners are destroyed.
++            // Fork policy: no atfork handlers (the canonical window state and
++            // VmStoragePool follow the same policy). A child forked while
++            // another thread was inside the library may only exec.
+             alignas(RegistryState) static std::byte storage[sizeof(RegistryState)];
+             static auto* state = ::new (static_cast<void*>(storage)) RegistryState;
+             return *state;

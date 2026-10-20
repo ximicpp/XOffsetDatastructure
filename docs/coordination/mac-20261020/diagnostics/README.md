@@ -9,3 +9,8 @@ No CPU pinning, no quiet-host control, no pre-registration. Medians only, no int
 - explore_M_d1_r25.jsonl: + D1 (canonical guard ablated: canonical_bytes_at returns nullptr; src-d1) and r1m2ctl (same build script, unmodified).
 - explore_M_d2_r25.jsonl: + D2 (guard load relaxed instead of acquire; src-d2).
 Apple arm64 default codegen already uses LDAPR for acquire (227 sites), d3rcpc (-mcpu=apple-m4) identical.
+
+NON-SHIPPABLE VARIANTS: every src-* directory here is diagnostic only. In particular src-g1 (G1 alone on R1+M2)
+is unsafe for receive storage: for_receive makes the whole maximum read/write before transport writes, so G1's
+pristine-page assumption fails there; the shippable form (W3 onward, incl. W7/W8) sets zero_from_ = maximum for
+receive storage. D1/D2/X1/X2/X3/W1b/W1c are ablations or rejected guard forms.
