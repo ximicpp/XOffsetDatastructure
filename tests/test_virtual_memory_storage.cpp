@@ -597,6 +597,79 @@ void test_move_swap_and_release(std::size_t page) {
           "destructor releases reservation exactly once");
 }
 
+// G1: growth zeroes only bytes that may be dirty; everything newly exposed
+// must still read as zero (shrink/regrow, pool reuse, from_bytes partial and
+// full copies, tail reclamation). Receive storage keeps full zeroing.
+bool all_zero(const char* p, std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) if (p[i] != 0) return false;
+    return true;
+}
+void test_g1_zeroing() {
+    const std::size_t max = 1 << 20, n = 256 << 10, small = 1000;
+    {
+        VirtualMemoryStorage s(0, max);
+        check(s.grow_to(n), "G1 grow failed");
+        std::memset(s.data(), 0x5a, n);
+        s.resize_logical(small);
+        check(s.grow_to(n) && all_zero(s.data() + small, n - small) && s.data()[small - 1] == 0x5a,
+              "G1 shrink+regrow exposed stale bytes");
+        check(s.grow_to(max) && all_zero(s.data() + small, max - small), "G1 growth beyond high-water not zero");
+    }
+    {
+        VmStoragePool pool({2, 4 * max, 4 * max});
+        {
+            VirtualMemoryStorage a(0, max, pool);
+            check(a.grow_to(n), "G1 pooled grow failed");
+            std::memset(a.data(), 0x6b, n);
+        }
+        check(pool.stats().cached_blocks == 1, "G1 pooled owner not cached");
+        VirtualMemoryStorage b(0, max, pool);
+        check(pool.stats().hits == 1, "G1 pool reuse not exercised");
+        check(b.grow_to(n) && all_zero(b.data(), n), "G1 pool reuse exposed stale bytes");
+        std::memset(b.data(), 0x6c, 64);
+        b.resize_logical(0);
+        check(b.grow_to(64) && all_zero(b.data(), 64), "G1 pooled regrow exposed stale bytes");
+    }
+    {
+        std::vector<char> input(5000, 'x');
+        auto s = VirtualMemoryStorage::from_bytes(input.data(), input.size(), max);
+        check(s.size() == input.size() && s.data()[4999] == 'x', "G1 from_bytes contents differ");
+        check(s.grow_to(n) && all_zero(s.data() + input.size(), n - input.size()), "G1 growth after from_bytes not zero");
+        s.resize_logical(10);
+        check(s.grow_to(input.size()) && all_zero(s.data() + 10, input.size() - 10), "G1 regrow over copied bytes not zero");
+        std::vector<char> full(64 << 10, 'y');
+        auto f = VirtualMemoryStorage::from_bytes(full.data(), full.size(), full.size());
+        f.resize_logical(100);
+        check(f.grow_to(full.size()) && all_zero(f.data() + 100, full.size() - 100), "G1 full-copy regrow not zero");
+    }
+    {
+        VirtualMemoryStorage s(0, max);
+        check(s.grow_to(max), "G1 grow failed");
+        std::memset(s.data(), 0x7d, max);
+        s.resize_logical(small);
+        check(s.reclaim_tail().complete(), "G1 reclaim failed");
+        check(s.grow_to(max) && all_zero(s.data() + small, max - small), "G1 regrow after reclaim not zero");
+    }
+    {   // Receive storage: the whole maximum is read/write before a transport
+        // writes, possibly past the logical length; growth must zero it.
+        auto r = VirtualMemoryStorage::for_receive(100, max);
+        check(r.accessible_bytes() == r.reserved_bytes(), "receive storage not fully accessible");
+        std::memset(r.data() + 100, 0xab, 8192);
+        check(r.grow_to(100 + 8192) && all_zero(r.data() + 100, 8192),
+              "receive growth exposed bytes written beyond the logical length");
+    }
+    {   // Pooled receive storage keeps its full-zeroing high-water mark.
+        VmStoragePool pool({2, 4 * max, 4 * max});
+        {
+            auto r = VirtualMemoryStorage::for_receive(100, max, pool);
+            std::memset(r.data(), 0x3c, max);
+        }
+        VirtualMemoryStorage b(0, max, pool);
+        check(pool.stats().hits == 1, "receive pool reuse not exercised");
+        check(b.grow_to(max) && all_zero(b.data(), max), "pooled receive storage exposed stale bytes");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -615,6 +688,7 @@ int main() {
     test_full_capacity_from_bytes(page);
     test_from_bytes_failure_and_live_input(page);
     test_move_swap_and_release(page);
+    test_g1_zeroing();
     clear_vm_failures();
     std::cout << "Virtual memory storage tests passed (page_size=" << page
               << ", reservation_granularity=" << probe.reservation_granularity() << ")\n";

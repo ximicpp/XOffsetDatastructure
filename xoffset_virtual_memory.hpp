@@ -186,6 +186,10 @@ public:
     // accessible before beginning one byte-array lifetime. This commits virtual
     // backing/accounting up front, but does not initialize/touch the whole max.
     // Later grow_to retains that array and zeroes only newly logical bytes.
+    // W9: the array (canonical_byte_origin) is still begun and registered for
+    // the public canonical_bytes_at API and the raw receive validator, but the
+    // library's own resolution of received data is flat origin + delta, the
+    // same disclosed flat-address model as ordinary loads.
     static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
                                             std::size_t maximum_capacity,
                                             const VmStoragePool& pool = {}) {
@@ -200,6 +204,12 @@ public:
         auto* bytes = ::new (static_cast<void*>(owner.base_)) std::byte[maximum_capacity];
         if (static_cast<void*>(bytes) != static_cast<void*>(owner.base_)) std::terminate();
         owner.canonical_byte_origin_ = bytes;
+        // G1 does not apply to receive storage: the whole maximum is read/write
+        // before the transport writes, and bytes beyond the logical length may
+        // be written by a transport. Every growth of this owner zeroes all newly
+        // exposed bytes. (A G1 build without this line -- the early G1-only
+        // diagnostic variant -- is not shippable.)
+        owner.zero_from_ = maximum_capacity;
         if (!owner.grow_to(logical_bytes)) throw std::bad_alloc();
         return owner;
     }
@@ -228,6 +238,7 @@ public:
         }
         std::memcpy(owner.base_, bytes, length);
         owner.logical_bytes_ = length;
+        if (owner.zero_from_ < length) owner.zero_from_ = length;
         return owner;
     }
 
@@ -268,8 +279,15 @@ public:
         if (new_logical_bytes == logical_bytes_) return true;
         if (!enable_prefix(new_logical_bytes)) return false;
         if (consume_vm_failure(VmOperation::Prepare)) return false;
-        std::memset(base_ + logical_bytes_, 0, new_logical_bytes - logical_bytes_);
+        // Bytes at or beyond zero_from_ have never been exposed since the OS
+        // supplied them (fresh anonymous/committed or replaced pages) and are
+        // therefore already zero; only previously exposed bytes are cleared.
+        const std::size_t dirty_end = (std::min)(new_logical_bytes,
+            (std::max)(zero_from_, logical_bytes_));
+        if (dirty_end > logical_bytes_)
+            std::memset(base_ + logical_bytes_, 0, dirty_end - logical_bytes_);
         logical_bytes_ = new_logical_bytes;
+        if (zero_from_ < new_logical_bytes) zero_from_ = new_logical_bytes;
         return true;
     }
 
@@ -322,6 +340,8 @@ public:
         }
 #endif
         accessible_bytes_ = retained;
+        // Decommitted/replaced pages return zero-filled when enabled again.
+        if (zero_from_ > retained) zero_from_ = retained;
         result.status = VmReclaimStatus::Reclaimed;
         result.discarded_bytes = bytes;
         result.inaccessible_bytes = bytes;
@@ -346,6 +366,7 @@ private:
         swap(maximum_capacity_, other.maximum_capacity_);
         swap(accessible_bytes_, other.accessible_bytes_);
         swap(logical_bytes_, other.logical_bytes_);
+        swap(zero_from_, other.zero_from_);
         swap(page_size_, other.page_size_);
         swap(reservation_granularity_, other.reservation_granularity_);
     }
@@ -404,6 +425,7 @@ private:
         base_ = nullptr;
         canonical_byte_origin_ = nullptr;
         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
+        zero_from_ = 0;
         page_size_ = reservation_granularity_ = 0;
     }
 
@@ -413,6 +435,9 @@ private:
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};
     std::size_t logical_bytes_{0};
+    // Lowest offset from which every reserved byte is known to be OS-zero.
+    // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned.
+    std::size_t zero_from_{0};
     std::size_t page_size_{0};
     std::size_t reservation_granularity_{0};
     VmStoragePool pool_;
