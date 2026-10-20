@@ -1,0 +1,42 @@
+{
+  "argv": [
+    "wire",
+    "--source-dir",
+    "/Volumes/XOffsetCS/candidates/w9a",
+    "--deps",
+    "external",
+    "--compiler",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++",
+    "--sdk",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "--library-dir",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib",
+    "--wire-bundle",
+    "docs/validation/2026-10-15-vm-followup/wire-inputs-and-versions.tar.gz",
+    "--out",
+    "/Volumes/XOffsetCS/results/wire-w9a-20261020"
+  ],
+  "finished_epoch": 1792493535.2708511,
+  "historical_frames_passed": 84,
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "input_sha256": {
+    "wire_bundle": "8ec72d53f54fb5ef8b56c5f84c90fcc56f4cd56d2e7591e30a215300df433485"
+  },
+  "inputs": {
+    "deps": "/Users/ximi/workspace/XOffsetDatastructure-mac-20261020/external",
+    "out": "/Volumes/XOffsetCS/results/wire-w9a-20261020",
+    "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "source_dir": "/Volumes/XOffsetCS/candidates/w9a",
+    "wire_bundle": "/Users/ximi/workspace/XOffsetDatastructure-mac-20261020/docs/validation/2026-10-15-vm-followup/wire-inputs-and-versions.tar.gz"
+  },
+  "operations_passed": 504,
+  "runner_sha256": "1f54736a190a86e560d325bae65b90aa1ce706148fb00fb074aeb6a57694d657",
+  "started_epoch": 1792493524.1981802,
+  "status": "passed",
+  "variants": [
+    "v0",
+    "v1",
+    "d",
+    "current"
+  ]
+}

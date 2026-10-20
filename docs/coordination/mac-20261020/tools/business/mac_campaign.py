@@ -69,16 +69,18 @@ sys.dont_write_bytecode = True
 MAC_ADAPTER = Path(__file__).resolve()
 BUSINESS = MAC_ADAPTER.parent
 MAC_RUNNER = BUSINESS / "runner/experiments/vm_coordination/run_job.py"
-METAS = {"c14": BUSINESS / "meta-c14", "r1m2": BUSINESS / "meta-r1m2"}
+METAS = {"c14": BUSINESS / "meta-c14", "r1m2": BUSINESS / "meta-r1m2", "w9a": BUSINESS / "meta-w9a"}
 # Expected xoffset production-content identity per protocol label (see
 # identities/*.json; algorithm from combined_full/business/prepare.py).
 EXPECTED_CONTENT = {
     "xoffset-receive-completion-v1": "26299f796e2ba289ab15b38b000a785ad1877fbc65ce29cf3071d2118804c3b4",
     "xoffset-c14-r1-m2-combined-v1": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+    "xoffset-mac-w9-flat-v1": "6ce627e5bae69329ac928b6c80b9920930b693b6543449464998778cdfcc89fb",
 }
 EXPECTED_MAIN_HEADER = {
     "xoffset-receive-completion-v1": "66818de49b18fe85ab8049c9f9ad299bbebbb214eb3fceee0a665fe65f4275c3",
     "xoffset-c14-r1-m2-combined-v1": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+    "xoffset-mac-w9-flat-v1": "a1593020d4a928086f7788ed4ff06c0a32ce2ee777c15fbbbf875f3999273f5d",
 }
 PLATFORM_CLASS = "macos-arm64-native"
 CANDIDATE_PREFIX = "candidate-file/"

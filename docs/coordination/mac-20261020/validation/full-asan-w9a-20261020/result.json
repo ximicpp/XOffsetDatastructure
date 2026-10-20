@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "native",
+    "--suite",
+    "full",
+    "--source-dir",
+    "/Volumes/XOffsetCS/candidates/w9a",
+    "--deps",
+    "external",
+    "--compiler",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++",
+    "--sdk",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "--library-dir",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib",
+    "--sanitizer",
+    "address-undefined",
+    "--targets",
+    "test_adaptive_reservation,test_allocator_failures,test_allocator_model,test_assign_range,test_basic_types,test_canonical_cold_no_callback,test_canonical_registry_v2,test_canonical_zero_target,test_compaction,test_complex_nesting,test_core_lifetime,test_custom_future_lifetime,test_enum_support,test_error_paths,test_field_limit_fix,test_fixed_layout_containers,test_freelist_index,test_inheritance,test_locator_soundness,test_main_containers,test_map_set,test_memory_efficiency,test_modify,test_mutation_failures,test_nested,test_owner_identity,test_owner_registry,test_range_hint,test_receive_raw,test_reflection_advanced,test_reflection_core,test_resize_growth,test_runtime_regressions,test_same_arena_move,test_scalar_resize,test_schema_envelope,test_snapshot_index_header_only,test_stable_erase_if,test_stable_storage,test_storage_policies,test_string_replace,test_tail_expansion,test_type_safety,test_type_signatures,test_validation_resource,test_validation_v4,test_validation_v5,test_validation_v5_bounds,test_validation_v6_dense_fusion,test_validation_v8_single_word,test_vector,test_verified_paths,test_verified_receive,test_virtual_memory_storage,test_vm_lifecycle,test_vm_pool,test_vm_transport,test_wire_admission,test_wire_bitmap,test_wire_range_failures,test_wire_range_index,test_wire_validation,test_xbuffer_api,test_xhandle,test_xstring_direct_assign,test_zero_boilerplate",
+    "--jobs",
+    "8",
+    "--out",
+    "/Volumes/XOffsetCS/results/full-asan-w9a-20261020"
+  ],
+  "finished_epoch": 1792493474.445014,
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "inputs": {
+    "deps": "/Users/ximi/workspace/XOffsetDatastructure-mac-20261020/external",
+    "out": "/Volumes/XOffsetCS/results/full-asan-w9a-20261020",
+    "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "source_dir": "/Volumes/XOffsetCS/candidates/w9a"
+  },
+  "reason": "command exited 8: /Volumes/XOffsetCS/results/full-asan-w9a-20261020/ctest.log\nthout bounded TLS ownership\n\n      Start 54: test_owner_registry\n51/73 Test #54: test_owner_registry ........................   Passed    0.47 sec\n      Start 55: test_tail_expansion\n52/73 Test #55: test_tail_expansion ........................   Passed    0.57 sec\n      Start 56: test_storage_policies\n53/73 Test #56: test_storage_policies ......................   Passed    0.44 sec\n      Start 57: test_allocator_model\n54/73 Test #57: test_allocator_model .......................   Passed    1.63 sec\n      Start 58: test_allocator_failures\n55/73 Test #58: test_allocator_failures ....................   Passed    0.63 sec\n      Start 59: test_vm_lifecycle_empty-globals\n56/73 Test #59: test_vm_lifecycle_empty-globals ............   Passed    0.03 sec\n      Start 60: test_vm_lifecycle_global-assigned\n57/73 Test #60: test_vm_lifecycle_global-assigned ..........   Passed    0.03 sec\n      Start 61: test_vm_lifecycle_static-before-registry\n58/73 Test #61: test_vm_lifecycle_static-before-registry ...   Passed    0.03 sec\n      Start 62: test_vm_lifecycle_static-after-registry\n59/73 Test #62: test_vm_lifecycle_static-after-registry ....   Passed    0.03 sec\n      Start 63: test_vm_lifecycle_shutdown-transfers\n60/73 Test #63: test_vm_lifecycle_shutdown-transfers .......   Passed    0.03 sec\n      Start 64: test_owner_registry_fail_node\n61/73 Test #64: test_owner_registry_fail_node ..............   Passed    0.03 sec\n      Start 65: test_owner_registry_fail_rehash\n62/73 Test #65: test_owner_registry_fail_rehash ............   Passed    0.03 sec\n      Start 66: test_verified_paths\n63/73 Test #66: test_verified_paths ........................***Failed    0.62 sec\nnew API output OOM changed value/source before normalization\n\n      Start 67: test_stable_erase_if\n64/73 Test #67: test_stable_erase_if .......................   Passed    0.44 sec\n      Start 68: test_locator_soundness\n65/73 Test #68: test_locator_soundness .....................   Passed    0.44 sec\n      Start 69: test_snapshot_index_header_only\n66/73 Test #69: test_snapshot_index_header_only ............   Passed    0.61 sec\n      Start 70: test_core_lifetime\n67/73 Test #70: test_core_lifetime .........................   Passed    0.44 sec\n      Start 71: test_custom_future_lifetime\n68/73 Test #71: test_custom_future_lifetime ................   Passed    0.60 sec\n      Start 72: test_receive_raw\n69/73 Test #72: test_receive_raw ...........................   Passed    0.45 sec\n      Start 73: test_verified_receive\n70/73 Test #73: test_verified_receive ......................   Passed    0.53 sec\n      Start 74: test_canonical_registry_v2\n71/73 Test #74: test_canonical_registry_v2 .................   Passed    0.62 sec\n      Start 75: test_canonical_cold_no_callback\n72/73 Test #75: test_canonical_cold_no_callback ............   Passed    0.45 sec\n      Start 76: test_canonical_zero_target\n73/73 Test #76: test_canonical_zero_target .................   Passed    0.58 sec\n\n88% tests passed, 9 tests failed out of 73\n\nLabel Time Summary:\nbasic         =   4.21 sec*proc (7 tests)\nfour-paths    =   2.11 sec*proc (4 tests)\nlifecycle     =   0.14 sec*proc (5 tests)\nreflection    =  50.73 sec*proc (64 tests)\nregistry      =   0.05 sec*proc (2 tests)\nstorage       =   2.78 sec*proc (2 tests)\n\nTotal Test time (real) =  57.74 sec\n\nThe following tests FAILED:\n\t 14 - test_scalar_resize (Failed)                       reflection\n\t 19 - test_validation_v4 (Failed)                       reflection\n\t 21 - test_wire_bitmap (Failed)                         reflection\n\t 23 - test_validation_resource (Failed)                 reflection\n\t 46 - test_wire_range_failures (Failed)                 reflection\n\t 49 - test_range_hint (Failed)                          reflection\n\t 52 - test_vm_transport (Subprocess aborted)            reflection\n\t 53 - test_owner_identity (Failed)                      reflection\n\t 66 - test_verified_paths (Failed)                      four-paths reflection\nErrors while running CTest\n",
+  "runner_sha256": "1f54736a190a86e560d325bae65b90aa1ce706148fb00fb074aeb6a57694d657",
+  "started_epoch": 1792493322.604906,
+  "status": "failed"
+}

@@ -43,7 +43,8 @@ CMAKE = Path("/opt/homebrew/bin/cmake")
 NINJA = Path("/opt/homebrew/bin/ninja")
 COMPETITORS = Path("/Volumes/XOffsetCS/competitors/sources")
 SOURCES = {"c14": Path("/Volumes/XOffsetCS/results/full-native-c14-p2996d77-20261020/source"),
-           "r1m2": Path("/Volumes/XOffsetCS/candidate-r1m2-20261020")}
+           "r1m2": Path("/Volumes/XOffsetCS/candidate-r1m2-20261020"),
+           "w9a": Path("/Volumes/XOffsetCS/candidates/w9a")}
 LIBRARIES = ("xoffset", "cista", "flatbuffers", "capnproto", "cereal")
 COMPETITOR_DIRS = {"cista": "cista-v0.16", "flatbuffers": "flatbuffers-v25.12.19",
                    "capnproto": "capnproto-v1.5.0", "cereal": "cereal-v1.3.2"}

@@ -1,0 +1,48 @@
+--- /Volumes/XOffsetCS/candidates/w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ xoffsetdatastructure.hpp	2026-10-20 03:59:33
+@@ -28,6 +28,7 @@
+ #include <utility>
+ #include <vector>
+ #include <cstring>
++#include <cstdio>
+ #include <algorithm>
+ #include <limits>
+ #include <memory>
+@@ -5375,7 +5376,9 @@
+             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
+             // Verified wire currently uses the same normalized transport semantics as save():
+             // payload bytes are preserved, allocator slack is not.
++            const auto b2_t0 = __builtin_readcyclecounter();
+             this->shrink_to_fit();
++            const auto b2_t1 = __builtin_readcyclecounter();
+             auto* root_ptr = detail::find_root<T>(*this);
+             if (!root_ptr) {
+                 throw XException(
+@@ -5411,6 +5414,8 @@
+             header.crc32c = 0;
+             header.reserved0 = 0;
+ 
++            const auto b2_t2 = __builtin_readcyclecounter();
++            std::uint64_t b2_t3 = 0, b2_t4 = 0, b2_t5 = 0;
+             std::string out;
+             if (sizeof(header) > out.max_size() ||
+                 payload_size > out.max_size() - sizeof(header)) {
+@@ -5419,10 +5424,18 @@
+             const auto output_size = sizeof(header) + payload_size;
+ #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
++                b2_t3 = __builtin_readcyclecounter();
+                 std::memcpy(output, &header, sizeof(header));
++                b2_t4 = __builtin_readcyclecounter();
+                 std::memcpy(output + sizeof(header), base, payload_size);
++                b2_t5 = __builtin_readcyclecounter();
+                 return output_size;
+             });
++            const auto b2_t6 = __builtin_readcyclecounter();
++            std::fprintf(stderr, "B2 shrink=%llu header=%llu alloc=%llu hdrcopy=%llu payload=%llu ret=%llu bytes=%zu dstmod64=%zu srcmod64=%zu\n",
++                (unsigned long long)(b2_t1-b2_t0),(unsigned long long)(b2_t2-b2_t1),(unsigned long long)(b2_t3-b2_t2),
++                (unsigned long long)(b2_t4-b2_t3),(unsigned long long)(b2_t5-b2_t4),(unsigned long long)(b2_t6-b2_t5),
++                output_size, (std::size_t)(reinterpret_cast<std::uintptr_t>(out.data()+sizeof(header))%64), (std::size_t)(reinterpret_cast<std::uintptr_t>(base)%64));
+ #else
+             out.reserve(output_size);
+             out.append(reinterpret_cast<const char*>(&header), sizeof(header));
