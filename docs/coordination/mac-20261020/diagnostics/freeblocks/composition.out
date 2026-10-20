@@ -1,0 +1,95 @@
+==== INPUT: /Volumes/XOffsetCS/mac-validation/runs/c14-functional-normal/commands/xoffset-M.input.wire
+file_bytes=13119264  v1_header=88  payload(used_bytes)=13119176  arena.used_end=13119176  arena.header_size=48  root_off=168  alloc_off=64
+load_verified: OK  records=16384 (capacity 16384)  segment_size=13119176
+allocator_state: arena_begin=88 arena_end=13119112 free_bytes=0 epoch=0  freelist blocks=0 sum(block_bytes)=0
+scan: live blocks=196611 (graph-registered 196611, dup 0)  freelist blocks=0 (listed 0)  orphan blocks=0  gap 8B-steps=0
+-- byte composition (payload) --
+  arena_header(48B XBUFV1)                                 48
+  live AllocationHeader                               3145776
+  allocator state(88B user)                                88
+  root Snapshot(user)                                      32
+  live user data(registered extent)                   9973232
+  live internal slack(user_bytes>registered)                0
+  free-list AllocationHeader                                0
+  free-list FreeBlockHeader(8B)                             0
+  free-list body(block_bytes-8)                             0
+  free-list slack(user_bytes>block_bytes)                   0
+  orphan(Core-free) AllocationHeader                        0
+  orphan(Core-free) body                                    0
+  alignment gap/padding                                     0
+  trailing slack before used_end                            0
+  SUM payload                                        13119176  (+88 header = 13119264, file=13119264)
+-- live by kind: blocks / registered bytes / internal slack --
+  alloc_state          1           88          0
+  root                 1           32          0
+  records[]            1      1441792          0
+  name             16384       667120          0
+  samples          16384      2097152          0
+  payload          16384      2097152          0
+  attrs[]          16384      2097152          0
+  attr.key         65536       524288          0
+  attr.value       65536      1048576          0
+-- orphan (unreferenced, not in free list; Core-level free_blocks_ are host-only) --
+  orphans with user_bytes > 262144 (freelist max class): 0 blocks, 0 B
+-- 16 KiB pages entirely dead (payload-relative, payload base page-aligned) --
+  A: free-list body only (keep AHDR+FreeBlockHeader)              0 /    800 pages =          0 B
+  B: A + orphan blocks (hdr+body) + gaps                          0 /    800 pages =          0 B
+  C: B + live internal slack                                      0 /    800 pages =          0 B
+  D(upper bound): every free-list/orphan/gap byte incl. headers      0 /    800 pages =          0 B
+  free-list contiguous runs=0  longest run=0 B at payload off 0  max block_bytes=0
+-- same, wire-file-relative pages (payload starts at file offset 88) --
+  A(file)                                                         0 /    799 pages =          0 B
+  B(file)                                                         0 /    799 pages =          0 B
+  C(file)                                                         0 /    799 pages =          0 B
+nonzero bytes: free-list body+slack=0  orphan body=0
+
+==== FINAL: /Volumes/XOffsetCS/diag/freeblocks/final.wire
+file_bytes=17215264  v1_header=88  payload(used_bytes)=17215176  arena.used_end=17215176  arena.header_size=48  root_off=168  alloc_off=64
+load_verified: OK  records=16384 (capacity 16384)  segment_size=17215176
+allocator_state: arena_begin=88 arena_end=17215112 free_bytes=1440576 epoch=81920  freelist blocks=8192 sum(block_bytes)=1440576
+  class  1 (<=    16 B):      586 blocks       9376 B
+  class  2 (<=    32 B):      581 blocks      13944 B
+  class  3 (<=    64 B):       19 blocks        904 B
+  class  4 (<=   128 B):     4958 blocks     629920 B
+  class  6 (<=   512 B):     2048 blocks     786432 B
+scan: live blocks=204803 (graph-registered 204803, dup 0)  freelist blocks=8192 (listed 8192)  orphan blocks=0  gap 8B-steps=0
+-- byte composition (payload) --
+  arena_header(48B XBUFV1)                                 48
+  live AllocationHeader                               3276848
+  allocator state(88B user)                                88
+  root Snapshot(user)                                      32
+  live user data(registered extent)                  11773432
+  live internal slack(user_bytes>registered)           593080
+  free-list AllocationHeader                           131072
+  free-list FreeBlockHeader(8B)                         65536
+  free-list body(block_bytes-8)                       1375040
+  free-list slack(user_bytes>block_bytes)                   0
+  orphan(Core-free) AllocationHeader                        0
+  orphan(Core-free) body                                    0
+  alignment gap/padding                                     0
+  trailing slack before used_end                            0
+  SUM payload                                        17215176  (+88 header = 17215264, file=17215264)
+-- live by kind: blocks / registered bytes / internal slack --
+  alloc_state          1           88          0
+  root                 1           32          0
+  records[]            1      1441792          0
+  name             16384      1058296       1800
+  samples          16384      2621440          0
+  payload          16384      2621440          0
+  attrs[]          16384      2228224          0
+  attr.key         69632       557056      32768
+  attr.value       69632      1245184     558512
+-- orphan (unreferenced, not in free list; Core-level free_blocks_ are host-only) --
+  orphans with user_bytes > 262144 (freelist max class): 0 blocks, 0 B
+-- 16 KiB pages entirely dead (payload-relative, payload base page-aligned) --
+  A: free-list body only (keep AHDR+FreeBlockHeader)              0 /   1050 pages =          0 B
+  B: A + orphan blocks (hdr+body) + gaps                          0 /   1050 pages =          0 B
+  C: B + live internal slack                                      0 /   1050 pages =          0 B
+  D(upper bound): every free-list/orphan/gap byte incl. headers     49 /   1050 pages =     802816 B
+  free-list contiguous runs=6145  longest run=819200 B at payload off 15675080  max block_bytes=384
+-- same, wire-file-relative pages (payload starts at file offset 88) --
+  A(file)                                                         0 /   1049 pages =          0 B
+  B(file)                                                         0 /   1049 pages =          0 B
+  C(file)                                                         0 /   1049 pages =          0 B
+nonzero bytes: free-list body+slack=1363762  orphan body=0
+
