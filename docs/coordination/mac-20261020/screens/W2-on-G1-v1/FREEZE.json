@@ -1,0 +1,37 @@
+{
+ "schema": "xoffset-mac-screen-v1",
+ "name": "W2-on-G1-v1",
+ "description": "W2 fixed-address canonical window (with receive full-zero fix) on top of R1+M2+G1",
+ "base_source": "/Volumes/XOffsetCS/diag/src-g1",
+ "candidate_source": "/Volumes/XOffsetCS/candidates/w3",
+ "base_binary_sha256": "79c4064dc677f63ce4abb2fdfd2384b550d1945ecc94306a4a006744607f9a17",
+ "candidate_binary_sha256": "5927bcb28da23d165f2e7f65f8078a7a4ab9c42b0d286a85b8da4d56d893821d",
+ "screen_py_sha256": "66e58ff85c0903ea72312fe1ef6e38135dce3870aa0d23e4ddee415e04ea646a",
+ "fixture": "M (prepared-v1, regenerated on Mac; S matches golden)",
+ "pairs": 72,
+ "order": "36 AB + 36 BA shuffled by random.Random(20261020)",
+ "primary": {
+  "metrics": [
+   "read_sum",
+   "mutate"
+  ],
+  "rule": "one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4,71); promotion requires every primary upper bound < 1"
+ },
+ "auxiliary": {
+  "metrics": [
+   "load",
+   "query_before",
+   "emit_after",
+   "retire_modified_state",
+   "reload",
+   "query_after",
+   "cleanup",
+   "total"
+  ],
+  "rule": "two-sided intervals with t(1-0.05/72,71); any lower bound > 1 vetoes promotion"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or re-run; child timeout 20 s; any child failure aborts the screen as failed",
+ "host": "macOS-26.3-arm64-arm-64bit-Mach-O",
+ "frozen_epoch": 1792485863.649266,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}

@@ -1,0 +1,20 @@
+{
+ "schema": "xoffset-mac-screen-v1",
+ "candidate": "G1 (new-page zero skip) on R1+M2",
+ "base": "R1+M2 (155f0847)",
+ "base_binary_sha256": "e2beea21f3f50a57b5855bf3f7f94204ae8af60463615aef8bb244f2ca375fc8",
+ "candidate_binary_sha256": "79c4064dc677f63ce4abb2fdfd2384b550d1945ecc94306a4a006744607f9a17",
+ "runner_sha256": "54d5149236cd6ccfdd4fd89a3dd0e7f4af3b71151f237055a7c2fa2545db049f",
+ "candidate_source": "/Volumes/XOffsetCS/diag/src-g1",
+ "base_source": "/Volumes/XOffsetCS/candidate-r1m2-20261020",
+ "design": "72 pairs, AB/BA 36 each, order from random.Random(20261020).shuffle, fixture M, one child per run",
+ "primary": "mutate: one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4, 71) (retained historical constant); promotion requires upper bound < 1",
+ "auxiliary": "read_sum, load, query_before, query_after, emit_after, retire_modified_state, reload, cleanup, total: two-sided intervals with t(1-0.05/72, 71); any auxiliary lower bound > 1 vetoes promotion (cost-shift veto)",
+ "promotion": "promote iff primary upper bound < 1 and no auxiliary veto; result is final for this screen (no resampling, deletion, trend removal or re-run)",
+ "note": "Primary family is evaluated as written; no resampling, no deletion, no trend removal. A/A pilot aa_w5_72 (non-formal) had all 9 phase intervals within [0.947,1.046].",
+ "child_timeout_s": 20,
+ "host": "macOS-26.3-arm64-arm-64bit",
+ "frozen_epoch": 1792484778.331427,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+ "revision_note": "pre-run text correction of primary/promotion wording; no data existed when edited"
+}

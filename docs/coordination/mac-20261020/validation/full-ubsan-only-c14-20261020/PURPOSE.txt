@@ -1,0 +1,1 @@
+flags=-fsanitize=undefined -fno-sanitize-recover=all; dynamic libc++ (same linkage as validate_vm.py). All registered CTest cases.

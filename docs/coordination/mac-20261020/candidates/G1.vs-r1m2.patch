@@ -1,0 +1,63 @@
+diff -ruN --exclude=external --exclude=*.orig --exclude=*.rej --exclude=MAC_CANDIDATE_MATERIALIZATION.json --exclude=.DS_Store candidate-r1m2-20261020/xoffset_virtual_memory.hpp diag/src-g1/xoffset_virtual_memory.hpp
+--- candidate-r1m2-20261020/xoffset_virtual_memory.hpp	2026-10-19 21:02:56
++++ diag/src-g1/xoffset_virtual_memory.hpp	2026-10-19 21:53:16
+@@ -228,6 +228,7 @@
+         }
+         std::memcpy(owner.base_, bytes, length);
+         owner.logical_bytes_ = length;
++        if (owner.zero_from_ < length) owner.zero_from_ = length;
+         return owner;
+     }
+ 
+@@ -268,8 +269,15 @@
+         if (new_logical_bytes == logical_bytes_) return true;
+         if (!enable_prefix(new_logical_bytes)) return false;
+         if (consume_vm_failure(VmOperation::Prepare)) return false;
+-        std::memset(base_ + logical_bytes_, 0, new_logical_bytes - logical_bytes_);
++        // Bytes at or beyond zero_from_ have never been exposed since the OS
++        // supplied them (fresh anonymous/committed or replaced pages) and are
++        // therefore already zero; only previously exposed bytes are cleared.
++        const std::size_t dirty_end = (std::min)(new_logical_bytes,
++            (std::max)(zero_from_, logical_bytes_));
++        if (dirty_end > logical_bytes_)
++            std::memset(base_ + logical_bytes_, 0, dirty_end - logical_bytes_);
+         logical_bytes_ = new_logical_bytes;
++        if (zero_from_ < new_logical_bytes) zero_from_ = new_logical_bytes;
+         return true;
+     }
+ 
+@@ -322,6 +330,8 @@
+         }
+ #endif
+         accessible_bytes_ = retained;
++        // Decommitted/replaced pages return zero-filled when enabled again.
++        if (zero_from_ > retained) zero_from_ = retained;
+         result.status = VmReclaimStatus::Reclaimed;
+         result.discarded_bytes = bytes;
+         result.inaccessible_bytes = bytes;
+@@ -346,6 +356,7 @@
+         swap(maximum_capacity_, other.maximum_capacity_);
+         swap(accessible_bytes_, other.accessible_bytes_);
+         swap(logical_bytes_, other.logical_bytes_);
++        swap(zero_from_, other.zero_from_);
+         swap(page_size_, other.page_size_);
+         swap(reservation_granularity_, other.reservation_granularity_);
+     }
+@@ -404,6 +415,7 @@
+         base_ = nullptr;
+         canonical_byte_origin_ = nullptr;
+         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
++        zero_from_ = 0;
+         page_size_ = reservation_granularity_ = 0;
+     }
+ 
+@@ -413,6 +425,9 @@
+     std::size_t maximum_capacity_{0};
+     std::size_t accessible_bytes_{0};
+     std::size_t logical_bytes_{0};
++    // Lowest offset from which every reserved byte is known to be OS-zero.
++    // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned.
++    std::size_t zero_from_{0};
+     std::size_t page_size_{0};
+     std::size_t reservation_granularity_{0};
+     VmStoragePool pool_;

@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "native",
+    "--suite",
+    "storage",
+    "--source-dir",
+    ".",
+    "--compiler",
+    "/usr/bin/clang++",
+    "--jobs",
+    "4",
+    "--out",
+    "/Volumes/XOffsetCS/results/storage-native-appleclang21-20261020"
+  ],
+  "finished_epoch": 1792465528.623788,
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "inputs": {
+    "out": "/Volumes/XOffsetCS/results/storage-native-appleclang21-20261020",
+    "source_dir": "/Users/ximi/workspace/XOffsetDatastructure-mac-20261020"
+  },
+  "leak_detection": false,
+  "runner_sha256": "1f54736a190a86e560d325bae65b90aa1ce706148fb00fb074aeb6a57694d657",
+  "sanitizer": "none",
+  "selection": {
+    "registered_count": 2,
+    "scope": "all",
+    "selected_count": 2,
+    "selected_names": [
+      "test_virtual_memory_storage",
+      "test_vm_pool"
+    ],
+    "targets": []
+  },
+  "started_epoch": 1792465527.246928,
+  "status": "passed",
+  "suite": "storage",
+  "tests_passed": 2
+}

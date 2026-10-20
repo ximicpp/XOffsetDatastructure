@@ -1,0 +1,1 @@
+purpose: diagnose 9 ASan/UBSan failures; same flags as validate_vm run but libc++/libc++abi linked statically so libc++-internal operator new calls reach the tests' replacement (Darwin ASan dylib interposition). Diagnostic only, not a validate_vm.py pass.

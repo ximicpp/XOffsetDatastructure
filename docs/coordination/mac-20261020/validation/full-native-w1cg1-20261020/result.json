@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "native",
+    "--suite",
+    "full",
+    "--source-dir",
+    "/Volumes/XOffsetCS/diag/src-w1c",
+    "--deps",
+    "external",
+    "--compiler",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++",
+    "--sdk",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "--library-dir",
+    "/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib",
+    "--jobs",
+    "8",
+    "--out",
+    "/Volumes/XOffsetCS/results/full-native-w1cg1-20261020"
+  ],
+  "finished_epoch": 1792474764.1108952,
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "inputs": {
+    "deps": "/Users/ximi/workspace/XOffsetDatastructure-mac-20261020/external",
+    "out": "/Volumes/XOffsetCS/results/full-native-w1cg1-20261020",
+    "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+    "source_dir": "/Volumes/XOffsetCS/diag/src-w1c"
+  },
+  "reason": "command exited 8: /Volumes/XOffsetCS/results/full-native-w1cg1-20261020/ctest.log\nest_owner_registry ........................   Passed    0.43 sec\n      Start 55: test_tail_expansion\n55/80 Test #55: test_tail_expansion ........................   Passed    0.41 sec\n      Start 56: test_storage_policies\n56/80 Test #56: test_storage_policies ......................   Passed    0.43 sec\n      Start 57: test_allocator_model\n57/80 Test #57: test_allocator_model .......................   Passed    0.66 sec\n      Start 58: test_allocator_failures\n58/80 Test #58: test_allocator_failures ....................   Passed    0.54 sec\n      Start 59: test_vm_lifecycle_empty-globals\n59/80 Test #59: test_vm_lifecycle_empty-globals ............   Passed    0.01 sec\n      Start 60: test_vm_lifecycle_global-assigned\n60/80 Test #60: test_vm_lifecycle_global-assigned ..........   Passed    0.01 sec\n      Start 61: test_vm_lifecycle_static-before-registry\n61/80 Test #61: test_vm_lifecycle_static-before-registry ...   Passed    0.01 sec\n      Start 62: test_vm_lifecycle_static-after-registry\n62/80 Test #62: test_vm_lifecycle_static-after-registry ....   Passed    0.01 sec\n      Start 63: test_vm_lifecycle_shutdown-transfers\n63/80 Test #63: test_vm_lifecycle_shutdown-transfers .......   Passed    0.01 sec\n      Start 64: test_owner_registry_fail_node\n64/80 Test #64: test_owner_registry_fail_node ..............   Passed    0.01 sec\n      Start 65: test_owner_registry_fail_rehash\n65/80 Test #65: test_owner_registry_fail_rehash ............   Passed    0.01 sec\n      Start 66: test_canonical_window\n66/80 Test #66: test_canonical_window ......................   Passed    0.59 sec\n      Start 67: test_canonical_window_reserve_failure\n67/80 Test #67: test_canonical_window_reserve_failure ......***Failed    0.01 sec\nunreserved window resolved an address\n\n      Start 68: test_canonical_window_small\n68/80 Test #68: test_canonical_window_small ................   Passed    0.45 sec\n      Start 69: test_canonical_window_disabled\n69/80 Test #69: test_canonical_window_disabled .............   Passed    0.46 sec\n      Start 70: test_verified_paths\n70/80 Test #70: test_verified_paths ........................   Passed    0.43 sec\n      Start 71: test_stable_erase_if\n71/80 Test #71: test_stable_erase_if .......................   Passed    0.44 sec\n      Start 72: test_locator_soundness\n72/80 Test #72: test_locator_soundness .....................   Passed    0.43 sec\n      Start 73: test_snapshot_index_header_only\n73/80 Test #73: test_snapshot_index_header_only ............   Passed    0.44 sec\n      Start 74: test_core_lifetime\n74/80 Test #74: test_core_lifetime .........................   Passed    0.46 sec\n      Start 75: test_custom_future_lifetime\n75/80 Test #75: test_custom_future_lifetime ................   Passed    0.43 sec\n      Start 76: test_receive_raw\n76/80 Test #76: test_receive_raw ...........................   Passed    1.19 sec\n      Start 77: test_verified_receive\n77/80 Test #77: test_verified_receive ......................   Passed    0.45 sec\n      Start 78: test_canonical_registry_v2\n78/80 Test #78: test_canonical_registry_v2 .................   Passed    0.41 sec\n      Start 79: test_canonical_cold_no_callback\n79/80 Test #79: test_canonical_cold_no_callback ............   Passed    0.46 sec\n      Start 80: test_canonical_zero_target\n80/80 Test #80: test_canonical_zero_target .................   Passed    0.44 sec\n\n99% tests passed, 1 tests failed out of 80\n\nLabel Time Summary:\nbasic               =   2.94 sec*proc (7 tests)\ncanonical-window    =   0.92 sec*proc (3 tests)\nfour-paths          =   1.73 sec*proc (4 tests)\nlifecycle           =   0.04 sec*proc (5 tests)\nreflection          =  39.23 sec*proc (68 tests)\nregistry            =   0.01 sec*proc (2 tests)\nstorage             =   0.88 sec*proc (2 tests)\ntooling             =   3.07 sec*proc (3 tests)\n\nTotal Test time (real) =  46.13 sec\n\nThe following tests FAILED:\n\t 67 - test_canonical_window_reserve_failure (Failed)    canonical-window reflection\nErrors while running CTest\n",
+  "runner_sha256": "1f54736a190a86e560d325bae65b90aa1ce706148fb00fb074aeb6a57694d657",
+  "started_epoch": 1792474694.223256,
+  "status": "failed"
+}
