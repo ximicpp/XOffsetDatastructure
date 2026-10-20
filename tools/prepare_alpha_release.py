@@ -41,7 +41,7 @@ EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
                       "typelayout": "9a6de1d73617631a9612ba9f572d6c0844a90b19"}
 FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp')
 OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
-ROOT_FILES = ("CMakeLists.txt", "README.md", "VERSION", "CHANGELOG.md", "LICENSE",
+ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp",
               "Dockerfile", "docker-compose.yml", ".dockerignore")
 DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/VM_PACKAGING.md", "docs/VM_VALIDATION_RUNNER.md")
@@ -250,8 +250,8 @@ def validate_payload(payload):
             raise ValueError("file is outside source distribution closure: " + name)
         if len(data) > MAX_FILE_BYTES:
             raise ValueError("source member exceeds size limit: " + name)
-    if payload["VERSION"].decode("utf-8").strip() != VERSION:
-        raise ValueError("VERSION differs from " + VERSION)
+    if payload["XOFFSET_VERSION"].decode("utf-8").strip() != VERSION:
+        raise ValueError("XOFFSET_VERSION differs from " + VERSION)
     check_cpp_and_cmake_closure(payload)
     return dependency_lock(payload)
 
