@@ -913,7 +913,9 @@ void reactivate_inline_prefix(T* data,std::size_t live_count) noexcept {
     if constexpr (!raw_needs_activation<T>()) return;
     else {
         const auto n=live_count*sizeof(T);
-        auto* origin=XBufferCore::canonical_bytes_at(data,reinterpret_cast<std::uintptr_t>(data),n);
+        // W9: no canonical receive-array lookup; always the legacy flat
+        // element-address path (origin == nullptr).
+        std::byte* origin=nullptr;
         CanonicalRawBytes bytes{origin,n,n};
         for(std::size_t i=0;i<live_count;++i) {
             // Legacy has an already-created T[] from the caller's barrier;

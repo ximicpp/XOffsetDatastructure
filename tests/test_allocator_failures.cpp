@@ -62,6 +62,48 @@ void lazy_load() {
     require(hits==1,"post-load lazy metadata failure not reached");
     require(loaded.root<AllocatorFailureRoot>().values[0]==77,"post-load OOM changed root");
 }
+// G: the failed no-growth attempt inside allocate_dynamic_bytes is a probe,
+// not a thrown XBadAlloc: no diagnostic exception string is allocated before
+// the unchanged release-then-grow recovery, whose order and errors are kept.
+auto growth_policy(bool automatic) {
+    auto cap=XBuffer::maximum_capacity(1024*1024);
+    return automatic ? cap.with_growth(XGrowPolicy::Automatic) : cap;
+}
+void growth_probe_without_host_allocation() {
+    for(long point:{-1L,0L}) {
+        auto b=XBuffer::create<AllocatorFailureRoot>(4096,growth_policy(true));
+        auto* state=b.find_allocator_storage<XAllocatorStateV1>(); require(state,"missing state");
+        require(state->free_bytes==0,"fixture unexpectedly has cached blocks");
+        auto ref=fixed_detail::allocator_ref_of(state); const auto size=b.get_size();
+        attempts=hits=0;fail_after=point;watch=true;
+        void* p=nullptr;
+        try { p=fixed_detail::allocate_dynamic_bytes(ref,static_cast<std::uint32_t>(size),8); }
+        catch(...) { watch=false;fail_after=-1;throw; }
+        watch=false;fail_after=-1;
+        require(p && b.get_size()>size,"growth allocation did not grow");
+        require(attempts==0 && hits==0,"growth signalling attempted a host allocation");
+        std::memset(p,0x47,size);
+        auto frame=b.save_verified<AllocatorFailureRoot>(); (void)XBuffer::load_verified<AllocatorFailureRoot>(frame);
+    }
+}
+void growth_probe_releases_cached_blocks_first() {
+    for(bool automatic:{true,false}) {
+        auto b=XBuffer::create<AllocatorFailureRoot>(4096,growth_policy(automatic));
+        auto* state=b.find_allocator_storage<XAllocatorStateV1>(); require(state,"missing state");
+        auto ref=fixed_detail::allocator_ref_of(state);
+        auto* small=fixed_detail::allocate_dynamic_bytes(ref,256,8); fixed_detail::retire_dynamic_bytes(ref,small,256);
+        require(state->free_bytes==256,"fixture cached block missing");
+        const auto epoch=state->epoch; const auto size=b.get_size();
+        bool bad=false; void* p=nullptr;
+        try { p=fixed_detail::allocate_dynamic_bytes(ref,static_cast<std::uint32_t>(size),8); }
+        catch(const XBadAlloc&) { bad=true; }
+        require(state->free_bytes==0 && state->epoch==epoch+1,"cached blocks were not released exactly once before growth");
+        for(auto head:state->freelist_head) require(head==0,"release retained a free-list head");
+        if(automatic) require(!bad && p && b.get_size()>size,"automatic growth after release failed");
+        else require(bad && !p && b.get_size()==size,"explicit policy must still end with XBadAlloc");
+        require(b.arena()->allocate_aligned(200,8)==small,"released block was not handed to the Core free list");
+    }
+}
 }
 int main() {try {
     std::size_t points=0,max_lost=0;
@@ -70,5 +112,5 @@ int main() {try {
         for(std::size_t n=0;n<normal.attempts;++n) {auto r=exercise(kind,n);require(r.hits==1,"requested fail point not hit");
             require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
     }
-    lazy_load(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
+    lazy_load(); growth_probe_without_host_allocation(); growth_probe_releases_cached_blocks_first(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
 } catch(const std::exception& e) {watch=false;std::cerr<<e.what()<<'\n';return 1;} }
