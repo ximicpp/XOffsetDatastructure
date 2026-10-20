@@ -1,0 +1,311 @@
+diff -ruN --exclude=external --exclude=*.orig w6/tests/test_canonical_window.cpp w7/tests/test_canonical_window.cpp
+--- w6/tests/test_canonical_window.cpp	2026-10-20 01:58:22
++++ w7/tests/test_canonical_window.cpp	2026-10-20 02:14:22
+@@ -3,7 +3,8 @@
+ // provenance root of every canonical pointer.
+ //
+ // Variants (same source, separate targets):
+-//   default                         full window; optional --reserve-failure
++//   default                         full window (reserved lazily by the first
++//                                   receive); optional --reserve-failure
+ //   XOFFSET_TEST_WINDOW_SMALL       window of 4 granules (exhaustion)
+ //   XOFFSET_TEST_WINDOW_DISABLED    XOFFSET_CANONICAL_WINDOW_BYTES == 0
+ #include "xoffsetdatastructure.hpp"
+@@ -342,7 +343,55 @@
+     for (int f : failures) need(f == 0, "concurrent window slot use failed");
+ }
+ 
++bool window_untouched() {
++    return !xd::canonical_window_array.load() && !xd::canonical_window_attempted.load();
++}
++
++// Force the kernel-chosen address into the window range while the window is
++// not reserved: the unconditional overlap guard must move the reservation out
++// and release the colliding mapping (PROT_NONE path and full-copy RW path).
++void collision_relocates(const char* phase) {
++    for (int full_copy = 0; full_copy != 2; ++full_copy) {
++        const auto moved = xd::canonical_window_relocations.load();
++        xd::fail_next_vm_operation(xd::VmOperation::WindowCollide);
++        std::vector<char> input(1 << 20, 'z');
++        Storage s = full_copy ? Storage::from_bytes(input.data(), input.size(), input.size())
++                              : Storage(0, 1 << 20);
++        need(xd::canonical_window_relocations.load() == moved + 1, phase);
++        need(s.data() && !touches_window(s.data(), s.reserved_bytes()), "colliding ordinary storage not relocated");
++        need(!full_copy || (s.size() == input.size() && s.data()[input.size() - 1] == 'z'), "relocated copy differs");
++        Storage t(0, 1 << 20);
++        need(!touches_window(t.data(), t.reserved_bytes()), "ordinary storage entered the window after collision");
++    }
++}
++
++// W7: ordinary create/mutate/save/load/reload and raw storage never reserve
++// the window (lazy reservation at the first receive) and never touch it.
++void ordinary_only_leaves_window_unreserved(const std::string& input) {
++    need(window_untouched(), "ordinary create/save reserved the window");
++    {
++        auto loaded = Buffer::load_verified(input, policy());
++        check(loaded);
++        loaded.root().values.push_back(77);
++        auto again = Buffer::load_verified(loaded.save_verified(), policy());
++        need(again.root().values.size() == 7 && again.root().values[6] == 77, "ordinary reload differs");
++        Storage plain(0, 1 << 20);
++        auto copy = Storage::from_bytes(input.data(), input.size(), 1 << 20);
++        need(!touches_window(loaded.get_address(), loaded.maximum_capacity()) &&
++             !touches_window(plain.data(), plain.reserved_bytes()) &&
++             !touches_window(copy.data(), copy.reserved_bytes()), "ordinary storage touches the window range");
++    }
++    ordinary_full_lifecycle();
++    need(window_untouched(), "ordinary load/storage reserved the window");
++    collision_relocates("window collision hook was not exercised before the reservation");
++    need(window_untouched(), "collision relocation reserved the window");
++}
++
+ void reserve_failure_mode() {
++    // Ordinary storage before the first receive: never reserves, never lands
++    // in the window range.
++    need(window_untouched(), "window touched before any VM storage existed");
++    ordinary_only_leaves_window_unreserved(wire());
+     // First window use in this process: inject the one-time reservation failure.
+     need(!xd::canonical_window_array.load(), "window reserved before injection");
+     xd::fail_next_vm_operation(xd::VmOperation::WindowReserve);
+@@ -360,28 +409,18 @@
+     ordinary_outside_window();
+     ordinary_full_lifecycle();
+     g1_zeroing();
+-    // Force the kernel-chosen address into the window range: the overlap
+-    // guard must move the reservation out and release the colliding mapping.
+-    for (int full_copy = 0; full_copy != 2; ++full_copy) {
+-        const auto moved = xd::canonical_window_relocations.load();
+-        xd::fail_next_vm_operation(xd::VmOperation::WindowCollide);
+-        std::vector<char> input(1 << 20, 'z');
+-        Storage s = full_copy ? Storage::from_bytes(input.data(), input.size(), input.size())
+-                              : Storage(0, 1 << 20);
+-        need(xd::canonical_window_relocations.load() == moved + 1, "window collision hook was not exercised");
+-        need(s.data() && !touches_window(s.data(), s.reserved_bytes()), "colliding ordinary storage not relocated");
+-        need(!full_copy || (s.size() == input.size() && s.data()[input.size() - 1] == 'z'), "relocated copy differs");
+-        // The released colliding range is free again: a receive still fails
+-        // (the window attempt is final), ordinary storage still avoids it.
+-        Storage t(0, 1 << 20);
+-        need(!touches_window(t.data(), t.reserved_bytes()), "ordinary storage entered the window after collision");
+-    }
++    // After the failed reservation the guard still relocates colliding
++    // mappings; the released range is free again, but a receive still fails
++    // (the window attempt is final) and ordinary storage still avoids it.
++    collision_relocates("window collision hook was not exercised after the failed reservation");
++    need(throws_bad_alloc([] { auto s = Storage::for_receive(16, 4096); (void)s; }),
++         "receive succeeded after a final failed reservation");
+     const auto bytes = wire(); // ordinary create/save path still works
+     need(!bytes.empty(), "ordinary save failed");
+     std::cout << "canonical window reservation failure: receive rejected once and for all, ordinary unaffected\n";
+ }
+ 
+-// Default window size: 32 GiB on macOS (eager reservation cost scales with
++// Default window size: 32 GiB on macOS (reservation cost scales with
+ // size there), 256 GiB on the other enabled platforms. 1 MiB granules.
+ #if defined(__APPLE__)
+ static_assert(Window::bytes == (32ull << 30) && Window::slots == 32768 && Window::granule == (1u << 20),
+@@ -416,17 +455,24 @@
+ 
+ void run() {
+     static_assert(Window::enabled);
+-    need(!xd::canonical_window_array.load() && !xd::canonical_window_attempted.load(),
+-         "window touched before any VM storage existed");
++    need(window_untouched(), "window touched before any VM storage existed");
+     const auto input = wire();
+-    need(xd::canonical_window_array.load() && xd::canonical_window_attempted.load(),
+-         "first VM storage creation did not reserve the window eagerly");
+-    {   // The collision hook is inert while the window is reserved.
++    ordinary_only_leaves_window_unreserved(input);
++    {   // Lazy reservation: the first receive reserves the window.
++        auto first = receive(input);
++        check(first);
++        need(xd::canonical_window_array.load() && xd::canonical_window_attempted.load() &&
++             in_window(first.get_address(), 1), "first receive did not reserve the window");
++    }
++    {   // While the window is reserved the kernel cannot honour the collision
++        // hint; it may place the mapping right after the window (touching its
++        // closed range), which the unconditional guard then relocates.
+         const auto moved = xd::canonical_window_relocations.load();
+         xd::fail_next_vm_operation(xd::VmOperation::WindowCollide);
+         Storage s(0, 1 << 20);
+-        need(!s.in_canonical_window() && !touches_window(s.data(), s.reserved_bytes()) &&
+-             xd::canonical_window_relocations.load() == moved, "reserved window admitted ordinary storage");
++        const auto relocated = xd::canonical_window_relocations.load() - moved;
++        need(!s.in_canonical_window() && !touches_window(s.data(), s.reserved_bytes()) && relocated <= 1,
++             "reserved window admitted ordinary storage");
+     }
+     {
+         auto first = receive(input);
+@@ -442,7 +488,7 @@
+     ordinary_outside_window();
+     ordinary_full_lifecycle();
+     g1_zeroing();
+-    std::cout << "canonical window: eager reservation, placement, equivalence, reuse, pool isolation, concurrency, G1 passed\n";
++    std::cout << "canonical window: lazy reservation at first receive, placement, equivalence, reuse, pool isolation, concurrency, G1 passed\n";
+ }
+ #endif
+ } // namespace
+diff -ruN --exclude=external --exclude=*.orig w6/xoffset_virtual_memory.hpp w7/xoffset_virtual_memory.hpp
+--- w6/xoffset_virtual_memory.hpp	2026-10-20 01:56:48
++++ w7/xoffset_virtual_memory.hpp	2026-10-20 02:13:01
+@@ -52,8 +52,8 @@
+ // Default rationale (PROT_NONE / MEM_RESERVE address space, which costs no
+ // memory or commit charge until a slot's pages are enabled exactly as ordinary
+ // storage enables them). Size: 32 GiB on macOS, 256 GiB elsewhere. On Darwin
+-// the eager one-time reservation was measured to cost ~0.5 us per GiB (256 GiB
+-// = 0.1-0.7 ms in the first VM storage creation of every process), so the
++// the one-time reservation was measured to cost ~0.5 us per GiB (256 GiB
++// = 0.1-0.7 ms per process; it is now made lazily at the first receive), so the
+ // macOS default is 32 GiB (~20 us): 32768 granules, e.g. 512 concurrent
+ // receives at the default 64 MiB maximum capacity (one receive is at most
+ // MAX_PAYLOAD < 2 GiB). The Linux (one PROT_NONE VMA) and Windows (one
+@@ -76,6 +76,8 @@
+ //    reserve it: receive then throws std::bad_alloc unless overridden.
+ //  * Windows x64: 0x5800'0000'0000 (128 TiB user VA since Windows 8.1).
+ //  * Everything else (32-bit, iOS, other OSes): disabled (bytes 0).
++// The window is reserved lazily by the first receive storage request; ordinary
++// storage never reserves it and never touches its address range.
+ // A reservation that cannot be placed exactly at the base (address already in
+ // use, sanitizer rejection, VA too small) fails once and permanently: receive
+ // storage creation then throws std::bad_alloc, ordinary storage is unaffected.
+@@ -131,9 +133,10 @@
+ // only when additional pages are required; Prepare precedes logical publication.
+ // WindowReserve models failure of the one-time canonical receive window
+ // reservation (see CanonicalWindow below); it is consumed only by that attempt.
+-// WindowCollide is a test hook: the next ordinary reservation made while the
+-// window is unavailable first asks for the window base, so the overlap guard
+-// (VirtualMemoryStorage::map_ordinary) must relocate it.
++// WindowCollide is a test hook: the next ordinary reservation first asks for
++// the window base. While the window is not reserved the kernel can honour it,
++// so the overlap guard (VirtualMemoryStorage::map_ordinary) must relocate it;
++// while it is reserved the kernel picks another address.
+ enum class VmOperation : std::uint8_t {
+     Reserve, Enable, Prepare, Reclaim, Protect, WindowReserve, WindowCollide
+ };
+@@ -184,11 +187,11 @@
+ // value means the window is not (or can never be) reserved: nothing in the
+ // address range belongs to this library, and resolution returns nullptr.
+ inline std::atomic<std::byte*> canonical_window_array{nullptr};
+-// Set (release) once the single reservation attempt has finished, whatever
+-// its result. Ordinary storage creation waits for this before mapping, so its
+-// overlap guard always sees the final window state.
++// Set (release) once the single (lazy, first-receive) reservation attempt has
++// finished, whatever its result. Ordinary storage does not read it: its
++// overlap guard is unconditional.
+ inline std::atomic<bool> canonical_window_attempted{false};
+-// Diagnostics: ordinary reservations moved away from an unavailable window.
++// Diagnostics: ordinary reservations moved out of the window address range.
+ inline std::atomic<std::size_t> canonical_window_relocations{0};
+ 
+ class CanonicalWindow {
+@@ -235,12 +238,13 @@
+ 
+     // INTERNAL resolution: no runtime load at all. The in-window branch names
+     // the window array object by laundering the constant base address.
+-    // Precondition (see w2-PROOF.md): target lies within (n == 0: at most one
++    // Precondition (see w7-PROOF.md): target lies within (n == 0: at most one
+     // past) the reservation of a live library VirtualMemoryStorage. Every
+-    // library reservation either is a window slot (then the window array is
+-    // alive) or does not touch [base, base+bytes] (enforced by map_ordinary
+-    // while the window is unavailable), so the branch is reached only while
+-    // the array object exists.
++    // library reservation either is a window slot (which exists only after a
++    // successful reservation, so the window array is alive) or is ordinary and
++    // never touches [base, base+bytes] (enforced unconditionally by
++    // map_ordinary, whatever the window state), so the branch is reached only
++    // while the array object exists.
+     static std::byte* internal_bytes_at(std::uintptr_t target, std::size_t n) noexcept {
+         if constexpr (enabled) {
+             const std::uintptr_t offset = target - base;
+@@ -278,18 +282,6 @@
+         }
+     }
+ 
+-    // Performs the one reservation attempt if it has not happened yet. Called
+-    // before any ordinary reservation is mapped (eager reservation at first
+-    // VM storage creation).
+-    static void ensure_attempted() noexcept {
+-        if constexpr (enabled) {
+-            if (canonical_window_attempted.load(std::memory_order_acquire)) return;
+-            State& s = state();
+-            std::lock_guard<std::mutex> lock(s.mutex);
+-            (void)reserve_locked(s);
+-        }
+-    }
+-
+     // True when [p, p+n) lies inside the reserved window.
+     static bool contains(const void* p, std::size_t n) noexcept {
+         if (!enabled || !canonical_window_array.load(std::memory_order_acquire)) return false;
+@@ -297,8 +289,9 @@
+         return offset <= bytes && n <= bytes - offset;
+     }
+ 
+-    // Reserves the window on first use (once per process, success or failure)
+-    // and takes a first-fit run of granules covering `reserved` bytes. Returns
++    // Reserves the window lazily, at the first receive slot request (once per
++    // process, success or failure; ordinary storage never triggers it) and
++    // takes a first-fit run of granules covering `reserved` bytes. Returns
+     // the slot's first byte as an element of the window array, or nullptr if
+     // the window is disabled/unavailable/exhausted. No C++ allocation occurs,
+     // locked or not, so new_handler reentry cannot deadlock on this mutex.
+@@ -756,19 +749,18 @@
+         swap(reservation_granularity_, other.reservation_granularity_);
+     }
+ 
+-    // Maps an ordinary (non-window) reservation. Invariant W (w2-PROOF.md):
+-    // while the canonical window is not reserved, no library reservation
+-    // touches the closed range [window base, window base + bytes]. The single
+-    // window attempt is completed first (eager reservation at the first VM
+-    // storage creation), so the window state seen here is final: if it is
+-    // reserved the kernel cannot hand out any address in its range; if it is
+-    // unavailable, a mapping that touches the range is kept mapped (so the
+-    // kernel cannot return it again) while the reservation is retried at hints
+-    // just above and just below the window, then released. Returns nullptr on
+-    // failure (callers throw std::bad_alloc).
++    // Maps an ordinary (non-window) reservation. Invariant W' (w7-PROOF.md):
++    // no ordinary library reservation ever touches the closed range
++    // [window base, window base + bytes], whatever the window state, and the
++    // window is NOT reserved here (it is reserved lazily by the first receive).
++    // A kernel-chosen mapping that touches the range (possible only while the
++    // window is not reserved) is kept mapped, so the kernel cannot return it
++    // again, while the reservation is retried at hints just above and just
++    // below the window; then it is released. The common path costs the two
++    // compares of touches(). Returns nullptr on failure (callers throw
++    // std::bad_alloc).
+     static void* map_ordinary(std::size_t length, [[maybe_unused]] bool accessible) noexcept {
+-        CanonicalWindow::ensure_attempted();
+-        const bool guard = CanonicalWindow::enabled && !CanonicalWindow::reserved();
++        constexpr bool guard = CanonicalWindow::enabled;
+         const bool collide = consume_vm_failure(VmOperation::WindowCollide) && guard;
+         void* const window = reinterpret_cast<void*>(CanonicalWindow::base);
+ #if defined(_WIN32)
+diff -ruN --exclude=external --exclude=*.orig w6/xoffsetdatastructure.hpp w7/xoffsetdatastructure.hpp
+--- w6/xoffsetdatastructure.hpp	2026-10-20 01:56:35
++++ w7/xoffsetdatastructure.hpp	2026-10-20 02:12:40
+@@ -385,7 +385,7 @@
+         }
+ 
+         // INTERNAL load-free resolver used by the library's own resolution
+-        // sites (w2-PROOF.md). Same results as canonical_bytes_at whenever the
++        // sites (w7-PROOF.md). Same results as canonical_bytes_at whenever the
+         // window is reserved. Precondition: target lies within (bytes == 0: at
+         // most one past) the reservation of a live library storage, so an
+         // in-window target proves the window array exists. Not for arbitrary
+@@ -4112,7 +4112,8 @@
+         // Wire validation resolves addresses formed from untrusted deltas
+         // after validate_storage_range bounded them to [ctx.base, ctx.end].
+         // A context base inside the window is live library storage in the
+-        // window, which proves the window array exists (invariant W), so the
++        // window, i.e. a receive slot (ordinary storage never touches the
++        // window, invariant W'), which proves the window array exists, so the
+         // load-free resolver is valid for EVERY target. Any other base uses the
+         // checked public resolver, which is valid for any address. Neither
+         // throws, so validation error order is unchanged.
+@@ -4394,7 +4395,7 @@
+             const auto used = xbuf.arena()->used_end;
+             const char* validated_end;
+             // xbuf is live library storage; the end target is bounded by the
+-            // segment check below before it is resolved (w2-PROOF.md).
++            // segment check below before it is resolved (w7-PROOF.md).
+             if (XBufferCore::canonical_bytes_at_internal(xbuf.get_address(),
+                     reinterpret_cast<std::uintptr_t>(xbuf.get_address()), 1)) {
+                 if (used > xbuf.segment_size())
