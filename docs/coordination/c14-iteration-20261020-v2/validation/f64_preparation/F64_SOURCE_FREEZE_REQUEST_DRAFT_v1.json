@@ -1,0 +1,107 @@
+{
+  "status": "draft_not_execution_admission_root_Q_engineering_acceptance_and_explicit_F_preparation_admission_required",
+  "candidate": "r1-m2-combined-v1",
+  "campaign": "formal",
+  "entry": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "identity": {
+      "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8",
+      "bytes": 118612
+    }
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "formal",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1"
+  ],
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/formal-freeze-v1",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "formal",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1"
+  ],
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "output": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1",
+  "future_timing_output": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1",
+  "original_runner_sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909",
+  "default_shared_real_lock_only": true,
+  "nested_runner": false,
+  "root_qualification_acceptance_path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-acceptance.json",
+  "qualification_acceptance_actual_identity": null,
+  "read_contract": "Source require_qualified_q() exact decimal-string IDs, actual Qreport/queue6members/manifests/postpin and currentfull11tools; original formal freeze copies acceptedQrecord and maintains fullbody/source/fixture validation. No new source edits needed.",
+  "actual_Q_result_index": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_ACTUAL_RESULT_INDEX_v1.json",
+    "identity": {
+      "sha256": "4be7e7096e11adbfe51bea998570f3352431d405a26f2e94f039b32b7dafa06f",
+      "bytes": 26704
+    }
+  },
+  "actual_Q_statistical_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_STATISTICAL_RESULT_ACCEPTANCE.json",
+    "identity": {
+      "sha256": "a1888a505958d30d04715dce2be68ce07fd97bac398b1367cb4d58233216146f",
+      "bytes": 58112
+    }
+  },
+  "root_Q_engineering_acceptance_actual_identity": null,
+  "budget": {
+    "pause": 0,
+    "power_change": false,
+    "compile": 0,
+    "capture": 0,
+    "F_timing_samples": 0,
+    "native": 0,
+    "host_plan": 0,
+    "outer_seconds": 600
+  },
+  "original_F_policy": {
+    "inference_primary": 4608,
+    "whole_seconds": 5400,
+    "primary_warmup": 24,
+    "child_seconds": 20,
+    "primary": 4632,
+    "macrocycles": 64,
+    "windows": 1,
+    "actual_children": 9264,
+    "retries": 0,
+    "conditioning": 4632
+  },
+  "actual_F_manifest": null,
+  "fresh_space_requirement": "Actualguestandbacking >= original8GiBcap+2GiBmargin(10GiB) atfreeze; historicalQsnapshotsareonlyprovenance. Originalfreeze andeveryactualchildretainoriginalcapacity/admission checks.",
+  "required_before_dispatch": [
+    "Root actual Q engineering acceptance and materialized exact qualification-acceptance.json.",
+    "Explicit exactonce-only originalW1validation600 preparation admission; draft alone does not authorize.",
+    "No other realsharedheavy lease active and freshout/queue; preserve failure,no overwrite/retry."
+  ],
+  "postfreeze": "Actualmaintained verifier success/manifest/base/staging/retained+physical/free projections and originalqueuecleanup indexed for independent acceptance. Root final actualFrequest/REVIEW/HOST_REVIEW/GLOBALQUIET/onceledger required beforeFtiming.",
+  "existing_formal_host_source": "core/formal_host_v1/F64_HOST_SOURCE_READY_v1.json is root/core authored; do not recreate/edit. Currently under independent source review. Exactexistingexecute5ead5... /Python b5c4d... /PS0898a5...,5520guard/min5460. No invocation.",
+  "F64_admitted": false,
+  "executed": 0
+}

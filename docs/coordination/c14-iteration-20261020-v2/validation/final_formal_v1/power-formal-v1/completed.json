@@ -1,0 +1,9 @@
+{
+    "status":  "passed",
+    "original":  "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "restored":  true,
+    "reason":  "requested_stop",
+    "error":  null,
+    "pid":  142884,
+    "finished_utc":  "2026-10-19T23:36:49.9223257+00:00"
+}

@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "original": {
+    "bytes": 601475,
+    "sha256": "d4e296d277c92dd38fa16ff7ab7af283cbf403a9be9df5a9d6a1e8e1051f1363"
+  },
+  "derived": {
+    "bytes": 602302,
+    "sha256": "229d8adfa4353dddf1934f69d52e3ce79e4c370a1bcce76d988ecf7bbc822ced"
+  },
+  "delta": "Only four closure bindings added: actual bounded pause module/helper/provenance and complete154/14 identity serialization equivalence. No source,binary,profile,policy,schedule,input or native command changed.",
+  "native_executions": 0
+}

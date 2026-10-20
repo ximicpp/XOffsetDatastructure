@@ -1,0 +1,42 @@
+{
+  "status": "passed",
+  "queue_audits": {
+    "m1-v2-codegen": {
+      "status": "audit_passed",
+      "job_status": "complete",
+      "run_id": "993e2f9853794161be8db186247d31c2"
+    },
+    "m1-v2-correctness": {
+      "status": "audit_passed",
+      "job_status": "complete",
+      "run_id": "809837966de04d78b88f533f98e6202d"
+    },
+    "m1-v2-mechanism": {
+      "status": "audit_passed",
+      "job_status": "complete",
+      "run_id": "a337aae2ea154efd96fcc79366bf79a2"
+    },
+    "s1-output16-v1": {
+      "status": "audit_passed",
+      "job_status": "complete",
+      "run_id": "ebe011f96fb34193bff3a9485ffd054f"
+    }
+  },
+  "baseline154_unchanged": true,
+  "lease": {
+    "status": "idle",
+    "lock": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination/queue.lock",
+    "last_record": {
+      "finished_at": "2026-10-19T14:18:05.937087+00:00",
+      "out": "/root/xoffset-c14-iteration/20261019/v1/validation/leases/s1-output16-v1",
+      "owner": "W1",
+      "run_id": "ebe011f96fb34193bff3a9485ffd054f",
+      "status": "complete"
+    }
+  },
+  "new_cpp_compiles": 13,
+  "new_native_runs": 11,
+  "new_timing_samples": 0,
+  "M1_screening_admitted": false,
+  "remaining": "Applicable complete business/SML/V1/consumer gates and frozen statistical/screen protocol; S1 other-path work attribution remains separately scoped."
+}

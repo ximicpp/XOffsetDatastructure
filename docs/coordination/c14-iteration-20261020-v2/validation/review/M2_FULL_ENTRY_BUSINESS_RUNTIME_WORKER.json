@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "stage": "runtime",
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_FULL_ENTRY_BUSINESS_RUNTIME_ADMISSION.json",
+    "identity": {
+      "bytes": 1122358,
+      "sha256": "52c55cbd865ebf5d990af6780ab20c4a2d2d3ec59fbd645394c41c62b9482713"
+    }
+  },
+  "lease_proof": {
+    "holder": {
+      "kind": "validation",
+      "out": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/queues/package-runtime-v2",
+      "owner": "W1",
+      "run_id": "ecb4a5ed42164a99b56be5dd0f2f5a04",
+      "started_at": "2026-10-19T18:48:59.826942+00:00",
+      "status": "running",
+      "supervisor_pid": 1405
+    },
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/queues/package-runtime-v2/request.json",
+      "identity": {
+        "bytes": 1381,
+        "sha256": "7e2ae0a516949472d662f2c577bb0600e298e0b7f1cef1ffcdd0ee93c8261e90"
+      }
+    }
+  },
+  "wrapper61_before": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  },
+  "timing_samples": 0,
+  "actual_result": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/package-runtime-v2/result.json",
+    "identity": {
+      "bytes": 3392,
+      "sha256": "cd7cf0b889e3b0d6370bb5e393f7a83ca1545aae0f62ff23008d4c268cd7e8f2"
+    }
+  },
+  "wrapper61_after": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  }
+}

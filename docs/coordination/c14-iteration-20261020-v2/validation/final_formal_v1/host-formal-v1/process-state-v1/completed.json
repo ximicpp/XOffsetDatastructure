@@ -1,0 +1,51 @@
+{
+    "schema_version":  1,
+    "status":  "passed",
+    "restored":  true,
+    "run_token":  "e7867323d5ef46dea58e2710ec155cc9",
+    "reason":  "requested_stop",
+    "error":  null,
+    "started_utc":  "2026-10-19T22:22:39.8215840+00:00",
+    "all_suspended_utc":  "2026-10-19T22:22:39.9172451+00:00",
+    "resume_started_utc":  "2026-10-19T23:39:41.5868834+00:00",
+    "finished_utc":  "2026-10-19T23:39:41.6194468+00:00",
+    "maximum_seconds":  5520,
+    "targets":  [
+                    {
+                        "identity":  {
+                                         "pid":  49116,
+                                         "name":  "TGitCache",
+                                         "image_path":  "C:\\Program Files\\TortoiseGit\\bin\\TGitCache.exe",
+                                         "owner_sid":  "S-1-5-21-4175325682-2436190947-2784970811-7045",
+                                         "creation_filetime":  "134359155653323608",
+                                         "start_time_utc":  "2026-10-08T06:46:05.3323608Z"
+                                     },
+                        "suspended":  true,
+                        "suspend_status":  0,
+                        "resume_attempted":  true,
+                        "resume_status":  0,
+                        "exited_before_resume":  false,
+                        "wait_before_resume":  258,
+                        "wait_after_resume":  258
+                    },
+                    {
+                        "identity":  {
+                                         "pid":  133148,
+                                         "name":  "client_ue4-Win64-Shipping",
+                                         "image_path":  "D:\\WhLauncher\\games\\wh\\client_ue4\\Binaries\\Win64\\client_ue4-Win64-Shipping.exe",
+                                         "owner_sid":  "S-1-5-21-4175325682-2436190947-2784970811-7045",
+                                         "creation_filetime":  "134368861706454844",
+                                         "start_time_utc":  "2026-10-19T12:22:50.6454844Z"
+                                     },
+                        "suspended":  true,
+                        "suspend_status":  0,
+                        "resume_attempted":  true,
+                        "resume_status":  0,
+                        "exited_before_resume":  false,
+                        "wait_before_resume":  258,
+                        "wait_after_resume":  258
+                    }
+                ],
+    "pid":  36484,
+    "no_kill_restart_priority_change":  true
+}

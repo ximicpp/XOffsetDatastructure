@@ -1,0 +1,95 @@
+{
+  "kind": "parent-combined-complete-functional-admission",
+  "status": "passed",
+  "candidate": "r1-m2-combined-v1",
+  "observed_at": "2026-10-19T19:43:39.868063+00:00",
+  "request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_FULL.json",
+    "identity": {
+      "bytes": 84671,
+      "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+    }
+  },
+  "initial_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_INITIAL.json",
+    "identity": {
+      "bytes": 53428,
+      "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+    }
+  },
+  "independent_tool_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_TOOL_REVIEW.json",
+    "identity": {
+      "bytes": 8972,
+      "sha256": "e0f5fcd21dbe497eb37c2598cfa19e9bad5769301db12f06d0a1b7c2d08e7caa"
+    }
+  },
+  "independent_initial_tool_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_INITIAL_TOOL_REVIEW.json",
+    "identity": {
+      "bytes": 6945,
+      "sha256": "34216b372d979a37ff3958d652a4484533b92cffea96c72a864e7efccf696f76"
+    }
+  },
+  "independent_source_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 8470,
+      "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+    }
+  },
+  "authorization": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FUNCTIONAL_EXECUTION_AUTHORIZATION.json",
+    "identity": {
+      "bytes": 2870,
+      "sha256": "cd51fa1016c35269f1b6bc0bdf868a4d553ab86c4ae1a98a89b25da869980c16"
+    }
+  },
+  "actual_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+  "canonical_production14_digest": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+  "remaining_jobs": [
+    {
+      "id": "COMBINED-BUSINESS-prepare-v1",
+      "timeout_seconds": 300
+    },
+    {
+      "id": "COMBINED-BUSINESS-bench-v1",
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "COMBINED-BUSINESS-functional-v1",
+      "timeout_seconds": null
+    },
+    {
+      "id": "COMBINED-BUSINESS-package-v1",
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "COMBINED-BUSINESS-runtime-v1",
+      "timeout_seconds": 2400
+    },
+    {
+      "id": "COMBINED-LIFECYCLE52-v1",
+      "timeout_seconds": 3600
+    },
+    {
+      "id": "COMBINED-FINAL-FUNCTIONAL-v1",
+      "timeout_seconds": 120
+    }
+  ],
+  "functional_coordinator_budget_note": "Functional stage has separate original per-tool/native/audit/compat subqueue limits; top coordinator timeout=None does not authorize an unlimited heavy lease or any increase.",
+  "executor_required": [
+    "Finish own initial normal/SAN/external actual dependencies; never repeat already completed initial jobs.",
+    "Check fresh per-entry request/tools/source/outer61B/resources/original lease before every launch.",
+    "Use exact immutable d535 tool closure, unchanged workload, fixtures, full validation and V1.",
+    "Own six-repo full JUnit/compileDB/source coverage plus external4 and full SML80+80/V1/consumers/runtime/lifecycle52 must actually pass.",
+    "Preserve real failures, diagnose exact defect before repair, no historical evidence mutation or test/source shortcut."
+  ],
+  "scope": "Finite complete own functional execution eligibility only. Reviews are explicitly passed_static_tools_only and passed_static_source_only, not functional success. Actual results and per-entry resources/queue admission remain required.",
+  "screen_admitted": false,
+  "QF_admitted": false,
+  "no_new_72": true,
+  "no_new_diagnostic_or_ASM_experiments": true,
+  "default_source_integrated": false,
+  "performance_goal_complete": false
+}

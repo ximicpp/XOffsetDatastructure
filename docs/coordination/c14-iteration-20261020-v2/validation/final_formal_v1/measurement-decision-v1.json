@@ -1,0 +1,75 @@
+{
+  "backing_verification": {
+    "bytes": "794",
+    "sha256": "4ef276fc0e989d054f2aefe91a510cc77c13bd718f7559bb8c4dd9addb6bd253"
+  },
+  "common": {
+    "AA_contrasts": 30,
+    "AA_equivalence_factor": 1.05,
+    "AA_tails": 60,
+    "combined_overall_95_percent_claimed": false,
+    "confidence_families_are_separate": true,
+    "diagnostic_contrasts": 40,
+    "diagnostic_tails": 80,
+    "formal_failure": "Preserve, no retry/no sample extension/no winner",
+    "formal_retries": 0,
+    "formal_windows_limit": 1,
+    "old_control_cost_transfer_veto": {
+      "lower_bound_strictly_above": 1,
+      "metrics": [
+        "load",
+        "reload",
+        "retire_modified_state",
+        "cleanup",
+        "total"
+      ],
+      "role": "old_xoffset"
+    },
+    "primary_contrasts": 12,
+    "qualification_failure": "Preserve all evidence and do not launch formal; no retry or relaxed threshold",
+    "qualification_retries": 0
+  },
+  "formal": {
+    "actual_children": 9264,
+    "all_30_AA_equivalent_required": true,
+    "conditioning": 4632,
+    "inference_primary": 4608,
+    "macrocycles": 64,
+    "maximum_allocated_output_bytes": 8589934592,
+    "maximum_logical_retained_bytes": 549755813888,
+    "maximum_primary_wire_bytes": 137438953472,
+    "maximum_seconds": 5400,
+    "maximum_wire_bytes": 274877906944,
+    "primary": 4632,
+    "primary_thresholds": {
+      "emit_after": 0.2,
+      "mutate": 1.05,
+      "read_sum": 1.05
+    },
+    "primary_warmup": 24
+  },
+  "power_capability": {
+    "bytes": "797",
+    "sha256": "1967456dbb7209326ff827fe8ff14d5792296df9fe7d728454d3202190ef2c65"
+  },
+  "qualification": {
+    "actual_children": 4656,
+    "all_30_AA_equivalent_required": true,
+    "conditioning": 2328,
+    "cross_library_contrasts_computed": false,
+    "inference_primary": 2304,
+    "macrocycles": 32,
+    "maximum_allocated_output_bytes": 4294967296,
+    "maximum_logical_retained_bytes": 274877906944,
+    "maximum_primary_wire_bytes": 68719476736,
+    "maximum_seconds": 2700,
+    "maximum_wire_bytes": 137438953472,
+    "primary": 2328,
+    "primary_warmup": 24
+  },
+  "resources_pure_tests": {
+    "bytes": "551",
+    "sha256": "bee28ffa60d30053ffcd8217ca5c00f1527ea7444f0b4429c03a99f342ea115c"
+  },
+  "schema_version": 1
+}

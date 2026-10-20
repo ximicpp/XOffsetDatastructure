@@ -1,0 +1,288 @@
+{
+  "status": "prior_static_finding_retracted_exact_pinned_source_already_correct",
+  "original_finding": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/review/COMBINED_PREPARE_CTEST_FINDING.json",
+    "identity": {
+      "bytes": 6945,
+      "sha256": "00113009af6d968be9f82108fcfb40491f59a71529d6dc3a7839286dfe02db7a"
+    }
+  },
+  "unchanged_original_verifier": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/verify_combined_initial.py",
+    "identity": {
+      "bytes": 7209,
+      "sha256": "d5f9116dff482bce761ddf7809c125dbee6bf64ea48160f4018f4f82744d5d73"
+    }
+  },
+  "explanation": "The previous finding incorrectly described its own pinned verifier. Exact d5f9116d source already accepts bracketed or unbracketed names, requires build/bin/Release/name, and selects properties using the same token. All12 actual normal/SAN registrations and properties satisfy that unchanged consumer. No CTest parsing fix or full rerun is required. External-v1 failed receipt remains a real independent blocker requiring the corrective external addendum.",
+  "actual12_registration_checks": [
+    {
+      "mode": "normal",
+      "name": "test_canonical_zero_target",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_canonical_zero_target \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_zero_target\")",
+      "properties": [
+        "set_tests_properties(test_canonical_zero_target PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;26;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_zero_target",
+        "identity": {
+          "bytes": 45400,
+          "sha256": "50ab743a23d0432fa8940cdfa5418cd8ba1edd2596f68ec1ce28e79bd96cf0a6"
+        }
+      }
+    },
+    {
+      "mode": "normal",
+      "name": "test_canonical_cold_no_callback",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_canonical_cold_no_callback \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_cold_no_callback\")",
+      "properties": [
+        "set_tests_properties(test_canonical_cold_no_callback PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;25;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_cold_no_callback",
+        "identity": {
+          "bytes": 130472,
+          "sha256": "3158ffa2bb4b488a377662bef0656586213215a89eb2cbb7f1470566d64fb3ee"
+        }
+      }
+    },
+    {
+      "mode": "normal",
+      "name": "test_canonical_registry_v2",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_canonical_registry_v2 \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_registry_v2\")",
+      "properties": [
+        "set_tests_properties(test_canonical_registry_v2 PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;22;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_canonical_registry_v2",
+        "identity": {
+          "bytes": 117544,
+          "sha256": "90d58f994f494ace1eca7c28a1eebb040d811a68c937c461a559ba6042d14110"
+        }
+      }
+    },
+    {
+      "mode": "normal",
+      "name": "test_owner_identity",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_owner_identity \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_owner_identity\")",
+      "properties": [
+        "set_tests_properties(test_owner_identity PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;96;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_owner_identity",
+        "identity": {
+          "bytes": 145440,
+          "sha256": "35da2e8128b2ec005ac0c4e36317045072a73950dfd784657f24a2b9e9f26582"
+        }
+      }
+    },
+    {
+      "mode": "normal",
+      "name": "test_same_arena_move",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_same_arena_move \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_same_arena_move\")",
+      "properties": [
+        "set_tests_properties(test_same_arena_move PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;96;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_same_arena_move",
+        "identity": {
+          "bytes": 168440,
+          "sha256": "62ace3d939c78e55c74fbb33bda032453101d47b211840265bfd9c501dd10ec6"
+        }
+      }
+    },
+    {
+      "mode": "normal",
+      "name": "test_locator_soundness",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 45198,
+          "sha256": "4c6f9adc80ec778d1c7e064a4074df5370fd80fea871777a975e577879e210b3"
+        }
+      },
+      "add_test": "add_test(test_locator_soundness \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_locator_soundness\")",
+      "properties": [
+        "set_tests_properties(test_locator_soundness PROPERTIES  LABELS \"reflection;four-paths\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;11;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-normal/build/bin/Release/test_locator_soundness",
+        "identity": {
+          "bytes": 72104,
+          "sha256": "15f98332011d0cfa540c273477d5035a457ef4ac36881a3bf468e5f2c06ad00f"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_canonical_zero_target",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_canonical_zero_target \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_zero_target\")",
+      "properties": [
+        "set_tests_properties(test_canonical_zero_target PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;26;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_zero_target",
+        "identity": {
+          "bytes": 2392496,
+          "sha256": "26b856adb4e7bf8e46f828649f8b283313cb63c0a193b2cde1661e78a0514572"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_canonical_cold_no_callback",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_canonical_cold_no_callback \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_cold_no_callback\")",
+      "properties": [
+        "set_tests_properties(test_canonical_cold_no_callback PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;25;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_cold_no_callback",
+        "identity": {
+          "bytes": 3083952,
+          "sha256": "b9dcd289587a55f1a17341f7cefc42bddf448bff41d9d1d08def65a4c7eac412"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_canonical_registry_v2",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_canonical_registry_v2 \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_registry_v2\")",
+      "properties": [
+        "set_tests_properties(test_canonical_registry_v2 PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;22;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_canonical_registry_v2",
+        "identity": {
+          "bytes": 3031920,
+          "sha256": "d212c4bf21ffc66cc9ead2de74226ad585a578ee16e55617845f5463e5188d46"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_owner_identity",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_owner_identity \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_owner_identity\")",
+      "properties": [
+        "set_tests_properties(test_owner_identity PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;96;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_owner_identity",
+        "identity": {
+          "bytes": 3121120,
+          "sha256": "4217df250a6821aa53767d42131b390151bde18bfd48594e80ec08d5669fc60a"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_same_arena_move",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_same_arena_move \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_same_arena_move\")",
+      "properties": [
+        "set_tests_properties(test_same_arena_move PROPERTIES  LABELS \"reflection\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;96;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_same_arena_move",
+        "identity": {
+          "bytes": 3314744,
+          "sha256": "edc5e98a3452794834a6b54544b38fa6b656878f250188b1f692e08db8ec8fbd"
+        }
+      }
+    },
+    {
+      "mode": "sanitized",
+      "name": "test_locator_soundness",
+      "actual_CTest": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/tests/CTestTestfile.cmake",
+        "identity": {
+          "bytes": 46119,
+          "sha256": "d267939632bbe828b683bb0473e0a31d96c80b1ea2f8883bd68b210ea765856c"
+        }
+      },
+      "add_test": "add_test(test_locator_soundness \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_locator_soundness\")",
+      "properties": [
+        "set_tests_properties(test_locator_soundness PROPERTIES  LABELS \"reflection;four-paths\" _BACKTRACE_TRIPLES \"/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;5;add_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;11;add_xoffset_test;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/cmake/XOffsetFourPathTests.cmake;0;;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;130;include;/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/source/tests/CMakeLists.txt;0;\")"
+      ],
+      "actual_binary": {
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/build/bin/Release/test_locator_soundness",
+        "identity": {
+          "bytes": 2676536,
+          "sha256": "8d048fb8e6b73e8e6567f4f153f362f3eceb752e21b62417aff08924cf901c98"
+        }
+      }
+    }
+  ],
+  "compiler": 0,
+  "native": 0,
+  "queue": 0,
+  "full_targeted_gate_passed_by_this_correction": false
+}

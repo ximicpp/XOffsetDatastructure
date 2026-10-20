@@ -1,0 +1,96 @@
+{
+  "F64_admitted": false,
+  "actual_plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "fb6085b19e71cc42b6e591ee2cffe71c92a8ff5ec79e7ed12372065debf30830"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-plan-v1.json"
+  },
+  "actual_suspended": 2,
+  "audit_not_yet_started": true,
+  "benchmark_results_not_examined_for_adaptation": true,
+  "compile": 0,
+  "extra_capture": 0,
+  "guard_ready": {
+    "identity": {
+      "bytes": 1359,
+      "sha256": "f82813a2a20f95194bb84034022a24a1bf83ee964efb83ac54167c4eeca34b61"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-state-v1/ready.json"
+  },
+  "guard_ready_observed": {
+    "identity": {
+      "bytes": 329,
+      "sha256": "ce45e76a875fc988d8c99211240a3da4416f184cd995cbaba923adea16d3994c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-state-v1/ready-observed.json"
+  },
+  "guard_request": {
+    "identity": {
+      "bytes": 1473,
+      "sha256": "79efcb64aebe7213993d843979b590582238f8943443d8da185a4565362c04a9"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-state-v1/request.json"
+  },
+  "immediate_guard_bound": {
+    "identity": {
+      "bytes": 115,
+      "sha256": "90d46b110afef8875c942189dde7eb9c32a76e73a28b1d2704e7f0fc7a09fcc1"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-controller-v1/IMMEDIATE_DISPATCH_GUARD_BOUND.json"
+  },
+  "maximum_actual_children": 4656,
+  "maximum_seconds": 2700,
+  "native_child_cap_seconds": 20,
+  "observed_utc": "2026-10-19T21:13:15.756564+00:00",
+  "power_current_observed_ready": {
+    "active": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+    "maximum_seconds": 2760,
+    "original": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "pid": 28076,
+    "scope": "Temporary existing scheme selection; no scheme settings, WSL configuration or services changed.",
+    "started_utc": "2026-10-19T21:12:31.3041948+00:00",
+    "status": "ready"
+  },
+  "power_ready": {
+    "identity": {
+      "bytes": 367,
+      "sha256": "07518be9d7c29fdb18a93ef28c8a16d04ea67091bf469f1a04b07e8b6ca63fed"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/power-qualification-v1/ready.json"
+  },
+  "power_request": {
+    "identity": {
+      "bytes": 894,
+      "sha256": "9d149ede481ff1a2d4f3cb9f9d04ce5d39fc8391a6950b498c170f9b983bb675"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/power-qualification-v1/request.json"
+  },
+  "prelude_ready": {
+    "identity": {
+      "bytes": 1691,
+      "sha256": "11c4c77ba000917709a8fa99c4dc64312b81b06609ab44a92b45e70775e32687"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/PRELUDE_READY.json"
+  },
+  "prelude_result": {
+    "identity": {
+      "bytes": 443,
+      "sha256": "cc2d513b5f27ee13f79109c4841aa89a6d623c4321c02e1b33980fd84f5b87b0"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-host-prelude-v1/result.json"
+  },
+  "qualification_passed": false,
+  "remaining_guard_seconds": 2818.093655415,
+  "retry": 0,
+  "run_id": "15a33d5e75014b3e85019eebccf0712d",
+  "status": "actual_once_Q32_started_not_qualified",
+  "timing_request": {
+    "identity": {
+      "bytes": 1740,
+      "sha256": "27517fc70174ff9619847f57059e2c833d11b70b3cfd5893ebbafd3a064704e0"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/request.json"
+  }
+}

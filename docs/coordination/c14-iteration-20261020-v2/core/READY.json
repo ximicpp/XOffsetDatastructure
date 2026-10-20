@@ -1,0 +1,21 @@
+{
+  "status": "R1_B_passed_M2_reviewed_requests_ready_common_diag_joint_binding_pending",
+  "request": "REQUESTS_R1_NATIVE_v2.json",
+  "candidate_unchanged": true,
+  "core_native_executed": 0,
+  "timing_admitted": false,
+  "M2": "independent C14 candidate ready: REVIEW_M2.md, M2_IDENTITY.json, REQUESTS_M2_CODEGEN.json, REQUESTS_M2_NATIVE.json",
+  "phase_C": "REQUESTS_PHASE_C_DRAFT.json: common hook/source prepared+review, final external milestones/flush/audit/wrapper binding required from validation before any run",
+  "superseded_unexecuted_request": "REQUESTS_R1_NATIVE.json",
+  "R1_revision": "v2 wording-only correction before first native: repeated reads do not prove warm TLS. The four retained canonical programs supply actual cold/hot coverage; all handoff assertions unchanged. v1 preserved and not a separate execution budget.",
+  "M2_mechanism": "REQUESTS_M2_MECHANISM_DRAFT.json: executable candidate command proposed, conditional one candidate child with exact predeclared C14 common control",
+  "R1_B_result": "validation/R1_NATIVE_RESULT.json (10 programs passed; no diagnostic/screen admission)",
+  "core_observed_results": "OBSERVED_RESULTS.json",
+  "common_diag_design": "COMMON_DIAG_DESIGN.md",
+  "next": "Validation may consume M2 candidate-only codegen/targeted requests; Phase C requires final event/flush/audit/monitor identity and independent finite admission before its two original run processes.",
+  "R1_full": "REQUESTS_R1_FULL_v2.json active outer envelope (inner v1 recipe preserved); final full/source154/receipt/tools/PREPARED binding recheck added; no extra native budget",
+  "R1_full_source_ready": "R1_FULL_SOURCE_READY.json; R1_FULL_HANDOFF.md",
+  "R1_full_final_request_sha256": "68bec6b9a03db3d0c868912f48fee29b9988ef09eae170ed5e3d8cf5d2db8a4f",
+  "M2_full": "REQUESTS_M2_FULL.json final SHA9fe1735d1e1bb4e0f3a7afde43f1ae9257176a61a485e0879374f85a9dc3d1c8; REVIEW_M2_FULL.md final independent static review passed; M2_FULL_SOURCE_READY.json and M2_FULL_HANDOFF.md; current executor preflight remains",
+  "screen_designs": "SCREEN_DESIGN_R1.json / SCREEN_DESIGN_M2.json: source-bound public fixed seed full72pair/144child AB36/BA36 schedules, independently reconstructed in PREPARATION_CHECK.json; metadata only, no worker request or execution admission"
+}

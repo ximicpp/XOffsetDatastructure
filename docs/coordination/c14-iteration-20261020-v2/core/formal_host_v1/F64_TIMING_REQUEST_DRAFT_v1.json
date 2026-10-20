@@ -1,0 +1,97 @@
+{
+  "actual_freeze_acceptance": null,
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "timing",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1/queue",
+    "--timeout-seconds",
+    "5400",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "run",
+    "--campaign",
+    "formal",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1",
+    "--frozen",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1",
+    "--frozen-sha256",
+    "ACTUAL_FORMAL_FREEZE_SHA256_REQUIRED",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1/queue"
+  ],
+  "campaign": "formal",
+  "candidate": "r1-m2-combined-v1",
+  "capture": 0,
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "run",
+    "--campaign",
+    "formal",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1",
+    "--frozen",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1",
+    "--frozen-sha256",
+    "ACTUAL_FORMAL_FREEZE_SHA256_REQUIRED",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1/queue"
+  ],
+  "compile": 0,
+  "conditioning_children": 4632,
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "execution_admitted": false,
+  "freeze_sha256": null,
+  "frozen_manifest": {
+    "identity": null,
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-formal-v1/manifest.json"
+  },
+  "inference_primary": 4608,
+  "kind": "c14-f64-timing-request-v1",
+  "kind_of_lease": "timing",
+  "launcher_source": {
+    "identity": {
+      "bytes": 19409,
+      "sha256": "5ead5e942d97698196a4e1a2b99799f3f44e19957c51073dc41e4062d0af9a6c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/formal_host_v1/execute.py"
+  },
+  "macrocycles": 64,
+  "native_actual_children": 9264,
+  "native_child_seconds": 20,
+  "out": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1",
+  "owner": "W3",
+  "primary_children": 4632,
+  "primary_warmup": 24,
+  "qualification_acceptance": {
+    "identity": null,
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-acceptance.json"
+  },
+  "queue": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/formal-v1/queue",
+  "retry": 0,
+  "run_requires": "Not an execution request. Root must accept actual original Q audit/engineering, write COORD qualification-acceptance.json, admit separate original formal freeze, then materialize a new exact request with actual F manifest and acceptance identities. Root distinct F REVIEW/HOST_REVIEW/GLOBAL_QUIET/external once ledger required before launcher invocation. No Q record/pin/state may stand in for F.",
+  "source": {
+    "identity": {
+      "bytes": 118612,
+      "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py"
+  },
+  "statistics": "Original F64/df63;30AA plus12 primary contrasts;read_sum/mutate1.05,emit_after0.20;no source/math changes.",
+  "status": "DRAFT_NOT_EXECUTABLE_NOT_ADMISSION",
+  "timeout_seconds": 5400,
+  "wait_seconds": 0
+}

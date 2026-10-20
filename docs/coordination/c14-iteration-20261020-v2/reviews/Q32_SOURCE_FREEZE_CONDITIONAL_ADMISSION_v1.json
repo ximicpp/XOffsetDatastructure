@@ -1,0 +1,61 @@
+{
+  "status": "conditionally_admitted_exact_zero_native_source_freeze_preparation",
+  "observed_utc": "2026-10-19T20:53:09.638048+00:00",
+  "basis": "Existing accepted exact bound source, composition gates/full closure/resource observation, and accepted exact once-only current metadata producer. Freeze is reversible zero-benchmark preparation; timing remains unadmitted.",
+  "prerequisites": [
+    "Exact registration request876fc3be02f2edfe91f4895011a99ab68fe7645e5098c73e61fc71ff58b58ac8 completed under original W1 validation600 lease with exit0 and cleanup empty.",
+    "Sole executor verifies actual current11 typed/proposal/7refs/capability chain/fresh capacity and bound source exact; save actual indexed receipts/pins.",
+    "No other original shared heavy lease active, output fresh, no known unresolved registration or input mismatch."
+  ],
+  "entry": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "identity": {
+      "bytes": 118612,
+      "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8"
+    }
+  },
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-freeze-v1",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1"
+  ],
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发",
+  "output": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1",
+  "original_shared_lease": true,
+  "budget": {
+    "outer_seconds": 600,
+    "new_native": 0,
+    "compile": 0,
+    "new_capture": 0,
+    "process_pause": 0,
+    "power_change": false,
+    "timing_samples": 0
+  },
+  "finite_rule": "One exact freeze attempt; preserve any failure/prefix and diagnose without overwrite or retry. Do not edit bound11, original statistics/protocols, profiles, competitors or capacities.",
+  "actual_independent_review": "Independent actual registration and actual freeze acceptance may proceed after preparation; all accepted actual source/resource/host/quiet gates required before timing. This conditional preparation authorization does not pre-claim those actual outcomes.",
+  "after": "Record maintained verify_frozen result, exact manifest SHA/inventory/actual base/staging/physical+generated+logical/free-margin projections and original queue cleanup; prepare exact final REVIEW/HOST_REVIEW/GLOBAL_QUIET and timing request for independent admission.",
+  "Q32_timing_admitted": false,
+  "F64_timing_admitted": false
+}

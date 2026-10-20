@@ -1,0 +1,81 @@
+{
+  "schema": "q32-preparation-source-index-v1",
+  "status": "source_ready_under_three_finite_independent_reviews",
+  "refs": {
+    "REGISTRATION_SOURCE_READY_v2.json": {
+      "identity": {
+        "bytes": 4759,
+        "sha256": "7ac99be872c03ae78681c9c6db47357fc881996a8abd0bb26bcec8b90a14b74d"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_SOURCE_READY_v2.json"
+    },
+    "Q32_HOST_SOURCE_READY_v1.json": {
+      "identity": {
+        "bytes": 3424,
+        "sha256": "31fc3d9a6dc9d545b572d8aa4ecbe44aa5081c41e1a79d7f91c3101e044efc1f"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_HOST_SOURCE_READY_v1.json"
+    },
+    "COMBINED_TYPED_GATE_COMPOSITION_REQUEST_v1.json": {
+      "identity": {
+        "bytes": 19472,
+        "sha256": "a109946400dc2e27cb8d21ee774dc742aab9eed452679105b7480b91518bcd17"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/COMBINED_TYPED_GATE_COMPOSITION_REQUEST_v1.json"
+    },
+    "REGISTRATION_PREPARATION_REQUEST_DRAFT_v1.json": {
+      "identity": {
+        "bytes": 4139,
+        "sha256": "cc46eae81c2177a11c95c1181c3e83b91092cb8fb01b8f9d66dd0c20f79f3f6b"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_PREPARATION_REQUEST_DRAFT_v1.json"
+    },
+    "CURRENT_AUTHORITATIVE_UPDATE_v1.json": {
+      "identity": {
+        "bytes": 4271,
+        "sha256": "f49f3bf7389f933aac3b85bd2cca8c27e5bc4d1a24b18ef5d1fe11dc2afd3566"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/CURRENT_AUTHORITATIVE_UPDATE_v1.json"
+    },
+    "Q32_ACTUAL_RUN_INTERFACE_v1.json": {
+      "identity": {
+        "bytes": 3507,
+        "sha256": "ab0ed39924ee5e1bcd32c0bfac3ca550340628a305f3b74870f4a75f2e0da9f3"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_ACTUAL_RUN_INTERFACE_v1.json"
+    },
+    "Q32_READONLY_POWER_AVAILABILITY_v1.json": {
+      "identity": {
+        "bytes": 1426,
+        "sha256": "69d7811ea94869eed93128e70bce7e270a9fb45f6822a78d79da9c4c9e5181d0"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_READONLY_POWER_AVAILABILITY_v1.json"
+    }
+  },
+  "expected_actual_root_gate_acceptance_path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_TYPED_GATE_COMPOSITION_ACCEPTANCE_v1.json",
+  "gate_acceptance_identity": null,
+  "source_edits_closed": true,
+  "next": "After actual root gate acceptance and source-review files exist, pin them in NEW final preparation request; exact original W1 validation600/defaultlease once. Actual prepare yields fresh capacity+small registration, no native/pause/power/freeze. Then actualrefs+direct originalW1validation600 freeze request for root admission.",
+  "final_preparation_command_template": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/q32_registration_v1/prepare_current.py",
+    "--request",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_PREPARATION_REQUEST_v1.json",
+    "--request-sha256",
+    "ACTUAL_NEW_REQUEST_SHA_REQUIRED_AS_EXTERNAL_ARGV"
+  ],
+  "no_self_referential_request_digest": true,
+  "source_freeze_native_children": 0,
+  "Q32_timing_admitted": false,
+  "F64_admitted": false,
+  "new_native": 0,
+  "new_capture": 0,
+  "new_compiler": 0,
+  "queue_dispatched": 0,
+  "freeze_executed": 0,
+  "power_switched": 0,
+  "processes_paused": 0,
+  "unexecuted_source_freeze": "Direct argv is CURRENT_AUTHORITATIVE_UPDATE_v1; unchanged600/default originallease only, never execute old300draft."
+}

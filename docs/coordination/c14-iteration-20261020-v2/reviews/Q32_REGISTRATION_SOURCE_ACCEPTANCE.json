@@ -1,0 +1,63 @@
+{
+  "schema": "q32-registration-static-source-acceptance-v1",
+  "status": "passed_static_source_review_execution_not_admitted",
+  "reviewer": "/root/v2_stats_review",
+  "scope": "Finite independent static review of four q32_registration_v1 metadata-preparation sources and their declared integration. This does not accept the eleven typed gates, host guard, actual registration, source freeze, Q32 or F64 execution.",
+  "source_accepted": true,
+  "source_ready": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_SOURCE_READY_v2.json",
+    "identity": {
+      "bytes": 4759,
+      "sha256": "7ac99be872c03ae78681c9c6db47357fc881996a8abd0bb26bcec8b90a14b74d"
+    }
+  },
+  "tool_root": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/q32_registration_v1",
+  "tools": {
+    "register_current.py": {"bytes": 11990, "sha256": "49bd41fd30c9c35e0b930eda7c4f90444156092d21c5e059f7caf67c99ad0381"},
+    "prepare_current.py": {"bytes": 1926, "sha256": "fd390124b76c7cd61eb1cab6d5353f22b85192f0982af1614898a8e5adc37fbe"},
+    "observe-capacity.py": {"bytes": 3787, "sha256": "2663ae3fbeae694e7739da70bdd22bbd9a2459f7ff4a3d5db2e9913b9e984f2f"},
+    "observe-backing.ps1": {"bytes": 2570, "sha256": "92e71fa94567ecb2c70063604df2fa343cfc6b92dd0db4e19aecd838d9200ceb"}
+  },
+  "source_identity_check": {
+    "all_four_match_ready_and_preparation_draft": true,
+    "all_four_unchanged_between_review_reads": true,
+    "original_windows_helper_byte_identical": true,
+    "original_observer": {"bytes": 2730, "sha256": "a6ca4fe874bd4b6f21675145102424d3a3757bf1884b2976ed6fd5c6e7533cb0"},
+    "bound_inventory_members_checked": 11,
+    "bound_inventory_all_match_accepted_ready": true,
+    "bound_executor": {"bytes": 118612, "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8"},
+    "bound_files_modified_by_this_review": 0
+  },
+  "integration_findings": {
+    "actual_input_refs": "All twelve small refs in REGISTRATION_ADAPTATION_PLAN_v1.actual_inputs matched their recorded bytes/SHA. The existing accepted combined closure identifies r1-m2-combined-v1, fourteen production files, source154_each_full_rechecked=true and the v2 source identity; normal/SAN full and capture-reuse acceptance are consumed by exact identity rather than re-created here.",
+    "capture12": "Bound source literal STAGE_BINDINGS is parsed without importing/executing the runner and must equal the exact accepted capture index: normal and sanitized, each with six fixed roles. Existing actual resource projection and own complete acceptance refs remain separate inputs.",
+    "original_policy": "All five original policy/capability pin refs matched small-file bytes/SHA. register_current.py:148-153 copies schema_version/common/qualification/formal directly from the pinned old decision; 165-168 copies kind/statistics_version/campaigns directly from the pinned old proposal. Only current identities, gate-map and stage bindings are supplied. No statistics, scheduling, conditioner, comparison, cost-veto, fixture or competitor-mode implementation is edited or executed.",
+    "seven_refs": "The exact seven original names are preserved. The two decisions, two current backing records and cap2/cap3 are addressed in the new coordinator directory. The seventh resources-pure-tests-v3.json intentionally remains the exact immutable original receipt, matching bound six-role-campaign.py:934-935 registration_source().",
+    "original_capability": "Original cap2/cap3 predecessor, historical ready/completed identities and completed.restored=true are checked. Bound power module/helper and pure-resource module identities must match those receipts; original normal/optimized 26-case receipt and zero native benchmark children are reused. No power probe, power change or pure-test rerun is introduced.",
+    "capacity": "Read-only original Windows helper is byte-identical. Current observer retains original backing-volume schema, VHD-path/reparse/volume provenance and 1 GiB host/backing-view agreement tolerance. Guest, /mnt/c backing and host free bytes must each be at least 8 GiB + 2 GiB = 10 GiB. Host snapshot, verification, request and receipt age must all be 0..600 seconds at registration. This is fresh admission evidence, not a promise of later capacity; original freeze/child capacity checks remain intact.",
+    "budget": "The current preparation draft and CURRENT_AUTHORITATIVE_UPDATE_v1 consistently specify original run_job.py run, W1, validation, timeout 600, wait 0, default shared lease only, no nested runner. Preparation has two sequential 120-second child ceilings, including one read-only Windows helper with a 30-second ceiling, and no benchmark native/compile/capture/freeze/power-change actions. Stale 300-second draft text is explicitly superseded and is not an executable request.",
+    "cli": "Static argparse inspection confirms prepare_current.py --request/--request-sha256, observer --out, register --capacity/--gate-acceptance/--gate-acceptance-sha256, original run_job.py run --owner/--kind/--out/--timeout-seconds/--wait-seconds, and the existing bound freeze --campaign/--out interfaces. No guessed CLI or additional runner is used.",
+    "fresh_and_failure": "Capacity directory is exclusive; helper uses CreateNew; metadata uses x/xb; registration rejects an existing coordinator directory or adjacent proposal before creating output. A fresh exclusive coordinator directory contains the copies. Partial outputs and request/stdout/stderr remain on failure; no cleanup, retry, overwrite or historical deletion occurs. Timeout can leave no receipt, which fails closed and leaves the recorded prefix.",
+    "gate_boundary": "Producer requires exact candidate identity, exact composition-request ref, exact eleven accepted names, pinned root acceptance SHA and exact small evidence refs. Typed-gate composition correctness is independently owned by phase_c_source_review/root, not re-adjudicated by this review. Result metadata explicitly records no formal qualification or Q/F timing admission."
+  },
+  "pending_execution_inputs": [
+    "Independent exact eleven-gate composition acceptance and host/guard review remain outside this source acceptance.",
+    "Root must publish a NEW final preparation request with ready_for_independent_admission status, the actual gate_acceptance ref, the exact four admitted source identities and an externally supplied exact request SHA; the preserved draft has gate_acceptance=null and draft_never_execute=true.",
+    "Only separately admitted original W1 validation600 preparation may produce fresh capacity and registration. Actual registration/proposal identities must then be independently checked before separately admitted source freeze and any timing window."
+  ],
+  "source_blockers": [],
+  "execution": {
+    "project_python_entries": 0,
+    "observer_or_powershell_invocations": 0,
+    "native": 0,
+    "compile": 0,
+    "queue": 0,
+    "probe": 0,
+    "large_body_or_binary_hashes": 0,
+    "statistics_tests_or_samples": 0,
+    "registration_or_freeze": 0
+  },
+  "registration_execution_admitted": false,
+  "Q32_admitted": false,
+  "F64_admitted": false
+}

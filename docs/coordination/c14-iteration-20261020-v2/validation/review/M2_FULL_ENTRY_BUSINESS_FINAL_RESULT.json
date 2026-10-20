@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "stage": "final",
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_FULL_ENTRY_BUSINESS_FINAL_ADMISSION.json",
+    "identity": {
+      "bytes": 1122365,
+      "sha256": "8e513b3cc2bd18f41441d24cceef3c4d93fafa32d85ae30c4394f8fa0a33bf67"
+    }
+  },
+  "wrapper61_before": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  },
+  "new_timing_samples": 0,
+  "screen_admitted": false,
+  "actual_result": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/m2_full/M2_FUNCTIONAL_GATES.json",
+    "identity": {
+      "bytes": 32280,
+      "sha256": "6af220ba48246bacf65e58b5c776aaa59be691a4fa37bda7cf55261d7b77cceb"
+    }
+  },
+  "wrapper61_after": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  }
+}

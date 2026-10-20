@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "business": {
+    "functional-coordinator.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\functional-coordinator.py",
+      "before": {
+        "bytes": 6590,
+        "sha256": "0d14575ba6fc6f2962ae1d0c715501a93bff0f3d50345b641bddef56e4a10935"
+      },
+      "after": {
+        "bytes": 6556,
+        "sha256": "e73a182d80cf5ecb7400396a13f7b9b3ef5a38eca587fa887bc3f53999fb9c3f"
+      }
+    },
+    "compatibility-worker.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\compatibility-worker.py",
+      "before": {
+        "bytes": 3935,
+        "sha256": "9b6920bf9d7d3108840b3dcb01e37867aab4bc2ef4ba26ca8e9c94243d9e5603"
+      },
+      "after": {
+        "bytes": 3935,
+        "sha256": "9b6920bf9d7d3108840b3dcb01e37867aab4bc2ef4ba26ca8e9c94243d9e5603"
+      }
+    },
+    "business_common.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\business_common.py",
+      "before": {
+        "bytes": 9626,
+        "sha256": "06930e012dad1a751c624c4da916d6920c60d3a45e7294587468a851bc18ed28"
+      },
+      "after": {
+        "bytes": 9565,
+        "sha256": "6263f1144a9a0ce24d7bf589b38b4667ac718e9f91843a6168f67eaf44cf1d99"
+      }
+    },
+    "bench-profiles-worker.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\bench-profiles-worker.py",
+      "before": {
+        "bytes": 1598,
+        "sha256": "43e4c630112ec37501a9e1fc057079ae468464f90fcd76ceb4509e31f7d93953"
+      },
+      "after": {
+        "bytes": 1598,
+        "sha256": "43e4c630112ec37501a9e1fc057079ae468464f90fcd76ceb4509e31f7d93953"
+      }
+    },
+    "bench-gates.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\bench-gates.py",
+      "before": {
+        "bytes": 4391,
+        "sha256": "38518d9ae10159278956255206a2aa0b6cd1fe8acbdb4623a7e78a71bedcf2c8"
+      },
+      "after": {
+        "bytes": 4391,
+        "sha256": "5e2e8626624def1f1b621ea5b494339ebd67db046e433168a458444cc3581b7b"
+      }
+    },
+    "profiles-reuse-v1.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\profiles-reuse-v1.py",
+      "before": {
+        "bytes": 11733,
+        "sha256": "f3089ec5651e308ffd87efe7d8531eaccbeffd06b1aa4e463cf2e4ccd3b43a72"
+      },
+      "after": {
+        "bytes": 11935,
+        "sha256": "a0534c9a37355418509039409c137f2b7e547920d2f13b7e08070e09b320ddd5"
+      }
+    },
+    "prepare-functional-tools.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\prepare-functional-tools.py",
+      "before": {
+        "bytes": 2320,
+        "sha256": "538b1dbeab65b7e29e69b5df75f1af00f2b60478a9ae6f15058c9f2ad51849cb"
+      },
+      "after": {
+        "bytes": 2324,
+        "sha256": "0844797323a88c6d3aadb7ca4cae177b77625d76e5f3af5d50f0e25272f42f9b"
+      }
+    },
+    "dispatch.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\dispatch.py",
+      "before": {
+        "bytes": 1622,
+        "sha256": "e9c4b59bafd99c590facfe19662ff74125b961d14db5e8b0503fd05a1bd55673"
+      },
+      "after": {
+        "bytes": 1622,
+        "sha256": "e9c4b59bafd99c590facfe19662ff74125b961d14db5e8b0503fd05a1bd55673"
+      }
+    },
+    "v1-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\v1-compatibility.py",
+      "before": {
+        "bytes": 6577,
+        "sha256": "a6434865b3058748b2e1501b35b43384749029a015ccca1e374bc5a4ba207624"
+      },
+      "after": {
+        "bytes": 6573,
+        "sha256": "4c09c404f2b94289cfd743efb5bee27ef90096d5d670f8827aae375e07bf4bc6"
+      }
+    },
+    "v8-direct-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\v8-direct-compatibility.py",
+      "before": {
+        "bytes": 4675,
+        "sha256": "f301952dc8430696174abe16746d8deb2b01abc8c1eaffac031cb531d424ebec"
+      },
+      "after": {
+        "bytes": 4675,
+        "sha256": "f301952dc8430696174abe16746d8deb2b01abc8c1eaffac031cb531d424ebec"
+      }
+    },
+    "alpha-S-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\alpha-S-compatibility.py",
+      "before": {
+        "bytes": 2468,
+        "sha256": "0c2bab2b5993bafabe25093aa3606236fc2872822a83c23854c5170ceec0bd7b"
+      },
+      "after": {
+        "bytes": 2464,
+        "sha256": "a2e1d3f025210e48dcde5506e389e3d6b7b5b46f9aabd45e7820321997ee6add"
+      }
+    },
+    "resize-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\resize-compatibility.py",
+      "before": {
+        "bytes": 2062,
+        "sha256": "87d2c4a7e8c6b0be3ff464ec08b18370ce81c2369b4bec6fb27867e63f2bb3b5"
+      },
+      "after": {
+        "bytes": 2058,
+        "sha256": "9c34576a9c1fb6f94286a27422de75e7d61635d3c92a4908762eb3f02e19f3bf"
+      }
+    },
+    "string-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\string-compatibility.py",
+      "before": {
+        "bytes": 2088,
+        "sha256": "22c21120bc914cdc822ae1697e69d63958a93822293b0cdc8b052d03c289ac45"
+      },
+      "after": {
+        "bytes": 2084,
+        "sha256": "4acdeb4b12013153dfb2d674a889299ba64bbb634e1a1f09951b8f1e1e1b365a"
+      }
+    },
+    "new-API-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\new-API-compatibility.py",
+      "before": {
+        "bytes": 2350,
+        "sha256": "b207876aa36737cfb3bd609c45aa7520f1d203744c41c18c41cefc8e8b4f9152"
+      },
+      "after": {
+        "bytes": 2346,
+        "sha256": "b0d3aac76427670306847d0ca8b426a4956f1a297dc716849ce72815cca0aab3"
+      }
+    },
+    "AB-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\AB-compatibility.py",
+      "before": {
+        "bytes": 2905,
+        "sha256": "ae5f0f1d615c678b25f192be94541ac2da3aaff6ebe9ccd9822af6668e0fbd80"
+      },
+      "after": {
+        "bytes": 2905,
+        "sha256": "ae5f0f1d615c678b25f192be94541ac2da3aaff6ebe9ccd9822af6668e0fbd80"
+      }
+    },
+    "C-compatibility.py": {
+      "original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\business-v2\\C-compatibility.py",
+      "before": {
+        "bytes": 4663,
+        "sha256": "3fbf964cc3618142142618f63d5523c33e4e8eadae8f94e736952105b044ef38"
+      },
+      "after": {
+        "bytes": 4663,
+        "sha256": "3fbf964cc3618142142618f63d5523c33e4e8eadae8f94e736952105b044ef38"
+      }
+    }
+  },
+  "package_original": "C:\\Users\\gzsufanchen\\Documents\\ChatGPT\\xoffsetdatastructure开发\\build\\receive-completion-20261019\\package-archive-repair-v2a",
+  "scope": "Source-only tool derivation; zero compilation/native/queue/performance."
+}

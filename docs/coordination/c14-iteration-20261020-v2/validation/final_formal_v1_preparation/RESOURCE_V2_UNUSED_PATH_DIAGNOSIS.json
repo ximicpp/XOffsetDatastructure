@@ -1,0 +1,18 @@
+{
+  "bound_acceptance_handling": "b113 acceptance is independently supplied as v1 worker admission.bound_source_acceptance, as already supported by unchanged worker.",
+  "original_valid_request_sha256": "89de4706638869ac1ff6c4a1f5a527809a023ff1b30e3a01dd76e10b37dcf81e",
+  "project_python_worker": 0,
+  "status": "unused_unexecuted_metadata_draft",
+  "unused_request_sha256": "73f04c9c2e6ced3c59fb864b6f2c21ea8ea68d856390bf177fc1d9251e7e02e8",
+  "unused_ready_sha256": "894e9d2bd5fab48c7e6170efd9c136ffed455dec52501c0937b0f9026a9eda60",
+  "unused_request": "RESOURCE_EXECUTION_REQUEST_v2.json",
+  "diagnosis": "PowerShell Join-Path produced backslashes, then appended to a /mnt/c prefix without separator normalization. v2 worker_argv request path is invalid on Linux, and v2 ready argv retained the v1 POSIX path while replacing the hash. No dispatch occurred. Parent explicitly keeps exact already-reviewed v1 and uses bound acceptance as admission reference; no corrected v2/v3 is needed.",
+  "original_valid_request": "RESOURCE_EXECUTION_REQUEST_v1.json",
+  "native": 0,
+  "unused_ready": "RESOURCE_REQUEST_SOURCE_READY_v2.json",
+  "compile": 0,
+  "observed_utc": "2026-10-19T20:26:31.578667Z",
+  "v1_and_worker_bytes_unchanged": true,
+  "queue": 0,
+  "disposition": "Preserve both v2 artifacts as unused source-only drafts. Only exact v1 request89de and worker7ead may be admitted."
+}

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/r1_full/business/dispatch.py",
+    "functional"
+  ],
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_FULL_ENTRY_BUSINESS_FUNCTIONAL_ADMISSION.json",
+    "identity": {
+      "bytes": 1121950,
+      "sha256": "5443ec9e31521a13263086b6cc9f70389905c280e9f2082492bcd47e8db77884"
+    }
+  },
+  "nested_lease": false
+}

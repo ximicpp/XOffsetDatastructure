@@ -1,0 +1,90 @@
+{
+  "status": "source_ready_not_execution_admission",
+  "candidate": "r1-canonical-hotcold-v1",
+  "files": {
+    "audit_job.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/audit_job.py",
+      "identity": {
+        "bytes": 2079,
+        "sha256": "d4780af0f78b0adf0eea382c0499161156e3d73db394200f4a567cf49583543c"
+      }
+    },
+    "campaign.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/campaign.py",
+      "identity": {
+        "bytes": 54254,
+        "sha256": "33dfc628a7202d4f08c31e463a4ac0c4fffc27ba5fd04dad3b4a991d402b99c2"
+      }
+    },
+    "core.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/core.py",
+      "identity": {
+        "bytes": 7845,
+        "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+      }
+    },
+    "execute.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/execute.py",
+      "identity": {
+        "bytes": 10295,
+        "sha256": "a19950ed50850ebbcfa1ce8d1da00ac570fc89a1bdbef8f54f8896dea3630870"
+      }
+    },
+    "finalize.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/finalize.py",
+      "identity": {
+        "bytes": 2693,
+        "sha256": "c195fc66ce5006a12fb950a998466a1d48cb454bf477ffc38d4a6b22e9332b21"
+      }
+    },
+    "host/pause-control.ps1": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/host/pause-control.ps1",
+      "identity": {
+        "bytes": 12668,
+        "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+      }
+    },
+    "host/process_pause.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/host/process_pause.py",
+      "identity": {
+        "bytes": 16269,
+        "sha256": "ce898a67023bdc0ad69057f3cc9a2558b9090e1818689f9bef99983ffc6f48ec"
+      }
+    },
+    "protocol.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/protocol.py",
+      "identity": {
+        "bytes": 11167,
+        "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+      }
+    },
+    "screen.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/screen.py",
+      "identity": {
+        "bytes": 47522,
+        "sha256": "d197dcee48bc4cd7faaaec543bb65e6e35a7dc645cc2a3fe4988fbe305224f08"
+      }
+    }
+  },
+  "borrowed_bytes_unchanged": [
+    "campaign.py",
+    "core.py",
+    "protocol.py",
+    "host/pause-control.ps1"
+  ],
+  "host_module_delta": "Exactly one STATE assignment to own v2 candidate domain; actual PID/image/SID/creation/held-handle and suspend/resume/watchdog logic unchanged. No plan or host action executed.",
+  "original_worker": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/screen/m1_screen.py",
+    "identity": {
+      "bytes": 39510,
+      "sha256": "8310364077d3c37e01b4ca521932d33c4eb69023ecf645d9a7e6a5b40fe659b7"
+    }
+  },
+  "original_host_module": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/host/process_pause.py",
+    "identity": {
+      "bytes": 16259,
+      "sha256": "a48417c6764186efdffd0a7f24d17890d67620b33404f4cc88a6c02f360d93da"
+    }
+  }
+}

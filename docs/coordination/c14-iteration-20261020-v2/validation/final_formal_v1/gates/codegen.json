@@ -1,0 +1,61 @@
+{
+  "candidate_identity": {
+    "identity": {
+      "bytes": 45694,
+      "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json"
+  },
+  "combination_asm_executed": false,
+  "evidence": [
+    {
+      "identity": {
+        "bytes": 38610,
+        "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json"
+    },
+    {
+      "identity": {
+        "bytes": 10321,
+        "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json"
+    },
+    {
+      "identity": {
+        "bytes": 8470,
+        "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_SOURCE_ACCEPTANCE.json"
+    },
+    {
+      "identity": {
+        "bytes": 31040,
+        "sha256": "b24068223eb60184295b863258522eff8e7e2aef3562c5e34ff80d459701524a"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/R1_SCREEN_GATES_v2/codegen.json"
+    },
+    {
+      "identity": {
+        "bytes": 28269,
+        "sha256": "37410c92b82071e7969d6dacfb56896ade6a6a2c4f83656f5b3f2944f8cbe4aa"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_GATES_v1/codegen.json"
+    }
+  ],
+  "gate": "codegen",
+  "independent_review": {
+    "record": {
+      "identity": {
+        "bytes": "25995",
+        "sha256": "a33493ba4a5c214fdcb8649fc2d26b4b55a5fcecc16539b4393186015d842ea2"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_TYPED_GATE_COMPOSITION_ACCEPTANCE_v1.json"
+    },
+    "status": "passed"
+  },
+  "own_new_execution_here": false,
+  "scope": "Actual combined compiler success in own73+73/full business closure; retained component codegen plus exact patch union. No new combined ASM run or claimed combined machine-code mechanism.",
+  "status": "passed"
+}

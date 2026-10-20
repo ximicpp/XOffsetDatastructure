@@ -1,0 +1,140 @@
+{
+  "status": "source_ready_waiting_independent_full_mechanism_reviews_and_tool_review",
+  "candidate": "m2-exact-owns-v1",
+  "tool": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/prepare_capture_v4.py",
+    "identity": {
+      "bytes": 16055,
+      "sha256": "3b922974dbc6b0b97b57a157a4520107e13e3868733caff0d2ee78eaa44b0f79"
+    }
+  },
+  "runtime_files": {
+    "screen.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/screen.py",
+      "identity": {
+        "bytes": 59817,
+        "sha256": "9dc7c7808c3cb8e5fc9c77ed5ed4cf34e6f51b82a5ca490c6751ba17a7b07aaf"
+      }
+    },
+    "campaign.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/campaign.py",
+      "identity": {
+        "bytes": 54254,
+        "sha256": "33dfc628a7202d4f08c31e463a4ac0c4fffc27ba5fd04dad3b4a991d402b99c2"
+      }
+    },
+    "core.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/core.py",
+      "identity": {
+        "bytes": 7845,
+        "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+      }
+    },
+    "protocol.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/protocol.py",
+      "identity": {
+        "bytes": 11167,
+        "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+      }
+    },
+    "execute.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/execute.py",
+      "identity": {
+        "bytes": 10288,
+        "sha256": "9b4aad4e26aa6c403c847e8dfd818f381fa193705e4a52e7641db9441359af66"
+      }
+    },
+    "audit_job.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/audit_job.py",
+      "identity": {
+        "bytes": 2079,
+        "sha256": "ad86c1684a40b297097a372ce16db898adabf0060216add11405fec09a1c89f9"
+      }
+    },
+    "finalize.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/finalize.py",
+      "identity": {
+        "bytes": 2679,
+        "sha256": "ecc432784590dfe1cd10da58cc1355cc4304ce5a1ed818ea742a13a08341e1a8"
+      }
+    },
+    "host/process_pause.py": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/host/process_pause.py",
+      "identity": {
+        "bytes": 16269,
+        "sha256": "220c404b4aa70082ba4ae2c649ec7e7c63469bc6ec6ec1fd5298fba1ebefb603"
+      }
+    },
+    "host/pause-control.ps1": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/host/pause-control.ps1",
+      "identity": {
+        "bytes": 12668,
+        "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+      }
+    }
+  },
+  "execution_worker_modified": false,
+  "requirements": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_CAPTURE_REVIEW_REQUIREMENTS_v4.json",
+    "identity": {
+      "bytes": 6235,
+      "sha256": "18a1e704aeceac5693bb104b2e490af9f34f81bc1be0eedae9dab0e4ef88f9aa"
+    }
+  },
+  "power_observation": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/WINDOWS_POWER_OBSERVATION.json",
+    "identity": {
+      "bytes": 480,
+      "sha256": "593404ccce4bd3f7e92b71aac9a8edda3fbb8d97accab7aae8295587e5860778"
+    }
+  },
+  "current_power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "schema_note": "M2_FUNCTIONAL_GATES is the final functional summary; no R1-style FUNCTIONAL_GATES_BINDING is required or generated.",
+  "independent_review_files_present": {
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_FULL_ACCEPTANCE.json": true,
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_EXECUTION_ACCEPTANCE.json": false
+  },
+  "budgets": {
+    "resource_children": 2,
+    "child_seconds": 20,
+    "outer_seconds": 120,
+    "new_compile": 0,
+    "warmup": 0,
+    "retry": 0,
+    "timing_inference_samples": 0,
+    "screen_children": 144,
+    "screen_outer_seconds": 600,
+    "nonchild_seconds": 60,
+    "seal_seconds": 30,
+    "tail_seconds_per_child": 0.25,
+    "RSS_bytes": 17179869184,
+    "allocated_bytes": 4294967296,
+    "free_reserve_bytes": 2147483648
+  },
+  "input_policy": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/INPUT_POLICY.json",
+    "identity": {
+      "bytes": 3783,
+      "sha256": "f75f6dd954ac1be248ed13e422078b5ea0b4216dac88f7ff59d23b50d9ad3b8b"
+    }
+  },
+  "staging_engineering_cost": {
+    "seconds": 1.275457023,
+    "retained_allocated_bytes": 62218240
+  },
+  "outputs_not_generated": [
+    "PRECONDITIONS.json",
+    "config.json",
+    "RESOURCE_CAPTURE_REQUEST.json",
+    "RESOURCE_CAPTURE_DISPATCH.json"
+  ],
+  "actions": {
+    "compile": 0,
+    "native": 0,
+    "queue": 0,
+    "capture": 0,
+    "host_pause": 0,
+    "freeze": 0
+  },
+  "screen_not_admitted": true
+}

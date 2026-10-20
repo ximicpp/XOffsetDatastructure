@@ -1,0 +1,38 @@
+{
+  "status": "ready_for_independent_initial_execution_review",
+  "initial": {
+    "path": "REQUESTS_COMBINED_INITIAL.json",
+    "identity": {
+      "bytes": 53428,
+      "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+    }
+  },
+  "external": {
+    "path": "REQUESTS_COMBINED_EXTERNAL.json",
+    "identity": {
+      "bytes": 202565,
+      "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+    }
+  },
+  "source_acceptance": {
+    "path": "../reviews/COMBINED_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 8470,
+      "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+    }
+  },
+  "immutable_initial_tools": [
+    "combined_full_jobs.py",
+    "combined_full/full_entry.py",
+    "run_native_targets.py",
+    "write_combined_initial.py"
+  ],
+  "jobs": [
+    "normal73",
+    "SAN73",
+    "external4"
+  ],
+  "remaining": "business/full final request being completed independently; does not alter initial closure",
+  "new_compile": 0,
+  "new_native": 0
+}

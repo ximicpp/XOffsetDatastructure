@@ -1,0 +1,25 @@
+{
+  "kind": "parent-M2-quiet-observation",
+  "status": "passed",
+  "observed_utc": "2026-10-19T19:16:49.714985+00:00",
+  "app_inventory_tool": "list_threads limit50 at2026-10-19T19:15:16Z, returned52 including pinned",
+  "app_active_thread_ids": [
+    "01a15479-36f3-72d3-8c17-6630a51f854b",
+    "01a14d62-bc8e-7580-a12b-368196e6e08a"
+  ],
+  "core_thread_status": "idle",
+  "root_child_agents": {
+    "phase_c_source_review": "completed_idle",
+    "runtime_observer_review": "completed_idle",
+    "v2_stats_review": "completed_idle_after_final_freeze_review"
+  },
+  "validation_children": "Executor reports its three subagents stopped; only bounded protocol execution remains.",
+  "original_lease_observation": {
+    "status": "complete",
+    "run_id": "bdb1a061e5d74986ae29f49cb9c3ce74",
+    "scope": "M2 source-only freeze; no other queued/running heavy work observed"
+  },
+  "WSL_compiler_processes_observed": [],
+  "root_commitment": "Stop builds/searches/scans/source edits and new agents until timing+restoration complete; bounded event waits and progress only.",
+  "scope": "Controlled app/task work; not a claim that unrelated user processes have been terminated."
+}

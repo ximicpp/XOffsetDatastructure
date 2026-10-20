@@ -1,0 +1,31 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "functional",
+    "--out",
+    "/root/xoffset-c14-iteration/20261019/v1/validation/m1-screen-capture-v1/queue",
+    "--timeout-seconds",
+    "120",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261019/validation/screen/m1_screen.py",
+    "capture",
+    "--config",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261019-v1/validation/screen/CONFIG_r2.json",
+    "--out",
+    "/root/xoffset-c14-iteration/20261019/v1/validation/m1-screen-capture-v1",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261019/v1/validation/m1-screen-capture-v1/queue"
+  ],
+  "native_budget": 2,
+  "timing_samples": 0
+}

@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "ready": {
+    "bytes": 365,
+    "sha256": "0923a1aa40cb1fea85c006ea94d799d5e93fa10c8982d9209acc1cced1bba737"
+  },
+  "completed": {
+    "bytes": 247,
+    "sha256": "0fabf3e407763003c10444ae7c40a7d17d4787b8190d52b21d4e340f2281ecb9"
+  },
+  "helper": {
+    "bytes": 3438,
+    "sha256": "46068ff66e083a5c39dd1ff97eed93db316fdb2f0ff5685559fa94cebdfb67cc"
+  },
+  "module": {
+    "bytes": 5008,
+    "sha256": "c907215b74800e552c153ac1bd072ace0c5b3d45e86ca54ecf98701d4ac02e09"
+  },
+  "native_benchmark_executions": 0,
+  "first_failure_preserved": "power-probe-v1: UTF-8 assumption for localized launcher stderr; independent deadline restored original power.",
+  "v1_restore_verified": true
+}

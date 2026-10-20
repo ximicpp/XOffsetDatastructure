@@ -1,0 +1,215 @@
+{
+  "all118_native_JSON_and_completed_value_ledgers_verified": true,
+  "all119_receipt_metadata_and_hashes_verified": true,
+  "attempted_children": 119,
+  "attempts": 1,
+  "audit": {
+    "children": 118,
+    "command_elapsed_seconds": 58.097674396,
+    "command_returncode": 0,
+    "independent_cap_seconds": 3600,
+    "original_global_lease": true,
+    "queue_status": "complete",
+    "restoration_preceded_audit": true,
+    "result_status": "preserved_failure",
+    "run_id": "f8c98e4e6ecd4ea49f75c9b158425ab2",
+    "summary": null
+  },
+  "causality_limit": "The receipt proves a child exceeded its fixed20-second full-process cap and was killed with returncode-9. Empty stdout/stderr and absent native/body outputs do not identify an active phase, candidate correctness defect, or host-noise cause. Do not infer any of these or infer speed from the failed prefix.",
+  "compiles_by_reviewer": 0,
+  "completed_children": 118,
+  "current_all_screen_artifacts_allocated_bytes": 2204110848,
+  "decision": "Seal the sole M1 attempt as a timeout closure without promotion; preserve all raw failure data and keep unused suffix unexecuted. No retry, new name, replacement, partial-window test, or alpha reuse.",
+  "exact_schedule_prefix": true,
+  "freeze_sha256": "e57468ed00157a0154f220b4c67a29879c3fc14bebb9ff04d65f621e4ed11685",
+  "frozen_before_after_runtime_source_tool_identity_equal": true,
+  "host": {
+    "Balanced_before_after": true,
+    "actual_targets": 2,
+    "each_owned_resume_status": 0,
+    "each_target_remained_live": true,
+    "guard_tokens_match": true,
+    "no_cross_clock_offset_assumption": true,
+    "ready_timing_stop_causal_interval_verified": true,
+    "requested_stop_reason": true,
+    "user_processes_restored": true
+  },
+  "inference": {
+    "QF_admitted": false,
+    "alpha_recycled": false,
+    "complete72pairs": false,
+    "eligible_for_promotion": false,
+    "partial_prefix_benefit_reported": false,
+    "ratios_or_intervals_computed": false,
+    "summary": null
+  },
+  "kind": "independent-screen-failure-review",
+  "last_failure": {
+    "id": "p059-1-candidate",
+    "launch_error": null,
+    "native_wire_canonical_query_files_absent": true,
+    "observed_elapsed_seconds": 20.02279041,
+    "order": "BA",
+    "pair": 59,
+    "returncode": -9,
+    "role": "candidate",
+    "stderr_bytes": 0,
+    "stdout_bytes": 0,
+    "timed_out": true,
+    "timeout_seconds": 20
+  },
+  "manifest": {
+    "all_small_receipt_native_and_dedup_JSON_file_hashes_checked": true,
+    "body_evidence": "Reuse exact externally pinned run manifest and original leased completed offline full-body audit. Independent check matches each retained body size/native SHA to manifest and byte-exact dedup same-inode ledger; does not rerun bulk body audit.",
+    "current_file_names_sizes_and_regular_types_match_pinned_manifest": true,
+    "large_body_hashing_repeated": false,
+    "postrun_pin": "7a6a5811c3d014ed96aacc7972de67d4a64a882af1c70b48088b4ff6252d55d5"
+  },
+  "native_runs_by_reviewer": 0,
+  "no_duplicate_or_later_child_receipt": true,
+  "no_prefix_replacement_found": true,
+  "performance_accepted": false,
+  "physical_limit_bytes": 4294967296,
+  "queue": {
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "command_elapsed_seconds": 370.219591107,
+    "command_returncode": 1,
+    "overall600second_cap_exhausted": false,
+    "run_id": "c8c4fa7355fe4a48b228d65ed90fe822",
+    "status": "failed"
+  },
+  "references": {
+    "audit": {
+      "identity": {
+        "bytes": "3498",
+        "sha256": "30c76108340bb4d6a89cf2719df39ddc94b70c8bafb0e770bc7ecb9fb5714ece"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/AUDIT.json"
+    },
+    "audit_queue_manifest": {
+      "identity": {
+        "bytes": "913",
+        "sha256": "d1c626d1306703fd44d7a6e045beb761538111b9f4ff863053d02534e5d8469b"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/m1-screen-audit-v1/queue/manifest.json"
+    },
+    "audit_queue_result": {
+      "identity": {
+        "bytes": "444",
+        "sha256": "0916112d0a0f7c6ab364d63c808ece7c919eed9b9e0737a3bf5a08a24b1fc82b"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/m1-screen-audit-v1/queue/result.json"
+    },
+    "controller_review": {
+      "identity": {
+        "bytes": "7041",
+        "sha256": "f3ded9d2b80e24a0dbb4e1fe99a91920bbceb1bdf3041cc4ccf9299e4c90d64f"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/HOST_CONTROLLER_REVIEW.json"
+    },
+    "freeze": {
+      "identity": {
+        "bytes": "1711488",
+        "sha256": "e57468ed00157a0154f220b4c67a29879c3fc14bebb9ff04d65f621e4ed11685"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/frozen-v1/freeze.json"
+    },
+    "guard_completed": {
+      "identity": {
+        "bytes": "2616",
+        "sha256": "18641ee65c427f237d974a8a6d5229255944a9efd21bb25a5f9dda089fdf549c"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/host/process-state-v1/completed.json"
+    },
+    "host": {
+      "identity": {
+        "bytes": "1418",
+        "sha256": "0007ec8b0ee179b65c93d9f97ce50cced75dfeda023a278c90885881d5a3085d"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/HOST.json"
+    },
+    "last_receipt": {
+      "identity": {
+        "bytes": "1458",
+        "sha256": "c96bc6fcd1870ba4ae99bff23d989d0a5111262cca3eb470051199a0ad1e6ae6"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/commands/p059-1-candidate.receipt.json"
+    },
+    "postrun_pin": {
+      "identity": {
+        "bytes": "599",
+        "sha256": "43915e859c7d745d22bf46ee7e15d6a6c87d0415828cff21eaeb753442ec0417"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/POSTRUN_PIN.json"
+    },
+    "queue_manifest": {
+      "identity": {
+        "bytes": "912",
+        "sha256": "160b322c3b22e432bdf14ccc2b3f2c05737ffadfd912c519ced396949a3e6c91"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/queue/manifest.json"
+    },
+    "queue_request": {
+      "identity": {
+        "bytes": "2142",
+        "sha256": "cfb42f8175120cce2a89f6f07fd020f38769f1039cf918afa28d083d528d6f84"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/queue/request.json"
+    },
+    "queue_result": {
+      "identity": {
+        "bytes": "439",
+        "sha256": "85556e7ff59f358f5824632b8a421ca95007fe5fb690537c1751ac30baaaddcd"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/queue/result.json"
+    },
+    "quiet": {
+      "identity": {
+        "bytes": "2730",
+        "sha256": "6047e167952ba90eac51533fa638aa31483661c608f364fd46210c1da7564b2b"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/GLOBAL_QUIET.json"
+    },
+    "restoration": {
+      "identity": {
+        "bytes": "1061",
+        "sha256": "890d25ecd24190178d591249705501847e3c8f65a43c0258ce8fd508b7ed3228"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/RESTORED.json"
+    },
+    "screen_manifest": {
+      "identity": {
+        "bytes": "168845",
+        "sha256": "55018246b878daecff12d1b3ad5f426a6c42dfd12ead3e13e3c552743cab49af"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/manifest.json"
+    },
+    "status": {
+      "identity": {
+        "bytes": "71179",
+        "sha256": "8e605cfacb604638fd358971298c01364ab11fcb29fa7b7294ff95c785d3b276"
+      },
+      "path": "/root/xoffset-c14-iteration/20261019/v1/validation/M1-screen-20261019-v1/status.json"
+    },
+    "timing_dispatch": {
+      "identity": {
+        "bytes": "575",
+        "sha256": "7ea0ec37f7aa1767e7a28976b4c4d37d3c59163bf6bda5a200f0c5997de0e345"
+      },
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/screen/TIMING_DISPATCH_RESULT.json"
+    }
+  },
+  "replacements": 0,
+  "retries": 0,
+  "reviewer": "screen_review",
+  "schema": "m1-independent-closed-failure-review-v1",
+  "status": "verified_closed_failure",
+  "timing_samples_by_reviewer": 0,
+  "unexecuted_children": 25,
+  "verification_status": "passed",
+  "window_status": "failed_closed"
+}

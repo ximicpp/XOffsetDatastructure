@@ -1,0 +1,43 @@
+{
+  "status": "passed",
+  "cases": [
+    {
+      "case": "valid-preflight",
+      "passed": true,
+      "returncode": 0,
+      "stdout": "{\"status\": \"ready\", \"argv\": [\"/usr/bin/python3\", \"-I\", \"-B\", \"/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\\u5f00\\u53d1/experiments/vm_coordination/run_job.py\", \"run\", \"--owner\", \"W1\", \"--kind\", \"validation\", \"--out\", \"/root/xoffset-c14-iteration/20261019/v1/validation/preflight-only-never-run-lease\", \"--timeout-seconds\", \"2400\", \"--wait-seconds\", \"0\", \"--\", \"/usr/bin/python3\", \"-I\", \"-B\", \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\\u5f00\\u53d1/tools/c14_iteration_20261019/validation/candidate_job.py\", \"worker\", \"--request\", \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\\u5f00\\u53d1/docs/coordination/c14-iteration-20261019-v1/validation/entry-check-v1/valid-preflight.json\", \"--request-sha256\", \"0ae82d79ed5eb49f025129c176c146bf4cf2ad89c60940311aaea8e5217e43c0\"], \"source_member_count\": 154, \"new_cpp_executions\": 0}\n",
+      "stderr": ""
+    },
+    {
+      "case": "empty-test-inventory",
+      "passed": true,
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 168, in <module>\n    main()\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 156, in main\n    q,files,out=verify(request)\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 61, in verify\n    require(q[key] and len(q[key])==len(set(q[key])) and all(re.fullmatch(r'test_[A-Za-z0-9_-]+',n) for n in q[key]),'explicit unique '+key+' required')\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 46, in require\n    if not condition: raise ValueError(message)\nValueError: explicit unique tests required\n"
+    },
+    {
+      "case": "wrong-baseline",
+      "passed": true,
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 168, in <module>\n    main()\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 156, in main\n    q,files,out=verify(request)\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 65, in verify\n    require(q['baseline_main_sha256']==material['production_files']['xoffsetdatastructure.hpp']['sha256'],'wrong baseline')\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 46, in require\n    if not condition: raise ValueError(message)\nValueError: wrong baseline\n"
+    },
+    {
+      "case": "source-byte-mismatch",
+      "passed": true,
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 168, in <module>\n    main()\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 156, in main\n    q,files,out=verify(request)\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 70, in verify\n    for n,v in files.items(): require(fid(v['path'])==v['identity'],'changed source input: '+n)\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 46, in require\n    if not condition: raise ValueError(message)\nValueError: changed source input: xoffsetdatastructure.hpp\n"
+    },
+    {
+      "case": "stale-backing-observation",
+      "passed": true,
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 168, in <module>\n    main()\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 156, in main\n    q,files,out=verify(request)\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 82, in verify\n    require(0<=age<=900,'refresh actual Windows backing free-space observation within 15 minutes')\n  File \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/candidate_job.py\", line 46, in require\n    if not condition: raise ValueError(message)\nValueError: refresh actual Windows backing free-space observation within 15 minutes\n"
+    }
+  ],
+  "new_cpp_compiles": 0,
+  "new_cpp_executions": 0,
+  "leases_acquired": 0
+}

@@ -1,0 +1,36 @@
+{
+  "kind": "M2-predeclared-finite-capture-resource-policy",
+  "status": "pending_independent_exact_capture_and_screen_admission",
+  "candidate": "m2-exact-owns-v1",
+  "capture_children": 2,
+  "child_seconds": 20,
+  "capture_outer_seconds": 120,
+  "screen_children": 144,
+  "screen_outer_seconds": 600,
+  "nonchild_reserve_seconds": 60,
+  "seal_reserve_seconds": 30,
+  "projection_tail_margin_seconds": 0.25,
+  "tail_basis": "Fixed additional0.25s above complete process+full native_result/byte oracle audit per child for dedup/ledger; predeclared before this finite resource capture, no data-based retuning/retry.",
+  "staging_seconds": 1.275457023,
+  "staging_retained_allocated_bytes": 62218240,
+  "staging_time_and_allocated_charged": true,
+  "RSS_bytes": 17179869184,
+  "allocated_bytes": 4294967296,
+  "free_reserve_bytes": 2147483648,
+  "independent_full_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_CAPTURE_FUNCTIONAL_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 1880,
+      "sha256": "dc43c3e27c650d241d1dbb4ef002635fe99280277a9866431eb07d2d9eec5dca"
+    }
+  },
+  "independent_mechanism_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_EXECUTION_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 1778,
+      "sha256": "4d8deaf53cfbaf22c244a7ec3f1d738b1191e5b34dfa96f81f46166bc4866e70"
+    }
+  },
+  "future_auxiliary_veto": "Original9 auxiliaries, any lower>1 rejects; any zero/undefined blocks promotion. Keep retire/reload/cleanup/total; diagnostics and resource runs never waive future actual gates.",
+  "engineering_gate_not_passed_here": true
+}

@@ -1,0 +1,31 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/queues/functional-normal-audit-v2",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/functional-tools-v2/campaign.py",
+    "audit",
+    "--bundle",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/functional-normal-v2",
+    "--postrun-pin",
+    "3bcf87a776906c333d90d6d1775f49386c45c9089367f35ad6ba6b887a3786fb"
+  ],
+  "script": {
+    "bytes": 54171,
+    "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+  }
+}

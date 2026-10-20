@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "original_module": {
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/receive-completion-20261019/process-pause-allocation-v1/process_pause.py",
+    "bytes": 16122,
+    "sha256": "505aa0454e8eae9f516069c17672100886762bcbd17844f650e3a67ad151a92f"
+  },
+  "module": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/host/process_pause.py",
+    "bytes": 16259,
+    "sha256": "a48417c6764186efdffd0a7f24d17890d67620b33404f4cc88a6c02f360d93da"
+  },
+  "helper": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/host/pause-control.ps1",
+    "bytes": 12668,
+    "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+  },
+  "delta": "Exactly one state-directory assignment relocated to new M1 validation-owned C: domain; helper bytes and identity/handle/suspend/resume/watchdog checks unchanged.",
+  "original_human_grant": {
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/process-pause-authorization-v1.json",
+    "bytes": 775,
+    "sha256": "504243b5cdcf609ad3e5bd70b4bbd0893279b17b3085bb28240efc8d554fc8c0"
+  },
+  "standing_interpretation": {
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/standing-process-pause-human-authorization-v1.json",
+    "bytes": 1532,
+    "sha256": "b97fa5871d35687119f41ddb576386dd4f4210f08aa9cd0068ff50ba78203b92"
+  },
+  "scope": "One new M1-only72pair/144child screen; only these2 names, actual fresh PID/creation/image/SID/held handles, restore on success/failure.",
+  "power_policy": "Keep current Balanced scheme381b4222-f694-41f0-9685-ff5bb260df2e; read before/after, no scheme switch.",
+  "new_human_reply_claimed": false,
+  "old_pid_or_handle_reused": false,
+  "processes_paused_here": 0
+}

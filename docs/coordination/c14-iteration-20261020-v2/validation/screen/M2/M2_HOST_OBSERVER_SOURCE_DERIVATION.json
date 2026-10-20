@@ -1,0 +1,54 @@
+{
+  "kind": "M2-read-only-host-observer-source-derivation",
+  "status": "source_only_pending_independent_review",
+  "evidence": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/observe_host_r1.py",
+      "identity": {
+        "bytes": 1568,
+        "sha256": "21fd7c3dc3c100af93e88fb165a17485dc46563f78e51ecb1a08e5c0abe4550b"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/observe_host_m2.py",
+      "identity": {
+        "bytes": 1568,
+        "sha256": "73c8e013bd435aa27811a553770bb9ea4b41525ca8ee90e074541a01b3a50346"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/execute.py",
+      "identity": {
+        "bytes": 10288,
+        "sha256": "9b4aad4e26aa6c403c847e8dfd818f381fa193705e4a52e7641db9441359af66"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/host/process_pause.py",
+      "identity": {
+        "bytes": 16269,
+        "sha256": "220c404b4aa70082ba4ae2c649ec7e7c63469bc6ec6ec1fd5298fba1ebefb603"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/host/pause-control.ps1",
+      "identity": {
+        "bytes": 12668,
+        "sha256": "cb976637024caacead844dfd5e40277304f9a7bd3ef750fe06f9cd0078b60f44"
+      }
+    }
+  ],
+  "exact_path_derivation": true,
+  "changes": [
+    "import m2 module directory",
+    "M2-only observation lease output",
+    "M2-only controller/module/helper provenance references"
+  ],
+  "expected_output": "validation/screen/M2/host/HOST_OBSERVATION.json and pre-review-process-plan-v1.json",
+  "runtime_requirements": "Actual M2 config exists; own originalW1validation60 lease matching current supervisor; source-only plan/read actual power. Fresh formal prelude plan/handles/token still separately required.",
+  "guard_started": false,
+  "paused_processes": 0,
+  "power_changed": false,
+  "queue_executed": false,
+  "screen_admitted": false
+}

@@ -1,0 +1,220 @@
+{
+  "schema": "q32-small-registration-adaptation-plan-v1",
+  "status": "analysis_complete_missing_registration_and_host_inputs_not_execution_admission",
+  "source_register": {
+    "path": "/root/xoffset-four-paths/20261018/v1/formal-registration-v4/author/register.py",
+    "identity": {
+      "bytes": 19895,
+      "sha256": "729e96910648b92b885e1a52a11053840b2c4439b0986f08d10c41da862956d5"
+    },
+    "required_flags": [
+      "--author-layer",
+      "--author-receipt-sha256",
+      "--gate-map",
+      "--fixed-captures",
+      "--capacity"
+    ],
+    "original_gate_map_exact": {
+      "functionals": [
+        "normal",
+        "sanitized"
+      ],
+      "compatibility": "path",
+      "executor_validation": "path"
+    },
+    "direct_current_execution_allowed": false
+  },
+  "adjacent_helpers": [
+    {
+      "path": "/root/xoffset-four-paths/20261018/v1/formal-registration-v4/author/registration_common.py",
+      "bytes": 7754,
+      "sha256": "7c9ea062f30840c01fcade5b93c6a446ef55a1dfe87e390bd57f0ddf08f2ba97"
+    },
+    {
+      "path": "/root/xoffset-four-paths/20261018/v1/formal-registration-v4/author/gate_records.py",
+      "bytes": 9589,
+      "sha256": "1eff62966f57a0f51eff70908b8bf75e230d267791fdf5a509017ceb555b9054"
+    },
+    {
+      "path": "/root/xoffset-four-paths/20261018/v1/formal-registration-v4/author/observe-backing.ps1",
+      "bytes": 2570,
+      "sha256": "92e71fa94567ecb2c70063604df2fa343cfc6b92dd0db4e19aecd838d9200ceb"
+    },
+    {
+      "path": "/root/xoffset-four-paths/20261018/v1/formal-registration-v4/author/observe-capacity.py",
+      "bytes": 2730,
+      "sha256": "a6ca4fe874bd4b6f21675145102424d3a3757bf1884b2976ed6fd5c6e7533cb0"
+    }
+  ],
+  "actual_inputs": {
+    "bound_ready": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/FINAL_FORMAL_BOUND_SOURCE_READY.json",
+      "identity": {
+        "bytes": 11243,
+        "sha256": "7dc0d66c13b2282570da9b8d9032bdb2cc68d0944c1a7729173cd0a5fb9e8e35"
+      }
+    },
+    "source_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_FORMAL_SOURCE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 12919,
+        "sha256": "46692a1bdb54d8a069d59510e042dcc56e562eb5f7841b81ed6210106eea99f0"
+      }
+    },
+    "bound_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/BOUND_SOURCE_AND_CAPTURE_REUSE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 41252,
+        "sha256": "b113e5b7ff1b432f4e307cbc243f460776604843675350148ee5ae32d142f918"
+      }
+    },
+    "capture_index": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/CAPTURE_REUSE_INDEX_DRAFT.json",
+      "identity": {
+        "bytes": 47491,
+        "sha256": "67aeb7207f4145e3869409e0d9fa344c099101a2b024d67c75080eb35c59b2da"
+      }
+    },
+    "capture_reuse_audit": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RECORD_REUSE_AUDIT.json",
+      "identity": {
+        "bytes": 40768,
+        "sha256": "1e069d2cc17db68b743942509684965b0ee9854a453b7e5c2d0c4d6981f212c3"
+      }
+    },
+    "resource_actual_ready": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RESOURCE_ACTUAL_READY_v1.json",
+      "identity": {
+        "bytes": 11277,
+        "sha256": "3e1de43fcd4010e95b418004d5a0296cd7674454eb1863fafabe993f4e869faf"
+      }
+    },
+    "resource_actual_projection": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RESOURCE_ACTUAL_PROJECTION_v1.json",
+      "identity": {
+        "bytes": 9493,
+        "sha256": "dadcb33a581d21cf7aea82a94b8db979be81ef1c6ed7e0006abd71d4220fb4a0"
+      }
+    },
+    "own_full_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/COMBINED_FULL_ACTUAL_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 10321,
+        "sha256": "6b3a0227d1e258181f4824c0862fbb609cc8ea32a2a549c17c40e367f4c4d27c"
+      }
+    },
+    "own_full_closure": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_FUNCTIONAL_GATES_v2.json",
+      "identity": {
+        "bytes": 38610,
+        "sha256": "6baf5b71dd166544925207f19dc5e45dbf744582e079f70febbb776d2e46c6c4"
+      }
+    },
+    "profile_index": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/COMBINED_BENCH_PROFILE_INDEX.json",
+      "identity": {
+        "bytes": 9197,
+        "sha256": "e5bdc478fe7a3a630cf0411a61a878ce3f9578bce3e0f5c87581797cb5d1697b"
+      }
+    },
+    "candidate_identity": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/IDENTITY.json",
+      "identity": {
+        "bytes": 45694,
+        "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+      }
+    },
+    "source_identity": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/business/candidate-source-identity-v2.json",
+      "identity": {
+        "bytes": 2550,
+        "sha256": "a160f395702a70c5837f4f7d3433b9820e106de3082ca6160bf3c29483d61b1e"
+      }
+    }
+  },
+  "whitelist": {
+    "registration_common.py": [
+      "ROOT/C/H/B/SOURCE and C14/current baseline origin locations only; current candidate-source-identity-v2 and14 production members.",
+      "candidate()/critical(): exact current combined identity/content/14 files; do not borrow old9 identifiers.",
+      "sealed(): preserve original V5 competitor and sealed initial-wire chain; current C14 old_xoffset comes from accepted bound/profile/capture records, not old V8final-v1 assumptions.",
+      "fid/norm/match/read/write/fresh_observation semantics preserved; no OS framework/traversal."
+    ],
+    "gate_records.py": [
+      "stable_gates(): consume current own11 typed gate refs plus root accepted combined ownfull closure; remove historical full66/package3/specific oldmatrix constraints only where replaced by actual own73/full consumer/lifecycle refs.",
+      "functional_gate()/v1_gate(): current normal/SAN80 and84+8/AB4/C4 refs from accepted combined closure; preserve original truth/status/identity checks.",
+      "queue_passed()/passed_xml(): preserve validation semantics; own full JUnit73 replaces66, no re-execution."
+    ],
+    "register.py": [
+      "accepted_binding(): current14/profile-normal-v2/sanitized-v2 and compiled-source-binding-v2; retain six fixed modes and exact original sealed wires.",
+      "captures(): consume accepted twelve complete records and original manifests/reuse audit; remove synthetic single-capture-root48/newprefix assumptions. No new capture/body audit here.",
+      "main(): do not require STAGE_BINDINGS=None; assert accepted bound source hash and literal equality to actual capture index, and never rewrite source.",
+      "main(): produce only small proposal/registration/gate binding documents at exact newCOORD and adjacent proposal path; preserve original authoring/source.",
+      "main(): reuse policy JSON from pinned original proposal and unchanged phase/envelope identities rather than executing project modules; exact original common/Q/F values unchanged.",
+      "capability_sources(): pin actual unchanged helper/module and historical capability-v3 to v2 plus pure26normal/optimized chain, current lexical paths explicit; never run original power helper."
+    ],
+    "observe-capacity.py/observe-backing.ps1": [
+      "No invocation in this task. Existing literal input/output schema recorded for root; any future current observation uses fresh directory and read-only provenance, then independent acceptance."
+    ]
+  },
+  "current_production14_added_over_original9": [
+    "receive_future.hpp",
+    "receive_raw.hpp",
+    "receive_raw_fwd.hpp",
+    "xoffset_core_lifetime.hpp",
+    "xoffset_verified_receive.hpp"
+  ],
+  "proposal_schema": {
+    "kind": "sc-four-path-conditioned-lifecycle-envelope-v3",
+    "statistics_version": "copy exact unchanged phase protocol VERSION",
+    "campaigns": "copy exact pinned original proposal qualification/formal statistics+envelope objects; no recomputation",
+    "coordinator_references": "exact7 name->normalized file identity; all actual current output IDs",
+    "actual_stage_bindings": "exact inert STAGE_BINDINGS from accepted6c3319 source, including accepted12record index",
+    "gate_map": "actual current gate-map identity",
+    "root_attempt_ledger_required": true,
+    "new_formal_authorization_created_here": false
+  },
+  "required_gate_names": [
+    "codegen",
+    "mechanism",
+    "targeted",
+    "full_normal",
+    "full_san",
+    "business_SML",
+    "v1_bidirectional",
+    "consumers",
+    "lifecycle",
+    "safety",
+    "engineering"
+  ],
+  "gate_schema": "Own combined exact candidate identity/source154/production14/evidence. Each passed typed receipt independent_review={status:passed,record:{path,identity}}; prerequisite must not turn missing reviews into passed. Freeze tests gate.status only, so root external typed admission remains mandatory.",
+  "registration_members": [
+    "measurement-decision-v1.json",
+    "measurement-decision-v2.json",
+    "backing-volume-windows-v1.json",
+    "backing-volume-verification-v1.json",
+    "power-capability-v2.json",
+    "power-capability-v3.json",
+    "resources-pure-tests-v3.json"
+  ],
+  "decision_schema": "Original schema1/common/qualification/formal unchanged; update backing_verification/power_capability/resources_pure_tests actual identities only; v2supersedes exact currentv1 and policy_and_budgets_unchanged=true.",
+  "pending": [
+    "Actual newCOORD7 registration records (pure-tests source is original pinned receipt), prerequisite+combined gate docs, adjacent proposal.",
+    "Root actual11 typed combined gates and new exact gate-map/executor-validation metadata bridge; old register path-only gate map cannot stand in.",
+    "Current capacity observation contract and actual independent fixed12 resource acceptance/ref.",
+    "Final exact HOST_REVIEW/GLOBAL_QUIET/current authorized2-name plan; oldpause780 incompatible withQ2700.",
+    "Separate Q32 freeze manifest/actual base/resource projection/fresh free checks/recovery and execution admission."
+  ],
+  "author_executions": {
+    "project_import": 0,
+    "project_entrypoint": 0,
+    "native": 0,
+    "compile": 0,
+    "queue": 0,
+    "freeze": 0,
+    "body_audit": 0,
+    "pause": 0,
+    "power": 0,
+    "host_probe": 0
+  },
+  "root_owned_request": "Q32_FREEZE_REQUEST_DRAFT_v1.json is owned by root; authoritative proposed W1validation300/default lease. Earlier note600/W3 is superseded proposal only; no execution occurred."
+}

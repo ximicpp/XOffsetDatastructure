@@ -1,0 +1,37 @@
+{
+  "boot_id": "ca23ebe8-465b-4e33-b35d-531e8b949bb7",
+  "controller": {
+    "identity": {
+      "bytes": 17558,
+      "sha256": "2ae2f22053fdd50cf7cbfdceb22e11d04284cc4fcf70811a203e8edf6f3722b6"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/q32_host_v1/execute.py"
+  },
+  "freeze_sha256": "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+  "guard_controller_start_monotonic_ns": "5710973467",
+  "guard_ready": {
+    "identity": {
+      "bytes": 1359,
+      "sha256": "f82813a2a20f95194bb84034022a24a1bf83ee964efb83ac54167c4eeca34b61"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-state-v1/ready.json"
+  },
+  "plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "fb6085b19e71cc42b6e591ee2cffe71c92a8ff5ec79e7ed12372065debf30830"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-plan-v1.json"
+  },
+  "power_before": {
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "ready_monotonic_ns": "7151987424",
+  "standalone_bounded_watchdog_seconds": 2820,
+  "status": "passed"
+}

@@ -1,0 +1,121 @@
+{
+  "status": "passed",
+  "mode": "sanitized",
+  "request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/r1_full/R1_FULL_SANITIZED_REQUEST_v1.json",
+    "identity": {
+      "bytes": 8093,
+      "sha256": "5b9c765f71f5bb0daf7773eab6fa0e2b901e632aab6af32799e89a33322e89b5"
+    }
+  },
+  "inner_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_FULL.json",
+    "identity": {
+      "bytes": 76714,
+      "sha256": "2d963e6a88238738199456b717eda10866febf3d53c6bd5f4b21ee495461975d"
+    }
+  },
+  "outer_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_FULL_v2.json",
+    "identity": {
+      "bytes": 78281,
+      "sha256": "68bec6b9a03db3d0c868912f48fee29b9988ef09eae170ed5e3d8cf5d2db8a4f"
+    }
+  },
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_FULL_ENTRY_SANITIZED_ADMISSION.json",
+    "identity": {
+      "bytes": 590589,
+      "sha256": "12fa573cf548e54ac7141c710ab3d7c4363f6aba8c799442aa8156605a6fe3ea"
+    }
+  },
+  "queue_result": {
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "command_elapsed_seconds": 193.884559884,
+    "command_pid": 400,
+    "command_returncode": 0,
+    "finished_at": "2026-10-19T17:25:06.910868+00:00",
+    "kind": "validation",
+    "owner": "W1",
+    "reason": "command_exit",
+    "run_id": "2148d55830f84644926c06edf6bdebb3",
+    "schema_version": 1,
+    "started_at": "2026-10-19T17:21:53.021684+00:00",
+    "status": "complete"
+  },
+  "worker": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/R1_FULL_ENTRY_SANITIZED_WORKER.json",
+    "identity": {
+      "bytes": 1584,
+      "sha256": "b8cf358fa5b0b510b3637f450a708568f3261aeb79ebf1c49e614d159b8ceffa"
+    }
+  },
+  "postcheck_error": null,
+  "production_files": {
+    "receive_future.hpp": {
+      "bytes": 3052,
+      "sha256": "42b2f9aac5286a3c56d62d706bf8d4528bb94eb5c3f27687464a0bcb2e306651"
+    },
+    "receive_raw.hpp": {
+      "bytes": 50646,
+      "sha256": "a6a5f4176b6c94acaa54999c01a64ad8f4570855005eef4b506d17647a1ba3a0"
+    },
+    "receive_raw_fwd.hpp": {
+      "bytes": 4997,
+      "sha256": "1933345bb64eb363a435aff86745318dcb97d4c72d50754674c64db8bbdcd9ca"
+    },
+    "snapshot_index_runtime.cpp": {
+      "bytes": 525,
+      "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
+    },
+    "validation_scratch.cpp": {
+      "bytes": 408,
+      "sha256": "b16223714ed972aa17c7f8243216930969bfbaab58398b3de5e85ec08f5b6fcd"
+    },
+    "validation_scratch.hpp": {
+      "bytes": 15756,
+      "sha256": "edaf40d8cb472acfaddca5938bbb3dbf4c31a54d4c8fa03cea6b25dc0084592c"
+    },
+    "xoffset_core_lifetime.hpp": {
+      "bytes": 7269,
+      "sha256": "1fed92b34c842b14905502db4f35ff93e66b4d102e59b7e37df3969db8e8f268"
+    },
+    "xoffset_snapshot_index.hpp": {
+      "bytes": 11831,
+      "sha256": "6286b20288bd43cff22006c5169eab3585960276004a526e32974bf3dcbf63f9"
+    },
+    "xoffset_snapshot_index_budget.hpp": {
+      "bytes": 3042,
+      "sha256": "724dba8fee57faa6f19d596e2726cc5198a3d5f1054867f5014d9db8f7f02b4d"
+    },
+    "xoffset_validation_scratch.hpp": {
+      "bytes": 1094,
+      "sha256": "63e673b17d9ba38bda4ade0effe9ec15cf3ac367fa8c5f18c189277211ebddb3"
+    },
+    "xoffset_verified_paths.hpp": {
+      "bytes": 10209,
+      "sha256": "a3e69dc13d595bbe94955e0a940b1def5f07b76300e2d5d84242d4d1383e3512"
+    },
+    "xoffset_verified_receive.hpp": {
+      "bytes": 15907,
+      "sha256": "f92b2bff7b812ef4bb53687c093ed0e73d13bf1b0defaf282447a5ad02abab4a"
+    },
+    "xoffset_virtual_memory.hpp": {
+      "bytes": 20900,
+      "sha256": "90105e4c172da26a5b23cbb10021a18613b458e92b795beee8ec9d7faed72991"
+    },
+    "xoffsetdatastructure.hpp": {
+      "bytes": 278801,
+      "sha256": "b4c61b2d286d6d4ffdfbd44af3ff7151b1640dd07f8b9a2c9bfcfa01a6a9c23f"
+    }
+  },
+  "expected_tests": 73,
+  "actual_tests": 73,
+  "new_timing_samples": 0,
+  "performance_accepted": false,
+  "screen_admitted": false
+}

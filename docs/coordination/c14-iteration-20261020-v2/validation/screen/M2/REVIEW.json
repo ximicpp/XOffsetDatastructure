@@ -1,0 +1,94 @@
+{
+  "kind": "independent-screen-admission",
+  "status": "passed",
+  "candidate": "m2-exact-owns-v1",
+  "observed_utc": "2026-10-19T19:16:49.714985+00:00",
+  "freeze_sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2",
+  "freeze": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/frozen-v1/freeze.json",
+    "identity": {
+      "bytes": 1827701,
+      "sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2"
+    }
+  },
+  "scope": "Sole registered72-pair M2 mutate own-C14 control screen, no formal competitor acceptance.",
+  "evidence": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_ACTUAL_SCREEN_FREEZE_REVIEW.md",
+      "identity": {
+        "bytes": 4355,
+        "sha256": "c258d70370bbf6452554371686408f13d9693813f3b7d67fc4f59c1c652c91d7"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_SCREEN_COMPLETE_GATES_ADMISSION.json",
+      "identity": {
+        "bytes": 4738,
+        "sha256": "bfce36241fce5611ed361c92ece363f83a1a819a0deaf92ad175b217bc80ac44"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_RESOURCE_CAPTURE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 7482,
+        "sha256": "389339a3f7b1349a0fce37e16b6d10024c88a3271650adf189034bfd0d68bf45"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_FULL_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 15117,
+        "sha256": "312d7d965f2c039d89eada390de7cf2c10b8a15c1599961c1297d4226ee793b7"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_MECHANISM_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 4727,
+        "sha256": "7ca0a36ed401a3c8769774cb70e3a201bebd6e5259225c2fcb28e3e9aab6891e"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_HOST_SOURCE_SCOPE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 4326,
+        "sha256": "b39b49a4228c6d0c5cf0c5c352a4e2d33b3a6038f51df556b0e83585a0a181da"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_CAPTURE_PREPARATION_REVIEW.md",
+      "identity": {
+        "bytes": 6119,
+        "sha256": "50d1a6b01d72499bccbeef9b4eb61e031f4f79349f3c9b9f27db07487a5270e5"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_CAPTURE_PREPARATION_V5_DELTA_REVIEW.md",
+      "identity": {
+        "bytes": 3500,
+        "sha256": "ebddd746776fc395a165b8e4d8419d8d19dc9212a928a78e0e0d23073483f22d"
+      }
+    }
+  ],
+  "actual_gate_count": 11,
+  "source_runtime_checks": "Frozen actual own M2 main3e/source154/prod14/profile/bare binary and unchanged actual worker/input complete; executor repeats actual binding checks before/after.",
+  "policy": {
+    "primary": "mutate",
+    "pairs": 72,
+    "children": 144,
+    "AB": 36,
+    "BA": 36,
+    "primary_family": 4,
+    "auxiliary_family": 36,
+    "retry": 0,
+    "replacement": 0,
+    "child_seconds": 20,
+    "command_seconds": 600,
+    "audit_seconds": 3600
+  },
+  "engineering": "Actual176.089992063s/2,915,424,609B accepted incl staging/capture/all144wire unique/7temporaryslots/metadata/0.25stail; no future-tail guarantee.",
+  "stop": "Any failure closes and preserves prefix without inference/replacement. Complete defined72 statistics, primary jointupper<1/noauxlower>1 and actual engineering/recovery/audit required for promotion.",
+  "restore_before_audit": true,
+  "QF_admitted": false,
+  "performance_accepted": false
+}

@@ -1,0 +1,64 @@
+{
+  "Q32_timing_admitted": false,
+  "actual_registration": {
+    "identity": {
+      "bytes": 7449,
+      "sha256": "4b78bf17126329399f4640ce47fa96ac34ca9e82e46fcc81374d35bc0ab4c390"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/REGISTRATION_ACTUAL_VERIFIED_v1.json"
+  },
+  "admission": {
+    "identity": {
+      "bytes": 3372,
+      "sha256": "44f416dde3c22d3e465d43de6b884f78e4aaf477681e2fe71533981af94bd1a7"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_SOURCE_FREEZE_CONDITIONAL_ADMISSION_v1.json"
+  },
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-freeze-v1",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "freeze",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/frozen-qualification-v1"
+  ],
+  "capacity_age_seconds": 114.235075,
+  "capture": 0,
+  "compile": 0,
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1",
+  "native": 0,
+  "pause": 0,
+  "power_change": false,
+  "shared_status": {
+    "argv": [
+      "/usr/bin/python3",
+      "-I",
+      "-B",
+      "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+      "status"
+    ],
+    "returncode": 0,
+    "stderr": "",
+    "stdout": "{\"last_record\": {\"finished_at\": \"2026-10-19T20:52:50.968580+00:00\", \"out\": \"/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/registration-prepare-v1\", \"owner\": \"W1\", \"run_id\": \"2e1332061ace49e49b997cc4bcac2842\", \"status\": \"complete\"}, \"lock\": \"/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\\u5f00\\u53d1/build/vm-coordination/queue.lock\", \"status\": \"idle\"}\n"
+  },
+  "status": "conditional_freeze_prerequisites_satisfied_before_once_only_dispatch"
+}

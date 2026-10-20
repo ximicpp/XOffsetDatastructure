@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/diag/dummy-v1-queue",
+    "--timeout-seconds",
+    "30",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/diag/diag_wrapper.py",
+    "selfcheck",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/diag/dummy-v1",
+    "--queue",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/diag/dummy-v1-queue"
+  ],
+  "tools": {
+    "dummy_child.py": {
+      "bytes": 2224,
+      "sha256": "01cd1edb6379f9a3454855b5358d8596c7696848d2d9c5769575e375c102b2db"
+    },
+    "INTERFACE.json": {
+      "bytes": 2739,
+      "sha256": "737bc78401caf58d0fd7300f8e669f1b48eb30595798d67625188fa5c55a6a5b"
+    },
+    "dummy_selfcheck.py": {
+      "bytes": 4939,
+      "sha256": "3cf9209ae8276df44b777295b55f09031920b4d2803b33a19e3982f530427be5"
+    },
+    "diag_wrapper.py": {
+      "bytes": 23161,
+      "sha256": "d6a9746a80e53ff05416126d719c89d7a0924ed742db67c9ff029f87955ed5d2"
+    }
+  },
+  "cpp_compiles": 0,
+  "real_diag_native": 0,
+  "python_dummy_budget": 18,
+  "artifact_projection_bytes": 23068672
+}

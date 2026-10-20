@@ -1,0 +1,5 @@
+def request_capture(config,out,request):
+    cfg=C.read(config);runtime=validate_cfg(cfg);out=path(out)
+    need(out==Path('/root/xoffset-c14-iteration/20261020/v2/validation/%LOWER%-screen-resource-capture-v1') and not out.exists(),'one fresh registered finite capture path')
+    record=dict(kind='v2-screen-finite-resource-capture',status='pending_independent_parent_admission',candidate='%CANDIDATE%',config=dict(path=str(path(config)),identity=fid(config)),config_identity=fid(config),runtime=runtime,output=str(out),queue=str(out/'queue'),roles=['control','candidate'],children=2,child_seconds=20,outer_seconds=120,compile=0,retry=0,timing_inference_samples=0,body_file_limit_bytes=64*1024**2,RSS_limit_bytes=16*GiB,allocated_limit_bytes=4*GiB,free_reserve_bytes=2*GiB,input_policy=cfg['input_policy'],staging_engineering_cost=input_policy(cfg),purpose='Complete bare process+full-body hash/oracle auditing resource feasibility only; no warmup/sample selection/AB difference/confidence or old prefix.')
+    write(request,record);return dict(status='finite_request_pending_independent_admission',request_sha256=C.sha(request),compile=0,native=0,queue=0)

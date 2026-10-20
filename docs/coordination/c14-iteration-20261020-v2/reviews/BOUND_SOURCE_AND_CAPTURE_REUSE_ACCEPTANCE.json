@@ -1,0 +1,969 @@
+{
+  "schema": "independent-bound-source-and-capture-reuse-acceptance-v1",
+  "status": "passed_source_continuation_and_existing_record_reuse_only",
+  "reviewer": "phase_c_source_review",
+  "date": "2026-10-20 Asia/Shanghai",
+  "bound_source_and_existing_record_reuse_accepted": true,
+  "ready": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\final_formal_v1_preparation\\FINAL_FORMAL_BOUND_SOURCE_READY.json",
+    "identity": {
+      "bytes": 11243,
+      "sha256": "7dc0d66c13b2282570da9b8d9032bdb2cc68d0944c1a7729173cd0a5fb9e8e35"
+    }
+  },
+  "prior_source_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_FORMAL_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 12919,
+      "sha256": "46692a1bdb54d8a069d59510e042dcc56e562eb5f7841b81ed6210106eea99f0"
+    }
+  },
+  "capture_index": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/CAPTURE_REUSE_INDEX_DRAFT.json",
+    "identity": {
+      "bytes": 47491,
+      "sha256": "67aeb7207f4145e3869409e0d9fa344c099101a2b024d67c75080eb35c59b2da"
+    }
+  },
+  "record_reuse_audit": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RECORD_REUSE_AUDIT.json",
+    "identity": {
+      "bytes": 40768,
+      "sha256": "1e069d2cc17db68b743942509684965b0ee9854a453b7e5c2d0c4d6981f212c3"
+    }
+  },
+  "bound_executor": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "identity": {
+      "bytes": 118612,
+      "sha256": "6c3319cb3502ce380d3ddd022be33de9da79483ea7ecbd911695fc215b4964c8"
+    }
+  },
+  "patch": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/FINAL_FORMAL_CAPTURE_BINDING.patch",
+    "identity": {
+      "bytes": 49619,
+      "sha256": "f5fae092fcf2d122fd90d076a356b0efa60c7b4d0e63c36aab3864e1c79c98f9"
+    }
+  },
+  "source_checks": {
+    "actual_files": 11,
+    "other_files_identical": 10,
+    "assignment_exterior_byte_identical": true,
+    "only_semantic_STAGE_field_changed": "fixed_input_captures",
+    "embedded_capture_index_exact": true,
+    "remaining_STAGE_fields_equal": true,
+    "all_functions_rules_unchanged": true,
+    "authoring_preserved": true
+  },
+  "reuse_checks": {
+    "records": 12,
+    "current_C14_combo_records": 4,
+    "unchanged_competitor_records": 8,
+    "members_stat_checked": 240,
+    "small_metadata_actual_SHA_checked": 168,
+    "actual_receipts_checked": 48,
+    "original_manifest_pins_closed": true,
+    "profile_binary_path_mode_environment_argv_actions_order_caps_checked": true,
+    "sealed_wire_and_complete_truth_IDs_closed": true,
+    "large_body_binary_SHA_scope": "Retained actual validation-owned RECORD_REUSE_AUDIT and original manifest identities; no reviewer body or binary rehash or semantic reexecution."
+  },
+  "records": [
+    {
+      "mode": "normal",
+      "role": "old_xoffset",
+      "prefix": "/root/xoffset-receive-completion/20261019/v1/functional-normal-v2/commands/xoffset-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "225856",
+          "sha256": "7ff88829110ceea397bd9baded724bc1438e6645e3b39a6b67934873de1a11d3"
+        },
+        "path": "/root/xoffset-receive-completion/20261019/v1/bench-normal-v2/bin/sc_xoffset"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "61507",
+          "sha256": "f8b11b42cdc0daf3c730b64eb2d0c40d868ab4f6886e6f2cf3747af7561ab9e0"
+        },
+        "path": "/root/xoffset-receive-completion/20261019/v1/functional-normal-v2/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-normal-v2\\commands\\xoffset-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 766,
+              "sha256": "b736f98829eed13fada179c483addbf677736af3e9b4d05f00e5196e68d8441c"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.064807462
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-normal-v2\\commands\\xoffset-M-validate.receipt.json",
+            "identity": {
+              "bytes": 871,
+              "sha256": "a54331da1057b8acf804fb5ecad565156b02c9268d45cdf797012439dba96c58"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.666332762
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-normal-v2\\commands\\xoffset-M-run.receipt.json",
+            "identity": {
+              "bytes": 1223,
+              "sha256": "0e9683336682b1b178b9457cdf84473ce4beacaab4cc4c1e7fd2634af4dd3bfa"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.365507339
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-normal-v2\\commands\\xoffset-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 761,
+              "sha256": "b1e44ba8ef50da9b9c159743eeb98283237694825bdf0f7a49020a4b16aa2383"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.065266464
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "normal",
+      "role": "new_xoffset",
+      "prefix": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-normal-v2/commands/xoffset-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "229352",
+          "sha256": "8b52729c014885a4f4df24dac1a8fc7d1e989e4c3903ea1792a4fde5795f57b8"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/bench-normal-v2/bin/sc_xoffset"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "61507",
+          "sha256": "35e91c7661c816eec584aba620c8ee2c0f340c004dec1b0b49f66d0c0ed20979"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-normal-v2/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-normal-v2\\commands\\xoffset-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 849,
+              "sha256": "9188d68c45dd6554e837ef274d54ab219dbae4f59f0a0f72b32d99254f80106a"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.065358369
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-normal-v2\\commands\\xoffset-M-validate.receipt.json",
+            "identity": {
+              "bytes": 981,
+              "sha256": "186aefbe2ddc57367d15846acc2c5bdc78c8d8a5bc5bf0d34980373ad858e925"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.77373755
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-normal-v2\\commands\\xoffset-M-run.receipt.json",
+            "identity": {
+              "bytes": 1414,
+              "sha256": "9ab6d62084f96f4b597d3081b1856eaa057b71c213d35ce5979071b42f5f43ec"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.372362306
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-normal-v2\\commands\\xoffset-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 844,
+              "sha256": "268ebcec6eb3d02ff9b5af8644f28ac0d1bd6d310058f5735ae83dd08d4f340f"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.066405941
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "normal",
+      "role": "cista",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/normal/cista/commands/cista-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "180456",
+          "sha256": "d5fc2c2c73e5a52d4ed37a2ab33ce1a7cb5e0026e7c3575a4800a63894ded46d"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_cista"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cista\\commands\\cista-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 774,
+              "sha256": "cc56f42fd502d51eb5ab264e59e922ba7b51a90c57ffafde34d2940d2a32697e"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.06574392
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cista\\commands\\cista-M-validate.receipt.json",
+            "identity": {
+              "bytes": 887,
+              "sha256": "22b9ec00be6352c9582ad8da107ef2ffb79ffe224b797a6e4cb5e0c00ced07d9"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.724373659
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cista\\commands\\cista-M-run.receipt.json",
+            "identity": {
+              "bytes": 1257,
+              "sha256": "65a90b1ea8901c6550530bc9e5998f9e49e57b71cc2fd5ed4ceea65eba881d51"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.370605129
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cista\\commands\\cista-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 769,
+              "sha256": "dc8253e22363366ad95bbc1bc4f229ef7dc94625641c121059208a6afe4c31dd"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.066719879
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "normal",
+      "role": "flatbuffers",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/normal/flatbuffers/commands/flatbuffers-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "150088",
+          "sha256": "105909a60974ad6aaf53ec0373d38a8f24da0f9a84b2bebd7bb1947b0f148ead"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_flatbuffers"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\flatbuffers\\commands\\flatbuffers-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 804,
+              "sha256": "a09b2d1c25e0d6a20aa77b85f4f102ed700faf8a899fc60f8d31e49b23d7ebe5"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.066582408
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\flatbuffers\\commands\\flatbuffers-M-validate.receipt.json",
+            "identity": {
+              "bytes": 923,
+              "sha256": "ca5fe9835452da3282e2a622a04db6225014d9abf959a913b0158b3375008de0"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.877124091
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\flatbuffers\\commands\\flatbuffers-M-run.receipt.json",
+            "identity": {
+              "bytes": 1329,
+              "sha256": "83cbbabe1c1a6b3881ee6f20e6b208e8f7609bdaf02f79f07f900c696d998c2e"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.47178487
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\flatbuffers\\commands\\flatbuffers-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 799,
+              "sha256": "909afb535157344e977602455b303a7540f602c2c1e18dc305d5dee40ea5359b"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.11790867
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "normal",
+      "role": "capnproto",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/normal/capnproto/commands/capnproto-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "556064",
+          "sha256": "8808a8c1abc52538c2bce7d01a7ad1074421d1c7224d5d0f19853df7512aff6b"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_capnproto"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\capnproto\\commands\\capnproto-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 794,
+              "sha256": "c654ef461a410ddbbd81aecd0687c2a692737082938b8402bf325fa8a9f7b267"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.066653786
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\capnproto\\commands\\capnproto-M-validate.receipt.json",
+            "identity": {
+              "bytes": 911,
+              "sha256": "8fe40549640193f0b58111802e2de90dbecba345bfee88321e1434a164ff9c83"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.925306324
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\capnproto\\commands\\capnproto-M-run.receipt.json",
+            "identity": {
+              "bytes": 1305,
+              "sha256": "d05f4f5aa88f1b33f8d28a2d9044089a7b3b4859f621b515aa31823c4fc1e738"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.520647743
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\capnproto\\commands\\capnproto-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 789,
+              "sha256": "ac44adc92448d0e97fca656bb2833e7bf0da9772253c02cc7e8df30d76396ef6"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.116306825
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "normal",
+      "role": "cereal",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/normal/cereal/commands/cereal-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "152784",
+          "sha256": "e169afb796486b46880ad0ccf7d66aa650e1aeb49056a907ea73bd63b20b5fcf"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_cereal"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cereal\\commands\\cereal-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 779,
+              "sha256": "f5999a755a679682fdd1572b05ff5b94647ed315305629e1828e616172ae9b64"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.065382244
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cereal\\commands\\cereal-M-validate.receipt.json",
+            "identity": {
+              "bytes": 893,
+              "sha256": "d5fe8d9420f312fd0ce4d30ea7a1927c5d021246b1f6a15ab8d381c5a6989381"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.822858942
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cereal\\commands\\cereal-M-run.receipt.json",
+            "identity": {
+              "bytes": 1269,
+              "sha256": "139bb491828a15c306feadb331846de8d81ccff37f553e3a2d8ffba630cf76fd"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.368682685
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\normal\\cereal\\commands\\cereal-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 774,
+              "sha256": "4fa08dc591fe86ab7c340978c33921861c0df51362cdb5be910b7dda9626ef76"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.06553155
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "old_xoffset",
+      "prefix": "/root/xoffset-receive-completion/20261019/v1/functional-sanitized-v2/commands/xoffset-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "4553512",
+          "sha256": "c7df06774ea99a98fda818dc62451dc83e503766d9aa51838c90b31d41c35a54"
+        },
+        "path": "/root/xoffset-receive-completion/20261019/v1/bench-sanitized-v2/bin/sc_xoffset"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "61522",
+          "sha256": "0837343142241c30651d87358407616939dad1485334374dc8d3e7d144f7e67d"
+        },
+        "path": "/root/xoffset-receive-completion/20261019/v1/functional-sanitized-v2/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-sanitized-v2\\commands\\xoffset-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 918,
+              "sha256": "d045cbf30572a1ebcd9a31e1487082036bc75cb0e4ad1e635df963ef09ff248c"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.215060022
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-sanitized-v2\\commands\\xoffset-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1026,
+              "sha256": "7c28fe70e336ee916a7e0a4a5aca815352518605685a93fdb1697546a676961e"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.373612226
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-sanitized-v2\\commands\\xoffset-M-run.receipt.json",
+            "identity": {
+              "bytes": 1387,
+              "sha256": "83d2c84353f58f804103d56d218e197a55b52f60449f6bda480d341f1c0e3dc6"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.969012654
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-receive-completion\\20261019\\v1\\functional-sanitized-v2\\commands\\xoffset-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 913,
+              "sha256": "5251144f0420335ec3c0c2056fb8f1912d8423bfd5f57fb22104fb5b625cb7ef"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.266050578
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "new_xoffset",
+      "prefix": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-sanitized-v2/commands/xoffset-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "4571424",
+          "sha256": "9804af119c68eed4b2050df7accd3a661776e84928f8efa27686bb0cb67e8116"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/bench-sanitized-v2/bin/sc_xoffset"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "61525",
+          "sha256": "31f462e7de9579ca6e96acb86b45aa094f8cfacded16982cce983b07555df3f5"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/functional-sanitized-v2/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-sanitized-v2\\commands\\xoffset-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 1000,
+              "sha256": "c73857654370095e048859bda46d3d450d4c793bd0da7c70e6a2f2515e15c62e"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.216295792
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-sanitized-v2\\commands\\xoffset-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1135,
+              "sha256": "ef40d29ebe6a1627cad73b07772cb940d6f34febc72d6011d5603d06f6ca00e1"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.372384566
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-sanitized-v2\\commands\\xoffset-M-run.receipt.json",
+            "identity": {
+              "bytes": 1577,
+              "sha256": "1d1d1f32a3f15d1475e3cdb303859a00546258b98ca5bfde6db4fe776be3926b"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.917348933
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-c14-iteration\\20261020\\v2\\validation\\combined-business-v1\\functional-sanitized-v2\\commands\\xoffset-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 995,
+              "sha256": "400fab87958437ff9ad5d3548e4435154a1d62303aff520f3fc4a87b752ed3e4"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.266161991
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "cista",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/sanitized/cista/commands/cista-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "4038608",
+          "sha256": "66164e32ebb3378d415daed47e447af4813b4ef6868cef280a9014be73b78a07"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_cista"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cista\\commands\\cista-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 924,
+              "sha256": "081826cd5b76b1cdcb38a55dcfa8f1ab395bb163f095c2945bad6aae2fa7807d"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.367143204
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cista\\commands\\cista-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1040,
+              "sha256": "70038b13918172f0f1dfa3d3865c0ad1dd99536573bc249ab2d690a9d8273b49"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.825084847
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cista\\commands\\cista-M-run.receipt.json",
+            "identity": {
+              "bytes": 1419,
+              "sha256": "4a00d1b58dcab844f7ba501384214c2c86abee7606e6468e035b42a16568c8fa"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 1.368912054
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cista\\commands\\cista-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 919,
+              "sha256": "933f450260fbddf6eab39bee76fc4fbc672f7515173c90a03a9279a62ea76da6"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.316000488
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "flatbuffers",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/sanitized/flatbuffers/commands/flatbuffers-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "3864472",
+          "sha256": "74f87620fb887d89244eed387b2fd44ab93a01e984dd38aeb49d17988ea6ea9e"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_flatbuffers"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\flatbuffers\\commands\\flatbuffers-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 954,
+              "sha256": "ec0994f74bc57d11fbe0e9d8aac73faac21e622a5762375e937cea6cf4b986fe"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.215419834
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\flatbuffers\\commands\\flatbuffers-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1076,
+              "sha256": "73bdd51787885230ad18f186492e4574fa6f2aed184890726bcfc4c49fcbac8b"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.72263493
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\flatbuffers\\commands\\flatbuffers-M-run.receipt.json",
+            "identity": {
+              "bytes": 1491,
+              "sha256": "54db628b1c86a83c4303b86353d61fa3c93d8da4d51e7bfac8bc65aa0594c625"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.96688598
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\flatbuffers\\commands\\flatbuffers-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 949,
+              "sha256": "bfd255c7eca531a9fd25a14fb9bc559f503603a51c5775d12f0f75c44607cdec"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.315287542
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "capnproto",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/sanitized/capnproto/commands/capnproto-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "7660176",
+          "sha256": "b8a9d9c9bc5f5e47204f9e497227ff0dc125a5638a882b609f03b10af086b278"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_capnproto"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\capnproto\\commands\\capnproto-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 944,
+              "sha256": "a23d5bf46a2a23c1c8346d4b734eb96a5023862b27e098c919702ca308403674"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.215040155
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\capnproto\\commands\\capnproto-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1064,
+              "sha256": "79c60c257b9485152064e29c45852524e3e30fce57644d762f006dd75f6059d9"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.670556413
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\capnproto\\commands\\capnproto-M-run.receipt.json",
+            "identity": {
+              "bytes": 1467,
+              "sha256": "9a96fba60669e4673436a8f9fffb95f95b4bee40a8f9e55946ee2f792e8a5647"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 1.1173347
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\capnproto\\commands\\capnproto-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 939,
+              "sha256": "44a647feff15d8a7e61de1e068a8d5e396c766176f18b2e1633deca81a558f8b"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.365671018
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    },
+    {
+      "mode": "sanitized",
+      "role": "cereal",
+      "prefix": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/sanitized/cereal/commands/cereal-M",
+      "binary_metadata": {
+        "identity": {
+          "bytes": "3977688",
+          "sha256": "98cce9e5a56884c34c0fb36449e26f74ac290bf319429f0e094d8dc06aa52857"
+        },
+        "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_cereal"
+      },
+      "original_manifest": {
+        "identity": {
+          "bytes": "58043",
+          "sha256": "523edc11f7a85d4b64bcc46e8bf89e98875bfcb870ca18cdbcfa4643a8daa7f4"
+        },
+        "path": "/root/xoffset-four-paths/20261018/v1/fixed-input-captures-v1/manifest.json"
+      },
+      "members": 20,
+      "actual_sizes_and_original_manifest_IDs_match": true,
+      "small_metadata_hashes": 14,
+      "actions": [
+        {
+          "action": "inspect-input",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cereal\\commands\\cereal-M-inspect-input.receipt.json",
+            "identity": {
+              "bytes": 929,
+              "sha256": "5cdf51a4f74c98e40dcef4c996cfef4775051807311c255a7bcfb393f7898014"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.215198898
+        },
+        {
+          "action": "validate",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cereal\\commands\\cereal-M-validate.receipt.json",
+            "identity": {
+              "bytes": 1046,
+              "sha256": "f1ab024dc55a2cc72040adf08fbd799f696ac10c5cea2e4507e810ad96b3722c"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 2.258182435
+        },
+        {
+          "action": "run",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cereal\\commands\\cereal-M-run.receipt.json",
+            "identity": {
+              "bytes": 1431,
+              "sha256": "5689b5899cd16067eca47646b9743301e1af34df08d6f7bb4e1babb728a8a65b"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.92939734
+        },
+        {
+          "action": "inspect-final",
+          "receipt": {
+            "path": "\\\\wsl.localhost\\Ubuntu-22.04\\root\\xoffset-four-paths\\20261018\\v1\\fixed-input-captures-v1\\sanitized\\cereal\\commands\\cereal-M-inspect-final.receipt.json",
+            "identity": {
+              "bytes": 924,
+              "sha256": "9059e66d68bbd7898d45157075f1a909d1c76c4d0e471e936171660630c64987"
+            }
+          },
+          "cap_seconds": 60,
+          "whole_process_seconds": 0.21825906
+        }
+      ],
+      "stage9_native_digest_metadata_match": true
+    }
+  ],
+  "new_capture_runs": 0,
+  "new_project_Python": 0,
+  "new_compiler": 0,
+  "new_native": 0,
+  "new_queue": 0,
+  "new_probe": 0,
+  "large_body_binary_hashes": 0,
+  "new_maxC_maxP_admitted": false,
+  "finite_resource_draft_reviewed": false,
+  "execution_freeze_accepted": false,
+  "QF_admitted": false,
+  "Q_passed": false,
+  "F_passed": false,
+  "performance_goal_complete": false,
+  "limits": [
+    "Existing complete record reuse and source continuation only; actual current host/runtime/resource/power/quiet/lease admission remains separate.",
+    "Original capture receipts allow up to60seconds and are not future20second Q/F children or registered conditioner/primary maxC/maxP evidence.",
+    "No eight-phase native total is promoted to whole-process max or performance result.",
+    "No large body was hashed or full audit rerun; body semantic/SHA evidence is retained only under the actual pinned validation audit/index/manifest chain."
+  ]
+}

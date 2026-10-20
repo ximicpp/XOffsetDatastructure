@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "status": "ready_after_REVIEW_R1_source_gate",
+  "candidate": "r1-canonical-hotcold-v1",
+  "candidate_main_sha256": "b4c61b2d286d6d4ffdfbd44af3ff7151b1640dd07f8b9a2c9bfcfa01a6a9c23f",
+  "candidate_patch_sha256": "0bfbad574e9d9d5bdd6e326b5ac3a495812f9042b74d40a957b3c3faf44b67ad",
+  "independent_C14_derivative": true,
+  "M1_combined": false,
+  "M1_REQUESTS_overwritten": false,
+  "executor": "validation-thread only under the existing actual global shared lease",
+  "scope": "one new original-driver bare O3 DNDEBUG assembly compile; no native, tests or timing admitted",
+  "reference_control": {
+    "path": "/root/xoffset-c14-iteration/20261019/v1/validation/m1-v2/codegen/control-driver.s",
+    "bytes": 1779270,
+    "sha256": "110bc1bc494a1d731c563660d5760a630d5bb0da39531eb6e43e83bd04479640"
+  },
+  "reference_binding": "Reuse the already verified identical C14 control/driver/vendor/compiler/profile assembly; verify its recorded SHA before comparison, do not rebuild it.",
+  "source_review": "core/REVIEW_R1.md must find no blocker before the compile",
+  "prepare_output_directory": "/root/xoffset-c14-iteration/20261019/v1/validation/r1-v1/codegen",
+  "jobs": [
+    {
+      "id": "R1-STAGE-v1",
+      "deadline_seconds": 60,
+      "compile_budget": 0,
+      "native_budget": 0,
+      "argv": [
+        "python3",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/core/stage_m1.py",
+        "--candidate",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261019-v1/candidates/r1-canonical-hotcold-v1",
+        "--out",
+        "/root/xoffset-c14-iteration/20261019/v1/core/r1-canonical-hotcold-v1"
+      ]
+    },
+    {
+      "id": "R1-CODEGEN-v1",
+      "depends_on": [
+        "R1-STAGE-v1",
+        "source review passed"
+      ],
+      "deadline_seconds": 240,
+      "compile_budget": 1,
+      "native_budget": 0,
+      "argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+        "-std=gnu++26",
+        "-freflection",
+        "-fexpansion-statements",
+        "-stdlib=libc++",
+        "-pthread",
+        "-O3",
+        "-DNDEBUG",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/typelayout/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/config/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/container_hash/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/core/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/intrusive/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/predef/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/static_assert/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/throw_exception/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/type_traits/include",
+        "-I/root/xoffset-receive-completion/20261019/v1/final-v4/source/external/boost/libs/winapi/include",
+        "-I/root/xoffset-c14-iteration/20261019/v1/core/r1-canonical-hotcold-v1/source",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison",
+        "-I/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/include",
+        "-DSC_ADAPTER_HEADER=\"adapters/xoffset/adapter.hpp\"",
+        "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
+        "-S",
+        "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/handoff/continuation-20261019-v1/experiments/serialization_comparison/driver.cpp",
+        "-o",
+        "/root/xoffset-c14-iteration/20261019/v1/validation/r1-v1/codegen/candidate-driver.s"
+      ],
+      "expected": [
+        "/root/xoffset-c14-iteration/20261019/v1/validation/r1-v1/codegen/candidate-driver.s",
+        "compile argv/exit/log/compiler/source/profile identities"
+      ],
+      "gate": "Actual query_view must inline the acquire count load/zero branch and avoid entering canonical cold prologue on inactive path, with no hoisting across public calls. Active cold body and callbacks must remain semantically intact. If no actual call/prologue savings: reject R1 without timing."
+    }
+  ],
+  "observed_control": {
+    "assembly_sha256": "110bc1bc494a1d731c563660d5760a630d5bb0da39531eb6e43e83bd04479640",
+    "canonical_definition_1based": 19278,
+    "pre_load_pushes": 5,
+    "count_load_1based": 19299,
+    "zero_branch_1based": 19301,
+    "query_view_start_1based": 46902,
+    "query_call_examples_1based": [
+      47036,
+      47057,
+      47069,
+      47136
+    ]
+  },
+  "input_bindings": {
+    "build/c14-iteration-20261019-v1/candidates/r1-canonical-hotcold-v1/IDENTITY.json": {
+      "bytes": 44342,
+      "sha256": "52570679ffd1a479bdf39d3854c8424aa8b29a51e67339d2f93e6fd3c6072948"
+    },
+    "build/c14-iteration-20261019-v1/candidates/r1-canonical-hotcold-v1/R1.patch": {
+      "bytes": 1415,
+      "sha256": "0bfbad574e9d9d5bdd6e326b5ac3a495812f9042b74d40a957b3c3faf44b67ad"
+    },
+    "tools/c14_iteration_20261019/core/stage_m1.py": {
+      "bytes": 1324,
+      "sha256": "5985045b23856b4caa468eb3569ba440df3bf32f2cfa31dee89db2e32f030e3c"
+    },
+    "tools/c14_iteration_20261019/core/prepare_r1.py": {
+      "bytes": 3734,
+      "sha256": "7a6b68e67a1f62a2061f6758241932b3ceb04d76f9720b4f3bbe4e650380cacd"
+    },
+    "tools/c14_iteration_20261019/core/write_r1_requests.py": {
+      "bytes": 4371,
+      "sha256": "d14edd05b73624b150a6876a4e751f5fe673ac9ce4b88fc40ebf32b8b3d9b2a3"
+    },
+    "docs/coordination/c14-iteration-20261019-v1/validation/M1_CODEGEN_RESULT.json": {
+      "bytes": 83091,
+      "sha256": "e8f11983db49f3bcb170e4bf19cfdc7e97ff748f5c3b3d474b3f6c5108d561c2"
+    }
+  },
+  "following_requests": "Only after mechanism admission: targeted canonical-zero/cold-no-callback/registry/owner normal+SAN, one fixed-M control/candidate original trajectory with actual active/inactive hit accounting, then complete applicable business/V1 gates and separately frozen screen. None authorized by this codegen request."
+}

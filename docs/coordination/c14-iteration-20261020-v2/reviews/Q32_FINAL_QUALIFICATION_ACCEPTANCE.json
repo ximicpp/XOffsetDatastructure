@@ -1,0 +1,45 @@
+{
+  "schema": "q32-root-final-qualification-acceptance-v1",
+  "status": "passed",
+  "accepted_at": "2026-10-19T22:10:29.478617+00:00",
+  "qualification_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-acceptance.json",
+    "identity": {
+      "bytes": "2827",
+      "sha256": "4aa3c2ce7eb3e1566e5eaee5fdfe5a664a26661f2f7d71a057f20e93e49e5fd1"
+    }
+  },
+  "statistics": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_STATISTICAL_RESULT_ACCEPTANCE.json",
+    "identity": {
+      "bytes": "58112",
+      "sha256": "a1888a505958d30d04715dce2be68ce07fd97bac398b1367cb4d58233216146f"
+    }
+  },
+  "engineering": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_ENGINEERING_RESULT_ACCEPTANCE.json",
+    "identity": {
+      "bytes": "12727",
+      "sha256": "074d4ef38faa968b7d1151f5cda9b8ad068afb5ed33b553d368c252c95f98b19"
+    }
+  },
+  "actual_index": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_ACTUAL_RESULT_INDEX_v1.json",
+    "identity": {
+      "bytes": "26704",
+      "sha256": "4be7e7096e11adbfe51bea998570f3352431d405a26f2e94f039b32b7dafa06f"
+    }
+  },
+  "actual_children": 4656,
+  "primary_children": 2328,
+  "inference_children": 2304,
+  "A_A_required": 30,
+  "A_A_passed": 30,
+  "timing_seconds": 2308.301671385,
+  "offline_audit_seconds": 581.5375681529999,
+  "all_budgets_passed": true,
+  "F64_timing_admitted": false,
+  "candidate_integrated": false,
+  "performance_goal_complete": false,
+  "activity": "Read actual small metadata, pinned two independent results and original audit/queue identities; no native, compiler, new audit, freeze, lease or host action."
+}

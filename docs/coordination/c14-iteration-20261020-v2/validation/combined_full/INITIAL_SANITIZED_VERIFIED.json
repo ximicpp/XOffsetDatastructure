@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "stage": "sanitized",
+  "actual_receipt": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized/receipt.json",
+    "identity": {
+      "bytes": 63620,
+      "sha256": "4ee804a4ff79262c425152f15c57a5ed78c159165a4e54d794a3792335f16abe"
+    }
+  },
+  "queue": {
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized-lease/request.json",
+      "identity": {
+        "bytes": 1601,
+        "sha256": "f09f4c100051e5f7420ce938d14860f46b5add8a38eabf6bbf5ed9f77f7a6efa"
+      }
+    },
+    "result": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-full-v1-sanitized-lease/result.json",
+      "identity": {
+        "bytes": 450,
+        "sha256": "1675bc23d5477bcc869b3a339cf8436908fa3f1289439edec48bbe50aef93aa5"
+      }
+    },
+    "run_id": "b4b6d4917e8b4fcbbbf7dfb52ca27eab"
+  },
+  "source154_before_after_unchanged": true,
+  "copied_provider_verified": true,
+  "compiler_launcher": {
+    "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+    "identity": {
+      "bytes": 61,
+      "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+    }
+  },
+  "initial_binding": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/INITIAL_EXECUTION_BINDING.json",
+    "identity": {
+      "bytes": 553292,
+      "sha256": "2c48b0b2a2a950add9dc6efcec04c2f75f2a30be2de49cbf527954d9fa9a3102"
+    }
+  },
+  "counts": {
+    "full_tests": 73,
+    "separate_configure_probes": 3
+  },
+  "performance_samples": 0,
+  "six_repository_targeted_coverage_separately_required": true,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

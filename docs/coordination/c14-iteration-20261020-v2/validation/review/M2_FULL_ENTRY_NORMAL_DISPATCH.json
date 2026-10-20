@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W1",
+    "--kind",
+    "validation",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/m2-full-v1-normal-lease",
+    "--timeout-seconds",
+    "2400",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/m2_full_job.py",
+    "worker",
+    "normal",
+    "--admission-sha",
+    "2bb94bb7f700c597fc617c3196c1248c97eb189993c4a2a44df641b79d145562"
+  ],
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_FULL_ENTRY_NORMAL_ADMISSION.json",
+    "identity": {
+      "bytes": 589364,
+      "sha256": "2bb94bb7f700c597fc617c3196c1248c97eb189993c4a2a44df641b79d145562"
+    }
+  }
+}

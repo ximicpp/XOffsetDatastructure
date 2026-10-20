@@ -1,0 +1,6 @@
+{
+  "observed_utc": "2026-10-19T17:18:23.062387Z",
+  "backing_free_bytes": 64102121472,
+  "backing_drive": "C",
+  "wsl_distribution": "Ubuntu-22.04"
+}

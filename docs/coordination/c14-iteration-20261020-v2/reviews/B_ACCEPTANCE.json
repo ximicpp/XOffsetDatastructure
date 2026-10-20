@@ -1,0 +1,20 @@
+{
+  "schema":"c14-v2-stage-B-independent-acceptance-v1",
+  "status":"passed_targeted_scope_only",
+  "result":"../validation/R1_NATIVE_RESULT.json",
+  "result_sha256":"c451e37927763432cc94265bf1a95edf5c7063d724b6cd8413d14ba1d6351ee8",
+  "request_sha256":"edcf2fb2d29f5d5249d8d1ebc2d7727bafcd2d44a503ff1bacd839018edf7d4a",
+  "native_receipt_sha256":"4f7db65752ab788b0f136ddbb4d74418c0260766ce3625d98e0f276038317bed",
+  "source154_before_and_after_match_exact_request":true,
+  "actual_compiles":10,
+  "actual_native_executions":10,
+  "normal_programs_passed":5,
+  "SAN_programs_passed":5,
+  "global_lease_run_id":"2b4b08cad8e54c4e9fd124d7abb5f855",
+  "command_elapsed_seconds":35.556955634999994,
+  "cleanup":{"live":[],"process_groups":[],"zombies":[]},
+  "hot_cold_coverage_note":"Repeated handoff check alone does not prove warm TLS; existing controlled canonical programs supply cold/hot coverage. The final request corrected wording before execution.",
+  "diagnostic_or_screen_admitted":false,
+  "later_identified_binding_limit":"The prior request did not separately pin the outer61-byte clang++-libcxx forwarding launcher before/after execution. Source154, checked compiler/runtime files, actual commands, binary/native and cleanup evidence remain within their recorded scope; complete transitive launcher binding is not claimed. Future builds must bind it; no retrospective rewrite or metadata-only rerun.",
+  "performance_claim":"none"
+}

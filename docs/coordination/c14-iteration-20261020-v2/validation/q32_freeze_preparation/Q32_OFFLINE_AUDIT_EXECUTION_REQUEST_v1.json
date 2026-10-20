@@ -1,0 +1,113 @@
+{
+  "F64_admitted": false,
+  "actual_pause_coverage": {
+    "identity": {
+      "bytes": 705,
+      "sha256": "ad99e0523b038b710da6397e20fc4ca6eb05e722606e4ad4c494c06c79cb2b93"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/TIMING_PAUSE_COVERAGE.json"
+  },
+  "actual_power_completed": {
+    "identity": {
+      "bytes": 247,
+      "sha256": "54576360c235c58ab53652fc61f3d44582f28cbfa9e3c627ec53139eedb61802"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/power-qualification-v1/completed.json"
+  },
+  "actual_queue_manifest": {
+    "identity": {
+      "bytes": 913,
+      "sha256": "a5ddc3ffcefc8ff481d1c2094aa22cf73bc67377739663f2675029ae22f436a8"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/manifest.json"
+  },
+  "actual_run_manifest": {
+    "identity": {
+      "bytes": 4849967,
+      "sha256": "bc110e793dd37d4da1cf32f83a56e7c590f75b68b12db0bb85745298bbd0c3ca"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/manifest.json"
+  },
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "functional",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-offline-audit-v1",
+    "--timeout-seconds",
+    "3600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "audit",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1",
+    "--frozen-sha256",
+    "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+    "--postrun-pin",
+    "b3db8adafebb4079f65f7557e00917ac108a71184dfcb93ed7bfc2df992449ce",
+    "--report",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json"
+  ],
+  "capture": 0,
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/validation/final_formal_bound_v1/six-role-campaign.py",
+    "audit",
+    "--campaign",
+    "qualification",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1",
+    "--frozen-sha256",
+    "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+    "--postrun-pin",
+    "b3db8adafebb4079f65f7557e00917ac108a71184dfcb93ed7bfc2df992449ce",
+    "--report",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json"
+  ],
+  "compile": 0,
+  "conditional_admission": {
+    "identity": {
+      "bytes": 4911,
+      "sha256": "a20b7e1bc004e955ec940cc5c3c5d55f1e4dd31c1fcbe3d53579df5cb2a8d2b4"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_FINAL_EXECUTION_ADMISSION_v1.json"
+  },
+  "cwd": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1",
+  "native_benchmark_children": 0,
+  "original_queue_audits": {
+    "identity": {
+      "bytes": 1085,
+      "sha256": "3d3ea2e9401a3a3b66c6b68f4731ac638c69d2f0bff6e9f32fd29452f45841c9"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_PRELUDE_AND_TIMING_ORIGINAL_QUEUE_AUDITS_v1.json"
+  },
+  "postrun_pin": "b3db8adafebb4079f65f7557e00917ac108a71184dfcb93ed7bfc2df992449ce",
+  "restored": {
+    "identity": {
+      "bytes": 1624,
+      "sha256": "a77415a147427e36069b061b922bb65986205c8fa6c83fcf38840afa5832b39c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/qualification-controller-v1/RESTORED.json"
+  },
+  "retry": 0,
+  "status": "conditional_admission_actual_restore_and_sealed_queue_prerequisites_satisfied",
+  "timing_result": {
+    "identity": {
+      "bytes": 442,
+      "sha256": "5a3c972974f39764903b06790f01aee9962c777467eb6f1756f729660d21d1ad"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/result.json"
+  }
+}

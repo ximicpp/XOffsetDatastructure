@@ -1,0 +1,71 @@
+{
+  "kind": "v2-screen-host-scope-acceptance",
+  "status": "passed",
+  "observed_at": "2026-10-20T02:14:05+08:00",
+  "scope": "R1 finite internal screen host preparation only; final same-freeze HOST_REVIEW and factual quiet still required before any pause/window",
+  "human_authorization": {
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/standing-process-pause-human-authorization-v1.json",
+    "identity": {
+      "bytes": 1532,
+      "sha256": "b97fa5871d35687119f41ddb576386dd4f4210f08aa9cd0068ff50ba78203b92"
+    }
+  },
+  "original_record": {
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/process-pause-authorization-v1.json",
+    "identity": {
+      "bytes": 775,
+      "sha256": "504243b5cdcf609ad3e5bd70b4bbd0893279b17b3085bb28240efc8d554fc8c0"
+    }
+  },
+  "root_read_original_question_answer": true,
+  "interpretation": "The retained actual question asks temporary pause of the two named programs during measurement followed by restoration; user answer permits pause/restore. Earlier cursor-only performance label was root-added. Existing human permission persists for this finite measurement; no new human reply claimed and no other task message expands it.",
+  "authorized_names": [
+    "client_ue4-Win64-Shipping",
+    "TGitCache"
+  ],
+  "not_authorized": [
+    "termination/restart",
+    "unrelated programs",
+    "power changes"
+  ],
+  "fresh_readonly_host": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/HOST_OBSERVATION.json",
+    "identity": {
+      "bytes": 2552,
+      "sha256": "a280484d11f01ab94f1b11f8202403918ecc759f7ba4756e7c3658dfd13fc267"
+    }
+  },
+  "prereview_plan": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/pre-review-process-plan-v1.json",
+    "identity": {
+      "bytes": 1522,
+      "sha256": "e8cc71259f69690c1af6715390de139b0c73315b2a549010763412d7601d1a95"
+    }
+  },
+  "source_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/R1_HOST_PRELUDE_REVIEW.md",
+    "identity": {
+      "bytes": 4661,
+      "sha256": "5376dee85d404f8000f36db3f6b06c13014db9d1f80bd5997343015cbdf0eca9"
+    }
+  },
+  "derivation": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/WATCHDOG_DERIVATION.json",
+    "identity": {
+      "bytes": 3801,
+      "sha256": "e95ce2af597270decf4573930f0790eecfea904f2938c682fe7b3cde6c5a5ca3"
+    }
+  },
+  "power_guid_unchanged": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "watchdog_seconds": 780,
+  "conditions": [
+    "Preregistered2 names only; new actual plan and creation/image/SID identity with fresh held process handles/token immediately before pause.",
+    "Do not reuse prereview PIDs or old pause state/guard proof.",
+    "Standalone Windows bounded watchdog and finally restoration; early restoration invalidates coverage.",
+    "No other controlled compile/heavy work during timing. Actual factual quiet and same frozen host tools are mandatory.",
+    "Restore before independent audit; root checks actual full timing coverage and actual no-residual process state afterward."
+  ],
+  "pause_or_guard_started_by_root": false,
+  "screen_admitted": false,
+  "QF_admitted": false
+}

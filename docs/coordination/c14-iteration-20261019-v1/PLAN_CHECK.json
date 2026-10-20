@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "baseline_members_verified": 154,
+  "baseline_unchanged": true,
+  "task_count": 12,
+  "task_DAG_valid": true,
+  "S0_accepted": true,
+  "current_stage": "S1",
+  "plan_blocking_findings": 0,
+  "native_or_performance_claim": "none_from_this_plan_review",
+  "files": {
+    "PLAN.md": {
+      "bytes": 10320,
+      "sha256": "b4f9fbeda402ac9f0248483e684a93722134350461c07c348552200f29e89b0d"
+    },
+    "TASKS.json": {
+      "bytes": 4150,
+      "sha256": "b7624fca4b0edfad1c23df5bf31a39274e35a912baf5a604aa1ba958137ae6d6"
+    },
+    "STATE.json": {
+      "bytes": 1330,
+      "sha256": "6d502da42f85cb608520a8a90be4e17f553cd24b5c8053adaf1dc3a9677c3510"
+    },
+    "VALIDATION_MATRIX.md": {
+      "bytes": 19273,
+      "sha256": "6ff2b866d8c0084f1c3e5e15cc1debd6437e3850c470f10c0adf153f11c6ac6a"
+    },
+    "REVIEW.md": {
+      "bytes": 2172,
+      "sha256": "f0642fecffc5206726fa77dadc59c213ffad946c261b1d1c4a30262fa1fa2fc2"
+    },
+    "validation/S0_RESULT.json": {
+      "bytes": 85631,
+      "sha256": "f3cf2929a7a4d3fb0244b43b17204f6a3b4d82205a13728b4b5e6d6dfd15de33"
+    }
+  }
+}

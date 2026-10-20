@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "ready": {
+    "bytes": 366,
+    "sha256": "74a720269733b0ff1d2efd9979101898146c658ecc60fc09657175af26c10448"
+  },
+  "completed": {
+    "bytes": 248,
+    "sha256": "69e4857b298c2d46caeb4668dcd717ded12c499a1a9bafd00899b4b5a98dee85"
+  },
+  "helper": {
+    "bytes": 3617,
+    "sha256": "db9691fe2a6b21dfdf9be6b985f549e551638ac14d19575f41baba7ffff290a9"
+  },
+  "module": {
+    "bytes": 5008,
+    "sha256": "c907215b74800e552c153ac1bd072ace0c5b3d45e86ca54ecf98701d4ac02e09"
+  },
+  "native_benchmark_executions": 0,
+  "publication": "Complete JSON closed before same-directory atomic new-path Move; no overwrite",
+  "previous_capability": {
+    "bytes": 710,
+    "sha256": "5b209d4e16f389d118319819f09d8f5d484d3419e21a56d69e6d26058d6753ce"
+  },
+  "v1_restore_verified": true
+}

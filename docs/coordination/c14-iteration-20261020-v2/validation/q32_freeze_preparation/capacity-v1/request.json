@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure\u5f00\u53d1\\tools\\c14_iteration_20261020_v2\\validation\\q32_registration_v1\\observe-backing.ps1",
+    "-Out",
+    "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure\u5f00\u53d1\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\q32_freeze_preparation\\capacity-v1\\windows.json"
+  ],
+  "created_at": "2026-10-19T20:52:48.638063+00:00",
+  "helper": {
+    "bytes": "2570",
+    "sha256": "92e71fa94567ecb2c70063604df2fa343cfc6b92dd0db4e19aecd838d9200ceb"
+  }
+}

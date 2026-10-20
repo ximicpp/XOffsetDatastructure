@@ -1,0 +1,291 @@
+{
+  "status": "passed",
+  "returncode": 0,
+  "result": {
+    "Cxx_compiles": 0,
+    "actual_python_dummy_children": 18,
+    "business_native_runs": 0,
+    "cases": [
+      {
+        "body_files": 0,
+        "case": "normal",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 8990,
+          "sha256": "d25564531c97944a22944a7be1b65808aacc29d030861f79a052216ea6bb18d8"
+        },
+        "status": "complete"
+      },
+      {
+        "body_files": 0,
+        "case": "nonzero",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3903,
+          "sha256": "cc518bc88ac97505ed2d26e65a5456eb51771cdfc18d0ebe37eaf595968c711e"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "signal",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3878,
+          "sha256": "3f24ba99b568f7ed6466d49fa82717c77a34028718c13afe95dc38966b8192b4"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "no_event_hang",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.25,
+        "passed": true,
+        "receipt": {
+          "bytes": 4483,
+          "sha256": "9e658247b5cb4ea5e430a83eb13f6fef77bf36ac2067e90b6894f94b3aaaf080"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "event_hang",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.25,
+        "passed": true,
+        "receipt": {
+          "bytes": 5259,
+          "sha256": "f34acd3481309e733f9e15575c1d354d1835789afd774d2a480c9ef2b0d73744"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "partial_hang",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.25,
+        "passed": true,
+        "receipt": {
+          "bytes": 4820,
+          "sha256": "97fec66316b3cfbf3edc64c3d212420336a92c209f0d28b001799bd7ff2ce255"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "truncated",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3932,
+          "sha256": "b50aaaf34753891a4737d87d5349f2977f9bbddf1f0d237bc2989a60fa786077"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "epipe",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3747,
+          "sha256": "0e6e667a3499ce1b32c1aa3f4ef9a4f8ee1575fd9641e8cbb8657cde02c92a35"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "close_after_first",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 4066,
+          "sha256": "36bb29cf5b8a9e8b58fd97877e4196958a097e06d23932d01ea329a457414ba1"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "large_logs",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 4032,
+          "sha256": "cf1add33b5f925a2975a8cf3bc64dc740a72747cfde7d220c9697ea91f2b5533"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "log_limit",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 4782,
+          "sha256": "96d5883ee6bffc714419a8022d57286b9f63c4e90743726814df8757fd0f417c"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "sequence_gap",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3930,
+          "sha256": "e3eff1d77f6a0ef4665a72fac3a7b244c5100602f9ca3e6cf5304b5b89b9c417"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "event65",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 14951,
+          "sha256": "58962ccdc35606a7a753a2f22b33404b8ce30fc96d2784dfabea33ba3487e7d8"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "wakeups",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.12,
+        "passed": true,
+        "receipt": {
+          "bytes": 4455,
+          "sha256": "19a3faef89b441ebc2c6eb0f825da0ec713c54a39a3d90dde75833f87793ee0c"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "exec_failure",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 3588,
+          "sha256": "b7df36b66996c3a085b3c42c2506b6fc0d229a68f5b4c92f4867ee5ce92b327e"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "collector_error",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 4805,
+          "sha256": "1ca166cf6a3f3814802862ff0257c3e781f78049253a03ab27741de16b7163cd"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "echild",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 9215,
+          "sha256": "dc97d9fc7bc2555a0840c54cea10104989bbee5ad40b2ea96d332c0bda4c3b5d"
+        },
+        "status": "failed"
+      },
+      {
+        "body_files": 0,
+        "case": "descendant_fd",
+        "cleanup_remaining": [],
+        "log_cap_bytes": 1048576,
+        "native_child_cap_seconds": 0.75,
+        "passed": true,
+        "receipt": {
+          "bytes": 5365,
+          "sha256": "f0e3ae7ba4ef1f373f41995be56777af6114d3ec9be8e462320c97d25f046649"
+        },
+        "status": "failed"
+      }
+    ],
+    "event_pipe": "inherited O_NONBLOCK; parent persists while child runs",
+    "outer_cap_seconds": 30,
+    "planned_cases": 18,
+    "real_diagnostic_runs": 0,
+    "schema": "xoffset-diag-dummy-check-v1",
+    "single_reaper": "only wait4 successful reaping; injected ECHILD discards the sole real wait4 result and intentionally reports resources unavailable",
+    "status": "passed",
+    "timing_inference_samples": 0
+  },
+  "queue_result": {
+    "cleanup": {
+      "live": [],
+      "process_groups": [],
+      "zombies": []
+    },
+    "command_elapsed_seconds": 3.274149708,
+    "command_pid": 382,
+    "command_returncode": 0,
+    "finished_at": "2026-10-19T17:03:38.434058+00:00",
+    "kind": "validation",
+    "owner": "W3",
+    "reason": "command_exit",
+    "run_id": "b215fe32df91429dab96655855441860",
+    "schema_version": 1,
+    "started_at": "2026-10-19T17:03:35.156002+00:00",
+    "status": "complete"
+  },
+  "tools_after": {
+    "dummy_child.py": {
+      "bytes": 2224,
+      "sha256": "01cd1edb6379f9a3454855b5358d8596c7696848d2d9c5769575e375c102b2db"
+    },
+    "INTERFACE.json": {
+      "bytes": 2739,
+      "sha256": "737bc78401caf58d0fd7300f8e669f1b48eb30595798d67625188fa5c55a6a5b"
+    },
+    "dummy_selfcheck.py": {
+      "bytes": 4939,
+      "sha256": "3cf9209ae8276df44b777295b55f09031920b4d2803b33a19e3982f530427be5"
+    },
+    "diag_wrapper.py": {
+      "bytes": 23161,
+      "sha256": "d6a9746a80e53ff05416126d719c89d7a0924ed742db67c9ff029f87955ed5d2"
+    }
+  },
+  "real_diag_started": false,
+  "diagnostic_admitted": false
+}

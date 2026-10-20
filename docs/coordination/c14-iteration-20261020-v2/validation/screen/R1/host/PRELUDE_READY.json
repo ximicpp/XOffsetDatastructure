@@ -1,0 +1,35 @@
+{
+  "controller": {
+    "identity": {
+      "bytes": 10295,
+      "sha256": "a19950ed50850ebbcfa1ce8d1da00ac570fc89a1bdbef8f54f8896dea3630870"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/r1/execute.py"
+  },
+  "freeze_sha256": "c168eed40879c5339e91a390506eb6c32cce73fc47ea407ab7ae51cb6a437cf3",
+  "guard_ready": {
+    "identity": {
+      "bytes": 1359,
+      "sha256": "72cb41a731aeebd6e8530cdc7b9361e453289d3324fec6977212638f01a2c4d6"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/process-state-v1/ready.json"
+  },
+  "plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "8b84ea89cc6d67cd99c092d656be4bcf959eb3cffd6a2aa6cfeb408cbf4d5995"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/R1/host/process-plan-v1.json"
+  },
+  "power_before": {
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "ready_monotonic_ns": "7484830572",
+  "standalone_bounded_watchdog_seconds": 780,
+  "status": "passed"
+}

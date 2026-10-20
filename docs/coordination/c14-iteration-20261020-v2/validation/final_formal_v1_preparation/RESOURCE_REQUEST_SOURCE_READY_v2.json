@@ -1,0 +1,73 @@
+{
+  "status": "concrete_fixed12_source_request_ready_not_executed",
+  "request": {
+    "identity": {
+      "bytes": 33712,
+      "sha256": "73f04c9c2e6ced3c59fb864b6f2c21ea8ea68d856390bf177fc1d9251e7e02e8"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs\\coordination\\c14-iteration-20261020-v2\\validation\\final_formal_v1_preparation\\RESOURCE_EXECUTION_REQUEST_v2.json"
+  },
+  "worker": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_six_role_resource_worker_v1.py",
+    "identity": {
+      "bytes": 12049,
+      "sha256": "7ead3a2470411d4b8ce99e60c16437990c55e68951b9c8a261fb353983ef5384"
+    }
+  },
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "run",
+    "--owner",
+    "W3",
+    "--kind",
+    "functional",
+    "--out",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/final-six-role-resource-v1/queue",
+    "--timeout-seconds",
+    "600",
+    "--wait-seconds",
+    "0",
+    "--",
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/final_six_role_resource_worker_v1.py",
+    "--request",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RESOURCE_EXECUTION_REQUEST_v1.json",
+    "--request-sha256",
+    "73f04c9c2e6ced3c59fb864b6f2c21ea8ea68d856390bf177fc1d9251e7e02e8",
+    "--admission",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_SIX_ROLE_RESOURCE_EXECUTION_ADMISSION.json"
+  ],
+  "exact_admission_path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_SIX_ROLE_RESOURCE_EXECUTION_ADMISSION.json",
+  "compile": 0,
+  "native": 0,
+  "queue": 0,
+  "capture": 0,
+  "QF_admitted": false,
+  "budget": {
+    "children": 12,
+    "child_seconds": 20,
+    "outer_seconds": 600,
+    "nonchild_projection_seconds": 300,
+    "seal_seconds": 30
+  },
+  "note": "All action argv concrete; no invented original CLI flags. Run only after independent source/budget review and exact root admission including fresh host and bound-source acceptance refs.",
+  "bound_source_acceptance": {
+    "identity": {
+      "bytes": 41252,
+      "sha256": "b113e5b7ff1b432f4e307cbc243f460776604843675350148ee5ae32d142f918"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/BOUND_SOURCE_AND_CAPTURE_REUSE_ACCEPTANCE.json"
+  },
+  "supersedes_unexecuted_request": {
+    "identity": {
+      "bytes": 31706,
+      "sha256": "89de4706638869ac1ff6c4a1f5a527809a023ff1b30e3a01dd76e10b37dcf81e"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs\\coordination\\c14-iteration-20261020-v2\\validation\\final_formal_v1_preparation\\RESOURCE_EXECUTION_REQUEST_v1.json"
+  }
+}

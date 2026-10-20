@@ -1,0 +1,191 @@
+{
+  "QF_admitted": false,
+  "actions": {
+    "new_capture": 0,
+    "new_compile": 0,
+    "new_freeze": 0,
+    "new_native": 0,
+    "new_projectPython_execution": 0,
+    "new_queue": 0
+  },
+  "candidate": "r1-m2-combined-v1",
+  "capture_native_budget_requested": 0,
+  "capture_records_requested": 0,
+  "capture_reuse_audit": {
+    "identity": {
+      "bytes": "40768",
+      "sha256": "1e069d2cc17db68b743942509684965b0ee9854a453b7e5c2d0c4d6981f212c3"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/RECORD_REUSE_AUDIT.json"
+  },
+  "capture_reuse_index": {
+    "identity": {
+      "bytes": "47491",
+      "sha256": "67aeb7207f4145e3869409e0d9fa344c099101a2b024d67c75080eb35c59b2da"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1_preparation/CAPTURE_REUSE_INDEX_DRAFT.json"
+  },
+  "competitor_and_C14_combo_existing_records_reused": 12,
+  "kind": "final-formal-finite-preparation-request-draft",
+  "parent_final_formal_source_must_remain_unchanged_by_validator": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1",
+  "projection_fields": {
+    "F_allocated_cap_bytes": 8589934592,
+    "F_generated_wire_bytes": 157351335928,
+    "F_logical_retained_formula": "generated_wire+9264*(canonical+queries+65536)+actual_frozen_base+sum(tool_bytes)+metadata_reserve+pool_anchors; <=512GiB",
+    "F_metadata_reserve_bytes": 674234368,
+    "F_next_child_physical_peak_bytes": 909630704,
+    "F_primary_generated_wire_bytes": 78675667964,
+    "F_projection_seconds": null,
+    "F_required_formula": "772*S+300<=5400",
+    "H_F_seconds": 300,
+    "H_Q_seconds": 300,
+    "Q_allocated_cap_bytes": 4294967296,
+    "Q_generated_wire_bytes": 79083313912,
+    "Q_logical_retained_formula": "generated_wire+4656*(canonical+queries+65536)+actual_frozen_base+sum(tool_bytes)+metadata_reserve+pool_anchors; <=256GiB",
+    "Q_metadata_reserve_bytes": 372244480,
+    "Q_next_child_physical_peak_bytes": 607640816,
+    "Q_primary_generated_wire_bytes": 39541656956,
+    "Q_projection_seconds": null,
+    "Q_required_formula": "388*S+300<=2700",
+    "S_sum_maxC_plus_maxP_seconds": null,
+    "actual_frozen_base_allocated_bytes": null,
+    "actual_frozen_base_logical_bytes": null,
+    "actual_new_capture_allocated_bytes": 0,
+    "actual_preparation_failed_and_retained_allocated_bytes": null,
+    "canonical_plus_queries_bytes": 17845881,
+    "current_C_backing_free_bytes": null,
+    "current_guest_free_bytes": null,
+    "final_wire_bytes_by_role": {
+      "capnproto": 33623952,
+      "cereal": 9772151,
+      "cista": 12095936,
+      "flatbuffers": 10757704,
+      "new_xoffset": 17830872,
+      "old_xoffset": 17830872
+    },
+    "free_margin_each_bytes": 2147483648,
+    "maximum_file_limit_bytes": 33623952,
+    "no_final_resource_pass_claim": true,
+    "physical_accounting": "Fresh independent generation everychild; only after exit+fulltruth SHA,size,byteexact compare may wire/canonical/queries pool. Generated/logical sums do not shrink. Base+seven-slot physicalpeak+metadata reserve and bothvolumes2GiB margin required; do not assume all futurewirehashes equal currentcapture identities."
+  },
+  "remaining_prerequisites": [
+    "Parent actual combined finalfunctional/consumer/runtime/lifecycle independent acceptance and finalsource/profile closed IDs.",
+    "Parent source owner independently reviews exact index and binds fixed_input_captures in newfinal_formal source; validator does not edit that directory.",
+    "Minimal fixed12 resource worker/request must be concretely authored and independently pinned/admitted,or exact same C/P historical proof acceptedbeforebudgetfixing.",
+    "Fresh actual profile/runtime/provider/input/tool/binary beforeafter,current power/quiet/resource and globallease admission; nohostpauseorpolicychange authorizedhere.",
+    "Actual complete-process maxC/maxP and coordinator audit/ledgerwall plus allocated/logical/generated/peak/free evidence must populate projection;Q32/F64 still independently frozen/admitted."
+  ],
+  "resource_only_proposal": {
+    "actual_worker_argv": null,
+    "actual_worker_path": null,
+    "captures": 0,
+    "child_seconds": 20,
+    "compile": 0,
+    "fixed_order": "For each role in original role order:conditioning thenprimary. No additional warmup,selection,retry or statistical inference.",
+    "historical_maxima_scope": "Old fourcompetitor C/P maxima can only be reused after explicit complete samebinary/runtime/input/envelope/currenthost conditions are accepted before final request. Current equality of rolebinary alone does not establish that bridge; default proposal remains12,not data-dependent reduction.",
+    "lease_kind_proposed": "functional",
+    "lease_owner_proposed": "W3",
+    "maxC_seconds_by_role": {
+      "capnproto": null,
+      "cereal": null,
+      "cista": null,
+      "flatbuffers": null,
+      "new_xoffset": null,
+      "old_xoffset": null
+    },
+    "maxP_seconds_by_role": {
+      "capnproto": null,
+      "cereal": null,
+      "cista": null,
+      "flatbuffers": null,
+      "new_xoffset": null,
+      "old_xoffset": null
+    },
+    "native_budget_proposed": 12,
+    "new_output_proposed": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1-preparation/resource-process-v1",
+    "nonchild_identity_full_body_audit_ledger_and_seal_budget_seconds_proposed": 360,
+    "normal_profiles": {
+      "new": {
+        "identity": {
+          "bytes": "276487",
+          "sha256": "bfcc0fc389687c1a1c14b59462dc5b34d080d2bfa68ecae351eb1d7c88eb8348"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/profile-normal-v2.json"
+      },
+      "old": {
+        "identity": {
+          "bytes": "275120",
+          "sha256": "64a0a6756f2e60f6cdf54654b5c5b2b7bb5227ea038d58322ab5936e4b21d00d"
+        },
+        "path": "/root/xoffset-receive-completion/20261019/v1/profile-normal-v2.json"
+      }
+    },
+    "online_audit_and_verified_pooling_cost": "Measure separately around G.execute+originalG.native_result+Ledger.record_outputs; preserve actual wall and charge it to fixedH300/fullwindow,never pretend process interval includes coordinator work.",
+    "original_global_runner": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/experiments/vm_coordination/run_job.py",
+    "original_single_lock": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination/queue.lock",
+    "outer_budget_is_approved": false,
+    "outer_seconds_proposed": 600,
+    "pairs_per_role": 1,
+    "per_role_execution_kinds": [
+      "conditioning",
+      "primary"
+    ],
+    "process_metric": "(receipt.finished_monotonic_ns-receipt.started_monotonic_ns)/1e9; actual complete G.execute process interval including process setup/nativefullaudit,not native.total_ns or8phase sum.",
+    "roles": [
+      "old_xoffset",
+      "new_xoffset",
+      "cista",
+      "flatbuffers",
+      "capnproto",
+      "cereal"
+    ],
+    "same_C_P_argv_note": "Original argv_for uses the same G.command(run,wire,trace,wire/canonical/queries/native outputs,binary=frozen/bin/role) in both classes. Separate actual C thenP fresh processes still required because predecessor/conditioning state and real whole-process intervals differ. A singlebusinessM-run is not simultaneously a C/P pair.",
+    "source_API": {
+      "argv": {
+        "identity": {
+          "bytes": "89763",
+          "sha256": "92c79e792f666b8700981d05bbc71c52045cebc8090716484e2c2ef57d6f451f"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/six-role-campaign.py"
+      },
+      "conditioner_envelope": {
+        "identity": {
+          "bytes": "2915",
+          "sha256": "c1ab6d1ad275b716500e269942969abb4ace4a4550a5eb890758fa1b9f1b6fa1"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/conditioning_envelope.py"
+      },
+      "native_core": {
+        "identity": {
+          "bytes": "7845",
+          "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/native_helpers/core.py"
+      },
+      "native_execute_and_truth": {
+        "identity": {
+          "bytes": "54171",
+          "sha256": "6d11c4ebfa6a493f29825577fad6cfcacc04d1d238ef2ad273fb597fba60275e"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/native_helpers/campaign.py"
+      },
+      "native_protocol": {
+        "identity": {
+          "bytes": "11739",
+          "sha256": "8a1a6cf4cf32d8a7ea4d2c29e938b0afe82e26f3a7945c6706898c5c587e1c3a"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/native_helpers/protocol.py"
+      },
+      "resource_ledger": {
+        "identity": {
+          "bytes": "14438",
+          "sha256": "11888f0dfbf398749eb5a5c730d35e7ce138a2fdd49070e7005562847dba5fff"
+        },
+        "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/final_formal_v1/runtime_resources.py"
+      }
+    },
+    "underlying_record_new_native_budget_note": "Twelve resource processes are a distinct proposed budget;0capture does not authorize these12 or Q/F.",
+    "why_no_executable_dispatch": "There is no registered six-role resources CLI. A narrow fixed12 worker and exact pinned request must be authored/reviewed separately; original six-role CLI freeze/run/audit cannot be repurposed or passed invented--profile/--bindings/--maxC flags."
+  },
+  "status": "pending_parent_independent_source_budget_and_exact_request_admission"
+}

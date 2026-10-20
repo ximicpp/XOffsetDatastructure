@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261019/validation/host/process_pause.py",
+    "plan",
+    "--out",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261019-v1/validation/host/process-plan-initial.json"
+  ],
+  "returncode": 0,
+  "stdout": "{\"identity\": {\"bytes\": 1522, \"sha256\": \"f35ca674d4cb22a2792ae7605a7a4a87cf79ad104b137e84f0942fedf2d3f3de\"}, \"path\": \"/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\\u5f00\\u53d1/docs/coordination/c14-iteration-20261019-v1/validation/host/process-plan-initial.json\"}\n",
+  "stderr": ""
+}

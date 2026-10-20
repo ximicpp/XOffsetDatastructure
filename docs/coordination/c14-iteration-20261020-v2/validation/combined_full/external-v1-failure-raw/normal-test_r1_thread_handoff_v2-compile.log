@@ -1,0 +1,176 @@
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:413:
+In file included from /opt/p2996-toolchain/include/c++/v1/bit:71:
+In file included from /opt/p2996-toolchain/include/c++/v1/__bit/bit_ceil.h:13:
+In file included from /opt/p2996-toolchain/include/c++/v1/__bit/countl.h:14:
+In file included from /opt/p2996-toolchain/include/c++/v1/limits:118:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:413:
+In file included from /opt/p2996-toolchain/include/c++/v1/bit:87:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:414:
+In file included from /opt/p2996-toolchain/include/c++/v1/initializer_list:50:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:415:
+In file included from /opt/p2996-toolchain/include/c++/v1/optional:233:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:415:
+In file included from /opt/p2996-toolchain/include/c++/v1/optional:238:
+In file included from /opt/p2996-toolchain/include/c++/v1/compare:164:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:421:
+In file included from /opt/p2996-toolchain/include/c++/v1/source_location:33:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:422:
+In file included from /opt/p2996-toolchain/include/c++/v1/span:183:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:423:
+In file included from /opt/p2996-toolchain/include/c++/v1/string:618:
+In file included from /opt/p2996-toolchain/include/c++/v1/__memory_resource/polymorphic_allocator.h:22:
+In file included from /opt/p2996-toolchain/include/c++/v1/tuple:273:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:423:
+In file included from /opt/p2996-toolchain/include/c++/v1/string:624:
+In file included from /opt/p2996-toolchain/include/c++/v1/__string/char_traits.h:30:
+In file included from /opt/p2996-toolchain/include/c++/v1/iosfwd:121:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:423:
+In file included from /opt/p2996-toolchain/include/c++/v1/string:654:
+In file included from /opt/p2996-toolchain/include/c++/v1/string_view:246:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:423:
+In file included from /opt/p2996-toolchain/include/c++/v1/string:655:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:425:
+In file included from /opt/p2996-toolchain/include/c++/v1/type_traits:570:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:426:
+In file included from /opt/p2996-toolchain/include/c++/v1/variant:274:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:427:
+In file included from /opt/p2996-toolchain/include/c++/v1/vector:326:
+In file included from /opt/p2996-toolchain/include/c++/v1/__vector/vector_bool_formatter.h:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_bool.h:19:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_integral.h:29:
+In file included from /opt/p2996-toolchain/include/c++/v1/array:147:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:427:
+In file included from /opt/p2996-toolchain/include/c++/v1/vector:326:
+In file included from /opt/p2996-toolchain/include/c++/v1/__vector/vector_bool_formatter.h:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_bool.h:19:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_integral.h:36:
+In file included from /opt/p2996-toolchain/include/c++/v1/__locale:19:
+In file included from /opt/p2996-toolchain/include/c++/v1/__memory/shared_count.h:14:
+In file included from /opt/p2996-toolchain/include/c++/v1/typeinfo:69:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:427:
+In file included from /opt/p2996-toolchain/include/c++/v1/vector:326:
+In file included from /opt/p2996-toolchain/include/c++/v1/__vector/vector_bool_formatter.h:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_bool.h:19:
+In file included from /opt/p2996-toolchain/include/c++/v1/__format/formatter_integral.h:36:
+In file included from /opt/p2996-toolchain/include/c++/v1/__locale:31:
+In file included from /opt/p2996-toolchain/include/c++/v1/cstddef:40:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:18:
+In file included from /opt/p2996-toolchain/include/c++/v1/experimental/meta:15:
+In file included from /opt/p2996-toolchain/include/c++/v1/meta:427:
+In file included from /opt/p2996-toolchain/include/c++/v1/vector:329:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:20:
+In file included from /opt/p2996-toolchain/include/c++/v1/concepts:162:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/test_r1_thread_handoff_v2.cpp:1:
+In file included from /mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/xoffsetdatastructure.hpp:21:
+In file included from /opt/p2996-toolchain/include/c++/v1/functional:557:
+In file included from /opt/p2996-toolchain/include/c++/v1/__functional/boyer_moore_searcher.h:28:
+In file included from /opt/p2996-toolchain/include/c++/v1/unordered_map:622:
+/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/r1-m2-combined-v1/source/version:1:1: error: expected unqualified-id
+    1 | 0.1.0-alpha.1
+      | ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.

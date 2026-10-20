@@ -1,0 +1,20 @@
+{
+  "kind": "c14-f64-external-once-attempt-ledger",
+  "status": "registered_once_no_retry",
+  "candidate": "r1-m2-combined-v1",
+  "freeze_sha256": "5c5a81530b808ff5420bfed36b00b838ef6c147987542012acb4057f9af132d8",
+  "observed_utc": "2026-10-19T22:21:49.641177+00:00",
+  "maximum_windows": 1,
+  "retries": 0,
+  "actual_attempt_claim": "Created by the admitted launcher only; source/freeze/metadata preparation are not timing attempts. Immutable ledger plus fresh formal-controller-v1/ATTEMPT_CLAIMED.json prohibit retry.",
+  "timing_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/f64_preparation/F64_TIMING_REQUEST_v1.json",
+    "identity": {
+      "bytes": "5883",
+      "sha256": "1b1c3162fa66a3a24eee3b3455f38e96f0bf93831540c624c2c4d02f2a62cc1c"
+    }
+  },
+  "native_budget": 9264,
+  "sample_replacement": false,
+  "frozen_schedule_changed": false
+}

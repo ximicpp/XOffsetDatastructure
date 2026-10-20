@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "kind": "R6-ninja-raw-dependency-count-repair-v2a",
+  "ancestor": "package-archive-repair-v2",
+  "reason": "Ninja raw946/unique945 is valid; duplicate main dependency is not a duplicate object section",
+  "changed_files": [
+    {
+      "path": "deps_audit.py",
+      "before": {
+        "bytes": 3369,
+        "sha256": "684bb89a6e255b396fc35b94d6d779c56904d079d53aeaa246758c6d44fa9bd3"
+      },
+      "after": {
+        "bytes": 3495,
+        "sha256": "f339e11c031c7c45becca616c7e55d406ae4b44f862f8d9ec658e569c5526518"
+      }
+    },
+    {
+      "path": "test_deps_audit.py",
+      "before": {
+        "bytes": 2696,
+        "sha256": "1c1983a6e062fbdf0e0f0286e804f4b2ae158c25c4590e51ba8e01fba3df9997"
+      },
+      "after": {
+        "bytes": 3524,
+        "sha256": "5337d063e394278d08844d375e3ea5b7d9b6c58cfded035523d05472beebda59"
+      }
+    }
+  ],
+  "unchanged_copied_members": 35,
+  "no_author_import_execute_or_tests": true
+}

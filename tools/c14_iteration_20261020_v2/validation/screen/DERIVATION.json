@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "original_worker": {
+    "bytes": 39510,
+    "sha256": "8310364077d3c37e01b4ca521932d33c4eb69023ecf645d9a7e6a5b40fe659b7"
+  },
+  "candidates": {
+    "R1": {
+      "design": {
+        "bytes": 99923,
+        "sha256": "3c835b01d1b84dbd06a28d0660a932fc97b4148f68bc71703a674f146309410d"
+      },
+      "worker": {
+        "bytes": 59903,
+        "sha256": "0ae713213e7f5cfeba5cba8cd7dded155fe44a3114fbcecabf30f23f6f651a21"
+      },
+      "borrowed": {
+        "campaign.py": {
+          "bytes": 54254,
+          "sha256": "33dfc628a7202d4f08c31e463a4ac0c4fffc27ba5fd04dad3b4a991d402b99c2"
+        },
+        "core.py": {
+          "bytes": 7845,
+          "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+        },
+        "protocol.py": {
+          "bytes": 11167,
+          "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+        }
+      },
+      "native": 0,
+      "compile": 0
+    },
+    "M2": {
+      "design": {
+        "bytes": 99893,
+        "sha256": "9b6737a6a0d4a1962c3183e4da995fb60ef1d9c0e15f2f158b63bd49bbf31151"
+      },
+      "worker": {
+        "bytes": 59817,
+        "sha256": "9dc7c7808c3cb8e5fc9c77ed5ed4cf34e6f51b82a5ca490c6751ba17a7b07aaf"
+      },
+      "borrowed": {
+        "campaign.py": {
+          "bytes": 54254,
+          "sha256": "33dfc628a7202d4f08c31e463a4ac0c4fffc27ba5fd04dad3b4a991d402b99c2"
+        },
+        "core.py": {
+          "bytes": 7845,
+          "sha256": "9ad9063aade365b9dc243f9cf1261df93483e3aa2e8bb7ab443898ae3396cada"
+        },
+        "protocol.py": {
+          "bytes": 11167,
+          "sha256": "17c3eaf1d880e61e89a29cebad3df33fe4af5b2dc9a44f1c946df4bc125a9537"
+        }
+      },
+      "native": 0,
+      "compile": 0
+    }
+  },
+  "scope": "Source-only v2; new random schedule and correct primary/auxiliary sets, typed gates/projection and current host bindings; old v1 untouched"
+}

@@ -1,0 +1,19 @@
+{
+  "status": "registered_once_no_retry",
+  "candidate": "r1-m2-combined-v1",
+  "freeze_sha256": "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+  "maximum_windows": 1,
+  "retries": 0,
+  "observed_utc": "2026-10-19T21:11:43.724457+00:00",
+  "timing_request": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_TIMING_REQUEST_v1.json",
+    "identity": {
+      "bytes": 4159,
+      "sha256": "7e9875518d84cbc2fd0a8c3e7cc0480778989c4dd3338d336ed6bb91f68286ba"
+    }
+  },
+  "previous_current_candidate_Q_windows": 0,
+  "no_replacement_or_append": true,
+  "scope": "One new exact final-combination Q32 qualification only; historical M1/L1/R1/M2/old Q evidence remains preserved. This immutable registration is not a result; controller exclusive ATTEMPT_CLAIMED and original queue supply actual attempt facts.",
+  "F64_authorized": false
+}

@@ -1,0 +1,36 @@
+{
+  "kind": "v2-screen-global-quiet",
+  "status": "passed",
+  "candidate": "m2-exact-owns-v1",
+  "freeze_sha256": "d74af43ad891b87873b7bdb1bf4ce9bc0fd79eca4fcb4474b58c1c7af386fab2",
+  "observed_utc": "2026-10-19T19:16:49.714985+00:00",
+  "all_other_chats_and_agents_quiet": true,
+  "no_other_heavy_jobs": true,
+  "C_compilation_active": false,
+  "evidence": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_QUIET_OBSERVATION.json",
+      "identity": {
+        "bytes": 1200,
+        "sha256": "b1ed8b8ead7ab3d41c2c789b43deccb67d601f87a6e57c85ff495bb38c6d1ccb"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/M2_ACTUAL_SCREEN_FREEZE_REVIEW.md",
+      "identity": {
+        "bytes": 4355,
+        "sha256": "c258d70370bbf6452554371686408f13d9693813f3b7d67fc4f59c1c652c91d7"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/HOST_REVIEW.json",
+      "identity": {
+        "bytes": 3845,
+        "sha256": "adc2f7f3a42163a77fe710cf15dc141348eabf1de6fd751a1cffd43af8591860"
+      }
+    }
+  ],
+  "root_commitment": "Stop builds/searches/scans/source edits and new agents until timing+restoration complete; bounded event waits and progress only.",
+  "scope_note": "Actual task-tree, current app inventory maximum50 and original shared lease establish controlled-work quiet; no broad user program shutdown.",
+  "host_policy": "Prior-authorized two names only; fresh held handles/identity/token, hidden bounded780guard; no power/priority changes, restore before audit."
+}

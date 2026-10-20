@@ -1,0 +1,24 @@
+{
+  "R1_B_status": "passed",
+  "R1_B_actual_compiles": 10,
+  "R1_B_actual_native_executions": 10,
+  "R1_B_receipt": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/r1-native-v2/receipt.json",
+    "identity": {
+      "bytes": 25713,
+      "sha256": "4f7db65752ab788b0f136ddbb4d74418c0260766ce3625d98e0f276038317bed"
+    }
+  },
+  "R1_B_result_sha256": "c451e37927763432cc94265bf1a95edf5c7063d724b6cd8413d14ba1d6351ee8",
+  "R1_B_request_identity": {
+    "bytes": 167092,
+    "sha256": "edcf2fb2d29f5d5249d8d1ebc2d7727bafcd2d44a503ff1bacd839018edf7d4a"
+  },
+  "R1_diagnostic_admitted": false,
+  "R1_screen_admitted": false,
+  "M2_bare_main_sha256": "3e347612c1a62299bb910c68dd6b1411663f3165e18e298a51e7ba2e062c201f",
+  "M2_native_executed_by_core": 0,
+  "M1_screen_closed": true,
+  "baseline_main_unchanged": true,
+  "performance_goal_complete": false
+}

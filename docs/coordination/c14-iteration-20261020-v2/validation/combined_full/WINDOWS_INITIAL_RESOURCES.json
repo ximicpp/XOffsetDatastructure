@@ -1,0 +1,7 @@
+{
+  "observed_utc": "2026-10-19T19:35:48.711091Z",
+  "backing_free_bytes": 37330141184,
+  "backing_drive": "C",
+  "wsl_distribution": "Ubuntu-22.04",
+  "scope": "Initial combined normal/SAN/external finite batch; each existing core dispatcher additionally refreshes actual WSL/backing free checks."
+}

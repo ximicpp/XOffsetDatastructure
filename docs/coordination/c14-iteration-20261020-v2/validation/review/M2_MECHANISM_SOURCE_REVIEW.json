@@ -1,0 +1,144 @@
+{
+  "schema": "m2-independent-mechanism-source-review-v1",
+  "kind": "independent-m2-mechanism-source-review",
+  "status": "passed",
+  "scope": "Static one-candidate entry and fixed C API/control integration; actual new freeze still pending",
+  "reviewer": "screen_review",
+  "reviewed_utc": "2026-10-19T18:01:09.592062+00:00",
+  "tool": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/m2_mechanism_job.py",
+    "identity": {
+      "bytes": 18452,
+      "sha256": "60b0ca20be8fdd0cd5455485e09cc8ddc8d7c63b769e662e5ee147598d21b562"
+    }
+  },
+  "reused_C_tool": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/diag/phase_c_job.py",
+    "identity": {
+      "bytes": 38059,
+      "sha256": "9d7b3585cdc05a2c3444b931702da27bad9c914944478fcf0b61a878f86e60bb"
+    }
+  },
+  "original_C_freeze": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_FREEZE_DRAFT.json",
+    "identity": {
+      "bytes": 1321251,
+      "sha256": "250ce7daf7e1fb20513c8977928524c008aa6079211dbb66b9f5ef7efc4c7f0c"
+    }
+  },
+  "actual_C_result": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/C_RESULT.json",
+    "identity": {
+      "bytes": 5897,
+      "sha256": "c13e761ba41a67a7abcac600fbcea2a1edfe517032c782ccc98f1d41cbeab2c4"
+    }
+  },
+  "shared_C14_audit": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/AUDIT.json",
+    "identity": {
+      "bytes": 17479,
+      "sha256": "7b834986bd69ea3c8ca0eb0fe0e6940da3bf44f52abc8d69922f5e2a0b9af503"
+    }
+  },
+  "API_review": {
+    "fixed_C_SHA_checked_before_import": true,
+    "compiler_implementation_reused": true,
+    "dependency_implementation_reused": true,
+    "native_single_reaper_implementation_reused": true,
+    "strict36_sample_POD_native_truth_audit_reused": true,
+    "source_identity_and_resource_implementation_reused": true,
+    "single_compile_call_site": true,
+    "single_native_observer_call_site": true,
+    "no_new_control_or_capture_path": true,
+    "no_subprocess_or_direct_fork_in_new_entry": true
+  },
+  "scope_controls": {
+    "roles": [
+      "m2"
+    ],
+    "new_compiles": 1,
+    "new_native": 1,
+    "new_controls": 0,
+    "retry": 0,
+    "warmup": 0,
+    "outer_original_W3_diagnostic_seconds": 300,
+    "compile_seconds": 120,
+    "native_seconds": 20,
+    "projection_seconds": 292.5,
+    "projection_components": {
+      "compile": 120,
+      "compile_cleanup": 2,
+      "native_and_cleanup": 20.5,
+      "audit": 60,
+      "identity_checker_seal": 90
+    },
+    "same_original_mnt_c_wire_trace_fixture": true,
+    "new_staged_screen_inputs_used": false,
+    "driver_adapter_hook_event_header_must_equal_C14": true,
+    "only_compile_source_output_and_native_output_TMPDIR_paths_differ": true,
+    "full_original6459_runtime_source_input_alias_chain_retained": true,
+    "M2_business_evidence_and_same_freeze_parent_admission_required": true,
+    "new_control_forbidden": true
+  },
+  "control_review": {
+    "original_queue_command_manifest_and_cleanup_checked_by_entry": true,
+    "original_C_freeze_and_control_AUDIT_hard_pinned": true,
+    "actual_control_binary_compile_receipt_native_argv_source_body_refs_added": true,
+    "control_not_reexecuted": true
+  },
+  "checker_review": {
+    "same_preregistered_frozen_source": true,
+    "runs_after_successful_M2_full_role_audit_and_identity_check": true,
+    "same_process_import_no_new_child": true,
+    "read_pinned_original_control_and_new_candidate_AUDIT_SHA": true,
+    "execution_success_separate_from_mechanism_hit": true,
+    "no_speed_or_screen_inference": true
+  },
+  "remaining_before_execution": [
+    "Root source-only prepare creates the actual M2 freeze/resources/request once. Independently bridge exact generated SHA and original control/input closure.",
+    "Root same-freeze admission must accept actual M2 business gates, shared completed C14 control, source/tool and resource evidence.",
+    "After sole execution independently check original300-second queue/result/manifest/cleanup and complete raw receipts/binary/body/source identities; failed prefix is not retried."
+  ],
+  "references": [
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/M2_MECHANISM_READY.json",
+      "identity": {
+        "bytes": 1452,
+        "sha256": "d0001fe18dbb270921ec0d2be76c38dead90a4c787c60c5087977abbebf33783"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/diag/M2_MECHANISM_COORDINATOR.md",
+      "identity": {
+        "bytes": 6604,
+        "sha256": "7afeeb4840d96a3151a4183eae3ab8b916a671aabbfc2aaaaf5e454eaaf74024"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_M2_MECHANISM_DRAFT.json",
+      "identity": {
+        "bytes": 13048,
+        "sha256": "1ad9b4223627e331106cc71201db0c3fc58fb2662131b28b97186a1c0b1717ab"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_EXECUTION_REVIEW.json",
+      "identity": {
+        "bytes": 21393,
+        "sha256": "50b5b4e19c709a8c20142901393305fef3ca1f70ef5c3134c9800fe0042877ec"
+      }
+    },
+    {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_MECHANISM_SOURCE_REVIEW.md",
+      "identity": {
+        "bytes": 3166,
+        "sha256": "ef1d64e48ea82dba105a2df1ebd53a8950502d3e19f365bfa9d8d6c9915d95fa"
+      }
+    }
+  ],
+  "unresolved_source_blockers": [],
+  "actual_new_freeze_review": "pending_root_prepare",
+  "mechanism_execution_admitted": false,
+  "new_prepare_compiler_native_dummy_checker_executions_by_reviewer": 0,
+  "performance_inference": null
+}

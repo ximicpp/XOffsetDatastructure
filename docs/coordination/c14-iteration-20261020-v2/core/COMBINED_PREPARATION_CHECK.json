@@ -1,0 +1,50 @@
+{
+  "status": "source_tool_metadata_checks_passed_not_actual_combined_functional_result",
+  "requests": {
+    "REQUESTS_COMBINED_INITIAL.json": {
+      "identity": {
+        "bytes": 53428,
+        "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+      },
+      "local_pins_matched": 10,
+      "jobs": 3
+    },
+    "REQUESTS_COMBINED_FULL.json": {
+      "identity": {
+        "bytes": 84671,
+        "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+      },
+      "local_pins_matched": 87,
+      "jobs": 7
+    }
+  },
+  "external_request": {
+    "bytes": 202565,
+    "sha256": "88e8d3a1ab95c0ac5e6d2b65632a38666447f17d781a1ae028229610d0cf07ff"
+  },
+  "initial_unchanged": true,
+  "derived_files": 65,
+  "byte_exact_cpp_fixtures": 18,
+  "existing_metadata_parser_known_answers_only": {
+    "normal": [
+      "test_canonical_zero_target",
+      "test_canonical_cold_no_callback",
+      "test_canonical_registry_v2",
+      "test_owner_identity",
+      "test_same_arena_move",
+      "test_locator_soundness"
+    ],
+    "sanitized": [
+      "test_canonical_zero_target",
+      "test_canonical_cold_no_callback",
+      "test_canonical_registry_v2",
+      "test_owner_identity",
+      "test_same_arena_move",
+      "test_locator_soundness"
+    ]
+  },
+  "scope_limit": "No actual combined pass manufactured; effective project c++26 vs old manual gnu++26 explicitly disclosed for independent scope review; immutable external informational worker_argv is non-operative, exact initial.jobs execution is authoritative.",
+  "core_cpp_compiles": 0,
+  "core_native": 0,
+  "core_queue": 0
+}

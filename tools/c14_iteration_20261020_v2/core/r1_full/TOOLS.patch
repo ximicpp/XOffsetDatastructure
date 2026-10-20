@@ -1,0 +1,269 @@
+--- v1/business/dispatch.py
++++ r1/business/dispatch.py
+@@ -1,4 +1,4 @@
+-"""Concrete M1 business stage dispatch, with the existing shared runner only.
++"""Concrete R1 business stage dispatch, with the existing shared runner only.
+ 
+ check performs AST/file-identity checks only. Other actions require full73+73.
+ Run outside a lease; each heavy worker owns its original global lease.
+@@ -7,9 +7,9 @@
+ import argparse, ast, hashlib, json, os, subprocess, sys
+ sys.dont_write_bytecode=True
+ HERE=Path(__file__).resolve().parent
+-ROOT=HERE.parents[3]
+-DOC=ROOT/'docs/coordination/c14-iteration-20261019-v1/validation/business'
+-B=Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-business-v2')
++ROOT=Path('/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发')
++DOC=ROOT/'docs/coordination/c14-iteration-20261020-v2/validation/r1_full/business'
++B=Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-business-v1')
+ OLD=Path('/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发')
+ RUNNER=OLD/'experiments/vm_coordination/run_job.py'
+ 
+@@ -26,7 +26,7 @@
+     for n,v in manifest['files'].items():need(fid(HERE/n)==v,'tool changed: '+n)
+     for p in HERE.rglob('*.py'):ast.parse(p.read_text(encoding='utf-8-sig'))
+     return {'status':'source_ready','tool_files':len(manifest['files']),'compiles':0,'native_runs':0,'timing_samples':0,
+-      'full_prerequisite':'M1_FULL_RESULT plus two actual73 receipts; checked again by prepare',
++      'full_prerequisite':'R1_FULL_RESULT plus two actual73 receipts; checked again by prepare',
+       'stages':{'prepare':300,'bench':2400,'functional':'normal1800/audit600/SAN1800/audit600/V1-compat1500',
+                 'package':2400,'runtime':2400},'runner':str(RUNNER),'output':str(B)}
+ 
+@@ -34,7 +34,7 @@
+     ap=argparse.ArgumentParser();ap.add_argument('stage',choices=('check','prepare','bench','functional','package','runtime'));a=ap.parse_args()
+     state=check()
+     if a.stage=='check':print(json.dumps(state));return
+-    need(read(DOC.parent/'M1_FULL_RESULT.json')['status']=='passed','current M1 full gates required')
++    need(read(DOC.parent/'R1_FULL_RESULT.json')['status']=='passed','current R1 full gates required')
+     sys.path.insert(0,str(HERE/'workers'));import common as C
+     if a.stage=='functional':
+         # Original dispatcher is deliberately outside the lease: it creates the
+@@ -45,11 +45,11 @@
+         script={'prepare':HERE/'prepare.py','bench':HERE/'workers/bench-profiles-worker.py',
+           'package':HERE/'workers/package/package-worker.py','runtime':HERE/'workers/package/runtime-worker.py'}[a.stage]
+         args=[] if a.stage=='prepare' else ['--inputs',str(DOC/'inputs.json')] if a.stage=='bench' else ['--spec',str(DOC/'package-input.json')]
+-        label={'prepare':'m1-business-prepare-v2','bench':'bench-profiles-v2','package':'package-standard-v2','runtime':'package-runtime-v2'}[a.stage]
++        label={'prepare':'r1-business-prepare-v1','bench':'bench-profiles-v2','package':'package-standard-v2','runtime':'package-runtime-v2'}[a.stage]
+         lease=B.parent/'leases'/label if a.stage=='prepare' else B/'queues'/label
+         argv=['/usr/bin/python3','-B',str(RUNNER),'run','--owner','W1','--kind','validation','--out',str(lease),
+           '--timeout-seconds',str(timeout),'--wait-seconds','0','--','/usr/bin/python3','-B',str(script),*args]
+-    write(DOC/(a.stage+'-dispatch-request.json'),{'argv':argv,'tool_manifest':fid(HERE/'TOOL_MANIFEST.json'),'scope':'M1 correctness only; zero timing'})
++    write(DOC/(a.stage+'-dispatch-request.json'),{'argv':argv,'tool_manifest':fid(HERE/'TOOL_MANIFEST.json'),'scope':'R1 correctness only; zero timing'})
+     p=subprocess.run(argv,env=C.env(),cwd=ROOT)
+     check()
+     write(DOC/(a.stage+'-dispatch-result.json'),{'returncode':p.returncode,'argv':argv})
+--- v1/business/prepare.py
++++ r1/business/prepare.py
+@@ -1,4 +1,4 @@
+-"""Prepare M1 inputs/metadata only, under the existing global validation lease.
++"""Prepare R1 inputs/metadata only, under the existing global validation lease.
+ 
+ No compiler, native child, campaign or queue is started by this entry.
+ """
+@@ -26,21 +26,21 @@
+ 
+ def main():
+     holder=read(R/'build/vm-coordination/queue.lock')
+-    need(holder['status']=='running' and Path(holder['out'])==B.parent/'leases/m1-business-prepare-v2','original active prepare lease required')
++    need(holder['status']=='running' and Path(holder['out'])==B.parent/'leases/r1-business-prepare-v1','original active prepare lease required')
+     need(not B.exists(),'fresh business output required')
+     doc=C.parent
+-    result=read(doc/'M1_CODEGEN_RESULT.json'); requests=ROOT/'docs/coordination/c14-iteration-20261019-v1/core/REQUESTS.json'
++    result=read(doc/'R1_FULL_SOURCE_BINDING.json'); requests=ROOT/'docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_R1_FULL.json'
+     need(result['status']=='passed' and stable(requests)==result['request_identity'],'current full request identity required')
+     prod=result['production_files']['candidate'];need(len(prod)==14,'14 production files')
+-    source=Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-full-v2-normal/source')
+-    full_result=doc/'M1_FULL_RESULT.json'; fr=read(full_result)
+-    need(fr['status']=='passed' and fr['production_files']==prod and fr['request_identity']==result['request_identity'],'M1 complete normal/SAN required')
+-    refs={};profiles={};binding={str(requests):stable(requests),str(doc/'M1_CODEGEN_RESULT.json'):stable(doc/'M1_CODEGEN_RESULT.json'),str(full_result):stable(full_result)}
+-    ident=ROOT/'build/c14-iteration-20261019-v1/candidates/m1-default-scalar-v2/IDENTITY.json'
++    source=Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal/source')
++    full_result=doc/'R1_FULL_RESULT.json'; fr=read(full_result)
++    need(fr['status']=='passed' and fr['production_files']==prod and fr['request_identity']==result['request_identity'],'R1 complete normal/SAN required')
++    refs={};profiles={};binding={str(requests):stable(requests),str(doc/'R1_FULL_SOURCE_BINDING.json'):stable(doc/'R1_FULL_SOURCE_BINDING.json'),str(full_result):stable(full_result)}
++    ident=ROOT/'build/c14-iteration-20261019-v1/candidates/r1-canonical-hotcold-v1/IDENTITY.json'
+     need(stable(ident)==result['candidate_identity_file'],'core154 identity differs')
+     binding[str(ident)]=stable(ident)
+     for mode in ('normal','sanitized'):
+-        base=B.parent/('m1-full-v2-'+mode); receipt=base/'receipt.json'; r=read(receipt)
++        base=B.parent/('r1-full-v1-'+mode); receipt=base/'receipt.json'; r=read(receipt)
+         need(r['status']=='passed' and r['production_files']==prod and len(r['junit_names'])==len(set(r['junit_names']))==73,'actual full73 '+mode)
+         inv=read(base/'build/test-inventory.json')
+         expected=inv['runtime_test_programs']+inv['subprocess_scenarios']+inv['tooling_checks']
+@@ -62,7 +62,7 @@
+             rel=p.relative_to(meta)
+             need(stable(p)==stable(old/rel),'metadata copy differs: '+str(rel))
+             original_metadata[rel.as_posix()]=stable(old/rel)
+-    identity={'candidate_id':'xoffset-c14-m1-default-scalar-v2','baseline_candidate_id':'xoffset-four-paths-v1',
++    identity={'candidate_id':'xoffset-c14-r1-canonical-hotcold-v1','baseline_candidate_id':'xoffset-four-paths-v1',
+       'production_files':prod,'source_content_sha256':hashlib.sha256(json.dumps(prod,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+       'core_request':stable(requests),'core_identity':stable(ident),'core_member_count':154}
+     identity_path=C/'candidate-source-identity-v2.json';write(identity_path,identity)
+@@ -92,9 +92,9 @@
+             need(stable(meta/n)==v,'unexpected metadata edit: '+n)
+     write(C/'METADATA_DERIVATION.json',{'original_source':str(old),'before':original_metadata,
+       'after':{n:stable(meta/n) for n in original_metadata},'changes':changes,
+-      'note':'source_archive_sha256 is inherited historical metadata and is not asserted to be a new M1 archive; current identity is the exact154/14 source and request binding.'})
++      'note':'source_archive_sha256 is inherited historical metadata and is not asserted to be a new R1 archive; current identity is the exact154/14 source and request binding.'})
+     for mode in ('normal','sanitized'):
+-        base=B.parent/('m1-full-v2-'+mode);r=read(base/'receipt.json');inv=read(base/'build/test-inventory.json')
++        base=B.parent/('r1-full-v1-'+mode);r=read(base/'receipt.json');inv=read(base/'build/test-inventory.json')
+         accept=C/('full-'+mode+'-acceptance.json')
+         write(accept,{'status':'passed','source':str(source),'production_files':prod,'ctest_count':73,'receipt':refs[mode],
+           'runtime_test_programs':inv['runtime_test_programs'],'configure_checks':inv['configure_checks'],'configure_checks_are_not_ctest_cases':True})
+@@ -108,13 +108,13 @@
+     # Existing 11 installed own headers, excluding separately installed OS header.
+     own=['xoffsetdatastructure.hpp','xoffset_verified_paths.hpp','xoffset_validation_scratch.hpp','validation_scratch.hpp',
+        'xoffset_snapshot_index.hpp','xoffset_snapshot_index_budget.hpp','xoffset_core_lifetime.hpp','receive_raw_fwd.hpp','receive_raw.hpp','receive_future.hpp','xoffset_verified_receive.hpp']
+-    write(C/'package-input.json',{'schema_version':1,'kind':'c14-m1-package-input-v1','source':str(source),
++    write(C/'package-input.json',{'schema_version':1,'kind':'c14-r1-package-input-v1','source':str(source),
+       'production_files':prod,'own_headers':own,'source_identity':{'path':str(identity_path),'identity':stable(identity_path)},
+       'full_receipts':refs,'bindings':binding})
+     write(C/'PREPARED.json',{'status':'prepared','production_files':prod,'members':154,'requests':stable(requests),
+       'full_receipts':refs,'metadata_changes':changes,'bindings':binding,'performance_samples':0,'native_runs':0,'compiles':0,
+-      'benchmark_commit_meaning':'7539433ab96d69c4a07b1db5c0a13786da85cdcd is retained legacy benchmark base metadata; it is neither the M1 current Git base 1904b9c71230026ac6f2d58f919a9ab76447d264 nor a claim M1 has been committed. Actual identity is core REQUESTS plus IDENTITY154 plus production14 and source/compiler inputs.',
++      'benchmark_commit_meaning':'7539433ab96d69c4a07b1db5c0a13786da85cdcd is retained legacy benchmark base metadata; it is neither the R1 current Git base 1904b9c71230026ac6f2d58f919a9ab76447d264 nor a claim R1 has been committed. Actual identity is core REQUESTS plus IDENTITY154 plus production14 and source/compiler inputs.',
+       'full_binding':'Actual passed full normal/SAN receipts from r2 requests bind the new snapshots; the earlier rejected staged-path preflight is not a compiled-source or platform result.'})
+-    print('M1 business metadata prepared; no compiler/native/queue started',flush=True)
++    print('R1 business metadata prepared; no compiler/native/queue started',flush=True)
+ 
+ if __name__=='__main__':main()
+--- v1/business/workers/business_common.py
++++ r1/business/workers/business_common.py
+@@ -6,11 +6,11 @@
+ from common import *
+ 
+ HERE = Path(__file__).resolve().parent
+-SOURCE = Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-full-v2-normal/source')
++SOURCE = Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal/source')
+ BENCH_META = B / 'metadata'
+ IDENTITY_FILE = C / 'candidate-source-identity-v2.json'
+ MATERIALIZATION_FILE = B / 'source-identity.json'
+-CANDIDATE_ID = 'xoffset-c14-m1-default-scalar-v2'
++CANDIDATE_ID = 'xoffset-c14-r1-canonical-hotcold-v1'
+ BASELINE_ID = 'xoffset-four-paths-v1'
+ BASELINE_SOURCE = Path('/root/xoffset-receive-completion/20261019/v1/baseline/source')
+ # Explicit aliases: the immediate source predecessor is FOUR PATHS, while the
+@@ -76,9 +76,9 @@
+ 
+ def require_final_identity():
+     prepared=read(C/'PREPARED.json')
+-    require(prepared['status']=='prepared', 'Current M1 prepared bindings required')
++    require(prepared['status']=='prepared', 'Current R1 prepared bindings required')
+     for path,value in prepared['bindings'].items():
+-        require(fid(Path(path))==value, 'Frozen M1 source/tool/input changed: '+path)
++        require(fid(Path(path))==value, 'Frozen R1 source/tool/input changed: '+path)
+     require(fid(INPUTS_PATH)==INPUTS_ID, 'Business input record changed')
+     require(match_ref(INPUTS['source_identity'])==IDENTITY_FILE, 'Candidate identity reference changed')
+     identity=read(IDENTITY_FILE)
+--- v1/business/workers/common.py
++++ r1/business/workers/common.py
+@@ -1,12 +1,12 @@
+-"""M1 paths around the original command, environment and global lease helpers."""
++"""R1 paths around the original command, environment and global lease helpers."""
+ from pathlib import Path
+ import importlib.util, json, subprocess, os
+ 
+ H=Path(__file__).resolve().parent
+-ROOT=H.parents[4]
++ROOT=Path('/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发')
+ R=Path('/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发')
+-B=Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-business-v2')
+-C=ROOT/'docs/coordination/c14-iteration-20261019-v1/validation/business'
++B=Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-business-v1')
++C=ROOT/'docs/coordination/c14-iteration-20261020-v2/validation/r1_full/business'
+ RUNNER=R/'experiments/vm_coordination/run_job.py'
+ spec=importlib.util.spec_from_file_location('original_receive_common',R/'build/receive-completion-20261019/common.py')
+ original=importlib.util.module_from_spec(spec);spec.loader.exec_module(original)
+--- v1/business/workers/package/support.py
++++ r1/business/workers/package/support.py
+@@ -13,8 +13,8 @@
+     global _INPUT_SPEC
+     ap=argparse.ArgumentParser();ap.add_argument('--spec',type=Path,required=True);args=ap.parse_args()
+     spec=read(args.spec);_INPUT_SPEC=spec
+-    need(spec['kind']=='c14-m1-package-input-v1','exact M1 package input')
+-    source=Path(spec['source']);need(source==Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-full-v2-normal/source'),'explicit M1 full source')
++    need(spec['kind']=='c14-r1-package-input-v1','exact R1 package input')
++    source=Path(spec['source']);need(source==Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-full-v1-normal/source'),'explicit R1 full source')
+     own=headers(spec['own_headers']);check_production(source,spec['production_files'])
+     for mode,ref in spec['full_receipts'].items():
+         need(fid(ref['path'])==ref['identity'],'full receipt identity changed')
+--- v1/business_matrix/common.py
++++ r1/business_matrix/common.py
+@@ -2,11 +2,11 @@
+ from pathlib import Path
+ import importlib.util
+ HERE=Path(__file__).resolve().parent
+-ROOT=HERE.parents[3]
++ROOT=Path('/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发')
+ R=Path('/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发')
+ H=R/'build/receive-completion-20261019'
+-B=Path('/root/xoffset-c14-iteration/20261019/v1/validation/m1-business-matrix-v2')
+-C=ROOT/'docs/coordination/c14-iteration-20261019-v1/validation/business'
++B=Path('/root/xoffset-c14-iteration/20261020/v2/validation/r1-business-matrix-v1')
++C=ROOT/'docs/coordination/c14-iteration-20261020-v2/validation/r1_full/business'
+ spec=importlib.util.spec_from_file_location('original_common_matrix',H/'common.py')
+ original=importlib.util.module_from_spec(spec);spec.loader.exec_module(original)
+ P,P1,fid,env=original.P,original.P1,original.fid,original.env
+--- v1/business_matrix/dispatch.py
++++ r1/business_matrix/dispatch.py
+@@ -18,14 +18,14 @@
+     verify_tools();holder=read(R/'build/vm-coordination/queue.lock')
+     need(holder['status']=='running' and Path(holder['out'])==QUEUE,'original active matrix lease required')
+     prepared=read(C/'PREPARED.json')
+-    need(prepared['status']=='prepared','M1 business prepared input required')
+-    for p,v in prepared['bindings'].items():need(stable(p)==v,'M1 bound input differs '+p)
++    need(prepared['status']=='prepared','R1 business prepared input required')
++    for p,v in prepared['bindings'].items():need(stable(p)==v,'R1 bound input differs '+p)
+     for leaf in ('final-business-functional-v2/result.json','package-standard-v2/result.json','package-runtime-v2/result.json'):
+-        p=B.parent/'m1-business-v2'/leaf;need(read(p)['status']=='passed','required business/consumer gate '+leaf)
+-    base=B.parent/'m1-full-v2-normal/source';source=B/'source'
++        p=B.parent/'r1-business-v1'/leaf;need(read(p)['status']=='passed','required business/consumer gate '+leaf)
++    base=B.parent/'r1-full-v1-normal/source';source=B/'source'
+     need(not source.exists(),'fresh matrix source required')
+     shutil.copytree(base,source)
+-    meta=B.parent/'m1-business-v2/metadata'
++    meta=B.parent/'r1-business-v1/metadata'
+     for rel in ('experiments/serialization_comparison','tools/serialization_comparison'):
+         shutil.copytree(meta/rel,source/rel)
+     members={p.relative_to(source).as_posix():stable(p) for p in source.rglob('*') if p.is_file()}
+@@ -36,7 +36,7 @@
+     for p in HERE.glob('*'):
+         if p.is_file():bindings[str(p)]=stable(p)
+     reference=Path('/root/xoffset-serialization-comparison/20261017/implementation/prepared-v1/reference.py')
+-    spec={'schema_version':1,'kind':'c14-m1-production-matrix-input-v1','source':str(source),
++    spec={'schema_version':1,'kind':'c14-r1-production-matrix-input-v1','source':str(source),
+       'materialization':{'path':str(material),'identity':stable(material)},
+       'candidate_identity':{'path':str(ident),'identity':stable(ident)},'full_receipts':prepared['full_receipts'],
+       'bindings':bindings,'source_members':members,'reference':{'path':str(reference),'identity':stable(reference)}}
+--- v1/business_matrix/worker.py
++++ r1/business_matrix/worker.py
+@@ -46,7 +46,7 @@
+     shutil.copyfile(receipt,destination/'receipt.json')
+     return destination,value,actual
+ def prerequisite(spec):
+-    need(spec['kind']=='c14-m1-production-matrix-input-v1','current M1 input required')
++    need(spec['kind']=='c14-r1-production-matrix-input-v1','current R1 input required')
+     source=Path(spec['source']);need(source==SOURCE,'exact current matrix source')
+     exact(MATERIALIZATION,spec['materialization']['identity'])
+     record=K.read(MATERIALIZATION);production=record['production_files']
+--- v1/candidate_job.py
++++ r1/full_entry.py
+@@ -18,15 +18,15 @@
+ import time
+ import xml.etree.ElementTree as ET
+ 
+-ROOT = Path(__file__).resolve().parents[3]
++ROOT = Path('/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发')
+ OLD = Path('/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发')
+ RUNNER = OLD/'experiments/vm_coordination/run_job.py'
+ LOCK = OLD/'build/vm-coordination'
+ P1 = Path('/root/xoffset-serialization-comparison/20261017/p1-v1')
+ TOOLS = P1/'tools'
+ VENDOR = Path('/root/xoffset-receive-completion/20261019/v1/final-v4/source')
+-OUTPUT = Path('/root/xoffset-c14-iteration/20261019/v1/validation')
+-DOC = ROOT/'docs/coordination/c14-iteration-20261019-v1/validation'
++OUTPUT = Path('/root/xoffset-c14-iteration/20261020/v2/validation')
++DOC = ROOT/'docs/coordination/c14-iteration-20261020-v2/validation/r1_full'
+ FIXED_TOOLS = [RUNNER, TOOLS/'cmake/bin/cmake', TOOLS/'cmake/bin/ctest',
+                TOOLS/'p2996-profile/bin/clang++-libcxx', Path('/usr/bin/ninja')]
+ 

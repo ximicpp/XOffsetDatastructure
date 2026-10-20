@@ -1,0 +1,193 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/check_dynamic_acceptance.py",
+    "--candidate",
+    "r1",
+    "--control-audit",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/AUDIT.json",
+    "--control-sha256",
+    "7b834986bd69ea3c8ca0eb0fe0e6940da3bf44f52abc8d69922f5e2a0b9af503",
+    "--candidate-audit",
+    "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/AUDIT.json",
+    "--candidate-sha256",
+    "56975c1f1f1b72da6fe34c458ffba45db9d11177160ef81e3b09ed7ebc7f4e81"
+  ],
+  "audits": {
+    "c14": {
+      "identity": {
+        "bytes": 17479,
+        "sha256": "7b834986bd69ea3c8ca0eb0fe0e6940da3bf44f52abc8d69922f5e2a0b9af503"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/c14/AUDIT.json"
+    },
+    "r1": {
+      "identity": {
+        "bytes": 17477,
+        "sha256": "56975c1f1f1b72da6fe34c458ffba45db9d11177160ef81e3b09ed7ebc7f4e81"
+      },
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/phase-c-original-run-v1/r1/AUDIT.json"
+    }
+  },
+  "checker": {
+    "identity": {
+      "bytes": 7389,
+      "sha256": "7315074f7cd37f60c893d5a22e71574324bb80194ac86fb217940b62e96cf48c"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/tools/c14_iteration_20261020_v2/core/check_dynamic_acceptance.py"
+  },
+  "new_diagnostic_native": 0,
+  "result": {
+    "QF_admitted": false,
+    "bare_codegen_checked": false,
+    "candidate": "R1",
+    "diagnostic_only": true,
+    "execution_admission_checked": false,
+    "external_audit_sha256": {
+      "candidate": "56975c1f1f1b72da6fe34c458ffba45db9d11177160ef81e3b09ed7ebc7f4e81",
+      "control": "7b834986bd69ea3c8ca0eb0fe0e6940da3bf44f52abc8d69922f5e2a0b9af503"
+    },
+    "predicate": "positive read_sum inactive return count; identical logical work; bare codegen obligation separate",
+    "scopes": [
+      {
+        "active": 0,
+        "canonical": 12081262,
+        "inactive": 12081262,
+        "logical_counts_equal": true,
+        "scope": "primary"
+      },
+      {
+        "active": 0,
+        "canonical": 2439240,
+        "inactive": 2439240,
+        "logical_counts_equal": true,
+        "scope": "read_sum"
+      },
+      {
+        "active": 0,
+        "canonical": 589831,
+        "inactive": 589831,
+        "logical_counts_equal": true,
+        "scope": "load"
+      },
+      {
+        "active": 0,
+        "canonical": 1216548,
+        "inactive": 1216548,
+        "logical_counts_equal": true,
+        "scope": "query_before"
+      },
+      {
+        "active": 0,
+        "canonical": 8421400,
+        "inactive": 8421400,
+        "logical_counts_equal": true,
+        "scope": "mutate"
+      },
+      {
+        "active": 0,
+        "canonical": 0,
+        "inactive": 0,
+        "logical_counts_equal": true,
+        "scope": "emit_after"
+      },
+      {
+        "active": 0,
+        "canonical": 0,
+        "inactive": 0,
+        "logical_counts_equal": true,
+        "scope": "retire_modified_state"
+      },
+      {
+        "active": 0,
+        "canonical": 630791,
+        "inactive": 630791,
+        "logical_counts_equal": true,
+        "scope": "reload"
+      },
+      {
+        "active": 0,
+        "canonical": 1222692,
+        "inactive": 1222692,
+        "logical_counts_equal": true,
+        "scope": "query_after"
+      },
+      {
+        "active": 0,
+        "canonical": 0,
+        "inactive": 0,
+        "logical_counts_equal": true,
+        "scope": "cleanup"
+      },
+      {
+        "active": 0,
+        "canonical": 65536,
+        "inactive": 65536,
+        "logical_counts_equal": true,
+        "scope": "mutation_1"
+      },
+      {
+        "active": 0,
+        "canonical": 98305,
+        "inactive": 98305,
+        "logical_counts_equal": true,
+        "scope": "mutation_2"
+      },
+      {
+        "active": 0,
+        "canonical": 1040385,
+        "inactive": 1040385,
+        "logical_counts_equal": true,
+        "scope": "mutation_3"
+      },
+      {
+        "active": 0,
+        "canonical": 3272704,
+        "inactive": 3272704,
+        "logical_counts_equal": true,
+        "scope": "mutation_4"
+      },
+      {
+        "active": 0,
+        "canonical": 373320,
+        "inactive": 373320,
+        "logical_counts_equal": true,
+        "scope": "mutation_5"
+      },
+      {
+        "active": 0,
+        "canonical": 839680,
+        "inactive": 839680,
+        "logical_counts_equal": true,
+        "scope": "mutation_6"
+      },
+      {
+        "active": 0,
+        "canonical": 999303,
+        "inactive": 999303,
+        "logical_counts_equal": true,
+        "scope": "mutation_7"
+      },
+      {
+        "active": 0,
+        "canonical": 1732167,
+        "inactive": 1732167,
+        "logical_counts_equal": true,
+        "scope": "mutation_8"
+      },
+      {
+        "active": 0,
+        "canonical": 0,
+        "inactive": 0,
+        "logical_counts_equal": true,
+        "scope": "mutation_9"
+      }
+    ],
+    "screen_admitted": false,
+    "speed_inferred": false,
+    "status": "mechanism_hit"
+  },
+  "returncode": 0
+}

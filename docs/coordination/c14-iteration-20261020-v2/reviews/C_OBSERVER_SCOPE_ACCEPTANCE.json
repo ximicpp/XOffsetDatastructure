@@ -1,0 +1,26 @@
+{
+  "schema":"c14-v2-observer-component-acceptance-v1",
+  "status":"component_source_and_affected_dummy_checks_passed",
+  "source_review":"OBSERVER_CODE_REVIEW.md",
+  "wrapper_sha256":"48ddd6262b371a96ec1eabd2c57c57aa392e909e831869c5dae634de1d92fc34",
+  "selfcheck_sha256":"cdcaa06338c7c9d247aa1a4af080738658d1aef4d6919063c951b2ef1f9aa130",
+  "dummy_child_sha256":"01cd1edb6379f9a3454855b5358d8596c7696848d2d9c5769575e375c102b2db",
+  "current_dummy_result":"../validation/diag/DUMMY_RESULT_v2.json",
+  "current_dummy_result_sha256":"af985da496a2313f7f7f32b401a2c7cb3f0a78f2fd0142d4e8ddc9e3824a9a2c",
+  "actual_affected_cases":["normal","event_hang","partial_hang","collector_error","register_error","log_limit"],
+  "actual_affected_python_children":6,
+  "dummy_queue_run_id":"b4d013235baa428d9af3d129e7f05683",
+  "dummy_queue_elapsed_seconds":1.2091292580000186,
+  "dummy_cleanup_empty":true,
+  "previous18_cases":"Retained only for their oldd6a9746 wrapper scope; not relabeled as current execution.",
+  "interface_identity_bridge":{
+    "dummy_interface_sha256":"d551ac98c06e582e58ab6570ec3bbe43382b52e6a6ce6b18d41b32fd5d873ab9",
+    "current_interface_sha256":"7bbba10ea8351e6a3af576de7cbe8963c9733b5e144075444427b0fe7cddf20c",
+    "independently_checked_parsed_difference":"Only labels adds truth.replay.before and truth.replay.after; all other JSON fields identical.",
+    "effect":"Generic parser label whitelist extends by two. Existing tested labels/limits/transport/reaper unchanged. section() already handles generic .before/after labels. This is source/data review, not a retroactive claim that dummy used new labels."
+  },
+  "fixed_findings_closed":["No per-chunk/event or pre-killfsync in supervision loop","Event registration/reader fault setup covered by existing error cleanup"],
+  "whole_C_diagnostic_admitted":false,
+  "remaining":"Final producer/driver/adapter/source/input/runtime/compile and native argv; two roles, original20s/600s and exact resource projection; external supervisor dispatch and full truth audit still require independent final freeze admission.",
+  "performance_claim":false
+}

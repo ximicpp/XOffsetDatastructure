@@ -1,0 +1,64 @@
+{
+  "kind": "phase-c-independent-admission",
+  "status": "passed",
+  "observed_at": "2026-10-20T01:49:07+08:00",
+  "freeze_sha256": "250ce7daf7e1fb20513c8977928524c008aa6079211dbb66b9f5ef7efc4c7f0c",
+  "R1_B_passed": true,
+  "interface36_scope_accepted": true,
+  "resources_passed": true,
+  "final_source_and_tools_passed": true,
+  "root_local_fixed_files_rechecked": 106,
+  "evidence": {
+    "R1_B": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/R1_NATIVE_RESULT.json",
+      "identity": {
+        "bytes": 47494,
+        "sha256": "c451e37927763432cc94265bf1a95edf5c7063d724b6cd8413d14ba1d6351ee8"
+      }
+    },
+    "interface36_acceptance": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_OBSERVER_SCOPE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 2117,
+        "sha256": "ac7a10185d61c4133252533137478715c878a10705e55a7e0886385603340ee5"
+      }
+    },
+    "source_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_ASSEMBLED_REVIEW.json",
+      "identity": {
+        "bytes": 21584,
+        "sha256": "924768e7508dc22b18b9dadffa1908f687b91232a0b161cbe69438ac1636d856"
+      }
+    },
+    "resource_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_RESOURCE_ACCEPTANCE.json",
+      "identity": {
+        "bytes": 1918,
+        "sha256": "00df8af6495e0faa001b08afac70bb1aa07c3102f81690c3f10d5ff4435545f8"
+      }
+    },
+    "whole_freeze_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/C_JOB_FREEZE_REVIEW.json",
+      "identity": {
+        "bytes": 20375,
+        "sha256": "256440484f0390b59911e2fdc3b3feafb3a5343f6a3a120023d4fede9e2b5b28"
+      }
+    },
+    "root_agent_freeze_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/C_ACTUAL_FREEZE_REVIEW.md",
+      "identity": {
+        "bytes": 4662,
+        "sha256": "9cffffa8cd004746b6d69a8be93244fd70cef00e19c88896d04c43055e6102e9"
+      }
+    },
+    "dynamic_predicate_review": {
+      "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/DYNAMIC_ACCEPTANCE_REVIEW.md",
+      "identity": {
+        "bytes": 5967,
+        "sha256": "54a8eb4efd4261f30e40553807efed7e0322c7c6075ee12a5f33e073fab7ba25"
+      }
+    }
+  },
+  "execution": "Original W3 diagnostic lease600; exact inherited PATH, /usr/bin/python3 -I -B, same frozen argv; C14 then R1 at most2compile/2native,120/20s; no retries. Current resource/identity checks still mandatory.",
+  "postrun": "Require outerqueue complete exit0 <=600s with cleanup live/groups/zombies empty and exact source/binary/audit bindings; any failure seals sole prefix. No screen/QF/speed admission."
+}

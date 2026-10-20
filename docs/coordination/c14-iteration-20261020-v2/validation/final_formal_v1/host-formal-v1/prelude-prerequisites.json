@@ -1,0 +1,24 @@
+{
+  "C_compilation_active": false,
+  "all_agents_quiet": true,
+  "authority": {
+    "identity": {
+      "bytes": 734,
+      "sha256": "246e2913c220ffd5467fab89fb4a77167e502312c63f18364478f7f40d902318"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-formal-v1/prelude-authority.json"
+  },
+  "controlled_queues_drained": true,
+  "kind": "cursor-process-pause-prerequisites-v1",
+  "prelude_lease_kind": "validation",
+  "prelude_lease_owner": "W1",
+  "prelude_queue": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/formal-host-prelude-v1",
+  "quiet_evidence": {
+    "identity": {
+      "bytes": 1940,
+      "sha256": "3bb17dcc81fa5a4baede2d132bfc3fcf7d75540cd794770b3940b5748c4a23f9"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/F64_GLOBAL_QUIET_v1.json"
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,214 @@
+{
+  "note": "Profiles contain original adapter commit metadata7539433; true154/14/header/compiledsource identity above is authoritative. No new captures/native resource or QF authorized by this index. Parent owns separate final_formal_v1 source-only derivation.",
+  "production14_content_sha256": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+  "actual_bench_guard": {
+    "identity": {
+      "bytes": 958614,
+      "sha256": "3ba4c173c9f394ac6e40c8c9aa73b631c0f150985318a3642e23c266a96aa363"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/business_guard_v2/BENCH_AFTER.json"
+  },
+  "profiles": {
+    "sanitized": {
+      "profile": {
+        "identity": {
+          "bytes": 279860,
+          "sha256": "0f1f7ccdb3532c56f780612a829920edf344dd2baeddccad8d2097a15cad8a95"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/profile-sanitized-v2.json"
+      },
+      "binaries": {
+        "xoffset": {
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/bench-sanitized-v2/bin/sc_xoffset",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "xoffset-c14-r1-m2-combined-v1",
+          "commit": "7539433ab96d69c4a07b1db5c0a13786da85cdcd",
+          "trust_mode": "T-trusted-typed-verified-owning-copy-Automatic;stable-owner-V8-plus-explicit-production-paths-four-v1;U-not-established",
+          "load_contract": "detached",
+          "source_content_sha256": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518"
+        },
+        "cista": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_cista",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "cista-v0.16",
+          "commit": "015b94e66c4c0d7c1ef29742383a024c84fbbba1",
+          "trust_mode": "T-trusted-offset-mode-NONE-structural-checks-private-blob;U-not-established",
+          "load_contract": "detached"
+        },
+        "flatbuffers": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_flatbuffers",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "flatbuffers-v25.12.19",
+          "commit": "7e163021e59cca4f8e1e35a7c828b5c6b7915953",
+          "trust_mode": "trusted-object-api-no-upfront-verifier",
+          "load_contract": "detached"
+        },
+        "capnproto": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_capnproto",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "capnproto-v1.5.0",
+          "commit": "373e61ec89e2359f1c362e9b2eadc552f4779306",
+          "trust_mode": "T-trusted-bounded-reader-builder-detached;U-not-established",
+          "load_contract": "detached"
+        },
+        "cereal": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-sanitized-v1/bin/sc_cereal",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "cereal-v1.3.2",
+          "commit": "ebef1e929807629befafbb2918ea1a08c7194554",
+          "trust_mode": "T-trusted-binary-native-std-detached;U-not-established",
+          "load_contract": "detached"
+        }
+      },
+      "lock_dir": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination",
+      "compiled_source_binding": {
+        "identity": {
+          "bytes": 72369,
+          "sha256": "cd4791cd08bb640dfad09ad69bd70082a0b64f3049b187a13a363a92abee145f"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/compiled-source-binding-sanitized-v2.json"
+      },
+      "platform_class": "wsl2-vm-x86_64",
+      "environment": {
+        "LC_ALL": "C",
+        "LANG": "C",
+        "TZ": "UTC",
+        "PATH": "/usr/bin:/bin",
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1:allocator_may_return_null=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      }
+    },
+    "normal": {
+      "profile": {
+        "identity": {
+          "bytes": 276487,
+          "sha256": "bfcc0fc389687c1a1c14b59462dc5b34d080d2bfa68ecae351eb1d7c88eb8348"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/profile-normal-v2.json"
+      },
+      "binaries": {
+        "xoffset": {
+          "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/bench-normal-v2/bin/sc_xoffset",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "xoffset-c14-r1-m2-combined-v1",
+          "commit": "7539433ab96d69c4a07b1db5c0a13786da85cdcd",
+          "trust_mode": "T-trusted-typed-verified-owning-copy-Automatic;stable-owner-V8-plus-explicit-production-paths-four-v1;U-not-established",
+          "load_contract": "detached",
+          "source_content_sha256": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518"
+        },
+        "cista": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_cista",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "cista-v0.16",
+          "commit": "015b94e66c4c0d7c1ef29742383a024c84fbbba1",
+          "trust_mode": "T-trusted-offset-mode-NONE-structural-checks-private-blob;U-not-established",
+          "load_contract": "detached"
+        },
+        "flatbuffers": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_flatbuffers",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "flatbuffers-v25.12.19",
+          "commit": "7e163021e59cca4f8e1e35a7c828b5c6b7915953",
+          "trust_mode": "trusted-object-api-no-upfront-verifier",
+          "load_contract": "detached"
+        },
+        "capnproto": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_capnproto",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "capnproto-v1.5.0",
+          "commit": "373e61ec89e2359f1c362e9b2eadc552f4779306",
+          "trust_mode": "T-trusted-bounded-reader-builder-detached;U-not-established",
+          "load_contract": "detached"
+        },
+        "cereal": {
+          "path": "/root/xoffset-performance-v5/20261018/v1/bench-normal-v1/bin/sc_cereal",
+          "prefix": [
+            "/usr/bin/taskset",
+            "-c",
+            "2"
+          ],
+          "library": "cereal-v1.3.2",
+          "commit": "ebef1e929807629befafbb2918ea1a08c7194554",
+          "trust_mode": "T-trusted-binary-native-std-detached;U-not-established",
+          "load_contract": "detached"
+        }
+      },
+      "lock_dir": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination",
+      "compiled_source_binding": {
+        "identity": {
+          "bytes": 71302,
+          "sha256": "dd0abd8518dc69a4e257c9cf24e40e2b9910ba6f7081745ac70828ed28f14906"
+        },
+        "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/compiled-source-binding-normal-v2.json"
+      },
+      "platform_class": "wsl2-vm-x86_64",
+      "environment": {
+        "LC_ALL": "C",
+        "LANG": "C",
+        "TZ": "UTC",
+        "PATH": "/usr/bin:/bin"
+      }
+    }
+  },
+  "candidate_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+  "actual_bench_queue_result": {
+    "identity": {
+      "bytes": 444,
+      "sha256": "31c1d6a9ecc50d736f6e657ce5549cbfd15f2c738bdf18d4f73d2b21aec465ac"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/queues/bench-profiles-v2/result.json"
+  },
+  "observed_utc": "2026-10-19T19:59:31.564513Z",
+  "actual_bench_result": {
+    "identity": {
+      "bytes": 2659,
+      "sha256": "ad2ebb2f917a492f5c568009beac15199e7d9b0c40ea8a287fbcbbde1ef38d16"
+    },
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-v1/bench-profiles-v2/result.json"
+  },
+  "candidate": "r1-m2-combined-v1",
+  "status": "actual_combined_bench_profiles_ready_not_formal_admission",
+  "source_identity": {
+    "identity": {
+      "bytes": 2550,
+      "sha256": "a160f395702a70c5837f4f7d3433b9820e106de3082ca6160bf3c29483d61b1e"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/business/candidate-source-identity-v2.json"
+  }
+}

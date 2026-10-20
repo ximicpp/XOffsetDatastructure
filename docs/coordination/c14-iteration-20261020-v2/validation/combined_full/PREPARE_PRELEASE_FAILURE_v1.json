@@ -1,0 +1,22 @@
+{
+  "source_or_tool_changed": false,
+  "lease_started": false,
+  "observed_utc": "2026-10-19T19:57:00.104912Z",
+  "status": "diagnosed_prelease_metadata_directory_absent",
+  "error": "FileNotFoundError at business/dispatch.py:22 opening business/prepare-dispatch-request.json in exclusive-create mode; parent business directory absent",
+  "actual_argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/prepare_combined_business_v2.py"
+  ],
+  "preserved_outputs": [
+    "COMBINED_INITIAL_GATES_v2.json",
+    "COMBINED_FULL_SOURCE_BINDING.json",
+    "business_guard_v2/PREPARE_BEFORE.json"
+  ],
+  "native": 0,
+  "correction": "Create only missing own validation business output directory, then resume original not-yet-dispatched queue. Original metadata bridge write_once accepts only equal existing values; no heavy retry or additional budget.",
+  "compiler": 0,
+  "tool_session": 44002
+}

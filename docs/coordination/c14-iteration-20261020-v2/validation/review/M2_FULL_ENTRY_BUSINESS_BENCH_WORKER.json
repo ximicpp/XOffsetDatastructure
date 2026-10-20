@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "stage": "bench",
+  "admission": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/review/M2_FULL_ENTRY_BUSINESS_BENCH_ADMISSION.json",
+    "identity": {
+      "bytes": 1119497,
+      "sha256": "655e73a0cee0c7836d765667c6b4608ad30905923d2cecbf952e7005ecd0c9f3"
+    }
+  },
+  "lease_proof": {
+    "holder": {
+      "kind": "validation",
+      "out": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/queues/bench-profiles-v2",
+      "owner": "W1",
+      "run_id": "6abf5fe7a80546d3a183487143b23939",
+      "started_at": "2026-10-19T17:59:49.064365+00:00",
+      "status": "running",
+      "supervisor_pid": 390
+    },
+    "request": {
+      "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/queues/bench-profiles-v2/request.json",
+      "identity": {
+        "bytes": 1378,
+        "sha256": "324a311f48f8eab13e6df80b18d6069edbb2caa1cb5a1ae202b40681dd65d64b"
+      }
+    }
+  },
+  "wrapper61_before": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  },
+  "timing_samples": 0,
+  "actual_result": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/m2-business-v1/bench-profiles-v2/result.json",
+    "identity": {
+      "bytes": 2659,
+      "sha256": "720ea8d9bc2736db88c03479bab988b4ad84243a98b62836cdaf7ea87934f095"
+    }
+  },
+  "wrapper61_after": {
+    "bytes": 61,
+    "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+  }
+}

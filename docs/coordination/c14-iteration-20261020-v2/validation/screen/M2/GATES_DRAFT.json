@@ -1,0 +1,24 @@
+{
+  "kind": "v2-screen-complete-gates-admission",
+  "status": "pending",
+  "candidate_identity": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/build/c14-iteration-20261020-v2/candidates/m2-exact-owns-v1/IDENTITY.json",
+    "identity": {
+      "bytes": 44233,
+      "sha256": "4a62016c53b103964d4a0b14ce56e3b717b59b54b011efbd52c021b7114b944c"
+    }
+  },
+  "gates": {
+    "codegen": null,
+    "mechanism": null,
+    "targeted": null,
+    "full_normal": null,
+    "full_san": null,
+    "business_SML": null,
+    "v1_bidirectional": null,
+    "consumers": null,
+    "lifecycle": null,
+    "safety": null,
+    "engineering": null
+  }
+}

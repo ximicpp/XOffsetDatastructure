@@ -1,0 +1,24 @@
+{
+  "C_compilation_active": false,
+  "all_agents_quiet": true,
+  "authority": {
+    "identity": {
+      "bytes": 748,
+      "sha256": "8a3c61e6767fef1d6e5f2987fe0abf466b804dbc42c89b4d27474aaa20049fb8"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/prelude-authority.json"
+  },
+  "controlled_queues_drained": true,
+  "kind": "cursor-process-pause-prerequisites-v1",
+  "prelude_lease_kind": "validation",
+  "prelude_lease_owner": "W1",
+  "prelude_queue": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-host-prelude-v1",
+  "quiet_evidence": {
+    "identity": {
+      "bytes": 1674,
+      "sha256": "aea6610b56812072262d10adc3adfd214315c4325c20e3f8e3b3cfc479f5f40d"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_GLOBAL_QUIET_v1.json"
+  },
+  "schema_version": 1
+}

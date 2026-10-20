@@ -1,0 +1,159 @@
+{
+  "status": "read_only_current_host_cpu_observation_not_quiet_admission",
+  "observed_utc": "2026-10-19T21:01:15.016297Z",
+  "sample_start_utc": "2026-10-19T21:01:12.786428Z",
+  "sample_seconds": 2.2298693,
+  "logical_windows_processors": 32,
+  "metric": "Delta TotalProcessorTime per actual PID+creation identity over observed interval;100percent means one logical core, not percent of whole machine",
+  "top20": [
+    {
+      "pid": 137532,
+      "name": "UnrealEditor",
+      "start_time_utc": "2026-10-19T15:14:35.4271547Z",
+      "cpu_seconds_delta": 4.46875,
+      "percent_of_one_core": 200.40412234026454
+    },
+    {
+      "pid": 161012,
+      "name": "zenserver",
+      "start_time_utc": "2026-10-19T15:14:42.9993595Z",
+      "cpu_seconds_delta": 4.140625,
+      "percent_of_one_core": 185.6891343362591
+    },
+    {
+      "pid": 143748,
+      "name": "powershell",
+      "start_time_utc": "2026-10-19T21:00:01.9980151Z",
+      "cpu_seconds_delta": 1.9375,
+      "percent_of_one_core": 86.88850059507973
+    },
+    {
+      "pid": 133148,
+      "name": "client_ue4-Win64-Shipping",
+      "start_time_utc": "2026-10-19T12:22:50.6454844Z",
+      "cpu_seconds_delta": 1.265625,
+      "percent_of_one_core": 56.7578108725924
+    },
+    {
+      "pid": 4340,
+      "name": "Code",
+      "start_time_utc": "2026-10-13T07:48:22.2339148Z",
+      "cpu_seconds_delta": 1.25,
+      "percent_of_one_core": 56.05709715811595
+    },
+    {
+      "pid": 151808,
+      "name": "Code",
+      "start_time_utc": "2026-10-15T06:53:13.5971090Z",
+      "cpu_seconds_delta": 1.15625,
+      "percent_of_one_core": 51.85281487125726
+    },
+    {
+      "pid": 140976,
+      "name": "OneDrive.Sync.Service",
+      "start_time_utc": "2026-10-12T23:06:30.2244274Z",
+      "cpu_seconds_delta": 0.453125,
+      "percent_of_one_core": 20.320697719817034
+    },
+    {
+      "pid": 153652,
+      "name": "Code",
+      "start_time_utc": "2026-10-15T06:52:52.8818562Z",
+      "cpu_seconds_delta": 0.296875,
+      "percent_of_one_core": 13.31356057505254
+    },
+    {
+      "pid": 17924,
+      "name": "explorer",
+      "start_time_utc": "2026-10-08T02:08:37.4896597Z",
+      "cpu_seconds_delta": 0.234375,
+      "percent_of_one_core": 10.510705717146742
+    },
+    {
+      "pid": 27136,
+      "name": "du",
+      "start_time_utc": "2026-10-19T16:05:22.6400212Z",
+      "cpu_seconds_delta": 0.234375,
+      "percent_of_one_core": 10.510705717146742
+    },
+    {
+      "pid": 49116,
+      "name": "TGitCache",
+      "start_time_utc": "2026-10-08T06:46:05.3323608Z",
+      "cpu_seconds_delta": 0.203125,
+      "percent_of_one_core": 9.109278288193842
+    },
+    {
+      "pid": 175988,
+      "name": "MyPopo",
+      "start_time_utc": "2026-10-16T01:48:14.5390246Z",
+      "cpu_seconds_delta": 0.171875,
+      "percent_of_one_core": 7.707850859240944
+    },
+    {
+      "pid": 157380,
+      "name": "Taskmgr",
+      "start_time_utc": "2026-10-11T14:51:24.1780037Z",
+      "cpu_seconds_delta": 0.109375,
+      "percent_of_one_core": 4.904996001335146
+    },
+    {
+      "pid": 32908,
+      "name": "pwsh",
+      "start_time_utc": "2026-10-19T21:01:11.7889237Z",
+      "cpu_seconds_delta": 0.09375,
+      "percent_of_one_core": 4.204282286858697
+    },
+    {
+      "pid": 175428,
+      "name": "popo_render",
+      "start_time_utc": "2026-10-16T01:49:08.5479560Z",
+      "cpu_seconds_delta": 0.078125,
+      "percent_of_one_core": 3.503568572382247
+    },
+    {
+      "pid": 17348,
+      "name": "msedgewebview2",
+      "start_time_utc": "2026-10-08T02:10:05.8277637Z",
+      "cpu_seconds_delta": 0.078125,
+      "percent_of_one_core": 3.503568572382247
+    },
+    {
+      "pid": 23204,
+      "name": "Code",
+      "start_time_utc": "2026-10-13T07:48:22.3531754Z",
+      "cpu_seconds_delta": 0.0625,
+      "percent_of_one_core": 2.8028548579057975
+    },
+    {
+      "pid": 40364,
+      "name": "codex",
+      "start_time_utc": "2026-10-19T13:09:37.4921120Z",
+      "cpu_seconds_delta": 0.046875,
+      "percent_of_one_core": 2.1021411434293484
+    },
+    {
+      "pid": 14812,
+      "name": "claude",
+      "start_time_utc": "2026-10-19T16:33:37.3852899Z",
+      "cpu_seconds_delta": 0.046875,
+      "percent_of_one_core": 2.1021411434293484
+    },
+    {
+      "pid": 198252,
+      "name": "ChatGPT",
+      "start_time_utc": "2026-10-19T13:09:33.6569532Z",
+      "cpu_seconds_delta": 0.046875,
+      "percent_of_one_core": 2.1021411434293484
+    }
+  ],
+  "processes_suspended": 0,
+  "processes_stopped": 0,
+  "priorities_changed": 0,
+  "power_calls": 0,
+  "benchmark_children": 0,
+  "queue_dispatched": 0,
+  "controlled_global_quiet_proved_here": false,
+  "external_activity_scope": "All observed process activity remains live. Only the existing authorized Shipping/TGitCache plan may be paused during a separately admitted prelude; Editor,zenserver and unrelated processes are outside that authorization.",
+  "Q32_timing_admitted": false
+}

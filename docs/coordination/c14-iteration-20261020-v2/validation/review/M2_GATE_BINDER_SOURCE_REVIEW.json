@@ -1,0 +1,82 @@
+{
+  "QF_admitted": false,
+  "actions_performed": {
+    "R1_raw144_read": 0,
+    "binder_entry": 0,
+    "checker": 0,
+    "compile": 0,
+    "freeze": 0,
+    "host": 0,
+    "native": 0,
+    "queue": 0,
+    "read_small_metadata_and_AST_only": true
+  },
+  "actual_screen_worker": {
+    "identity": {
+      "bytes": 59817,
+      "sha256": "9dc7c7808c3cb8e5fc9c77ed5ed4cf34e6f51b82a5ca490c6751ba17a7b07aaf"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/m2/screen.py"
+  },
+  "blocking": [
+    {
+      "consumer": "m2/screen.py freeze(): expected[mechanism]",
+      "id": "mechanism-assertions-incompatible-with-actual-screen-freeze",
+      "impact": "prepare writes mechanism as passed without these two required assertions. complete preserves original eight receipts. Consequently actual freeze rejects this receipt even after three parent decisions pass. Fix only after binding the actual independent static-codegen and unhooked-bare evidence; do not infer either assertion from hooked runtime counts.",
+      "produced": {
+        "actual_nonempty_path_observed": true,
+        "diagnostic_candidate_runs": 1,
+        "new_control_runs": 0,
+        "same_predeclared_C14_control": true
+      },
+      "producer": "facts(): assertions[mechanism]",
+      "required_missing": {
+        "static_actual_codegen_passed": true,
+        "unhooked_screen_binary": true
+      }
+    }
+  ],
+  "candidate": "m2-exact-owns-v1",
+  "contract": {
+    "identity": {
+      "bytes": 7190,
+      "sha256": "423df98e886f83d993fdca8f7dbd6eb91329307122065ebe625d093618c29772"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/screen/M2/M2_GATE_REVIEW_MAP_REQUEST.md"
+  },
+  "gate_binding_execution_admitted": false,
+  "kind": "independent-M2-gate-binder-source-review",
+  "observed_utc": "2026-10-19T19:05:06.633415+00:00",
+  "other_static_findings": [
+    {
+      "area": "actual M2 full/source",
+      "details": "Hardpins actual functional/core records; actual core identity154 and production14 subset/source_root checks. Full normal/SAN use exact four-ref full_closure with154 source input identities/73 unique tests/junit+inventory IDs. Actual schemas have these fields; targeted exact16commands/8native normal4+SAN4 and same154/14 are present. Business/consumer/runtime/lifecycle actual identity refs and52/25+25+2 schema are compatible.",
+      "status": "satisfactory_at_schema_scope"
+    },
+    {
+      "area": "independent eight-gate evidence",
+      "details": "Requires status+record envelope, actual fileID, non-self map. Seven gates require exactdc43 functional bridge and underlying independently passed samecandidate counts154/14; mechanism requires exact4d8 bridge and actual underlying mechanism audit/checker/core pins. Mechanism actual result is onecandidate/no newcontrol, original control audit7b834..., positive mutate/full truth, unchanged6492 and cleanup. No original native_result/checker is called.",
+      "status": "satisfactory_at_source_scope"
+    },
+    {
+      "area": "three parent typed decisions",
+      "details": "Checks root typed kind/gate/passedstatus/exact candidateidentity154/14/assertions/evidence and identical independent_review envelope. Underlying passed record must bind samecandidate. Actual codegen/safety root envelopes are compatible; engineering typed file is currently absent, so missing/unchecked parent decisions fail through checked/open errors before any GATES_v2 publication.",
+      "status": "satisfactory_at_source_scope"
+    },
+    {
+      "area": "publication/failure boundary",
+      "details": "write() creates parent directories before exclusive x-file write, solving missing output-dir issue. prepare publishes8passed+3pending and pending GATES only, complete requires all3actual decisions and retains original8. No binder compilation/native/checker/queue/freeze or exception swallow/continue path exists. Any partial publication stays immutable; caller must honor nonzero exit. Output scope only M2 new gate directories/GATES/PARENT request; no R1/shared writes.",
+      "status": "satisfactory_at_source_scope"
+    }
+  ],
+  "reviewer": "screen_review",
+  "screen_admitted": false,
+  "status": "blocked",
+  "tool": {
+    "identity": {
+      "bytes": 19497,
+      "sha256": "99ea764fc8d7b0e19ea4fe83ca3e51d26ad73f2ea9d453f516985e4ecb4538f2"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/screen/bind_gates_m2.py"
+  }
+}

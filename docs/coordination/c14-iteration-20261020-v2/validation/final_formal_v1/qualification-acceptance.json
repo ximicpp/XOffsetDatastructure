@@ -1,0 +1,56 @@
+{
+  "schema": "qualification-root-acceptance-v1",
+  "status": "passed",
+  "measurement_qualified": true,
+  "complete": true,
+  "audit_report": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_OFFLINE_AUDIT_RESULT_v1.json",
+    "identity": {
+      "bytes": "441839",
+      "sha256": "c704b28b8227f550522e3054f9f7ed56f36afb9dc171b3757897cffd45785814"
+    }
+  },
+  "queue_request": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/request.json",
+    "identity": {
+      "bytes": "1740",
+      "sha256": "27517fc70174ff9619847f57059e2c833d11b70b3cfd5893ebbafd3a064704e0"
+    }
+  },
+  "queue_result": {
+    "path": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue/result.json",
+    "identity": {
+      "bytes": "442",
+      "sha256": "5a3c972974f39764903b06790f01aee9962c777467eb6f1756f729660d21d1ad"
+    }
+  },
+  "postrun_pin": "b3db8adafebb4079f65f7557e00917ac108a71184dfcb93ed7bfc2df992449ce",
+  "accepted_at": "2026-10-19T22:10:29.478617+00:00",
+  "accepted_by": "root",
+  "source_candidate": "r1-m2-combined-v1",
+  "candidate_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+  "independent_statistics": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_STATISTICAL_RESULT_ACCEPTANCE.json",
+    "identity": {
+      "bytes": "58112",
+      "sha256": "a1888a505958d30d04715dce2be68ce07fd97bac398b1367cb4d58233216146f"
+    }
+  },
+  "independent_engineering": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_ENGINEERING_RESULT_ACCEPTANCE.json",
+    "identity": {
+      "bytes": "12727",
+      "sha256": "074d4ef38faa968b7d1151f5cda9b8ad068afb5ed33b553d368c252c95f98b19"
+    }
+  },
+  "actual_result_index": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_ACTUAL_RESULT_INDEX_v1.json",
+    "identity": {
+      "bytes": "26704",
+      "sha256": "4be7e7096e11adbfe51bea998570f3352431d405a26f2e94f039b32b7dafa06f"
+    }
+  },
+  "performance_goal_complete": false,
+  "formal_timing_admitted": false,
+  "scope": "Current once-only original Q32 complete audit, all30 AA and actual engineering accepted. Allows separately reviewed original F preparation; no F timing admission or competitive performance claim."
+}

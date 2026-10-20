@@ -1,0 +1,15 @@
+{
+  "kind": "v2-screen-preconditions",
+  "status": "pending",
+  "candidate": "r1-canonical-hotcold-v1",
+  "cpu": null,
+  "affinity_observation": null,
+  "cost_policy": null,
+  "functional_summary": null,
+  "full_request": null,
+  "control_manifest_exception": null,
+  "host_policy": {
+    "power_guid": null,
+    "change_power": false
+  }
+}

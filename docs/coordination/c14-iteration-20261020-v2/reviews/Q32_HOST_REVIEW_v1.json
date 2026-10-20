@@ -1,0 +1,103 @@
+{
+  "status": "passed",
+  "kind": "c14-q32-host-admission",
+  "candidate": "r1-m2-combined-v1",
+  "freeze_sha256": "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+  "launcher_source": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/q32_host_v1/execute.py",
+    "identity": {
+      "bytes": 17558,
+      "sha256": "2ae2f22053fdd50cf7cbfdceb22e11d04284cc4fcf70811a203e8edf6f3722b6"
+    }
+  },
+  "allowed_names": [
+    "client_ue4-Win64-Shipping",
+    "TGitCache"
+  ],
+  "fresh_plan_required": true,
+  "no_old_pid_or_state": true,
+  "watchdog_seconds": 2820,
+  "prelaunch_remaining_seconds_minimum": 2760,
+  "restoration_before_audit": true,
+  "standing_human_authorization": {
+    "identity": {
+      "bytes": 1532,
+      "sha256": "b97fa5871d35687119f41ddb576386dd4f4210f08aa9cd0068ff50ba78203b92"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/standing-process-pause-human-authorization-v1.json"
+  },
+  "original_human_authorization": {
+    "identity": {
+      "bytes": 775,
+      "sha256": "504243b5cdcf609ad3e5bd70b4bbd0893279b17b3085bb28240efc8d554fc8c0"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/docs/coordination/receive-completion-20261019/process-pause-authorization-v1.json"
+  },
+  "watchdog_source_acceptance": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_HOST_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 5221,
+      "sha256": "693344acb1003137d0aca35cb90a0122e153639de1a29fc088672b575f54ad88"
+    }
+  },
+  "power_policy": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/FINAL_QF_POWER_POLICY_DECISION.json",
+    "identity": {
+      "bytes": 1880,
+      "sha256": "85a7951389cd442e07a52118a50daf25d9fd656a56fbc4f65510069015169392"
+    }
+  },
+  "preparation_original_power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "power_target_guid": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+  "power_temporary_change": true,
+  "source_power_unchanged": true,
+  "restore_original_power": true,
+  "pre_review_process_plan": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_READONLY_PROCESS_PLAN_v1.json",
+    "identity": {
+      "bytes": 1522,
+      "sha256": "faa541ee23ff851dcfd86def921065c9034847c5b37f2575513d19e023370be7"
+    }
+  },
+  "current_host_cpu": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/q32_freeze_preparation/Q32_CURRENT_HOST_CPU_v1.json",
+    "identity": {
+      "bytes": 5065,
+      "sha256": "02fc306ca23fe3d73c37d7111d4ce5857c3cbabd1bccb6b39c014e31ace977d0"
+    }
+  },
+  "host_external_activity": "ObservedliveUnrealEditor~200%onecore/zenserver~186%/Shipping~57%plusCode; onlyShipping/TGitCache authorizedpause. Root must explicitly assess liveotheractivity; no whole-machine quiet claim. Observationitselfisnotquietadmission.",
+  "resource_observation": "Actualfixed12 b897 Balanced/livehost once-only feasibility projection; no HighPerformance sample or future tail guarantee.",
+  "power_coverage": "Originalnativeinterval starts under originalPowerWindow ready existingHighPerformance; original finally/watchdog restores actualoriginal. Parentlauncher onlyreadspower; aftertiming it owned-resumesprocesses then waitsmax90sec fororiginalpower completion beforeassertingrestored. Full originaloffline audit checksactualpowerinterval/metadata; originalsourceunchanged.",
+  "observed_utc": "2026-10-19T21:11:43.724457+00:00",
+  "launcher_independent_source_review": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_TIMING_LAUNCHER_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 5914,
+      "sha256": "60d55e9158b5a79d4a282e4f37482f9b6be5470fab6754a69bf1e6d4d2e7806d"
+    }
+  },
+  "actual_guest_queue_and_space": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_ROOT_PRELAUNCH_GUEST_FACTS_v1.json",
+    "identity": {
+      "bytes": 533,
+      "sha256": "b9144a7305207848931e49c98cb6c74daccf17674b6c26b85a87aa1e135bae73"
+    }
+  },
+  "actual_windows_process_and_power": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_ROOT_PRELAUNCH_WINDOWS_FACTS_v1.json",
+    "identity": {
+      "bytes": 618,
+      "sha256": "abd67ec98560102288b79cc99f840ed27248c546dbeb22b6fafb7d1d243ad7c9"
+    }
+  },
+  "controlled_scope_facts": {
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/reviews/Q32_ROOT_CONTROLLED_QUIET_FACTS_v1.json",
+    "identity": {
+      "bytes": 1220,
+      "sha256": "127e82366e4e9998881f657623803cc0b5266f7083e3599e53fcfef773bac173"
+    }
+  },
+  "root_actual_host_assessment": "Proceed with original finite qualification on disclosed live host with32 logical processors, sufficient current space and no visible compilers/controlled concurrent heavy work. Background Editor/zenserver/Code are not suspended. Neither this assessment nor the Balanced resource observation guarantees noise, same power measurements or future tails; original30 A/A and deadline/whole-resource rules remain binding.",
+  "conditional_actual_checks": "Prelude must freshly resolve two names/creation/SID/heldhandles/token and original scheme, assert remaining>=2760 twice, fail before sampling on any mismatch; restore own suspension and original PowerWindow before audit."
+}

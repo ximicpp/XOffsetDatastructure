@@ -1,0 +1,20 @@
+{
+  "compiler_process_names_queried": [
+    "cl",
+    "c1xx",
+    "clang++",
+    "clang",
+    "cmake",
+    "ninja",
+    "gcc",
+    "g++",
+    "link"
+  ],
+  "C_drive_available_bytes": 25962213376,
+  "kind": "f64-root-prelaunch-windows-facts-v1",
+  "observed_utc": "2026-10-19T22:14:29.7619726Z",
+  "power_query_only": true,
+  "active_compiler_processes": [],
+  "actual_power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+  "scope": "Exact Windows process names and current power read only; not whole-machine quiet or physical core exclusivity"
+}

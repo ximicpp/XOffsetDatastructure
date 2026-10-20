@@ -1,0 +1,31 @@
+{
+  "audits": [
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+        "audit",
+        "--out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-host-prelude-v1"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\"job_status\": \"complete\", \"run_id\": \"92307c4faaef40bb80ae3523db6387c3\", \"status\": \"audit_passed\"}\n"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/experiments/vm_coordination/run_job.py",
+        "audit",
+        "--out",
+        "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/qualification-v1/queue"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "{\"job_status\": \"complete\", \"run_id\": \"15a33d5e75014b3e85019eebccf0712d\", \"status\": \"audit_passed\"}\n"
+    }
+  ],
+  "status": "passed"
+}

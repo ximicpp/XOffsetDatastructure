@@ -1,0 +1,179 @@
+{
+  "schema": "independent-combined-full-tool-review-v1",
+  "status": "passed_static_tools_only",
+  "reviewer": "phase_c_source_review",
+  "date": "2026-10-20 Asia/Shanghai",
+  "request": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\core\\REQUESTS_COMBINED_FULL.json",
+    "identity": {
+      "bytes": 84671,
+      "sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7"
+    }
+  },
+  "authoring_revision": {
+    "parent_initial_read_sha256": "6209f54c4a6c3a162aba447c32f2c107e6c42ea5857baa7ce059e8208bbaef4d",
+    "reviewed_actual_sha256": "d53584c5feef956307aaa717e8b638248608dc576b5ac55c9665ca13fca352f7",
+    "reviewed_actual_bytes": 84671,
+    "scope": "Full request was unexecuted authoring metadata. Root instructed review of actual d535 revision; no acceptance is transferred to superseded6209 bytes. Immutable INITIAL3006 is unchanged."
+  },
+  "candidate": "r1-m2-combined-v1",
+  "candidate_identity": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\build\\c14-iteration-20261020-v2\\candidates\\r1-m2-combined-v1\\IDENTITY.json",
+    "identity": {
+      "bytes": 45694,
+      "sha256": "f88dba6a6f18a6b70bbe47253d1edae360463c8e812051694202f15175486d67"
+    }
+  },
+  "candidate_main_sha256": "155f0847dff72047ac580ae8d3ead6927e52ff84eb5c9062ea2d4999980cd501",
+  "source_members": 154,
+  "production_members": 14,
+  "production_canonical_content_digest": "8cd90345f109308d150caa141e49fa65e2e7b1fac957957e8e45bc8ee8eb5518",
+  "source_content_digest_policy": "Prepare derives canonical sorted production14 JSON from actual source; generic profile/dependency consumers recalculate and verify it, not an inherited M2 literal.",
+  "derived_tools": {
+    "derivation": {
+      "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\combined_full\\DERIVATION.json",
+      "identity": {
+        "bytes": 37114,
+        "sha256": "a06c89a0996c4641ecf7a22beb43b3c1a2851916f228003c76a19d7a325b6591"
+      }
+    },
+    "diff": {
+      "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\combined_full\\TOOLS.patch",
+      "identity": {
+        "bytes": 20226,
+        "sha256": "dbe232b9b81fb22e4ff20cc032e7534551d03bd4ea692bb86fc1458af44f0d9d"
+      }
+    },
+    "members": 65,
+    "actual_before_after_pins_match": true,
+    "changed_python_files": [
+      "business/dispatch.py",
+      "business/prepare.py",
+      "business/workers/business_common.py",
+      "business/workers/common.py",
+      "business/workers/package/support.py",
+      "business_matrix/common.py",
+      "business_matrix/dispatch.py",
+      "business_matrix/worker.py",
+      "full_entry.py"
+    ],
+    "unchanged_CPP_header_fixtures": 18,
+    "exact_literal_derivation_plus_two_explicit_bridges": true
+  },
+  "request_tools_and_inputs_actual_hash_checked": 88,
+  "compiler_launcher": {
+    "reference": {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+      "identity": {
+        "bytes": 61,
+        "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+      }
+    },
+    "actual_match": true
+  },
+  "initial_request": {
+    "path": "C:/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/core/REQUESTS_COMBINED_INITIAL.json",
+    "identity": {
+      "bytes": 53428,
+      "sha256": "3006c3057c6f05300d391e71cb5a70ccdfd0417abc1819bdc9df1c836bde0e2c"
+    }
+  },
+  "remaining_jobs": 7,
+  "remaining_job_timeouts_seconds": [
+    300,
+    2400,
+    null,
+    2400,
+    2400,
+    3600,
+    120
+  ],
+  "initial_reuse": "Real same-combination normal73/SAN73/external4 are mandatory and are never rerun by this remaining request.",
+  "repo_targeted_scope": "Verifier requires own six repository sources, source154, real JUnit run/pass, compileDB/CTest no-arg scope, O3/P2996/libc++/pthread, effective C++26, assertions after DNDEBUG, sanitizer profile and failpoint environment. Scope difference c++26 vs manual gnu++26 is explicit; no missing scope is silently credited.",
+  "external_scope": "Verifier pins real REQUESTS_COMBINED_EXTERNAL and receipt, eight actual compile/run commands with exact argv/labels/kinds and rc0, and same combined source154: four actual programs. Informational inherited worker_argv is nonoperative and explicitly disclosed; registered immutable initial.jobs[2].argv is authoritative.",
+  "business_scope": {
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "native_children_each_profile": 80,
+    "nine_stage_truth_preserved": true,
+    "V1_main": 84,
+    "V1_extras": 8,
+    "AB_native_actions": 4,
+    "C_native_actions": 4,
+    "consumers": "storage/full installed/subproject/relocated/archive plus receive",
+    "shared_runtimes": 2,
+    "lifecycle_normal_models": 25,
+    "lifecycle_sanitized_models": 25,
+    "lifecycle_pool_probes": 2,
+    "lifecycle_children": 52
+  },
+  "new_bridge_and_finalizer": {
+    "verifier": {
+      "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\verify_combined_initial.py",
+      "identity": {
+        "bytes": 7209,
+        "sha256": "d5f9116dff482bce761ddf7809c125dbee6bf64ea48160f4018f4f82744d5d73"
+      }
+    },
+    "prepare_bridge": {
+      "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\prepare_combined_business.py",
+      "identity": {
+        "bytes": 1963,
+        "sha256": "249c8dcc2762f49f51f4640d78ec0f30fd979566ffba8e378c0827ff3dd896a3"
+      }
+    },
+    "finalizer": {
+      "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\core\\finalize_combined_full.py",
+      "identity": {
+        "bytes": 7578,
+        "sha256": "e4b8b608052b79cf1ae2f65f463975fcaa41653e05a07ed64552f0dff7150c03"
+      }
+    },
+    "current_vs_initial_request_identity_distinguished": true,
+    "own_actual_154_JUnit_inventory_compileDB_refs_rechecked": true,
+    "PREPARED_dynamic_binding_and_final_refs_preserved": true
+  },
+  "unchanged_policies": [
+    "Original global supervisor and single shared lease; dispatch outside held lease, no nested supervisor.",
+    "Failure stops and preserves evidence; actual cleanup/resource/deadline admission remains validation responsibility.",
+    "Original fixtures, oracles, workloads, public operations, nine stages, assertions and caps remain unchanged.",
+    "Fresh combined candidate source/profile/dependency/output identities; immutable controls/competitors only reused under existing pins."
+  ],
+  "active_stale_M2_expected_SHA_digest_library_or_output_prefix_found": false,
+  "source_review_reused": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\reviews\\COMBINED_SOURCE_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 8470,
+      "sha256": "6b92309f8e147df886fa2651a00a3cfb3b9d372aceedba073b08531e2e7bd31d"
+    }
+  },
+  "M2_predecessor_review_reused": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\reviews\\M2_FULL_ACCEPTANCE.json",
+    "identity": {
+      "bytes": 15117,
+      "sha256": "312d7d965f2c039d89eada390de7cf2c10b8a15c1599961c1297d4226ee793b7"
+    }
+  },
+  "initial_execution_tool_review_repeated": false,
+  "new_reviewer_python_executions": 0,
+  "new_compiles": 0,
+  "new_native": 0,
+  "new_queue_dispatches": 0,
+  "large_body_hashes": 0,
+  "combined_functional_pass_proved": false,
+  "speed_inferred": false,
+  "new72_authorized": false,
+  "new_diagnostic_authorized": false,
+  "screen_admitted": false,
+  "QF_admitted": false,
+  "limits": [
+    "Static tooling review only. Actual current resources/host/original lease/tool-runtime-dependency closures and finite execution admission are still required.",
+    "Initial already-started execution tools were not re-reviewed; runtime-agent scope is separate.",
+    "No standalone M2/R1/M1 correctness result replaces actual combined results.",
+    "No Python script/import/AST checker, compiler, native or queue was run by this reviewer.",
+    "No new tests, measurement-window admission or performance conclusion."
+  ]
+}

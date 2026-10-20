@@ -1,0 +1,195 @@
+{
+  "new_queue": 0,
+  "scope": "Current short processCPU/memory/disk snapshot and original runner nonblocking status; no persistent quiet guarantee. Parent controls otheragents idle at actual admission. No process pause, scheme change, compiler or native benchmark.",
+  "paused_processes": 0,
+  "backing_free_bytes": 27913748480,
+  "QF_admitted": false,
+  "windows_top_cpu": [
+    {
+      "cpu_one_core_percent": 270,
+      "pid": 137532,
+      "working_set_bytes": 963792896,
+      "name": "UnrealEditor"
+    },
+    {
+      "cpu_one_core_percent": 201,
+      "pid": 161012,
+      "working_set_bytes": 206143488,
+      "name": "zenserver"
+    },
+    {
+      "cpu_one_core_percent": 67,
+      "pid": 133148,
+      "working_set_bytes": 645992448,
+      "name": "client_ue4-Win64-Shipping"
+    },
+    {
+      "cpu_one_core_percent": 13,
+      "pid": 175988,
+      "working_set_bytes": 646418432,
+      "name": "MyPopo"
+    },
+    {
+      "cpu_one_core_percent": 10,
+      "pid": 17924,
+      "working_set_bytes": 499392512,
+      "name": "explorer"
+    },
+    {
+      "cpu_one_core_percent": 9,
+      "pid": 132180,
+      "working_set_bytes": 105299968,
+      "name": "pwsh"
+    },
+    {
+      "cpu_one_core_percent": 9,
+      "pid": 188060,
+      "working_set_bytes": 1164009472,
+      "name": "ChatGPT"
+    },
+    {
+      "cpu_one_core_percent": 7,
+      "pid": 173788,
+      "working_set_bytes": 112312320,
+      "name": "powershell"
+    },
+    {
+      "cpu_one_core_percent": 6,
+      "pid": 9312,
+      "working_set_bytes": 108814336,
+      "name": "EpicGamesLauncher"
+    },
+    {
+      "cpu_one_core_percent": 5,
+      "pid": 157380,
+      "working_set_bytes": 842022912,
+      "name": "Taskmgr"
+    },
+    {
+      "cpu_one_core_percent": 4,
+      "pid": 175428,
+      "working_set_bytes": 108482560,
+      "name": "popo_render"
+    },
+    {
+      "cpu_one_core_percent": 4,
+      "pid": 27872,
+      "working_set_bytes": 35291136,
+      "name": "msedgewebview2"
+    }
+  ],
+  "new_native_benchmark": 0,
+  "new_compile": 0,
+  "power_changed": false,
+  "guest": {
+    "guest_free_bytes": 579152142336,
+    "backing_free_bytes": 27913748480,
+    "memory": {
+      "MemTotal": 67264135168,
+      "MemAvailable": 66161868800,
+      "SwapFree": 17179869184
+    },
+    "cpu_observation_seconds": 2.0041826179999997,
+    "top_cpu": [
+      {
+        "pid": 1,
+        "name": "systemd",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 2,
+        "name": "init-systemd(Ub",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 11,
+        "name": "init",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 65,
+        "name": "systemd-journal",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 89,
+        "name": "systemd-udevd",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 153,
+        "name": "systemd-resolve",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 154,
+        "name": "systemd-timesyn",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 200,
+        "name": "cron",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 202,
+        "name": "dbus-daemon",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 207,
+        "name": "networkd-dispat",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 208,
+        "name": "rsyslogd",
+        "cpu_one_core_percent": 0.0
+      },
+      {
+        "pid": 211,
+        "name": "systemd-logind",
+        "cpu_one_core_percent": 0.0
+      }
+    ]
+  },
+  "windows_cpu_observation_seconds": 2.228841,
+  "observed_utc": "2026-10-19T20:27:58.463056Z",
+  "original_runner": {
+    "bytes": 16898,
+    "sha256": "6f155fcb1f17d6a01d68c4c9393bc636bf4af82bafdc830ba8dc8b759ea1d909"
+  },
+  "power": {
+    "after": "电源方案 GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (平衡)",
+    "before": "电源方案 GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (平衡)",
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "is_original_Balanced": true,
+    "unchanged": true
+  },
+  "status": "read_only_host_resource_observed_not_execution_admission",
+  "original_lease": {
+    "last_record": {
+      "finished_at": "2026-10-20T04:13:26.518164+08:00",
+      "out": "/root/xoffset-c14-iteration/20261020/v2/validation/combined-business-matrix-v1/queues/production-C-matrix-v2",
+      "owner": "W1",
+      "run_id": "95fa423de9f04cff829196536421932e",
+      "status": "complete"
+    },
+    "lock": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure开发/build/vm-coordination/queue.lock",
+    "status": "idle"
+  },
+  "authorized_name_process_observations": [
+    {
+      "cpu_one_core_percent": 67,
+      "pid": 133148,
+      "working_set_bytes": 645992448,
+      "name": "client_ue4-Win64-Shipping"
+    },
+    {
+      "cpu_one_core_percent": 4,
+      "pid": 49116,
+      "working_set_bytes": 372797440,
+      "name": "TGitCache"
+    }
+  ]
+}

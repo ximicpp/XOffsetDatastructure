@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/core/combined_full/business/workers/functional-coordinator.py"
+  ],
+  "coordinator": {
+    "bytes": 6556,
+    "sha256": "e73a182d80cf5ecb7400396a13f7b9b3ef5a38eca587fa887bc3f53999fb9c3f"
+  },
+  "source_identity": {
+    "bytes": 2836,
+    "sha256": "de4c1b6c9102d5583c8f2f69ea61e0a00609bd8fade713ee3a094e09b63ae51b"
+  },
+  "reused_bench_profiles": {
+    "bytes": 2659,
+    "sha256": "ad2ebb2f917a492f5c568009beac15199e7d9b0c40ea8a287fbcbbde1ef38d16"
+  }
+}

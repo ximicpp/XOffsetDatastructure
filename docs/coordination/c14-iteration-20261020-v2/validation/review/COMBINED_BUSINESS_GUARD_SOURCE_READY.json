@@ -1,0 +1,85 @@
+{
+  "kind": "combined-business-before-after-source-only-guard-ready",
+  "status": "source_only_waiting_independent_review_not_executed",
+  "observed_utc": "2026-10-19T19:45:20.007618+00:00",
+  "tool": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\combined_business_guard.py",
+    "identity": {
+      "bytes": 16609,
+      "sha256": "95f835a280d619831cde01de53e017b125059e182d2b931e7b62599d7e13e07e"
+    }
+  },
+  "retained_initial_guard": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\tools\\c14_iteration_20261020_v2\\validation\\combined_initial_guard.py",
+    "identity": {
+      "bytes": 9857,
+      "sha256": "f298c76860682e3a66dbbae72824ed450950efdaa2384e2824173b366dcee84c"
+    }
+  },
+  "request_sha_policy": "--request-sha256 must name actual independently admitted final REQUESTS_COMBINED_FULL.json bytes. No6209/d535 hardcoded assumption; current raw candidate and immutable INITIAL3006/EXTERNAL88e8 remain checked.",
+  "stages": [
+    "prepare",
+    "bench",
+    "functional",
+    "package",
+    "runtime",
+    "lifecycle",
+    "final"
+  ],
+  "before_argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/combined_business_guard.py",
+    "before",
+    "STAGE",
+    "--request-sha256",
+    "FINAL_ADMITTED_SHA256",
+    "--windows-observation",
+    "ABSOLUTE_ROOT_CREATED_FRESH_WINDOWS_STAGE_FILE.json"
+  ],
+  "run_between": "Invoke exact REQUESTS_COMBINED_FULL.jobs[stage].argv directly outside every lease. The guard never dispatches and never owns a lease.",
+  "after_argv": [
+    "/usr/bin/python3",
+    "-I",
+    "-B",
+    "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/tools/c14_iteration_20261020_v2/validation/combined_business_guard.py",
+    "after",
+    "STAGE",
+    "--request-sha256",
+    "SAME_FINAL_ADMITTED_SHA256"
+  ],
+  "outputs": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure开发/docs/coordination/c14-iteration-20261020-v2/validation/combined_full/business_guard/STAGE_BEFORE.json and STAGE_AFTER.json (exclusive)",
+  "facts": [
+    "Actual SHA every qfull/qinitial/qexternal tool/runtime input, including SHA-only13 input schema; own source154/14 and full normal/SAN154 plus locked provider copies.",
+    "Initial actual verified normal/SAN/external all required with exact initial binding/rawreceipt/queue refs. Guard does not substitute isolated R1/M2 results or decide six-fixture scope.",
+    "Current actual61B/actual compiler/runtime inputs are hashed, not copied from compiler_declared_not_rehashed metadata.",
+    "PREPARED and every binding are hashed when present; after prepare captures new PREPARED in after_inputs. Later stages also bind own compiled source/profile label/content and five binaries for each normal/SAN profile.",
+    "Actual root-provided Windows observation <=15min and >=8GiB admission, plus current /root and /mnt/c >=8GiB. After preserves old observation bytes and freshly checks actual guest/backing space; it does not claim old Windows timestamp remained fresh after a long stage.",
+    "After requires prior old pins unchanged, own actual stage result/counts, original run/out/cwd/command/owner/kind/cap/runner/lock and exact three empty cleanup lists. Functional checks six actual original queues: tools300,normal1800,audit600,SAN1800,audit600,V1compat1500. Final stage is source-only and has no lease invented.",
+    "No flock acquisition, scheduler/native/subprocess invocation, project import, C++ or AST execution exists in this tool; initial guard/core/request/frozen evidence unchanged."
+  ],
+  "prior_source_review": {
+    "path": "C:\\Users\\gzsufanchen\\.codex\\worktrees\\cross-machine-handoff-20261019\\xoffsetdatastructure开发\\docs\\coordination\\c14-iteration-20261020-v2\\validation\\review\\COMBINED_BUSINESS_SOURCE_REVIEW.json",
+    "identity": {
+      "bytes": 101190,
+      "sha256": "240e8149520efe1702c2da61e5cac9f1051a76f6409bce892fee4909ca63db25"
+    }
+  },
+  "limitations": [
+    "Source-only tool not run, including before/after. Independent source review required before use.",
+    "Core CTest consumer fix and independently admitted final remaining request still required; guard does not fix or waive it.",
+    "This is root evidence binding, not independent gate/screen/QF acceptance."
+  ],
+  "actions": {
+    "tool_execution": 0,
+    "project_import": 0,
+    "AST": 0,
+    "compiler": 0,
+    "native": 0,
+    "queue": 0,
+    "core_edits": 0
+  },
+  "screen_admitted": false,
+  "QF_admitted": false
+}

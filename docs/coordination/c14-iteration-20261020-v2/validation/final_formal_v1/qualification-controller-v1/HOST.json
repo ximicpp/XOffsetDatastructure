@@ -1,0 +1,30 @@
+{
+  "actual_plan": {
+    "identity": {
+      "bytes": 1522,
+      "sha256": "fb6085b19e71cc42b6e591ee2cffe71c92a8ff5ec79e7ed12372065debf30830"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/process-plan-v1.json"
+  },
+  "coverage_bound": "Controller start precedes independent Windows guard clock, so this remaining bound is conservative.",
+  "freeze_sha256": "b8e2eaa5f6743a88eb603637640e80a6cfcb11c0edb4183eedc7a67191aa3f23",
+  "power_before": {
+    "argv": [
+      "/mnt/c/Windows/System32/powercfg.exe",
+      "/getactivescheme"
+    ],
+    "guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "stdout_base64": "tefUtLe9sLggR1VJRDogMzgxYjQyMjItZjY5NC00MWYwLTk2ODUtZmY1YmIyNjBkZjJlICAoxr264ik="
+  },
+  "power_changed_by_launcher": false,
+  "power_target_guid": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+  "ready": {
+    "identity": {
+      "bytes": 1691,
+      "sha256": "11c4c77ba000917709a8fa99c4dc64312b81b06609ab44a92b45e70775e32687"
+    },
+    "path": "/mnt/c/Users/gzsufanchen/.codex/worktrees/cross-machine-handoff-20261019/xoffsetdatastructure\u5f00\u53d1/docs/coordination/c14-iteration-20261020-v2/validation/final_formal_v1/host-qualification-v1/PRELUDE_READY.json"
+  },
+  "remaining_guard_nanoseconds_before_dispatch": "2818139539139",
+  "status": "passed"
+}

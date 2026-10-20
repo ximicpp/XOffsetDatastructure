@@ -1,0 +1,18 @@
+{
+  "holder": {
+    "kind": "validation",
+    "out": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-host-prelude-v1",
+    "owner": "W1",
+    "run_id": "92307c4faaef40bb80ae3523db6387c3",
+    "started_at": "2026-10-19T21:12:21.420085+00:00",
+    "status": "running",
+    "supervisor_pid": 388
+  },
+  "lock": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/build/vm-coordination/queue.lock",
+  "queue": "/root/xoffset-c14-iteration/20261020/v2/validation/final-formal-v1/leases/qualification-host-prelude-v1",
+  "request": {
+    "bytes": 2431,
+    "sha256": "c3f495966b6752ef51ab0b46982e6637ee66b0d717a4909fb580286dd79bdf46"
+  },
+  "run_id": "92307c4faaef40bb80ae3523db6387c3"
+}
