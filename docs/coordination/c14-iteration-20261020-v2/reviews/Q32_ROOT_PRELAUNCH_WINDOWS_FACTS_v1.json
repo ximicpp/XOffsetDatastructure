@@ -1,7 +1,0 @@
-{
-  "observed_utc": "2026-10-19T21:09:58.8805100+00:00",
-  "visible_windows_compilers": [],
-  "actual_power_guid": "381b4222-f694-41f0-9685-ff5bb260df2e",
-  "source": "Actual root exec GetProcessesByName over cl,c1xx,clang++,clang,cmake,ninja,gcc,g++,link; powercfg /getactivescheme, exit0 in0.708719s. No power change.",
-  "global_app_inventory": "Two bounded aggregate list_threads attempts did not return; no successful global inventory claimed. Controlled core/sole-validation direct wait snapshots and root agent registry are separately used for quiet, alongside actual shared queue and compiler facts."
-}

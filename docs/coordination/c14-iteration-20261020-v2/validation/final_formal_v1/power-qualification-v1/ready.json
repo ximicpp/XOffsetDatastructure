@@ -1,9 +1,0 @@
-{
-    "status":  "ready",
-    "original":  "381b4222-f694-41f0-9685-ff5bb260df2e",
-    "active":  "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
-    "pid":  28076,
-    "started_utc":  "2026-10-19T21:12:31.3041948+00:00",
-    "maximum_seconds":  2760,
-    "scope":  "Temporary existing scheme selection; no scheme settings, WSL configuration or services changed."
-}
