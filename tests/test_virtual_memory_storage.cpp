@@ -605,25 +605,25 @@ bool all_zero(const char* p, std::size_t n) {
     return true;
 }
 void test_g1_zeroing() {
-    const std::size_t max = 1 << 20, n = 256 << 10, small = 1000;
+    const std::size_t max_bytes = 1 << 20, n = 256 << 10, small_bytes = 1000;
     {
-        VirtualMemoryStorage s(0, max);
+        VirtualMemoryStorage s(0, max_bytes);
         check(s.grow_to(n), "G1 grow failed");
         std::memset(s.data(), 0x5a, n);
-        s.resize_logical(small);
-        check(s.grow_to(n) && all_zero(s.data() + small, n - small) && s.data()[small - 1] == 0x5a,
+        s.resize_logical(small_bytes);
+        check(s.grow_to(n) && all_zero(s.data() + small_bytes, n - small_bytes) && s.data()[small_bytes - 1] == 0x5a,
               "G1 shrink+regrow exposed stale bytes");
-        check(s.grow_to(max) && all_zero(s.data() + small, max - small), "G1 growth beyond high-water not zero");
+        check(s.grow_to(max_bytes) && all_zero(s.data() + small_bytes, max_bytes - small_bytes), "G1 growth beyond high-water not zero");
     }
     {
-        VmStoragePool pool({2, 4 * max, 4 * max});
+        VmStoragePool pool({2, 4 * max_bytes, 4 * max_bytes});
         {
-            VirtualMemoryStorage a(0, max, pool);
+            VirtualMemoryStorage a(0, max_bytes, pool);
             check(a.grow_to(n), "G1 pooled grow failed");
             std::memset(a.data(), 0x6b, n);
         }
         check(pool.stats().cached_blocks == 1, "G1 pooled owner not cached");
-        VirtualMemoryStorage b(0, max, pool);
+        VirtualMemoryStorage b(0, max_bytes, pool);
         check(pool.stats().hits == 1, "G1 pool reuse not exercised");
         check(b.grow_to(n) && all_zero(b.data(), n), "G1 pool reuse exposed stale bytes");
         std::memset(b.data(), 0x6c, 64);
@@ -632,7 +632,7 @@ void test_g1_zeroing() {
     }
     {
         std::vector<char> input(5000, 'x');
-        auto s = VirtualMemoryStorage::from_bytes(input.data(), input.size(), max);
+        auto s = VirtualMemoryStorage::from_bytes(input.data(), input.size(), max_bytes);
         check(s.size() == input.size() && s.data()[4999] == 'x', "G1 from_bytes contents differ");
         check(s.grow_to(n) && all_zero(s.data() + input.size(), n - input.size()), "G1 growth after from_bytes not zero");
         s.resize_logical(10);
@@ -643,30 +643,30 @@ void test_g1_zeroing() {
         check(f.grow_to(full.size()) && all_zero(f.data() + 100, full.size() - 100), "G1 full-copy regrow not zero");
     }
     {
-        VirtualMemoryStorage s(0, max);
-        check(s.grow_to(max), "G1 grow failed");
-        std::memset(s.data(), 0x7d, max);
-        s.resize_logical(small);
+        VirtualMemoryStorage s(0, max_bytes);
+        check(s.grow_to(max_bytes), "G1 grow failed");
+        std::memset(s.data(), 0x7d, max_bytes);
+        s.resize_logical(small_bytes);
         check(s.reclaim_tail().complete(), "G1 reclaim failed");
-        check(s.grow_to(max) && all_zero(s.data() + small, max - small), "G1 regrow after reclaim not zero");
+        check(s.grow_to(max_bytes) && all_zero(s.data() + small_bytes, max_bytes - small_bytes), "G1 regrow after reclaim not zero");
     }
     {   // Receive storage: the whole maximum is read/write before a transport
         // writes, possibly past the logical length; growth must zero it.
-        auto r = VirtualMemoryStorage::for_receive(100, max);
+        auto r = VirtualMemoryStorage::for_receive(100, max_bytes);
         check(r.accessible_bytes() == r.reserved_bytes(), "receive storage not fully accessible");
         std::memset(r.data() + 100, 0xab, 8192);
         check(r.grow_to(100 + 8192) && all_zero(r.data() + 100, 8192),
               "receive growth exposed bytes written beyond the logical length");
     }
     {   // Pooled receive storage keeps its full-zeroing high-water mark.
-        VmStoragePool pool({2, 4 * max, 4 * max});
+        VmStoragePool pool({2, 4 * max_bytes, 4 * max_bytes});
         {
-            auto r = VirtualMemoryStorage::for_receive(100, max, pool);
-            std::memset(r.data(), 0x3c, max);
+            auto r = VirtualMemoryStorage::for_receive(100, max_bytes, pool);
+            std::memset(r.data(), 0x3c, max_bytes);
         }
-        VirtualMemoryStorage b(0, max, pool);
+        VirtualMemoryStorage b(0, max_bytes, pool);
         check(pool.stats().hits == 1, "receive pool reuse not exercised");
-        check(b.grow_to(max) && all_zero(b.data(), max), "pooled receive storage exposed stale bytes");
+        check(b.grow_to(max_bytes) && all_zero(b.data(), max_bytes), "pooled receive storage exposed stale bytes");
     }
 }
 

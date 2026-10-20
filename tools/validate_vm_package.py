@@ -25,15 +25,17 @@ DEPENDENCY_ROOTS = ["external/typelayout/include"] + [
      "container_hash", "type_traits", "winapi", "intrusive", "predef")]
 DEPENDENCY_LICENSES = ["external/boost/LICENSE_1_0.txt", "external/typelayout/LICENSE",
                        "external/typelayout/LICENSE_1_0.txt"]
-RELEASE_FILES = ("VERSION", "CHANGELOG.md", "docs/ALPHA_COMPATIBILITY.md")
+# Source path -> installed name under share/XOffsetDatastructure.
+RELEASE_FILES = {"XOFFSET_VERSION": "VERSION", "CHANGELOG.md": "CHANGELOG.md",
+                 "docs/ALPHA_COMPATIBILITY.md": "ALPHA_COMPATIBILITY.md"}
 VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc)\.(0|[1-9][0-9]*)")
 
 
 def read_version(source: Path) -> dict[str, str]:
-    full = (source / "VERSION").read_text(encoding="utf-8").strip()
+    full = (source / "XOFFSET_VERSION").read_text(encoding="utf-8").strip()
     match = VERSION_PATTERN.fullmatch(full)
     if not match:
-        raise ValueError("VERSION must contain one prerelease identifier without leading zeros")
+        raise ValueError("XOFFSET_VERSION must contain one prerelease identifier without leading zeros")
     return {"full": full, "numeric": ".".join(match.group(1, 2, 3)),
             "prerelease": ".".join(match.group(4, 5))}
 
@@ -78,8 +80,8 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
     version = read_version(source)
     expected = {"include/xoffset_virtual_memory.hpp": digest(source / "xoffset_virtual_memory.hpp"),
                 "share/XOffsetDatastructure/licenses/LICENSE": digest(source / "LICENSE")}
-    for path in RELEASE_FILES:
-        expected["share/XOffsetDatastructure/" + Path(path).name] = digest(source / path)
+    for path, installed in RELEASE_FILES.items():
+        expected["share/XOffsetDatastructure/" + installed] = digest(source / path)
     config_dir = "lib/cmake/XOffsetDatastructure/"
     config = prefix / config_dir / "XOffsetDatastructureConfig.cmake"
     configured = source.parent / "producer-build/XOffsetDatastructureConfig.cmake"
