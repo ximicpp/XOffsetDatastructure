@@ -11,6 +11,8 @@ template<class T> struct wire_future_lifetime;
 template<class... T> struct wire_future_children;
 namespace detail {
 template<class T> consteval bool raw_implicit_lifetime();
+template<class T> consteval bool raw_descriptor_layout();
+template<class T> consteval bool raw_needs_activation();
 namespace custom_future_contract {
 template<class T> consteval bool surface_complete();
 }
