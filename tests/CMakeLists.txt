@@ -92,6 +92,7 @@ set(REFLECTION_TESTS
     test_allocator_failures
     test_v2_golden
     test_cross_compiler_wire
+    test_stability_contract
     test_v2_fuzz
 )
 
