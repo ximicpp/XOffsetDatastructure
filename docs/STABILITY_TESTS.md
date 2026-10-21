@@ -19,14 +19,13 @@ K1–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | `test_stability_contract`（K5 部分） | 重新加载后释放再分配复用空洞、尾部不增长；接收方的分配决定与发送方逐字节一致；第二跳同样成立 |
 | | | `test_free_table_policy`（`lifecycle_move_swap_reload`） | 空洞表写-读-写字节一致，重新加载后的分配决定与原 buffer 相同 |
 | K6 | schema 指纹精确匹配，不同就拒 | `test_schema_envelope`、`test_wire_admission` | schema 哈希、根类型 id、magic、端序标记不符时拒绝；V1 wire 明确拒绝 |
-| K7 | 跨编译器、跨平台对象表示一致（现状：CTest 核对测试类型的签名） | `check_compat`、`check_signature_regeneration`、`check_signature_matrix` | 4 个目标平台、3 个测试类型的签名与基线一致 |
+| K7 | 跨编译器、跨平台对象表示一致；用户 schema 固定签名后不一致即构建失败 | `check_compat`、`check_signature_regeneration`、`check_signature_matrix` | 4 个目标平台、3 个测试类型的签名与基线一致 |
 | | | `test_cross_compiler_wire` + CI 作业 `cross-compiler-wire` | P2996 Clang 与 GCC 16 写出的 5 个语料 wire 逐字节一致，并互相 `load_verified` 通过 |
 | | | CI 作业 `gcc16` | GCC 16 跑全量 CTest |
+| | | `test_schema_pin`、`schema_pin_mismatch` | 用户 schema 用 `XOFFSET_PIN_SCHEMA` 固定签名后，布局与固定值一致时编译通过；不一致时构建失败，报错含 `XOffset schema pin mismatch (K7)` |
 
 ## 不在 CTest 里的部分
 
 - K2、K3 的性能（读、改 ≤ 1.05，独立输出 ≤ 0.20）由正式测量协议在固定机器上判定，
   不在 CI 里。结果见仓库外的性能报告。
-- K7 的目标（为用户 schema 固定签名，不一致时构建失败）在开发中，合并后在本表增加
-  对应的编译失败测试。
 - 内容完整性不在承诺内：只改一个字段值的 wire 会被接受。不要把 K4 说成防篡改。
