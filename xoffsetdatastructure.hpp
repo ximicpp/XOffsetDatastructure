@@ -82,6 +82,9 @@ namespace XOffsetDatastructure {
         template<class T, class Alloc> void future_default_construct(void*, const Alloc&);
         template<class T, class Src, class Alloc> void future_transfer_construct(void*, Src&&, const Alloc&);
         template<class T> void future_relocate_construct(T*, T&) noexcept;
+        template<class T> consteval bool shift_relocate_supported();
+        template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
+        template<class T> void empty_vacated_slot(T*) noexcept;
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -594,6 +597,13 @@ namespace XOffsetDatastructure {
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
+        // Releases this thread's cached empty free tables, so the next table
+        // is a fresh host allocation (allocation-failure tests use this).
+        static void trim_free_table_cache() noexcept {
+            if (!free_table_cache_available()) return;
+            auto& cache = free_table_cache();
+            while (cache.count) delete cache.tables[--cache.count];
+        }
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
 
@@ -605,9 +615,14 @@ namespace XOffsetDatastructure {
         void for_each_free_block(Fn&& fn) const {
             if (!free_table_) return;
             const auto& table = *free_table_;
-            for (std::uint32_t bin = 0; bin < FreeTable::small_bins; ++bin) {
-                const auto bytes = (bin + 1u) * 8u;
-                for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+            // Empty bins emit nothing, so visiting only nonempty bins in
+            // ascending order keeps the canonical order.
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    const auto bytes = (bin + 1u) * 8u;
+                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+                }
             }
             for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
         }
@@ -627,9 +642,9 @@ namespace XOffsetDatastructure {
         // old table is destroyed only after publication.
         void load_free_blocks(const void* holes, std::size_t count) {
             const auto identity = owner_record_;
-            std::unique_ptr<FreeTable> table;
+            FreeTablePtr table; // no holes: an absent table is an exact, empty one
             try {
-                table = std::make_unique<FreeTable>();
+                if (count != 0) table = make_free_table();
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
                     std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
@@ -637,6 +652,7 @@ namespace XOffsetDatastructure {
                         const auto bin = hole.bytes / 8u - 1u;
                         table->bins[bin].push_back(hole.offset);
                         table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     } else {
                         table->large.emplace(hole.bytes, hole.offset);
                     }
@@ -664,10 +680,68 @@ namespace XOffsetDatastructure {
             static constexpr std::uint32_t small_bins = small_max / 8;
             std::vector<std::uint32_t> bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
+            // Bins that may own storage (set on every insertion, never cleared
+            // by removal), so recycling visits only those bins.
+            std::uint64_t touched[small_bins / 64] = {};
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
         };
+
+        // A table is ~12 KiB of bin headers. Constructing, zeroing and
+        // releasing one per load dominated small-message loads, so released
+        // tables are emptied (bin and map storage returned to the host
+        // allocator) and kept in a small per-thread cache. A cached table is
+        // indistinguishable from a freshly constructed one.
+        static bool& free_table_cache_available() noexcept {
+            static thread_local bool available = true; // trivial: outlives the cache
+            return available;
+        }
+
+        struct FreeTableCache {
+            static constexpr std::size_t capacity = 4;
+            FreeTable* tables[capacity] = {};
+            std::size_t count = 0;
+            ~FreeTableCache() {
+                free_table_cache_available() = false;
+                while (count) delete tables[--count];
+            }
+        };
+
+        static FreeTableCache& free_table_cache() noexcept {
+            static thread_local FreeTableCache cache;
+            return cache;
+        }
+
+        struct FreeTableRecycler {
+            void operator()(FreeTable* table) const noexcept {
+                if (!table) return;
+                if (!free_table_cache_available()) { delete table; return; }
+                auto& cache = free_table_cache();
+                if (cache.count == FreeTableCache::capacity) { delete table; return; }
+                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u)
+                        std::vector<std::uint32_t>().swap(
+                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))]);
+                    table->nonempty[word] = 0;
+                    table->touched[word] = 0;
+                }
+                table->large.clear();
+                table->bytes = 0;
+                table->count = 0;
+                cache.tables[cache.count++] = table;
+            }
+        };
+        using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
+
+        // Throws std::bad_alloc only when the cache is empty and allocation fails.
+        static FreeTablePtr make_free_table() {
+            if (free_table_cache_available()) {
+                auto& cache = free_table_cache();
+                if (cache.count) return FreeTablePtr(cache.tables[--cache.count]);
+            }
+            return FreeTablePtr(new FreeTable());
+        }
 
         // Records one free block. Host allocation (table, bin growth, map
         // node) may run new_handler, which may move, swap or release this
@@ -679,7 +753,7 @@ namespace XOffsetDatastructure {
         // incomplete (save_verified recomputes it from the live graph).
         bool insert_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
             const auto identity = owner_record_;
-            std::unique_ptr<FreeTable> spare_table;
+            FreeTablePtr spare_table;
             std::vector<std::uint32_t> spare_bin;
             std::multimap<std::uint32_t, std::uint32_t> spare_large;
             try {
@@ -689,7 +763,7 @@ namespace XOffsetDatastructure {
                     if (!owner) return true; // the payload was released
                     if (!owner->free_table_) {
                         if (!spare_table) {
-                            spare_table = std::make_unique<FreeTable>();
+                            spare_table = make_free_table();
                             continue; // re-resolve after the allocation
                         }
                         owner->free_table_.swap(spare_table);
@@ -712,6 +786,7 @@ namespace XOffsetDatastructure {
                         }
                         slot.push_back(offset);
                         table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     }
                     table.bytes += bytes;
                     ++table.count;
@@ -1209,7 +1284,7 @@ namespace XOffsetDatastructure {
         OwnerRecordPtr owner_record_;
         detail::VirtualMemoryStorage buffer_;
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
-        std::unique_ptr<FreeTable> free_table_;
+        FreeTablePtr free_table_;
         bool free_table_lost_ = false;
         const void* root_type_identity_ = nullptr;
         std::uint64_t m_epoch = 0;
@@ -2467,6 +2542,21 @@ namespace XOffsetDatastructure {
                 std::memmove(data() + index + 1, data() + index, (size_ - index) * sizeof(T));
                 std::memcpy(data() + index, staged, sizeof(T));
                 ++size_;
+            } else if constexpr (detail::shift_relocate_supported<T>()) {
+                with_staged(construct, [&](T& staged) {
+                    if (size_ == capacity_) reserve(grown_capacity());
+                    // SHIFT: same bytes and deltas as the loop below, in one
+                    // memmove plus an inline-head restart of the moved run.
+                    auto* items = data();
+                    const auto moved = size_ - index;
+                    std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index), std::size_t(moved) * sizeof(T));
+                    detail::shift_rebase_moved(items + index + 1, moved,
+                        -static_cast<std::int32_t>(sizeof(T)));
+                    detail::empty_vacated_slot(items + index);
+                    std::destroy_at(items + index);
+                    fixed_detail::relocate_construct(items + index, staged);
+                    ++size_;
+                });
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 with_staged(construct, [&](T& staged) {
                     if (size_ == capacity_) reserve(grown_capacity());
@@ -2492,6 +2582,17 @@ namespace XOffsetDatastructure {
             if (index + 1 == size_) { pop_back(); return; }
             if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
+                --size_;
+            } else if constexpr (detail::shift_relocate_supported<T>()) {
+                // SHIFT: same bytes and deltas as the loop below, in one
+                // memmove plus an inline-head restart of the moved run.
+                auto* items = data();
+                const auto moved = size_ - index - 1;
+                std::destroy_at(items + index);
+                std::memmove(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+                detail::shift_rebase_moved(items + index, moved, static_cast<std::int32_t>(sizeof(T)));
+                detail::empty_vacated_slot(items + size_ - 1);
+                std::destroy_at(items + size_ - 1);
                 --size_;
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 std::destroy_at(data() + index);
