@@ -77,6 +77,9 @@ namespace XOffsetDatastructure {
         template<class T, class Alloc> void future_default_construct(void*, const Alloc&);
         template<class T, class Src, class Alloc> void future_transfer_construct(void*, Src&&, const Alloc&);
         template<class T> void future_relocate_construct(T*, T&) noexcept;
+        template<class T> consteval bool shift_relocate_supported();
+        template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
+        template<class T> void empty_vacated_slot(T*) noexcept;
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -2600,6 +2603,21 @@ namespace XOffsetDatastructure {
                 std::memmove(data() + index + 1, data() + index, (size_ - index) * sizeof(T));
                 std::memcpy(data() + index, staged, sizeof(T));
                 ++size_;
+            } else if constexpr (detail::shift_relocate_supported<T>()) {
+                with_staged(construct, [&](T& staged) {
+                    if (size_ == capacity_) reserve(grown_capacity());
+                    // SHIFT: same bytes and deltas as the loop below, in one
+                    // memmove plus an inline-head restart of the moved run.
+                    auto* items = data();
+                    const auto moved = size_ - index;
+                    std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index), std::size_t(moved) * sizeof(T));
+                    detail::shift_rebase_moved(items + index + 1, moved,
+                        -static_cast<std::int32_t>(sizeof(T)));
+                    detail::empty_vacated_slot(items + index);
+                    std::destroy_at(items + index);
+                    fixed_detail::relocate_construct(items + index, staged);
+                    ++size_;
+                });
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 with_staged(construct, [&](T& staged) {
                     if (size_ == capacity_) reserve(grown_capacity());
@@ -2625,6 +2643,17 @@ namespace XOffsetDatastructure {
             if (index + 1 == size_) { pop_back(); return; }
             if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
+                --size_;
+            } else if constexpr (detail::shift_relocate_supported<T>()) {
+                // SHIFT: same bytes and deltas as the loop below, in one
+                // memmove plus an inline-head restart of the moved run.
+                auto* items = data();
+                const auto moved = size_ - index - 1;
+                std::destroy_at(items + index);
+                std::memmove(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+                detail::shift_rebase_moved(items + index, moved, static_cast<std::int32_t>(sizeof(T)));
+                detail::empty_vacated_slot(items + size_ - 1);
+                std::destroy_at(items + size_ - 1);
                 --size_;
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 std::destroy_at(data() + index);
