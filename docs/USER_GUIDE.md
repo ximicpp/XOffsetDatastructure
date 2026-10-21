@@ -63,6 +63,40 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 - 也可以用带类型的包装 `TypedXBuffer<T>`：`create`、`root()`、`save_verified()`、
   `load()`（走校验路径）。
 
+### 3.1 删除与插入的性能
+
+`XVector` 从中间 `erase`/`insert` 一个元素，要把后面的元素整体挪一格，成本与后面
+的元素个数成正比。在循环里逐条从中间删除是 O(n·k)，元素含容器头时尤其明显
+（SLG 原型里 2000 条行军每 tick 逐条删除，每周期约 160 万次元素搬移）。
+
+- 批量删除用 `stable_erase_if`：一次遍历，保持原顺序，每个保留的元素最多挪一次。
+- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，下面两个声明会打开更快的
+  路径。它们是对**源码**的承诺：记录只有普通的非静态成员，没有基类、`union`、
+  位域、`[[no_unique_address]]`，成员互不重叠。库不靠反射猜测这些性质，声明错了
+  是未定义行为。
+
+```cpp
+struct Troop { std::int32_t type{}; std::int32_t count{}; };
+struct March {
+    std::int64_t id{};
+    std::int32_t eta{};
+    XVector<Troop> troops;
+};
+
+namespace XOffsetDatastructure {
+// 中间 erase/insert 一次 memmove 挪动，只重建内联容器头（成员类型也要声明）。
+template<> struct wire_record_layout<Troop> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<March> { static constexpr bool ordinary_members = true; };
+// 允许对 XVector<March> 调用 stable_erase_if。
+template<> struct StableEraseOrdinaryMembers<March> : std::true_type {};
+}
+
+marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
+```
+
+- 不写这些声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
+  `stable_erase_if` 不可用（编译期报错）。两条路径输出的 wire 字节相同。
+
 ## 4. 保存与加载
 
 ```cpp
