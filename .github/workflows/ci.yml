@@ -215,7 +215,9 @@ jobs:
           CID=$(docker create --platform linux/amd64 "$XOFFSET_CI_IMAGE")
           docker cp -L "$CID:$RES/include" build/asan-resource/include
           docker rm "$CID"
-          find build/asan-resource -maxdepth 3 | head -n 40
+          # pipefail: head closing the pipe would fail find with SIGPIPE.
+          find build/asan-resource -maxdepth 3 > build/asan-resource-listing.txt
+          head -n 40 build/asan-resource-listing.txt
 
       - name: Run ASan+UBSan suite
         run: |
