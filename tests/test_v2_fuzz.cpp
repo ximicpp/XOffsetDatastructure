@@ -5,7 +5,12 @@
 //   1. an independent spec oracle written here from the V2 format rules,
 //   2. the typed validator (XBuffer::load_verified<T>),
 //   3. the raw validator (receive_raw::validate<T>, flat),
-//   4. the verified receive path (begin_verified_receive/finish_verified).
+//   4. the verified receive path (begin_verified_receive/finish_verified),
+//   5. the in-place reload (XBuffer::reload_verified<T>) into ONE long-lived
+//      buffer: it must accept exactly what load_verified accepts, and an
+//      accepted reload must hold byte-identical payload (in particular gap and
+//      tail bytes left by every earlier reload read as zero) and re-save
+//      byte-identically; after a reject typed root access must throw.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
@@ -295,6 +300,45 @@ std::optional<Buffer> typed_load(const std::string& wire, std::string* error = n
         if (error) *error = e.what();
         return std::nullopt;
     }
+}
+
+// Acceptor 5: one buffer reused for every case (same maximum as typed_load).
+Buffer& reloader() {
+    static Buffer buffer = Buffer::create(
+        4096, xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
+    return buffer;
+}
+
+bool reload_accepts(const std::string& wire, std::string* error) {
+    try {
+        reloader().reload_verified(wire);
+        return true;
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+        bool refused = false;
+        try { (void)reloader().root(); } catch (const xo::XException&) { refused = true; }
+        if (!refused) fail("root() succeeded after a rejected reload_verified");
+        if (reloader().has_root()) fail("has_root() after a rejected reload_verified");
+        return false;
+    }
+}
+
+// Accepted reload vs fresh load of the same wire.
+void compare_reload(Buffer& fresh) {
+    auto& again = reloader();
+    const auto a = fresh.get_buffer(), b = again.get_buffer();
+    if (a.size() != b.size() || std::memcmp(a.data(), b.data(), a.size()) != 0)
+        fail("reload_verified payload differs from load_verified (stale bytes?)");
+    if (fresh.free_block_count() != again.free_block_count() ||
+        fresh.free_block_bytes() != again.free_block_bytes())
+        fail("reload_verified free table differs from load_verified");
+    // Newly exposed tail bytes must read as zero after any earlier content.
+    const auto size = again.get_size();
+    if (!again.grow(4096)) fail("reloaded buffer cannot grow");
+    for (std::size_t i = size; i < again.get_size(); ++i)
+        if (again.data()[i] != 0) fail("stale byte exposed after reload_verified growth");
+    if (again.save_verified() != fresh.save_verified())
+        fail("reload_verified re-save differs from load_verified re-save");
 }
 
 // Header-valid wire -> {aligned payload with gaps zeroed, gaps, hole pointer}.
@@ -611,6 +655,8 @@ int main(int argc, char** argv) {
         if (!o.ok) fail("oracle rejects a library-generated wire: " + o.why);
         auto loaded = typed_load(w);
         if (!loaded) fail("typed load rejects a library-generated wire");
+        if (!reload_accepts(w, nullptr)) fail("reload_verified rejects a library-generated wire");
+        compare_reload(*loaded);
         if (loaded->save_verified() != w) fail("golden write-read-write not byte stable");
         ++golden;
         xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
@@ -637,6 +683,11 @@ int main(int argc, char** argv) {
         if (bool(typed) != o.ok)
             fail("case " + std::to_string(c) + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
+        std::string lerr;
+        if (reload_accepts(w, &lerr) != bool(typed))
+            fail("case " + std::to_string(c) + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
+                 " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
+        if (typed) compare_reload(*typed);
         if (o.ok || o.stage == Oracle::Stage::Payload) {
             const bool raw = raw_accepts(w, &rerr);
             const bool recv = receive_accepts(w, &verr);
