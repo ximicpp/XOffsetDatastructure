@@ -109,6 +109,10 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
+      # Keep LF endings: the dependency lock hashes file content byte for byte.
+      - name: Disable CRLF conversion
+        shell: pwsh
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
           submodules: recursive
