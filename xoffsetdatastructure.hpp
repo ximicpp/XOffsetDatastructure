@@ -1960,6 +1960,13 @@ namespace XOffsetDatastructure {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
 
+        // I1: a string of at most inline_max bytes may live in bytes 4..14 of
+        // this head. Inline is marked by bit 31 of capacity_ (byte 15, which a
+        // heap capacity < 2^31 never sets); bits 24..30 hold the length. The
+        // byte after the last character and every unused inline byte are 0.
+        static constexpr std::uint32_t inline_flag = 0x80000000u;
+        static constexpr std::uint32_t inline_max = 10;
+
         std::int32_t arena_delta = 0;
         std::int32_t data_delta = 0;
         std::uint32_t size_ = 0;
@@ -1986,6 +1993,14 @@ namespace XOffsetDatastructure {
         }
         XFixedString& operator=(XFixedString&& other) {
             if (this == &other) return *this;
+            if (other.is_inline()) {
+                // An inline source owns no storage: copy its bytes, no allocator.
+                if (!is_bound() && other.is_bound()) bind_like(other);
+                release();
+                std::memcpy(inline_bytes(), other.inline_bytes(), 12);
+                other.reset_head();
+                return *this;
+            }
             if (is_bound() && other.is_bound()) {
                 const auto destination = binding();
                 // MV: binding() is {allocator_state(), arena()}, and for a state
@@ -2009,7 +2024,7 @@ namespace XOffsetDatastructure {
                     // MV: release()'s empty-destination case inline (data() is
                     // null exactly when data_delta == 0, and release() then only
                     // clears the descriptor); otherwise the unchanged release().
-                    if (data_delta == 0) {
+                    if (!is_inline() && data_delta == 0) {
                         size_ = 0;
                         capacity_ = 0;
                     } else {
@@ -2074,29 +2089,46 @@ namespace XOffsetDatastructure {
             return {alloc.state, alloc.segment};
         }
 
+        bool is_inline() const noexcept { return (capacity_ & inline_flag) != 0; }
+
+        // Bytes of out-of-line storage owned by this head (0 when inline/null).
+        std::size_t owned_extent() const noexcept {
+            return is_inline() || capacity_ == 0 ? 0u : std::size_t(capacity_) + 1u;
+        }
+
         char* data() noexcept {
+            if (is_inline()) return inline_bytes();
             return fixed_detail::resolve_rel32<char>(&data_delta, data_delta);
         }
 
         const char* data() const noexcept {
+            if (is_inline()) return inline_bytes();
             return fixed_detail::resolve_rel32_const<char>(&data_delta, data_delta);
         }
 
-        std::uint32_t size() const noexcept { return size_; }
-        std::uint32_t capacity() const noexcept { return capacity_; }
-        bool empty() const noexcept { return size_ == 0; }
+        std::uint32_t size() const noexcept { return is_inline() ? inline_size() : size_; }
+        std::uint32_t capacity() const noexcept { return is_inline() ? inline_max : capacity_; }
+        bool empty() const noexcept { return size() == 0; }
 
         std::string_view view() const noexcept {
-            return data() ? std::string_view(data(), size_) : std::string_view{};
+            if (is_inline()) return std::string_view(inline_bytes(), inline_size());
+            return data_delta ? std::string_view(
+                fixed_detail::resolve_rel32_const<char>(&data_delta, data_delta), size_)
+                              : std::string_view{};
         }
 
         operator std::string_view() const noexcept { return view(); }
 
         const char* c_str() const noexcept {
-            return data() ? data() : "";
+            auto* ptr = data();
+            return ptr ? ptr : "";
         }
 
         void clear() noexcept {
+            if (is_inline()) {
+                store_inline(nullptr, 0);
+                return;
+            }
             size_ = 0;
             if (auto* ptr = data()) ptr[0] = '\0';
         }
@@ -2105,9 +2137,14 @@ namespace XOffsetDatastructure {
             ensure_bound();
             if (requested >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             auto new_cap = static_cast<std::uint32_t>(requested);
-            if (new_cap <= capacity_) return;
+            if (new_cap <= capacity()) return;
 
             auto alloc = binding();
+            if (is_inline()) {
+                const auto count = inline_size();
+                move_to_heap(alloc, inline_bytes(), count, new_cap);
+                return;
+            }
             auto* old_storage = data();
             if (fixed_detail::try_expand_dynamic_bytes(
                     alloc, old_storage, static_cast<std::uint32_t>(new_cap + 1), alignof(char))) {
@@ -2136,6 +2173,17 @@ namespace XOffsetDatastructure {
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
             const auto new_size = static_cast<std::uint32_t>(rhs.size());
+            if (is_inline() || data_delta == 0) {
+                // No out-of-line storage: short values stay inline, longer
+                // values get an exact heap block. rhs may alias the inline
+                // bytes; it is read completely before the head is rewritten.
+                if (new_size <= inline_max) {
+                    store_inline(rhs.data(), new_size);
+                    return;
+                }
+                move_to_heap(binding(), rhs.data(), new_size, new_size);
+                return;
+            }
             auto* old_data = data();
             if (new_size <= capacity_) {
                 std::memmove(old_data, rhs.data(), rhs.size());
@@ -2224,8 +2272,65 @@ namespace XOffsetDatastructure {
             return os << value.view();
         }
 
+        // Moves this head's payload into dst (a freshly bound head) and empties
+        // this head. Inline bytes are copied; out-of-line storage is rebased.
+        void relocate_payload_to(XFixedString& dst) noexcept {
+            if (is_inline()) {
+                std::memcpy(dst.inline_bytes(), inline_bytes(), 12);
+            } else {
+                // Both heads are in the same bounded arena; the delta fits.
+                fixed_detail::set_rel32(dst.data_delta, &dst.data_delta, data());
+                dst.size_ = size_;
+                dst.capacity_ = capacity_;
+            }
+            reset_head();
+        }
+
     private:
+        char* inline_bytes() noexcept { return reinterpret_cast<char*>(this) + 4; }
+        const char* inline_bytes() const noexcept { return reinterpret_cast<const char*>(this) + 4; }
+        std::uint32_t inline_size() const noexcept { return (capacity_ >> 24) & 0x7fu; }
+
+        void reset_head() noexcept {
+            data_delta = 0;
+            size_ = 0;
+            capacity_ = 0;
+        }
+
+        // src may alias these inline bytes.
+        void store_inline(const char* src, std::uint32_t count) noexcept {
+            char bytes[12] = {};
+            if (count != 0) std::memcpy(bytes, src, count);
+            bytes[11] = static_cast<char>(0x80u | count);
+            std::memcpy(inline_bytes(), bytes, sizeof(bytes));
+        }
+
+        // The head has no out-of-line storage (inline or null). src may alias
+        // the inline bytes: it is copied before the head is rewritten.
+        void move_to_heap(const allocator_type& alloc, const char* src,
+                          std::uint32_t count, std::uint32_t new_cap) {
+            auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
+                alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)), std::size_t(new_cap) + 1u);
+            std::int32_t incoming_delta = 0;
+            try {
+                fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
+            } catch (...) {
+                fixed_detail::retire_dynamic_bytes(
+                    alloc, fresh, static_cast<std::uint32_t>(new_cap + 1));
+                throw;
+            }
+            if (count != 0) std::memmove(fresh, src, count);
+            fresh[count] = '\0';
+            data_delta = incoming_delta;
+            size_ = count;
+            capacity_ = new_cap;
+        }
+
         void release() noexcept {
+            if (is_inline()) {
+                reset_head();
+                return;
+            }
             auto* old_data = data();
             auto alloc = binding();
             std::uint32_t old_cap = capacity_;
@@ -4176,9 +4281,26 @@ namespace XOffsetDatastructure {
 
 
 
+        // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
+        inline void validate_inline_string_bytes(const char* head) {
+            unsigned char bytes[12];
+            std::memcpy(bytes, head + 4, sizeof(bytes));
+            const unsigned length = bytes[11] & 0x7fu;
+            if (length > XFixedString::inline_max)
+                throw XException("wire validation failed: inline XFixedString length exceeds 10");
+            for (unsigned i = length; i < 11; ++i) {
+                if (bytes[i] != 0)
+                    throw XException("wire validation failed: inline XFixedString has nonzero padding");
+            }
+        }
+
         inline void validate_wire_value(const XFixedString& value,
                                         WireValidationContext& ctx) {
             validate_binding(value.arena_delta, ctx);
+            if (value.is_inline()) {
+                validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
+                return;
+            }
             if (value.size_ > value.capacity_ || value.capacity_ >= XBufferCore::MAX_PAYLOAD) {
                 throw XException(
                     "wire validation failed: XFixedString size exceeds capacity");
@@ -4402,8 +4524,7 @@ namespace XOffsetDatastructure {
                           !is_owning_head<CleanT>::value) {
                 return move_assignment_owns_address(value, address);
             } else if constexpr (detail::is_fixed_string_v<CleanT>) {
-                return move_assignment_contains(value.data(),
-                    value.capacity_ ? std::size_t(value.capacity_) + 1u : 0u, address);
+                return move_assignment_contains(value.data(), value.owned_extent(), address);
             } else if constexpr (std::is_trivially_copyable_v<typename CleanT::value_type>) {
                 return move_assignment_contains(value.data(),
                     std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address);
@@ -4460,8 +4581,7 @@ namespace XOffsetDatastructure {
                 return false;
             } else if constexpr (is_owning_head<CleanT>::value) {
                 if constexpr (detail::is_fixed_string_v<CleanT>) {
-                    return move_assignment_contains(value.data(),
-                        value.capacity_ ? std::size_t(value.capacity_) + 1u : 0u, address);
+                    return move_assignment_contains(value.data(), value.owned_extent(), address);
                 } else {
                     const auto* elements = value.data();
                     if (move_assignment_contains(elements,
@@ -4510,6 +4630,9 @@ namespace XOffsetDatastructure {
                 for (std::size_t i = 0; i < std::extent_v<T>; ++i) relocate_construct(&(*dst)[i], src[i]);
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memcpy(dst, &src, sizeof(T));
+            } else if constexpr (detail::is_fixed_string_v<T>) {
+                std::construct_at(dst, src.binding());
+                src.relocate_payload_to(*dst);
             } else if constexpr (is_owning_head<T>::value) {
                 std::construct_at(dst, src.binding());
                 set_rel32(dst->data_delta, &dst->data_delta, src.data());
@@ -4622,6 +4745,9 @@ namespace XOffsetDatastructure {
             static_assert(stable_erase_supported<T>());
             if constexpr (StableEraseRelocator<T>::enabled) {
                 StableEraseRelocator<T>::relocate_construct(destination, source);
+            } else if constexpr (detail::is_fixed_string_v<T>) {
+                std::construct_at(destination, source.binding());
+                source.relocate_payload_to(*destination);
             } else if constexpr (is_owning_head<T>::value) {
                 // These explicit constructors begin owning-head lifetimes even
                 // when they were not created by an enclosing implicit copy.
@@ -4837,7 +4963,8 @@ namespace XOffsetDatastructure {
                        wire_abi_signature<std::remove_extent_t<U>>() +
                        tl::FixedString{">"};
             } else if constexpr (is_fixed_string_v<U>) {
-                return fixed_sequence_header_signature<U>(tl::FixedString{"xstring"});
+                return fixed_sequence_header_signature<U>(tl::FixedString{"xstring"}) +
+                       tl::FixedString{"{inline:10}"};
             } else if constexpr (is_fixed_flat_map_v<U>) {
                 return fixed_sequence_header_signature<U>(tl::FixedString{"xflatmap"}) +
                        tl::FixedString{"<"} +

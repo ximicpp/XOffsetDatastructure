@@ -145,8 +145,17 @@ inline char* raw_verified_relative(char* field, std::int32_t delta,
     return reinterpret_cast<char*>(target);
 }
 
+inline constexpr std::uint32_t raw_inline_string_flag = 0x80000000u;
+inline bool raw_inline_string(const RawOwningDescriptor& head) noexcept {
+    return (head.capacity & raw_inline_string_flag) != 0;
+}
+inline std::uint32_t raw_inline_string_size(const RawOwningDescriptor& head) noexcept {
+    return (head.capacity >> 24) & 0x7fu;
+}
+
 inline std::string_view raw_verified_string(const char* address) noexcept {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
+    if (raw_inline_string(head)) return {address + 4, raw_inline_string_size(head)};
     if (!head.capacity) return {};
     const auto* data = raw_verified_relative(
         const_cast<char*>(address + 4), head.data_delta);
@@ -300,14 +309,20 @@ bool raw_compare_keys(const char* lhs,const char* rhs,const WireValidationContex
             if(bytes) {
                 const auto a=raw_wire_pod<RawOwningDescriptor>(lhs);
                 const auto b=raw_wire_pod<RawOwningDescriptor>(rhs);
-                auto* x=a.capacity?raw_verified_relative(const_cast<char*>(raw_advance(lhs,4,bytes)),a.data_delta,bytes):nullptr;
-                auto* y=b.capacity?raw_verified_relative(const_cast<char*>(raw_advance(rhs,4,bytes)),b.data_delta,bytes):nullptr;
-                for(std::size_t i=0;i<std::min(a.size,b.size);++i) {
+                auto chars=[&](const char* head,const RawOwningDescriptor& d) -> const char* {
+                    if(raw_inline_string(d)) return raw_advance(head,4,bytes);
+                    return d.capacity?raw_verified_relative(const_cast<char*>(raw_advance(head,4,bytes)),d.data_delta,bytes):nullptr;
+                };
+                const auto as=raw_inline_string(a)?raw_inline_string_size(a):a.size;
+                const auto bs=raw_inline_string(b)?raw_inline_string_size(b):b.size;
+                auto* x=chars(lhs,a);
+                auto* y=chars(rhs,b);
+                for(std::size_t i=0;i<std::min(as,bs);++i) {
                     const auto u=raw_wire_pod<unsigned char>(raw_advance(x,i,bytes));
                     const auto v=raw_wire_pod<unsigned char>(raw_advance(y,i,bytes));
                     if(u!=v)return u<v;
                 }
-                return a.size<b.size;
+                return as<bs;
             }
         }
     }
@@ -597,6 +612,10 @@ template<class T> void validate_wire_value_raw(const char*,WireValidationContext
 inline void validate_string_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
     raw_validate_binding(address,head.arena_delta,ctx,bytes);
+    if (raw_inline_string(head)) {
+        validate_inline_string_bytes(address);
+        return;
+    }
     if (head.size > head.capacity || head.capacity >= XBufferCore::MAX_PAYLOAD)
         throw XException("wire validation failed: XFixedString size exceeds capacity");
     if (!head.capacity) {
@@ -829,7 +848,7 @@ template<class T> void activate_wire_value_raw(char* address,
         object->capacity_ = saved.capacity;
         ++stats.owning_heads;
         if constexpr (is_fixed_string_v<T>) {
-            if(saved.capacity) {
+            if(saved.capacity && !raw_inline_string(saved)) {
                 auto* data=raw_verified_relative(raw_advance(address,4,bytes),saved.data_delta,bytes);
                 activate_allocation_header_raw(data,stats,bytes);
                 (void)raw_recover_array_object<char>(data,std::size_t(saved.capacity)+1,bytes);
