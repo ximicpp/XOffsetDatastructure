@@ -25,7 +25,7 @@ class PackageAuditTests(unittest.TestCase):
         self.source.mkdir()
         (self.source / "cmake").mkdir()
         (self.source / "docs").mkdir()
-        (self.source / "VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8", newline="\n")
+        (self.source / "XOFFSET_VERSION").write_text("0.1.0-alpha.1\n", encoding="utf-8", newline="\n")
         (self.source / "CHANGELOG.md").write_text("alpha release notes\n", encoding="utf-8", newline="\n")
         (self.source / "docs/ALPHA_COMPATIBILITY.md").write_text("no cross-release compatibility promise\n", encoding="utf-8", newline="\n")
         self.project = Path(__file__).resolve().parents[2]
@@ -42,7 +42,7 @@ class PackageAuditTests(unittest.TestCase):
         (producer / "XOffsetDatastructureConfig.cmake").write_text(config, encoding="utf-8", newline="\n")
         files = {"include/xoffset_virtual_memory.hpp": "test header",
                  "share/XOffsetDatastructure/licenses/LICENSE": "test license",
-                 "share/XOffsetDatastructure/VERSION": (self.source / "VERSION").read_text(encoding="utf-8"),
+                 "share/XOffsetDatastructure/VERSION": (self.source / "XOFFSET_VERSION").read_text(encoding="utf-8"),
                  "share/XOffsetDatastructure/CHANGELOG.md": (self.source / "CHANGELOG.md").read_text(encoding="utf-8"),
                  "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md": (self.source / "docs/ALPHA_COMPATIBILITY.md").read_text(encoding="utf-8"),
                  "lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake": config,
@@ -140,7 +140,7 @@ class PackageAuditTests(unittest.TestCase):
         self.assertIn("0.1.0-alpha.1|0.1.0|alpha.1", valid.stdout)
         for version in ("0.1.0", "0.1.0-alpha", "00.1.0-alpha.1", "0.1.0-alpha.01", "0.1.0-alpha.1\n0.1.0-alpha.2"):
             with self.subTest(version=version):
-                (self.source / "VERSION").write_text(version, encoding="utf-8")
+                (self.source / "XOFFSET_VERSION").write_text(version, encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, "prerelease identifier"):
                     MODULE.read_version(self.source)
                 invalid = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
