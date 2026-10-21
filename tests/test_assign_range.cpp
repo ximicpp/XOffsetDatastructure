@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <iterator>
+#include <list>
 #include <new>
 #include <span>
 #include <stdexcept>
@@ -207,12 +209,32 @@ void bulk_workload_operation_gate_and_lifecycle() {
     std::cout<<"bulk gate: "<<n<<" replacements, skipped_zero_bytes="<<n*16u
              <<" skipped_old_copy_bytes="<<n*16u<<"; mechanism counts, no timing\n";
 }
+void iterator_assign_paths() {
+    auto b=make_buffer(); auto& v=b.root<BulkRoot>().numbers;
+    assign(v,std::vector<std::uint32_t>{1,2});
+    // Contiguous trivially copyable source: the assign_range path, one exact block.
+    const std::vector<std::uint32_t> flat{5,6,7,8,9};
+    auto* old=v.data(); v.assign(flat.begin(),flat.end());
+    need(values(v)==flat && v.capacity()==5 && has_hole(b,old,extent(2*4)),"iterator assign contiguous path");
+    // Non-contiguous forward source: the generic path builds a fresh exact block.
+    const std::list<std::uint32_t> linked{11,12,13};
+    old=v.data(); const auto cap=v.capacity(); v.assign(linked.begin(),linked.end());
+    need(values(v)==std::vector<std::uint32_t>({11,12,13}) && v.capacity()==3 && has_hole(b,old,extent(cap*4)),
+         "iterator assign generic path");
+    // The generic path may read from the container it replaces.
+    v.assign(std::make_reverse_iterator(v.data()+v.size()),std::make_reverse_iterator(v.data()));
+    need(values(v)==std::vector<std::uint32_t>({13,12,11}),"iterator assign self-aliasing source");
+    const std::list<std::uint32_t> none; v.assign(none.begin(),none.end());
+    need(v.empty(),"iterator assign empty generic source");
+    v.assign(linked.begin(),linked.end()); roundtrip(b);
+}
 }
 int main() {
     try {
         self_subrange_overlap_and_empty(); fresh_same_foreign_and_nested_sources();
         no_default_constructor_and_no_alias_staging(); failed_growth_keeps_old_descriptor_and_source();
         no_host_staging_under_host_oom(); bulk_workload_operation_gate_and_lifecycle();
-        std::cout<<"6 bulk assignment groups passed; no timing\n";
+        iterator_assign_paths();
+        std::cout<<"7 bulk assignment groups passed; no timing\n";
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
 }

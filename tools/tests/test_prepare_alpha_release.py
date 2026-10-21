@@ -82,7 +82,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         payload["share/XOffsetDatastructure/VERSION"] = (A.VERSION + "\n").encode()
         config = {
             "XOffsetDatastructure_VERSION": '"' + A.VERSION + '"',
-            "XOffsetDatastructure_VERSION_NUMERIC": '"0.1.0"',
+            "XOffsetDatastructure_VERSION_NUMERIC": '"0.2.0"',
             "XOffsetDatastructure_VERSION_PRERELEASE": '"alpha.1"',
             "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
             "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
