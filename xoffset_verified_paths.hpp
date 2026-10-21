@@ -203,10 +203,12 @@ VerifiedSnapshot<T> freeze_verified(TypedXBuffer<T>&& source, std::pmr::memory_r
     current.shrink_to_fit();
     // M3: frozen segments expose the arena itself; holes are free, so clear
     // their stale contents in place (the source is consumed, no reader).
+#ifndef XOFFSET_MEASURE_DISABLE_M3
     {
         char* const payload = static_cast<char*>(const_cast<void*>(current.get_address()));
         for (const auto hole : owner->holes) std::memset(payload + hole.offset, 0, hole.bytes);
     }
+#endif
     owner->header = header;
     owner->source = std::move(static_cast<XBuffer&>(source)); // noexcept commit
     // The frozen payload is immutable: it has no host owner for allocation.
