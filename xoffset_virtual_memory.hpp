@@ -120,9 +120,12 @@ private:
     friend class VirtualMemoryStorage;
 };
 
-// OS storage only: no allocator metadata or process-local information is stored
-// in the reservation. Accessible means page permissions are read/write; it does
-// not measure resident physical memory or promise future fault-free allocation.
+// OS storage. V2: one read/write host page precedes the payload reservation;
+// its last pointer-sized slot names the current owner (host_owner). That page
+// is never part of the payload, so it is never copied, emitted or exposed by
+// data()/size(). Accessible means payload page permissions are read/write; it
+// does not measure resident physical memory or promise future fault-free
+// allocation.
 class VirtualMemoryStorage {
 public:
     VirtualMemoryStorage() noexcept = default;
@@ -160,20 +163,35 @@ private:
         if (consume_vm_failure(VmOperation::Reserve)) throw std::bad_alloc();
         pool_ = pool;
         if (!acquire_from_pool()) {
+            const std::size_t prefix = page_size_;
+            if (reserved > static_cast<std::size_t>(
+                    (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
+                throw std::length_error("VM reservation page rounding overflows");
 #if defined(_WIN32)
-            base_ = static_cast<char*>(::VirtualAlloc(
-                nullptr, reserved, MEM_RESERVE, PAGE_NOACCESS));
-            if (!base_) throw std::bad_alloc();
+            auto* mapping = static_cast<char*>(::VirtualAlloc(
+                nullptr, reserved + prefix, MEM_RESERVE, PAGE_NOACCESS));
+            if (!mapping) throw std::bad_alloc();
+            if (!::VirtualAlloc(mapping, prefix, MEM_COMMIT, PAGE_READWRITE)) {
+                ::VirtualFree(mapping, 0, MEM_RELEASE);
+                throw std::bad_alloc();
+            }
+            base_ = mapping + prefix;
 #else
             if (full_copy && consume_vm_failure(VmOperation::Enable)) throw std::bad_alloc();
-            void* mapping = ::mmap(nullptr, reserved, full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
+            void* mapping = ::mmap(nullptr, reserved + prefix,
+                                   full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
                                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             if (mapping == MAP_FAILED) throw std::bad_alloc();
-            base_ = static_cast<char*>(mapping);
+            if (!full_copy && ::mprotect(mapping, prefix, PROT_READ | PROT_WRITE) != 0) {
+                ::munmap(mapping, reserved + prefix);
+                throw std::bad_alloc();
+            }
+            base_ = static_cast<char*>(mapping) + prefix;
             if (full_copy) accessible_bytes_ = reserved;
 #endif
             reserved_bytes_ = reserved;
         }
+        set_host_owner(nullptr);
         // A throwing constructor does not run this object's destructor.
         if (!grow_to(logical_bytes)) {
             release();
@@ -258,6 +276,13 @@ public:
     }
 
     std::byte* canonical_byte_origin() const noexcept { return canonical_byte_origin_; }
+    // Host-only owner slot in the page preceding the payload (null if none).
+    void* host_owner() const noexcept {
+        return base_ ? *reinterpret_cast<void* const*>(base_ - sizeof(void*)) : nullptr;
+    }
+    void set_host_owner(void* owner) noexcept {
+        if (base_) *reinterpret_cast<void**>(base_ - sizeof(void*)) = owner;
+    }
     char* data() noexcept { return base_; }
     const char* data() const noexcept { return base_; }
     std::size_t size() const noexcept { return logical_bytes_; }
@@ -417,9 +442,9 @@ private:
     void release_mapping() noexcept {
         if (base_) {
 #if defined(_WIN32)
-            ::VirtualFree(base_, 0, MEM_RELEASE);
+            ::VirtualFree(base_ - page_size_, 0, MEM_RELEASE);
 #else
-            ::munmap(base_, reserved_bytes_);
+            ::munmap(base_ - page_size_, reserved_bytes_ + page_size_);
 #endif
         }
         base_ = nullptr;
@@ -507,6 +532,7 @@ inline void VirtualMemoryStorage::release() noexcept {
             statistics.cached_reserved_bytes += reserved_bytes_;
             statistics.cached_accessible_bytes += accessible_bytes_;
             logical_bytes_ = 0;
+            set_host_owner(nullptr);
             state->cached.emplace_back();
             swap_storage(state->cached.back());
             ++statistics.cached_blocks;
