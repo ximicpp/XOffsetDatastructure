@@ -31,6 +31,7 @@
 #include <string_view>
 #include <ostream>
 #include <utility>
+#include <array>
 #include <vector>
 #include <cstring>
 #include <algorithm>
@@ -86,6 +87,7 @@ namespace XOffsetDatastructure {
         template<class T> consteval bool shift_relocate_supported();
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
+        template<class T> void zero_implicit_padding(T*) noexcept;
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -1700,6 +1702,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst);
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T, typename Src, typename Alloc>
@@ -1731,6 +1734,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, static_cast<const CleanSrc&>(src));
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T, typename Alloc, typename... Args>
@@ -1757,6 +1761,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, std::forward<Args>(args)...);
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T>
@@ -3082,6 +3087,7 @@ namespace XOffsetDatastructure {
                 std::destroy_at(&dst->first);
                 throw;
             }
+            detail::zero_implicit_padding(dst);  // between key and value (M6)
         }
     };
 
@@ -4743,6 +4749,7 @@ namespace XOffsetDatastructure {
                     constexpr auto member = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
                     relocate_construct(&((*dst).[:member:]), src.[:member:]);
                 });
+                detail::zero_implicit_padding(dst);
             }
         }
     } // namespace fixed_detail
@@ -5638,6 +5645,87 @@ namespace XOffsetDatastructure {
 
     template <typename T>
     inline constexpr bool has_implicit_padding_v = detail::has_implicit_padding<T>();
+
+    // M6: the library zeroes implicit padding of every container element it
+    // constructs or relocates, so neither stale arena bytes nor the caller's
+    // stack (a copied temporary) reach the wire through padding. Covers
+    // records, arrays and XKeyValue (map entries); padding of a record that
+    // the caller assigns directly is outside the library's reach.
+    namespace detail {
+        struct PaddingRange { std::size_t offset; std::size_t bytes; };
+
+        template <typename T>
+        consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base);
+
+        template <typename U, std::size_t... Is>
+        consteval void collect_record_padding(std::vector<PaddingRange>& out, std::size_t base,
+                                              std::index_sequence<Is...>) {
+            using namespace std::meta;
+            std::size_t covered = 0;
+            auto field = [&]<std::size_t I>() {
+                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
+                using FieldType = [:type_of(member):];
+                constexpr std::size_t offset = offset_of(member).bytes;
+                if (offset > covered) out.push_back({base + covered, offset - covered});
+                collect_padding<FieldType>(out, base + offset);
+                if (offset + sizeof(FieldType) > covered) covered = offset + sizeof(FieldType);
+            };
+            (field.template operator()<Is>(), ...);
+            if (covered < sizeof(U)) out.push_back({base + covered, sizeof(U) - covered});
+        }
+
+        template <typename T>
+        consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base) {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_array_v<U>) {
+                using E = std::remove_extent_t<U>;
+                if constexpr (std::is_class_v<E> || std::is_array_v<E>)
+                    for (std::size_t i = 0; i < std::extent_v<U>; ++i) collect_padding<E>(out, base + i * sizeof(E));
+            } else if constexpr (is_xkeyvalue_v<U>) {
+                collect_record_padding<U>(out, base, std::make_index_sequence<2>{});
+            } else if constexpr (std::is_class_v<U> && !is_fixed_string_v<U> && !is_fixed_vector_v<U>) {
+                // Records with bases are left alone (layout of base subobjects
+                // is not walked here).
+                if constexpr (reflected_base_count<U>() == 0)
+                    collect_record_padding<U>(out, base,
+                        std::make_index_sequence<reflected_member_count<U>()>{});
+            }
+        }
+
+        template <typename T>
+        consteval std::vector<PaddingRange> merged_padding() {
+            std::vector<PaddingRange> raw, merged;
+            collect_padding<T>(raw, 0);
+            for (const auto& r : raw) {
+                if (!merged.empty() && merged.back().offset + merged.back().bytes == r.offset)
+                    merged.back().bytes += r.bytes;
+                else
+                    merged.push_back(r);
+            }
+            return merged;
+        }
+
+        template <typename T>
+        inline constexpr auto padding_ranges = [] {
+            constexpr std::size_t n = merged_padding<T>().size();
+            std::array<PaddingRange, n> ranges{};
+            const auto v = merged_padding<T>();
+            for (std::size_t i = 0; i < n; ++i) ranges[i] = v[i];
+            return ranges;
+        }();
+
+        template <class T>
+        void zero_implicit_padding(T* object) noexcept {
+            if constexpr (!std::is_class_v<std::remove_cv_t<T>> && !std::is_array_v<std::remove_cv_t<T>>) {
+                (void)object;
+            } else if constexpr (padding_ranges<T>.size() == 0) {
+                (void)object;
+            } else {
+                auto* bytes = reinterpret_cast<unsigned char*>(object);
+                for (const auto& r : padding_ranges<T>) std::memset(bytes + r.offset, 0, r.bytes);
+            }
+        }
+    } // namespace detail
 
     // Opt-in per type: fails compilation when T carries implicit padding.
 #define XOFFSET_REQUIRE_NO_PADDING(Type) \

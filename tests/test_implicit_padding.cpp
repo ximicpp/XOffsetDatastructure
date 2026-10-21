@@ -1,9 +1,14 @@
 // M6 (threat model T5/P3): has_implicit_padding_v finds bytes no field covers,
-// in the type itself or anywhere a wire can reach from it.
+// in the type itself or anywhere a wire can reach from it; and the library
+// zeroes the padding of every container element it builds or moves, so a
+// wire carries neither stale arena bytes nor the caller's stack through it.
 #include "xoffsetdatastructure.hpp"
 
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <string>
 
 namespace xo = XOffsetDatastructure;
 
@@ -47,7 +52,73 @@ static_assert(!xo::has_implicit_padding_v<std::uint64_t[3]>);
 XOFFSET_REQUIRE_NO_PADDING(pad::DenseRoot);
 XOFFSET_REQUIRE_NO_PADDING(pad::Explicit);
 
+namespace padrt {
+struct Entry { std::uint8_t tag{}; std::uint64_t value{}; };          // 7 padding bytes
+struct WithString { std::uint16_t id{}; xo::XString name; };           // 2 padding bytes
+struct Root {
+    xo::XVector<Entry> entries;
+    xo::XMap<std::int32_t, std::int64_t> resources;                    // 4 bytes per entry
+    xo::XVector<WithString> named;
+    xo::XVector<std::uint64_t> scratch;
+};
+} // namespace padrt
+
+XOFFSET_REGISTER_SCHEMA_NAME(padrt::Root, "test.implicit_padding.root")
+
+namespace {
+[[noreturn]] void fail(const std::string& message) {
+    std::cerr << "test_implicit_padding FAILED: " << message << "\n";
+    std::exit(1);
+}
+
+template <class T>
+void expect_zero_padding(const T& object, const char* what) {
+    const auto* bytes = reinterpret_cast<const unsigned char*>(&object);
+    for (const auto& r : xo::detail::padding_ranges<T>)
+        for (std::size_t i = 0; i < r.bytes; ++i)
+            if (bytes[r.offset + i] != 0)
+                fail(std::string(what) + ": padding byte at offset " + std::to_string(r.offset + i) + " is not zero");
+}
+
+// Builds the same logical content with `garbage` in the caller's
+// temporaries and in freed arena blocks that the elements then reuse.
+std::string build(unsigned char garbage) {
+    auto b = xo::TypedXBuffer<padrt::Root>::create(
+        4096, xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
+    auto& r = b.root();
+    r.scratch.assign(512, 0x0101010101010101ull * garbage);
+    r.scratch.reserve(8192);                           // the dirty 4 KiB block goes to the free table
+    r.scratch.clear();
+    for (int i = 0; i < 16; ++i) {
+        padrt::Entry t;
+        std::memset(static_cast<void*>(&t), garbage, sizeof t);   // stack garbage in the padding
+        t.tag = std::uint8_t(i);
+        t.value = std::uint64_t(i) * 3;
+        r.entries.push_back(t);
+        r.resources.insert_or_assign(std::int32_t(i), std::int64_t(i) * 7);
+        auto& n = r.named.emplace_back();
+        n.id = std::uint16_t(i);
+        n.name = "name-" + std::to_string(i);
+    }
+    r.resources.erase(3);                              // shifts entries (relocation)
+    r.entries.erase(r.entries.begin() + 2);
+    for (const auto& e : r.entries) expect_zero_padding(e, "vector element");
+    for (const auto& kv : r.resources) expect_zero_padding(kv, "map entry");
+    for (const auto& n : r.named) expect_zero_padding(n, "element with string");
+    return b.save_verified();
+}
+
+void elements_have_zero_padding_and_wires_are_deterministic() {
+    const auto a = build(0xAB);
+    const auto c = build(0xCD);
+    if (a != c) fail("the same content with different garbage produced different wires");
+    if (a.find(std::string(4, char(0xAB))) != std::string::npos)
+        fail("caller or arena garbage reached the wire");
+}
+} // namespace
+
 int main() {
-    std::cout << "implicit padding detection: 12 compile-time checks passed\n";
+    elements_have_zero_padding_and_wires_are_deterministic();
+    std::cout << "implicit padding: 12 compile-time checks, element padding zeroed, wires deterministic\n";
     return 0;
 }
