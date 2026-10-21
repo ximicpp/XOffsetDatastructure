@@ -94,6 +94,7 @@ set(REFLECTION_TESTS
     test_v2_golden
     test_cross_compiler_wire
     test_schema_pin
+    test_wire_hole_zeroing
     test_v2_fuzz
 )
 
