@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstring>
 #include <limits>
+#include <exception>
 #include <new>
 
 namespace XOffsetDatastructure::detail {
@@ -133,6 +134,119 @@ T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
         // The following original walk rebases heads and empties source owns.
         return static_cast<T*>(std::memcpy(storage, &source, sizeof(T)));
     } else return destination;
+}
+
+// SHIFT: XFixedVector erase/insert move a contiguous run of live elements by
+// one slot. The caller memmoves the run, which supplies implicit object
+// creation of the ordinary outers and scalars as in rebuild_dynamic_array.
+// Only the INLINE heads of the moved run are then restarted, with every
+// self-relative delta rebased by the known displacement. Out-of-line payloads
+// keep their addresses and are neither scanned nor restarted. Custom activation
+// or lifetime policies keep the per-element relocate_construct path.
+template<class T>
+consteval bool shift_rebase_domain() {
+    if constexpr (wire_activation<T>::enabled || future_custom_lifetime_supported<T>()) return false;
+    else if constexpr (fixed_detail::is_owning_head<T>::value) return raw_descriptor_layout<T>();
+    else if constexpr (std::is_array_v<T>) return shift_rebase_domain<std::remove_extent_t<T>>();
+    else if constexpr (std::is_scalar_v<T>) return true;
+    else if constexpr (std::is_class_v<T>) {
+        if constexpr (reflected_base_count<T>() != 0) return false;
+        else return []<std::size_t... I>(std::index_sequence<I...>) {
+            return ([] {
+                constexpr auto member = std::meta::nonstatic_data_members_of(
+                    ^^T, std::meta::access_context::unchecked())[I];
+                if constexpr (std::meta::is_bit_field(member)) return false;
+                else {
+                    using M = [:std::meta::type_of(member):];
+                    return shift_rebase_domain<M>();
+                }
+            }() && ...);
+        }(std::make_index_sequence<reflected_member_count<T>()>{});
+    } else return false;
+}
+
+template<class T>
+consteval bool shift_relocate_supported() {
+    if constexpr (std::is_trivially_copyable_v<T> ||
+                  !fixed_detail::can_relocate_without_allocation<T>()) return false;
+    else if constexpr (!receive_raw::future_supported<T>() || !raw_needs_activation<T>()) return false;
+    else if constexpr (fixed_detail::is_owning_head<T>::value) return shift_rebase_domain<T>();
+    else return ordinary_outer_lifetime_supported<T>() && shift_rebase_domain<T>();
+}
+
+// Heads live in one bounded arena, so a rebased delta stays in rel32 range;
+// an impossible overflow ends the program as set_rel32 in a noexcept relocation does.
+inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept {
+    if (delta == 0) return 0;
+    const std::int64_t moved = std::int64_t(delta) + shift;
+    if (moved < (std::numeric_limits<std::int32_t>::min)() ||
+        moved > (std::numeric_limits<std::int32_t>::max)()) [[unlikely]] std::terminate();
+    return static_cast<std::int32_t>(moved);
+}
+
+// `shift` = old address - new address, so each delta grows by it.
+template<class T>
+void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
+    if constexpr (fixed_detail::is_owning_head<T>::value) {
+        // Descriptor layout {arena_delta, data_delta, size_, capacity_} is
+        // checked by raw_descriptor_layout<T>() in shift_rebase_domain.
+        std::int32_t arena_delta, data_delta;
+        std::uint32_t size, capacity;
+        std::memcpy(&arena_delta, address, 4);
+        std::memcpy(&data_delta, address + 4, 4);
+        std::memcpy(&size, address + 8, 4);
+        std::memcpy(&capacity, address + 12, 4);
+        auto* object = ::new (static_cast<void*>(address)) T;
+        bool inline_bytes = false;
+        if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XFixedString::inline_flag) != 0;
+        object->arena_delta = shift_rel32(arena_delta, shift);
+        object->data_delta = inline_bytes ? data_delta : shift_rel32(data_delta, shift);
+        object->size_ = size;
+        object->capacity_ = capacity;
+    } else if constexpr (std::is_array_v<T>) {
+        using E = std::remove_extent_t<T>;
+        if constexpr (raw_needs_activation<E>())
+            for (std::size_t i = 0; i < std::extent_v<T>; ++i)
+                shift_rebase_inline_value<E>(address + i * sizeof(E), shift);
+    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_activation<M>())
+                shift_rebase_inline_value<M>(address + std::meta::offset_of(member).bytes, shift);
+        });
+    }
+}
+
+template<class T>
+void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
+    static_assert(shift_relocate_supported<T>());
+    for (std::size_t i = 0; i < count; ++i)
+        shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), shift);
+}
+
+// The live slot a shift left behind still names the moved payloads. Empty its
+// inline heads exactly as a relocated-from source is emptied (binding kept),
+// so the caller's destroy_at releases nothing and spare bytes match the
+// per-element path.
+template<class T>
+void empty_vacated_slot(T* slot) noexcept {
+    if constexpr (fixed_detail::is_owning_head<T>::value) {
+        slot->data_delta = 0;
+        slot->size_ = 0;
+        slot->capacity_ = 0;
+    } else if constexpr (std::is_array_v<T>) {
+        for (auto& element : *slot) empty_vacated_slot(&element);
+    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_activation<M>())
+                empty_vacated_slot(&(slot->[:member:]));
+        });
+    }
 }
 
 } // namespace XOffsetDatastructure::detail
