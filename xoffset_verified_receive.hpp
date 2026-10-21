@@ -85,8 +85,13 @@ namespace detail {
 
     template<class T>
     void check_received_wire_header(const XWireHeaderV2& h, std::size_t payload_bytes,
-                                    const std::byte* holes, std::size_t hole_count) {
+                                    const std::byte* holes, std::size_t hole_count,
+                                    const std::byte* extents, std::size_t extent_count,
+                                    std::vector<XBufferCore::WireHole>& gaps) {
         check_wire_format(h, "load_verified<T>()");
+        if (h.extent_count != extent_count) throw XException("load_verified<T>(): extent count mismatch");
+        (void)parse_extent_table(reinterpret_cast<const char*>(extents), extent_count, h.used_bytes,
+                                 "load_verified<T>()", gaps);
         if (h.root_type_id != wire_root_type_id<T>()) throw XException("load_verified<T>(): root type id mismatch");
         if (h.schema_hash_lo != wire_schema_hash<T>() || h.schema_hash_hi != 0)
             throw XException("load_verified<T>(): schema hash mismatch");
@@ -105,11 +110,14 @@ namespace detail {
 }
 
 template<class T> class VerifiedReceiveToken;
-// V2: `holes` is the wire header's hole_count; the transport writes the hole
-// table (holes x 8 bytes) into Operation::hole_bytes().
+// V2: `holes` / `extents` are the wire header's hole_count / extent_count.
+// The transport writes the hole table into Operation::hole_bytes() and, for a
+// sparse wire, the extent table into Operation::extent_bytes() and each extent
+// at its payload offset inside Operation::payload_bytes() (gaps stay untouched).
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
 VerifiedReceiveToken<T> begin_verified_receive(std::size_t,
-    std::optional<XBufferCore::MaximumCapacity> = std::nullopt, std::size_t holes = 0);
+    std::optional<XBufferCore::MaximumCapacity> = std::nullopt, std::size_t holes = 0,
+    std::size_t extents = 0);
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
 TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>&,
     std::pmr::memory_resource* = std::pmr::new_delete_resource());
@@ -127,16 +135,20 @@ class VerifiedReceiveToken {
         const std::size_t expected_holes;
         std::vector<std::byte> holes;
         std::size_t received_holes = 0;
+        const std::size_t expected_extents;
+        std::vector<std::byte> extents;
+        std::size_t received_extents = 0;
         std::atomic<Phase> phase{Phase::Idle};
         std::atomic<bool> cancelled{false}, complete{false};
-        State(std::size_t n, XBufferCore::MaximumCapacity cap, std::size_t hole_count)
+        State(std::size_t n, XBufferCore::MaximumCapacity cap, std::size_t hole_count, std::size_t extent_count)
             : storage(detail::VirtualMemoryStorage::for_receive(n, cap.value, cap.pool)),
               growth(cap.growth), base(storage.canonical_byte_origin()), maximum(cap.value), expected(n),
-              expected_holes(hole_count), holes(hole_count * sizeof(XBufferCore::WireHole)) {}
+              expected_holes(hole_count), holes(hole_count * sizeof(XBufferCore::WireHole)),
+              expected_extents(extent_count), extents(extent_count * 8u) {}
     };
     std::shared_ptr<State> owner_;
     explicit VerifiedReceiveToken(std::shared_ptr<State> owner) noexcept : owner_(std::move(owner)) {}
-    friend VerifiedReceiveToken<T> begin_verified_receive<T>(std::size_t, std::optional<XBufferCore::MaximumCapacity>, std::size_t);
+    friend VerifiedReceiveToken<T> begin_verified_receive<T>(std::size_t, std::optional<XBufferCore::MaximumCapacity>, std::size_t, std::size_t);
     friend TypedXBuffer<T> finish_verified<T>(VerifiedReceiveToken<T>&, std::pmr::memory_resource*);
 public:
     VerifiedReceiveToken() noexcept = default;
@@ -180,13 +192,19 @@ public:
         std::span<std::byte> hole_bytes() const noexcept {
             return owner_ ? std::span<std::byte>(owner_->holes) : std::span<std::byte>{};
         }
+        std::span<std::byte> extent_bytes() const noexcept {
+            return owner_ ? std::span<std::byte>(owner_->extents) : std::span<std::byte>{};
+        }
         void cancel() noexcept { if (owner_) owner_->cancelled.store(true, std::memory_order_release); }
+        // payload_bytes counts the received payload bytes INCLUDING sparse
+        // gaps (i.e. the full logical payload length once every extent landed).
         void complete(std::size_t header_bytes, std::size_t payload_bytes,
-                      std::size_t hole_bytes = 0) noexcept {
+                      std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
             if (!owner_) return;
             owner_->received_header = header_bytes;
             owner_->received_payload = payload_bytes;
             owner_->received_holes = hole_bytes;
+            owner_->received_extents = extent_bytes;
             owner_->complete.store(true, std::memory_order_release);
             owner_->phase.store(State::Phase::Idle, std::memory_order_release);
             owner_.reset();
@@ -225,14 +243,15 @@ public:
 
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
 VerifiedReceiveToken<T> begin_verified_receive(std::size_t bytes,
-        std::optional<XBufferCore::MaximumCapacity> capacity, std::size_t holes) {
+        std::optional<XBufferCore::MaximumCapacity> capacity, std::size_t holes, std::size_t extents) {
     static_assert(is_v1_wire_admitted_v<T>);
     static_assert(detail::receive_raw::future_supported_v<T>, "T requires audited initial and recursive default future construction");
     const auto cap = capacity.value_or(XBufferCore::maximum_capacity(bytes));
     if (bytes > XBufferCore::MAX_PAYLOAD || cap.value > XBufferCore::MAX_PAYLOAD || bytes > cap.value ||
-        holes > XBufferCore::MAX_PAYLOAD / sizeof(XBufferCore::WireHole))
+        holes > XBufferCore::MAX_PAYLOAD / sizeof(XBufferCore::WireHole) ||
+        extents > XBufferCore::MAX_PAYLOAD / 8u)
         throw XBadAlloc();
-    return VerifiedReceiveToken<T>(std::make_shared<typename VerifiedReceiveToken<T>::State>(bytes,cap,holes));
+    return VerifiedReceiveToken<T>(std::make_shared<typename VerifiedReceiveToken<T>::State>(bytes,cap,holes,extents));
 }
 
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
@@ -252,11 +271,13 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
         ~Reset(){if(armed)s.phase.store(Phase::Idle,std::memory_order_release);} } reset{*state};
     if (!state->complete.load(std::memory_order_acquire) || state->cancelled.load(std::memory_order_acquire) ||
         state->received_header != sizeof(XWireHeaderV2) || state->received_payload != state->expected ||
-        state->received_holes != state->holes.size())
+        state->received_holes != state->holes.size() || state->received_extents != state->extents.size())
         throw XException("verified receive: incomplete or cancelled input");
     XWireHeaderV2 header{};
     std::memcpy(&header,state->header.data(),sizeof(header));
-    detail::check_received_wire_header<T>(header,state->expected,state->holes.data(),state->expected_holes);
+    std::vector<XBufferCore::WireHole> gaps;
+    detail::check_received_wire_header<T>(header,state->expected,state->holes.data(),state->expected_holes,
+                                          state->extents.data(),state->expected_extents,gaps);
     XBuffer prepared; // default only; no arena/allocator/storage constructor
     detail::VerifiedPathsAccess::adopt_storage(prepared,state->storage,state->growth);
     struct Rollback {
@@ -270,7 +291,7 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
     // Independent component does no VM/registry/typed publication. All its
     // throwing preparation finishes before the exact no-throw activation step.
     auto proof=detail::receive_raw::validate<T>(state->base,state->maximum,state->expected,
-        header.root_offset,state->holes.data(),state->expected_holes,scratch);
+        header.root_offset,state->holes.data(),state->expected_holes,scratch,gaps.data(),gaps.size());
     prepared.load_free_blocks(state->holes.data(),state->expected_holes);
     // Cancellation observed before the no-callback publication point aborts.
     // There is deliberately no post-callback read/write of the Token object.

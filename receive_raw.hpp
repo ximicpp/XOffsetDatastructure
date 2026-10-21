@@ -554,11 +554,130 @@ std::size_t raw_root_offset(const char* base, std::size_t extent,
     return static_cast<std::size_t>(h.root_offset);
 }
 
+
+template<class T> void validate_wire_value_raw(const char*,WireValidationContext&,const CanonicalRawBytes* = nullptr);
+
+inline void validate_string_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
+    const auto head = raw_wire_pod<RawOwningDescriptor>(address);
+    raw_validate_binding(address,head.arena_delta,ctx,bytes);
+    if (raw_inline_string(head)) {
+        validate_inline_string_bytes(address);
+        return;
+    }
+    if (head.size > head.capacity || head.capacity >= XBufferCore::MAX_PAYLOAD)
+        throw XException("wire validation failed: XFixedString size exceeds capacity");
+    if (!head.capacity) {
+        if (head.size != 0 || head.data_delta != 0)
+            throw XException("wire validation failed: empty XFixedString has invalid payload");
+        return;
+    }
+    const auto* data=raw_checked_relative(raw_advance(address,4,bytes),head.data_delta,ctx,bytes);
+    validate_storage_range(data, std::size_t(head.capacity) + 1, alignof(char), ctx,
+        "wire validation failed: XFixedString payload out of bounds");
+    raw_register_allocation(data,
+        fixed_detail::round_up_to_alignment(head.capacity+1,8),8,ctx,false,bytes);
+    if(raw_wire_pod<char>(raw_advance(data,head.size,bytes))!='\0')
+        throw XException("wire validation failed: XFixedString missing terminator");
+}
+
+template<class Element>
+RawOwningDescriptor validate_vector_raw(const char* address,
+                                        WireValidationContext& ctx,const CanonicalRawBytes* view=nullptr) {
+    const auto head = raw_wire_pod<RawOwningDescriptor>(address);
+    raw_validate_binding(address,head.arena_delta,ctx,view);
+    if (head.size > head.capacity ||
+        head.capacity > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(Element))
+        throw XException("wire validation failed: XFixedVector size exceeds capacity");
+    if (!head.capacity) {
+        if (head.size != 0 || head.data_delta != 0)
+            throw XException("wire validation failed: empty XFixedVector has invalid payload");
+        return head;
+    }
+    const auto* data=raw_checked_relative(raw_advance(address,4,view),head.data_delta,ctx,view);
+    const auto bytes = std::size_t(head.capacity) * sizeof(Element);
+    validate_storage_range(data, bytes, alignof(Element), ctx,
+        "wire validation failed: XFixedVector payload out of bounds");
+    raw_register_allocation(data,(bytes+7u)&~std::size_t(7u),
+        std::max<std::size_t>(alignof(Element),8),ctx,false,view);
+    if constexpr (raw_needs_validation<Element>())
+        for (std::uint32_t i = 0; i < head.size; ++i)
+            validate_wire_value_raw<Element>(raw_advance(data,std::size_t(i)*sizeof(Element),view),ctx,view);
+    return head;
+}
+
+template<class T>
+void validate_wire_value_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes) {
+    static_assert(receive_raw_supported<T>(), "unsupported raw wire activation domain");
+    if constexpr (wire_activation<T>::enabled) {
+        if(bytes) {
+            if constexpr (requires(char* write,RawActivationStats& stats) {
+                { wire_activation<T>::validate_raw(address,ctx,bytes) } -> std::same_as<void>;
+                { wire_activation<T>::activate(write,stats,bytes) } noexcept -> std::same_as<void>;
+            })
+                wire_activation<T>::validate_raw(address,ctx,bytes);
+            else throw XException("raw receive: custom canonical validation policy required");
+        } else wire_activation<T>::validate_raw(address,ctx);
+    }
+    else if constexpr (std::is_same_v<T, bool>) {
+        const auto bits = raw_wire_pod<unsigned char>(address);
+        if (bits > 1) throw XException("wire validation: invalid bool representation");
+    } else if constexpr (std::is_enum_v<T>) {
+        // Read U first, never E, before the full standard value-range check.
+        using U=std::underlying_type_t<T>;
+        const U bits=raw_wire_pod<U>(address);
+        if(!raw_enum_representation_valid<T>(bits))
+            throw XException("wire validation: invalid enum representation");
+    } else if constexpr (std::is_array_v<T>) {
+        using E = std::remove_extent_t<T>;
+        if constexpr (raw_needs_validation<E>())
+            for (std::size_t i = 0; i < std::extent_v<T>; ++i)
+                validate_wire_value_raw<E>(raw_advance(address,i*sizeof(E),bytes),ctx,bytes);
+    } else if constexpr (is_fixed_string_v<T>)
+        validate_string_raw(address,ctx,bytes);
+    else if constexpr (is_fixed_flat_set_v<T>) {
+        using E = typename T::value_type;
+        const auto head=validate_vector_raw<E>(address,ctx,bytes);
+        if (head.size > 1) {
+            const auto* data = raw_verified_relative(
+                const_cast<char*>(raw_advance(address,4,bytes)),head.data_delta,bytes);
+            for (std::uint32_t i = 1; i < head.size; ++i)
+                if(!raw_compare_keys<E>(raw_advance(data,std::size_t(i-1)*sizeof(E),bytes),
+                    raw_advance(data,std::size_t(i)*sizeof(E),bytes),ctx,bytes))
+                    throw XException("wire validation: set keys not strictly ordered");
+        }
+    } else if constexpr (is_fixed_flat_map_v<T>) {
+        using E = typename T::value_type;
+        using K = typename T::key_type;
+        const auto head=validate_vector_raw<E>(address,ctx,bytes);
+        if (head.size > 1) {
+            const auto* data = raw_verified_relative(
+                const_cast<char*>(raw_advance(address,4,bytes)),head.data_delta,bytes);
+            for (std::uint32_t i = 1; i < head.size; ++i)
+                if(!raw_compare_keys<K>(
+                    raw_advance(data,std::size_t(i-1)*sizeof(E)+offsetof(E,first),bytes),
+                    raw_advance(data,std::size_t(i)*sizeof(E)+offsetof(E,first),bytes),ctx,bytes))
+                    throw XException("wire validation: map keys not strictly ordered");
+        }
+    } else if constexpr (is_fixed_vector_v<T>)
+        (void)validate_vector_raw<typename T::value_type>(address,ctx,bytes);
+    else if constexpr (std::is_class_v<T>) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_validation<M>())
+                validate_wire_value_raw<M>(
+                    raw_advance(address,std::meta::offset_of(member).bytes,bytes),ctx,bytes);
+        });
+    }
+}
+
 template<class T>
 RawWireVerification verify_structural_wire_graph_raw_at(
         const char* base, std::size_t extent, const RawPayloadHeader& arena,
         std::size_t root, const void* holes, std::size_t hole_count,
-        std::pmr::memory_resource* upstream,const CanonicalRawBytes* bytes=nullptr) {
+        std::pmr::memory_resource* upstream,const CanonicalRawBytes* bytes=nullptr,
+        const void* gaps=nullptr,std::size_t gap_count=0) {
     static_assert(receive_raw_supported<T>(), "unsupported raw wire activation domain");
     if(!upstream)throw std::invalid_argument("validation scratch: null upstream");
     auto* resource=upstream;
@@ -576,6 +695,7 @@ RawWireVerification verify_structural_wire_graph_raw_at(
     raw_register_allocation(raw_advance(base,root,bytes),sizeof(T),alignof(T),ctx,false,bytes);
     validate_wire_value_raw<T>(raw_advance(base,root,bytes),ctx,bytes);
     require_exact_coverage(ctx);
+    require_gaps_free(static_cast<const XBufferCore::WireHole*>(gaps), gap_count, ctx);
     return {root, extent};
 }
 
@@ -758,7 +878,8 @@ void reactivate_inline_prefix(T* data,std::size_t live_count) noexcept {
 template<class T> requires(supported_v<T>)
 Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
                   const void* holes, std::size_t hole_count,
-                  std::pmr::memory_resource* upstream) {
+                  std::pmr::memory_resource* upstream,
+                  const void* gaps, std::size_t gap_count) {
     const auto arena = read_raw_arena_header(base, used);
     if (arena.used_end != used)
         throw XException("load_verified<T>(): non-normalized payload extent");
@@ -766,7 +887,7 @@ Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
     if (root != wire_root_offset)
         throw XException("load_verified<T>(): root offset mismatch");
     (void)verify_structural_wire_graph_raw_at<T>(
-        base, used, arena, root, holes, hole_count, upstream);
+        base, used, arena, root, holes, hole_count, upstream, nullptr, gaps, gap_count);
     // Local scratch and its upstream callbacks have finished before a proof is
     // returned. No pointer into scratch is retained; activation walks the same
     // already-proved byte graph without allocation or a typed raw-head read.
@@ -776,14 +897,14 @@ Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
 template<class T> requires(supported_v<T>)
 Proof<T> validate(std::byte* origin,std::size_t maximum,std::size_t used,
         std::uint64_t wire_root_offset,const void* holes,std::size_t hole_count,
-        std::pmr::memory_resource* upstream) {
+        std::pmr::memory_resource* upstream,const void* gaps,std::size_t gap_count) {
     if(!origin||used>maximum)throw XException("XBufferCore: payload too small");
     CanonicalRawBytes bytes{origin,maximum,used};
     const auto arena=read_raw_arena_header(bytes.at(0),used);
     if(arena.used_end!=used)throw XException("load_verified<T>(): non-normalized payload extent");
     const auto root=raw_root_offset<T>(bytes.at(0),used,arena);
     if(root!=wire_root_offset)throw XException("load_verified<T>(): root offset mismatch");
-    (void)verify_structural_wire_graph_raw_at<T>(bytes.at(0),used,arena,root,holes,hole_count,upstream,&bytes);
+    (void)verify_structural_wire_graph_raw_at<T>(bytes.at(0),used,arena,root,holes,hole_count,upstream,&bytes,gaps,gap_count);
     return Proof<T>(origin,maximum,used,root);
 }
 

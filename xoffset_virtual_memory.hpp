@@ -260,6 +260,41 @@ public:
         return owner;
     }
 
+    // V2 sparse load: `stored` holds the concatenated extents; extent i is
+    // {u32 offset, u32 bytes} at extents + 8*i (unaligned allowed), ascending
+    // and validated by the caller to tile [0, length) with gaps. Gap bytes
+    // read as zero (fresh pages, or explicitly cleared if previously exposed).
+    static VirtualMemoryStorage from_extents(const char* stored, const void* extents,
+                                             std::size_t count, std::size_t length,
+                                             std::size_t maximum_capacity,
+                                             const VmStoragePool& pool = {}) {
+        if (length > maximum_capacity) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        VirtualMemoryStorage owner(0, maximum_capacity, pool, false);
+        if (length == 0) return owner;
+        if (!owner.enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
+            throw std::bad_alloc();
+        }
+        std::size_t cursor = 0;
+        auto clear = [&](std::size_t begin, std::size_t end) {
+            const auto dirty = (std::min)(end, owner.zero_from_);
+            if (begin < dirty) std::memset(owner.base_ + begin, 0, dirty - begin);
+        };
+        for (std::size_t i = 0; i < count; ++i) {
+            std::uint32_t entry[2];
+            std::memcpy(entry, static_cast<const char*>(extents) + i * sizeof(entry), sizeof(entry));
+            clear(cursor, entry[0]);
+            std::memcpy(owner.base_ + entry[0], stored, entry[1]);
+            stored += entry[1];
+            cursor = std::size_t(entry[0]) + entry[1];
+        }
+        clear(cursor, length);
+        owner.logical_bytes_ = length;
+        if (owner.zero_from_ < length) owner.zero_from_ = length;
+        return owner;
+    }
+
     ~VirtualMemoryStorage() { release(); }
 
     VirtualMemoryStorage(const VirtualMemoryStorage&) = delete;
