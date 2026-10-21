@@ -230,7 +230,7 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
     if (hole_sum != h.hole_bytes) return reject(Oracle::Stage::Header, "hole bytes");
     // Payload stage (also what the raw/receive validators see). Gaps read as 0.
     std::vector<unsigned char> payload(std::size_t(h.used_bytes), 0);
-    if (h.extent_count == 0) std::memcpy(payload.data(), table, payload.size());
+    if (h.extent_count == 0 && !payload.empty()) std::memcpy(payload.data(), table, payload.size());
     else {
         const auto* src = table + tbytes;
         for (auto [off, b] : extents) { std::memcpy(payload.data() + off, src, b); src += b; }
@@ -353,7 +353,7 @@ bool receive_accepts(const std::string& wire, std::string* error) {
             auto hb = op.header_bytes(); std::memcpy(hb.data(), wire.data(), kHeader);
             // Scatter: write only extents (gap bytes stay as received storage).
             auto pb = op.payload_bytes();
-            if (u.h.extent_count == 0) std::memcpy(pb.data(), u.base(), used);
+            if (u.h.extent_count == 0) { if (used) std::memcpy(pb.data(), u.base(), used); }
             else {
                 std::uint64_t pos = 0;
                 for (const auto& g : u.gaps) {
@@ -362,8 +362,9 @@ bool receive_accepts(const std::string& wire, std::string* error) {
                 }
                 if (pos < used) std::memcpy(pb.data() + pos, u.base() + pos, used - pos);
             }
-            auto eb = op.extent_bytes(); std::memcpy(eb.data(), u.table, eb.size());
-            auto lb = op.hole_bytes(); std::memcpy(lb.data(), u.holes, lb.size());
+            // Empty spans have null data(); memcpy requires non-null pointers.
+            auto eb = op.extent_bytes(); if (!eb.empty()) std::memcpy(eb.data(), u.table, eb.size());
+            auto lb = op.hole_bytes(); if (!lb.empty()) std::memcpy(lb.data(), u.holes, lb.size());
             op.complete(kHeader, used, lb.size(), eb.size());
         }
         auto received = xo::finish_verified<fz::Root>(token);
