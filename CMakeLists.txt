@@ -16,6 +16,13 @@ option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEV
 if(XOFFSET_BUILD_TESTS)
     enable_testing()
 endif()
+# MinGW: libstdc++ as a DLL keeps its own operator new, so std::pmr and other
+# library-internal allocations bypass a test's replacement operator new. Link
+# the runtime statically so replacements see every allocation (project-local;
+# not part of the exported interface).
+if(MINGW AND XOFFSET_TOP_LEVEL)
+    add_link_options(-static)
+endif()
 include(cmake/XOffsetBuildChecks.cmake)
 include(cmake/XOffsetTestInventory.cmake)
 find_package(Threads REQUIRED)
