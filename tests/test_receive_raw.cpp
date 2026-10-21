@@ -1,4 +1,4 @@
-// Source-only tests; author has not compiled or executed this target.
+// Raw receive component tests (V2 wire: header + payload + hole table).
 #include "receive_raw.hpp"
 #include <array>
 #include <cstddef>
@@ -231,14 +231,21 @@ void need(bool ok, const char* text) {
 auto capacity() {
     return xo::XBuffer::maximum_capacity(4u << 20).with_growth(xo::XGrowPolicy::Automatic);
 }
+// V2 wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
 struct Wire {
     std::string bytes;
-    xo::XWireHeaderV1 header() const {
-        return rd::raw_wire_pod<xo::XWireHeaderV1>(bytes.data());
+    xo::XWireHeaderV2 header() const {
+        return rd::raw_wire_pod<xo::XWireHeaderV2>(bytes.data());
     }
-    const char* payload() const { return bytes.data() + sizeof(xo::XWireHeaderV1); }
-    char* payload() { return bytes.data() + sizeof(xo::XWireHeaderV1); }
-    std::size_t extent() const { return bytes.size() - sizeof(xo::XWireHeaderV1); }
+    const char* payload() const { return bytes.data() + sizeof(xo::XWireHeaderV2); }
+    char* payload() { return bytes.data() + sizeof(xo::XWireHeaderV2); }
+    std::size_t extent() const { return std::size_t(header().used_bytes); }
+    const char* holes() const { return payload() + extent(); }
+    std::size_t hole_count() const { return std::size_t(header().hole_count); }
+    xo::XBufferCore::WireHole hole(std::size_t i) const {
+        need(i < hole_count(), "test hole index");
+        return rd::raw_wire_pod<xo::XBufferCore::WireHole>(holes() + i * sizeof(xo::XBufferCore::WireHole));
+    }
     template<class P> P at(std::size_t offset) const {
         need(offset <= extent() && sizeof(P) <= extent() - offset, "test raw read bounds");
         return rd::raw_wire_pod<P>(payload() + offset);
@@ -256,18 +263,26 @@ struct Wire {
     xo::XBufferCore owner() const {
         // This component fixture deliberately uses the existing copied owner.
         // It tests RAW verification/activation, not the token's no-copy seam.
-        return xo::XBufferCore(payload(), extent(), capacity());
+        // V2: an owner copied from raw bytes has no known free table until
+        // the wire hole table is installed (the Core wrapper requires it).
+        xo::XBufferCore core(payload(), extent(), capacity());
+        core.load_free_blocks(holes(), hole_count());
+        return core;
     }
 };
 template<class T> Wire wire_of(xo::XBuffer& source) {
-    return {source.save_verified<T>()};
+    Wire wire{source.save_verified<T>()};
+    const auto h = wire.header();
+    need(wire.bytes.size() == sizeof(xo::XWireHeaderV2) + h.used_bytes +
+         h.hole_count * sizeof(xo::XBufferCore::WireHole), "V2 wire size differs from header");
+    return wire;
 }
 template<class T>
 auto admit(xo::XBufferCore& owner, const Wire& wire,
            std::pmr::memory_resource* resource = std::pmr::new_delete_resource()) {
     const auto header = wire.header();
     return rr::validate<T>(owner.data(), owner.get_size(),
-        header.root_offset, header.allocator_offset, resource);
+        header.root_offset, wire.holes(), wire.hole_count(), resource);
 }
 Wire demo() {
     auto source = xo::XBuffer::create<model::Snapshot>(65536, capacity());
@@ -277,16 +292,19 @@ Wire demo() {
     for (std::uint32_t i = 0; i < 2; ++i) {
         auto& r = snapshot.records[i];
         r.id = 10 + i; r.revision = i; r.score = -std::int64_t{100} + i;
-        r.name = "original";
+        // Out-of-line (> 10 bytes): its replacement below retires a block.
+        r.name = "original record name";
         r.samples.push_back(i); r.samples.push_back(i + 20);
         r.payload.push_back(std::uint8_t(i + 4));
         r.attrs.resize(1);
         r.attrs[0].key = "attrs";
         r.attrs[0].value.push_back(std::uint8_t(i + 1));
     }
-    // Ensure a real free-list range and a second scratch index exist.
+    // Ensure a real hole (V2 hole table entry) and a second scratch index exist.
     snapshot.records[0].name = "a substantially longer replacement name";
-    return wire_of<model::Snapshot>(source);
+    auto wire = wire_of<model::Snapshot>(source);
+    need(wire.hole_count() != 0 && wire.header().hole_bytes != 0, "demo wire has no hole table entry");
+    return wire;
 }
 class CountingResource : public std::pmr::memory_resource {
 public:
@@ -361,8 +379,10 @@ void metadata_error_order() {
     const auto wire = demo();
     const auto wire_header = wire.header();
     const auto arena = wire.at<rd::RawPayloadHeader>(0);
+    const std::string table(wire.holes(), wire.hole_count() * sizeof(xo::XBufferCore::WireHole));
     const auto expect = [&](rd::RawPayloadHeader altered, std::uint64_t wire_root,
-                            std::uint64_t wire_allocator, const char* message) {
+                            const std::string& holes, const char* message,
+                            bool before_scratch = true) {
         auto owner = wire.owner();
         std::memcpy(owner.data(), &altered, sizeof(altered));
         const auto before = owner.copy_bytes();
@@ -370,42 +390,152 @@ void metadata_error_order() {
         bool caught = false;
         try {
             (void)rr::validate<model::Snapshot>(owner.data(), owner.get_size(),
-                wire_root, wire_allocator, &resource);
+                wire_root, holes.data(), holes.size() / sizeof(xo::XBufferCore::WireHole), &resource);
         } catch (const xo::XException& error) {
             caught = std::string_view(error.what()) == message;
         }
         need(caught, "raw metadata error order differs");
-        need(resource.attempts == 0 && owner.copy_bytes() == before,
+        need((!before_scratch || resource.attempts == 0) && resource.live == 0 &&
+             owner.copy_bytes() == before,
              "metadata rejection allocated scratch or wrote payload");
     };
+    // V2 payload header: {magic XBUFV2, header_size, flags, root_offset,
+    // used_end, reserved0, reserved1}; there is no allocator offset/state.
     auto bad = arena;
-    bad.allocator_offset = 0;
-    expect(bad, wire_header.root_offset + 8, wire_header.allocator_offset,
+    bad.magic[5] = '1'; // the V1 payload magic is not accepted
+    expect(bad, wire_header.root_offset + 8, table, "XBufferCore: payload header mismatch");
+    bad = arena;
+    bad.header_size = 40;
+    expect(bad, wire_header.root_offset, table, "XBufferCore: payload header mismatch");
+    bad = arena;
+    bad.reserved0 = 1;
+    expect(bad, wire_header.root_offset + 8, table,
            "load_verified<T>(): root offset mismatch");
-    expect(bad, wire_header.root_offset, wire_header.allocator_offset,
-           "load_verified<T>(): allocator state not found");
+    expect(bad, wire_header.root_offset, table,
+           "wire validation: unsupported arena header flags");
+    bad = arena;
+    bad.reserved1 = 1;
+    expect(bad, wire_header.root_offset, table,
+           "wire validation: unsupported arena header flags");
     bad = arena;
     bad.root_offset = wire.extent() + 8;
-    expect(bad, wire_header.root_offset + 8, wire_header.allocator_offset,
+    expect(bad, wire_header.root_offset + 8, table,
            "load_verified<T>(): root not found");
     bad = arena;
     bad.flags = 1;
-    expect(bad, wire_header.root_offset + 8, wire_header.allocator_offset,
+    expect(bad, wire_header.root_offset + 8, table,
            "load_verified<T>(): root offset mismatch");
-    expect(bad, wire_header.root_offset, wire_header.allocator_offset + 8,
-           "load_verified<T>(): allocator offset mismatch");
-    expect(bad, wire_header.root_offset, wire_header.allocator_offset,
+    expect(bad, wire_header.root_offset, table,
            "wire validation: unsupported arena header flags");
     bad = arena;
     bad.used_end -= 8;
-    expect(bad, wire_header.root_offset + 8, wire_header.allocator_offset,
+    expect(bad, wire_header.root_offset + 8, table,
            "load_verified<T>(): non-normalized payload extent");
+    // Hole table entries are checked after the payload header (whose range
+    // registration may use scratch) and before the root/graph walk.
+    need(wire.hole_count() != 0, "metadata fixture has no hole table");
+    const auto first = wire.hole(0);
+    auto with_first = [&](xo::XBufferCore::WireHole hole) {
+        std::string altered = table;
+        std::memcpy(altered.data(), &hole, sizeof(hole));
+        return altered;
+    };
+    for (const auto hole : {xo::XBufferCore::WireHole{first.offset + 4, first.bytes},
+                            xo::XBufferCore::WireHole{first.offset, first.bytes + 4},
+                            xo::XBufferCore::WireHole{first.offset, 0},
+                            xo::XBufferCore::WireHole{0, 8},
+                            xo::XBufferCore::WireHole{std::uint32_t(wire.extent()), 8}})
+        expect(arena, wire_header.root_offset, with_first(hole),
+               "wire validation failed: invalid hole table entry", false);
+}
+
+// V2 exact coverage: header + live blocks + holes tile [0, used_end).
+template<class T>
+void rejects_holes(const Wire& wire, const std::string& holes, const char* expected) {
+    auto owner = wire.owner();
+    const auto before = owner.copy_bytes();
+    CountingResource resource;
+    bool caught = false;
+    try {
+        (void)rr::validate<T>(owner.data(), owner.get_size(), wire.header().root_offset,
+            holes.data(), holes.size() / sizeof(xo::XBufferCore::WireHole), &resource);
+    } catch (const xo::XException& error) {
+        caught = std::string_view(error.what()) == expected;
+    }
+    need(caught, "raw hole-table first error differs");
+    need(resource.live == 0 && owner.copy_bytes() == before, "rejected hole table leaked scratch or changed payload");
+}
+void hole_table_exact_coverage() {
+    const auto wire = demo();
+    using Hole = xo::XBufferCore::WireHole;
+    const std::string table(wire.holes(), wire.hole_count() * sizeof(Hole));
+    std::uint64_t sum = 0;
+    for (std::size_t i = 0; i < wire.hole_count(); ++i) {
+        const auto hole = wire.hole(i);
+        need(hole.offset % 8 == 0 && hole.bytes % 8 == 0 && hole.bytes != 0 &&
+             hole.offset >= sizeof(rd::RawPayloadHeader) && hole.offset + hole.bytes <= wire.extent(),
+             "writer emitted an unaligned/out-of-range hole");
+        sum += hole.bytes;
+    }
+    need(sum == wire.header().hole_bytes, "writer hole_bytes differs from the table");
+    // A dropped hole leaves an uncovered dead range.
+    rejects_holes<model::Snapshot>(wire, table.substr(sizeof(Hole)),
+        "wire validation failed: payload is not exactly covered by live blocks and holes");
+    // A duplicated hole overlaps itself; a hole over the root overlaps a live block.
+    rejects_holes<model::Snapshot>(wire, table + table.substr(0, sizeof(Hole)),
+        "wire validation detected overlapping free-list ranges");
+    {
+        std::string over_root = table;
+        const Hole root{std::uint32_t(wire.header().root_offset), 8};
+        std::memcpy(over_root.data(), &root, sizeof(root));
+        rejects_holes<model::Snapshot>(wire, over_root,
+            "wire validation detected live/free overlap");
+    }
+    // Splitting a hole into two exact halves is an equally exact tiling.
+    const auto first = wire.hole(0);
+    if (first.bytes >= 16) {
+        std::string split = table;
+        const Hole a{first.offset, 8}, b{first.offset + 8, first.bytes - 8};
+        std::memcpy(split.data(), &a, sizeof(a));
+        split.append(reinterpret_cast<const char*>(&b), sizeof(b));
+        auto owner = wire.owner();
+        (void)rr::validate<model::Snapshot>(owner.data(), owner.get_size(), wire.header().root_offset,
+            split.data(), split.size() / sizeof(Hole));
+    }
+    // An unreferenced live-looking block (allocated, never retired) is dead
+    // space that V2 rejects at the coverage step: a mutation that drops a
+    // vector's ownership leaves its block uncovered.
+    auto source = xo::XBuffer::create<model::Bools>(65536, capacity());
+    source.root<model::Bools>().values.reserve(16);
+    auto bools = wire_of<model::Bools>(source);
+    need(bools.hole_count() == 0, "bool fixture unexpectedly has holes");
+    const auto head = std::size_t(bools.header().root_offset) + offsetof(model::Bools, values);
+    auto descriptor = bools.at<rd::RawOwningDescriptor>(head);
+    descriptor.data_delta = 0; descriptor.size = 0; descriptor.capacity = 0;
+    bools.put(head, descriptor);
+    rejects<model::Bools>(bools,
+        "wire validation failed: payload is not exactly covered by live blocks and holes");
 }
 void bad_bool_and_terminator() {
     auto source = xo::XBuffer::create<model::Flag>(65536, capacity());
     source.root<model::Flag>().flag = true;
     source.root<model::Flag>().label = "valid";
     auto flag = wire_of<model::Flag>(source);
+    // I1: "valid" is an inline string (head bytes 4..14, byte 15 = 0x80|len).
+    const auto label = std::size_t(flag.header().root_offset) + offsetof(model::Flag, label);
+    need(rd::raw_inline_string(flag.at<rd::RawOwningDescriptor>(label)) &&
+         rd::raw_inline_string_size(flag.at<rd::RawOwningDescriptor>(label)) == 5,
+         "short label fixture is not inline");
+    {
+        auto padding = flag; padding.put<char>(label + 4 + 7, 'p');
+        rejects<model::Flag>(padding, "wire validation failed: inline XFixedString has nonzero padding");
+        auto terminator = flag; terminator.put<char>(label + 4 + 5, 'X');
+        rejects<model::Flag>(terminator, "wire validation failed: inline XFixedString has nonzero padding");
+        auto length = flag; length.put<unsigned char>(label + 15, 0x80u | 11u);
+        rejects<model::Flag>(length, "wire validation failed: inline XFixedString length exceeds 10");
+        auto binding = flag; binding.put<std::int32_t>(label, 0);
+        rejects<model::Flag>(binding, "wire validation: invalid allocator binding");
+    }
     flag.put<unsigned char>(std::size_t(flag.header().root_offset) + offsetof(model::Flag, flag), 2);
     rejects<model::Flag>(flag, "wire validation: invalid bool representation");
     auto wire = demo();
@@ -453,13 +583,29 @@ void full_elements_before_ordering() {
     wire.put<unsigned char>(data + sizeof(Pair) + offsetof(Pair, second), 0);
     rejects<model::Maps>(wire, "wire validation: map keys not strictly ordered");
 
+    // Out-of-line keys (> 10 bytes): the first key's payload byte is changed.
     auto strings = xo::XBuffer::create<model::Sets>(65536, capacity());
-    strings.root<model::Sets>().names.insert("a");
-    strings.root<model::Sets>().names.insert("b");
+    strings.root<model::Sets>().names.insert("a-out-of-line-key");
+    strings.root<model::Sets>().names.insert("b-out-of-line-key");
     auto set = wire_of<model::Sets>(strings);
     const auto set_head = std::size_t(set.header().root_offset) + offsetof(model::Sets, names);
+    need(!rd::raw_inline_string(set.at<rd::RawOwningDescriptor>(set.target(set_head))), "long key fixture is inline");
     set.put<char>(set.target(set.target(set_head)), 'z');
     rejects<model::Sets>(set, "wire validation: set keys not strictly ordered");
+    // I1 inline keys: the first key's characters live in its head bytes 4..14.
+    auto short_strings = xo::XBuffer::create<model::Sets>(65536, capacity());
+    short_strings.root<model::Sets>().names.insert("a");
+    short_strings.root<model::Sets>().names.insert("b");
+    auto short_set = wire_of<model::Sets>(short_strings);
+    const auto short_head = std::size_t(short_set.header().root_offset) + offsetof(model::Sets, names);
+    const auto first_key = short_set.target(short_head);
+    need(rd::raw_inline_string(short_set.at<rd::RawOwningDescriptor>(first_key)), "short key fixture is not inline");
+    {
+        auto owner = short_set.owner();
+        (void)admit<model::Sets>(owner, short_set); // inline keys are admitted
+    }
+    short_set.put<char>(first_key + 4, 'z');
+    rejects<model::Sets>(short_set, "wire validation: set keys not strictly ordered");
 }
 void explicit_enum_policy() {
     // The old validator sees const key lvalues; rvalue-only operators are
@@ -539,8 +685,16 @@ void fixed_arrays() {
     const auto before = owner.copy_bytes();
     const auto structural = rd::verify_structural_wire_graph_raw<model::FixedScalars>(owner);
     need(structural.root_offset == wire.header().root_offset &&
-         structural.allocator_offset == wire.header().allocator_offset &&
          structural.used_bytes == owner.get_size(), "Core wrapper metadata differs");
+    // V2: the Core wrapper uses the owner's free table as its hole table and
+    // refuses an owner whose table is unknown (raw-copied, never installed).
+    {
+        xo::XBufferCore unknown(wire.payload(), wire.extent(), capacity());
+        bool refused = false;
+        try { (void)rd::verify_structural_wire_graph_raw<model::FixedScalars>(unknown); }
+        catch (const xo::XException& e) { refused = std::string_view(e.what()) == "wire validation: free table incomplete"; }
+        need(refused, "Core wrapper accepted an owner with an unknown free table");
+    }
     auto proof = admit<model::FixedScalars>(owner, wire);
     const auto stats = std::move(proof).activate();
     const auto* actual=std::launder(reinterpret_cast<const model::FixedScalars*>(owner.data()+wire.header().root_offset));
@@ -559,7 +713,7 @@ void incomplete_canonical_policy(){
     for(std::size_t i=0;i<wire.extent();++i)origin[i]=std::byte(static_cast<unsigned char>(wire.payload()[i]));
     xo::wire_activation<T>::canonical_calls=0;bool caught=false;
     try{(void)rr::validate<T>(origin,wire.extent(),wire.extent(),
-        wire.header().root_offset,wire.header().allocator_offset);}
+        wire.header().root_offset,wire.holes(),wire.hole_count());}
     catch(const xo::XException& e){caught=std::string_view(e.what())=="raw receive: custom canonical validation policy required";}
     need(caught&&xo::wire_activation<T>::canonical_calls==0&&
          std::memcmp(origin,wire.payload(),wire.extent())==0,
@@ -619,6 +773,7 @@ int main() {
     try {
         demo_activation_and_oom();
         metadata_error_order();
+        hole_table_exact_coverage();
         bad_bool_and_terminator();
         dirty_capacity_tail_bool();
         full_elements_before_ordering();

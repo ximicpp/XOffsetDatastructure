@@ -555,7 +555,11 @@ namespace XOffsetDatastructure {
             if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
                 (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
             if (alignment <= 8 && free_table_) {
-                if (void* reused = take_free_block(*free_table_, bytes)) return reused;
+                FreeSplit split;
+                if (void* reused = take_free_block(*free_table_, bytes, split)) {
+                    finish_free_split(split);
+                    return reused;
+                }
             }
             return bump_block(bytes, alignment, allow_growth);
         }
@@ -612,18 +616,35 @@ namespace XOffsetDatastructure {
         }
 
         // Replaces the free table with validated holes (wire order).
-        // `holes` need not be aligned (it may point into wire bytes).
+        // `holes` need not be aligned (it may point into wire bytes). The new
+        // table is built off to the side (host allocation may run
+        // new_handler); the payload's current owner is re-resolved and the
+        // old table is destroyed only after publication.
         void load_free_blocks(const void* holes, std::size_t count) {
-            free_table_.reset();
-            free_table_lost_ = false;
-            for (std::size_t i = 0; i < count; ++i) {
-                WireHole hole;
-                std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
-                if (!insert_free_block(hole.offset, hole.bytes)) {
-                    free_table_lost_ = true;
-                    throw XBadAlloc();
+            const auto identity = owner_record_;
+            std::unique_ptr<FreeTable> table;
+            try {
+                table = std::make_unique<FreeTable>();
+                for (std::size_t i = 0; i < count; ++i) {
+                    WireHole hole;
+                    std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
+                    if (hole.bytes <= FreeTable::small_max) {
+                        const auto bin = hole.bytes / 8u - 1u;
+                        table->bins[bin].push_back(hole.offset);
+                        table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    } else {
+                        table->large.emplace(hole.bytes, hole.offset);
+                    }
+                    table->bytes += hole.bytes;
+                    ++table->count;
                 }
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
             }
+            auto* owner = identity ? record_owner(identity) : this;
+            if (!owner) throw XException("arena owner lookup failed");
+            owner->free_table_.swap(table);
+            owner->free_table_lost_ = false;
         }
 
         // Replaces the free table with an exact recomputation (used after an
@@ -643,30 +664,79 @@ namespace XOffsetDatastructure {
             std::size_t count = 0;
         };
 
+        // Records one free block. Host allocation (table, bin growth, map
+        // node) may run new_handler, which may move, swap or release this
+        // Core: every allocation is prepared first, then the payload's owner
+        // is re-resolved through its registry record before publication, and
+        // replaced host storage is destroyed only after publication. An
+        // unregistered Core (receive preparation) is unreachable and is used
+        // directly. On host OOM the entry is lost and the table is marked
+        // incomplete (save_verified recomputes it from the live graph).
         bool insert_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            const auto identity = owner_record_;
+            std::unique_ptr<FreeTable> spare_table;
+            std::vector<std::uint32_t> spare_bin;
+            std::multimap<std::uint32_t, std::uint32_t> spare_large;
             try {
-                if (!free_table_) free_table_ = std::make_unique<FreeTable>();
-                auto& table = *free_table_;
-                if (bytes <= FreeTable::small_max) {
-                    const auto bin = bytes / 8u - 1u;
-                    table.bins[bin].push_back(offset);
-                    table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
-                } else {
-                    table.large.emplace(bytes, offset);
+                if (bytes > FreeTable::small_max) spare_large.emplace(bytes, offset);
+                for (;;) {
+                    XBufferCore* owner = identity ? record_owner(identity) : this;
+                    if (!owner) return true; // the payload was released
+                    if (!owner->free_table_) {
+                        if (!spare_table) {
+                            spare_table = std::make_unique<FreeTable>();
+                            continue; // re-resolve after the allocation
+                        }
+                        owner->free_table_.swap(spare_table);
+                    }
+                    auto& table = *owner->free_table_;
+                    if (bytes > FreeTable::small_max) {
+                        table.large.insert(spare_large.extract(spare_large.begin()));
+                    } else {
+                        const auto bin = bytes / 8u - 1u;
+                        auto& slot = table.bins[bin];
+                        if (slot.size() == slot.capacity()) {
+                            const auto want = std::max<std::size_t>(8u, slot.capacity() * 2u);
+                            if (spare_bin.capacity() < want) {
+                                spare_bin.clear();
+                                spare_bin.reserve(want);
+                                continue; // re-resolve after the allocation
+                            }
+                            spare_bin.assign(slot.begin(), slot.end()); // fits: no allocation
+                            slot.swap(spare_bin); // old storage released at scope exit
+                        }
+                        slot.push_back(offset);
+                        table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    }
+                    table.bytes += bytes;
+                    ++table.count;
+                    return true;
                 }
-                table.bytes += bytes;
-                ++table.count;
-                return true;
             } catch (...) {
+                if (auto* owner = identity ? record_owner(identity) : this) owner->free_table_lost_ = true;
                 return false;
             }
         }
 
         void push_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
-            if (!insert_free_block(offset, bytes)) free_table_lost_ = true;
+            (void)insert_free_block(offset, bytes);
         }
 
-        void* take_free_block(FreeTable& table, std::uint32_t bytes) noexcept {
+        struct FreeSplit {
+            std::uint32_t offset = 0, bytes = 0;
+            std::multimap<std::uint32_t, std::uint32_t>::node_type node;
+        };
+
+        // Remainder publication and release of the extracted map node may run
+        // host callbacks; the reused block was already removed from the table.
+        void finish_free_split(FreeSplit& split) {
+            const auto identity = owner_record_;
+            { auto released = std::move(split.node); }
+            if (split.bytes) push_free_block(split.offset, split.bytes);
+            if (identity && !record_owner(identity)) throw XException("arena owner lookup failed");
+        }
+
+        void* take_free_block(FreeTable& table, std::uint32_t bytes, FreeSplit& split) noexcept {
             std::uint32_t found_offset = 0, found_bytes = 0;
             if (bytes <= FreeTable::small_max) {
                 auto bin = bytes / 8u - 1u;
@@ -698,27 +768,41 @@ namespace XOffsetDatastructure {
                 if (it == table.large.end()) return nullptr;
                 found_bytes = it->first;
                 found_offset = it->second;
-                table.large.erase(it);
+                split.node = table.large.extract(it); // released after publication
             }
             table.bytes -= found_bytes;
             --table.count;
             // Split: the remainder stays free (a multiple of 8, at least 8).
-            if (found_bytes > bytes) push_free_block(found_offset + bytes, found_bytes - bytes);
+            if (found_bytes > bytes) {
+                split.offset = found_offset + bytes;
+                split.bytes = found_bytes - bytes;
+            }
             return payload_byte_address(found_offset);
         }
 
         void* bump_block(std::uint32_t bytes, std::size_t alignment, bool allow_growth) {
             auto* sm = arena();
             const size_type current_end = used_end_clamped();
-            const size_type start = align_up(current_end, std::max<std::size_t>(alignment, 8u));
+            // Align the ADDRESS (the payload base is only page aligned). For
+            // alignment <= 8 this equals aligning the offset.
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto limit = (std::numeric_limits<std::uintptr_t>::max)();
+            const auto align = std::max<std::size_t>(alignment, 8u);
+            if (current_end > limit - base || align - 1u > limit - base - current_end) throw XBadAlloc();
+            const size_type start = align_up(base + current_end, align) - base;
             if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) throw XBadAlloc();
             if (!ensure_allocation_extent(start + bytes, allow_growth)) throw XBadAlloc();
+            // Publish the allocation before any host callback can observe it.
+            sm->used_end = start + bytes;
+            void* result = payload_byte_address(start);
             // Alignment padding (alignment > 8 only) stays an exact free block.
-            if (start != current_end)
+            if (start != current_end) {
+                const auto identity = owner_record_;
                 push_free_block(static_cast<std::uint32_t>(current_end),
                                 static_cast<std::uint32_t>(start - current_end));
-            sm->used_end = start + bytes;
-            return payload_byte_address(start);
+                if (identity && !record_owner(identity)) throw XException("arena owner lookup failed");
+            }
+            return result;
         }
 
         void publish_host_owner() noexcept { buffer_.set_host_owner(this); }
@@ -1402,7 +1486,8 @@ namespace XOffsetDatastructure {
                                              std::uint32_t new_bytes,
                                              std::size_t alignment) {
             if (!alloc_ref.segment || !ptr || old_bytes == 0 || new_bytes == 0 || alignment == 0 ||
-                (alignment & (alignment - 1)) != 0 || alignment > 8 ||
+                (alignment & (alignment - 1)) != 0 || alignment > XBufferCore::MAX_PAYLOAD ||
+                reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0 ||
                 new_bytes > XBufferCore::MAX_PAYLOAD - 8u) return false;
             return XBufferCore::owner_from_arena(alloc_ref.segment).try_expand_block(
                 ptr, block_bytes_of(old_bytes), block_bytes_of(new_bytes));

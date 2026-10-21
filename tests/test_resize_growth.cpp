@@ -1,5 +1,4 @@
 // P2 semantic/failure/count gate. No timer. Parent owns all compilation/execution.
-#define XOFFSET_FREELIST_INDEX_DIAGNOSTICS 1
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -97,9 +96,13 @@ template<class T> auto descriptor(const T& value) {
     std::memcpy(bytes.data(), &value, bytes.size());
     return bytes;
 }
+// V2: a binding is exactly the payload base (no allocator-state pointer).
 bool same_binding(fd::allocator_ref a, fd::allocator_ref b) {
-    return a.state == b.state && a.segment == b.segment;
+    return a.segment == b.segment;
 }
+// V2 has no allocator operation counters (FreelistIndex diagnostics are gone).
+// Live bytes = used_end - free bytes, observed through the host free table.
+std::uint64_t live_bytes(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
 void fill(ResizeAttr& a, std::string_view key, std::uint8_t byte) {
     a.key.assign(key); a.value.resize(16);
     std::fill(a.value.begin(), a.value.end(), byte);
@@ -147,29 +150,34 @@ void roundtrip(xo::XBuffer& b) {
 
 void default_growth_preserves_prefix_storage() {
     auto b = make_buffer(); auto& v = b.root<ResizeRoot>().attrs;
-    v.resize(2); fill(v[0], "alpha", 10); fill(v[1], "beta", 11);
+    // I1: a key of at most 10 bytes is inline (its data() moves with the head),
+    // so the out-of-line prefix check uses a longer key; "beta" stays inline.
+    v.resize(2); fill(v[0], "alpha-heap-key", 10); fill(v[1], "beta", 11);
+    need(!v[0].key.is_inline() && v[1].key.is_inline(), "fixture key placement");
     auto* old_parent = v.data(); auto* p0 = v[0].key.data(); auto* p1 = v[1].value.data();
     const auto bind = v.binding();
     v.resize(5);
     need(v.size() == 5 && v.capacity() == 5 && v.data() != old_parent, "growth extent/strategy");
     need(v[0].key.data() == p0 && v[1].value.data() == p1, "old prefix payload copied");
     need(same_binding(v.binding(), bind) && same_binding(v[0].key.binding(), bind), "binding changed");
-    check(v[0], "alpha", 10); check(v[1], "beta", 11);
+    check(v[0], "alpha-heap-key", 10); check(v[1], "beta", 11);
+    need(v[1].key.is_inline(), "relocated inline key left inline mode");
     for (unsigned i = 2; i < 5; ++i) need(v[i].key.empty() && v[i].value.empty(), "new tail not default");
     roundtrip(b); ++cases;
 }
 
 void same_arena_fill_alias() {
     auto b = make_buffer(); auto& v = b.root<ResizeRoot>().attrs;
-    v.resize(2); fill(v[0], "aliased", 33); fill(v[1], "second", 44);
+    // Out-of-line key (> 10 bytes, I1) so its payload address is meaningful.
+    v.resize(2); fill(v[0], "aliased-heap-key", 33); fill(v[1], "second", 44);
     auto* p = v[0].key.data(); auto* bytes = v[0].value.data();
     v.resize(5, v[0]);
     need(v[0].key.data() == p && v[0].value.data() == bytes, "fill moved prefix too early");
     for (unsigned i = 2; i < 5; ++i) {
-        check(v[i], "aliased", 33);
+        check(v[i], "aliased-heap-key", 33);
         need(v[i].key.data() != p && v[i].value.data() != bytes, "fill incorrectly shares ownership");
     }
-    v[0].key.assign("changed"); check(v[2], "aliased", 33);
+    v[0].key.assign("changed"); check(v[2], "aliased-heap-key", 33);
     roundtrip(b); ++cases;
 }
 
@@ -183,7 +191,7 @@ void subobject_and_cross_arena_fill() {
     for (unsigned i = 2; i < 5; ++i) need(root.words[i].view() == "subobject", "subobject fill lost alias");
     auto source = make_buffer(); auto& a = source.root<ResizeRoot>().attrs;
     a.resize(1); fill(a[0], "external", 66); const auto src = descriptor(a[0].key);
-    root.attrs.resize(1); fill(root.attrs[0], "old", 7); auto* ptr = root.attrs[0].key.data();
+    root.attrs.resize(1); fill(root.attrs[0], "old-heap-prefix", 7); auto* ptr = root.attrs[0].key.data();
     root.attrs.resize(4, a[0]);
     need(descriptor(a[0].key) == src && root.attrs[0].key.data() == ptr, "cross-arena fill mutated source/prefix");
     for (unsigned i = 1; i < 4; ++i) {
@@ -289,10 +297,9 @@ void arena_bad_alloc_and_vm_failure() {
 
 void nonrelocatable_fallback() {
     auto b = make_buffer();
-    auto* state = b.find_allocator_storage<xo::XAllocatorStateV1>();
     auto* v = std::construct_at(static_cast<xo::XVector<Fallback>*>(
         b.arena()->allocate_aligned(sizeof(xo::XVector<Fallback>), alignof(xo::XVector<Fallback>))),
-        fd::allocator_ref_of(state));
+        fd::allocator_ref_of(b.arena()));
     v->resize(2); (*v)[0].text.assign("fallback-old"); (*v)[1].text.assign("second");
     const char* original = (*v)[0].text.data();
     v->resize(4);
@@ -305,32 +312,38 @@ void stage6_mechanism_gate() {
     constexpr unsigned n = 4096;
     auto b = make_buffer(16u * 1024u * 1024u); auto& rows = b.root<ResizeRoot>().records;
     rows.resize(n);
-    std::vector<std::array<const void*, 8>> pointers(n);
+    std::vector<std::array<const void*, 4>> pointers(n);
     constexpr const char* keys[] = {"k0000", "k0001", "k0002", "k0003"};
     for (unsigned i = 0; i < n; ++i) {
         rows[i].attrs.resize(4);
         for (unsigned j = 0; j < 4; ++j) {
             fill(rows[i].attrs[j], keys[j], std::uint8_t(i + j));
-            pointers[i][2*j] = rows[i].attrs[j].key.data();
-            pointers[i][2*j+1] = rows[i].attrs[j].value.data();
+            // I1: "k000x" keys are inline and own no payload; values are out of line.
+            pointers[i][j] = rows[i].attrs[j].value.data();
         }
     }
-    dt::reset_freelist_index_stats();
+    const auto live_before = live_bytes(b);
     for (unsigned i = 0; i < n; ++i) {
         auto& attrs = rows[i].attrs; attrs.resize(5);
         attrs[4].key.assign("k0004"); attrs[4].value.resize(32);
         std::fill(attrs[4].value.begin(), attrs[4].value.end(), std::uint8_t(i));
+        // I1: a 5-byte key is stored inline and allocates nothing.
+        need(attrs[4].key.is_inline() && attrs[4].key.owned_extent() == 0, "stage6 short key allocated");
     }
-    const auto count = dt::freelist_index_stats.lookup_calls;
-    need(count == 3u * n, "stage6 mechanism goal 12288 arena allocation calls not met");
+    // V1 goal was 3 arena allocations per row (array, key, value). V2: the key
+    // is inline, so each row is exactly one 5 x 32-byte array allocation, one
+    // 32-byte value allocation and one retire of the old 4 x 32-byte array.
+    constexpr std::uint64_t row_delta = 5 * sizeof(ResizeAttr) + 32 - 4 * sizeof(ResizeAttr);
+    const auto count = live_bytes(b) - live_before;
+    need(count == row_delta * n, "stage6 mechanism goal (2 exact allocations + 1 retire per row) not met");
     for (unsigned i = 0; i < n; ++i) for (unsigned j = 0; j < 4; ++j) {
         const auto& a = rows[i].attrs[j]; check(a, keys[j], std::uint8_t(i + j));
-        need(a.key.data() == pointers[i][2*j] && a.value.data() == pointers[i][2*j+1], "stage6 old nested storage copied");
+        need(a.key.is_inline() && a.value.data() == pointers[i][j], "stage6 old nested storage copied");
     }
     roundtrip(b);
     std::cout << "{\"case\":\"stage6-resize-mechanism\",\"operations\":" << n
-              << ",\"dynamic_allocate_calls\":" << count
-              << ",\"expected\":12288,\"old_prefix_nested_payload_addresses_preserved\":true,\"performance_sample\":false}\n";
+              << ",\"live_bytes_delta\":" << count
+              << ",\"expected\":" << row_delta * n << ",\"old_prefix_nested_payload_addresses_preserved\":true,\"performance_sample\":false}\n";
     ++cases;
 }
 

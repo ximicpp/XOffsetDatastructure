@@ -93,7 +93,7 @@ void into_exact_hot_and_oom() {
          "new API output OOM changed value/source before normalization");
     source.save_verified_into(out);
     need(out==source.save_verified() && source.get_address()==base && source.epoch()==epoch && handle.get()==root,
-         "into differs from exact old V1 or moved owner");
+         "into differs from exact save_verified V2 bytes or moved owner");
     const auto capacity=out.capacity();
     {Arm arm;source.save_verified_into(out);need(host::remaining==0,"hot output capacity allocated");}
     need(out.capacity()==capacity,"hot capacity changed");
@@ -110,7 +110,7 @@ void into_owner_callbacks() {
         from=&source;typed=&source;to=action==1?static_cast<xo::XBufferCore*>(&other):&destination;
         const auto base=source.get_address();const auto epoch=source.epoch();
         std::string out="unchanged";
-        const auto expected=source.save_verified(); // compare valid old normalized V1
+        const auto expected=source.save_verified(); // compare valid normalized V2 bytes
         // Force a real empty output allocation, not a capacity hit.
         out=std::string("unchanged");
         auto callback=action==0?move_owner:action==1?swap_owner:action==2?release_owner:action==3?grow_extent:grow_payload;
@@ -187,11 +187,69 @@ void freeze_transaction_and_lease() {
     need(!source.get_address() && frozen.segments()[1].data()==base,"freeze copied payload or failed to consume at commit");
     check(frozen.root());const auto segments=frozen.segments();const auto wire=join(frozen);
     auto moved=std::move(frozen);need(moved.segments()[0].data()==segments[0].data() &&
-        moved.segments()[1].data()==segments[1].data(),"snapshot handle move invalidated segments");
+        moved.segments()[1].data()==segments[1].data() && moved.segments()[2].data()==segments[2].data(),
+        "snapshot handle move invalidated segments");
     auto io=moved.acquire_io_lease();moved={};io.cancel();
     need(io.cancellation_requested() && io.segments()[1].data()==base,"cancellation released payload before completion");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(wire);check(loaded.root<PathsRoot>());
-    io.complete();need(io.segments()[0].empty() && io.segments()[1].empty(),"completion did not release lease");
+    io.complete();need(io.segments()[0].empty() && io.segments()[1].empty() && io.segments()[2].empty(),
+                       "completion did not release lease");
+}
+
+// V2: the free table travels as the wire hole table. save_verified_into and
+// save_verified emit identical bytes; a snapshot's third segment is the hole
+// table and a snapshot stays dense even when a save would be sparse (N10).
+xo::XWireHeaderV2 header_of(const std::string& wire) {
+    need(wire.size()>=sizeof(xo::XWireHeaderV2),"wire too small");
+    xo::XWireHeaderV2 h{};std::memcpy(&h,wire.data(),sizeof(h));return h;
+}
+void hole_table_paths() {
+    auto source=make();
+    source.root().name.reserve(64); // retires the 16-byte "verified paths" block
+    const auto holes=source.free_block_count();const auto hole_bytes=source.free_block_bytes();
+    need(holes!=0&&hole_bytes!=0,"hole fixture has no free block");
+    std::string into;source.save_verified_into(into);
+    const auto saved=source.save_verified();
+    const auto h=header_of(into);
+    need(into==saved,"save_verified_into differs from save_verified with holes");
+    need(h.extent_count==0&&h.hole_count==holes&&h.hole_bytes==hole_bytes&&
+         into.size()==sizeof(h)+h.used_bytes+holes*sizeof(xo::XBufferCore::WireHole),"dense V2 wire layout differs");
+    auto loaded=xo::XBuffer::load_verified<PathsRoot>(into);check(loaded.root<PathsRoot>());
+    need(loaded.free_block_count()==holes&&loaded.free_block_bytes()==hole_bytes,"loaded free table differs");
+    auto frozen=xo::freeze_verified(std::move(source));
+    const auto segments=frozen.segments();
+    need(segments[0].size()==sizeof(xo::XWireHeaderV2)&&segments[1].size()==h.used_bytes&&
+         segments[2].size()==holes*sizeof(xo::XBufferCore::WireHole),"snapshot segment sizes differ");
+    need(join(frozen)==saved,"snapshot segments differ from the saved V2 wire");
+    auto io=frozen.acquire_io_lease();need(io.segments()[2].data()==segments[2].data(),"lease hole segment differs");
+    io.complete();need(io.segments()[2].empty(),"completed lease kept the hole segment");
+    // A >= 4 KiB free run: save may skip it (sparse), the snapshot stays dense.
+    auto large=make();large.root().blob.resize(8192);
+    for(std::size_t i=0;i<80;++i)large.root().blob[i]=std::uint8_t(i+1);
+    large.root().labels.reserve(8); // keeps the blob block off the arena tail
+    large.root().blob.reserve(16384); // relocates: the old 8 KiB block becomes a hole
+    const auto sparse=large.save_verified();const auto sh=header_of(sparse);
+    std::string sparse_into;large.save_verified_into(sparse_into);
+    need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");
+    auto from_sparse=xo::XBuffer::load_verified<PathsRoot>(sparse);check(from_sparse.root<PathsRoot>());
+    auto dense_snapshot=xo::freeze_verified(std::move(large));
+    const auto dense=join(dense_snapshot);const auto dh=header_of(dense);
+    need(dh.extent_count==0&&dense_snapshot.segments()[1].size()==dh.used_bytes&&dh.used_bytes==sh.used_bytes&&
+         dh.hole_count==sh.hole_count&&dh.hole_bytes==sh.hole_bytes,"snapshot of a sparse-saving source is not dense");
+    need(sh.extent_count!=0&&sparse.size()<dense.size(),"save did not skip its >= 4 KiB free run (sparse wire)");
+    auto from_dense=xo::XBuffer::load_verified<PathsRoot>(dense);check(from_dense.root<PathsRoot>());
+    need(from_dense.root<PathsRoot>().blob.size()==8192,"dense snapshot reload differs");
+    // A lost retirement (host OOM in the free table) is recomputed before emission.
+    auto lost=make();
+    // A size class with no bin yet: retiring it needs a host allocation.
+    lost.root().name=std::string(300,'q');
+    lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
+    {Arm arm;lost.root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
+    need(!lost.free_table_complete(),"lost retirement not recorded");
+    std::string recomputed;lost.save_verified_into(recomputed);
+    need(lost.free_table_complete()&&header_of(recomputed).hole_count!=0,"save_verified_into did not recompute holes");
+    auto reloaded=xo::XBuffer::load_verified<PathsRoot>(recomputed);
+    need(reloaded.root<PathsRoot>().name.view()==std::string(300,'q'),"recomputed wire lost content");
 }
 
 void freeze_complete_header_and_graph() {
@@ -228,8 +286,8 @@ int main(int argc,char** argv) {try {
     }
 #if defined(XOFFSET_VERIFIED_PATHS_API)
     into_exact_hot_and_oom();into_owner_callbacks();into_alias_and_unverified();
-    freeze_transaction_and_lease();freeze_complete_header_and_graph();
-    std::cout<<"verified paths: five groups, exact/hot/OOM/owner callbacks/alias/freeze/lifetime/V1 passed\n";
+    freeze_transaction_and_lease();freeze_complete_header_and_graph();hole_table_paths();
+    std::cout<<"verified paths: six groups, exact/hot/OOM/owner callbacks/alias/freeze/lifetime/V2 hole table passed\n";
 #else
     throw std::runtime_error("full tests require the new APIs; baseline supports compatibility CLI only");
 #endif

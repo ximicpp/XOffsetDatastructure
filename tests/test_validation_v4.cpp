@@ -214,7 +214,8 @@ void trait_and_typed_checks(){
     root.name="verified";root.plain.resize(64);root.booleans.resize(3);root.booleans[1]=true;
     root.sorted.try_emplace(1,true);root.sorted.try_emplace(2,false);
     root.no_checks[127].a=123;root.plain[63].b=456;
-    const auto original=buffer.save_verified<V4ValidationRoot>();auto h=read_at<xo::XWireHeaderV1>(original,0);
+    const auto original=buffer.save_verified<V4ValidationRoot>();auto h=read_at<xo::XWireHeaderV2>(original,0);
+    need(h.extent_count==0,"fixture wire is sparse; payload offsets below assume a dense wire");
     const std::size_t rp=sizeof(h)+h.root_offset;
     {
         auto loaded=xo::XBuffer::load_verified<V4ValidationRoot>(original,
