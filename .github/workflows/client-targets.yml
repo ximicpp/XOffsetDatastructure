@@ -110,9 +110,12 @@ jobs:
         shell: msys2 {0}
     steps:
       # Keep LF endings: the dependency lock hashes file content byte for byte.
+      # Boost submodules mark files `text=auto`, which follows core.eol.
       - name: Disable CRLF conversion
         shell: pwsh
-        run: git config --global core.autocrlf false
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
       - uses: actions/checkout@v4
         with:
           submodules: recursive
