@@ -1,8 +1,10 @@
-// M3 (threat model T5): freed blocks keep their old bytes in the arena, but no
-// emitted wire may carry them. For dense and sparse wires from save_verified,
-// save_verified_into and freeze_verified: every hole byte is zero and every
-// other payload byte equals the arena byte. Also checks the M1/M2 limits on
-// declared wire sizes.
+// M3 (threat model T5): a retired block is cleared before it becomes a hole, so
+// neither the arena nor any emitted wire carries freed contents. For dense and
+// sparse wires from save_verified, save_verified_into and freeze_verified:
+// every hole byte is zero and every payload byte equals the arena byte. Holes a
+// loaded wire brought in keep the sender's bytes (forwarded unchanged); a block
+// the receiver retires is cleared. Also checks the M1/M2 limits on declared
+// wire sizes.
 #include "xoffsetdatastructure.hpp"
 
 #include <array>
@@ -49,9 +51,9 @@ xo::XBufferCore::MaximumCapacity cap() {
     return xo::XBuffer::maximum_capacity(16u << 20).with_growth(xo::XGrowPolicy::Automatic);
 }
 
-// Leaves freed blocks with recognizable contents; `sparse` adds a 64 KiB run.
+// Retires blocks that held recognizable contents; `sparse` adds a 64 KiB run.
 // Every allocation that could reuse the secret's block happens before it is
-// retired, so the arena still holds the secret when the wire is emitted.
+// retired, so the secret's block is still a hole when the wire is emitted.
 Buffer make(bool sparse) {
     auto b = Buffer::create(65536, cap());
     auto& r = b.root();
@@ -104,7 +106,7 @@ Parsed parse(std::string_view wire) {
     return p;
 }
 
-// Every emitted payload byte: zero inside a hole, the arena byte elsewhere.
+// Every emitted payload byte equals the arena byte, and is zero inside a hole.
 void check_emitted(std::string_view wire, const char* arena, const char* what) {
     const auto p = parse(wire);
     std::vector<bool> in_hole(p.header.used_bytes, false);
@@ -115,22 +117,21 @@ void check_emitted(std::string_view wire, const char* arena, const char* what) {
     }
     if (hole_bytes == 0) fail(std::string(what) + ": fixture has no holes");
     const char* stored = p.stored;
-    bool stale_seen = false;
     for (const auto& e : p.extents) {
         for (std::uint32_t i = 0; i < e[1]; ++i) {
             const auto offset = std::size_t(e[0]) + i;
-            if (in_hole[offset]) {
-                if (stored[i] != 0) fail(std::string(what) + ": hole byte at payload offset " +
-                                         std::to_string(offset) + " is not zero");
-                stale_seen |= arena[offset] != 0;
-            } else if (stored[i] != arena[offset]) {
-                fail(std::string(what) + ": live byte at payload offset " + std::to_string(offset) +
+            if (stored[i] != arena[offset])
+                fail(std::string(what) + ": byte at payload offset " + std::to_string(offset) +
                      " differs from the arena");
-            }
+            if (in_hole[offset] && stored[i] != 0)
+                fail(std::string(what) + ": hole byte at payload offset " + std::to_string(offset) +
+                     " is not zero");
         }
         stored += e[1];
     }
-    if (!stale_seen) fail(std::string(what) + ": fixture holes held no stale bytes");
+    for (std::uint64_t offset = 0; offset < p.header.used_bytes; ++offset)
+        if (in_hole[offset] && arena[offset] != 0)
+            fail(std::string(what) + ": arena hole byte at offset " + std::to_string(offset) + " is not zero");
     if (wire.find(kSecret.substr(0, 12)) != std::string_view::npos ||
         wire.find("AAAAAAAA") != std::string_view::npos)
         fail(std::string(what) + ": freed contents reached the wire");
@@ -142,8 +143,8 @@ void emitted_holes_are_zero() {
         const auto wire = b.save_verified();
         if ((parse(wire).header.extent_count != 0) != sparse) fail("unexpected dense/sparse emission");
         const char* arena = static_cast<const char*>(b.get_address());
-        if (std::string_view(arena, b.arena()->used_end).find(kSecret.substr(0, 12)) == std::string_view::npos)
-            fail("fixture: the secret is not left in the arena");
+        if (std::string_view(arena, b.arena()->used_end).find(kSecret.substr(0, 12)) != std::string_view::npos)
+            fail("the retired secret is still in the arena");
         check_emitted(wire, arena, sparse ? "save_verified sparse" : "save_verified dense");
 
         std::string into = "previous contents";
@@ -165,6 +166,30 @@ void frozen_segments_are_zero() {
         joined.append(reinterpret_cast<const char*>(seg.data()), seg.size());
     if (joined != expected) fail("frozen segments differ from save_verified bytes");
     if (joined.find(kSecret.substr(0, 12)) != std::string::npos) fail("frozen segments carry freed contents");
+}
+
+// A dense wire whose hole holds sender bytes: load accepts it, re-save forwards
+// those bytes unchanged (they are the sender's, not the receiver's), and a block
+// the receiver itself retires is cleared.
+void loaded_holes_keep_sender_bytes() {
+    auto b = make(false);
+    std::string wire = b.save_verified();
+    const auto p = parse(wire);
+    if (p.holes.empty() || p.header.extent_count != 0) fail("fixture: need a dense wire with holes");
+    const auto hole = p.holes.front();
+    const auto at = static_cast<std::size_t>(p.stored - wire.data()) + hole.offset;
+    std::memset(wire.data() + at, 0x5a, hole.bytes);
+    auto loaded = Buffer::load(wire, cap());
+    if (loaded.save_verified() != wire) fail("sender hole bytes were not forwarded unchanged");
+    auto& r = loaded.root();
+    r.secret = std::string(kSecret);
+    r.entries.emplace_back().note = "keeps the secret's block off the tail";
+    r.secret = std::string(300, 'y');           // the receiver retires the secret's block
+    const auto again = loaded.save_verified();
+    if (again.find(kSecret.substr(0, 12)) != std::string::npos) fail("receiver-freed contents reached the wire");
+    const char* arena = static_cast<const char*>(loaded.get_address());
+    if (std::string_view(arena, loaded.arena()->used_end).find(kSecret.substr(0, 12)) != std::string_view::npos)
+        fail("receiver-retired secret is still in the arena");
 }
 
 std::string inflate_sparse(const std::string& wire, std::uint64_t used) {
@@ -220,7 +245,8 @@ void declared_size_limits() {
 int main() {
     emitted_holes_are_zero();
     frozen_segments_are_zero();
+    loaded_holes_keep_sender_bytes();
     declared_size_limits();
-    std::cout << "wire hole zeroing and declared-size limits: 3 groups passed\n";
+    std::cout << "wire hole zeroing and declared-size limits: 4 groups passed\n";
     return 0;
 }
