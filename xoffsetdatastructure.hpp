@@ -589,6 +589,13 @@ namespace XOffsetDatastructure {
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
+        // Releases this thread's cached empty free tables, so the next table
+        // is a fresh host allocation (allocation-failure tests use this).
+        static void trim_free_table_cache() noexcept {
+            if (!free_table_cache_available()) return;
+            auto& cache = free_table_cache();
+            while (cache.count) delete cache.tables[--cache.count];
+        }
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
 
