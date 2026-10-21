@@ -144,7 +144,9 @@ void write_parts(const Operation& operation,const std::string& wire,const Framin
     auto header=operation.header_bytes(),body=operation.payload_bytes(),holes=operation.hole_bytes();
     auto table=operation.extent_bytes();
     std::size_t cursor=0;
-    auto next=[&]{return std::byte(static_cast<unsigned char>(wire[cursor++]));};
+    // A deliberately wrong framing (extent count + 1) asks for more bytes
+    // than the wire holds; those reads see zero, never past the string end.
+    auto next=[&]{return cursor<wire.size()?std::byte(static_cast<unsigned char>(wire[cursor++])):std::byte{0};};
     for(std::size_t i=0;i<header.size();++i)header[i]=next();
     for(std::size_t i=0;i<table.size();++i)table[i]=next();
     if(!f.extents){for(std::size_t i=0;i<f.payload;++i){const auto byte=next();if(i<body.size())body[i]=byte;}}
