@@ -19,7 +19,7 @@ inline void* allocate(std::size_t size, std::size_t alignment) {
         }
         void* p = nullptr;
         if (!fail) {
-            if (alignment <= alignof(std::max_align_t)) p = std::malloc(size ? size : 1);
+            if (alignment == 0) p = std::malloc(size ? size : 1); // ordinary new; aligned new pairs with _aligned_free
             else {
                 const auto n = size ? size : 1;
                 if (n > (std::numeric_limits<std::size_t>::max)() - alignment + 1) throw std::bad_alloc();
@@ -47,7 +47,7 @@ struct Arm {
     ~Arm() { fail_after = -1; }
 };
 }
-void* operator new(std::size_t n) { return index_host::allocate(n, alignof(std::max_align_t)); }
+void* operator new(std::size_t n) { return index_host::allocate(n, 0); }
 void* operator new[](std::size_t n) { return ::operator new(n); }
 void operator delete(void* p) noexcept { index_host::free(p, false); }
 void operator delete[](void* p) noexcept { index_host::free(p, false); }

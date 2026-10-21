@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## 0.3.0-beta.1: production-readiness beta
+
+Release gates G1–G8 (`PRODUCTION_READINESS_GOAL`): K1–K7 mapped to tests, two
+compilers with byte-identical wires, schema pins, threat model with
+mitigations, continuous fuzzing, sanitizers on both compilers, client-target
+feasibility. Changes since 0.2.0-alpha.1 (which was never tagged):
+
+- Client targets (K8, `docs/CLIENT_TARGETS.md`): CI runs the full CTest on
+  native Linux arm64 (GCC 16) and Windows x64 (MSYS2 UCRT64, MinGW-w64
+  GCC 16.2) and exchanges the wire corpus with Linux x86-64 (byte-identical,
+  mutually accepted). Android and iOS are not feasible yet (no P2996
+  toolchain or SDK); see the report. On MinGW the top-level build links the
+  runtime statically so test replacements of `operator new` see library
+  allocations; the signature exporter writes LF on every host.
+- Sanitizers: GCC 16 ASan+UBSan job over the full CTest suite, next to the
+  existing Clang ASan+UBSan job.
+- `docs/STABILITY_TESTS.md` maps each guarantee K1–K7 to the tests and CI jobs
+  that enforce it.
+- In-place buffer reuse: `XBuffer::reload_verified<T>(wire)` (same reject set
+  as `load_verified`; on failure the buffer is left empty) and
+  `XBuffer::reset<T>()`; `reload_verified` reuses its validation scratch
+  blocks (`release_reload_scratch()`). See `docs/BUFFER_REUSE.md`.
+- Performance: `XVector` middle erase/insert shifts the tail with one
+  `memmove` for eligible records (`wire_record_layout<T>::ordinary_members`,
+  `stable_erase_if`); host free tables are recycled per thread instead of
+  rebuilt per load (`XBufferCore::trim_free_table_cache()`); verified loads
+  record ascending live ranges instead of marking the byte index
+  (accept/reject and messages unchanged).
+- Documentation: USER_GUIDE recommends `XBufferPool` for many small messages;
+  K1–K7 and DEPLOYMENT guide; threat model `docs/V2_THREAT_MODEL.md`.
+
 - GCC 16 support for the full library: `<meta>` is used when available
   (`<experimental/meta>` otherwise), and CMake accepts GCC 16+ with
   `-std=c++26 -freflection` and libstdc++.
