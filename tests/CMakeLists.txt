@@ -92,6 +92,7 @@ set(REFLECTION_TESTS
     test_allocator_failures
     test_v2_golden
     test_v2_fuzz
+    test_reload_reset
 )
 
 foreach(test_name ${REFLECTION_TESTS})
