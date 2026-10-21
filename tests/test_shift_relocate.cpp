@@ -15,13 +15,15 @@
 namespace xo = XOffsetDatastructure;
 
 namespace shift {
-struct alignas(8) Troop { std::int32_t type{}; std::int32_t count{}; std::int32_t wounded{}; };
+// Explicit pad: brace-initialized temporaries would otherwise copy indeterminate
+// padding bytes into the arena and make the two wires differ for that reason alone.
+struct alignas(8) Troop { std::int32_t type{}; std::int32_t count{}; std::int32_t wounded{}; std::int32_t pad{}; };
 struct alignas(8) Rec {
     std::int64_t id{};
     bool active{};
     xo::XString name;                      // inline and heap
     xo::XVector<Troop> troops;
-    xo::XMap<std::int32_t, std::int64_t> res;
+    xo::XMap<std::int64_t, std::int64_t> res;  // int64 key: no padding inside entries
     xo::XString tag0;
     xo::XString tag1;
     std::int32_t tail{};
@@ -37,7 +39,7 @@ struct alignas(8) PlainRec {
     bool active{};
     xo::XString name;
     xo::XVector<Troop> troops;
-    xo::XMap<std::int32_t, std::int64_t> res;
+    xo::XMap<std::int64_t, std::int64_t> res;  // int64 key: no padding inside entries
     xo::XString tag0;
     xo::XString tag1;
     std::int32_t tail{};
