@@ -4,7 +4,9 @@
 // schema, the rest is the wire. There is no spec oracle for these schemas, so
 // the check is differential: if the wire framing is valid, typed load, raw
 // validation and verified receive must agree; if it is not, typed load must
-// reject. An accepted wire must re-save byte-identically, and after an edit
+// reject. An accepted wire re-saves with its hole bytes zeroed (M3): byte-
+// identically when they already were zero, otherwise the re-saved payload may
+// differ from the loaded one only by zero bytes inside holes. After an edit it
 // must re-save to a wire that loads again and re-saves identically.
 //
 // Built twice: as the fuzzer, and with XOFFSET_FUZZ_SEED_MAIN as
@@ -137,6 +139,42 @@ void edit(ms::Deep& r, std::mt19937_64& rng) {
     r.ratio = float(rng() % 100) / 3.0f;
 }
 
+// M3 contract for re-saving an accepted wire: hole bytes leave as zero, every
+// other payload byte and the free table are unchanged, and the re-save is a
+// fixed point (loads again and re-saves to itself).
+template <class Root>
+void expect_resave_zeroes_only_holes(xo::TypedXBuffer<Root>& typed, const std::string& w) {
+    const auto view = typed.get_buffer();
+    const std::string in(view.data(), view.size()); // before saving: save must not touch the arena
+    std::vector<bool> hole(in.size());
+    bool stale = false;
+    typed.for_each_free_block([&](xo::XBufferCore::WireHole h) {
+        for (std::uint64_t i = h.offset; i < std::uint64_t(h.offset) + h.bytes && i < in.size(); ++i) {
+            hole[i] = true;
+            stale |= in[i] != 0;
+        }
+    });
+    if (!stale) {
+        if (typed.save_verified() != w) fail("accepted wire with zero hole bytes does not re-save byte-identically");
+        return;
+    }
+    const auto saved = typed.save_verified();
+    if (typed.get_buffer().size() != in.size() ||
+        std::memcmp(typed.get_buffer().data(), in.data(), in.size()) != 0)
+        fail("save_verified changed the arena");
+    auto back = typed_load<Root>(saved);
+    if (!back) fail("re-saved accepted wire was rejected");
+    if (back->save_verified() != saved) fail("re-save of an accepted wire is not a fixed point");
+    const auto out = back->get_buffer();
+    if (out.size() != in.size()) fail("re-saved accepted wire changed the payload size");
+    if (back->free_block_count() != typed.free_block_count() ||
+        back->free_block_bytes() != typed.free_block_bytes())
+        fail("re-saved accepted wire changed the free table");
+    for (std::size_t i = 0; i < in.size(); ++i)
+        if (out[i] != (hole[i] ? 0 : in[i]))
+            fail(hole[i] ? "re-saved hole byte is not zero" : "re-save changed a live payload byte");
+}
+
 template <class Root>
 void check(const std::string& w, std::mt19937_64& rng) {
     std::string terr, rerr, verr;
@@ -152,7 +190,7 @@ void check(const std::string& w, std::mt19937_64& rng) {
              " raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
              " receive=" + (recv ? "accept" : "reject(" + verr + ")"));
     if (!typed) return;
-    if (typed->save_verified() != w) fail("accepted wire does not re-save byte-identically");
+    expect_resave_zeroes_only_holes(*typed, w);
     edit(typed->root(), rng);
     const auto saved = typed->save_verified();
     auto again = typed_load<Root>(saved);
