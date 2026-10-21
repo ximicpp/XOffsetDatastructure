@@ -32,11 +32,12 @@ struct Model {
 XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 
 // Pinned V2 bytes of build(false) / build(true). Update only for an intended
-// format change (and say so in the change description).
+// format change (and say so in the change description). 2026-10-21: hole
+// bytes and spare container capacity are emitted as zero (threat model M3/M4).
 #define GOLDEN_DENSE_SIZE 1800u
-#define GOLDEN_DENSE_FNV 0xa2dd300693cbc32full
+#define GOLDEN_DENSE_FNV 0x19a16d2dad97b1d1ull
 #define GOLDEN_SPARSE_SIZE 1856u
-#define GOLDEN_SPARSE_FNV 0x5465a3facca00e8full
+#define GOLDEN_SPARSE_FNV 0x4a1956fd0499ae21ull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;

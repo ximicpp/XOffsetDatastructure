@@ -12,6 +12,7 @@ option(XOFFSET_BUILD_TESTS "Build and register XOffset tests" ${XOFFSET_TOP_LEVE
 option(XOFFSET_BUILD_TOOLS "Build XOffset signature and benchmark tools" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_BUILD_EXAMPLES "Build XOffset examples" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEVEL})
+option(XOFFSET_BUILD_FUZZERS "Build libFuzzer targets (needs clang -fsanitize=fuzzer)" OFF)
 
 if(XOFFSET_BUILD_TESTS)
     enable_testing()
