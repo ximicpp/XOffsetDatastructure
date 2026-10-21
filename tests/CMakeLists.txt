@@ -129,6 +129,11 @@ foreach(failure_mode ${REGISTRY_FAILURE_MODES})
     set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
 endforeach()
 
+# G5: coverage-guided fuzzers, in their own directory (not test programs).
+if(XOFFSET_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
+
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
 # These are mandatory configure-time checks, not runtime test programs.
