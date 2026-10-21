@@ -1,5 +1,9 @@
 # 当前接续入口：2026-10-20 Mac 新工程交接
 
+> **2026-10-20 更新：** 默认实现现为 **W9a**（提交 `14b57637d6fa57f8521138a0997fb3c8736db4f1`，经 PR #2 合并，`next_cpp26` = `9e3602f`）。
+> 下文以 C14 为默认的描述均为历史记录。下文引用的证据路径（`handoff/`、`docs/coordination/`、`tools/c14_*` 等）已移出工作树，
+> 保存在 tag `archive/codex-mac-continuation-20261020`，恢复方法见 [docs/ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)。
+
 **先读 [HANDOFF_MAC_20261020.md](HANDOFF_MAC_20261020.md)。** 仓库与本次交接分支、完整性检查、候选恢复、去重证据包及 Mac 平台验证入口均在新说明中；可直接复制的启动提示词见 [PROMPT_MAC_20261020.md](PROMPT_MAC_20261020.md)。
 
 最新 R1/M2 与组合的有限实施及 Q32/F64 已完成，正式主目标仅 3/12 通过；默认仍为 C14，独立候选未晋升。下文旧交接状态仅保留历史，不能覆盖新说明。迁移完整性不是 Mac 平台测试，不重放旧 Windows/WSL 工具、租约或一次性准入。

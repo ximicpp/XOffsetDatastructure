@@ -1,9 +1,0 @@
-{
-  "observed_utc": "2026-10-19T19:42:47.302488Z",
-  "backing_free_bytes": 37105651712,
-  "backing_drive": "C",
-  "actual_wsl": {
-    "guest_free_bytes": 588126941184,
-    "C_backing_free_bytes": 37105651712
-  }
-}
