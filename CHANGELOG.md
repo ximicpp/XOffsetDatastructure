@@ -28,6 +28,12 @@
   - M4: container shrink (`clear`, `resize` down, `erase`, `pop_back`,
     `stable_erase_if`, shorter `assign`) zeroes the vacated element and
     character bytes, so spare capacity never carries old values.
+  - M6: `has_implicit_padding_v<T>` reports padding bytes in `T` or in any
+    record, array or container element type a wire reaches from it (padding
+    copies whatever the source object held). `XOFFSET_REQUIRE_NO_PADDING(T)`
+    fails compilation for one type; defining `XOFFSET_REJECT_IMPLICIT_PADDING`
+    makes every `save_verified` / `save_verified_into` / `freeze_verified` of
+    a padded root a compile error. Both are opt-in.
   - Wires with holes or spare capacity change bytes (golden values updated).
 - New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
   a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and

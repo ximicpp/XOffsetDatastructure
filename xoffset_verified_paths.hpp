@@ -18,6 +18,10 @@ namespace detail {
     template<class T>
     XWireHeaderV2 VerifiedPathsAccess::header(XBufferCore& source, bool normalize) {
         static_assert(is_v1_wire_admitted_v<T>);
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<T>,
+            "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
         if (!source.typed_root_access_allowed_)
             throw XException("verified paths: typed source required");
         if (source.schema_bound_ &&
