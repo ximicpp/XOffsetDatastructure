@@ -22,13 +22,16 @@ prerelease.
 
 | Use | Requirements |
 | --- | --- |
-| Full library, `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++; CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
+| Full library, `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
 Ordinary C++26 support does not imply P2996 support. The full API has no
-non-reflection fallback, and the supported compiler is the Bloomberg
-clang-p2996 fork pinned in [toolchains/README.md](toolchains/README.md).
+non-reflection fallback. The supported compilers are the Bloomberg clang-p2996
+fork pinned in [toolchains/README.md](toolchains/README.md) and GCC 16 (CI uses
+the official `gcc:16` image, GCC 16.2.0, pinned by digest). CI checks that both
+compilers produce byte-identical wires from the same source and accept each
+other's wires.
 Native Windows full-library support is not established; the tested Windows
 target is storage only.
 
@@ -142,6 +145,7 @@ Results are profile-specific, not a promise for every compiler on each OS.
 | --- | --- | --- |
 | macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
 | Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
+| Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build and CTest in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | Added after 0.2.0-alpha.1; no sanitizer or performance run with GCC yet |
 | Native Windows x64, MSVC | storage only (V1-era record) | Windows full P2996 unverified |
 
 V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
