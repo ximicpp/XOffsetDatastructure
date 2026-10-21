@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- GCC 16 support for the full library: `<meta>` is used when available
+  (`<experimental/meta>` otherwise), and CMake accepts GCC 16+ with
+  `-std=c++26 -freflection` and libstdc++.
+- Fix: set/map keys of an enum type that defines `operator<=>` but no
+  `operator<` were ordered differently by Clang (rewritten `<=>`) and GCC
+  (builtin `<`), so each compiler rejected the other's wires. The library now
+  calls `<=>` explicitly for such keys; Clang's order, and so its wires, are
+  unchanged.
+- K7 schema pins: `XOFFSET_PIN_SCHEMA(T, "<signature>")` fails compilation when
+  a compiler or target lays out `T` differently from the pinned text, and the
+  diagnostic shows the computed layout; `schema_pin<T>(name)` prints the pin.
+  See `docs/SCHEMA_PINS.md`. CTest `schema_pin_mismatch` requires the failure.
+- New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
+  a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and
+  mutual `load_verified` acceptance.
+
 ## 0.2.0-alpha.1: V2 storage and wire format
 
 Experimental prerelease from next_cpp26. Same toolchain requirements as

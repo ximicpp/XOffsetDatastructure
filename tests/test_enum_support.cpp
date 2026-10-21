@@ -4,6 +4,8 @@
 //          types for XBuffer, and that their TypeLayout signatures are correct.
 // ============================================================================
 
+#include <compare>
+#include <cstdint>
 #include <iostream>
 #include <cassert>
 #include "../xoffsetdatastructure.hpp"
@@ -76,6 +78,24 @@ struct Inventory {
     XVector<WeaponType> weapons;
     XVector<Direction> directions;
 };
+
+// Keys whose order is defined only by an ADL operator<=> (reverse of the
+// underlying value). Clang resolves `a < b` to the rewritten <=> and GCC to the
+// builtin <, so the library calls <=> explicitly for such keys.
+enum class Rank : std::uint32_t { low = 1, mid = 2, high = 3 };
+std::strong_ordering operator<=>(Rank a, Rank b) noexcept {
+    return std::uint32_t(b) <=> std::uint32_t(a);
+}
+// An explicit operator< is honoured as written (here: underlying order).
+enum class Tier : std::uint32_t { low = 1, high = 2 };
+bool operator<(Tier a, Tier b) noexcept { return std::uint32_t(a) < std::uint32_t(b); }
+
+struct RankedKeys {
+    XSet<Rank> ranks;
+    XMap<Rank, std::int32_t> by_rank;
+    XSet<Tier> tiers;
+};
+XOFFSET_REGISTER_SCHEMA_NAME(RankedKeys, "test.enum.ranked_keys")
 
 // ============================================================================
 // Test 1: Enum safety checks
@@ -244,6 +264,60 @@ bool test_enum_in_xvector() {
 }
 
 // ============================================================================
+// Test: enum keys ordered only by operator<=> use the same order everywhere
+// ============================================================================
+
+bool test_enum_spaceship_key_order() {
+    std::cout << "\n[TEST] Enum keys ordered by operator<=>\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    auto buffer = TypedXBuffer<RankedKeys>::create(65536, XBuffer::maximum_capacity(1u << 20));
+    auto& root = buffer.root();
+    for (auto r : {Rank::mid, Rank::low, Rank::high}) {
+        root.ranks.insert(r);
+        root.by_rank.insert_or_assign(r, static_cast<std::int32_t>(r));
+    }
+    root.tiers.insert(Tier::high);
+    root.tiers.insert(Tier::low);
+
+    const Rank expected[] = {Rank::high, Rank::mid, Rank::low};
+    std::size_t i = 0;
+    for (auto r : root.ranks) {
+        if (i >= 3 || r != expected[i]) {
+            std::cout << "  XSet<Rank> order does not follow operator<=> ... [FAIL]\n";
+            return false;
+        }
+        ++i;
+    }
+    i = 0;
+    for (const auto& kv : root.by_rank) {
+        if (i >= 3 || kv.first != expected[i]) {
+            std::cout << "  XMap<Rank> order does not follow operator<=> ... [FAIL]\n";
+            return false;
+        }
+        ++i;
+    }
+    if (*root.tiers.begin() != Tier::low) {
+        std::cout << "  XSet<Tier> order does not follow operator< ... [FAIL]\n";
+        return false;
+    }
+    if (!root.ranks.contains(Rank::mid) || root.by_rank.find(Rank::low) == root.by_rank.end()) {
+        std::cout << "  lookup by operator<=> order failed ... [FAIL]\n";
+        return false;
+    }
+    std::cout << "  XSet/XMap<Rank> iterate high, mid, low ... [OK]\n";
+
+    const auto wire = buffer.save_verified();
+    auto loaded = TypedXBuffer<RankedKeys>::load(wire, XBuffer::maximum_capacity(1u << 20));
+    if (loaded.root().ranks.size() != 3 || loaded.save_verified() != wire) {
+        std::cout << "  verified round trip changed the keys ... [FAIL]\n";
+        return false;
+    }
+    std::cout << "  verified load accepts the <=> order ... [OK]\n";
+    return true;
+}
+
+// ============================================================================
 // Test 6: Enum signature identity — different enums must differ
 // ============================================================================
 
@@ -319,6 +393,7 @@ int main() {
     all_passed &= test_enum_in_xvector();
     all_passed &= test_enum_signature_identity();
     all_passed &= test_enum_nested_signature();
+    all_passed &= test_enum_spaceship_key_order();
 
     std::cout << "\n" << std::string(50, '=') << "\n";
     if (all_passed) {
