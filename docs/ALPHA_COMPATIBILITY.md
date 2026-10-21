@@ -6,7 +6,7 @@
 
 ## 版本和工具链
 
-`VERSION` 是完整版本 `0.1.0-alpha.1` 的唯一文本来源；CMake project 数字版本是
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.1.0-alpha.1` 的唯一文本来源；CMake project 数字版本是
 `0.1.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
