@@ -1,7 +1,7 @@
 # XOffsetDatastructure 用户指南（0.2.0-alpha.1，V2 格式）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
-格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
+部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
 [ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md)。
 
 ## 1. 基本模型
@@ -61,7 +61,7 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 - 容器扩容、插入、删除会移动元素，不能长期保存元素指针；arena 基址和根对象地址
   在增长时保持不变。
 - 也可以用带类型的包装 `TypedXBuffer<T>`：`create`、`root()`、`save_verified()`、
-  `load()`（走校验路径）。
+  `load()`（走校验路径）。它属于便利接口（第 8 节 E2）。
 
 ### 3.1 删除与插入的性能
 
@@ -124,7 +124,7 @@ std::string_view who = r.name.view();
 | buffer 对象要比它的 `XHandle`、借用的 span 活得久 | 悬垂访问 |
 | 同一可执行文件内所有翻译单元使用相同的头文件版本、编译选项和工具链 | 布局或 schema 身份不一致 |
 | 接收不可信输入前限制 wire 长度、`maximum_capacity` 和并发 buffer 数 | 单个合法 wire 也可能占用大量内存 |
-| 只用于 64 位小端平台 | 其他平台编译期 `#error` |
+| 只用于 64 位小端平台（不支持 32 位安卓渠道包） | 其他平台编译期 `#error` |
 
 ## 6. 错误处理
 
@@ -139,25 +139,57 @@ std::string_view who = r.name.view();
 
 - wire 头里的 schema 身份必须与读取方类型完全一致。增加、删除、重排或改变任何
   一个字段，旧 wire 都会被拒绝。
-- 适合收发双方使用同一版本类型定义的场景（同一次构建部署的进程之间）。需要长期
-  保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
+- 适合收发双方使用同一版本类型定义的场景（同一次构建部署的进程之间）。客户端场景下，
+  任何改了 schema 的服务端更新都必须和客户端同时发版。
+- schema 演进是 TODO，并且是客户端场景规模化之前必须完成的前置项。
+- 需要长期保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
 - 不同编译器之间的 wire 兼容目前只在固定工具链内成立；`tools/sigs/` 的签名基线
   用于发现布局变化，不构成任意平台的兼容保证。
 
-## 8. API 稳定性
+## 8. 核心承诺与 API 稳定性
 
-alpha 之间不承诺源码 API 或 ABI 稳定。以下接口是设计上计划保持的核心面，变更会
-在 CHANGELOG 中单独列出：
+alpha 之间不承诺源码 API 或 ABI 稳定。下面 K1–K7 是核心承诺，后续版本不得回退；
+相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
-- `XBuffer::create<T>`、`root<T>`、`has_root<T>`、`save_verified<T>`、
-  `load_verified<T>`、`maximum_capacity`、`with_growth`、`XGrowPolicy`
-- `TypedXBuffer<T>` 的 `create`、`root`、`save_verified`、`load`
-- 容器 `XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` 的公开成员函数
-- `XOFFSET_REGISTER_SCHEMA_NAME`、`XException`、`XBadAlloc`
+| # | 承诺 | 接口 / 机制 |
+| --- | --- | --- |
+| K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
+| K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
+| K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
+| K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `load_verified<T>`、`XException` |
+| K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
+| K6 | schema 指纹精确匹配，不同就拒绝 | wire 头 `schema_hash` |
+| K7 | 跨编译器、跨平台的对象表示一致 | `tools/sigs/` 签名基线与跨目标比对 |
 
-其余接口属于实验性质，可能在后续 alpha 中改变：直接接收（`begin_verified_receive`）、
-`XBufferPool` 与预留策略、`XHandle`、`XCompactor`、`load_unverified`、诊断与统计接口、
-`XBufferCore` 的底层成员。
+K7 的现状与目标：
+
+- **现状**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标上，库自带的
+  3 个测试类型的签名在 CTest 里核对（`check_compat`、`check_signature_regeneration`）。
+  这不会让用户自己的构建失败。
+- **目标**：构建时为用户 schema 导出签名，任一目标不一致就构建失败；GCC 16 并入同一门禁。
+
+K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
+（约 2 GiB）的数据，让接收方复制并做全图校验，造成资源耗尽。默认上限建议见
+[DEPLOYMENT.md](DEPLOYMENT.md) 第 5 节。
+
+校验的承诺边界：对不可信输入保证内存安全和 schema 一致，**不保证内容完整性**。
+只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
+
+**目标（尚未承诺）K8**：客户端与服务端用同一套库，客户端用 clang-p2996 交叉编译
+Windows、Android、iOS，能接收、读写、校验、再发。三个客户端目标都交叉编译跑通、
+跨目标 wire 一致之后，再加入核心承诺。
+
+以下接口提供但属于可选或实验性质，可能在后续 alpha 中改变：
+
+| # | 接口 | 说明 |
+| --- | --- | --- |
+| E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 零拷贝分段发送、直接收进最终 arena |
+| E2 | `save_verified_into`、`TypedXBuffer<T>` | 便利接口 |
+| E3 | `XBufferPool`、预留与增长策略细节 | 小 buffer 高频场景 |
+| E4 | `load_unverified` | 只用于调用方已信任的数据 |
+| E5 | `XCompactor` | 同类型压缩整理 |
+
+`XHandle`、诊断与统计接口、`XBufferCore` 的底层成员不属于承诺范围。
 
 ## 9. 性能数据的口径
 
