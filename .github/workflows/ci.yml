@@ -289,6 +289,58 @@ jobs:
             build/corpus-gcc/*.xwire
           if-no-files-found: ignore
 
+  gcc16-sanitizer:
+    name: ASan+UBSan (GCC 16 Docker, Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      # GCC's null / nonnull-attribute / returns-nonnull-attribute checks make
+      # the library's consteval reflection code non-constant (all three must be
+      # off, any one left on fails constant evaluation). Every other UBSan
+      # check stays on and aborts the test.
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Configure, build and CTest (Debug, ASan+UBSan)
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e XOFFSET_GCC_SANITIZE \
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              g++ --version | head -n 1 &&
+              cmake -S . -B build/gcc16-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+                "-DCMAKE_CXX_FLAGS=$XOFFSET_GCC_SANITIZE" \
+                -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined &&
+              cmake --build build/gcc16-asan --parallel 4 &&
+              ctest --test-dir build/gcc16-asan --output-on-failure --parallel 2 --timeout 1800' \
+            2>&1 | tee build/gcc16-asan.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc16-sanitizer-result
+          path: build/gcc16-asan.log
+
   sanitizer:
     name: ASan+UBSan (P2996 Docker, Linux)
     runs-on: ubuntu-latest
