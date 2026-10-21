@@ -23,8 +23,12 @@
     **Behavior change:** pass `XBuffer::maximum_capacity()` for wires above
     64 MiB.
   - M2: the rejection names the declared size and the limit (`XBadAlloc`).
-  - M3: hole bytes are emitted as zero by `save_verified`, `save_verified_into`
-    and `freeze_verified`, never as the old contents of freed blocks.
+  - M3: a block is cleared when it is retired (freed), so holes and the
+    unwritten bytes of reused blocks are zero in the arena itself and every
+    output path (`save_verified`, `save_verified_into`, `freeze_verified`)
+    stays a plain copy. Holes that a loaded wire brought in keep the sender's
+    bytes and are forwarded unchanged on re-save; they are never the
+    receiver's memory.
   - M4: container shrink (`clear`, `resize` down, `erase`, `pop_back`,
     `stable_erase_if`, shorter `assign`) zeroes the vacated element and
     character bytes, so spare capacity never carries old values.

@@ -66,7 +66,7 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 
 | 来源 | 本版本的行为 | 你需要做的 |
 | --- | --- | --- |
-| P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | `save_verified`、`save_verified_into`、`freeze_verified` 输出时把空洞写成 0 | 无 |
+| P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | 块在释放时清零，arena 里的空洞本身就是 0，所有输出路径照常整段复制 | 转发收到的 wire 时，发送方 wire 空洞里的字节会原样再发出（那是发送方的字节，不是本端内存）。如果下游不应看到上游夹带的字节，转发前重新构建 buffer，不要直接 load 后 save |
 | P2 容器的空余容量：`clear()`、`resize()` 变小、`erase`、`pop_back` 之后 `[size, capacity)` 里的旧元素；字符串变短后的旧尾部 | 腾出的字节在缩小时清零（`clear()` 因此是 O(n)） | 无 |
 | P3 结构体的隐式填充字节 | 库构造或搬移的容器元素（含 `XMap` 的键值对）在构造时把填充清零，同样内容总是得到同样的 wire | 直接给根对象或其成员赋值的结构体，库碰不到它的填充。发给客户端的 schema 建议加 `XOFFSET_REQUIRE_NO_PADDING(T)`，或全局定义 `XOFFSET_REJECT_IMPLICIT_PADDING`，有隐式填充就编译失败，按报错补显式字段 |
 
