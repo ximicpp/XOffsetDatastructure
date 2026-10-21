@@ -1,10 +1,6 @@
 name: CI-Structure
 
 on:
-  push:
-    branches: [ next_cpp26 ]
-  pull_request:
-    branches: [ next_cpp26 ]
   workflow_dispatch:
 
 jobs:
