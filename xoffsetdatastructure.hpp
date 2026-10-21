@@ -5588,6 +5588,63 @@ namespace XOffsetDatastructure {
         return detail::wire_abi_signature<T>();
     }
 
+    // M6 (threat model T5/P3): implicit padding inside a wire type is copied
+    // into the arena as whatever bytes the source object held, and from there
+    // into every emitted wire. has_implicit_padding_v<T> is true when T, or any
+    // record, array element or container element type reachable from it, has
+    // bytes not covered by a field.
+    namespace detail {
+        template <typename T>
+        consteval bool has_implicit_padding();
+
+        template <typename U, std::size_t... Is>
+        consteval bool record_has_implicit_padding(std::index_sequence<Is...>) {
+            using namespace std::meta;
+            std::size_t covered = 0;
+            bool padded = false;
+            auto field = [&]<std::size_t I>() {
+                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
+                using FieldType = [:type_of(member):];
+                if (offset_of(member).bytes != covered) padded = true;
+                covered = offset_of(member).bytes + sizeof(FieldType);
+                if (has_implicit_padding<FieldType>()) padded = true;
+            };
+            (field.template operator()<Is>(), ...);
+            return padded || covered != sizeof(U);
+        }
+
+        template <typename T>
+        consteval bool has_implicit_padding() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (fixed_size_scalar<U> || std::is_enum_v<U> || is_fixed_string_v<U>) {
+                return false;
+            } else if constexpr (std::is_array_v<U>) {
+                return has_implicit_padding<std::remove_extent_t<U>>();
+            } else if constexpr (is_fixed_vector_v<U>) {
+                // The 16-byte head is four u32 fields; elements live in the arena.
+                return has_implicit_padding<typename U::value_type>();
+            } else if constexpr (is_xkeyvalue_v<U>) {
+                return record_has_implicit_padding<U>(std::make_index_sequence<2>{});
+            } else if constexpr (std::is_class_v<U>) {
+                static_assert(reflected_base_count<U>() == 0,
+                    "has_implicit_padding_v does not support base classes");
+                return record_has_implicit_padding<U>(
+                    std::make_index_sequence<reflected_member_count<U>()>{});
+            } else {
+                static_assert(sizeof(U) == 0, "has_implicit_padding_v: non-admitted wire type");
+            }
+        }
+    } // namespace detail
+
+    template <typename T>
+    inline constexpr bool has_implicit_padding_v = detail::has_implicit_padding<T>();
+
+    // Opt-in per type: fails compilation when T carries implicit padding.
+#define XOFFSET_REQUIRE_NO_PADDING(Type) \
+    static_assert(!::XOffsetDatastructure::has_implicit_padding_v<Type>, \
+        "XOffset: " #Type " has implicit padding bytes, which can carry stale memory into a wire " \
+        "(threat model T5/P3); add explicit fields")
+
     template <typename T>
     consteval std::uint64_t wire_schema_hash_v() {
         return detail::wire_schema_hash<T>();
@@ -5944,6 +6001,10 @@ namespace XOffsetDatastructure {
         std::string save_verified() {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+            static_assert(!has_implicit_padding_v<T>,
+                "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
             require_typed_root_access("save_verified<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
             this->shrink_to_fit();
