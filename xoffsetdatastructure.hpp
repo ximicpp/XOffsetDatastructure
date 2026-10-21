@@ -1942,7 +1942,11 @@ namespace XOffsetDatastructure {
                 return;
             }
             // M4: old characters never stay behind as spare capacity.
+#ifdef XOFFSET_MEASURE_DISABLE_M4
+            if (auto* ptr = data()) ptr[0] = '\0';
+#else
             if (auto* ptr = data()) std::memset(ptr, 0, std::size_t(size_) + 1u);
+#endif
             size_ = 0;
         }
 
@@ -2003,7 +2007,12 @@ namespace XOffsetDatastructure {
                 const auto old_size = size_;
                 std::memmove(old_data, rhs.data(), rhs.size());
                 // M4: zero the terminator and any old characters after it.
+#ifdef XOFFSET_MEASURE_DISABLE_M4
+                (void)old_size;
+                old_data[new_size] = '\0';
+#else
                 std::memset(old_data + new_size, 0, std::size_t(old_size > new_size ? old_size - new_size : 0) + 1u);
+#endif
                 size_ = new_size;
                 return;
             }
@@ -2756,6 +2765,9 @@ namespace XOffsetDatastructure {
         // M4 (threat model T5/P2): storage of destroyed elements is zeroed, so
         // a later save never emits the old values as spare capacity.
         void scrub(size_type from, size_type to) noexcept {
+#ifdef XOFFSET_MEASURE_DISABLE_M4
+            return;
+#endif
             if (to <= from) return;
             if (auto* items = data())
                 std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
@@ -4936,6 +4948,10 @@ namespace XOffsetDatastructure {
         inline void zero_emitted_holes(char* extents, const std::vector<XBufferCore::WireHole>& gaps,
                                        const std::vector<std::uint64_t>& skip,
                                        const XBufferCore& core) noexcept {
+#ifdef XOFFSET_MEASURE_DISABLE_M3
+            (void)extents; (void)gaps; (void)skip; (void)core;
+            return;
+#endif
             core.for_each_free_block([&](XBufferCore::WireHole hole) {
                 const auto next = std::upper_bound(gaps.begin(), gaps.end(), hole.offset,
                     [](std::uint32_t offset, const XBufferCore::WireHole& gap) { return offset < gap.offset; });
@@ -5534,6 +5550,10 @@ namespace XOffsetDatastructure {
 
         template <class T>
         void zero_implicit_padding(T* object) noexcept {
+#ifdef XOFFSET_MEASURE_DISABLE_M6
+            (void)object;
+            return;
+#endif
             if constexpr (!std::is_class_v<std::remove_cv_t<T>> && !std::is_array_v<std::remove_cv_t<T>>) {
                 (void)object;
             } else if constexpr (padding_ranges<T>.size() == 0) {
