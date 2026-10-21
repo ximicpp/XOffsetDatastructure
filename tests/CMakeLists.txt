@@ -95,6 +95,7 @@ set(REFLECTION_TESTS
     test_cross_compiler_wire
     test_schema_pin
     test_stability_contract
+    test_wire_hole_zeroing
     test_v2_fuzz
     test_reload_reset
 )
