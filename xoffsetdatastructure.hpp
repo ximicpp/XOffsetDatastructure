@@ -4015,6 +4015,56 @@ namespace XOffsetDatastructure {
             return ranges.overlaps(begin_offset, end_offset);
         }
 
+        // Validation scratch owned by one long-lived reload buffer. Every
+        // verified load builds two monotonic resources whose upstream blocks
+        // have the same few sizes message after message; this resource keeps
+        // up to `capacity` released blocks of at most `max_block` bytes and
+        // hands them out again by exact size and alignment. Larger or surplus
+        // blocks go straight back to new/delete. The validator constructs
+        // everything it reads, exactly as on fresh memory, and the scratch
+        // never reaches the payload or the wire. Its blocks are released with
+        // the buffer that owns it.
+        class ValidationScratchCache final : public std::pmr::memory_resource {
+        public:
+            static constexpr std::size_t max_block = 64u * 1024u;
+            static constexpr std::size_t capacity = 8;
+            ValidationScratchCache() = default;
+            ValidationScratchCache(const ValidationScratchCache&) = delete;
+            ValidationScratchCache& operator=(const ValidationScratchCache&) = delete;
+            ~ValidationScratchCache() override { release_all(); }
+            std::size_t cached_blocks() const noexcept { return count_; }
+            void release_all() noexcept {
+                while (count_) {
+                    const auto b = blocks_[--count_];
+                    std::pmr::new_delete_resource()->deallocate(b.p, b.bytes, b.align);
+                }
+            }
+        private:
+            struct Block { void* p; std::size_t bytes, align; };
+            Block blocks_[capacity] = {};
+            std::size_t count_ = 0;
+            void* do_allocate(std::size_t bytes, std::size_t align) override {
+                for (std::size_t i = count_; i-- > 0;) {
+                    if (blocks_[i].bytes == bytes && blocks_[i].align == align) {
+                        void* p = blocks_[i].p;
+                        blocks_[i] = blocks_[--count_];
+                        return p;
+                    }
+                }
+                return std::pmr::new_delete_resource()->allocate(bytes, align);
+            }
+            void do_deallocate(void* p, std::size_t bytes, std::size_t align) override {
+                if (bytes <= max_block && count_ < capacity) {
+                    blocks_[count_++] = {p, bytes, align};
+                    return;
+                }
+                std::pmr::new_delete_resource()->deallocate(p, bytes, align);
+            }
+            bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override {
+                return this == &other;
+            }
+        };
+
         struct WireValidationContext {
             const char* base{};
             const char* end{};
@@ -5502,6 +5552,7 @@ namespace XOffsetDatastructure {
         void swap(XBuffer& other) noexcept {
             if (this == &other) return;
             XBufferCore::swap(other);
+            reload_scratch_.swap(other.reload_scratch_);
         }
 
         friend void swap(XBuffer& a, XBuffer& b) noexcept { a.swap(b); }
@@ -5786,9 +5837,12 @@ namespace XOffsetDatastructure {
         /// without typed root access (root<T>() throws) until a later
         /// successful reload_verified or reset<T>(). Committed pages are kept
         /// (see reclaim_tail_pages()).
+        /// Validation scratch comes from a small block cache owned by this
+        /// buffer (released with it or by release_reload_scratch()), so a
+        /// reload loop does not allocate host memory per message.
         template <typename T>
         void reload_verified(std::span<const std::byte> data) {
-            reload_verified_with_resource<T>(data, std::pmr::new_delete_resource());
+            reload_into<T>(data, nullptr);
         }
 
         template <typename T>
@@ -5800,9 +5854,25 @@ namespace XOffsetDatastructure {
         template <typename T>
         void reload_verified_with_resource(std::span<const std::byte> data,
                                            std::pmr::memory_resource* upstream) {
-            constexpr const char* who = "reload_verified<T>()";
             if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+            reload_into<T>(data, upstream);
+        }
+
+        /// Returns the reload scratch blocks to the host allocator.
+        void release_reload_scratch() noexcept {
+            if (reload_scratch_) reload_scratch_->release_all();
+        }
+
+    private:
+        // upstream == nullptr: this buffer's own reload scratch.
+        template <typename T>
+        void reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
+            constexpr const char* who = "reload_verified<T>()";
             try {
+                if (!upstream) {
+                    if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::ValidationScratchCache>();
+                    upstream = reload_scratch_.get();
+                }
                 XWireHeaderV2 header{};
                 const auto layout = admit_wire_header<T>(data, header, who);
                 const auto used = static_cast<std::size_t>(header.used_bytes);
@@ -5815,6 +5885,9 @@ namespace XOffsetDatastructure {
             }
         }
 
+        std::unique_ptr<detail::ValidationScratchCache> reload_scratch_;
+
+    public:
         /// Empties this buffer and constructs a fresh root of type T in it,
         /// reusing the mapping and owner registration; equivalent to
         /// `*this = create<T>(get_size(), this buffer's MaximumCapacity)`.
