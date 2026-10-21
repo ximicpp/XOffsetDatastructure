@@ -686,8 +686,8 @@ namespace XOffsetDatastructure {
             static constexpr std::uint32_t small_bins = small_max / 8;
             std::vector<std::uint32_t> bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
-            // Bins that may own storage (set on every insertion, never cleared
-            // by removal), so recycling visits only those bins.
+            // Bins that may own storage (set whenever a bin gets storage,
+            // never cleared by removal), so recycling visits only those bins.
             std::uint64_t touched[small_bins / 64] = {};
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
@@ -720,8 +720,15 @@ namespace XOffsetDatastructure {
         }
 
         struct FreeTableRecycler {
+            // Kept out of line: every FreeTablePtr destructor on the mutate
+            // path (insert_free_block's spare) inlines only the null check.
             void operator()(FreeTable* table) const noexcept {
-                if (!table) return;
+                if (table) recycle(table);
+            }
+#if defined(__clang__) || defined(__GNUC__)
+            [[gnu::noinline, gnu::cold]]
+#endif
+            static void recycle(FreeTable* table) noexcept {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
@@ -741,6 +748,9 @@ namespace XOffsetDatastructure {
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
 
         // Throws std::bad_alloc only when the cache is empty and allocation fails.
+#if defined(__clang__) || defined(__GNUC__)
+        [[gnu::noinline, gnu::cold]]
+#endif
         static FreeTablePtr make_free_table() {
             if (free_table_cache_available()) {
                 auto& cache = free_table_cache();
@@ -789,10 +799,11 @@ namespace XOffsetDatastructure {
                             }
                             spare_bin.assign(slot.begin(), slot.end()); // fits: no allocation
                             slot.swap(spare_bin); // old storage released at scope exit
+                            // Storage only arrives here, so only growth marks the bin.
+                            table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         }
                         slot.push_back(offset);
                         table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
-                        table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     }
                     table.bytes += bytes;
                     ++table.count;
