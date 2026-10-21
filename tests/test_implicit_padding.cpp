@@ -34,7 +34,15 @@ struct DenseRoot {
 struct VectorOfPadded { xo::XVector<Interior> items; };
 struct MapWithPaddedPair { xo::XMap<std::uint8_t, std::uint64_t> m; };   // XKeyValue<u8,u64>
 struct ArrayOfPadded { Tail items[2]; };
+struct BigArray { std::uint32_t n{}; Interior items[4096]; };         // one element reflected, not 4096
+struct Grid { ArrayOfPadded rows[64][3]; };                            // array of records holding arrays
 } // namespace pad
+
+// A large array costs one element's ranges, repeated (compile-time bound).
+static_assert(xo::detail::padding_ranges<pad::Interior[4096]>.size() == 1);
+static_assert(xo::detail::padding_ranges<pad::Interior[4096]>[0].count == 4096);
+static_assert(xo::detail::padding_ranges<pad::Interior[4096]>[0].stride == sizeof(pad::Interior));
+static_assert(xo::has_implicit_padding_v<pad::BigArray>);
 
 static_assert(!xo::has_implicit_padding_v<pad::Dense>);
 static_assert(xo::has_implicit_padding_v<pad::Interior>);
@@ -75,9 +83,30 @@ template <class T>
 void expect_zero_padding(const T& object, const char* what) {
     const auto* bytes = reinterpret_cast<const unsigned char*>(&object);
     for (const auto& r : xo::detail::padding_ranges<T>)
-        for (std::size_t i = 0; i < r.bytes; ++i)
-            if (bytes[r.offset + i] != 0)
-                fail(std::string(what) + ": padding byte at offset " + std::to_string(r.offset + i) + " is not zero");
+        for (std::size_t k = 0; k < r.count; ++k)
+            for (std::size_t i = 0; i < r.bytes; ++i)
+                if (bytes[r.offset + k * r.stride + i] != 0)
+                    fail(std::string(what) + ": padding byte at offset " +
+                         std::to_string(r.offset + k * r.stride + i) + " is not zero");
+}
+
+// zero_implicit_padding on a dirty object clears exactly the bytes in `pad`
+// (offset within each `period`-byte element after `lead`) and nothing else.
+template <class T>
+void expect_exact_zeroing(const char* what, std::size_t lead, std::size_t period,
+                          std::size_t pad_begin, std::size_t pad_end) {
+    auto* object = static_cast<T*>(::operator new(sizeof(T)));
+    auto* bytes = reinterpret_cast<unsigned char*>(object);
+    std::memset(bytes, 0xAB, sizeof(T));
+    xo::detail::zero_implicit_padding(object);
+    for (std::size_t i = lead; i < sizeof(T); ++i) {   // bytes before `lead` are checked by the caller
+        const bool padding = i >= lead && (i - lead) % period >= pad_begin && (i - lead) % period < pad_end;
+        if (bytes[i] != (padding ? 0 : 0xAB)) {
+            ::operator delete(object);
+            fail(std::string(what) + ": byte " + std::to_string(i) + (padding ? " not zeroed" : " clobbered"));
+        }
+    }
+    ::operator delete(object);
 }
 
 // Builds the same logical content with `garbage` in the caller's
@@ -118,6 +147,20 @@ void elements_have_zero_padding_and_wires_are_deterministic() {
 } // namespace
 
 int main() {
+    // BigArray: n (4 bytes) + 4 padding, then 4096 Interior {u8; 7 pad; u64}.
+    expect_exact_zeroing<pad::BigArray>("BigArray", 8, sizeof(pad::Interior), 1, 8);
+    {
+        // n's own padding (bytes 4..7) lies before `lead`; check it separately.
+        pad::BigArray probe;
+        std::memset(static_cast<void*>(&probe), 0xAB, sizeof probe);
+        xo::detail::zero_implicit_padding(&probe);
+        const auto* p = reinterpret_cast<const unsigned char*>(&probe);
+        for (std::size_t i = 0; i < 8; ++i)
+            if (p[i] != (i < 4 ? 0xAB : 0)) fail("BigArray: bytes before items wrong at " + std::to_string(i));
+    }
+    // Grid: 192 ArrayOfPadded = 384 Tail {u64; u8; 7 pad}.
+    expect_exact_zeroing<pad::Grid>("Grid", 0, sizeof(pad::Tail), 9, 16);
+
     elements_have_zero_padding_and_wires_are_deterministic();
     std::cout << "implicit padding: 12 compile-time checks, element padding zeroed, wires deterministic\n";
     return 0;

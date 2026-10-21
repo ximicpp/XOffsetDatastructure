@@ -5454,7 +5454,13 @@ namespace XOffsetDatastructure {
     // records, arrays and XKeyValue (map entries); padding of a record that
     // the caller assigns directly is outside the library's reach.
     namespace detail {
-        struct PaddingRange { std::size_t offset; std::size_t bytes; };
+        // `count` runs of `bytes` padding bytes, `stride` apart from `offset`.
+        // An array contributes its element's ranges once, repeated by count,
+        // so a large array costs no more compile time than one element.
+        struct PaddingRange { std::size_t offset; std::size_t bytes; std::size_t stride = 0; std::size_t count = 1; };
+
+        template <typename T>
+        consteval std::vector<PaddingRange> merged_padding();
 
         template <typename T>
         consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base);
@@ -5468,21 +5474,30 @@ namespace XOffsetDatastructure {
                 constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
                 using FieldType = [:type_of(member):];
                 constexpr std::size_t offset = offset_of(member).bytes;
-                if (offset > covered) out.push_back({base + covered, offset - covered});
+                if (offset > covered) out.push_back({base + covered, offset - covered, 0, 1});
                 collect_padding<FieldType>(out, base + offset);
                 if (offset + sizeof(FieldType) > covered) covered = offset + sizeof(FieldType);
             };
             (field.template operator()<Is>(), ...);
-            if (covered < sizeof(U)) out.push_back({base + covered, sizeof(U) - covered});
+            if (covered < sizeof(U)) out.push_back({base + covered, sizeof(U) - covered, 0, 1});
         }
 
         template <typename T>
         consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base) {
             using U = std::remove_cv_t<T>;
             if constexpr (std::is_array_v<U>) {
-                using E = std::remove_extent_t<U>;
-                if constexpr (std::is_class_v<E> || std::is_array_v<E>)
-                    for (std::size_t i = 0; i < std::extent_v<U>; ++i) collect_padding<E>(out, base + i * sizeof(E));
+                using B = std::remove_all_extents_t<U>;
+                constexpr std::size_t total = sizeof(U) / sizeof(B);
+                if constexpr (std::is_class_v<B>) {
+                    for (const auto& r : merged_padding<B>()) {
+                        if (r.count == 1) {
+                            out.push_back({base + r.offset, r.bytes, sizeof(B), total});
+                        } else {
+                            for (std::size_t i = 0; i < total; ++i)
+                                out.push_back({base + i * sizeof(B) + r.offset, r.bytes, r.stride, r.count});
+                        }
+                    }
+                }
             } else if constexpr (is_xkeyvalue_v<U>) {
                 collect_record_padding<U>(out, base, std::make_index_sequence<2>{});
             } else if constexpr (std::is_class_v<U> && !is_fixed_string_v<U> && !is_fixed_vector_v<U>) {
@@ -5499,7 +5514,8 @@ namespace XOffsetDatastructure {
             std::vector<PaddingRange> raw, merged;
             collect_padding<T>(raw, 0);
             for (const auto& r : raw) {
-                if (!merged.empty() && merged.back().offset + merged.back().bytes == r.offset)
+                if (r.count == 1 && !merged.empty() && merged.back().count == 1 &&
+                    merged.back().offset + merged.back().bytes == r.offset)
                     merged.back().bytes += r.bytes;
                 else
                     merged.push_back(r);
@@ -5524,7 +5540,8 @@ namespace XOffsetDatastructure {
                 (void)object;
             } else {
                 auto* bytes = reinterpret_cast<unsigned char*>(object);
-                for (const auto& r : padding_ranges<T>) std::memset(bytes + r.offset, 0, r.bytes);
+                for (const auto& r : padding_ranges<T>)
+                    for (std::size_t i = 0; i < r.count; ++i) std::memset(bytes + r.offset + i * r.stride, 0, r.bytes);
             }
         }
     } // namespace detail
