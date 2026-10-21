@@ -42,15 +42,23 @@ jobs:
 
       - name: Validate test inventory against CMake
         run: |
-          echo "Checking tests/CMakeLists.txt against tests/test_*.cpp ..."
+          echo "Checking tests/CMakeLists.txt and cmake/XOffsetFourPathTests.cmake against tests/test_*.cpp ..."
 
-          awk '
-            /set\(BASIC_TESTS/ {collect=1; next}
-            /set\(REFLECTION_TESTS/ {collect=1; next}
-            /set\(STORAGE_TESTS/ {collect=1; next}
-            collect && /^\)/ {collect=0; next}
-            collect && $1 ~ /^test_/ {print $1}
-          ' tests/CMakeLists.txt | sort > /tmp/cmake_tests.txt
+          {
+            awk '
+              /set\(BASIC_TESTS/ {collect=1; next}
+              /set\(REFLECTION_TESTS/ {collect=1; next}
+              /set\(STORAGE_TESTS/ {collect=1; next}
+              collect && /^\)/ {collect=0; next}
+              collect && $1 ~ /^test_/ {print $1}
+            ' tests/CMakeLists.txt
+            awk '
+              /set\(XOFFSET_FOUR_PATH_TEST_PROGRAMS/ {collect=1; next}
+              collect && /^\)/ {collect=0; next}
+              collect && $1 ~ /^test_/ {print $1}
+              /^add_xoffset_test\(test_/ {sub(/^add_xoffset_test\(/, ""); print $1}
+            ' cmake/XOffsetFourPathTests.cmake
+          } | sort > /tmp/cmake_tests.txt
 
           ls tests/test_*.cpp | \
             sed 's|tests/||; s|\.cpp||' | \
@@ -65,7 +73,7 @@ jobs:
 
           if [ -n "$MISSING_IN_CMAKE" ]; then
             echo ""
-            echo "  ✗ Test files not listed in tests/CMakeLists.txt:"
+            echo "  ✗ Test files not listed in tests/CMakeLists.txt or cmake/XOffsetFourPathTests.cmake:"
             echo "$MISSING_IN_CMAKE" | sed 's/^/    - /'
             exit 1
           fi

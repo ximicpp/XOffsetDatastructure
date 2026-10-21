@@ -244,10 +244,11 @@ class ValidationInputs(unittest.TestCase):
         self.assertIn("outside source directories", report["reason"])
 
     def test_preserved_source_manifest_matches_archive(self):
-        evidence = RUNNER.parents[1] / "docs/validation/2026-10-15-vm-followup"
-        archive = evidence / "final-source.tar.gz"
+        # The follow-up F source archive was never published; Stage 2's preserved pair is.
+        evidence = RUNNER.parents[1] / "docs/validation/2026-10-15-vm-stage2/final-source"
+        archive = evidence / "source.tar.gz"
         vm.extract_archive(archive, self.root / "frozen")
-        expected = json.loads((evidence / "final-source-manifest.json").read_text())
+        expected = json.loads((evidence / "source-manifest.json").read_text())
         self.assertEqual(vm.file_manifest(self.root / "frozen"), expected)
 
     def test_zero_skipped_failed_and_wrong_test_results_never_pass(self):
