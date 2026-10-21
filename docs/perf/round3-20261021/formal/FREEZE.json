@@ -1,0 +1,43 @@
+{
+ "schema": "xoffset-mac-formal-v2-ownwire",
+ "name": "R3-formal-mac-v1",
+ "candidate": "Round 3 V2 format at r3 df876f6c (I1, headerless blocks, host free table + hole table, owner prefix page, N6, N7 adapter line, E1, N10 sparse wire); promoted by screen R3-V2-on-W9a-v4",
+ "binaries": {
+  "xoffset_cand": "6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d",
+  "xoffset_cand_aa": "6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d",
+  "xoffset_w9a": "24a51b0afa851e451d0ad7753ef9694eda07a0967ee74678b5fb9b68bf6a54a6",
+  "cista": "13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31",
+  "flatbuffers": "684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade",
+  "capnproto": "5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a",
+  "cereal": "c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565"
+ },
+ "input_wires": {
+  "xoffset_cand": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "xoffset_cand_aa": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "xoffset_w9a": "d36de6ad7564f90c54aee35ff965d08d57ed72646b96d5784ca004b4678cbddc",
+  "cista": "1d54344941e86b63bd3525b694971a0593a009d022052f440c89db20c2d9b84a",
+  "flatbuffers": "d53fb8e89a71eef77efd47f680c1c37bd0e187a5bb93fc2243eb7fa59a05987f",
+  "capnproto": "cc27816e0af6bc816624fa50840117bd5cf79071ab44e2e2ad84d2158420167b",
+  "cereal": "aba30c823a57f80470a928cfd15c94d6103ec1f7226ebb6f5868bfd5281cedfb"
+ },
+ "formal_py_sha256": "10685c4c5c67f5b256c62a0d7938f28a7bdd1baa73f8b902409e45634d6f03cd",
+ "metadata": "restore alpha-era serialization_comparison adapters/driver (final-v4 C++ side not transferred); competitors cista 0.16 / FlatBuffers 25.12.19 / Cap'n Proto 1.5.0 / cereal 1.3.2 at locked commits, modes unchanged, built natively on Mac",
+ "fixture": "M from prepared-v1 regenerated on Mac (S equals golden); each library reads its own M input wire (competitors and W9a: Mac functional runs; candidate: its own V2 encoding of the same input canonical, which cannot read V1)",
+ "design": "65 macro cycles x 3 rounds; each round runs all 7 binaries once in an order shuffled by random.Random(20261020+round); first 1 cycle discarded (pre-registered); inference on per-cycle mean log ratios, df=63",
+ "primary": {
+  "family": "12 = {cista,flatbuffers,capnproto,cereal} x {read_sum<=1.05, mutate<=1.05, emit_after<=0.20}; ratio xoffset_cand/competitor",
+  "rule": "joint one-sided 95% upper bound, critical t(1-0.05/12, df); an item passes iff upper bound <= its threshold"
+ },
+ "aa": {
+  "pair": "xoffset_cand_aa/xoffset_cand",
+  "rule": "two-sided t(1-0.05/(2*8), df) intervals for 8 phases must lie within [1/1.05, 1.05]; failure invalidates the batch (reported, not rerun)"
+ },
+ "auxiliary": {
+  "items": "reload ratio vs each competitor; cand/W9a for read_sum, mutate, emit_after, load, reload, total",
+  "rule": "two-sided t(1-0.05/(2*10), df); report only, no gate"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or rerun; any child failure aborts the batch as failed; child timeout 30 s",
+ "host": "macOS-26.3-arm64-arm-64bit",
+ "frozen_epoch": 1792566562.645559,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}
