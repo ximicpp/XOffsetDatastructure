@@ -124,7 +124,9 @@ Clang P2996 fork (from bloomberg/clang-p2996). Searched at: `/usr/local/bin/clan
 
 - **`next_cpp26`** — active development branch
 - **`main`** — stable branch
-- CI runs on push to both: `.github/workflows/ci.yml` reads the fixed Linux image
+- CI runs automatically only for `main`/`master`; on `next_cpp26` both workflows
+  (`CI`, `CI-Structure`) are manual (Actions tab → workflow_dispatch).
+  `.github/workflows/ci.yml` reads the fixed Linux image
   digest from `toolchains/vm-validation.json`, verifies compiler/dependency
   identity, builds, runs CTest and checks signature drift in `tools/sigs/`.
   Separate Linux/macOS/Windows jobs run only the ordinary C++17 OS layer.
