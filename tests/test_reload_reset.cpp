@@ -83,7 +83,7 @@ void failed_reload_is_rootless_then_recovers() {
     auto bad = good;
     bad[bad.size() / 2] ^= 0x5a;            // payload corruption
     std::string trunc = good.substr(0, 40);  // shorter than the wire header
-    const auto wrong = XBuffer::create<OtherRoot>(4096).save_verified<OtherRoot>();
+    auto wrong = XBuffer::create<OtherRoot>(4096).save_verified<OtherRoot>();
     for (const std::string* w : {&trunc, &wrong, &bad}) {
         bool threw = false, fresh_threw = false;
         try { in.reload_verified<ReloadRoot>(*w); } catch (const XException&) { threw = true; }
