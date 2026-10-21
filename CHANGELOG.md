@@ -14,6 +14,21 @@
   a compiler or target lays out `T` differently from the pinned text, and the
   diagnostic shows the computed layout; `schema_pin<T>(name)` prints the pin.
   See `docs/SCHEMA_PINS.md`. CTest `schema_pin_mismatch` requires the failure.
+- Untrusted input (threat model `docs/V2_THREAT_MODEL.md`):
+  - M1: `load_verified` / `TypedXBuffer::load` and `begin_verified_receive`
+    without an explicit `maximum_capacity` accept a wire that declares at most
+    the default maximum (64 MiB, `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`); larger
+    declared sizes are rejected before any reservation. Previously a sparse wire
+    of a few hundred bytes could make the receiver reserve up to 2 GiB.
+    **Behavior change:** pass `XBuffer::maximum_capacity()` for wires above
+    64 MiB.
+  - M2: the rejection names the declared size and the limit (`XBadAlloc`).
+  - M3: hole bytes are emitted as zero by `save_verified`, `save_verified_into`
+    and `freeze_verified`, never as the old contents of freed blocks.
+  - M4: container shrink (`clear`, `resize` down, `erase`, `pop_back`,
+    `stable_erase_if`, shorter `assign`) zeroes the vacated element and
+    character bytes, so spare capacity never carries old values.
+  - Wires with holes or spare capacity change bytes (golden values updated).
 - New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
   a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and
   mutual `load_verified` acceptance.
