@@ -25,7 +25,7 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.source.mkdir()
         for name in A.REQUIRED_FILES:
             self.write(name, b"// synthetic fixture\n")
-        self.write("VERSION", (A.VERSION + "\n").encode())
+        self.write("XOFFSET_VERSION", (A.VERSION + "\n").encode())
         self.write("tests/CMakeLists.txt", b"# fixture\n")
         self.write("examples/CMakeLists.txt", b"# fixture\n")
         trees = {}
@@ -170,7 +170,7 @@ class ReleaseArchiveTests(unittest.TestCase):
 
     def test_version_dependency_license_and_cpp_closure_fail_closed(self):
         for name, data, expected in (
-                ("VERSION", b"0.1.0\n", "VERSION"),
+                ("XOFFSET_VERSION", b"0.1.0\n", "VERSION differs"),
                 (A.DEPENDENCY_TREES[0] + "/boost/typelayout/fixture.hpp", b"changed", "content mismatch"),
                 (A.DEPENDENCY_LICENSES[0], b"changed", "license mismatch"),
                 ("tests/missing.cpp", b'#include "absent.hpp"\n', "include missing")):

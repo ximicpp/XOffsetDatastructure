@@ -1,6 +1,8 @@
 """Generated candidates must refuse stale or ambiguous frozen F anchors."""
+import hashlib
 import importlib.util
 from pathlib import Path
+import tarfile
 import unittest
 
 
@@ -9,11 +11,25 @@ SPEC = importlib.util.spec_from_file_location(
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+# The generators target the frozen F header (docs/VM_STAGE3_RESULTS.md), not the live one.
+FROZEN_F_ARCHIVE = (Path(__file__).resolve().parents[2]
+                    / "docs/validation/2026-10-15-vm-followup/wire-inputs-and-versions.tar.gz")
+FROZEN_F_SHA256 = "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
+
+
+def frozen_f_source():
+    with tarfile.open(FROZEN_F_ARCHIVE) as bundle:
+        data = bundle.extractfile("final/xoffsetdatastructure.hpp").read()
+    if hashlib.sha256(data).hexdigest() != FROZEN_F_SHA256:
+        raise AssertionError("frozen F header hash mismatch")
+    return data.decode("utf-8")
+
+
 
 class IndexCandidateGenerationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source = (Path(__file__).parents[2] / "xoffsetdatastructure.hpp").read_text()
+        cls.source = frozen_f_source()
 
     def test_both_variants_are_deterministic_and_isolated(self):
         for variant, enabled in (("C-linear", "false"), ("C-index", "true")):
@@ -23,7 +39,7 @@ class IndexCandidateGenerationTests(unittest.TestCase):
                 self.assertIn(f"Stage3FreeSlots<{enabled}> free_blocks_;", result)
                 self.assertNotIn("std::vector<FreeBlock> free_blocks_;", result)
                 self.assertIn("free_blocks_.find_first(bytes, alignment, buffer_.data())", result)
-                self.assertEqual(self.source, (Path(__file__).parents[2] / "xoffsetdatastructure.hpp").read_text())
+                self.assertEqual(self.source, frozen_f_source())
 
     def test_unknown_variant_rejected(self):
         with self.assertRaisesRegex(ValueError, "unknown Stage 3"):
