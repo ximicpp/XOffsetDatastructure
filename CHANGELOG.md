@@ -10,6 +10,10 @@
   (builtin `<`), so each compiler rejected the other's wires. The library now
   calls `<=>` explicitly for such keys; Clang's order, and so its wires, are
   unchanged.
+- K7 schema pins: `XOFFSET_PIN_SCHEMA(T, "<signature>")` fails compilation when
+  a compiler or target lays out `T` differently from the pinned text, and the
+  diagnostic shows the computed layout; `schema_pin<T>(name)` prints the pin.
+  See `docs/SCHEMA_PINS.md`. CTest `schema_pin_mismatch` requires the failure.
 - New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
   a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and
   mutual `load_verified` acceptance.
