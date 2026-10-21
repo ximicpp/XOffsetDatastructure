@@ -1,6 +1,7 @@
 name: Fuzz
 
-# G5: coverage-guided libFuzzer runs of the V2 validators (fuzz_v2_wire) under
+# G5: coverage-guided libFuzzer runs of the V2 validators (fuzz_v2_wire, and
+# fuzz_wire_schemas over three more schemas) under
 # ASan+UBSan. Pull requests and pushes run 5 minutes; the nightly run and
 # manual dispatch run longer. The corpus is carried between runs in the
 # Actions cache. GitHub reads `schedule` only from the default branch, so the
@@ -21,7 +22,7 @@ on:
 
 jobs:
   fuzz-v2-wire:
-    name: libFuzzer fuzz_v2_wire (P2996 Docker, ASan+UBSan)
+    name: libFuzzer V2 validators (P2996 Docker, ASan+UBSan)
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -76,8 +77,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build/fuzz-corpus
-          key: fuzz-v2-wire-${{ github.run_id }}
-          restore-keys: fuzz-v2-wire-
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
 
       - name: Build, smoke, fuzz
         shell: bash
@@ -98,12 +99,21 @@ jobs:
                 "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime" \
                 -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
                 -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
-              cmake --build build/fuzz --target test_v2_fuzz fuzz_v2_wire --parallel 4
+              cmake --build build/fuzz --parallel 4 --target \
+                test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds
               ctest --test-dir build/fuzz -L fuzz --output-on-failure
-              build/fuzz/bin/Debug/test_v2_fuzz --write-corpus build/fuzz-corpus
-              build/fuzz/bin/Debug/fuzz_v2_wire -max_total_time="$XOFFSET_FUZZ_SECONDS" \
-                -max_len=262144 -rss_limit_mb=2048 -timeout=30 -print_final_stats=1 \
-                -artifact_prefix=build/fuzz-artifacts/ build/fuzz-corpus' \
+              BIN=build/fuzz/bin/Debug
+              mkdir -p build/fuzz-corpus/v2_wire build/fuzz-corpus/wire_schemas
+              $BIN/test_v2_fuzz --write-corpus build/fuzz-corpus/v2_wire
+              $BIN/fuzz_wire_schemas_seeds build/fuzz-corpus/wire_schemas
+              # Split the time: 60% for the oracle-checked target, 40% for the
+              # three extra schemas.
+              T1=$(( XOFFSET_FUZZ_SECONDS * 3 / 5 )); T2=$(( XOFFSET_FUZZ_SECONDS - T1 ))
+              FLAGS="-max_len=262144 -rss_limit_mb=2048 -timeout=30 -print_final_stats=1"
+              $BIN/fuzz_v2_wire -max_total_time=$T1 $FLAGS \
+                -artifact_prefix=build/fuzz-artifacts/v2_wire- build/fuzz-corpus/v2_wire
+              $BIN/fuzz_wire_schemas -max_total_time=$T2 $FLAGS \
+                -artifact_prefix=build/fuzz-artifacts/wire_schemas- build/fuzz-corpus/wire_schemas' \
             2>&1 | tee build/fuzz.log
 
       - name: Save corpus
@@ -111,7 +121,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: build/fuzz-corpus
-          key: fuzz-v2-wire-${{ github.run_id }}
+          key: fuzz-corpus-${{ github.run_id }}
 
       - name: Upload log and crashing inputs
         if: always()

@@ -19,7 +19,10 @@
   survive read -> mutate -> save -> load byte-stably. It shares its core with
   `test_v2_fuzz` (`tests/fuzz/v2_fuzz_core.hpp`). The new `Fuzz` workflow runs
   it under ASan+UBSan for 5 minutes on pull requests and pushes and for an hour
-  nightly, keeping the corpus between runs. All acceptors in the fuzz core now
+  nightly, keeping the corpus between runs. `fuzz_wire_schemas` adds three
+  schemas (fixed arrays, enums and byte blobs; nested maps with string keys;
+  three-level nested vectors) with a differential check across typed load,
+  raw validation and verified receive. All acceptors in the fuzz core now
   use one 4 MiB limit, and the oracle rejects wires that declare more.
 
 ## 0.2.0-alpha.1: V2 storage and wire format

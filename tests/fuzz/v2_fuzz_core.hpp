@@ -291,10 +291,11 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
 // ---------------------------------------------------------------------------
 // Library acceptors.
 // ---------------------------------------------------------------------------
-std::optional<Buffer> typed_load(const std::string& wire, std::string* error = nullptr) {
+template <class Root = fz::Root>
+std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::string* error = nullptr) {
     try {
         // Growable so accepted inputs can be mutated afterwards.
-        return Buffer(xo::XBuffer::load_verified<fz::Root>(
+        return xo::TypedXBuffer<Root>(xo::XBuffer::load_verified<Root>(
             wire, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic)));
     } catch (const xo::XException& e) {
         if (error) *error = e.what();
@@ -331,12 +332,13 @@ Unpacked unpack(const std::string& wire) {
     return u;
 }
 
+template <class Root = fz::Root>
 bool raw_accepts(const std::string& wire, std::string* error) {
     auto u = unpack(wire);
     const auto used = std::size_t(u.h.used_bytes);
     auto* base = u.base();
     try {
-        auto proof = rr::validate<fz::Root>(base, used, u.h.root_offset, u.holes,
+        auto proof = rr::validate<Root>(base, used, u.h.root_offset, u.holes,
                                             std::size_t(u.h.hole_count), std::pmr::new_delete_resource(),
                                             u.gaps.data(), u.gaps.size());
         (void)proof;
@@ -347,11 +349,12 @@ bool raw_accepts(const std::string& wire, std::string* error) {
     }
 }
 
+template <class Root = fz::Root>
 bool receive_accepts(const std::string& wire, std::string* error) {
     auto u = unpack(wire);
     const auto used = std::size_t(u.h.used_bytes);
     try {
-        auto token = xo::begin_verified_receive<fz::Root>(used, xo::XBuffer::maximum_capacity(kLimit), std::size_t(u.h.hole_count),
+        auto token = xo::begin_verified_receive<Root>(used, xo::XBuffer::maximum_capacity(kLimit), std::size_t(u.h.hole_count),
                                                           std::size_t(u.h.extent_count));
         {
             auto op = token.acquire_operation();
@@ -372,7 +375,7 @@ bool receive_accepts(const std::string& wire, std::string* error) {
             auto lb = op.hole_bytes(); if (!lb.empty()) std::memcpy(lb.data(), u.holes, lb.size());
             op.complete(kHeader, used, lb.size(), eb.size());
         }
-        auto received = xo::finish_verified<fz::Root>(token);
+        auto received = xo::finish_verified<Root>(token);
         (void)received;
         return true;
     } catch (const xo::XException& e) {
