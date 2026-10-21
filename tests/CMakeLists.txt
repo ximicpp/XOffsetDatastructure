@@ -93,6 +93,7 @@ set(REFLECTION_TESTS
     test_allocator_failures
     test_v2_golden
     test_cross_compiler_wire
+    test_schema_pin
     test_v2_fuzz
     test_reload_reset
 )
@@ -131,8 +132,18 @@ foreach(failure_mode ${REGISTRY_FAILURE_MODES})
     set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
 endforeach()
 
+# K7: a schema pin that disagrees with the compiled layout must fail the build.
+add_executable(schema_pin_mismatch EXCLUDE_FROM_ALL schema_pin/pin_mismatch.cpp)
+configure_xoffset_target(schema_pin_mismatch)
+add_test(NAME schema_pin_mismatch
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_pin_mismatch --config $<CONFIG>)
+set_tests_properties(schema_pin_mismatch PROPERTIES
+    LABELS "reflection"
+    PASS_REGULAR_EXPRESSION "XOffset schema pin mismatch \\(K7\\)")
+
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
 # These are mandatory configure-time checks, not runtime test programs.
 xoffset_check_polymorphic_rejection()
 xoffset_write_test_inventory()
+
