@@ -98,7 +98,8 @@ jobs:
                 -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ \
                 "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime" \
                 -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
-                -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
+                -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
+                -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6
               cmake --build build/fuzz --parallel 4 --target \
                 test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds
               ctest --test-dir build/fuzz -L fuzz --output-on-failure
