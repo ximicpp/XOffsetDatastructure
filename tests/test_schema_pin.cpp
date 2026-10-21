@@ -29,7 +29,9 @@ int main() {
     XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
 
     const auto line = xo::schema_pin<pin::Root>("pin::Root");
-    const std::string_view signature(xo::wire_abi_signature<pin::Root>());
+    // wire_abi_signature returns the text by value; keep it alive for the view.
+    const auto signature_text = xo::wire_abi_signature<pin::Root>();
+    const std::string_view signature(signature_text);
     if (line != "XOFFSET_PIN_SCHEMA(pin::Root, \"" + std::string(signature) + "\");")
         fail("schema_pin<T>() does not reproduce the pin line: " + line);
     static_assert(xo::detail::schema_pin_matches<pin::Root>(
