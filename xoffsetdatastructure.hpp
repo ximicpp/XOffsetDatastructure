@@ -4685,31 +4685,23 @@ namespace XOffsetDatastructure {
                     b += n;
                 }
             });
+            // A run of at least min_units (>= 512) bits contains at least
+            // seven all-ones words: scan for all-ones stretches and extend
+            // each into its neighbouring partial words.
             const std::size_t min_units = wire_sparse_min_gap / 8u;
-            std::size_t pos = 0;
-            while (pos < units) {
-                // next set bit
-                auto word = pos / 64u;
-                auto w = bits[word] & (~std::uint64_t(0) << (pos % 64u));
-                while (w == 0) {
-                    if (++word >= bits.size()) return gaps;
-                    w = bits[word];
-                }
-                const auto start = word * 64u + static_cast<std::size_t>(std::countr_zero(w));
-                if (start >= units) return gaps;
-                // next clear bit at or after start
-                word = start / 64u;
-                w = ~bits[word] & (~std::uint64_t(0) << (start % 64u));
-                while (w == 0) {
-                    if (++word >= bits.size()) { w = 0; break; }
-                    w = ~bits[word];
-                }
-                const auto stop = w == 0 ? units
-                    : std::min(units, word * 64u + static_cast<std::size_t>(std::countr_zero(w)));
+            const std::size_t words = bits.size();
+            constexpr auto full = ~std::uint64_t(0);
+            for (std::size_t w = 0; w < words;) {
+                if (bits[w] != full) { ++w; continue; }
+                std::size_t e = w + 1;
+                while (e < words && bits[e] == full) ++e;
+                std::size_t start = w * 64u, stop = std::min(units, e * 64u);
+                if (w != 0) start -= static_cast<std::size_t>(std::countl_one(bits[w - 1]));
+                if (e < words) stop = std::min(units, stop + static_cast<std::size_t>(std::countr_one(bits[e])));
                 if (stop - start >= min_units)
                     gaps.push_back({static_cast<std::uint32_t>(start * 8u),
                                     static_cast<std::uint32_t>((stop - start) * 8u)});
-                pos = stop;
+                w = e;
             }
             return gaps;
         }
