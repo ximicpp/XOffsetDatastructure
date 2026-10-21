@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create, audit, or extract the local 0.1.0-alpha.1 source distribution.
+"""Create, audit, or extract the local 0.2.0-alpha.1 source distribution.
 
 No Git command, network request, compiler, or package installer is executed.
 The source archive includes the exact dependency headers/licenses that CMake
@@ -20,7 +20,7 @@ import stat
 import tarfile
 import zlib
 
-VERSION = "0.1.0-alpha.1"
+VERSION = "0.2.0-alpha.1"
 PACKAGE_NAME = "xoffsetdatastructure-" + VERSION
 MANIFEST_NAME = "SOURCE_MANIFEST.json"
 SCHEMA = "xoffset-alpha-source/v1"
@@ -433,7 +433,7 @@ def validate_install_payload(payload, component):
     config = payload["lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake"].decode("utf-8").replace("\r\n", "\n")
     declarations = {
         "XOffsetDatastructure_VERSION": '"' + VERSION + '"',
-        "XOffsetDatastructure_VERSION_NUMERIC": '"0.1.0"',
+        "XOffsetDatastructure_VERSION_NUMERIC": '"0.2.0"',
         "XOffsetDatastructure_VERSION_PRERELEASE": '"alpha.1"',
         "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
         "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',

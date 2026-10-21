@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, next_cpp26 ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, next_cpp26 ]
   workflow_dispatch:
 
 jobs:
@@ -173,4 +173,69 @@ jobs:
             build/compile-checks/*.log
             build/Testing/Temporary/*.log
           retention-days: 7
+          if-no-files-found: ignore
+
+  sanitizer:
+    name: ASan+UBSan (P2996 Docker, Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull P2996 Docker image
+        run: |
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          echo "XOFFSET_CI_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Prepare pinned CMake for C++26 consumer targets
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      # The image has no sanitizer runtime. Build a self-contained resource
+      # directory: the image compiler's builtin headers plus the pinned
+      # compiler-rt package (sha256 from toolchains/vm-validation.json).
+      - name: Materialize sanitizer resource directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://apt.llvm.org/noble/pool/main/l/llvm-toolchain-21/libclang-rt-21-dev_21.1.8~++20251221032922+2078da43e25a-1~exp1~20251221153059.70_amd64.deb'
+          EXPECTED=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["sanitizer_runtime"]["source_package_sha256"])')
+          mkdir -p build/rt-pkg build/asan-resource
+          curl -fsSL "$URL" -o build/rt-pkg/compiler-rt.deb
+          echo "$EXPECTED  build/rt-pkg/compiler-rt.deb" | sha256sum -c -
+          dpkg-deb -x build/rt-pkg/compiler-rt.deb build/rt-pkg/x
+          RT_LIB=$(find build/rt-pkg/x -type d -path '*/lib/clang/*/lib' | head -n 1)
+          test -n "$RT_LIB"
+          cp -rL "$RT_LIB" build/asan-resource/lib
+          RES=$(docker run --rm --platform linux/amd64 "$XOFFSET_CI_IMAGE" /opt/p2996-toolchain/bin/clang++ -print-resource-dir)
+          CID=$(docker create --platform linux/amd64 "$XOFFSET_CI_IMAGE")
+          docker cp -L "$CID:$RES/include" build/asan-resource/include
+          docker rm "$CID"
+          # pipefail: head closing the pipe would fail find with SIGPIPE.
+          find build/asan-resource -maxdepth 3 > build/asan-resource-listing.txt
+          head -n 40 build/asan-resource-listing.txt
+
+      - name: Run ASan+UBSan suite
+        run: |
+          python3 tools/validate_vm.py linux --suite full --source-dir . \
+            --deps external --image "$XOFFSET_CI_IMAGE" \
+            --compiler /opt/p2996-toolchain/bin/clang++ --platform linux/amd64 \
+            --cmake-root build/cmake-tool/root \
+            --sanitizer address-undefined --runtime-dir build/asan-resource \
+            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,test_free_table_policy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
+            --jobs 2 --out build/sanitizer-result
+
+      - name: Upload sanitizer results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-result
+          path: |
+            build/sanitizer-result/*.json
+            build/sanitizer-result/*.log
+            build/sanitizer-result/*.xml
           if-no-files-found: ignore
