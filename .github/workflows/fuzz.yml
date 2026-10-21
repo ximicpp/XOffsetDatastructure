@@ -1,0 +1,134 @@
+name: Fuzz
+
+# G5: coverage-guided libFuzzer runs of the V2 validators (fuzz_v2_wire, and
+# fuzz_wire_schemas over three more schemas) under
+# ASan+UBSan. Pull requests and pushes run 5 minutes; the nightly run and
+# manual dispatch run longer. The corpus is carried between runs in the
+# Actions cache. GitHub reads `schedule` only from the default branch, so the
+# nightly run starts once this file is on the default branch.
+
+on:
+  push:
+    branches: [ next_cpp26 ]
+  pull_request:
+    branches: [ next_cpp26 ]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: 'Fuzzing time in seconds'
+        default: '3600'
+
+jobs:
+  fuzz-v2-wire:
+    name: libFuzzer V2 validators (P2996 Docker, ASan+UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'next_cpp26' || '' }}
+          submodules: recursive
+
+      - name: Fuzzing time
+        run: |
+          case "${{ github.event_name }}" in
+            schedule) echo "XOFFSET_FUZZ_SECONDS=3600" >> "$GITHUB_ENV" ;;
+            workflow_dispatch) echo "XOFFSET_FUZZ_SECONDS=${{ github.event.inputs.seconds }}" >> "$GITHUB_ENV" ;;
+            *) echo "XOFFSET_FUZZ_SECONDS=300" >> "$GITHUB_ENV" ;;
+          esac
+
+      - name: Pull P2996 Docker image
+        run: |
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          echo "XOFFSET_CI_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      # Same resource directory as the ci.yml sanitizer job: the image's
+      # builtin headers plus the pinned compiler-rt package, which also
+      # carries the libFuzzer runtime.
+      - name: Materialize sanitizer and fuzzer resource directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://apt.llvm.org/noble/pool/main/l/llvm-toolchain-21/libclang-rt-21-dev_21.1.8~++20251221032922+2078da43e25a-1~exp1~20251221153059.70_amd64.deb'
+          EXPECTED=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["sanitizer_runtime"]["source_package_sha256"])')
+          mkdir -p build/rt-pkg build/fuzz-resource
+          curl -fsSL "$URL" -o build/rt-pkg/compiler-rt.deb
+          echo "$EXPECTED  build/rt-pkg/compiler-rt.deb" | sha256sum -c -
+          dpkg-deb -x build/rt-pkg/compiler-rt.deb build/rt-pkg/x
+          RT_LIB=$(find build/rt-pkg/x -type d -path '*/lib/clang/*/lib' | head -n 1)
+          test -n "$RT_LIB"
+          cp -rL "$RT_LIB" build/fuzz-resource/lib
+          RES=$(docker run --rm --platform linux/amd64 "$XOFFSET_CI_IMAGE" /opt/p2996-toolchain/bin/clang++ -print-resource-dir)
+          CID=$(docker create --platform linux/amd64 "$XOFFSET_CI_IMAGE")
+          docker cp -L "$CID:$RES/include" build/fuzz-resource/include
+          docker rm "$CID"
+          find build/fuzz-resource -name '*fuzzer*' | tee build/fuzz-runtime-listing.txt
+          test -s build/fuzz-runtime-listing.txt
+
+      - name: Restore corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: build/fuzz-corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+
+      - name: Build, smoke, fuzz
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/fuzz-corpus build/fuzz-artifacts
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -v "${{ github.workspace }}/build/fuzz-resource:/runtime:ro" \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            -e UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+            -e XOFFSET_FUZZ_SECONDS \
+            "$XOFFSET_CI_IMAGE" bash -c '
+              set -e
+              cmake -S . -B build/fuzz -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ \
+                "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime" \
+                -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
+                -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
+                -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6
+              cmake --build build/fuzz --parallel 4 --target \
+                test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds
+              ctest --test-dir build/fuzz -L fuzz --output-on-failure
+              BIN=build/fuzz/bin/Debug
+              mkdir -p build/fuzz-corpus/v2_wire build/fuzz-corpus/wire_schemas
+              $BIN/test_v2_fuzz --write-corpus build/fuzz-corpus/v2_wire
+              $BIN/fuzz_wire_schemas_seeds build/fuzz-corpus/wire_schemas
+              # Split the time: 60% for the oracle-checked target, 40% for the
+              # three extra schemas.
+              T1=$(( XOFFSET_FUZZ_SECONDS * 3 / 5 )); T2=$(( XOFFSET_FUZZ_SECONDS - T1 ))
+              FLAGS="-max_len=262144 -rss_limit_mb=2048 -timeout=30 -print_final_stats=1"
+              $BIN/fuzz_v2_wire -max_total_time=$T1 $FLAGS \
+                -artifact_prefix=build/fuzz-artifacts/v2_wire- build/fuzz-corpus/v2_wire
+              $BIN/fuzz_wire_schemas -max_total_time=$T2 $FLAGS \
+                -artifact_prefix=build/fuzz-artifacts/wire_schemas- build/fuzz-corpus/wire_schemas' \
+            2>&1 | tee build/fuzz.log
+
+      - name: Save corpus
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: build/fuzz-corpus
+          key: fuzz-corpus-${{ github.run_id }}
+
+      - name: Upload log and crashing inputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-v2-wire
+          path: |
+            build/fuzz.log
+            build/fuzz-artifacts/

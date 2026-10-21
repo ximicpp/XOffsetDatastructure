@@ -142,6 +142,11 @@ set_tests_properties(schema_pin_mismatch PROPERTIES
     LABELS "reflection"
     PASS_REGULAR_EXPRESSION "XOffset schema pin mismatch \\(K7\\)")
 
+# G5: coverage-guided fuzzers, in their own directory (not test programs).
+if(XOFFSET_BUILD_FUZZERS)
+    add_subdirectory(fuzz)
+endif()
+
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
 # These are mandatory configure-time checks, not runtime test programs.
