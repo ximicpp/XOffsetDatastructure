@@ -4082,6 +4082,22 @@ namespace XOffsetDatastructure {
                 std::size_t{4096}, std::pmr::new_delete_resource()};
             WireValidationByteIndex owned_ranges{&range_resource};
             WireValidationByteIndex free_ranges{&free_range_resource};
+            // Ascending live run (verify_structural_wire_graph only). While
+            // every live range starts at or after the end of all earlier live
+            // ranges, it cannot overlap any of them, so it is only recorded
+            // here; it is checked against the free set as usual. The first
+            // live range that starts lower, or a full run, writes the recorded
+            // ranges into owned_ranges (flush_deferred_owned) and the general
+            // path continues, exactly as if they had been inserted one by one.
+            struct DeferredOwned {
+                static constexpr std::size_t capacity = 128;
+                bool enabled = false;
+                std::uint32_t count = 0;
+                std::size_t run_end = 0; // every live range so far ends at or below this
+                std::uint32_t begin[capacity];
+                std::uint32_t end[capacity];
+                DeferredOwned() noexcept {} // ranges stay uninitialized until written
+            } deferred_owned;
         };
 
 #if defined(_MSC_VER)
@@ -4110,6 +4126,35 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // Differential-test switch: false makes verify_structural_wire_graph
+        // insert every live range directly, as before the ascending run
+        // existed (test_v2_fuzz compares both). Not for production use.
+        inline constinit bool wire_validation_defer_ascending_owned = true;
+
+        // Writes the deferred ascending live ranges into owned_ranges. They
+        // are pairwise disjoint and were each checked against the free set
+        // when recorded, so every insert takes the disjoint path.
+        inline void flush_deferred_owned(WireValidationContext& ctx) {
+            auto& d = ctx.deferred_owned;
+            const auto extent = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ctx.end) -
+                reinterpret_cast<std::uintptr_t>(ctx.base));
+            for (std::uint32_t i = 0; i < d.count; ++i) {
+                unsigned overlap = 0;
+                if (!WireValidationByteIndex::try_insert_dense_single_page(
+                        ctx.owned_ranges, ctx.free_ranges, false, d.begin[i], d.end[i], extent, overlap))
+                    ctx.owned_ranges.insert_disjoint(d.begin[i], d.end[i], extent);
+                else if (overlap != 0)
+                    throw XException("wire validation: deferred live range overlap");
+            }
+            d.count = 0;
+        }
+
+        inline void stop_deferring_owned(WireValidationContext& ctx) {
+            flush_deferred_owned(ctx);
+            ctx.deferred_owned.enabled = false;
+        }
+
         inline void register_owned_range(const void* ptr, std::size_t bytes,
                                          WireValidationContext& ctx,
                                          const char* what) {
@@ -4123,6 +4168,25 @@ namespace XOffsetDatastructure {
             const auto extent = static_cast<std::size_t>(
                 reinterpret_cast<std::uintptr_t>(ctx.end) -
                 reinterpret_cast<std::uintptr_t>(ctx.base));
+            if (auto& d = ctx.deferred_owned; d.enabled) {
+                if (begin_offset >= d.run_end) {
+                    // Disjoint from every live range; the free set decides.
+                    const auto [free_begin, free_end] = ctx.free_ranges.coverage_bounds();
+                    if (!ctx.free_ranges.empty() && end_offset > free_begin && begin_offset < free_end &&
+                        ctx.free_ranges.overlaps(begin_offset, end_offset)) {
+                        throw XException("wire validation detected live/free overlap");
+                    }
+                    if (d.count == WireValidationContext::DeferredOwned::capacity) flush_deferred_owned(ctx);
+                    d.begin[d.count] = static_cast<std::uint32_t>(begin_offset);
+                    d.end[d.count] = static_cast<std::uint32_t>(end_offset);
+                    ++d.count;
+                    d.run_end = end_offset;
+                    ctx.owned_bytes += bytes;
+                    /* XBV3: owned-registered */
+                    return;
+                }
+                stop_deferring_owned(ctx);
+            }
             unsigned overlap = 0;
             const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
                 ctx.owned_ranges, ctx.free_ranges, false,
@@ -4145,6 +4209,8 @@ namespace XOffsetDatastructure {
                                         WireValidationContext& ctx,
                                         const char* what) {
             if (bytes == 0 || !ptr) return;
+            // A free range must see every live range in owned_ranges.
+            if (ctx.deferred_owned.enabled) stop_deferring_owned(ctx);
             validate_storage_range(ptr, bytes, 1, ctx, what);
             const auto begin_offset = static_cast<std::size_t>(
                 reinterpret_cast<std::uintptr_t>(ptr) -
@@ -4449,11 +4515,16 @@ namespace XOffsetDatastructure {
             }
             register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header");
             if (holes) register_wire_holes(holes, hole_count, ctx);
+            // Every free range is registered; live ranges from here on may be
+            // deferred while they ascend (see WireValidationContext).
+            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned;
+            ctx.deferred_owned.run_end = ctx.owned_ranges.coverage_bounds().second;
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
             if (check_coverage) require_exact_coverage(ctx);
             if (gaps) require_gaps_free(gaps->data(), gaps->size(), ctx);
             if (recomputed) {
+                stop_deferring_owned(ctx);
                 // Every byte not covered by a live block is free.
                 recomputed->clear();
                 ctx.owned_ranges.for_each_gap(0, static_cast<std::size_t>(used),
