@@ -127,50 +127,83 @@ void prepare_failure_does_not_publish_bbox() {
     }
 }
 
-void header_metadata_error_order() {
-    using Header=xo::XBufferCore::AllocationHeader;
+// V2: blocks carry no header. register_allocation derives the extent from the
+// owner's request (round8(request)), enforces max(alignment, 8) and registers
+// exactly that extent. This replaces the V1 header metadata checks.
+void derived_extent_error_order() {
     alignas(64) std::array<char,4096> arena{};
-    auto one=[&](std::size_t offset,Header header,std::size_t request,std::size_t alignment,
-                 bool incoming_free,const char* expected,bool collide=false) {
+    constexpr const char* bounds="wire validation: allocation out of bounds";
+    auto one=[&](const char* ptr,std::size_t request,std::size_t alignment,bool incoming_free,
+                 const char* expected,std::size_t fixture_offset=0,std::size_t fixture_bytes=0,
+                 bool fixture_free=false) {
         wd::WireValidationContext ctx{.base=arena.data(),.end=arena.data()+arena.size()};
-        if (collide) wd::register_owned_range(arena.data()+offset-sizeof(Header),64,ctx,"fixture");
-        if (offset>=sizeof(Header)) std::memcpy(arena.data()+offset-sizeof(Header),&header,sizeof(header));
+        if (fixture_bytes) {
+            if (fixture_free) wd::register_free_range(arena.data()+fixture_offset,fixture_bytes,ctx,"fixture");
+            else wd::register_owned_range(arena.data()+fixture_offset,fixture_bytes,ctx,"fixture");
+        }
         const auto owned=snapshot(ctx.owned_ranges),free=snapshot(ctx.free_ranges);
+        const auto owned_bytes=ctx.owned_bytes,free_bytes=ctx.free_bytes;
         bool caught=false;
-        try {wd::register_allocation(arena.data()+offset,request,alignment,ctx,incoming_free);}
-        catch (const xo::XException& e) {caught=true;need(std::string(e.what())==expected,"metadata first-error category differs");}
-        need(caught==(expected[0]!='\0'),"metadata accept/reject differs");
-        if (caught) need(snapshot(ctx.owned_ranges)==owned && snapshot(ctx.free_ranges)==free,
-                         "metadata rejection changed index envelope/state");
+        try {wd::register_allocation(ptr,request,alignment,ctx,incoming_free);}
+        catch (const xo::XException& e) {caught=true;need(std::string(e.what())==expected,"derived-extent first-error category differs");}
+        need(caught==(expected[0]!='\0'),"derived-extent accept/reject differs");
+        if (caught) {
+            need(snapshot(ctx.owned_ranges)==owned && snapshot(ctx.free_ranges)==free &&
+                 ctx.owned_bytes==owned_bytes && ctx.free_bytes==free_bytes,
+                 "derived-extent rejection changed index envelope/state");
+        } else {
+            // The registered extent is exactly round8(request) at ptr.
+            const auto begin=static_cast<std::size_t>(ptr-arena.data());
+            const auto block=(request+7u)&~std::size_t(7u);
+            const auto& target=incoming_free?ctx.free_ranges:ctx.owned_ranges;
+            const auto& before=incoming_free?free:owned;
+            auto was_covered=[&](std::size_t x){
+                return x/64<before.words.size()&&((before.words[x/64]>>(x%64))&1u)!=0;
+            };
+            const auto lo=begin>=64?begin-64:0,hi=std::min(arena.size(),begin+block+64);
+            for (auto x=lo;x<hi;++x)
+                need(target.overlaps(x,x+1)==(was_covered(x)||(x>=begin&&x<begin+block)),
+                     "derived extent is not round8(request)");
+            need((incoming_free?ctx.free_bytes-free_bytes:ctx.owned_bytes-owned_bytes)==block,
+                 "coverage byte count is not the derived extent");
+        }
         ++metadata_cases;
     };
-    const Header valid{48,32,128,8};
-    one(128,valid,16,8,false,"");one(128,valid,16,8,true,"");
     for (bool incoming_free:{false,true}) {
-        for (std::uint32_t alignment:{0u,1u,4u,7u,24u,0x7ffffff9u,0x80000000u}) {
-            auto header=valid;header.alignment=alignment;
-            one(128,header,16,8,incoming_free,"wire validation: invalid allocation metadata",true);
-        }
-        auto header=valid;header.user_offset=127;
-        one(128,header,16,8,incoming_free,"wire validation: invalid allocation metadata",true);
-        header=valid;header.user_bytes=8;
-        one(128,header,16,8,incoming_free,"wire validation: invalid allocation metadata",true);
-        header=valid;header.total_bytes=49;
-        one(128,header,16,8,incoming_free,"wire validation: invalid allocation metadata",true);
-        header={48,32,144,64}; // requested8 alignment passes, header64 does not
-        one(144,header,16,8,incoming_free,"wire validation: invalid allocation metadata",true);
-        header={3016,3000,2048,8};
-        one(2048,header,8,8,incoming_free,incoming_free?"wire validation: invalid free allocation":
-            "wire validation: invalid live allocation");
-        one(8,{},8,8,incoming_free,"wire validation: missing allocation header");
-        one(17,{},1,1,incoming_free,"wire validation: invalid allocation header address");
-        one(arena.size(),{},1,1,incoming_free,"wire validation: allocation out of bounds");
+        const char* live_overlap=incoming_free?"wire validation detected free-list overlap with live ranges":
+            "wire validation detected overlapping dynamic ranges";
+        const char* free_overlap=incoming_free?"wire validation detected overlapping free-list ranges":
+            "wire validation detected live/free overlap";
+        // Accepted: exact multiples of 8 and requests rounded up to 8.
+        for (std::size_t request:{std::size_t{1},std::size_t{7},std::size_t{8},std::size_t{13},std::size_t{16},std::size_t{4095-127}})
+            one(arena.data()+128,request,8,incoming_free,"");
+        one(arena.data()+128,16,1,incoming_free,""); // alignment below 8 is raised to 8
+        one(arena.data()+128,16,64,incoming_free,"");
+        one(arena.data()+4088,8,8,incoming_free,""); // last block ends exactly at the extent
+        // Every block is 8-byte aligned regardless of the element alignment.
+        for (std::size_t offset:{std::size_t{1},std::size_t{4},std::size_t{17},std::size_t{124},std::size_t{132}})
+            for (std::size_t alignment:{std::size_t{1},std::size_t{4},std::size_t{8}})
+                one(arena.data()+offset,8,alignment,incoming_free,bounds);
+        one(arena.data()+136,16,64,incoming_free,bounds); // 8-aligned, not 64-aligned
+        one(arena.data()+136,16,16,incoming_free,bounds);
+        // The derived (rounded) extent is bounds-checked, not the raw request.
+        one(arena.data()+4088,9,8,incoming_free,bounds);
+        one(arena.data()+4080,17,8,incoming_free,bounds);
+        one(arena.data()+arena.size(),1,1,incoming_free,bounds);
+        one(nullptr,8,8,incoming_free,bounds);
+        // Rounding reaches a neighbouring block: [128,152) vs a block at 144.
+        one(arena.data()+128,17,8,incoming_free,live_overlap,144,8,false);
+        one(arena.data()+128,17,8,incoming_free,free_overlap,144,8,true);
+        one(arena.data()+128,16,8,incoming_free,"",144,8,false); // same request without rounding: disjoint
+        one(arena.data()+128,16,8,incoming_free,"",144,8,true);
+        // Bounds remain the first error even when the block would also overlap.
+        one(arena.data()+132,8,8,incoming_free,bounds,128,16,false);
     }
 }
 }
 int main(){try{
-    compare_to_independent_intervals();prepare_failure_does_not_publish_bbox();header_metadata_error_order();
+    compare_to_independent_intervals();prepare_failure_does_not_publish_bbox();derived_extent_error_order();
     std::cout<<"{\"groups\":3,\"independent_interval_operations\":"<<oracle_operations
-             <<",\"actual_resource_failure_points\":"<<resource_failures<<",\"metadata_cases\":"<<metadata_cases
+             <<",\"actual_resource_failure_points\":"<<resource_failures<<",\"derived_extent_cases\":"<<metadata_cases
              <<",\"timing_sample\":false}\n";return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -125,16 +125,17 @@ void failures_and_ownership() {
 void automatic_reuses_before_growing() {
     auto buffer = TypedXBuffer<PolicyRoot>::create(4096,
         XBuffer::maximum_capacity(limit).with_growth(XGrowPolicy::Automatic));
-    const auto alloc = fixed_detail::allocator_ref_of(buffer.allocator_state());
+    const auto alloc = fixed_detail::allocator_ref_of(buffer.arena());
     auto* left = fixed_detail::allocate_dynamic_bytes(alloc, 2048, 8);
-    // Whole-block reuse can leave physical storage larger than a container's
-    // capacity. Retiring that smaller capacity is legitimate historical state;
-    // flushing transfers the complete physical block back to Core.
-    fixed_detail::retire_dynamic_bytes(alloc, left, 1024);
+    // V2 retires the exact block (its size is derived by the owner) into the
+    // host free table. A smaller request is served by splitting that block
+    // before the tail grows; the residual stays an exact free block.
+    fixed_detail::retire_dynamic_bytes(alloc, left, 2048);
     buffer.shrink_to_fit();
     const auto logical = buffer.get_size();
     auto* reused = fixed_detail::allocate_dynamic_bytes(alloc, 1800, 8);
     assert(reused == left && buffer.get_size() == logical);
+    assert(buffer.free_block_count() == 1 && buffer.free_block_bytes() == 2048 - 1800);
     fixed_detail::retire_dynamic_bytes(alloc, reused, 1800);
     auto* aligned = buffer.arena()->allocate_aligned(32'768, 32'768);
     assert(reinterpret_cast<std::uintptr_t>(aligned) % 32'768 == 0);
@@ -157,8 +158,10 @@ void nested_mutation_failure_after_successful_growth() {
     const auto before_used = buffer.arena()->used_end;
     const auto base = buffer.get_address();
     const auto epoch = buffer.epoch();
-    const auto first_copy_bytes = root.source.first.size() + 1 + sizeof(XBufferCore::AllocationHeader);
-    const auto second_copy_bytes = root.source.second.size() + 1 + sizeof(XBufferCore::AllocationHeader);
+    // V2 blocks have no header: a string block is round8(size + 1).
+    const auto block = [](std::size_t bytes) { return (bytes + 7u) & ~std::size_t(7); };
+    const auto first_copy_bytes = block(root.source.first.size() + 1);
+    const auto second_copy_bytes = block(root.source.second.size() + 1);
     assert(before_used + first_copy_bytes + 16 < hard_limit);
     assert(before_used + first_copy_bytes + second_copy_bytes > hard_limit);
 
@@ -252,8 +255,9 @@ void pooled_verified_lifecycle() {
     assert(pool.stats().cached_blocks == 1);
     detail::clear_registry_failures();
     auto malformed = wire;
-    XWireHeaderV1 header;
+    XWireHeaderV2 header;
     std::memcpy(&header, malformed.data(), sizeof(header));
+    assert(header.extent_count == 0); // dense wire: payload = bytes [96, 96 + used)
     auto* vector_bytes = malformed.data() + sizeof(header) + header.root_offset
         + offsetof(PolicyRoot, values);
     using Values = XVector<std::uint32_t>;
@@ -276,9 +280,11 @@ void pooled_verified_lifecycle() {
 int main() {
     automatic_growth_and_limits();
     failures_and_ownership();
-    automatic_reuses_before_growing();
     nested_mutation_failure_after_successful_growth();
     reclaim_integration();
     pooled_verified_lifecycle();
+    // Last: its 32 KiB-aligned allocation currently trips a V2 library defect
+    // (alignment is applied to the payload offset, not the address).
+    automatic_reuses_before_growing();
     std::cout << "Storage policies passed\n";
 }

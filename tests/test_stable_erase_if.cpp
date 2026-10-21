@@ -192,7 +192,8 @@ auto make(unsigned count=17) {
     }
     return buffer;
 }
-bool same_binding(fd::allocator_ref a,fd::allocator_ref b) { return a.state==b.state && a.segment==b.segment; }
+// V2: a binding is exactly the payload base (no separate allocator state).
+bool same_binding(fd::allocator_ref a,fd::allocator_ref b) { return a.segment && a.segment==b.segment; }
 void verify(const EraseRecord& r,unsigned id) {
     need(r.id==id && r.name=="surviving-payload" && r.values.size()==2 &&
          r.values[0]==id && r.values[1]==id+100,"survivor contents differ");

@@ -88,6 +88,42 @@ void require_rejection(Operation&& operation) {
     assert(rejected);
 }
 
+// V2 keeps allocator state on the host: the arena header plus the host-side
+// free table replace the V1 in-arena XAllocatorStateV1 snapshot.
+struct AllocatorSnapshot {
+    XArena arena;
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> holes;
+};
+AllocatorSnapshot allocator_snapshot(const XBufferCore& buffer) {
+    AllocatorSnapshot snapshot{*buffer.arena(), {}};
+    buffer.for_each_free_block([&](XBufferCore::WireHole hole) {
+        snapshot.holes.emplace_back(hole.offset, hole.bytes);
+    });
+    return snapshot;
+}
+bool same_allocator_state(const XBufferCore& buffer, const AllocatorSnapshot& before) {
+    const auto now = allocator_snapshot(buffer);
+    return std::memcmp(&now.arena, &before.arena, sizeof(XArena)) == 0 && now.holes == before.holes &&
+        &XBufferCore::owner_from_arena(buffer.arena()) == &buffer;
+}
+bool has_hole(const XBufferCore& buffer, const void* ptr, std::uint32_t bytes) {
+    const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(ptr) - buffer.data());
+    bool found = false;
+    buffer.for_each_free_block([&](XBufferCore::WireHole hole) { found |= hole.offset == offset && hole.bytes == bytes; });
+    return found;
+}
+// V2 verified frame: header + payload + hole table (dense unless a free run of
+// at least 4 KiB makes it sparse; these fixtures never have one).
+XWireHeaderV2 check_verified_frame(const std::string& frame, const XBufferCore& buffer) {
+    XWireHeaderV2 header{};
+    std::memcpy(&header, frame.data(), sizeof(header));
+    assert(header.extent_count == 0);
+    assert(header.used_bytes == buffer.segment_size());
+    assert(header.hole_count == buffer.free_block_count() && header.hole_bytes == buffer.free_block_bytes());
+    assert(frame.size() == sizeof(header) + header.used_bytes + header.hole_count * sizeof(XBufferCore::WireHole));
+    return header;
+}
+
 void check_extents(const XBuffer& buffer) {
     assert(buffer.get_size() == buffer.segment_size());
     assert(buffer.maximum_capacity() == buffer.reserved_capacity());
@@ -262,16 +298,29 @@ void actual_addresses_honor_large_alignment() {
             const auto byte = static_cast<char>(instance + i + 1);
             assert(std::all_of(allocations[i], allocations[i] + 32,
                                [byte](char found) { return found == byte; }));
-            buffer.arena()->deallocate(allocations[i]);
+            // V2: a retired block is an exact 32-byte hole in the host free
+            // table; free blocks serve only 8-aligned requests, so stricter
+            // requests are placed at the tail and must still be aligned.
+            buffer.arena()->deallocate(allocations[i], 32);
+            assert(has_hole(buffer, allocations[i], 32));
             auto* same = buffer.arena()->allocate_aligned(32, alignments[i]);
-            assert(same == allocations[i]);
             assert(reinterpret_cast<std::uintptr_t>(same) % alignments[i] == 0);
-            buffer.arena()->deallocate(same);
+            buffer.arena()->deallocate(same, 32);
             auto* smaller = buffer.arena()->allocate_aligned(32, alignments[i] / 2);
-            assert(smaller == allocations[i]);
             assert(reinterpret_cast<std::uintptr_t>(smaller) % (alignments[i] / 2) == 0);
+            buffer.arena()->deallocate(smaller, 32);
         }
-        for (auto* allocation : allocations) buffer.arena()->deallocate(allocation);
+        // The retired over-aligned blocks are reused for an 8-aligned request.
+        {
+            const auto used_before = buffer.arena()->used_end;
+            const auto holes_before = allocator_snapshot(buffer).holes;
+            auto* reused = static_cast<char*>(buffer.arena()->allocate_aligned(32, 8));
+            const auto offset = static_cast<std::uint32_t>(reused - buffer.data());
+            assert(std::find(holes_before.begin(), holes_before.end(),
+                             std::pair<std::uint32_t, std::uint32_t>(offset, 32)) != holes_before.end());
+            assert(buffer.arena()->used_end == used_before && !has_hole(buffer, reused, 32));
+            buffer.arena()->deallocate(reused, 32);
+        }
         if (instance % 2 == 0) check_overaligned_root<65536>(buffer, 1234 + instance);
         else check_overaligned_root<131072>(buffer, 1234 + instance);
     }
@@ -281,7 +330,7 @@ void actual_addresses_honor_large_alignment() {
 
     XBufferCore exact(512, XBufferCore::maximum_capacity(alignments.back() * 2));
     const auto base = reinterpret_cast<std::uintptr_t>(exact.get_address());
-    const auto first = base + exact.arena()->used_end + sizeof(XBufferCore::AllocationHeader);
+    const auto first = base + exact.arena()->used_end; // V2: blocks have no header
     const auto address = (first + alignments.back() - 1) & ~(alignments.back() - 1);
     const auto required = address - base + 32;
     assert(required > exact.get_size());
@@ -324,8 +373,7 @@ void objects_and_relative_references_survive_growth() {
     const auto* name = root->name.data();
     const auto* numbers = root->numbers.data();
     const auto* items = root->items.data();
-    auto* state = buffer.allocator_state();
-    const auto state_before = *state;
+    const auto state_before = allocator_snapshot(buffer);
     const auto epoch = buffer.epoch();
 
     for (std::size_t extra : {std::size_t(1), page - 1, page + 3, page * 7}) {
@@ -336,8 +384,7 @@ void objects_and_relative_references_survive_growth() {
         assert(root->name.data() == name);
         assert(root->numbers.data() == numbers);
         assert(root->items.data() == items);
-        assert(buffer.allocator_state() == state);
-        assert(std::memcmp(state, &state_before, sizeof(state_before)) == 0);
+        assert(same_allocator_state(buffer, state_before));
         assert(buffer.epoch() == epoch);
         check_root(*root, 73);
         for (std::size_t i = 0; i < 8; ++i) assert(independent[i] == 9000 + i);
@@ -398,15 +445,13 @@ void shrink_regrow_and_transport() {
     const auto grow_preserving_storage = [](XBuffer& storage, std::size_t extra) {
         const auto* prior_base = storage.get_address();
         auto* prior_root = &storage.unsafe_root<StableRoot>();
-        auto* prior_allocator = storage.allocator_state();
-        const auto allocator_before = *prior_allocator;
+        const auto allocator_before = allocator_snapshot(storage);
         const auto payload_before = storage.copy_bytes();
         const auto prior_epoch = storage.epoch();
         assert(storage.grow(extra));
         assert(storage.get_address() == prior_base);
         assert(&storage.unsafe_root<StableRoot>() == prior_root);
-        assert(storage.allocator_state() == prior_allocator);
-        assert(std::memcmp(prior_allocator, &allocator_before, sizeof(allocator_before)) == 0);
+        assert(same_allocator_state(storage, allocator_before));
         assert(std::memcmp(storage.data(), payload_before.data(), payload_before.size()) == 0);
         assert(storage.epoch() == prior_epoch);
         check_extents(storage);
@@ -417,8 +462,8 @@ void shrink_regrow_and_transport() {
     for (int round = 0; round < 3; ++round) {
         for (const bool verified_path : {false, true}) {
             const auto frame = verified_path ? buffer.save_verified<StableRoot>() : buffer.save();
-            assert(frame.size() == buffer.segment_size() +
-                (verified_path ? sizeof(XWireHeaderV1) : 0));
+            if (verified_path) (void)check_verified_frame(frame, buffer);
+            else assert(frame.size() == buffer.segment_size());
             assert(buffer.get_address() == base && &buffer.root<StableRoot>() == root);
             assert(buffer.epoch() == epoch && handle.get() == root);
             grow_preserving_storage(buffer, page * 2 + round + 1);
@@ -443,8 +488,8 @@ void shrink_regrow_and_transport() {
             assert(loaded.get_address() == round_base);
             assert(&loaded.unsafe_root<StableRoot>() == round_root);
             assert(round_handle.get() == round_root);
-            assert(repeated_frame.size() == loaded.segment_size() +
-                (verified_path ? sizeof(XWireHeaderV1) : 0));
+            if (verified_path) (void)check_verified_frame(repeated_frame, loaded);
+            else assert(repeated_frame.size() == loaded.segment_size());
 
             auto reloaded = verified_path ? XBuffer::load_verified<StableRoot>(repeated_frame, limit)
                 : XBuffer::load_unverified(repeated_frame, limit);
@@ -492,11 +537,7 @@ void shrink_regrow_and_transport() {
     });
 
     auto verified = buffer.save_verified<StableRoot>();
-    XWireHeaderV1 header{};
-    std::memcpy(&header, verified.data(), sizeof(header));
-    assert(header.used_bytes == buffer.segment_size());
-    assert(header.reserved_bytes == header.used_bytes);
-    assert(verified.size() == sizeof(header) + header.used_bytes);
+    const auto header = check_verified_frame(verified, buffer);
     assert(buffer.get_address() == base && buffer.epoch() == epoch);
     assert(handle.get() == root);
     auto verified_loaded = XBuffer::load_verified<StableRoot>(verified);
@@ -522,13 +563,25 @@ void shrink_regrow_and_transport() {
             XBuffer::maximum_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
     });
 
-    // Existing frames may contain a larger historic reservation hint in this field.
-    header.reserved_bytes = page * 32;
-    std::memcpy(verified.data(), &header, sizeof(header));
-    auto legacy_frame = XBuffer::load_verified<StableRoot>(verified);
-    check_root(legacy_frame.root<StableRoot>(), 91);
-    assert(legacy_frame.grow(page));
-    check_extents(legacy_frame);
+    // V1 frames carried a historic reservation hint (reserved_bytes). V2 has no
+    // such field: V1 input is rejected outright and reserved fields must be 0.
+    auto v1_frame = verified;
+    std::memcpy(v1_frame.data(), XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
+    bool v1_rejected = false;
+    try { (void)XBuffer::load_verified<StableRoot>(v1_frame); }
+    catch (const XException& error) {
+        v1_rejected = std::string(error.what()).find("unsupported wire format version 1") != std::string::npos;
+    }
+    assert(v1_rejected);
+    auto reserved_frame = verified;
+    auto reserved_header = header;
+    reserved_header.reserved0 = static_cast<std::uint32_t>(page * 32);
+    std::memcpy(reserved_frame.data(), &reserved_header, sizeof(reserved_header));
+    require_rejection([&] { (void)XBuffer::load_verified<StableRoot>(reserved_frame); });
+    auto plain_frame = XBuffer::load_verified<StableRoot>(verified);
+    check_root(plain_frame.root<StableRoot>(), 91);
+    assert(plain_frame.grow(page));
+    check_extents(plain_frame);
 
     auto compacted = XCompactor::compact<StableRoot>(buffer);
     assert(compacted.get_address() != base);
@@ -561,7 +614,7 @@ void deterministic_growth_failures() {
     for (const auto failure : {detail::VmOperation::Enable, detail::VmOperation::Prepare}) {
         const auto logical = buffer.get_size();
         const auto accessible = buffer.accessible_bytes();
-        const auto allocator_before = *buffer.allocator_state();
+        const auto allocator_before = allocator_snapshot(buffer);
         const auto payload_before = std::string(buffer.get_buffer().begin(), buffer.get_buffer().end());
         const auto target = accessible + page + 1;
         detail::fail_next_vm_operation(failure);
@@ -576,7 +629,7 @@ void deterministic_growth_failures() {
         else
             assert(buffer.accessible_bytes() >= target);
         assert(std::memcmp(buffer.get_buffer().data(), payload_before.data(), logical) == 0);
-        assert(std::memcmp(buffer.allocator_state(), &allocator_before, sizeof(allocator_before)) == 0);
+        assert(same_allocator_state(buffer, allocator_before));
         assert(handle.get() == root);
         check_root(*root, 87);
         check_extents(buffer);
@@ -777,12 +830,14 @@ void independent_buffer_threads() {
 
 int main() {
     page_boundaries_and_capacity();
-    actual_addresses_honor_large_alignment();
     objects_and_relative_references_survive_growth();
     shrink_regrow_and_transport();
     deterministic_growth_failures();
     handle_storage_identity();
     handles_reject_different_root_types();
     independent_buffer_threads();
+    // Last: V2 currently aligns over-aligned blocks relative to the payload
+    // offset rather than the address (library defect, see report).
+    actual_addresses_honor_large_alignment();
     std::cout << "Stable storage integration tests passed\n";
 }

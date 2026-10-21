@@ -27,15 +27,22 @@ void ancestor_change_without_local_witness_change(){
     auto* b=&immediate_parent[0].children;
     const auto ad=descriptor(a),pd=descriptor(immediate_parent),bd=descriptor(*b);
     const auto right_before=descriptor(r.right);
-    const auto core_epoch=buffer.epoch();const auto state_epoch=a.allocator_state()->epoch;
+    // V2 has no in-arena allocator state (and no state epoch). Its allocator
+    // generation is the arena tail plus the host free table: a steal must
+    // neither allocate (used_end) nor retire (free blocks).
+    const auto core_epoch=buffer.epoch();const auto used_end=buffer.arena()->used_end;
+    const auto free_blocks=buffer.free_block_count();const auto free_bytes=buffer.free_block_bytes();
+    need(a.arena()==buffer.arena(),"fixture head is not bound to the payload base");
     need(!fd::move_assignment_owns_address(a,b),"initial source predicate should be negative");
-    // Public move to an empty same-arena destination steals without allocating,
-    // retiring or changing the allocator state epoch. B's complete immediate
-    // parent allocation stays at the same address and retains its descriptor.
+    // Public move to an empty same-arena destination steals without allocating
+    // or retiring. B's complete immediate parent allocation stays at the same
+    // address and retains its descriptor.
     r.left[0].children=std::move(r.right);
     need(descriptor(a)==ad && descriptor(immediate_parent)==pd && descriptor(*b)==bd,
          "local witness fixture changed");
-    need(buffer.epoch()==core_epoch && a.allocator_state()->epoch==state_epoch,"unexpected generation change");
+    need(buffer.epoch()==core_epoch && buffer.arena()->used_end==used_end &&
+         buffer.free_block_count()==free_blocks && buffer.free_block_bytes()==free_bytes,
+         "unexpected generation change (allocation or retirement)");
     need(descriptor(r.right)!=right_before,"full ancestor witness must detect moved root.right");
     need(fd::move_assignment_owns_address(a,b),"ordinary API changed negative to positive ownership");
     // This is a local finite tree test, not a recursive verified-wire schema.

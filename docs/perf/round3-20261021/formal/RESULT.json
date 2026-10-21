@@ -1,0 +1,182 @@
+{
+ "name": "R3-formal-mac-v1",
+ "df": 63,
+ "primary": {
+  "cista:read_sum": {
+   "geo": 0.8700643201259913,
+   "upper": 0.8840591168113142,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "cista:mutate": {
+   "geo": 0.7186677733931491,
+   "upper": 0.72623080490323,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "cista:emit_after": {
+   "geo": 0.14256245995990854,
+   "upper": 0.14518730302854357,
+   "threshold": 0.2,
+   "pass": true
+  },
+  "flatbuffers:read_sum": {
+   "geo": 0.657939220998493,
+   "upper": 0.6694635892743764,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "flatbuffers:mutate": {
+   "geo": 0.6379245211835405,
+   "upper": 0.6497635419047441,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "flatbuffers:emit_after": {
+   "geo": 0.13530756812467665,
+   "upper": 0.13770142618688824,
+   "threshold": 0.2,
+   "pass": true
+  },
+  "capnproto:read_sum": {
+   "geo": 0.2108444586954036,
+   "upper": 0.2135220980523946,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "capnproto:mutate": {
+   "geo": 0.2552600769168379,
+   "upper": 0.25764599599182014,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "capnproto:emit_after": {
+   "geo": 0.37066207729685846,
+   "upper": 0.3773080316017815,
+   "threshold": 0.2,
+   "pass": false
+  },
+  "cereal:read_sum": {
+   "geo": 0.9079136330005351,
+   "upper": 0.9261210909135648,
+   "threshold": 1.05,
+   "pass": true
+  },
+  "cereal:mutate": {
+   "geo": 1.053184368971548,
+   "upper": 1.0663423427199998,
+   "threshold": 1.05,
+   "pass": false
+  },
+  "cereal:emit_after": {
+   "geo": 0.18798755383486637,
+   "upper": 0.19125861152369505,
+   "threshold": 0.2,
+   "pass": true
+  }
+ },
+ "aa": {
+  "load": {
+   "geo": 1.0053421012919417,
+   "low": 0.9907178858195171,
+   "high": 1.0201821881857316,
+   "ok": true
+  },
+  "query_before": {
+   "geo": 1.0018165772253873,
+   "low": 0.9827495092895558,
+   "high": 1.0212535797948494,
+   "ok": true
+  },
+  "mutate": {
+   "geo": 0.9978634089496919,
+   "low": 0.9857364221035614,
+   "high": 1.0101395876149222,
+   "ok": true
+  },
+  "emit_after": {
+   "geo": 0.9895391803677748,
+   "low": 0.9710430819055473,
+   "high": 1.0083875862246987,
+   "ok": true
+  },
+  "retire_modified_state": {
+   "geo": 0.9992203260631805,
+   "low": 0.9793772934479532,
+   "high": 1.0194653957135762,
+   "ok": true
+  },
+  "reload": {
+   "geo": 1.0012407783414057,
+   "low": 0.9935719589142916,
+   "high": 1.0089687890438752,
+   "ok": true
+  },
+  "query_after": {
+   "geo": 1.0004685842373067,
+   "low": 0.9846122893230306,
+   "high": 1.0165802305128593,
+   "ok": true
+  },
+  "cleanup": {
+   "geo": 1.0155561450086277,
+   "low": 0.9855028677017055,
+   "high": 1.0465259082096934,
+   "ok": true
+  }
+ },
+ "auxiliary": {
+  "cista:reload": {
+   "geo": 0.44942325857706666,
+   "low": 0.4448549382071831,
+   "high": 0.45403849210719527
+  },
+  "flatbuffers:reload": {
+   "geo": 0.9980738054763703,
+   "low": 0.9876619146521841,
+   "high": 1.0085954580205605
+  },
+  "capnproto:reload": {
+   "geo": 0.76992743239424,
+   "low": 0.7574962255572476,
+   "high": 0.7825626467209205
+  },
+  "cereal:reload": {
+   "geo": 0.8110931847237794,
+   "low": 0.8019160411285989,
+   "high": 0.8203753517381799
+  },
+  "cand/xoffset_w9a:read_sum": {
+   "geo": 0.8904018363909744,
+   "low": 0.8773872673742439,
+   "high": 0.9036094547178437
+  },
+  "cand/xoffset_w9a:mutate": {
+   "geo": 0.761892475811614,
+   "low": 0.7518656345988876,
+   "high": 0.7720530344601144
+  },
+  "cand/xoffset_w9a:emit_after": {
+   "geo": 0.6980913825600069,
+   "low": 0.6851347059775204,
+   "high": 0.7112930846339749
+  },
+  "cand/xoffset_w9a:load": {
+   "geo": 0.7073370507077237,
+   "low": 0.7038100648473646,
+   "high": 0.7108817112645393
+  },
+  "cand/xoffset_w9a:reload": {
+   "geo": 0.5975033708821648,
+   "low": 0.5919843969038181,
+   "high": 0.6030737973547544
+  },
+  "cand/xoffset_w9a:total": {
+   "geo": 0.7503384495274735,
+   "low": 0.7433285914215569,
+   "high": 0.7574144131367061
+  }
+ },
+ "primary_passed": 10,
+ "aa_valid": true
+}

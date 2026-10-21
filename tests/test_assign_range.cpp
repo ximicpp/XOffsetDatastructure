@@ -1,5 +1,4 @@
 // v4 backward-compatible bulk replacement API; operation checks, no timer.
-#define XOFFSET_FREELIST_INDEX_DIAGNOSTICS 1
 #include <array>
 #include <cstdlib>
 #include <cstdint>
@@ -73,6 +72,21 @@ template<class V> auto values(const V& v) {
     return v.size() ? std::vector<T>(v.begin(), v.end()) : std::vector<T>{};
 }
 template<class V, class T> void assign(V& v, const std::vector<T>& a) { v.assign_range(std::span<const T>(a)); }
+// V2 has no allocator operation counters (FreelistIndex diagnostics are gone).
+// Allocator operations are observed through the host free table instead:
+// live bytes = used_end - free bytes, and a retired block is an exact hole.
+struct Ledger { std::uint64_t used, free; std::size_t holes; };
+Ledger ledger(const xo::XBufferCore& b) { return {b.arena()->used_end, b.free_block_bytes(), b.free_block_count()}; }
+std::uint64_t live(const Ledger& l) { return l.used - l.free; }
+std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
+bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {
+    const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(p) - b.data()); bool found = false;
+    b.for_each_free_block([&](xo::XBufferCore::WireHole h) { found |= h.offset == offset && h.bytes == bytes; });
+    return found;
+}
+std::size_t holes_of_size(const xo::XBufferCore& b, std::uint32_t bytes) {
+    std::size_t count = 0; b.for_each_free_block([&](xo::XBufferCore::WireHole h) { count += h.bytes == bytes; }); return count;
+}
 void roundtrip(xo::XBuffer& b) {
     auto& root = b.root<BulkRoot>(); const auto n = values(root.numbers); const auto v = values(root.bytes);
     const auto f = values(root.fixed_bytes); const auto nested = root.attrs.size() ? values(root.attrs[0].value) : std::vector<std::uint8_t>{};
@@ -94,7 +108,7 @@ void self_subrange_overlap_and_empty() {
     // caller that explicitly manages that element's lifetime. Normal self and
     // subrange cases above stay entirely within the public logical range.
     v.assign_range({}); need(v.empty() && v.data() == p && v.capacity() == cap, "empty range changed storage");
-    need(v.binding().state == binding.state && v.binding().segment == binding.segment, "self changed binding");
+    need(v.binding().segment == binding.segment, "self changed binding");
     v.assign_range(std::span<const std::uint32_t>(std::array<std::uint32_t, 3>{9,8,7}));
     need(values(v) == std::vector<std::uint32_t>({9,8,7}), "external temporary live array"); roundtrip(b);
     xo::XVector<std::uint32_t> unbound; unbound.assign_range({}); need(!unbound.is_bound() && unbound.empty(), "unbound empty");
@@ -106,9 +120,10 @@ void fresh_same_foreign_and_nested_sources() {
     auto b = make_buffer(), foreign = make_buffer(); auto& root = b.root<BulkRoot>();
     assign(root.numbers, std::vector<std::uint32_t>{7,8}); assign(root.donor, std::vector<std::uint32_t>(41, 71));
     root.blocker.assign(std::string(129, 'b')); auto* old = root.numbers.data(); const auto binding = root.numbers.binding();
-    dt::reset_freelist_index_stats(); root.numbers.assign_range({root.donor.data(), root.donor.size()});
+    const auto before = ledger(b); root.numbers.assign_range({root.donor.data(), root.donor.size()});
     need(root.numbers.data() != old && root.numbers.capacity() == 41, "fresh exact capacity");
-    need(dt::freelist_index_stats.lookup_calls == 1 && dt::freelist_index_stats.retire_updates == 1, "fresh bulk allocate/retire");
+    // Exactly one exact-size allocation (41 * 4 -> 168 bytes) and one retire of the old 8-byte block.
+    need(live(ledger(b)) == live(before) + extent(41 * 4) - extent(2 * 4) && has_hole(b, old, extent(2 * 4)), "fresh bulk allocate/retire");
     need(values(root.numbers) == std::vector<std::uint32_t>(41,71) && values(root.donor) == values(root.numbers), "same arena donor modified");
     auto& donor = foreign.root<BulkRoot>(); assign(donor.bytes, std::vector<std::uint8_t>(513, 42));
     root.bytes.assign_range({donor.bytes.data(), donor.bytes.size()});
@@ -116,7 +131,7 @@ void fresh_same_foreign_and_nested_sources() {
     root.attrs.resize(2); root.attrs[0].key.assign("k0000"); root.attrs[1].key.assign("k0001");
     root.attrs[0].value.assign_range({root.bytes.data()+3, 333}); root.attrs[1].value.assign_range({root.attrs[0].value.data(), 17});
     need(values(root.attrs[1].value) == std::vector<std::uint8_t>(17,42), "nested same arena source");
-    need(root.numbers.binding().state == binding.state && root.numbers.binding().segment == binding.segment, "fresh binding changed");
+    need(root.numbers.binding().segment == binding.segment, "fresh binding changed");
     root.fixed_bytes.assign_range({root.bytes.data(), 87});
     need(values(root.fixed_bytes) == std::vector<std::uint8_t>(87,42), "fixed-vector API");
     roundtrip(b); roundtrip(foreign);
@@ -157,6 +172,11 @@ void no_host_staging_under_host_oom() {
     assign(root.numbers,std::vector<std::uint32_t>{1,2});
     assign(root.donor,std::vector<std::uint32_t>(257,89));
     root.blocker.assign(std::string(129,'b'));
+    // V2 keeps free-table metadata in host memory, so the one retire below (the
+    // old 8-byte block) may allocate a bin slot. Warm that bin first so the
+    // gate isolates element staging from allocator metadata.
+    auto* warm=b.arena()->allocate_aligned(8,8); b.arena()->deallocate(warm,8);
+    need(b.arena()->allocate_aligned(8,8)==warm,"warm bin slot was not reused");
     host_oom::attempts=0;host_oom::forbidden=true;
     try {
         root.numbers.assign_range({root.donor.data(),root.donor.size()});
@@ -165,14 +185,19 @@ void no_host_staging_under_host_oom() {
     host_oom::forbidden=false;
     need(host_oom::attempts==0 && values(root.numbers)==std::vector<std::uint32_t>(211,89),
          "live same-arena bulk attempted host staging");
+    need(b.free_table_complete(),"bulk retire lost a free-table entry");
+    b.arena()->deallocate(warm,8); // V2 exact coverage: release before the verified save
     roundtrip(b);
 }
 void bulk_workload_operation_gate_and_lifecycle() {
     constexpr unsigned n=4096; auto b=make_buffer(8u<<20); auto& root=b.root<BulkRoot>(); root.attrs.resize(n);
     for(auto& a:root.attrs) { a.key.assign("k0001"); a.value.resize(16,std::uint8_t{3}); }
     root.blocker.assign(std::string(1024,'b')); const std::array<std::uint8_t,32> source=[] {std::array<std::uint8_t,32> x{};x.fill(91);return x;}();
-    dt::reset_freelist_index_stats(); for(auto& a:root.attrs) a.value.assign_range(source);
-    need(dt::freelist_index_stats.lookup_calls==n && dt::freelist_index_stats.retire_updates==n,"bulk workload arena operation count");
+    // Each replacement is one exact 32-byte allocation plus one retire of the
+    // old 16-byte block (a 16-byte hole can never serve a 32-byte request).
+    const auto before=ledger(b); const auto small_before=holes_of_size(b,16);
+    for(auto& a:root.attrs) a.value.assign_range(source);
+    need(live(ledger(b))==live(before)+std::uint64_t(n)*(32-16) && holes_of_size(b,16)==small_before+n,"bulk workload arena operation count");
     for(auto& a:root.attrs) need(values(a.value)==std::vector<std::uint8_t>(32,91),"bulk workload contents");
     auto moved=std::move(b); auto other=make_buffer(); swap(moved,other);
     other.root<BulkRoot>().attrs[0].value.assign_range({source.data()+1,17});

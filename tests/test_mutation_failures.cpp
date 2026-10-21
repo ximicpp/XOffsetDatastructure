@@ -63,16 +63,28 @@ int main() {
             r.set.insert("zzz");
             auto before = snapshot(r);
             auto free = buf.get_free_memory();
-            if (free > slack + 32)
-                (void)buf.arena()->allocate_aligned(static_cast<uint32_t>(free - slack - 32), 8);
+            // V2: an unreachable filler block must be released before a
+            // verified save (live blocks + holes must tile the payload).
+            void* filler = nullptr;
+            std::uint32_t filler_bytes = 0;
+            if (free > slack + 32) {
+                filler_bytes = static_cast<uint32_t>(free - slack - 32);
+                filler = buf.arena()->allocate_aligned(filler_bytes, 8);
+            }
+            auto release_filler = [&] {
+                if (filler) buf.arena()->deallocate(filler, filler_bytes);
+                filler = nullptr;
+            };
             try {
                 mutate(r, operation);
+                release_filler();
                 auto expected = snapshot(r);
                 auto loaded = TypedXBuffer<RetryRoot>::load(buf.save_verified<RetryRoot>());
                 assert(snapshot(loaded.root()) == expected);
                 ++succeeded;
             } catch (const XBadAlloc&) {
                 ++failed;
+                release_filler();
                 assert(snapshot(r) == before);
                 auto loaded = TypedXBuffer<RetryRoot>::load(buf.save_verified<RetryRoot>());
                 assert(snapshot(loaded.root()) == before);
