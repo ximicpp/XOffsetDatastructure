@@ -36,14 +36,16 @@ DeleteCallback take_delete_callback(void* p) noexcept {
     return nullptr;
 }
 void handler() { ++calls; if (callback) callback(); }
-void* allocate(std::size_t n, std::size_t alignment = alignof(std::max_align_t)) {
+// alignment 0: ordinary new (malloc, released by free). Any aligned new uses the
+// aligned allocator, so release_aligned matches it (_aligned_free on Windows).
+void* allocate(std::size_t n, std::size_t alignment = 0) {
     for (;;) {
         bool fail = fail_after == 0;
         if (fail) fail_after = -1;
         else if (fail_after > 0) --fail_after;
         void* p = nullptr;
         if (!fail) {
-            if (alignment <= alignof(std::max_align_t)) p = std::malloc(n ? n : 1);
+            if (alignment == 0) p = std::malloc(n ? n : 1);
             else {
                 const auto bytes = ((n ? n : 1) + alignment - 1) / alignment * alignment;
 #if defined(_WIN32)

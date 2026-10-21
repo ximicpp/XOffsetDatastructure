@@ -1,31 +1,31 @@
-# 0.2.0-alpha.1 兼容与输入边界
+# 0.3.0-beta.1 兼容与输入边界
 
-此 alpha 面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
-但 alpha 之间不承诺源码 API 或 ABI 稳定，也不承诺任意编译器、标准库、schema
+（文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
+但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K1–K7，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
 演进与布局组合之间的长期 wire 兼容。本版本使用 V2 存储与 wire 格式（`docs/V2_FORMAT.md`），
 不读取 V1 wire。
 
 ## 版本和工具链
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.2.0-alpha.1` 的唯一文本来源；CMake project 数字版本是
-`0.2.0`。安装消费采用无版本查找，再检查完整字符串：
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.3.0-beta.1` 的唯一文本来源；CMake project 数字版本是
+`0.3.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.3.0-beta.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.3.0-beta.1")
 endif()
 ```
 
 storage 消费改用 `COMPONENTS storage` 和 `XOffset::storage`。
-数字、EXACT 和版本范围查找全部拒绝，避免 alpha 被当作兼容的稳定版本。
+数字、EXACT 和版本范围查找全部拒绝，避免预发布版被当作兼容的稳定版本。
 源码构建中的完整版本变量是 `XOFFSET_VERSION_FULL`。
 
 完整库要求 64-bit little-endian、P2996 Clang 与匹配 libc++；普通 C++26 不是替代品。
 固定配方与依赖来源见源码分发中的 `docs/VM_PACKAGING.md`、`toolchains/README.md`
 及 `toolchains/vm-validation.json`；这些配方不随安装 prefix 复制。
-支持结论按具体 profile 给出，不能从 OS API 存在推导完整编译器支持。Windows 已验
-storage，完整 P2996 尚未验证。WSL、Docker 的结果必须保留实际虚拟化/仿真类别。
+支持结论按具体 profile 给出，不能从 OS API 存在推导完整编译器支持。Windows 上 MSVC 只验
+storage；MinGW-w64 GCC 16 的完整库由 CI 验证（`docs/CLIENT_TARGETS.md`）。WSL、Docker 的结果必须保留实际虚拟化/仿真类别。
 
 同一可执行文件内应使用一致的生产头、TypeLayout/Boost 内容、工具链和编译选项。
 `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 等宏在所有翻译单元中保持一致。
@@ -101,9 +101,9 @@ payload 上限为 `0x7ffffff8`，但这不是建议给每个请求预留的预�
 页面；显式 reclaim 可部分完成，应检查返回结果。pool 限额仅约束 idle reservation，
 不限制 live owner 或全进程内存；policy/pool 不序列化。
 
-## 本 alpha 不包含的承诺
+## 本版本不包含的承诺
 
-生产异步 transport、真实业务网络整合、N7 三项 I/O 扩展与性能归因不属于此 alpha
+生产异步 transport、真实业务网络整合、N7 三项 I/O 扩展与性能归因不属于此版本
 承诺。现有网络验收是同步 TCP 回环参考及独立注入生命周期模型。
 当前 WSL F/F 校准未取得预定的 2% 噪声资格，不能推导加速、等价、回退或候选 adoption。
 后续 Linux 测量允许 WSL 或 Docker；仍须事前固定输入、记录环境并通过噪声资格。

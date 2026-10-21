@@ -84,7 +84,8 @@ int write_target_signature_file(
     const std::filesystem::path& path,
     const xoffset::signature::SignatureTargetSpec& target,
     const std::vector<ExportedTypeEntry>& entries) {
-    std::ofstream os(path, std::ios::trunc);
+    // Binary mode: committed baselines are LF on every host (no CRLF on Windows).
+    std::ofstream os(path, std::ios::trunc | std::ios::binary);
     if (!os.is_open()) {
         std::cerr << "Error: cannot write " << path << '\n';
         return 1;

@@ -1,0 +1,169 @@
+name: Client targets (K8)
+
+# K8 feasibility: the same sources build and pass on client-class targets,
+# and their wires are byte-identical to the Linux x86-64 server build.
+#   linux-arm64   native AArch64 runner, GCC 16 (stands in for Android arm64:
+#                 same LP64 AArch64 data layout; bionic is not exercised)
+#   windows-x64   native Windows runner, MSYS2 UCRT64 GCC (LLP64, Win32 VM)
+on:
+  pull_request:
+    branches: [ next_cpp26 ]
+  push:
+    branches: [ next_cpp26 ]
+  workflow_dispatch:
+
+jobs:
+  corpus-x86:
+    name: Reference corpus (GCC 16, Linux x86-64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:3f73339bf0d3d64081cac3f6d9fdafc6dd4cef2b9c49e0a09f91e97cb0eb139a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+      - name: Build and write the corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              g++ --version | head -n 1 &&
+              cmake -S . -B build/x86 -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ &&
+              cmake --build build/x86 --target test_cross_compiler_wire --parallel 4 &&
+              build/x86/bin/Release/test_cross_compiler_wire --write build/corpus-x86'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpus-x86
+          path: build/corpus-x86/*.xwire
+          if-no-files-found: error
+
+  linux-arm64:
+    name: Linux arm64 (GCC 16, native)
+    needs: corpus-x86
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      # gcc:16 (16.2.0) linux/arm64/v8 image manifest (not its attestation).
+      XOFFSET_GCC_IMAGE: gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v4
+        with:
+          name: corpus-x86
+          path: build/corpus-x86
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-aarch64 --out build/cmake-tool
+      - name: Configure, build and CTest (Debug)
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/arm64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              uname -m && g++ --version | head -n 1 &&
+              cmake -S . -B build/arm64 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ &&
+              cmake --build build/arm64 --parallel 4 &&
+              ctest --test-dir build/arm64 --output-on-failure --parallel 2 --timeout 900' \
+            2>&1 | tee build/arm64-build.log
+      # The arm64 build must accept the x86-64 wires and produce the same bytes.
+      - name: Exchange and compare wires
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/arm64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              cmake -S . -B build/arm64-rel -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ &&
+              cmake --build build/arm64-rel --target test_cross_compiler_wire --parallel 4 &&
+              build/arm64-rel/bin/Release/test_cross_compiler_wire --read build/corpus-x86 &&
+              build/arm64-rel/bin/Release/test_cross_compiler_wire --write build/corpus-arm64'
+          diff -r build/corpus-x86 build/corpus-arm64
+          echo "Linux arm64 and Linux x86-64 wires are byte-identical and mutually accepted."
+      - name: Upload logs and corpus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-result
+          path: |
+            build/arm64-build.log
+            build/arm64/Testing/Temporary/*.log
+            build/corpus-arm64/*.xwire
+          if-no-files-found: ignore
+
+  windows-x64:
+    name: Windows x64 (MSYS2 UCRT64 GCC, native)
+    needs: corpus-x86
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      # Keep LF endings: the dependency lock hashes file content byte for byte.
+      # Boost submodules mark files `text=auto`, which follows core.eol.
+      - name: Disable CRLF conversion
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+            diffutils
+      - uses: actions/download-artifact@v4
+        with:
+          name: corpus-x86
+          path: build/corpus-x86
+      - name: Toolchain
+        run: |
+          g++ --version | head -n 1
+          major=$(g++ -dumpversion | cut -d. -f1)
+          if [ "$major" -lt 16 ]; then
+            echo "::error::MSYS2 UCRT64 GCC $major lacks C++26 reflection (need GCC 16)"
+            exit 1
+          fi
+      - name: Configure, build and CTest (Debug)
+        run: |
+          set -o pipefail
+          mkdir -p build
+          { cmake -S . -B build/win -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ &&
+            cmake --build build/win --parallel 4 &&
+            ctest --test-dir build/win --output-on-failure --parallel 2 --timeout 900; } 2>&1 | tee build/win-build.log
+      - name: Exchange and compare wires
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/win-rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++
+          cmake --build build/win-rel --target test_cross_compiler_wire --parallel 4
+          build/win-rel/bin/Release/test_cross_compiler_wire.exe --read build/corpus-x86
+          build/win-rel/bin/Release/test_cross_compiler_wire.exe --write build/corpus-win
+          diff -r build/corpus-x86 build/corpus-win
+          echo "Windows x64 and Linux x86-64 wires are byte-identical and mutually accepted."
+      - name: Upload logs and corpus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-result
+          path: |
+            build/win-build.log
+            build/win/Testing/Temporary/*.log
+            build/corpus-win/*.xwire
+          if-no-files-found: ignore
