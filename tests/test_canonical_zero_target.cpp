@@ -32,17 +32,17 @@ inline constexpr auto available_member=member("owner_cache_available");
 inline constexpr auto ledger_member=member("canonical_active_count_");
 inline constexpr auto mark_member=member("mark_canonical_registration");
 inline constexpr auto retire_member=member("retire_canonical_registration");
-decltype(auto) registry(){return [:registry_member:]();}
-decltype(auto) cache(){return [:cache_member:]();}
-decltype(auto) available()noexcept{return [:available_member:]();}
+decltype(auto) registry(){return (&[:registry_member:])();}
+decltype(auto) cache(){return (&[:cache_member:])();}
+decltype(auto) available()noexcept{return (&[:available_member:])();}
 decltype(auto) ledger()noexcept{return ([:ledger_member:]);}
 using State=std::remove_reference_t<decltype(registry())>;
 using Cache=std::remove_reference_t<decltype(cache())>;
 using Owners=std::remove_cvref_t<decltype(std::declval<State&>().owners)>;
 using RecordPtr=typename Owners::mapped_type;
 using Record=typename RecordPtr::element_type;
-void mark(Record& r)noexcept{[:mark_member:](r);}
-void retire(Record& r)noexcept{[:retire_member:](r);}
+void mark(Record& r)noexcept{(&[:mark_member:])(r);}
+void retire(Record& r)noexcept{(&[:retire_member:])(r);}
 void need(bool v,const char* m){if(!v)throw std::runtime_error(m);}
 void cleanup_need(bool v)noexcept{if(!v){std::fputs("private canonical fixture cleanup failed\n",stderr);std::abort();}}
 

@@ -15,8 +15,13 @@
     #define XOFFSET_LITTLE_ENDIAN 0
 #endif
 
+#if __has_include(<meta>)
+#include <meta>
+#else
 #include <experimental/meta>
+#endif
 #include <cstddef>
+#include <compare>
 #include <concepts>
 #include <functional>
 #include <cstdint>
@@ -1809,10 +1814,21 @@ namespace XOffsetDatastructure {
             return std::string_view(value);
         }
 
+        // An enum with an ADL operator<=> but no operator<: Clang resolves
+        // `a < b` to the rewritten operator<=>, GCC to the builtin operator<.
+        // Calling <=> explicitly gives the same key order on every compiler.
+        template <typename L, typename R>
+        concept enum_ordered_by_spaceship_only =
+            std::is_enum_v<L> && std::is_same_v<L, R> &&
+            requires(const L& a, const R& b) { operator<=>(a, b); } &&
+            !requires(const L& a, const R& b) { operator<(a, b); };
+
         template <typename L, typename R>
         bool ordered_less(const L& lhs, const R& rhs) {
             if constexpr (ordered_string_like<L> && ordered_string_like<R>) {
                 return ordered_view(lhs) < ordered_view(rhs);
+            } else if constexpr (enum_ordered_by_spaceship_only<L, R>) {
+                return (lhs <=> rhs) < 0;
             } else {
                 return lhs < rhs;
             }
