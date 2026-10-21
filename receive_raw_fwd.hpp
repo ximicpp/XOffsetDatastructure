@@ -17,10 +17,10 @@ template<class T> consteval bool surface_complete();
 struct alignas(8) RawPayloadHeader {
     char magic[8];
     std::uint32_t header_size, flags;
-    std::uint64_t root_offset, allocator_offset, used_end, reserved0;
+    std::uint64_t root_offset, used_end, reserved0, reserved1;
 };
 struct RawWireVerification {
-    std::size_t root_offset, allocator_offset, used_bytes;
+    std::size_t root_offset, used_bytes;
 };
 struct CanonicalRawBytes;
 struct RawActivationStats {
@@ -28,9 +28,6 @@ struct RawActivationStats {
     std::uint64_t custom_objects{};
     std::uint64_t ordinary_outers{}; // recovered pre-fill implicit objects
     std::uint64_t capacity_arrays{}; // recovered, never restarted after input
-    std::uint64_t allocation_headers{};
-    std::uint64_t allocator_states{};
-    std::uint64_t free_block_headers{};
     std::uint64_t arena_headers{};
 };
 template<class T> consteval bool receive_raw_supported();
@@ -38,7 +35,6 @@ template<class T> consteval bool receive_raw_future_supported();
 RawPayloadHeader read_raw_arena_header(const char*, std::size_t);
 template<class T>
 std::size_t raw_root_offset(const char*, std::size_t, const RawPayloadHeader&);
-std::size_t raw_allocator_offset(const char*, std::size_t, const RawPayloadHeader&);
 template<class T>
 RawWireVerification verify_structural_wire_graph_raw(
     XBufferCore&, std::pmr::memory_resource* = std::pmr::new_delete_resource());
@@ -63,13 +59,15 @@ template<class T> requires(future_supported_v<T>)
 void reactivate_inline_prefix(T* data, std::size_t live_count) noexcept;
 
 template<class T> class Proof;
+// V2: `holes` is the wire hole table (hole_count entries of {u32 offset,
+// u32 bytes}); it need not be aligned and is only read during validation.
 template<class T> requires(supported_v<T>)
 Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
-                  std::uint64_t wire_allocator_offset,
+                  const void* holes, std::size_t hole_count,
                   std::pmr::memory_resource* = std::pmr::new_delete_resource());
 template<class T> requires(supported_v<T>)
 Proof<T> validate(std::byte* origin, std::size_t maximum, std::size_t used,
-                  std::uint64_t wire_root_offset,std::uint64_t wire_allocator_offset,
+                  std::uint64_t wire_root_offset,const void* holes,std::size_t hole_count,
                   std::pmr::memory_resource* = std::pmr::new_delete_resource());
 
 // A proof is neither a storage owner nor a registry/transport lease. Its caller
@@ -84,10 +82,10 @@ template<class T> class Proof {
     Proof(std::byte* origin,std::size_t maximum,std::size_t used,std::size_t root) noexcept
         :base_(reinterpret_cast<char*>(origin)),root_(root),origin_(origin),maximum_(maximum),used_(used){}
     template<class U> requires(supported_v<U>)
-    friend Proof<U> validate(char*, std::size_t, std::uint64_t, std::uint64_t,
+    friend Proof<U> validate(char*, std::size_t, std::uint64_t, const void*, std::size_t,
                               std::pmr::memory_resource*);
     template<class U> requires(supported_v<U>)
-    friend Proof<U> validate(std::byte*,std::size_t,std::size_t,std::uint64_t,std::uint64_t,
+    friend Proof<U> validate(std::byte*,std::size_t,std::size_t,std::uint64_t,const void*,std::size_t,
                               std::pmr::memory_resource*);
 public:
     Proof(const Proof&) = delete;
