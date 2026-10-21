@@ -83,35 +83,34 @@ namespace detail {
                 throw XException("save_verified_into: output aliases source storage");
         };
         check_alias(initial);
-        const auto initial_header = header<T>(initial, false);
-        const auto prepared_size = verified_wire_size(initial_header);
+        auto initial_header = header<T>(initial, false);
+        const auto initial_gaps = wire_sparse_gaps(initial, std::size_t(initial_header.used_bytes));
+        wire_apply_gaps(initial_header, initial_gaps);
+        const auto prepared_size = wire_output_size(initial_header, initial_gaps);
         if (prepared_size > out.max_size())
             throw std::length_error("save_verified_into: output size exceeds string limit");
         out.reserve(prepared_size); // only output-allocation/callback boundary
 
         auto& current = owner(token);
         check_alias(current);
-        auto final_header = header<T>(current, false);
-        const auto final_size = verified_wire_size(final_header);
-        if (final_size > out.capacity())
+        // The source cannot change between these steps (no callback); the
+        // gap list computed before reserve still describes it.
+        auto final_header = header<T>(current, true);
+        wire_apply_gaps(final_header, initial_gaps);
+        const auto final_size = wire_output_size(final_header, initial_gaps);
+        if (final_size > out.capacity() || final_size != prepared_size)
             throw XException("save_verified_into: source changed beyond prepared output capacity");
-        final_header = header<T>(current, true);
         const auto* base = static_cast<const char*>(current.get_address());
-        const auto used = std::size_t(final_header.used_bytes);
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
         // Supported string implementation must honor its existing reserved
         // capacity. No host allocation or user callback may occur in this copy.
         out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
-            std::memcpy(destination, &final_header, sizeof(final_header));
-            std::memcpy(destination + sizeof(final_header), base, used);
-            current.write_free_blocks(destination + sizeof(final_header) + used);
+            write_wire(destination, final_size, final_header, initial_gaps, base, current);
             return final_size;
         });
 #else
         out.resize(final_size);
-        std::memcpy(out.data(), &final_header, sizeof(final_header));
-        std::memcpy(out.data() + sizeof(final_header), base, used);
-        current.write_free_blocks(out.data() + sizeof(final_header) + used);
+        write_wire(out.data(), final_size, final_header, initial_gaps, base, current);
 #endif
     }
 }
