@@ -94,6 +94,7 @@ set(REFLECTION_TESTS
     test_v2_golden
     test_cross_compiler_wire
     test_v2_fuzz
+    test_reload_reset
 )
 
 foreach(test_name ${REFLECTION_TESTS})
