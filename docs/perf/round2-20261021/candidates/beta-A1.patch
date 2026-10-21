@@ -1,0 +1,160 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_same_arena_move.cpp w9a-beta-A1/tests/test_same_arena_move.cpp
+--- w9a/tests/test_same_arena_move.cpp	2026-10-20 03:43:45
++++ w9a-beta-A1/tests/test_same_arena_move.cpp	2026-10-20 09:55:48
+@@ -123,6 +123,13 @@
+ template <> struct is_byte_copy_safe<LocalNode> : std::true_type {};
+ }
+ struct LocalTree { XVector<LocalNode> nodes; };
++// O: an aggregate whose SECOND owning member holds the alias. The first-true
++// subobject walk must continue past the non-matching first owning member.
++struct PairNode { std::uint32_t id; XString key; XVector<PairNode> kids; };
++namespace boost::typelayout::v1 {
++template <> struct is_byte_copy_safe<PairNode> : std::true_type {};
++}
++struct PairTree { XVector<PairNode> nodes; };
+ 
+ namespace {
+ std::size_t cases = 0, fast_new_attempts = 0, retire_new_attempts = 0, retire_new_hits = 0;
+@@ -366,6 +373,62 @@
+     ++cases;
+ }
+ 
++void second_member_alias_guards() {
++    auto build = [](PairTree& r) {
++        r.nodes.resize(2); r.nodes[0].id = 1; r.nodes[0].key.assign("first-key");
++        r.nodes[0].kids.resize(1); r.nodes[0].kids[0].id = 2; r.nodes[0].kids[0].key.assign("child-key");
++        r.nodes[0].kids[0].kids.resize(1); r.nodes[0].kids[0].kids[0].id = 3;
++        r.nodes[1].id = 4; r.nodes[1].key.assign("second-key");
++    };
++    {   // destination lives in the source's tree only through member #2 (kids)
++        auto buffer = XBuffer::create<PairTree>(1024u * 1024u, policy()); auto& r = buffer.root<PairTree>(); build(r);
++        auto* outer = r.nodes.data(); auto& deep = r.nodes[0].kids[0].kids;
++        deep = std::move(r.nodes);
++        require(r.nodes.data() == outer && r.nodes.size() == 2 && r.nodes[1].key.view() == "second-key",
++            "second-member descendant destination stole its own owning allocation");
++        require(deep.size() == 2 && deep.data() != outer && deep[0].key.view() == "first-key" &&
++            deep[0].kids.size() == 1 && deep[0].kids[0].id == 2 && deep[1].id == 4,
++            "second-member descendant fallback failed finite deep copy");
++    }
++    {   // source lives in the destination's tree only through member #2 (kids)
++        auto buffer = XBuffer::create<PairTree>(1024u * 1024u, policy()); auto& r = buffer.root<PairTree>(); build(r);
++        auto& deep = r.nodes[0].kids[0].kids; auto* inner = deep.data();
++        r.nodes = std::move(deep);
++        require(r.nodes.size() == 1 && r.nodes[0].id == 3 && r.nodes.data() != inner,
++            "second-member ancestor destination failed copy-before-retire fallback");
++    }
++    ++cases;
++}
++
++void moved_from_release_is_inert() {
++    auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
++    r.right.assign("x-source"); r.b.push_back(5); r.left.assign("y"); r.a.push_back(6);
++    r.left = std::move(r.right); r.a = std::move(r.b);          // right/b are now moved-from
++    auto* state = r.left.allocator_state(); require(state != nullptr, "missing allocator state");
++    const auto free_before = state->free_bytes; const auto epoch_before = state->epoch;
++    const auto sb = r.right.binding(), vb = r.b.binding();
++    r.records.resize(2);                                       // two empty in-arena records
++    const auto free_empty = state->free_bytes; const auto epoch_empty = state->epoch;
++    r.records[0].name = std::move(r.right); r.records[0].values = std::move(r.b);   // empty <- moved-from
++    r.right = std::move(r.records[1].name); r.b = std::move(r.records[1].values);   // moved-from <- empty
++    require(state->free_bytes == free_empty && state->epoch == epoch_empty,
++        "moved-from/empty in-arena move retired or touched allocator state");
++    require_empty_reusable_binding(r.right, sb); require_empty_reusable_binding(r.b, vb);
++    require(free_before <= free_empty && epoch_before <= epoch_empty, "allocator state regressed");
++    // Compaction into moved-from slots: only the one live destination retires.
++    r.records.resize(0); r.records.resize(4);
++    for (std::uint32_t i = 0; i < 4; ++i) fill(r.records[i], 50 + i);
++    r.records[0] = std::move(r.records[1]);                    // live destination: retires its payloads
++    const auto epoch_live = state->epoch;
++    r.records[1] = std::move(r.records[2]);                    // moved-from destination: no retire
++    r.records[2] = std::move(r.records[3]);
++    require(state->epoch == epoch_live, "moved-from destinations retired payloads");
++    check(r.records[0], 51); check(r.records[1], 52); check(r.records[2], 53);
++    r.records.resize(3);                                       // destroys a moved-from record
++    require(state->epoch == epoch_live, "destroying a moved-from record retired payloads");
++    verified_roundtrip(buffer); ++cases;
++}
++
+ void reloaded_moves() {
+     auto original = make_buffer(); auto& r = original.root<MoveRoot>();
+     r.left.assign("replace"); r.right.assign("loaded-value"); r.a.push_back(1); r.b.push_back(55);
+@@ -443,6 +506,7 @@
+         same_arena_and_self(); empty_capacity_transfer(); cross_arena_and_provenance();
+         unbound_fallback(); nested_compaction_and_rebuild(); parent_child_alias_guards();
+         reloaded_moves(); retire_metadata_failure(); cross_arena_failure_guarantees();
++        second_member_alias_guards(); moved_from_release_is_inert();
+         leaf_owns_and_binding_reuse();
+         std::cout << "{\"status\":\"passed\",\"cases\":" << cases
+                   << ",\"small_fast_new_attempts\":" << fast_new_attempts
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-beta-A1/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-beta-A1/xoffsetdatastructure.hpp	2026-10-20 09:55:35
+@@ -2009,11 +2009,13 @@
+                     // MV: release()'s empty-destination case inline (data() is
+                     // null exactly when data_delta == 0, and release() then only
+                     // clears the descriptor); otherwise the unchanged release().
++                    // A1 (R): arena_delta is unchanged since `destination` was
++                    // computed, so it IS this head's current binding.
+                     if (data_delta == 0) {
+                         size_ = 0;
+                         capacity_ = 0;
+                     } else {
+-                        release();
++                        release_bound(destination);
+                     }
+                     data_delta = incoming_delta;
+                     size_ = incoming_size;
+@@ -2225,9 +2227,17 @@
+         }
+ 
+     private:
++        // A1 (R): data() is null exactly when data_delta == 0, and then the
++        // original release only cleared the descriptor; skip the binding.
+         void release() noexcept {
++            if (data_delta == 0) { size_ = 0; capacity_ = 0; return; }
++            release_bound(binding());
++        }
++
++        // `alloc` must be this head's current binding().
++        void release_bound(const allocator_type& alloc) noexcept {
++            if (data_delta == 0) { size_ = 0; capacity_ = 0; return; }
+             auto* old_data = data();
+-            auto alloc = binding();
+             std::uint32_t old_cap = capacity_;
+ 
+             data_delta = 0;
+@@ -2309,11 +2319,13 @@
+                         // MV: release()'s empty-destination case inline (data()
+                         // is null exactly when data_delta == 0, and release()
+                         // then only clears the descriptor); otherwise unchanged.
++                        // A1 (R): arena_delta is unchanged since `destination`
++                        // was computed, so it IS this head's current binding.
+                         if (data_delta == 0) {
+                             size_ = 0;
+                             capacity_ = 0;
+                         } else {
+-                            release();
++                            release_bound(destination);
+                         }
+                         data_delta = incoming_delta;
+                         size_ = incoming_size;
+@@ -2811,9 +2823,18 @@
+             size_ = other.size_;
+         }
+ 
++        // A1 (R): data() is null exactly when data_delta == 0, and then the
++        // original release only cleared the descriptor (no element destruction,
++        // no retire); skip the binding.
+         void release() noexcept {
++            if (data_delta == 0) { size_ = 0; capacity_ = 0; return; }
++            release_bound(binding());
++        }
++
++        // `alloc` must be this head's current binding().
++        void release_bound(const allocator_type& alloc) noexcept {
++            if (data_delta == 0) { size_ = 0; capacity_ = 0; return; }
+             T* old_data = data();
+-            auto alloc = binding();
+             size_type old_size = size_;
+             size_type old_cap = capacity_;
+ 

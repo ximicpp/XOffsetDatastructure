@@ -1,0 +1,129 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_same_arena_move.cpp w9a-beta-B6/tests/test_same_arena_move.cpp
+--- w9a/tests/test_same_arena_move.cpp	2026-10-20 03:43:45
++++ w9a-beta-B6/tests/test_same_arena_move.cpp	2026-10-20 09:57:32
+@@ -123,6 +123,9 @@
+ template <> struct is_byte_copy_safe<LocalNode> : std::true_type {};
+ }
+ struct LocalTree { XVector<LocalNode> nodes; };
++// B6: one-level aggregate of leaves (inline owns branch) and a local root.
++struct LeafPair { std::uint32_t id; XString key; XVector<std::uint8_t> value; };
++struct LeafRoot { XVector<LeafPair> pairs; XVector<LeafPair> other; };
+ 
+ namespace {
+ std::size_t cases = 0, fast_new_attempts = 0, retire_new_attempts = 0, retire_new_hits = 0;
+@@ -366,6 +369,38 @@
+     ++cases;
+ }
+ 
++void leaf_aggregate_owns_and_moves() {
++    static_assert(fixed_detail::owns_leaf_aggregate<LeafPair>());
++    static_assert(!fixed_detail::owns_leaf_aggregate<MoveRecord>()); // labels: XVector<XString>
++    auto buffer = XBuffer::create<LeafRoot>(1024u * 1024u, policy()); auto& r = buffer.root<LeafRoot>();
++    r.pairs.resize(5);
++    for (std::uint32_t i = 0; i < 5; ++i) {
++        r.pairs[i].id = i; r.pairs[i].key.assign(std::string(9 + i, char('a' + i)));
++        r.pairs[i].value.resize(16 + i); r.pairs[i].value[0] = std::uint8_t(i);
++    }
++    auto window = [](const void* data, std::size_t n) {
++        auto* p = static_cast<const unsigned char*>(data);
++        return std::pair{p - 24, p + n + 24};
++    };
++    { auto [lo, hi] = window(r.pairs.data(), r.pairs.capacity() * sizeof(LeafPair)); owns_equivalence_for(r.pairs, lo, hi); }
++    for (std::uint32_t i = 0; i < 5; ++i) {
++        { auto [lo, hi] = window(r.pairs[i].key.data(), r.pairs[i].key.capacity() + 1u); owns_equivalence_for(r.pairs, lo, hi); }
++        { auto [lo, hi] = window(r.pairs[i].value.data(), r.pairs[i].value.capacity()); owns_equivalence_for(r.pairs, lo, hi); }
++    }
++    owns_equivalence_for(r.other, reinterpret_cast<const unsigned char*>(&r), reinterpret_cast<const unsigned char*>(&r) + 64);
++    auto* storage = r.pairs.data();
++    r.other = std::move(r.pairs);
++    require(r.other.data() == storage && r.other.size() == 5 && r.other[4].key.view() == std::string(13, 'e') &&
++        r.pairs.data() == nullptr, "leaf aggregate vector transfer");
++    // Descendant destination inside an element's value buffer: copy fallback.
++    auto* inner = std::construct_at(reinterpret_cast<XFixedVector<LeafPair>*>(r.other[4].value.data()), r.other.binding());
++    *inner = std::move(r.other);
++    require(r.other.data() == storage && inner->data() != storage && inner->size() == 5,
++        "leaf aggregate descendant destination stole its own owning allocation");
++    std::destroy_at(inner);
++    ++cases;
++}
++
+ void reloaded_moves() {
+     auto original = make_buffer(); auto& r = original.root<MoveRoot>();
+     r.left.assign("replace"); r.right.assign("loaded-value"); r.a.push_back(1); r.b.push_back(55);
+@@ -444,6 +479,7 @@
+         unbound_fallback(); nested_compaction_and_rebuild(); parent_child_alias_guards();
+         reloaded_moves(); retire_metadata_failure(); cross_arena_failure_guarantees();
+         leaf_owns_and_binding_reuse();
++        leaf_aggregate_owns_and_moves();
+         std::cout << "{\"status\":\"passed\",\"cases\":" << cases
+                   << ",\"small_fast_new_attempts\":" << fast_new_attempts
+                   << ",\"retire_new_attempts\":" << retire_new_attempts
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-beta-B6/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-beta-B6/xoffsetdatastructure.hpp	2026-10-20 09:57:41
+@@ -4394,6 +4394,41 @@
+         // copyable, the generic function evaluates exactly one containment
+         // test (no recursion); this is that test, inline. Every other type
+         // calls the generic function, so results are identical for all T.
++        // B6: a one-level aggregate of leaves -- a non-owning class whose
++        // members are all trivially copyable, string heads or vectors of
++        // trivially copyable elements (bit-fields are skipped by the generic
++        // walk as well), with no bases.
++        template <typename E>
++        consteval bool owns_leaf_member() {
++            if constexpr (std::is_trivially_copyable_v<E>) return true;
++            else if constexpr (is_owning_head<E>::value) {
++                if constexpr (detail::is_fixed_string_v<E>) return true;
++                else return std::is_trivially_copyable_v<typename E::value_type>;
++            } else return false;
++        }
++        template <typename E, std::size_t I>
++        consteval bool owns_leaf_member_at() {
++            constexpr auto member = std::meta::nonstatic_data_members_of(^^E,
++                std::meta::access_context::unchecked())[I];
++            if constexpr (std::meta::is_bit_field(member)) return true;
++            else {
++                using Member = [:std::meta::type_of(member):];
++                return owns_leaf_member<Member>();
++            }
++        }
++        template <typename E, std::size_t... I>
++        consteval bool owns_leaf_members(std::index_sequence<I...>) {
++            return (true && ... && owns_leaf_member_at<E, I>());
++        }
++        template <typename E>
++        consteval bool owns_leaf_aggregate() {
++            if constexpr (!std::is_class_v<E> || std::is_trivially_copyable_v<E> ||
++                          is_owning_head<E>::value || !boost::typelayout::is_byte_copy_safe_v<E>)
++                return false;
++            else if constexpr (detail::reflected_base_count<E>() != 0) return false;
++            else return owns_leaf_members<E>(std::make_index_sequence<detail::reflected_member_count<E>()>{});
++        }
++
+         template <typename T>
+         XOFFSET_DETAIL_MOVE_INLINE bool move_assignment_owns_address_fast(
+                 const T& value, const void* address) noexcept {
+@@ -4407,6 +4442,23 @@
+             } else if constexpr (std::is_trivially_copyable_v<typename CleanT::value_type>) {
+                 return move_assignment_contains(value.data(),
+                     std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address);
++            } else if constexpr (owns_leaf_aggregate<typename CleanT::value_type>()) {
++                // B6: the generic owning-vector branch, verbatim (M2 form:
++                // one data(), capacity containment first, then size, null-safe
++                // end, unqualified per-element call in the same namespace so
++                // the overload set incl. ADL is unchanged), inlined at the
++                // move-assignment call site for one-level leaf aggregates.
++                const auto* elements = value.data();
++                if (move_assignment_contains(elements,
++                    std::size_t(value.capacity_) * sizeof(typename CleanT::value_type), address))
++                    return true;
++                const auto count = value.size();
++                const auto* last = elements ? elements + count : nullptr;
++                for (auto* item = elements; item != last; ++item) {
++                    const auto& child = *item;
++                    if (move_assignment_owns_address(child, address)) return true;
++                }
++                return false;
+             } else {
+                 return move_assignment_owns_address(value, address);
+             }

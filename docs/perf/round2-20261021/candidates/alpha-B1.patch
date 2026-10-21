@@ -1,0 +1,459 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_owner_identity.cpp w9a-alpha-B1/tests/test_owner_identity.cpp
+--- w9a/tests/test_owner_identity.cpp	2026-10-20 03:43:45
++++ w9a-alpha-B1/tests/test_owner_identity.cpp	2026-10-20 09:37:00
+@@ -5,6 +5,8 @@
+ #include <cstdlib>
+ #include <cstring>
+ #include <iostream>
++#include <meta>
++#include <string_view>
+ #include <new>
+ #include <stdexcept>
+ #include <thread>
+@@ -153,11 +155,17 @@
+ xo::XBuffer* delete_move_source = nullptr;
+ xo::XBuffer* delete_move_target = nullptr;
+ bool delete_ok = false, delete_require_cold = false;
++// B1: a live lookup is answered by the reservation's host-page owner slot
++// (direct_hits) without TLS or the registry. "Cold" safety assertions below
++// therefore accept either path that never touches the TLS cache.
++std::uint64_t non_tls_lookups() noexcept {
++    return dt::owner_lookup_stats.cold_lookups + dt::owner_lookup_stats.direct_hits;
++}
+ std::uint32_t delete_expected_word = 0;
+ void check_delete_owner() noexcept {
+     delete_ok = false;
+     try {
+-        const auto cold_before = dt::owner_lookup_stats.cold_lookups;
++        const auto cold_before = non_tls_lookups();
+         auto& owner = delete_binding.segment->freelist_runtime_owner();
+         if (&owner != static_cast<xo::XBufferCore*>(delete_expected_owner) ||
+             static_cast<void*>(owner.data()) != static_cast<void*>(delete_binding.segment)) return;
+@@ -165,7 +173,7 @@
+         if (root.numbers.empty() || root.numbers[0] != delete_expected_word) return;
+         auto* p = fd::allocate_dynamic_bytes(delete_binding, 24, 8);
+         std::memset(p, 0x61, 24); fd::retire_dynamic_bytes(delete_binding, p, 24);
+-        if (delete_require_cold && dt::owner_lookup_stats.cold_lookups <= cold_before) return;
++        if (delete_require_cold && non_tls_lookups() <= cold_before) return;
+         delete_ok = true;
+     } catch (...) { delete_ok = false; }
+ }
+@@ -192,8 +200,9 @@
+     for (unsigned i = 0; i != 4096; ++i) a.segment->freelist_runtime_owner();
+     need(host::fail_after == 0, "hot lookup attempted host allocation"); host::fail_after = -1;
+     need(host::allocations.load() == before, "hot lookup allocated");
+-    need(dt::owner_lookup_stats.entries == 4096 && dt::owner_lookup_stats.cache_hits == 4096 &&
+-         dt::owner_lookup_stats.cold_lookups == 0, "hot lookup retained registry mutex path");
++    need(dt::owner_lookup_stats.entries == 4096 && dt::owner_lookup_stats.direct_hits == 4096 &&
++         dt::owner_lookup_stats.cache_hits == 0 && dt::owner_lookup_stats.cold_lookups == 0,
++         "hot lookup did not use the B1 owner slot");
+     need(buffer.copy_bytes() == bytes, "host identity changed persisted bytes");
+ }
+ 
+@@ -207,7 +216,8 @@
+     fd::retire_dynamic_bytes(ref, raw, 32);
+     need(host::fail_after == 0 && host::allocations.load() == before, "cold lookup allocated");
+     host::fail_after = -1;
+-    need(dt::owner_lookup_stats.cold_lookups == 1, "cold lookup not exercised");
++    need(dt::owner_lookup_stats.cold_lookups == 0 && dt::owner_lookup_stats.direct_hits == 2,
++         "evicted owner was not answered by the B1 owner slot");
+     bool caught = false; try { (void)make_buffer(); } catch (const xo::XBadAlloc&) { caught = true; }
+     dt::clear_registry_failures(); need(caught, "lookup consumed registration-only failure");
+     for (int point : {0, 1}) {
+@@ -238,7 +248,8 @@
+     need(reused.data() == address, "pool did not exercise exact base reuse");
+     auto again = binding(reused); p = fd::allocate_dynamic_bytes(again, 24, 8);
+     std::memset(p, 0x57, 24); fd::retire_dynamic_bytes(again, p, 24);
+-    need(dt::owner_lookup_stats.dead_records != 0, "old record not observed inert at reused base");
++    need(dt::owner_lookup_stats.direct_hits != 0 && dt::owner_lookup_stats.dead_records == 0,
++         "reused base was not routed to its new owner by the B1 owner slot");
+ }
+ 
+ void callback_during_allocation_diagnostic() {
+@@ -384,21 +395,38 @@
+     }
+ }
+ 
++// B1 answers live lookups from the host-page slot, so the TLS/registry search
++// (still the fallback for every slot miss) is exercised directly here.
++consteval std::meta::info core_member(std::string_view name) {
++    auto found=^^void; std::size_t count=0;
++    for (const auto item : std::meta::members_of(^^xo::XBufferCore, std::meta::access_context::unchecked()))
++        if (std::meta::has_identifier(item) && std::meta::identifier_of(item)==name) { found=item; ++count; }
++    if (count!=1) throw "exact private Core member missing or ambiguous";
++    return found;
++}
++inline constexpr auto search_member = core_member("owner_from_payload_ptr_search");
++xo::XBufferCore& search_owner(const void* payload) { return [:search_member:](payload); }
++
+ void delete_callback_during_cold_cache_eviction() {
+-    auto incoming = make_buffer(); incoming.root<OwnerRoot>().numbers.resize(3, 521u);
++    // B1: buffer creation no longer fills the TLS cache (live lookups use the
++    // owner slot), so each creation's former cold lookup is replayed through
++    // the search to rebuild the same cache contents.
++    auto warm = [](xo::XBuffer& b) { (void)search_owner(binding(b).segment); };
++    auto incoming = make_buffer(); incoming.root<OwnerRoot>().numbers.resize(3, 521u); warm(incoming);
+     auto receiver = xo::XBuffer{}; auto ref = binding(incoming);
+     std::array<xo::XBuffer, 4> first;
+-    for (auto& item : first) item = make_buffer(); // incoming is now cold
++    for (auto& item : first) { item = make_buffer(); warm(item); } // incoming is now cold
+     xo::XBufferPool pool({1, 4u << 20, 4u << 20}); // retain victim mapping, avoid base reuse
+     begin_capture(); auto victim = xo::XBuffer::create<OwnerRoot>(4096, policy().with_pool(pool));
+     need(!host::capture_next, "victim record allocation not captured");
++    warm(victim);
+     auto* control = host::captured; victim = xo::XBuffer{};
+     std::array<xo::XBuffer, 3> after;
+-    for (auto& item : after) item = make_buffer(); // next replacement is dead victim's slot
++    for (auto& item : after) { item = make_buffer(); warm(item); } // next replacement is dead victim's slot
+     delete_binding = ref; delete_expected_word = 521; delete_require_cold = false;
+     delete_move_source = &incoming; delete_move_target = &receiver;
+     arm_delete(control, move_during_delete_then_check);
+-    auto& actual = ref.segment->freelist_runtime_owner();
++    auto& actual = search_owner(ref.segment);
+     need(host::delete_calls == 1 && delete_ok && &actual == static_cast<xo::XBufferCore*>(&receiver),
+          "cold cache eviction returned owner cached before delete callback");
+     disarm_delete();
+@@ -431,6 +459,44 @@
+     static_assert(sizeof(xo::XAllocatorStateV1)==88 && sizeof(xo::XBufferCore::arena_header)==48);
+ }
+ 
++// B1: the host-page owner slot names exactly the registered record for the
++// payload, follows the storage through Core move/swap, is cleared before the
++// storage is pooled or unmapped, and is republished on pooled reuse.
++inline constexpr auto record_member = core_member("owner_record_");
++const void* slot_value(const void* payload) {
++    return dt::VirtualMemoryStorage::owner_slot(payload)->load(std::memory_order_acquire);
++}
++void host_page_owner_slot() {
++    auto a = make_buffer(), b = make_buffer();
++    auto& ra = static_cast<xo::XBufferCore&>(a).[:record_member:];
++    auto& rb = static_cast<xo::XBufferCore&>(b).[:record_member:];
++    const void* pa = a.data(); const void* pb = b.data();
++    need(slot_value(pa) == ra.get() && slot_value(pb) == rb.get(), "slot does not name the registered record");
++    a.swap(b);
++    need(slot_value(pa) == static_cast<xo::XBufferCore&>(b).[:record_member:].get() &&
++         binding(b).segment->freelist_runtime_owner().data() == pa &&
++         &binding(b).segment->freelist_runtime_owner() == static_cast<xo::XBufferCore*>(&b),
++         "slot/owner did not follow the storage through swap");
++    xo::XBuffer moved(std::move(a));
++    need(slot_value(pb) == static_cast<xo::XBufferCore&>(moved).[:record_member:].get() &&
++         &binding(moved).segment->freelist_runtime_owner() == static_cast<xo::XBufferCore*>(&moved),
++         "slot owner not updated after Core move");
++    xo::XBufferPool pool({1, 4u << 20, 4u << 20});
++    const void* pooled = nullptr;
++    {
++        auto p = xo::XBuffer::create<OwnerRoot>(4096, policy().with_pool(pool)); pooled = p.data();
++        need(slot_value(pooled) != nullptr, "pooled-capable buffer slot not published");
++    }
++    need(pool.stats().cached_blocks == 1 && slot_value(pooled) == nullptr, "slot not cleared before pooling");
++    auto again = xo::XBuffer::create<OwnerRoot>(4096, policy().with_pool(pool));
++    need(again.data() == pooled && slot_value(pooled) == static_cast<xo::XBufferCore&>(again).[:record_member:].get() &&
++         &binding(again).segment->freelist_runtime_owner() == static_cast<xo::XBufferCore*>(&again),
++         "pooled reuse did not republish the slot");
++    // Copies never include the host page; emitted bytes are unchanged.
++    const auto bytes = again.copy_bytes();
++    need(std::memcmp(bytes.data(), again.data(), bytes.size()) == 0, "copy_bytes differs from payload");
++}
++
+ xo::XBufferPool late_pool;
+ xo::XBuffer late_owner;
+ bool late_armed = false;
+@@ -440,9 +506,9 @@
+         try {
+             need(host::delete_calls == 1 && delete_ok, "TLS record delete callback did not use safe late cold lookup");
+             disarm_delete();
+-            auto ref=binding(late_owner); const auto before=dt::owner_lookup_stats.cold_lookups;
++            auto ref=binding(late_owner); const auto before=non_tls_lookups();
+             auto* p=fd::allocate_dynamic_bytes(ref,24,8);fd::retire_dynamic_bytes(ref,p,24);
+-            need(dt::owner_lookup_stats.cold_lookups > before, "late global destructor reused destroyed TLS cache");
++            need(non_tls_lookups() > before, "late global destructor reused destroyed TLS cache");
+         } catch (...) { std::abort(); }
+     }
+ } late_check;
+@@ -455,13 +521,14 @@
+         transfers_and_deterministic_reused_payload_base();
+         callback_during_allocation_diagnostic(); callback_during_core_reclamation();
+         callback_during_detached_cache_release_and_host_oom();
+-        registry_new_handler_reentry_is_unlocked(); alias_roundtrip_and_thread_exit();
++        registry_new_handler_reentry_is_unlocked(); alias_roundtrip_and_thread_exit(); host_page_owner_slot();
+         delete_callbacks_observe_complete_move(); delete_callback_during_cold_cache_eviction();
+         late_owner=make_buffer(); late_owner.root<OwnerRoot>().numbers.resize(3, 617u);
+         late_pool=xo::XBufferPool({1, 4u << 20, 4u << 20});
+         begin_capture();
+         auto late_victim=xo::XBuffer::create<OwnerRoot>(4096, policy().with_pool(late_pool));
+         need(!host::capture_next, "late victim control not captured");
++        (void)search_owner(binding(late_victim).segment); // B1: replay the former cold lookup (TLS lease)
+         auto* late_control=host::captured; late_victim=xo::XBuffer{};
+         delete_binding=binding(late_owner); delete_expected_owner=&late_owner;
+         delete_expected_word=617; delete_require_cold=true;
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_virtual_memory_storage.cpp w9a-alpha-B1/tests/test_virtual_memory_storage.cpp
+--- w9a/tests/test_virtual_memory_storage.cpp	2026-10-20 03:43:45
++++ w9a-alpha-B1/tests/test_virtual_memory_storage.cpp	2026-10-20 09:37:22
+@@ -2,6 +2,7 @@
+ // compilers can verify it independently of the full P2996 integration suite.
+ #include "../xoffset_virtual_memory.hpp"
+ 
++#include <atomic>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+@@ -670,6 +671,42 @@
+     }
+ }
+ 
++// B1 host page: every non-empty reservation (fresh PROT_NONE, full copy,
++// receive, pooled reuse) has a read/write owner slot just before data(),
++// begun null, outside the payload accounting, and moving with the storage.
++void test_host_page_owner_slot() {
++    using Slot = std::atomic<void*>;
++    auto slot = [](const VirtualMemoryStorage& s) { return VirtualMemoryStorage::owner_slot(s.data()); };
++    int marker = 0;
++    {
++        VirtualMemoryStorage s(0, 1 << 20);
++        check(slot(s)->load() == nullptr, "fresh owner slot not null");
++        slot(s)->store(&marker);
++        check(s.reserved_bytes() == (std::size_t(1) << 20) && s.accessible_bytes() == 0,
++              "host page counted in payload accounting");
++        VirtualMemoryStorage moved(std::move(s));
++        check(slot(moved)->load() == &marker, "owner slot did not move with the storage");
++        slot(moved)->store(nullptr);
++    }
++    {
++        std::vector<char> full(64 << 10, 'q');
++        auto f = VirtualMemoryStorage::from_bytes(full.data(), full.size(), full.size());
++        check(slot(f)->load() == nullptr && f.accessible_bytes() == f.reserved_bytes(),
++              "full-copy storage owner slot");
++        auto r = VirtualMemoryStorage::for_receive(16, 1 << 20);
++        check(slot(r)->load() == nullptr, "receive storage owner slot");
++    }
++    {
++        VmStoragePool pool({1, 4 << 20, 4 << 20});
++        const char* base = nullptr;
++        { VirtualMemoryStorage a(0, 1 << 20, pool); base = a.data(); check(slot(a)->load() == nullptr, "pooled slot"); }
++        VirtualMemoryStorage b(0, 1 << 20, pool);
++        check(b.data() == base && slot(b)->load() == nullptr && pool.stats().hits == 1,
++              "pooled reuse lost the host page");
++    }
++    static_assert(std::is_same<decltype(VirtualMemoryStorage::owner_slot(nullptr)), Slot*>::value, "slot type");
++}
++
+ } // namespace
+ 
+ int main() {
+@@ -688,6 +725,7 @@
+     test_full_capacity_from_bytes(page);
+     test_from_bytes_failure_and_live_input(page);
+     test_move_swap_and_release(page);
++    test_host_page_owner_slot();
+     test_g1_zeroing();
+     clear_vm_failures();
+     std::cout << "Virtual memory storage tests passed (page_size=" << page
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffset_verified_receive.hpp w9a-alpha-B1/xoffset_verified_receive.hpp
+--- w9a/xoffset_verified_receive.hpp	2026-10-20 03:43:45
++++ w9a-alpha-B1/xoffset_verified_receive.hpp	2026-10-20 09:34:23
+@@ -35,6 +35,7 @@
+                     pending.registry->owners.insert(std::move(pending.node));
+                     source.owner_record_ = pending.record;
+                     XBufferCore::mark_canonical_registration(*pending.record);
++                    XBufferCore::publish_owner_slot(*pending.record); // B1
+                     inserted = true;
+                 }
+             }
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffset_virtual_memory.hpp w9a-alpha-B1/xoffset_virtual_memory.hpp
+--- w9a/xoffset_virtual_memory.hpp	2026-10-20 03:43:45
++++ w9a-alpha-B1/xoffset_virtual_memory.hpp	2026-10-20 09:33:49
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <atomic>
+ #include <cstddef>
+ #include <cstdint>
+ #include <cstring>
+@@ -120,11 +121,31 @@
+     friend class VirtualMemoryStorage;
+ };
+ 
+-// OS storage only: no allocator metadata or process-local information is stored
+-// in the reservation. Accessible means page permissions are read/write; it does
+-// not measure resident physical memory or promise future fault-free allocation.
++// OS storage only: no allocator metadata is stored in the payload. Accessible
++// means page permissions are read/write; it does not measure resident physical
++// memory or promise future fault-free allocation.
++//
++// B1 host page: every non-empty reservation is preceded by one read/write
++// host-only page (POSIX: one page; Windows: one allocation granule, so the
++// payload keeps its granule alignment). Its last bytes hold an opaque
++// std::atomic<void*> owner slot at data() - host_slot_offset, begun when the
++// mapping is created and null until an owner publishes itself. The page is
++// not part of the payload: data(), size(), reserved_bytes(),
++// accessible_bytes() and pool accounting describe the payload only, and no
++// wire/copy path ever reads it. It travels with the reservation (move, swap,
++// pool reuse) and dies with the mapping.
+ class VirtualMemoryStorage {
+ public:
++    static constexpr std::size_t host_slot_offset = 16;
++    static_assert(host_slot_offset >= sizeof(std::atomic<void*>) &&
++                  host_slot_offset % alignof(std::atomic<void*>) == 0);
++    // Owner slot of a live library reservation whose payload starts at
++    // `payload` (precondition; never called with other addresses).
++    static std::atomic<void*>* owner_slot(const void* payload) noexcept {
++        return std::launder(reinterpret_cast<std::atomic<void*>*>(
++            static_cast<char*>(const_cast<void*>(payload)) - host_slot_offset));
++    }
++
+     VirtualMemoryStorage() noexcept = default;
+ 
+     VirtualMemoryStorage(std::size_t logical_bytes, std::size_t maximum_capacity)
+@@ -161,18 +182,34 @@
+         pool_ = pool;
+         if (!acquire_from_pool()) {
+ #if defined(_WIN32)
+-            base_ = static_cast<char*>(::VirtualAlloc(
+-                nullptr, reserved, MEM_RESERVE, PAGE_NOACCESS));
+-            if (!base_) throw std::bad_alloc();
++            const std::size_t host = reservation_granularity_;
++            if (reserved > (std::numeric_limits<std::size_t>::max)() - host) throw std::bad_alloc();
++            char* mapping = static_cast<char*>(::VirtualAlloc(
++                nullptr, host + reserved, MEM_RESERVE, PAGE_NOACCESS));
++            if (!mapping) throw std::bad_alloc();
++            if (!::VirtualAlloc(mapping, host, MEM_COMMIT, PAGE_READWRITE)) {
++                ::VirtualFree(mapping, 0, MEM_RELEASE);
++                throw std::bad_alloc();
++            }
++            base_ = mapping + host;
+ #else
++            const std::size_t host = page_size_;
++            if (reserved > (std::numeric_limits<std::size_t>::max)() - host) throw std::bad_alloc();
+             if (full_copy && consume_vm_failure(VmOperation::Enable)) throw std::bad_alloc();
+-            void* mapping = ::mmap(nullptr, reserved, full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
++            void* mapping = ::mmap(nullptr, host + reserved, full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
+                                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+             if (mapping == MAP_FAILED) throw std::bad_alloc();
+-            base_ = static_cast<char*>(mapping);
++            if (!full_copy && ::mprotect(mapping, host, PROT_READ | PROT_WRITE) != 0) {
++                ::munmap(mapping, host + reserved);
++                throw std::bad_alloc();
++            }
++            base_ = static_cast<char*>(mapping) + host;
+             if (full_copy) accessible_bytes_ = reserved;
+ #endif
++            host_bytes_ = host;
+             reserved_bytes_ = reserved;
++            // Begin the slot object once per mapping (fresh pages are zero).
++            ::new (static_cast<void*>(base_ - host_slot_offset)) std::atomic<void*>(nullptr);
+         }
+         // A throwing constructor does not run this object's destructor.
+         if (!grow_to(logical_bytes)) {
+@@ -361,6 +398,7 @@
+     void swap_storage(VirtualMemoryStorage& other) noexcept {
+         using std::swap;
+         swap(base_, other.base_);
++        swap(host_bytes_, other.host_bytes_);
+         swap(canonical_byte_origin_, other.canonical_byte_origin_);
+         swap(reserved_bytes_, other.reserved_bytes_);
+         swap(maximum_capacity_, other.maximum_capacity_);
+@@ -417,12 +455,13 @@
+     void release_mapping() noexcept {
+         if (base_) {
+ #if defined(_WIN32)
+-            ::VirtualFree(base_, 0, MEM_RELEASE);
++            ::VirtualFree(base_ - host_bytes_, 0, MEM_RELEASE);
+ #else
+-            ::munmap(base_, reserved_bytes_);
++            ::munmap(base_ - host_bytes_, host_bytes_ + reserved_bytes_);
+ #endif
+         }
+         base_ = nullptr;
++        host_bytes_ = 0;
+         canonical_byte_origin_ = nullptr;
+         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
+         zero_from_ = 0;
+@@ -430,6 +469,8 @@
+     }
+ 
+     char* base_{nullptr};
++    // Size of the host page that precedes base_ (0 when nothing is mapped).
++    std::size_t host_bytes_{0};
+     std::byte* canonical_byte_origin_{nullptr};
+     std::size_t reserved_bytes_{0};
+     std::size_t maximum_capacity_{0};
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-alpha-B1/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-alpha-B1/xoffsetdatastructure.hpp	2026-10-20 09:34:23
+@@ -92,6 +92,7 @@
+             std::uint64_t slow_revalidations = 0, reclamation_reserves = 0;
+             std::uint64_t reclamation_restarts = 0, reclamation_abandoned = 0;
+             std::uint64_t record_object_bytes = 0;
++            std::uint64_t direct_hits = 0; // B1: host-page owner slot hits
+         };
+ #if defined(XOFFSET_OWNER_LOOKUP_DIAGNOSTICS) && XOFFSET_OWNER_LOOKUP_DIAGNOSTICS
+         inline thread_local OwnerLookupStats owner_lookup_stats;
+@@ -740,7 +741,50 @@
+             return (value + alignment - 1u) & ~(alignment - 1u);
+         }
+ 
++        // B1 direct fetch. Precondition (all callers): ptr is the arena header,
++        // i.e. the payload base, of a live library VirtualMemoryStorage, whose
++        // host page therefore precedes it. The slot holds the OwnerRecord*
++        // published by register_registry/publish_node and is cleared by
++        // unregister_registry before the Core's lease is released, so a
++        // non-null slot always names a live record. A live hit (same payload,
++        // owner set) returns at once with no TLS, loop or registry; anything
++        // else (null slot, unpublished owner) takes the unchanged search,
++        // which keeps every error and the cold/new_handler rules.
+         static XBufferCore& owner_from_payload_ptr(const void* ptr) {
++            if (ptr) [[likely]] {
++                auto* record = static_cast<OwnerRecord*>(
++                    detail::VirtualMemoryStorage::owner_slot(ptr)->load(std::memory_order_acquire));
++                if (record && record->payload == ptr) [[likely]] {
++                    if (auto* owner = record->owner.load(std::memory_order_acquire)) [[likely]] {
++                        detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
++                        detail::owner_lookup_count(&detail::OwnerLookupStats::direct_hits);
++                        return *owner;
++                    }
++                }
++            }
++            return owner_from_payload_ptr_search(ptr);
++        }
++
++        static void publish_owner_slot(const OwnerRecord& record) noexcept {
++            if (record.payload)
++                detail::VirtualMemoryStorage::owner_slot(record.payload)->store(
++                    const_cast<OwnerRecord*>(&record), std::memory_order_release);
++        }
++
++        static void clear_owner_slot(const OwnerRecord& record) noexcept {
++            if (!record.payload) return;
++            auto* slot = detail::VirtualMemoryStorage::owner_slot(record.payload);
++            void* expected = const_cast<OwnerRecord*>(&record);
++            slot->compare_exchange_strong(expected, nullptr, std::memory_order_release,
++                                          std::memory_order_relaxed);
++        }
++
++#if defined(_MSC_VER)
++        __declspec(noinline)
++#elif defined(__clang__) || defined(__GNUC__)
++        __attribute__((noinline))
++#endif
++        static XBufferCore& owner_from_payload_ptr_search(const void* ptr) {
+             detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
+             OwnerCache* cache = nullptr;
+             if (owner_cache_available()) {
+@@ -874,6 +918,9 @@
+             auto record = std::move(owner_record_);
+             if (!record) return;
+             record->owner.store(nullptr, std::memory_order_release);
++            // B1: clear the host-page slot while `record` still holds a lease
++            // and before the storage can be released or pooled.
++            clear_owner_slot(*record);
+             RegistryOwners::node_type retired_node;
+             {
+                 auto& state = registry_state();
+@@ -906,6 +953,7 @@
+                         state.owners.insert(std::move(node));
+                         owner_record_ = record;
+                         mark_canonical_registration(*record);
++                        publish_owner_slot(*record); // B1
+                         inserted = true;
+                     }
+                 }

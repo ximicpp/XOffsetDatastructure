@@ -1,0 +1,37 @@
+{
+ "schema": "xoffset-mac-screen-v3-c",
+ "name": "VB4-on-W9a-v3",
+ "description": "V-B validation prefetch, distance D=4 (selected by 31-round exploration) vs W9a, v3 rules (user choice C)",
+ "base_source": "/Volumes/XOffsetCS/candidates/w9a",
+ "candidate_source": "/Volumes/XOffsetCS/candidates/w9a-vb",
+ "base_binary_sha256": "fdd030b513a313ac06071a9eac2c0ac40ee00ae76b68e8a17749567d0b747765",
+ "candidate_binary_sha256": "cadd075ee64ea094a42fd2c650f9122b045a8d0265dc02d8802c44fe67bc940f",
+ "screen_py_sha256": "6d2b1eb4b7c7ca4b2b069a1178f23a2c009a01bcdaa27c8e479e260711803867",
+ "fixture": "M (prepared-v1, regenerated on Mac; S matches golden)",
+ "pairs": 72,
+ "order": "36 AB + 36 BA shuffled by random.Random(20261020)",
+ "primary": {
+  "metrics": [
+   "reload"
+  ],
+  "rule": "one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4,71); promotion requires every primary upper bound < 1"
+ },
+ "auxiliary": {
+  "metrics": [
+   "load",
+   "query_before",
+   "mutate",
+   "emit_after",
+   "retire_modified_state",
+   "query_after",
+   "cleanup",
+   "read_sum",
+   "total"
+  ],
+  "rule": "one-sided 95% upper bound per item, critical t(0.95,71), no Bonferroni (user choice C, 2026-10-20 19:44Z); non-inferiority (user D1/Q12): read_sum and query_before/query_after upper bound must be <= 1.01, every other auxiliary upper bound <= 1.02, otherwise promotion is vetoed"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or re-run; child timeout 20 s; any child failure aborts the screen as failed",
+ "host": "macOS-26.3-arm64-arm-64bit-Mach-O",
+ "frozen_epoch": 1792548636.8750532,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}
