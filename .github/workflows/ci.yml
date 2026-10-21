@@ -175,6 +175,120 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  gcc16:
+    name: Build & Test (GCC 16 Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Official gcc:16 image (GCC 16.2.0, libstdc++), pinned by digest.
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Configure, build and CTest (Debug)
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              g++ --version | head -n 1 &&
+              cmake -S . -B build/gcc16 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ &&
+              cmake --build build/gcc16 --parallel 4 &&
+              ctest --test-dir build/gcc16 --output-on-failure --parallel 2 --timeout 900' \
+            2>&1 | tee build/gcc16-build.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc16-result
+          path: |
+            build/gcc16-build.log
+            build/gcc16/Testing/Temporary/*.log
+            build/gcc16/compile-checks/*.log
+          if-no-files-found: ignore
+
+  cross-compiler-wire:
+    name: Cross-compiler wire (P2996 Clang <-> GCC 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull images
+        run: |
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+          echo "XOFFSET_CI_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Build the corpus tool with both compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_CI_IMAGE" bash -c '
+              cmake -S . -B build/xw-clang -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ &&
+              cmake --build build/xw-clang --target test_cross_compiler_wire --parallel 4'
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              cmake -S . -B build/xw-gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ &&
+              cmake --build build/xw-gcc --target test_cross_compiler_wire --parallel 4'
+
+      # Each compiler writes the corpus and reads the other's. Reading
+      # requires load_verified to accept and the bytes to equal its own.
+      - name: Exchange and compare wires
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLANG_RUN="docker run --rm --platform linux/amd64 -v ${{ github.workspace }}:/workspace -w /workspace \
+            -e LD_LIBRARY_PATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:/opt/p2996-toolchain/lib \
+            $XOFFSET_CI_IMAGE build/xw-clang/bin/Release/test_cross_compiler_wire"
+          GCC_RUN="docker run --rm --platform linux/amd64 -v ${{ github.workspace }}:/workspace -w /workspace \
+            $XOFFSET_GCC_IMAGE build/xw-gcc/bin/Release/test_cross_compiler_wire"
+          $CLANG_RUN --write build/corpus-clang
+          $GCC_RUN --write build/corpus-gcc
+          $GCC_RUN --read build/corpus-clang
+          $CLANG_RUN --read build/corpus-gcc
+          diff -r build/corpus-clang build/corpus-gcc
+          echo "P2996 Clang and GCC 16 wires are byte-identical and mutually accepted."
+
+      - name: Upload corpora
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-compiler-wire
+          path: |
+            build/corpus-clang/*.xwire
+            build/corpus-gcc/*.xwire
+          if-no-files-found: ignore
+
   sanitizer:
     name: ASan+UBSan (P2996 Docker, Linux)
     runs-on: ubuntu-latest
