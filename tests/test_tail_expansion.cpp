@@ -180,8 +180,9 @@ void split_reuse_keeps_exact_extents() {
     reject_without_change(buffer, [&] { return buffer.arena()->try_expand(reused, 32, 96); });
     auto* rest = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(224, 8));
     assert(rest == large + 32 && buffer.free_block_count() == 0 && buffer.arena()->used_end == used);
-    // Retire/reuse kept every byte: there are no in-arena free-list headers.
-    for (std::size_t i = 0; i < 256; ++i) assert(large[i] == 0x6d);
+    // Retire cleared the block (M3) and reuse wrote nothing into it: there are
+    // no in-arena free-list headers.
+    for (std::size_t i = 0; i < 256; ++i) assert(large[i] == 0);
 
     auto* tail = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(64, 8));
     assert(offset_of(buffer, tail) == used);
