@@ -1,0 +1,81 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_resize_growth.cpp w9a-beta-B2/tests/test_resize_growth.cpp
+--- w9a/tests/test_resize_growth.cpp	2026-10-20 03:43:45
++++ w9a-beta-B2/tests/test_resize_growth.cpp	2026-10-20 09:56:21
+@@ -334,6 +334,30 @@
+     ++cases;
+ }
+ 
++// B2: the default-scalar reallocation branch value-initializes the new tail
++// in one call. Reused (dirty) free-list storage must still read zero, the old
++// prefix must survive, and the old storage must be retired.
++void scalar_reallocation_value_initializes() {
++    auto b = make_buffer(); auto& r = b.root<ResizeRoot>();
++    for (std::uint32_t round = 0; round < 64; ++round) {
++        auto& v = r.numbers;
++        v.clear(); std::destroy_at(&v); std::construct_at(&v, r.attrs.binding());
++        v.resize(3); v[0] = 7 + round; v[1] = 8; v[2] = 9;
++        // Leave a dirty block of the target size class on the free list.
++        auto* dirty = fd::allocate_dynamic_bytes(v.binding(), (6 + round % 5) * 4, alignof(std::uint32_t));
++        std::memset(dirty, 0xee, (6 + round % 5) * 4);
++        fd::retire_dynamic_bytes(v.binding(), dirty, (6 + round % 5) * 4);
++        r.late.resize(r.late.size() + 1); // keep v's storage away from the arena tail
++        const auto free_before = v.allocator_state()->free_bytes;
++        v.resize(6 + round % 5);
++        need(v.size() == 6 + round % 5 && v.capacity() == v.size(), "scalar reallocation extent");
++        need(v[0] == 7 + round && v[1] == 8 && v[2] == 9, "scalar reallocation lost the prefix");
++        for (std::uint32_t i = 3; i < v.size(); ++i) need(v[i] == 0, "scalar reallocation tail not value-initialized");
++        (void)free_before;
++    }
++    roundtrip(b); ++cases;
++}
++
+ void make_compatibility_fixture(xo::XBuffer& b) {
+     auto& r = b.root<ResizeRoot>();
+     r.numbers.resize(3); r.numbers[0] = 10; r.numbers[1] = 20; r.numbers[2] = 30;
+@@ -370,6 +394,7 @@
+         default_growth_preserves_prefix_storage(); same_arena_fill_alias(); subobject_and_cross_arena_fill();
+         zero_shrink_and_in_capacity(); late_fill_and_default_failure(); host_bad_alloc_tail_sweep();
+         arena_bad_alloc_and_vm_failure(); nonrelocatable_fallback(); stage6_mechanism_gate();
++        scalar_reallocation_value_initializes();
+         std::cout << "P2 resize growth cases=" << cases << " passed (no timing)\n";
+         return 0;
+     } catch (const std::exception& e) { std::cerr << "P2 resize growth failure: " << e.what() << '\n'; return 1; }
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-beta-B2/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-beta-B2/xoffsetdatastructure.hpp	2026-10-20 09:56:04
+@@ -2732,9 +2732,32 @@
+                 capacity_ = count;
+                 return;
+             }
+-            resize_construct(count, [&](T* dst) {
+-                fixed_detail::default_construct(dst, binding());
+-            });
++            // B2 (M1 reopened on W9a): resize_construct's relocation branch,
++            // with the default-scalar tail value-initialized in one call
++            // instead of default_construct(dst, binding()) per element. For a
++            // scalar T both are value-initialization (zero) and cannot throw;
++            // staging, publication order and retirement are unchanged. Only
++            // this default scalar path changes; fill, custom construction and
++            // aliasing paths still use resize_construct.
++            const auto old_cap = capacity_;
++            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
++                alloc, bytes, alignof(T)), count);
++            std::int32_t delta = 0;
++            try {
++                fixed_detail::set_rel32(delta, &data_delta, fresh);
++            } catch (...) {
++                fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
++                throw;
++            }
++            std::uninitialized_value_construct_n(fresh + old_size, count - old_size);
++            for (size_type i = 0; i < old_size; ++i)
++                fixed_detail::relocate_construct(fresh + i, old[i]);
++            fixed_detail::destroy_n(old, old_size);
++            data_delta = delta;
++            size_ = count;
++            capacity_ = count;
++            fixed_detail::retire_dynamic_bytes(
++                alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+         }
+ 
+         template <typename Construct>

@@ -1,0 +1,37 @@
+{
+ "schema": "xoffset-mac-screen-v2-d1",
+ "name": "beta-B2-on-W9a-v1",
+ "description": "beta group = {B2 scalar batch value-initialization, M1 reopened per Q5} (A1, B6 excluded by exploration; B3 rejected by counterexample) vs W9a",
+ "base_source": "/Volumes/XOffsetCS/candidates/w9a",
+ "candidate_source": "/Volumes/XOffsetCS/candidates/w9a-beta-B2",
+ "base_binary_sha256": "fdd030b513a313ac06071a9eac2c0ac40ee00ae76b68e8a17749567d0b747765",
+ "candidate_binary_sha256": "4f202918374638f577052eae8534efe5432371edcf6f2bbffe7c65e427cf76da",
+ "screen_py_sha256": "8a71a86b6aec40486dd18816ab4e5ae405972e8a0b12be48e900dd60c105f528",
+ "fixture": "M (prepared-v1, regenerated on Mac; S matches golden)",
+ "pairs": 72,
+ "order": "36 AB + 36 BA shuffled by random.Random(20261020)",
+ "primary": {
+  "metrics": [
+   "mutate"
+  ],
+  "rule": "one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4,71); promotion requires every primary upper bound < 1"
+ },
+ "auxiliary": {
+  "metrics": [
+   "load",
+   "query_before",
+   "emit_after",
+   "retire_modified_state",
+   "reload",
+   "query_after",
+   "cleanup",
+   "read_sum",
+   "total"
+  ],
+  "rule": "two-sided intervals with t(1-0.05/72,71); non-inferiority (user D1/Q12): read_sum and query_before/query_after upper bound must be <= 1.01, every other auxiliary upper bound <= 1.02, otherwise promotion is vetoed"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or re-run; child timeout 20 s; any child failure aborts the screen as failed",
+ "host": "macOS-26.3-arm64-arm-64bit-Mach-O",
+ "frozen_epoch": 1792516326.368672,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}

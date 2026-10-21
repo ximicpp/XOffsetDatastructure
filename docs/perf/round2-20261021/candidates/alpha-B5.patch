@@ -1,0 +1,21 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-alpha-B5/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-alpha-B5/xoffsetdatastructure.hpp	2026-10-20 09:38:51
+@@ -1653,13 +1653,16 @@
+             }
+ 
+             if (!owner) owner = &XBufferCore::owner_from_payload_ptr(arena);
+-            const auto identity = owner->owner_record_;
+             // G: nullptr exactly where allocate_aligned_impl(..., false) threw
+             // XBadAlloc. No diagnostic exception object (and so no host
+             // allocation, new_handler call or unwinding) separates the failed
+             // no-growth attempt from the unchanged recovery below.
+             void* raw = owner->try_allocate_aligned_without_growth(aligned_bytes, alignment);
+             if (!raw) {
++                // B5: the identity lease is taken only now. The probe is
++                // noexcept and runs no callback, so owner->owner_record_ is the
++                // record the former pre-probe copy would have held.
++                const auto identity = owner->owner_record_;
+                 // Revalidation kept: release_cached_blocks below can still
+                 // reach host allocation and new_handler.
+                 owner = &XBufferCore::require_record_owner(identity);

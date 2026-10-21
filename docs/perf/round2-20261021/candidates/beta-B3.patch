@@ -1,0 +1,44 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_resize_growth.cpp w9a-beta-B3/tests/test_resize_growth.cpp
+--- w9a/tests/test_resize_growth.cpp	2026-10-20 03:43:45
++++ w9a-beta-B3/tests/test_resize_growth.cpp	2026-10-20 09:58:01
+@@ -334,6 +334,32 @@
+     ++cases;
+ }
+ 
++// B3 (not adopted): "capacity_ > 0 implies bound with a non-null arena" is
++// FALSE for publicly reachable states, so an in-capacity push_back may not
++// skip ensure_bound(). Pin the existing first error for both counterexamples.
++void in_capacity_push_back_keeps_bound_check() {
++    auto b = make_buffer(); auto& r = b.root<ResizeRoot>(); auto& v = r.numbers;
++    v.reserve(8); v.push_back(1);
++    auto expect_unbound = [&](const char* why) {
++        bool hit = false;
++        try { v.push_back(2); }
++        catch (const xo::XException& e) { hit = std::string_view(e.what()) == "XFixedVector is not bound to an allocator"; }
++        need(hit && v.size() == 1 && v[0] == 1, why);
++    };
++    const auto original = v.binding();
++    v.bind(fd::allocator_ref{});              // public rebind to a null binding, storage kept
++    need(v.capacity() == 8 && v.is_bound() && v.arena() == nullptr, "counterexample 1 state");
++    expect_unbound("in-capacity push_back skipped the null-arena check");
++    auto* second = static_cast<xo::XAllocatorStateV1*>(b.arena()->allocate_aligned(sizeof(xo::XAllocatorStateV1), alignof(xo::XAllocatorStateV1)));
++    std::construct_at(second); fd::initialize_allocator_state(*second, nullptr);
++    v.bind(fd::allocator_ref_of(second));     // state bound, but the state has no segment
++    need(v.capacity() == 8 && v.allocator_state() == second && v.arena() == nullptr, "counterexample 2 state");
++    expect_unbound("in-capacity push_back skipped the state-without-segment check");
++    v.bind(original);
++    v.push_back(3); need(v.size() == 2 && v[1] == 3, "rebinding the original allocator restores push_back");
++    ++cases;
++}
++
+ void make_compatibility_fixture(xo::XBuffer& b) {
+     auto& r = b.root<ResizeRoot>();
+     r.numbers.resize(3); r.numbers[0] = 10; r.numbers[1] = 20; r.numbers[2] = 30;
+@@ -370,6 +396,7 @@
+         default_growth_preserves_prefix_storage(); same_arena_fill_alias(); subobject_and_cross_arena_fill();
+         zero_shrink_and_in_capacity(); late_fill_and_default_failure(); host_bad_alloc_tail_sweep();
+         arena_bad_alloc_and_vm_failure(); nonrelocatable_fallback(); stage6_mechanism_gate();
++        in_capacity_push_back_keeps_bound_check();
+         std::cout << "P2 resize growth cases=" << cases << " passed (no timing)\n";
+         return 0;
+     } catch (const std::exception& e) { std::cerr << "P2 resize growth failure: " << e.what() << '\n'; return 1; }
