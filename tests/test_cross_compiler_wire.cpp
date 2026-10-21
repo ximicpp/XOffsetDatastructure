@@ -16,6 +16,7 @@
 //
 // Inputs come from std::mt19937_64 raw output only: its sequence is fixed by
 // the standard, while the distributions differ between standard libraries.
+// Each draw is a separate statement, never two arguments of one call.
 #include "xoffsetdatastructure.hpp"
 
 #include <array>
@@ -32,6 +33,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace xo = XOffsetDatastructure;
@@ -121,7 +123,11 @@ void fill(cw::Root& r, Source& in, std::size_t scale) {
     for (std::size_t i = 0; i < scale; ++i) {
         r.labels.emplace_back(in.text(20));
         r.keys.insert(static_cast<std::int32_t>(in.next()));
-        r.attrs.insert_or_assign(in.text(16), in.next());
+        // Two draws in one call would run in an unspecified order (GCC and
+        // Clang differ), so every draw is its own statement.
+        auto key = in.text(16);
+        const auto value = in.next();
+        r.attrs.insert_or_assign(std::move(key), value);
     }
     for (std::uint32_t v = 1; v <= 8; ++v) {
         if (in.below(3) == 0) continue;
