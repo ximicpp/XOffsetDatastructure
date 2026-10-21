@@ -295,6 +295,56 @@ public:
         return owner;
     }
 
+    // In-place reload: replace the logical content of this owner with
+    // `length` bytes, keeping the reservation, its accessible pages and the
+    // payload address. Bytes beyond `length` that the old content exposed
+    // stay below zero_from_, so every later growth zeroes them. A failure
+    // leaves the old bytes and length unchanged.
+    void assign_bytes(const char* bytes, std::size_t length) {
+        if (length > maximum_capacity_) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        if (length != 0 && bytes == nullptr) {
+            throw std::invalid_argument("VM input is null");
+        }
+        if (length == 0) { logical_bytes_ = 0; return; }
+        if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
+            throw std::bad_alloc();
+        }
+        std::memcpy(base_, bytes, length);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+    }
+
+    // In-place form of from_extents (same extent contract). Gap bytes are
+    // cleared wherever the old content may have left them dirty.
+    void assign_extents(const char* stored, const void* extents, std::size_t count,
+                        std::size_t length) {
+        if (length > maximum_capacity_) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        if (length == 0) { logical_bytes_ = 0; return; }
+        if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
+            throw std::bad_alloc();
+        }
+        std::size_t cursor = 0;
+        auto clear = [&](std::size_t begin, std::size_t end) {
+            const auto dirty = (std::min)(end, zero_from_);
+            if (begin < dirty) std::memset(base_ + begin, 0, dirty - begin);
+        };
+        for (std::size_t i = 0; i < count; ++i) {
+            std::uint32_t entry[2];
+            std::memcpy(entry, static_cast<const char*>(extents) + i * sizeof(entry), sizeof(entry));
+            clear(cursor, entry[0]);
+            std::memcpy(base_ + entry[0], stored, entry[1]);
+            stored += entry[1];
+            cursor = std::size_t(entry[0]) + entry[1];
+        }
+        clear(cursor, length);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+    }
+
     ~VirtualMemoryStorage() { release(); }
 
     VirtualMemoryStorage(const VirtualMemoryStorage&) = delete;
