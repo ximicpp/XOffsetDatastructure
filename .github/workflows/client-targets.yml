@@ -49,8 +49,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     env:
-      # gcc:16 (16.2.0) linux/arm64/v8 manifest.
-      XOFFSET_GCC_IMAGE: gcc@sha256:6502974f064520165ecc17700bf4a67035faee993db2c8804266e4840904d26f
+      # gcc:16 (16.2.0) linux/arm64/v8 image manifest (not its attestation).
+      XOFFSET_GCC_IMAGE: gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a
     steps:
       - uses: actions/checkout@v4
         with:
