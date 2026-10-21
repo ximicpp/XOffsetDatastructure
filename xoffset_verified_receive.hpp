@@ -248,6 +248,11 @@ VerifiedReceiveToken<T> begin_verified_receive(std::size_t bytes,
         std::optional<XBufferCore::MaximumCapacity> capacity, std::size_t holes, std::size_t extents) {
     static_assert(is_v1_wire_admitted_v<T>);
     static_assert(detail::receive_raw::future_supported_v<T>, "T requires audited initial and recursive default future construction");
+    // M1: without an explicit limit, the declared size may not exceed the
+    // default maximum (the reservation still equals the declared size).
+    detail::require_wire_within_capacity(bytes,
+        capacity ? capacity->value : XBufferCore::DEFAULT_MAXIMUM_CAPACITY,
+        capacity.has_value(), "begin_verified_receive<T>()");
     const auto cap = capacity.value_or(XBufferCore::maximum_capacity(bytes));
     if (bytes > XBufferCore::MAX_PAYLOAD || cap.value > XBufferCore::MAX_PAYLOAD || bytes > cap.value ||
         holes > XBufferCore::MAX_PAYLOAD / sizeof(XBufferCore::WireHole) ||

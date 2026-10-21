@@ -14,9 +14,45 @@
   a compiler or target lays out `T` differently from the pinned text, and the
   diagnostic shows the computed layout; `schema_pin<T>(name)` prints the pin.
   See `docs/SCHEMA_PINS.md`. CTest `schema_pin_mismatch` requires the failure.
+- Untrusted input (threat model `docs/V2_THREAT_MODEL.md`):
+  - M1: `load_verified` / `TypedXBuffer::load` and `begin_verified_receive`
+    without an explicit `maximum_capacity` accept a wire that declares at most
+    the default maximum (64 MiB, `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`); larger
+    declared sizes are rejected before any reservation. Previously a sparse wire
+    of a few hundred bytes could make the receiver reserve up to 2 GiB.
+    **Behavior change:** pass `XBuffer::maximum_capacity()` for wires above
+    64 MiB.
+  - M2: the rejection names the declared size and the limit (`XBadAlloc`).
+  - M3: hole bytes are emitted as zero by `save_verified`, `save_verified_into`
+    and `freeze_verified`, never as the old contents of freed blocks.
+  - M4: container shrink (`clear`, `resize` down, `erase`, `pop_back`,
+    `stable_erase_if`, shorter `assign`) zeroes the vacated element and
+    character bytes, so spare capacity never carries old values.
+  - M6: implicit padding. The library zeroes the padding of every container
+    element it constructs or relocates, including map entries (an
+    `XMap<std::int32_t, std::int64_t>` entry has 4 padding bytes between key
+    and value), so copied temporaries and reused arena blocks no longer put
+    the caller's stack or stale bytes into a wire, and the same content
+    always yields the same wire. Padding of a record the caller assigns
+    directly is not reachable by the library: `has_implicit_padding_v<T>`,
+    `XOFFSET_REQUIRE_NO_PADDING(T)` and the opt-in
+    `XOFFSET_REJECT_IMPLICIT_PADDING` switch report such types at compile
+    time.
+  - Wires with holes or spare capacity change bytes (golden values updated).
 - New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
   a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and
   mutual `load_verified` acceptance.
+- Coverage-guided fuzzing (G5): `fuzz_v2_wire` (libFuzzer, option
+  `XOFFSET_BUILD_FUZZERS`) feeds each input to the spec oracle, typed load, raw
+  validation and verified receive, which must agree; accepted wires must
+  survive read -> mutate -> save -> load byte-stably. It shares its core with
+  `test_v2_fuzz` (`tests/fuzz/v2_fuzz_core.hpp`). The new `Fuzz` workflow runs
+  it under ASan+UBSan for 5 minutes on pull requests and pushes and for an hour
+  nightly, keeping the corpus between runs. `fuzz_wire_schemas` adds three
+  schemas (fixed arrays, enums and byte blobs; nested maps with string keys;
+  three-level nested vectors) with a differential check across typed load,
+  raw validation and verified receive. All acceptors in the fuzz core now
+  use one 4 MiB limit, and the oracle rejects wires that declare more.
 
 ## 0.2.0-alpha.1: V2 storage and wire format
 
