@@ -1,18 +1,19 @@
-# 0.1.0-alpha.1 兼容与输入边界
+# 0.2.0-alpha.1 兼容与输入边界
 
 此 alpha 面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
 但 alpha 之间不承诺源码 API 或 ABI 稳定，也不承诺任意编译器、标准库、schema
-演进与布局组合之间的长期 wire 兼容。本次版本包装不修改生产头或 V1 格式。
+演进与布局组合之间的长期 wire 兼容。本版本使用 V2 存储与 wire 格式（`docs/V2_FORMAT.md`），
+不读取 V1 wire。
 
 ## 版本和工具链
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.1.0-alpha.1` 的唯一文本来源；CMake project 数字版本是
-`0.1.0`。安装消费采用无版本查找，再检查完整字符串：
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.2.0-alpha.1` 的唯一文本来源；CMake project 数字版本是
+`0.2.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.1.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.1.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
 endif()
 ```
 
@@ -31,16 +32,18 @@ storage，完整 P2996 尚未验证。WSL、Docker 的结果必须保留实际�
 已验证的多翻译单元安装/源码消费不扩大为共享库、动态插件、跨 CRT、混合标准库
 或混合头版本的 ABI 保证。
 
-## V1 wire 的准入和兼容
+## V2 wire 的准入和兼容
 
-V1 是当前固定格式，不提供通用 schema migration 或任意 ABI 转换。加载要求匹配的
-root/schema/type/layout 身份及有效的 allocator/object graph；注册相同 schema 名称
+V2 是当前固定格式（magic `XOFFV2`，format_major 2）。V1 wire 一律以
+`unsupported wire format version 1` 拒绝，库内没有 V1 读取或迁移路径。
+不提供 schema 演进、通用 schema migration 或任意 ABI 转换：加载要求匹配的
+root/schema/type/layout 身份及有效的对象图（活块与空洞表恰好铺满已用区）；注册相同 schema 名称
 并不能让不同布局兼容。需要持久化跨版本读取时，应保留能够读取原格式的工具链、
 schema 与转换程序，并单独验证迁移结果。
 
 - 存储类型必须满足 `boost::typelayout::is_byte_copy_safe_v<T>`。
-- 固定 schema verified 路径还要求 `is_v1_wire_admitted_v<T>`；这是额外的 wire
-  准入约束，不等于“所有可平凡复制的 C++ 类型均可用”。
+- 固定 schema verified 路径还要求 `is_v1_wire_admitted_v<T>`（名称沿用旧版，规则适用于 V2）；
+  这是额外的 wire 准入约束，不等于“所有可平凡复制的 C++ 类型均可用”。
 - 使用 library 的 XString/XVector 等 arena 容器。普通进程地址、原生指针/引用、
   member pointer、union 不能进入此 admitted wire 域；普通 `std::string/std::vector`
   不是 offset 容器的替代品。
@@ -65,7 +68,7 @@ root/schema/allocator 并规范化输出，但不应被描述为完整对象图�
 `load_unverified()` 仅适合调用方已经信任的 raw payload。
 
 格式中的 signature、FNV 和文件 SHA-256 清单用于身份/完整性核对，不提供发送者认证、
-机密性、MAC 或数字签名。当前 V1 的 `crc32c` 字段写入并要求为 0，不能宣称它已经
+机密性、MAC 或数字签名。当前 V2 头的 `crc32c` 字段写入并要求为 0，不能宣称它已经
 提供 CRC 检验。若业务需要来源真实性或防篡改，应在外部协议中进行认证并保护对应
 版本/schema/长度信息；库的 verified 标记不替代该协议。
 

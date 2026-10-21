@@ -1,22 +1,22 @@
 # XOffsetDatastructure
 
-Development candidate: see [CANDIDATE.md](CANDIDATE.md) and the
-[next-version design](docs/PERFORMANCE_V3_DESIGN.md).
-The alpha version below identifies ancestry; this candidate is not a published release.
-
-**0.1.0-alpha.1** is an experimental C++26/P2996 library for reflected objects
+**0.2.0-alpha.1** is an experimental C++26/P2996 library for reflected objects
 and offset containers stored in an address-stable virtual-memory arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
 
-An owning buffer keeps its base address through growth, logical shrink and save.
-Saving produces an owning byte copy; loading validates and copies bytes into a
-new reservation. The format avoids per-field decoding. Save/load are not
-zero-copy operations.
+Objects live in one contiguous arena and refer to each other through relative
+offsets, so the arena bytes are the serialized form: there is no per-field
+encoding or decoding. Saving produces an owning byte copy; loading validates the
+whole object graph and copies the bytes into a new reservation. Save and load
+are not zero-copy operations.
 
-Start with the [package guide](docs/VM_PACKAGING.md) and read the
-[alpha compatibility contract](docs/ALPHA_COMPATIBILITY.md) before persisting or
-accepting wire data. [CHANGELOG.md](CHANGELOG.md) records this prerelease.
+This release uses the **V2 storage and wire format** ([format specification](docs/V2_FORMAT.md)).
+V1 wires are rejected with `unsupported wire format version 1`; there is no V1
+reader or migration path. Start with the [user guide](docs/USER_GUIDE.md), then
+read the [compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
+persisting or accepting wire data. [CHANGELOG.md](CHANGELOG.md) records each
+prerelease.
 
 ## Requirements
 
@@ -27,11 +27,13 @@ accepting wire data. [CHANGELOG.md](CHANGELOG.md) records this prerelease.
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
 Ordinary C++26 support does not imply P2996 support. The full API has no
-non-reflection fallback. Native Windows full-library support is not established
-for this alpha; the tested Windows target is storage only.
+non-reflection fallback, and the supported compiler is the Bloomberg
+clang-p2996 fork pinned in [toolchains/README.md](toolchains/README.md).
+Native Windows full-library support is not established; the tested Windows
+target is storage only.
 
 The source archive includes the locked TypeLayout and ten Boost header modules.
-Full installed packages include the same 851 dependency headers. Neither package
+Full installed packages include the same dependency headers. Neither package
 includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
 recipes are in [toolchains/README.md](toolchains/README.md),
 [toolchains/vm-validation.json](toolchains/vm-validation.json), and the
@@ -68,8 +70,10 @@ int main() {
 ```
 
 `TypedXBuffer<T>::load()` uses the verified path. Use library containers inside
-the arena, register each root schema, and satisfy both byte-copy safety and V1
-wire admission. A schema name alone does not establish compatibility.
+the arena, register each root schema, and satisfy both byte-copy safety and wire
+admission. A schema name alone does not establish compatibility: the reader's
+type layout must match the writer's exactly (see
+[schema changes](docs/USER_GUIDE.md#7-schema-变更)).
 See `examples/helloworld.cpp`, `examples/stable_storage.cpp` and
 `examples/demo.cpp` for more examples.
 
@@ -113,8 +117,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.1.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.1.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -132,37 +136,27 @@ only storage is needed.
 
 ## Validation scope
 
-These are recorded profile-specific results, not a promise for every compiler
-on each OS. The 2026-10-16 continuation kept the accepted production headers
-unchanged. Release-archive validation is reported separately from this baseline.
+Results are profile-specific, not a promise for every compiler on each OS.
 
-| Environment | Recorded result | Boundary |
+| Environment | V2 result | Boundary |
 | --- | --- | --- |
-| Native Windows x64, MSVC 19.44 | storage 2/2; installed 3/3; subproject 3/3 | Windows full P2996, sanitizer and performance unverified |
-| WSL2 Ubuntu 22.04 x86_64, GCC 11.4 | storage 2/2; installed 3/3; subproject 3/3 | Same-architecture virtual machine |
-| WSL2, P2996 `9ffb96e...`, initial restored profile | full 48/48; 3 separate configure checks | `linux-current-20261016` profile |
-| WSL2, same compiler, final runtime/link profile | full installed 3/3 and subproject 3/3; network ASan/UBSan 34 groups / 182 subcases; 2 controlled defects detected | `linux-current-complete-v2-20261016`; this is not a rerun of all 48 full tests |
-| Historical native macOS arm64, pinned P2996 | full 48/48; full and storage installed 3/3 plus subproject 3/3 | Earlier recorded runs, not rerun on this Windows host |
+| macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
+| Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
+| Native Windows x64, MSVC | storage only (V1-era record) | Windows full P2996 unverified |
 
-The full development checkout contains `docs/VM_WINDOWS_CURRENT_RESULTS.md`,
-`docs/VM_LINUX_CURRENT_RESULTS.md`, and `docs/VM_FINAL_DELIVERY.md` with evidence
-identities. These research records and their historical archives are omitted
-from the compact source distribution. The maintained full/storage entrypoints
-are described in [VM_VALIDATION_RUNNER.md](docs/VM_VALIDATION_RUNNER.md) and the
-[package guide](docs/VM_PACKAGING.md).
+V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
+ASan+UBSan) with zero disagreements. Earlier V1-era platform records are kept in
+[VM_FINAL_DELIVERY.md](docs/VM_FINAL_DELIVERY.md) and
+[VM_VALIDATION_RUNNER.md](docs/VM_VALIDATION_RUNNER.md); they do not describe
+the V2 format.
 
-WSL and Docker are acceptable environments for further Linux performance work;
-record their virtualization class and qualify measurement noise. The one current
-WSL F/F calibration ran 78 serial processes, but all four metrics failed the
-predeclared local-anchor and drift qualifications. It establishes no 2% comparison
-capability, speedup, equivalence or regression. No D/F comparison, ablation or
-optimization adoption follows from it. The development checkout records this in
-`docs/VM_N3_CURRENT_RESULTS.md`; the original evidence remains unchanged.
+## Performance
 
-The synchronous TCP loopback reference and separate lifecycle model do not
-establish production asynchronous transport support. The three N7 I/O extensions,
-production business integration and performance attribution are outside this
-alpha's commitments.
+The only formal measurement is one Apple M4 machine running one demo workload
+against cista, FlatBuffers, Cap'n Proto and cereal; see
+[the round-3 report](docs/perf/round3-20261021/REPORT.md) for the protocol, raw
+data and adapter notes. Treat those numbers as specific to that machine,
+workload and adapter set. No Linux or Windows performance figures are claimed.
 
 ## Storage and ownership rules
 
@@ -181,6 +175,9 @@ alpha's commitments.
 - Library container mutations preserve logical contents on allocation failure;
   capacities and allocator bookkeeping need not roll back. User operation
   sequences and external constructor effects are not transactions.
+- Arena memory allocated by hand (for example `XBuffer::allocator<T>()`) and not
+  reachable from the root must be released before `save_verified`; the V2 exact
+  coverage check rejects unreachable regions.
 - Bound wire size, per-buffer capacity and aggregate in-flight work before
   accepting untrusted input. Verified validation is not cryptographic
   authentication; see the [compatibility contract](docs/ALPHA_COMPATIBILITY.md).
@@ -188,8 +185,5 @@ alpha's commitments.
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
-wire compatibility.
-
-
-候选扩展：[完整校验后的直接接收与可变访问](docs/VERIFIED_RECEIVE.md)。支持域、完成/取消合同及平台内存成本见说明；最终验收记录随本机证据另行提供。
-直接接收的数据与普通 load 使用同一平坦地址模型：库内部的相对偏移解析一律按 `origin + delta` 计算，依赖与普通 buffer 相同、已披露的实现定义行为（由地址形成指针），不再承诺接收数据的指针由接收字节数组派生（不再提供额外的指针来源/标准一致性保证）。公开的 `XBufferCore::canonical_bytes_at` 接口保留，但库自身的解析不再使用它。
+wire compatibility; the [user guide](docs/USER_GUIDE.md#8-api-稳定性) lists which
+interfaces are intended to stay stable.
