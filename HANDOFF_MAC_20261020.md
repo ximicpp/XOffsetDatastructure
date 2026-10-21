@@ -1,5 +1,9 @@
 # Mac 新工程接续：2026-10-20
 
+> **2026-10-20 更新：** 默认实现现为 **W9a**（提交 `14b57637d6fa57f8521138a0997fb3c8736db4f1`，经 PR #2 合并，`next_cpp26` = `9e3602f`）。
+> 下文以 C14 为默认的描述均为历史记录。下文引用的证据路径（`handoff/`、`docs/coordination/`、`tools/c14_*` 等）已移出工作树，
+> 保存在 tag `archive/codex-mac-continuation-20261020`，恢复方法见 [docs/ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)。
+
 仓库：<https://github.com/ximicpp/XOffsetDatastructure.git>。本次交接分支为 `codex/mac-continuation-20261020`；以用户随启动提示词给定的实际推送提交为准。若用户只给出分支，先记录远端该分支实际 tip 和本地 `git rev-parse HEAD`，核对一致，再记录本次接续身份。不要误用默认分支或把历史基线提交当作本次交接提交。
 
 用户只需在 Mac 上新建工程/会话并粘贴 [PROMPT_MAC_20261020.md](PROMPT_MAC_20261020.md)。代理自行获取源码、恢复资料、准备依赖和工具链、验证平台并继续实施。不要要求用户手工搬文件或运行命令。常规可逆工作持续推进；仅在确需凭据、系统权限或外部操作且代理无法自行解决时说明具体阻塞。
