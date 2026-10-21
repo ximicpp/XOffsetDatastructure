@@ -1265,6 +1265,83 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // In-place reload/reset (XBuffer::reload_verified / reset). The
+        // mapping, the payload address and therefore the owner registration
+        // are kept; every typed pointer into the old content is invalidated
+        // (epoch), and the owner is left without typed root access until the
+        // caller finishes verification.
+        void begin_reinit() noexcept {
+            ++m_epoch;
+            free_table_.reset();
+            free_table_lost_ = false;
+            typed_root_access_allowed_ = false;
+            schema_bound_ = false;
+            bound_root_type_id_ = 0;
+            bound_schema_hash_ = 0;
+            root_type_identity_ = nullptr;
+        }
+
+        // Same admission as init_from_storage, against this owner's maximum.
+        template <typename Assign>
+        void reinit_from_storage(const char* data, size_type size, Assign&& assign) {
+            if (buffer_.empty() && buffer_.maximum_capacity() == 0)
+                throw XException("XBufferCore: buffer has no storage");
+            begin_reinit();
+            if (size > MAX_PAYLOAD) throw XBadAlloc();
+            if (!data || size < sizeof(arena_header)) {
+                throw XException(
+                    "XBufferCore: payload too small");
+            }
+            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
+            // Holes are unknown until verification supplies the hole table.
+            free_table_lost_ = true;
+            try {
+                assign();
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            } catch (const std::length_error&) {
+                throw XBadAlloc();
+            }
+            auto* sm = arena();
+            if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
+                sm->header_size != sizeof(arena_header)) {
+                throw XException(
+                    "XBufferCore: payload header mismatch");
+            }
+            if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
+                throw XException(
+                    "XBufferCore: payload used_end out of range");
+            }
+        }
+
+        void reinit_from_bytes(const char* data, size_type size) {
+            reinit_from_storage(data, size, [&] { buffer_.assign_bytes(data, size); });
+        }
+
+        void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
+            reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
+        }
+
+        // Empty arena: header only, no root, empty exact free table. Bytes
+        // above the header become dirty-below-zero_from_ and are zeroed by the
+        // regrowth to `logical` (or by any later growth). noexcept: if the
+        // storage cannot hold a header the owner simply stays without one.
+        void reset_arena(size_type logical) noexcept {
+            begin_reinit();
+            if (buffer_.maximum_capacity() < min_payload_size()) return;
+            if (buffer_.size() < min_payload_size() && !buffer_.grow_to(min_payload_size())) return;
+            if (buffer_.size() > min_payload_size()) buffer_.resize_logical(min_payload_size());
+            auto* sm = arena();
+            std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
+            sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
+            sm->flags = 0;
+            sm->root_offset = 0;
+            sm->used_end = min_payload_size();
+            sm->reserved0 = 0;
+            sm->reserved1 = 0;
+            if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
         // Storage-associated access/schema state belongs to the owner so even
         // transfers through XBufferCore cannot leave derived flags behind.
         bool typed_root_access_allowed_ = true;
@@ -5686,57 +5763,69 @@ namespace XOffsetDatastructure {
         static XBuffer load_verified_with_resource(std::span<const std::byte> data,
                                                   std::optional<MaximumCapacity> cap,
                                                   std::pmr::memory_resource* upstream) {
+            constexpr const char* who = "load_verified<T>()";
             if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
-            static_assert(is_v1_wire_admitted_v<T>,
-                "load_verified<T>() requires an admitted fixed-schema wire type.");
-            if (data.size_bytes() < sizeof(XWireHeaderV2)) {
-                throw XException(
-                    "load_verified<T>(): wire header too small");
-            }
-
             XWireHeaderV2 header{};
-            std::memcpy(&header, data.data(), sizeof(header));
-            detail::check_wire_format(header, "load_verified<T>()");
-            if (header.root_type_id != detail::wire_root_type_id<T>()) {
-                throw XException(
-                    "load_verified<T>(): root type id mismatch");
-            }
-            if (header.schema_hash_lo != detail::wire_schema_hash<T>() ||
-                header.schema_hash_hi != 0) {
-                throw XException(
-                    "load_verified<T>(): schema hash mismatch");
-            }
-            const auto layout = detail::parse_wire_layout(
-                header, reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2),
-                data.size_bytes() - sizeof(XWireHeaderV2), "load_verified<T>()");
+            const auto layout = admit_wire_header<T>(data, header, who);
             const auto used = static_cast<std::size_t>(header.used_bytes);
             const auto capacity = cap ? *cap : MaximumCapacity{capacity_from_hint(used, used)};
             XBuffer xbuf = layout.extent_count == 0
                 ? XBuffer(layout.stored, used, capacity)
                 : XBuffer(SparsePayload{layout.stored, layout.extents, layout.extent_count}, used, capacity);
-            if (xbuf.arena()->used_end != header.used_bytes) {
-                throw XException("load_verified<T>(): non-normalized payload extent");
-            }
-            auto* root_ptr = detail::find_root<T>(xbuf);
-            if (!root_ptr) {
-                throw XException(
-                    "load_verified<T>(): root not found");
-            }
-            auto actual_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<std::uintptr_t>(root_ptr) -
-                reinterpret_cast<std::uintptr_t>(xbuf.get_address()));
-            if (actual_offset != header.root_offset) {
-                throw XException(
-                    "load_verified<T>(): root offset mismatch");
-            }
-            detail::verify_structural_wire_graph(*root_ptr, xbuf, upstream, layout.holes, layout.hole_count,
-                                                 true, nullptr, &layout.gaps);
-            xbuf.load_free_blocks(layout.holes, layout.hole_count);
-            xbuf.typed_root_access_allowed_ = true;
-            xbuf.bind_schema<T>();
+            xbuf.finish_verified_load<T>(header, layout, upstream, who);
             return xbuf;
         }
 
+        /// Verified load INTO this buffer, reusing its mapping, maximum
+        /// capacity and owner registration (no new reservation, pool round
+        /// trip or registry entry). Admission and verification are exactly
+        /// those of load_verified<T>(wire, this buffer's MaximumCapacity).
+        /// Every root reference, element pointer and borrowed span into the
+        /// previous content is invalidated; XHandles re-resolve. On any
+        /// failure the exception propagates and the buffer is left empty and
+        /// without typed root access (root<T>() throws) until a later
+        /// successful reload_verified or reset<T>(). Committed pages are kept
+        /// (see reclaim_tail_pages()).
+        template <typename T>
+        void reload_verified(std::span<const std::byte> data) {
+            reload_verified_with_resource<T>(data, std::pmr::new_delete_resource());
+        }
+
+        template <typename T>
+        void reload_verified(const std::string& data) {
+            reload_verified<T>(std::span<const std::byte>(
+                reinterpret_cast<const std::byte*>(data.data()), data.size()));
+        }
+
+        template <typename T>
+        void reload_verified_with_resource(std::span<const std::byte> data,
+                                           std::pmr::memory_resource* upstream) {
+            constexpr const char* who = "reload_verified<T>()";
+            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+            try {
+                XWireHeaderV2 header{};
+                const auto layout = admit_wire_header<T>(data, header, who);
+                const auto used = static_cast<std::size_t>(header.used_bytes);
+                if (layout.extent_count == 0) reinit_from_bytes(layout.stored, used);
+                else reinit_from_extents(layout.stored, layout.extents, layout.extent_count, used);
+                finish_verified_load<T>(header, layout, upstream, who);
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+        }
+
+        /// Empties this buffer and constructs a fresh root of type T in it,
+        /// reusing the mapping and owner registration; equivalent to
+        /// `*this = create<T>(get_size(), this buffer's MaximumCapacity)`.
+        /// Invalidates references into the previous content like
+        /// reload_verified.
+        template <typename T>
+        T& reset() {
+            reset_arena(this->get_size());
+            if (!this->arena()) throw XException("reset<T>(): buffer has no arena");
+            return *this->template make<T>();
+        }
         template <typename T>
         static XBuffer load_verified(const std::string& data,
                                      std::optional<MaximumCapacity> cap = std::nullopt) {
@@ -5750,6 +5839,53 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // Wire admission shared by load_verified and reload_verified.
+        template <typename T>
+        static detail::WireLayout admit_wire_header(std::span<const std::byte> data,
+                                                    XWireHeaderV2& header, const char* who) {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "load_verified<T>() requires an admitted fixed-schema wire type.");
+            if (data.size_bytes() < sizeof(XWireHeaderV2)) {
+                throw XException(std::string(who) + ": wire header too small");
+            }
+            std::memcpy(&header, data.data(), sizeof(header));
+            detail::check_wire_format(header, who);
+            if (header.root_type_id != detail::wire_root_type_id<T>()) {
+                throw XException(std::string(who) + ": root type id mismatch");
+            }
+            if (header.schema_hash_lo != detail::wire_schema_hash<T>() ||
+                header.schema_hash_hi != 0) {
+                throw XException(std::string(who) + ": schema hash mismatch");
+            }
+            return detail::parse_wire_layout(
+                header, reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2),
+                data.size_bytes() - sizeof(XWireHeaderV2), who);
+        }
+
+        // Post-copy verification shared by load_verified and reload_verified.
+        template <typename T>
+        void finish_verified_load(const XWireHeaderV2& header, const detail::WireLayout& layout,
+                                  std::pmr::memory_resource* upstream, const char* who) {
+            if (this->arena()->used_end != header.used_bytes) {
+                throw XException(std::string(who) + ": non-normalized payload extent");
+            }
+            auto* root_ptr = detail::find_root<T>(*this);
+            if (!root_ptr) {
+                throw XException(std::string(who) + ": root not found");
+            }
+            auto actual_offset = static_cast<std::uint64_t>(
+                reinterpret_cast<std::uintptr_t>(root_ptr) -
+                reinterpret_cast<std::uintptr_t>(this->get_address()));
+            if (actual_offset != header.root_offset) {
+                throw XException(std::string(who) + ": root offset mismatch");
+            }
+            detail::verify_structural_wire_graph(*root_ptr, *this, upstream, layout.holes, layout.hole_count,
+                                                 true, nullptr, &layout.gaps);
+            this->load_free_blocks(layout.holes, layout.hole_count);
+            typed_root_access_allowed_ = true;
+            bind_schema<T>();
+        }
+
         void require_typed_root_access(const char* message) const {
             if (!typed_root_access_allowed_) {
                 throw XException(message);
@@ -5847,6 +5983,9 @@ namespace XOffsetDatastructure {
         }
 
         std::string save_verified() { return XBuffer::save_verified<T>(); }
+        void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
+        void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
+        T& reset() { return XBuffer::reset<T>(); }
 
         void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
 
