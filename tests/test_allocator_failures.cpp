@@ -33,8 +33,12 @@ bool same(const Holes& a,const Holes& c) {
 struct Outcome {std::size_t attempts,hits,free;};
 // V2 retirement pushes into the host-side free table. A host allocation
 // failure there drops that one entry, records the table as incomplete, and
-// save_verified recomputes the hole table from the live graph.
-Outcome exercise(long n) {
+// save_verified recomputes the hole table from the live graph. Released free
+// tables are cached per thread: a cold run (cache trimmed) makes the first
+// retire allocate a fresh table, a warm run reuses a cached one; both are
+// exercised at every allocation point.
+Outcome exercise(long n,bool cold) {
+    if(cold) XBufferCore::trim_free_table_cache();
     auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
     auto* guard=b.arena()->allocate_aligned(64,8); std::memset(guard,0x5d,64);
     std::array<void*,128> blocks{};
@@ -79,12 +83,14 @@ std::size_t hole_table_load() {
     for(std::size_t i=0;i<blocks.size();++i) b.arena()->deallocate(blocks[i],size(i));
     auto frame=b.save_verified<AllocatorFailureRoot>(); const auto expected=holes_of(b);
     require(expected.size()==blocks.size(),"fixture hole table");
+    XBufferCore::trim_free_table_cache(); // the load allocates its table afresh
     attempts=hits=0;fail_after=-1;watch=true;
     auto normal=XBuffer::load_verified<AllocatorFailureRoot>(frame);
     watch=false; const auto total=attempts;
     require(total>0,"no real load metadata allocations observed");
     require(same(holes_of(normal),expected) && normal.free_table_complete(),"normal load changed the hole table");
     for(std::size_t n=0;n<total;++n) {
+        XBufferCore::trim_free_table_cache();
         attempts=hits=0;fail_after=long(n);watch=true;
         try {
             auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(frame);
@@ -110,6 +116,7 @@ void lazy_load() {
     auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(frame,XBuffer::maximum_capacity(65536));
     require(loaded.free_block_count()==0,"fixture unexpectedly has holes");
     loaded.grow(4096);auto* p=loaded.arena()->allocate_aligned(64,8);
+    XBufferCore::trim_free_table_cache(); // the first retire allocates the table
     attempts=hits=0;fail_after=0;watch=true;loaded.arena()->deallocate(p,64);watch=false;fail_after=-1;
     require(hits==1,"post-load lazy metadata failure not reached");
     require(!loaded.free_table_complete(),"lost free entry was not recorded");
@@ -167,9 +174,12 @@ void growth_probe_keeps_cached_blocks() {
 }
 int main() {try {
     std::size_t points=0,max_lost=0;
-    auto normal=exercise(-1); require(normal.attempts>0,"no real metadata allocations observed");
-    for(std::size_t n=0;n<normal.attempts;++n) {auto r=exercise(long(n));require(r.hits==1,"requested fail point not hit");
-        require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
+    for(bool cold:{true,false}) {
+        auto normal=exercise(-1,cold); require(normal.attempts>0,"no real metadata allocations observed");
+        if(!cold) (void)exercise(-1,false); // the previous run's table is now cached
+        for(std::size_t n=0;n<normal.attempts;++n) {auto r=exercise(long(n),cold);require(r.hits==1,"requested fail point not hit");
+            require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
+    }
     points+=hole_table_load();
     lazy_load(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
 } catch(const std::exception& e) {watch=false;std::cerr<<e.what()<<'\n';return 1;} }

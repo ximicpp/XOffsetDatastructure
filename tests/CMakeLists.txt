@@ -79,6 +79,7 @@ set(REFLECTION_TESTS
     test_wire_range_index
     test_wire_range_failures
     test_same_arena_move
+    test_shift_relocate
     test_free_table_policy
     test_range_hint
     test_stable_storage
@@ -93,6 +94,7 @@ set(REFLECTION_TESTS
     test_v2_golden
     test_cross_compiler_wire
     test_v2_fuzz
+    test_reload_reset
 )
 
 foreach(test_name ${REFLECTION_TESTS})

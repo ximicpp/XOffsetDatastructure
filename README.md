@@ -13,8 +13,9 @@ are not zero-copy operations.
 
 This release uses the **V2 storage and wire format** ([format specification](docs/V2_FORMAT.md)).
 V1 wires are rejected with `unsupported wire format version 1`; there is no V1
-reader or migration path. Start with the [user guide](docs/USER_GUIDE.md), then
-read the [compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
+reader or migration path. Start with the [user guide](docs/USER_GUIDE.md) and
+the [deployment guide](docs/DEPLOYMENT.md), then read the
+[compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
 persisting or accepting wire data. [CHANGELOG.md](CHANGELOG.md) records each
 prerelease.
 
@@ -189,5 +190,5 @@ workload and adapter set. No Linux or Windows performance figures are claimed.
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
-wire compatibility; the [user guide](docs/USER_GUIDE.md#8-api-稳定性) lists which
-interfaces are intended to stay stable.
+wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
+core guarantees (K1–K7) and which interfaces they cover.
