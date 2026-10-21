@@ -61,6 +61,14 @@ static std::size_t payload_offset(const XBuffer& xbuf, const Member* member) {
     return static_cast<std::size_t>(ptr - base);
 }
 
+// Payload offsets below index a dense V2 wire (extent_count == 0): header
+// followed by used_bytes contiguous payload bytes.
+static bool dense_wire(const std::string& data) {
+    XWireHeaderV2 header{};
+    std::memcpy(&header, data.data(), sizeof(header));
+    return header.extent_count == 0;
+}
+
 static void populate_root(BridgeRoot& root) {
     root.owner = "BridgeOwner";
     root.scores.push_back(10);
@@ -248,12 +256,17 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
     XBuffer xbuf(8192);
     auto* root = xbuf.make<BridgeAssocRoot>();
     populate_assoc_root(*root);
+    // "FIVE" is an inline (I1) string with no size_/capacity_ fields; make the
+    // corrupted value out of line so its size_ field is real.
+    root->by_id.insert_or_assign(5, "FIVE-out-of-line-value");
 
     std::string data = xbuf.save_verified<BridgeAssocRoot>();
     root = &xbuf.root<BridgeAssocRoot>();
+    assert(!root->by_id.begin()[1].second.is_inline());
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV1) + payload_offset(xbuf, bad_size);
+        sizeof(XWireHeaderV2) + payload_offset(xbuf, bad_size);
+    assert(dense_wire(data));
     std::uint32_t corrupted = root->by_id.begin()[1].second.capacity_ + 9;
     std::memcpy(data.data() + size_offset, &corrupted, sizeof(corrupted));
 
@@ -265,6 +278,22 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
     }
 
     assert(threw);
+
+    // Inline value ("three"): an inline length above 10 must be rejected.
+    {
+        auto inline_data = xbuf.save_verified<BridgeAssocRoot>();
+        const auto& value = root->by_id.begin()[0].second;
+        assert(value.is_inline() && dense_wire(inline_data));
+        inline_data[sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) + 15] =
+            static_cast<char>(0x80 | (XFixedString::inline_max + 1));
+        bool inline_threw = false;
+        try {
+            (void)TypedXBuffer<BridgeAssocRoot>::load_verified(inline_data);
+        } catch (const XException&) {
+            inline_threw = true;
+        }
+        assert(inline_threw);
+    }
     std::cout << "  [OK]\n";
     return true;
 }

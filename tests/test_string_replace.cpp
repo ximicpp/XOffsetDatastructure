@@ -1,5 +1,4 @@
 // v3 full-string replacement regression and operation gate. No timer.
-#define XOFFSET_FREELIST_INDEX_DIAGNOSTICS 1
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -43,8 +42,23 @@ template<class T> auto descriptor(const T& value) {
     std::memcpy(result.data(), &value, result.size());
     return result;
 }
+// V2: a binding is exactly the payload base (no allocator-state pointer).
 bool same_binding(fd::allocator_ref a, fd::allocator_ref b) {
-    return a.state == b.state && a.segment == b.segment;
+    return a.segment == b.segment;
+}
+// V2 has no allocator operation counters (FreelistIndex diagnostics are gone).
+// Allocator operations are observed through the host free table instead:
+// live bytes = used_end - free bytes, and a retired block is an exact hole.
+using Holes = std::vector<std::pair<std::uint32_t, std::uint32_t>>;
+Holes holes(const xo::XBufferCore& b) {
+    Holes out; b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); }); return out;
+}
+std::uint64_t live(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
+std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
+bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {
+    const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(p) - b.data());
+    for (auto [o, n] : holes(b)) if (o == offset && n == bytes) return true;
+    return false;
 }
 void check(const xo::XString& value, std::string_view expected) {
     need(value.view() == expected && value.size() == expected.size(), "string value mismatch");
@@ -95,9 +109,10 @@ void replacement_growth_does_not_add_allocations() {
     auto buffer = make_buffer(); auto& root = buffer.root<ReplaceRoot>();
     root.first.assign(std::string(63, 'a')); root.blocker.assign(std::string(127, 'b'));
     const auto binding = root.first.binding(); auto* old = root.first.data();
-    const std::string desired(512, 'x'); dt::reset_freelist_index_stats();
+    const std::string desired(512, 'x'); const auto live_before = live(buffer);
     root.first.assign(desired);
-    need(dt::freelist_index_stats.lookup_calls == 1 && dt::freelist_index_stats.retire_updates == 1,
+    // Exactly one exact 513 -> 520-byte allocation and one retire of the old 64-byte block.
+    need(live(buffer) == live_before + extent(513) - extent(64) && has_hole(buffer, old, extent(64)),
          "fallback replacement allocation/retirement count");
     need(root.first.data() != old && root.first.capacity() == desired.size(), "fallback/exact capacity not exercised");
     need(same_binding(binding, root.first.binding()), "replacement changed binding");
@@ -107,9 +122,11 @@ void replacement_growth_does_not_add_allocations() {
 void physical_tail_still_expands_in_place() {
     auto buffer = make_buffer(); auto& text = buffer.root<ReplaceRoot>().first;
     text.assign(std::string(31, 'a')); auto* old = text.data();
-    const std::string desired(200, 'e'); dt::reset_freelist_index_stats(); text.assign(desired);
+    const std::string desired(200, 'e'); const auto holes_before = holes(buffer);
+    const auto used_before = buffer.arena()->used_end; text.assign(desired);
     need(text.data() == old && text.capacity() == 200, "physical-tail expansion lost");
-    need(dt::freelist_index_stats.lookup_calls == 0 && dt::freelist_index_stats.retire_updates == 0,
+    // In-place tail growth: the free table is untouched and used_end moves by exactly the extent delta.
+    need(holes(buffer) == holes_before && buffer.arena()->used_end == used_before + extent(201) - extent(32),
          "tail expansion allocated/retired");
     check(text, desired); roundtrip(buffer);
 }
@@ -192,20 +209,27 @@ void repeated_full_replacement_operation_gate() {
     // Deterministic operation gate, not a replacement benchmark workload.
     // Every initial payload is followed by another live allocation, so the
     // 128-byte replacement must use a fresh block, exactly as asserted below.
+    // I1: initial values of at most 10 bytes are inline and own no block.
     constexpr unsigned n = 4096;
     auto buffer = make_buffer(8u * 1024u * 1024u); auto& root = buffer.root<ReplaceRoot>();
-    root.words.resize(n); std::uint64_t old_bytes = 0;
+    root.words.resize(n); std::uint64_t old_bytes = 0, old_extents = 0; std::size_t heap_words = 0;
     for (unsigned i = 0; i < n; ++i) {
         const auto size = 8u + i % 57u; old_bytes += size;
         root.words[i].assign(std::string(size, char('a' + i % 26)));
+        need(root.words[i].is_inline() == (size <= 10), "initial word placement");
+        if (!root.words[i].is_inline()) { ++heap_words; old_extents += extent(root.words[i].owned_extent()); }
     }
     root.blocker.assign(std::string(1024, 'b')); const std::string desired(128, 'X');
-    dt::reset_freelist_index_stats();
+    need(buffer.free_block_count() == 0, "operation gate fixture has holes");
+    const auto live_before = live(buffer);
 #ifdef XOFFSET_STRING_REPLACE_COPY_AUDIT
     fd::reset_string_replace_audit_stats();
 #endif
     for (auto& word : root.words) word.assign(desired);
-    need(dt::freelist_index_stats.lookup_calls == n && dt::freelist_index_stats.retire_updates == n,
+    // One exact 129 -> 136-byte allocation per word and one retire per heap
+    // word; every retired block (at most 72 bytes) stays a distinct hole.
+    need(live(buffer) == live_before + std::uint64_t(n) * extent(129) - old_extents &&
+         buffer.free_block_count() == heap_words && buffer.free_block_bytes() == old_extents,
          "full replacement operation gate changed allocation count");
 #ifdef XOFFSET_STRING_REPLACE_COPY_AUDIT
     need(fd::string_replace_audit_stats.fresh_replacements == n &&

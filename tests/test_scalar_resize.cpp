@@ -1,5 +1,4 @@
 // v4 scalar default resize: required value initialization, no timer.
-#define XOFFSET_FREELIST_INDEX_DIAGNOSTICS 1
 #include <array>
 #include <cstdlib>
 #include <cstdint>
@@ -63,6 +62,20 @@ template<class T> auto descriptor(const T& value) {
 template<class T> std::vector<T> values(const xo::XVector<T>& v) {
     return v.size() ? std::vector<T>(v.begin(), v.end()) : std::vector<T>{};
 }
+// V2 has no allocator operation counters (FreelistIndex diagnostics are gone).
+// Allocator operations are observed through the host free table instead:
+// live bytes = used_end - free bytes, and a retired block is an exact hole.
+using Holes = std::vector<std::pair<std::uint32_t, std::uint32_t>>;
+Holes holes(const xo::XBufferCore& b) {
+    Holes out; b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); }); return out;
+}
+std::uint64_t live(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
+std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
+bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {
+    const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(p) - b.data());
+    for (auto [o, n] : holes(b)) if (o == offset && n == bytes) return true;
+    return false;
+}
 void roundtrip(xo::XBuffer& b) {
     const auto n = values(b.root<ScalarRoot>().numbers);
     const auto v = values(b.root<ScalarRoot>().bytes);
@@ -78,10 +91,11 @@ void roundtrip(xo::XBuffer& b) {
 void physical_tail_and_required_initialization() {
     auto b = make_buffer(); auto& root = b.root<ScalarRoot>();
     root.numbers.resize(4); for (unsigned i = 0; i != 4; ++i) root.numbers[i] = 100 + i;
-    auto* pointer = root.numbers.data(); dt::reset_freelist_index_stats();
+    auto* pointer = root.numbers.data(); const auto holes_before = holes(b); const auto used_before = b.arena()->used_end;
     root.numbers.resize(33);
     need(root.numbers.data() == pointer && root.numbers.capacity() == 33, "scalar physical-tail expansion");
-    need(dt::freelist_index_stats.lookup_calls == 0 && dt::freelist_index_stats.retire_updates == 0,
+    // In-place tail growth: the free table is untouched and used_end moves by exactly the extent delta.
+    need(holes(b) == holes_before && b.arena()->used_end == used_before + extent(33 * 4) - extent(4 * 4),
          "physical-tail expansion allocated or retired");
     for (unsigned i = 0; i != 33; ++i) need(root.numbers[i] == (i < 4 ? 100 + i : 0), "tail prefix/suffix");
     root.reals.resize(3); root.reals[0] = 1.5; auto* real_pointer = root.reals.data(); root.reals.resize(11);
@@ -92,9 +106,10 @@ void physical_tail_and_required_initialization() {
 void blocked_tail_and_in_capacity() {
     auto b = make_buffer(); auto& root = b.root<ScalarRoot>();
     root.numbers.resize(4, 29u); root.blocker.assign(std::string(129, 'b'));
-    auto* before = root.numbers.data(); dt::reset_freelist_index_stats(); root.numbers.resize(31);
+    auto* before = root.numbers.data(); const auto live_before = live(b); root.numbers.resize(31);
     need(root.numbers.data() != before && root.numbers.capacity() == 31, "non-tail must use fresh path");
-    need(dt::freelist_index_stats.lookup_calls == 1 && dt::freelist_index_stats.retire_updates == 1,
+    // Exactly one exact 124 -> 128-byte allocation and one retire of the old 16-byte block.
+    need(live(b) == live_before + extent(31 * 4) - extent(4 * 4) && has_hole(b, before, extent(4 * 4)),
          "blocked scalar fresh operation count");
     for (unsigned i = 0; i != 31; ++i) need(root.numbers[i] == (i < 4 ? 29u : 0u), "blocked prefix/suffix");
     auto* fresh = root.numbers.data(); root.numbers.resize(2); root.numbers.resize(30);
@@ -115,7 +130,7 @@ void fill_alias_and_nested_default_keep_existing_semantics() {
         need(root.children[i].numbers.size() == 4 && root.children[i].bytes.size() == 5, "nested fill sizes");
         for (auto v : root.children[i].numbers) need(v == 91, "nested fill alias values");
         for (auto v : root.children[i].bytes) need(v == 7, "nested bytes values");
-        need(root.children[i].numbers.allocator_state() == root.children[0].numbers.allocator_state(), "nested binding");
+        need(root.children[i].numbers.arena() == root.children[0].numbers.arena(), "nested binding");
     }
     root.children.resize(8);
     for (unsigned i = 5; i != 8; ++i)

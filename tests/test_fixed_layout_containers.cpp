@@ -55,6 +55,35 @@ std::size_t payload_offset(const XBuffer& xbuf, const Member* member) {
     return static_cast<std::size_t>(ptr - base);
 }
 
+// Payload offsets below index a dense V2 wire (extent_count == 0): header
+// followed by used_bytes contiguous payload bytes.
+static bool dense_wire(const std::string& data) {
+    XWireHeaderV2 header{};
+    std::memcpy(&header, data.data(), sizeof(header));
+    return header.extent_count == 0;
+}
+
+// I1: strings of at most 10 bytes live inline in head bytes 4..14 and have
+// no size_/capacity_ fields. Corrupting their length byte (head byte 15,
+// 0x80 | length) beyond 10 must be rejected.
+template <typename Root>
+bool verified_load_rejects(const std::string& data) {
+    try {
+        (void)TypedXBuffer<Root>::load_verified(data);
+    } catch (const XException&) {
+        return true;
+    }
+    return false;
+}
+
+template <typename Root>
+bool rejects_inline_length(const XBuffer& xbuf, std::string data, const XFixedString& value) {
+    assert(value.is_inline() && dense_wire(data));
+    const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) + 15;
+    data[length_byte] = static_cast<char>(0x80 | (XFixedString::inline_max + 1));
+    return verified_load_rejects<Root>(data);
+}
+
 bool test_basic_mutation() {
     std::cout << "\n[TEST] fixed containers basic mutation\n";
 
@@ -222,13 +251,15 @@ bool test_verified_rejects_corrupt_fixed_string() {
     XBuffer xbuf(4096);
     auto* root = xbuf.make<FixedRoot>();
     root->id = 12;
-    root->name = "BrokenName";
+    root->name = "BrokenName-out-of-line"; // heap string: real size_/capacity_ fields
     root->values.push_back(1);
 
     std::string data = xbuf.save_verified<FixedRoot>();
     root = &xbuf.root<FixedRoot>();
-    const std::size_t size_offset = sizeof(XWireHeaderV1) +
+    assert(!root->name.is_inline());
+    const std::size_t size_offset = sizeof(XWireHeaderV2) +
         payload_offset(xbuf, &root->name.size_);
+    assert(dense_wire(data));
     std::uint32_t bad_size = root->name.capacity_ + 1;
     std::memcpy(data.data() + size_offset, &bad_size, sizeof(bad_size));
 
@@ -240,6 +271,12 @@ bool test_verified_rejects_corrupt_fixed_string() {
     }
 
     assert(threw);
+
+    XBuffer inline_buf(4096);
+    auto* inline_root = inline_buf.make<FixedRoot>();
+    inline_root->id = 13;
+    inline_root->name = "BrokenName"; // 10 bytes: inline
+    assert(rejects_inline_length<FixedRoot>(inline_buf, inline_buf.save_verified<FixedRoot>(), inline_root->name));
     std::cout << "  [OK]\n";
     return true;
 }
@@ -253,14 +290,17 @@ bool test_verified_rejects_corrupt_nested_record() {
     for (int i = 0; i < 4; ++i) {
         auto& item = root->items.emplace_back();
         item.code = i;
-        item.label = ("Nested_" + std::to_string(i)).c_str();
+        // Out-of-line labels (> 10 bytes) so size_/capacity_ are real fields.
+        item.label = ("NestedLabel_" + std::to_string(i)).c_str();
     }
 
     std::string data = xbuf.save_verified<FixedNestedRoot>();
     root = &xbuf.root<FixedNestedRoot>();
+    assert(!root->items[2].label.is_inline());
     auto* nested_size = &root->items[2].label.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV1) + payload_offset(xbuf, nested_size);
+        sizeof(XWireHeaderV2) + payload_offset(xbuf, nested_size);
+    assert(dense_wire(data));
     std::uint32_t bad_size = root->items[2].label.capacity_ + 5;
     std::memcpy(data.data() + size_offset, &bad_size, sizeof(bad_size));
 
@@ -272,6 +312,16 @@ bool test_verified_rejects_corrupt_nested_record() {
     }
 
     assert(threw);
+
+    XBuffer inline_buf(4096);
+    auto* inline_root = inline_buf.make<FixedNestedRoot>();
+    for (int i = 0; i < 4; ++i) {
+        auto& item = inline_root->items.emplace_back();
+        item.code = i;
+        item.label = ("Nested_" + std::to_string(i)).c_str(); // inline
+    }
+    assert(rejects_inline_length<FixedNestedRoot>(
+        inline_buf, inline_buf.save_verified<FixedNestedRoot>(), inline_root->items[2].label));
     std::cout << "  [OK]\n";
     return true;
 }
@@ -370,14 +420,16 @@ bool test_verified_rejects_corrupt_fixed_flat_map() {
     XBuffer xbuf(8192);
     auto* root = xbuf.make<FixedAssocRoot>();
     root->by_id.emplace(1, "one");
-    root->by_id.emplace(2, "two");
+    root->by_id.emplace(2, "two-out-of-line"); // heap value: real size_/capacity_
     root->by_id.emplace(3, "three");
 
     std::string data = xbuf.save_verified<FixedAssocRoot>();
     root = &xbuf.root<FixedAssocRoot>();
+    assert(!root->by_id.begin()[1].second.is_inline());
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV1) + payload_offset(xbuf, bad_size);
+        sizeof(XWireHeaderV2) + payload_offset(xbuf, bad_size);
+    assert(dense_wire(data));
     std::uint32_t corrupted = root->by_id.begin()[1].second.capacity_ + 9;
     std::memcpy(data.data() + size_offset, &corrupted, sizeof(corrupted));
 
@@ -389,6 +441,9 @@ bool test_verified_rejects_corrupt_fixed_flat_map() {
     }
 
     assert(threw);
+    // The inline neighbours ("one", "three") are checked through their length byte.
+    assert(rejects_inline_length<FixedAssocRoot>(xbuf, xbuf.save_verified<FixedAssocRoot>(),
+                                                 root->by_id.begin()[2].second));
     std::cout << "  [OK]\n";
     return true;
 }

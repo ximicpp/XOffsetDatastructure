@@ -1,6 +1,8 @@
-// Build this same fixture against candidate and an independently pinned V1
-// reader. The old reader uses its existing resize+copy API only for expected
-// values. Successful cross-reader execution must be supplied by root's gate.
+// Write/read mutation fixture for the V2 wire format. V1 wire compatibility is
+// retired: a V2 reader must reject V1 input ("unsupported wire format version
+// 1"), so the former cross-reader gate (candidate vs a pinned V1 reader) is now
+// --expect-v1-rejection, which feeds this reader a wire relabeled as format 1.
+// The resize+copy fallback below remains for readers without assign_range.
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -47,7 +49,7 @@ std::string canonical(const MutationCompat& root) {
 }
 int main(int argc,char** argv) {
     try {
-        if(argc!=3) throw std::runtime_error("--write-wire/--read-wire PATH");
+        if(argc!=3) throw std::runtime_error("--write-wire/--read-wire/--expect-v1-rejection PATH");
         auto b=xo::XBuffer::create<MutationCompat>(1u<<20,policy()); fill(b.root<MutationCompat>());
         const auto expected=canonical(b.root<MutationCompat>());
         if(std::string(argv[1])=="--write-wire") {
@@ -60,7 +62,19 @@ int main(int argc,char** argv) {
             if(canonical(loaded.root<MutationCompat>())!=expected)throw std::runtime_error("old/new logical contents");
             fill(loaded.root<MutationCompat>());
             if(canonical(loaded.root<MutationCompat>())!=expected)throw std::runtime_error("loaded mutation");
+        } else if(std::string(argv[1])=="--expect-v1-rejection") {
+            std::ifstream in(argv[2],std::ios::binary);if(!in)throw std::runtime_error("read failed");
+            std::string wire((std::istreambuf_iterator<char>(in)),{});
+            if(wire.size()<sizeof(xo::XWireHeaderV2))throw std::runtime_error("wire too small");
+            // Relabel the stored wire as format 1 (V1 magic and major version).
+            xo::XWireHeaderV2 header{};std::memcpy(&header,wire.data(),sizeof(header));
+            std::memcpy(header.magic,xo::XWIRE_MAGIC_V1,sizeof(header.magic));header.format_major=1;
+            std::memcpy(wire.data(),&header,sizeof(header));
+            bool rejected=false;
+            try{(void)xo::XBuffer::load_verified<MutationCompat>(wire,policy());}
+            catch(const xo::XException& e){rejected=std::string(e.what()).find("unsupported wire format version 1")!=std::string::npos;}
+            if(!rejected)throw std::runtime_error("V1 wire was not rejected as format version 1");
         } else throw std::runtime_error("unknown command");
-        std::cout<<"V1 mutation fixture passed\n";
+        std::cout<<"V2 mutation fixture passed\n";
     } catch(const std::exception& e) {std::cerr<<e.what()<<'\n';return 1;}
 }

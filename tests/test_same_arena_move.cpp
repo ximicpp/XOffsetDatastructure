@@ -133,8 +133,22 @@ auto policy(std::size_t bytes = 16u * 1024u * 1024u) {
     return XBuffer::maximum_capacity(bytes).with_growth(XGrowPolicy::Automatic);
 }
 auto make_buffer() { return XBuffer::create<MoveRoot>(1024u * 1024u, policy()); }
+// V2: a binding is exactly the payload base (no separate allocator state).
 bool same_binding(fixed_detail::allocator_ref a, fixed_detail::allocator_ref b) {
-    return a.state == b.state && a.segment == b.segment;
+    return a.segment && a.segment == b.segment;
+}
+// V2 retirement records the block in the host-side free table. Its first use
+// of a bin allocates host memory (the table/bin vector), unlike V1's in-arena
+// free lists; warm the bin so the move itself is observed allocation-free.
+// The returned block is live and must be released before any save (an
+// unreferenced live block is dead space that exact coverage rejects).
+void* warm_free_bin(XBuffer& buffer, std::uint32_t bytes) {
+    auto* arena = buffer.arena();
+    auto* block = arena->allocate_aligned(bytes, 8);
+    arena->deallocate(block, bytes);
+    require(arena->allocate_aligned(bytes, 8) == block, "free-table warm-up did not reuse its block");
+    require(buffer.free_block_count() == 0, "free-table warm-up left a hole");
+    return block;
 }
 template <typename Head>
 std::array<unsigned char, 16> descriptor(const Head& h) {
@@ -170,14 +184,20 @@ void verified_roundtrip(XBuffer& b) {
 
 void same_arena_and_self() {
     auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
+    // "transferred" (11 bytes) is out of line; "old" is I1-inline (no block).
     r.left.assign("old"); r.right.assign("transferred");
     r.a.push_back(9); r.b.push_back(31); r.b.push_back(32);
+    require(r.left.is_inline() && !r.right.is_inline(), "string fixture representation differs");
     auto* text = r.right.data(); auto* values = r.b.data();
     const auto sb = r.right.binding(), vb = r.b.binding();
     const auto db = r.left.binding(), ab = r.a.binding();
+    const auto retired = static_cast<std::uint32_t>(r.a.capacity() * sizeof(std::uint32_t));
+    auto* warm = warm_free_bin(buffer, retired); // the bin of r.a's block, retired by the move
     { new_failure::Arm arm(0); r.left = std::move(r.right); r.a = std::move(r.b); }
     fast_new_attempts += new_failure::attempts;
     require(new_failure::attempts == 0 && new_failure::hits == 0, "small same-arena move allocated host memory");
+    require(buffer.free_block_count() == 1 && buffer.free_block_bytes() == retired, "destination block was not retired");
+    buffer.arena()->deallocate(warm, retired);
     require(r.left.data() == text && r.left.view() == "transferred", "string ownership not transferred");
     require(r.a.data() == values && r.a.size() == 2 && r.a[1] == 32, "vector ownership not transferred");
     require(same_binding(r.left.binding(), db) && same_binding(r.a.binding(), ab), "destination binding changed");
@@ -225,17 +245,20 @@ void cross_arena_and_provenance() {
     d.left.assign("different"); d.a[0] = 444;
     require(s.right.view() == "cross-arena" && s.b[0] == 123, "cross-arena storage aliases");
     verified_roundtrip(destination); verified_roundtrip(source);
-    // Same segment, unequal allocator provenance: legacy segment-bound source.
+    // V2 has a single provenance: every head binds to its payload base. (V1's
+    // state-bound vs legacy segment-bound distinction no longer exists.) An
+    // explicit rebind to the same arena is therefore the same allocator.
     auto local = make_buffer(); auto& r = local.root<MoveRoot>();
     r.right.bind(fixed_detail::allocator_ref_of(local.arena()));
     r.b.bind(fixed_detail::allocator_ref_of(local.arena()));
+    require(same_binding(r.right.binding(), r.left.binding()) && same_binding(r.b.binding(), r.a.binding()) &&
+            r.right.binding().segment == local.arena(), "rebind to the payload base differs");
     r.right.assign("segment-bound"); r.b.push_back(42);
     auto* old_text = r.right.data(); auto* old_values = r.b.data();
     r.left = std::move(r.right); r.a = std::move(r.b);
-    require(r.left.data() != old_text && r.a.data() != old_values, "unequal provenance stole payload");
-    require(r.right.view() == "segment-bound" && r.b[0] == 42, "unequal provenance changed source");
-    require(r.left.allocator_state() && !r.right.allocator_state(), "provenance distinction lost");
-    // This legacy binding case is local-only; it is not a verified-wire fixture.
+    require(r.left.data() == old_text && r.a.data() == old_values, "equal V2 provenance did not transfer");
+    require_empty_reusable_binding(r.right, r.left.binding()); require_empty_reusable_binding(r.b, r.a.binding());
+    verified_roundtrip(local);
     ++cases;
 }
 
@@ -348,17 +371,10 @@ void leaf_owns_and_binding_reuse() {
     require(r.b.data() == storage && r.b.size() == 8 && inner->data() != storage && inner->size() == 8,
         "leaf descendant destination stole its own owning allocation");
     std::destroy_at(inner);
-    // Two distinct allocator states in one arena: never the same allocator,
-    // so the reused-binding shortcut must not apply (copy fallback).
-    auto* second = static_cast<XAllocatorStateV1*>(buffer.arena()->allocate_aligned(sizeof(XAllocatorStateV1), alignof(XAllocatorStateV1)));
-    std::construct_at(second); fixed_detail::initialize_allocator_state(*second, buffer.arena());
-    r.right.bind(fixed_detail::allocator_ref_of(second)); r.right.assign("other-state");
-    auto* text = r.right.data();
-    r.left = std::move(r.right);
-    require(r.left.view() == "other-state" && r.left.data() != text && r.right.data() == text,
-        "distinct allocator states were treated as one allocator");
-    require(r.left.allocator_state() != second && r.right.allocator_state() == second, "bindings changed");
-    // Same state: transfer, live destination retires through the out-of-line path.
+    // (V1 case "two distinct allocator states in one arena" retired: V2 has no
+    // allocator state; distinct allocators are distinct arenas, covered by
+    // cross_arena_and_provenance.)
+    // Same allocator: transfer, live destination retires through the out-of-line path.
     r.b.resize(0); r.a.assign_range(std::span<const std::uint32_t>(std::array<std::uint32_t,3>{1,2,3}));
     r.b.resize(5, 9u); auto* values = r.b.data();
     r.a = std::move(r.b);
@@ -386,17 +402,23 @@ void reloaded_moves() {
 
 void retire_metadata_failure() {
     auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
-    // >262144 bytes bypasses persisted small free lists. Original core retirement
-    // may attempt host bookkeeping allocation, swallowed by its noexcept API.
+    // V2 retirement records every block in the host-side free table (here the
+    // large-block table). Its host bookkeeping allocation may fail; the noexcept
+    // retirement swallows it and marks the table incomplete, and save_verified
+    // recomputes the hole table from the live graph.
     r.a.resize(100000); r.a[99999] = 8; r.b.push_back(500); r.b.push_back(501);
     auto* source = r.b.data(); const auto sb = r.b.binding();
+    require(buffer.free_table_complete(), "fixture free table already incomplete");
     { new_failure::Arm arm(0); r.a = std::move(r.b); }
     retire_new_attempts += new_failure::attempts; retire_new_hits += new_failure::hits;
     require(new_failure::hits == 1, "fresh large-retirement host allocation failpoint not reached");
     require(r.a.data() == source && r.a.size() == 2 && r.a[0] == 500 && r.a[1] == 501,
         "retirement metadata OOM broke ownership commit");
+    require(!buffer.free_table_complete(), "lost retirement was not recorded as an incomplete free table");
     require_empty_reusable_binding(r.b, sb); r.b.push_back(999);
     verified_roundtrip(buffer);
+    require(buffer.free_table_complete() && buffer.free_block_bytes() >= 400000,
+        "save_verified did not recompute the lost hole");
     // The fresh owner has no earlier core-retired block. This observes an actual
     // hook exception, not an allocation callsite inferred from its request size.
     ++cases;

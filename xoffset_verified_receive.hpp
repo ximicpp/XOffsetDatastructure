@@ -50,7 +50,8 @@ namespace detail {
         // Trusted internal target is a completely constructed default XBuffer.
         // No ordinary XBuffer(size), arena initializer, copy or registry work.
         target.buffer_.swap(source);
-        target.publish_host_owner();
+        // The host owner is published only by publish_received, after full
+        // validation: a callback during finish must not reach this Core.
         target.free_table_.reset();
         target.free_table_lost_ = false;
         target.growth_policy_ = growth;
@@ -75,6 +76,7 @@ namespace detail {
     }
     template<class T>
     void VerifiedPathsAccess::publish_received(XBufferCore& source) noexcept {
+        source.publish_host_owner();
         source.template bind_root_type<T>();
         source.typed_root_access_allowed_ = true;
         source.schema_bound_ = true;

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <meta>
@@ -84,12 +85,19 @@ std::string wire(){
     for(unsigned i=0;i<8;++i)r.values[i]=200+i;
     return b.save_verified();
 }
+// V2 dense wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
 Buffer received(const std::string& bytes){
-    auto token=xo::begin_verified_receive<Root>(bytes.size()-sizeof(xo::XWireHeaderV1),policy());
-    {auto op=token.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes();
+    xo::XWireHeaderV2 header{};need(bytes.size()>=sizeof(header),"fixture wire too small");
+    std::memcpy(&header,bytes.data(),sizeof(header));
+    const auto body=std::size_t(header.used_bytes);const auto holes=std::size_t(header.hole_count);
+    need(header.extent_count==0&&bytes.size()==sizeof(header)+body+holes*sizeof(xo::XBufferCore::WireHole),
+         "fixture is not a dense V2 wire");
+    auto token=xo::begin_verified_receive<Root>(body,policy(),holes);
+    {auto op=token.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes(),table=op.hole_bytes();
      for(std::size_t i=0;i<h.size();++i)h[i]=std::byte(static_cast<unsigned char>(bytes[i]));
      for(std::size_t i=0;i<p.size();++i)p[i]=std::byte(static_cast<unsigned char>(bytes[h.size()+i]));
-     op.complete(h.size(),p.size());}
+     for(std::size_t i=0;i<table.size();++i)table[i]=std::byte(static_cast<unsigned char>(bytes[h.size()+p.size()+i]));
+     op.complete(h.size(),p.size(),table.size());}
     return xo::finish_verified(token);
 }
 void check(Buffer& b){auto& r=b.root();need(r.marker==0x99887766&&r.name=="cold canonical callback"&&
@@ -180,41 +188,48 @@ void direct_cold_has_no_eviction(const std::string& bytes){
     check(b);
 }
 
-void real_drain_second_block_has_no_callback(const std::string& bytes){
+// V2: there is no in-arena cache drain (release_cached_blocks). The host-side
+// free table's own growth is the allocator's host request; its new_handler
+// installs terminal TLS records. Retirement resolves the owner from the host
+// page, so it must not perform a canonical/TLS lookup, evict a record, run the
+// terminal delete callback, move A or lose the retired block.
+void real_free_table_growth_has_no_callback(const std::string& bytes){
     CacheScope scope;auto a=std::make_unique<Buffer>(received(bytes));Buffer b;check(*a);
     auto binding=a->root().values.binding();
-    auto* first=fd::allocate_dynamic_bytes(binding,24,8);
+    // A new bin reserves 8 slots; fill it so the next retire must grow it.
+    void* filled[8];
+    for(auto*& p:filled) p=fd::allocate_dynamic_bytes(binding,24,8);
     auto* second=fd::allocate_dynamic_bytes(binding,24,8);
+    auto* first=filled[7];
     need(first!=second,"two real allocator blocks required");
-    fd::retire_dynamic_bytes(binding,first,24);fd::retire_dynamic_bytes(binding,second,24);
-    need(binding.state->free_bytes==48,"real cached block count differs");
+    for(auto* p:filled) fd::retire_dynamic_bytes(binding,p,24); // table + a full 8-slot 24-byte bin
+    need(a->free_block_count()==8&&a->free_block_bytes()==192,"real free-table block count differs");
     const auto address=reinterpret_cast<std::uintptr_t>(a->get_address());
     scope.prepare();const auto expected=scope.pending_fingerprint();
     Arm arm(scope,a,b,true);
-    // No fixture/user operation is interposed in this actual production drain.
-    // Its first Core reclamation must reserve the initially empty host vector,
-    // installing four terminal records. The second cold canonical lookup must
-    // not evict one, move A, or use the saved old raw Core/cache reference.
-    fd::release_cached_blocks(binding.state);
-    need(host::handler_calls==1&&!host::fail_next,"actual reclamation new_handler was not exercised exactly once");
-    need(host::delete_calls==0&&!moved&&bool(a)&&binding.state->free_bytes==0,
-         "real drain evicted terminal record or used invalidated owner");
-    for(auto head:binding.state->freelist_head)need(head==0,"real drain left a cached list");
-    need(expected[0]==host::delete_address&&scope.same(expected),"real drain rotated terminal TLS cache");
-    // The callback remains armed until this deliberate, out-of-drain control.
+    // No fixture/user operation is interposed: the bin's growth is the only
+    // host request, and the armed failure reaches the real new_handler.
+    fd::retire_dynamic_bytes(binding,second,24);
+    need(host::handler_calls==1&&!host::fail_next,"actual free-table new_handler was not exercised exactly once");
+    need(host::delete_calls==0&&!moved&&bool(a)&&a->free_block_count()==9&&a->free_block_bytes()==216&&
+         a->free_table_complete(),"free-table growth evicted terminal record, used invalidated owner or lost a block");
+    need(expected[0]==host::delete_address&&scope.same(expected),"free-table growth rotated terminal TLS cache");
+    // The callback remains armed until this deliberate, out-of-allocator control.
     scope.exercise_delete();
     need(host::delete_calls==1&&moved&&!a&&reinterpret_cast<std::uintptr_t>(b.get_address())==address,
-         "drain terminal delete move/destroy control was not exercised");
+         "terminal delete move/destroy control was not exercised");
     check(b);
-    // Host-free blocks accumulated by the drain remain usable on the new Core.
+    // Host free-table blocks remain usable on the new Core.
+    need(b.free_block_count()==9,"free table did not move with the owner");
     auto* reused=fd::allocate_dynamic_bytes(binding,24,8);
-    need(reused==first||reused==second,"real drained host block was not reusable after owner move");
+    need(reused==second,"retired host-table block was not reusable (LIFO) after owner move");
     fd::retire_dynamic_bytes(binding,reused,24);check(b);
+    auto again=xo::TypedXBuffer<Root>::load_verified(b.save_verified(),policy());check(again);
 }
 }
 
 int main(){try{const auto bytes=test::wire();
-    test::direct_cold_has_no_eviction(bytes);test::real_drain_second_block_has_no_callback(bytes);
-    std::cout<<"canonical-v4: cold no-eviction/no-C++-allocation; real two-block drain and exact terminal-delete owner-move controls passed\n";
+    test::direct_cold_has_no_eviction(bytes);test::real_free_table_growth_has_no_callback(bytes);
+    std::cout<<"canonical-v4: cold no-eviction/no-C++-allocation; real free-table growth and exact terminal-delete owner-move controls passed\n";
     return 0;
 }catch(const std::exception& e){host::disarm();std::set_new_handler(nullptr);std::cerr<<e.what()<<'\n';return 1;}}

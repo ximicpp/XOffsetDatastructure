@@ -80,8 +80,15 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
     const auto epoch = source.epoch();
     const auto wire = source.save_verified<TransportRoot>();
     const auto payload = source.copy_bytes();
-    assert(wire.size() == sizeof(XWireHeaderV1) + payload.size());
-    assert(std::memcmp(wire.data() + sizeof(XWireHeaderV1), payload.data(), payload.size()) == 0);
+    // V2 wire: header + used_bytes payload + hole table. This fixture never
+    // retires a block, so its hole table is empty and the wire is dense.
+    XWireHeaderV2 header{};
+    std::memcpy(&header, wire.data(), sizeof(header));
+    assert(std::memcmp(header.magic, XWIRE_MAGIC_V2, sizeof(header.magic)) == 0);
+    assert(header.format_major == XWIRE_FORMAT_MAJOR_V2 && header.used_bytes == payload.size());
+    assert(header.hole_count == 0 && header.hole_bytes == 0);
+    assert(wire.size() == sizeof(XWireHeaderV2) + payload.size());
+    assert(std::memcmp(wire.data() + sizeof(XWireHeaderV2), payload.data(), payload.size()) == 0);
     assert(source.save_verified<TransportRoot>() == wire);
     assert(source.get_address() == source_base && source.epoch() == epoch && handle.get() == root);
 
@@ -118,6 +125,37 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
         check_root(*loaded_root, length);
     }
 
+    // A retired block travels as a V2 hole-table entry; the received free
+    // table re-emits identical bytes and the hole is reused after load.
+    {
+        auto holed = make_transport(length);
+        auto& holed_root = holed.root<TransportRoot>();
+        if (length == 0) holed_root.bytes.reserve(8); // keep the name block off the arena tail
+        holed_root.name = "a substantially longer transport name that retires the old block";
+        const auto holed_wire = holed.save_verified<TransportRoot>();
+        XWireHeaderV2 h{};
+        std::memcpy(&h, holed_wire.data(), sizeof(h));
+        assert(h.hole_count == 1 && h.hole_bytes == 40 && h.used_bytes == holed.get_size());
+        assert(holed_wire.size() == sizeof(h) + h.used_bytes + h.hole_count * sizeof(XBufferCore::WireHole));
+        XBufferCore::WireHole hole{};
+        std::memcpy(&hole, holed_wire.data() + sizeof(h) + h.used_bytes, sizeof(hole));
+        assert(hole.bytes == 40 && hole.offset % 8 == 0 && hole.offset + hole.bytes <= h.used_bytes);
+        auto reloaded = XBuffer::load_verified<TransportRoot>(holed_wire);
+        assert(reloaded.save_verified<TransportRoot>() == holed_wire);
+        assert(reloaded.free_block_count() == 1 && reloaded.free_block_bytes() == 40);
+        auto* reused = static_cast<char*>(reloaded.arena()->allocate_aligned(33, 8)); // 40-byte block
+        assert(reloaded.free_block_count() == 0 && reused == reloaded.data() + hole.offset);
+        reloaded.arena()->deallocate(reused, 33);
+        assert(reloaded.free_block_count() == 1 && reloaded.save_verified<TransportRoot>() == holed_wire);
+        // Dropping the hole table leaves dead space that exact coverage rejects.
+        std::string no_holes = holed_wire.substr(0, sizeof(h) + h.used_bytes);
+        XWireHeaderV2 stripped = h;
+        stripped.hole_count = 0;
+        stripped.hole_bytes = 0;
+        std::memcpy(no_holes.data(), &stripped, sizeof(stripped));
+        require_rejection([&] { (void)XBuffer::load_verified<TransportRoot>(no_holes); });
+    }
+
     if (!fixture_directory.empty()) {
         std::filesystem::create_directories(fixture_directory);
         std::ofstream output(fixture_directory / (std::to_string(length) + ".wire"), std::ios::binary);
@@ -145,9 +183,9 @@ void load_failures_preserve_target() {
         check_root(retry.root<TransportRoot>(), 65537);
     }
     std::string corrupt_header = wire;
-    corrupt_header[sizeof(XWireHeaderV1)] = '?';
+    corrupt_header[sizeof(XWireHeaderV2)] = '?';
     std::string corrupt_graph = wire;
-    XWireHeaderV1 header{};
+    XWireHeaderV2 header{};
     std::memcpy(&header, wire.data(), sizeof(header));
     corrupt_graph[sizeof(header) + header.root_offset + offsetof(TransportRoot, enabled)] = 2;
     for (const auto& invalid : {corrupt_header, corrupt_graph}) {
@@ -183,7 +221,7 @@ void save_failure_keeps_normalized_source_usable() {
     auto saved = source.save_verified<TransportRoot>();
     auto loaded = XBuffer::load_verified<TransportRoot>(saved);
     check_root(loaded.root<TransportRoot>(), 65537);
-    saved[sizeof(XWireHeaderV1)] = '?';
+    saved[sizeof(XWireHeaderV2)] = '?';
     assert(source.data()[0] != '?');
 }
 
