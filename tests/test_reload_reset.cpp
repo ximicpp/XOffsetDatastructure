@@ -152,6 +152,24 @@ void save_into_is_an_independent_copy() {
     need(r.root().id == 5, "TypedXBuffer reload_verified");
     need(r.reset().id == 0, "TypedXBuffer reset");
 }
+
+void reload_scratch_survives_release_and_swap() {
+    const auto good = make_wire(3, 100, 3);
+    const auto other = make_wire(4, 50, 2);
+    auto in = XBuffer::create<ReloadRoot>(4096, cap());
+    for (int i = 0; i < 3; ++i) in.reload_verified<ReloadRoot>(i % 2 ? other : good);
+    auto fresh = XBuffer::load_verified<ReloadRoot>(other, cap());
+    in.reload_verified<ReloadRoot>(other);
+    need(payload_equal(in, fresh) && in.save_verified<ReloadRoot>() == other, "reload with reused scratch");
+    in.release_reload_scratch();
+    in.reload_verified<ReloadRoot>(good);
+    need(in.save_verified<ReloadRoot>() == good, "reload after releasing scratch");
+    auto peer = XBuffer::create<ReloadRoot>(4096, cap());
+    swap(in, peer);
+    peer.reload_verified<ReloadRoot>(other);
+    in.reload_verified<ReloadRoot>(good);
+    need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
+}
 } // namespace
 
 int main() {
@@ -160,6 +178,7 @@ int main() {
         failed_reload_is_rootless_then_recovers();
         reset_equals_create();
         save_into_is_an_independent_copy();
+        reload_scratch_survives_release_and_swap();
         std::cout << "test_reload_reset passed\n";
         return 0;
     } catch (const std::exception& e) {
