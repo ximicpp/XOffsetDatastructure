@@ -54,6 +54,10 @@ Breaking: the V2 format replaces V1. V1 wires are rejected with
 - CI: the main workflow also runs on pushes and pull requests to next_cpp26, and
   adds a Linux ASan+UBSan job (P2996 image, pinned compiler-rt).
 - Tests: `test_assign_range` covers the iterator form of `assign(first, last)`.
+- `docs/USER_GUIDE.md` section 8 lists the core guarantees K1–K7 (K8, the
+  client cross-compile, is a goal) and the optional interfaces E1–E5; new
+  `docs/DEPLOYMENT.md` (same-version release, untrusted input, default receive
+  limits, client capacity, client-link compression).
 
 ## 0.1.0-alpha.1
 
