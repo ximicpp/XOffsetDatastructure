@@ -11,21 +11,28 @@ endfunction()
 function(xoffset_configure_full_interface target_name)
     target_link_libraries(${target_name} INTERFACE Threads::Threads)
     target_compile_features(${target_name} INTERFACE cxx_std_26)
-    target_compile_options(${target_name} INTERFACE
-        -std=c++26 -freflection -fexpansion-statements -stdlib=libc++)
-    target_link_options(${target_name} INTERFACE -stdlib=libc++)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC 16+ implements P2996 and expansion statements with libstdc++.
+        target_compile_options(${target_name} INTERFACE -std=c++26 -freflection)
+    else()
+        target_compile_options(${target_name} INTERFACE
+            -std=c++26 -freflection -fexpansion-statements -stdlib=libc++)
+        target_link_options(${target_name} INTERFACE -stdlib=libc++)
+    endif()
     foreach(include_dir IN LISTS BOOST_INCLUDE_DIRS TYPELAYOUT_INCLUDE_DIRS)
         target_include_directories(${target_name} SYSTEM INTERFACE
             "$<BUILD_INTERFACE:${include_dir}>")
     endforeach()
     # SDK-based Clang installations do not necessarily keep libc++ here.
     # Let the actual compile/link probe report unsupported reflection flags.
-    if(IS_DIRECTORY "${CLANG_INSTALL_DIR}/include/c++/v1")
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND IS_DIRECTORY "${CLANG_INSTALL_DIR}/include/c++/v1")
         target_include_directories(${target_name} SYSTEM INTERFACE
             "$<BUILD_INTERFACE:${CLANG_INSTALL_DIR}/include/c++/v1>")
     endif()
     target_include_directories(${target_name} INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>")
-    target_link_directories(${target_name} INTERFACE "$<BUILD_INTERFACE:${CLANG_INSTALL_DIR}/lib>")
+    if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_link_directories(${target_name} INTERFACE "$<BUILD_INTERFACE:${CLANG_INSTALL_DIR}/lib>")
+    endif()
 endfunction()
 
 function(xoffset_compile_check check_name source_file result_variable output_variable)

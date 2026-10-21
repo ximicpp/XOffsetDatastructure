@@ -15,8 +15,13 @@
     #define XOFFSET_LITTLE_ENDIAN 0
 #endif
 
+#if __has_include(<meta>)
+#include <meta>
+#else
 #include <experimental/meta>
+#endif
 #include <cstddef>
+#include <compare>
 #include <concepts>
 #include <functional>
 #include <cstdint>
@@ -1809,10 +1814,21 @@ namespace XOffsetDatastructure {
             return std::string_view(value);
         }
 
+        // An enum with an ADL operator<=> but no operator<: Clang resolves
+        // `a < b` to the rewritten operator<=>, GCC to the builtin operator<.
+        // Calling <=> explicitly gives the same key order on every compiler.
+        template <typename L, typename R>
+        concept enum_ordered_by_spaceship_only =
+            std::is_enum_v<L> && std::is_same_v<L, R> &&
+            requires(const L& a, const R& b) { operator<=>(a, b); } &&
+            !requires(const L& a, const R& b) { operator<(a, b); };
+
         template <typename L, typename R>
         bool ordered_less(const L& lhs, const R& rhs) {
             if constexpr (ordered_string_like<L> && ordered_string_like<R>) {
                 return ordered_view(lhs) < ordered_view(rhs);
+            } else if constexpr (enum_ordered_by_spaceship_only<L, R>) {
+                return (lhs <=> rhs) < 0;
             } else {
                 return lhs < rhs;
             }
@@ -5513,6 +5529,64 @@ namespace XOffsetDatastructure {
         return detail::wire_schema_hash<T>();
     }
 
+    // K7 schema pins. XOFFSET_PIN_SCHEMA(T, "<signature>") fails compilation on
+    // any compiler or target whose wire layout of T differs from the pinned
+    // text; the diagnostic shows the layout that compiler computed.
+    // schema_pin<T>("T") returns the pin line for the current layout.
+    namespace detail {
+        template <std::size_t N>
+        struct SchemaPinMessage {
+            char text[N]{};
+            std::size_t length = 0;
+            constexpr void append(std::string_view part) noexcept {
+                for (char c : part) text[length++] = c;
+            }
+            constexpr const char* data() const noexcept { return text; }
+            constexpr std::size_t size() const noexcept { return length; }
+        };
+
+        inline constexpr std::string_view schema_pin_message_head =
+            "XOffset schema pin mismatch (K7): this compiler and target lay the type out as \"";
+        inline constexpr std::string_view schema_pin_message_tail =
+            "\"; update the pin only for an intended schema change";
+
+        // Static storage, so a constexpr string_view may refer to it.
+        template <typename T>
+        inline constexpr auto schema_pin_signature = wire_abi_signature<T>();
+
+        template <typename T>
+        consteval bool schema_pin_matches(std::string_view pinned) {
+            return std::string_view(schema_pin_signature<T>) == pinned;
+        }
+
+        template <typename T>
+        consteval auto schema_pin_message() {
+            constexpr std::string_view actual(schema_pin_signature<T>);
+            SchemaPinMessage<schema_pin_message_head.size() + actual.size() +
+                             schema_pin_message_tail.size()> message;
+            message.append(schema_pin_message_head);
+            message.append(actual);
+            message.append(schema_pin_message_tail);
+            return message;
+        }
+    } // namespace detail
+
+    template <typename T>
+    std::string schema_pin(std::string_view type_name) {
+        static_assert(is_v1_wire_admitted_v<T>,
+            "schema_pin<T>() requires an admitted fixed-schema wire type.");
+        constexpr auto signature = wire_abi_signature<T>();
+        std::string line = "XOFFSET_PIN_SCHEMA(";
+        line.append(type_name);
+        line += ", \"";
+        for (char c : std::string_view(signature)) {
+            if (c == '"' || c == '\\') line += '\\';
+            line += c;
+        }
+        line += "\");";
+        return line;
+    }
+
     // XHandle<T> — Epoch-cached handle. O(1) deref when address is stable.
     // ========================================================================
     template <typename T>
@@ -6387,6 +6461,13 @@ struct _XOffset_NS_Sentinel {};
     template<> struct XOffsetDatastructure::schema_name<Type> {                \
         static constexpr std::string_view value = literal;                     \
     };
+
+// K7: compile-time pin of a type's wire layout (see schema_pin<T>()). Valid at
+// namespace or block scope. Use an alias for a type name containing commas.
+#define XOFFSET_PIN_SCHEMA(Type, signature)                                    \
+    static_assert(                                                             \
+        ::XOffsetDatastructure::detail::schema_pin_matches<Type>(signature),   \
+        ::XOffsetDatastructure::detail::schema_pin_message<Type>())
 
 #define XOFFSET_REGISTER_MIGRATION_TYPE(Type, strategy)                        \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MIGRATION_TYPE")         \

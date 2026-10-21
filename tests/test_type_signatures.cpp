@@ -13,7 +13,11 @@
 #include <boost/typelayout/tools/safety_level.hpp>  // compat::classify_signature, SafetyLevel
 #include <iostream>
 #include <cassert>
+#if __has_include(<meta>)
+#include <meta>
+#else
 #include <experimental/meta>
+#endif
 
 using namespace XOffsetDatastructure;
 using namespace boost::typelayout;

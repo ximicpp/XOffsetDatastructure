@@ -70,8 +70,8 @@ consteval std::meta::info member(std::string_view name){
 inline constexpr auto cache_member=member("owner_cache");
 inline constexpr auto available_member=member("owner_cache_available");
 inline constexpr auto registry_member=member("registry_state");
-decltype(auto) cache(){return [:cache_member:]();}
-decltype(auto) available(){return [:available_member:]();}
+decltype(auto) cache(){return (&[:cache_member:])();}
+decltype(auto) available(){return (&[:available_member:])();}
 using Cache=std::remove_reference_t<decltype(cache())>;
 using RecordPtr=std::remove_cvref_t<decltype(std::declval<Cache&>().records[0])>;
 using Record=typename RecordPtr::element_type;

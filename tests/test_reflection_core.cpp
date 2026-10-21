@@ -10,7 +10,11 @@
 
 #include "../xoffsetdatastructure.hpp"
 #include <iostream>
+#if __has_include(<meta>)
+#include <meta>
+#else
 #include <experimental/meta>
+#endif
 #include <utility>
 #include <cassert>
 
