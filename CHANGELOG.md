@@ -13,6 +13,14 @@
 - New `test_cross_compiler_wire` corpus. CI jobs: GCC 16 build and CTest, and
   a P2996 Clang <-> GCC 16 exchange that requires byte-identical wires and
   mutual `load_verified` acceptance.
+- Coverage-guided fuzzing (G5): `fuzz_v2_wire` (libFuzzer, option
+  `XOFFSET_BUILD_FUZZERS`) feeds each input to the spec oracle, typed load, raw
+  validation and verified receive, which must agree; accepted wires must
+  survive read -> mutate -> save -> load byte-stably. It shares its core with
+  `test_v2_fuzz` (`tests/fuzz/v2_fuzz_core.hpp`). The new `Fuzz` workflow runs
+  it under ASan+UBSan for 5 minutes on pull requests and pushes and for an hour
+  nightly, keeping the corpus between runs. All acceptors in the fuzz core now
+  use one 4 MiB limit, and the oracle rejects wires that declare more.
 
 ## 0.2.0-alpha.1: V2 storage and wire format
 
