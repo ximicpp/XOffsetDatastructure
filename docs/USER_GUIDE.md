@@ -81,6 +81,38 @@ std::string_view who = r.name.view();
 - 直接把数据收进最终 arena 的接收接口是 `begin_verified_receive<T>` /
   `finish_verified`（`xoffset_verified_receive.hpp`），校验强度与 `load_verified` 相同。
 
+### 4.1 大量小消息：用 `XBufferPool` 复用映射
+
+每个 `XBuffer` 都有自己的虚拟内存预留：建立时预留 `maximum_capacity` 并开启宿主
+前缀页和载荷页，销毁时整块释放。这套系统调用和缺页在 Apple M4 上约 4.4 µs，
+与预留大小关系不大。消息只有几 KB、而且每条都新建、销毁一个 buffer 时（战斗服往返、
+只读战报、客户端收包），这部分开销会远大于校验本身。
+
+这类接收方和发送方应当共用一个池，让销毁后的映射留给下一条消息复用：
+
+```cpp
+XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // 最多缓存 16 块空闲映射
+const auto cap = XBuffer::maximum_capacity(cap_bytes).with_pool(pool);
+
+XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // 仍是完整校验
+// ... 使用 in；离开作用域时映射回到池里，而不是还给操作系统
+```
+
+- 池只复用映射，不跳过任何校验，也不改变 wire。复用的映射在重新暴露前会清零。
+- 池按 `maximum_capacity` 的精确值匹配，同一类消息请用同一个上限。
+- 池里的空闲映射仍占着虚拟地址和已触碰的页，`Limits` 的三个上限（块数、预留字节、
+  可访问字节）决定最多留多少；`pool.clear()` 立即全部释放。
+- `XBufferPool` 目前属于实验接口（见第 8 节）。
+
+SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
+
+| 场景 | 每条消息新建映射 | 用池 |
+| --- | ---: | ---: |
+| 战斗服往返，XOffset ÷ cereal / FlatBuffers / protobuf（几何均值） | 2.91 / 4.16 / 1.28 | 0.58 / 0.85 / 0.25 |
+| 只读战报，每次读取 | 4.9 µs | 0.44 µs |
+
+只读战报用池后仍慢于 cereal（约 2.6 倍），剩余开销在建立 owner 和"先拷贝再校验"。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
