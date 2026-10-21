@@ -88,6 +88,7 @@ void operator delete[](void* p, std::align_val_t, const std::nothrow_t&) noexcep
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 #include "../xoffsetdatastructure.hpp"
 #include "bitmap_test_support.hpp"
 using namespace XOffsetDatastructure;
@@ -111,6 +112,7 @@ void need(bool ok, const char* why) { if (!ok) throw std::runtime_error(why); }
 struct Summary {
     std::size_t direct_points{}, first_upstream_chunk_request_bytes{}, graph_new_calls{}, typed_load_new_calls{};
     std::size_t typed_bad_alloc{}, typed_xbad_alloc{}, chunk_sized_requests{};
+    std::size_t graph_start{}, free_table_points{};
 } summary;
 std::array<std::size_t, fail_new::trace_capacity> observed_graph_requests{};
 void register_one(bool free, const char* address, wd::WireValidationContext& ctx) {
@@ -173,9 +175,10 @@ std::string make_wire() {
         for (std::uint32_t j = 0; j < 32; ++j) record.values.push_back(0xa5000000u + i * 32 + j);
         record.attrs.reserve(2); record.attrs.try_emplace(-3, "lower"); record.attrs.try_emplace(9, "upper");
     }
-    // Retire a non-tail allocation so real typed load also creates the free index.
+    // Retire a non-tail allocation so the wire carries a hole table: real
+    // typed load registers it as free ranges and then loads the host free table.
     root.retired.reserve(8); root.barrier = std::string(96, 'z'); root.retired.reserve(256);
-    need(buffer.allocator_state()->free_bytes > 0, "fixture did not retain a real free-list allocation");
+    need(buffer.free_block_count() > 0 && buffer.free_block_bytes() > 0, "fixture did not retain a real retired allocation");
     return buffer.save_verified<RangeFailureRoot>();
 }
 void values(XBuffer& buffer) {
@@ -192,9 +195,18 @@ void values(XBuffer& buffer) {
         need(lower != record.attrs.end() && upper != record.attrs.end() && lower->second.view() == "lower" && upper->second.view() == "upper", "typed reload attributes differ");
     }
 }
+std::vector<XBufferCore::WireHole> wire_holes(const std::string& wire) {
+    XWireHeaderV2 header{}; std::memcpy(&header, wire.data(), sizeof(header));
+    need(header.hole_count > 0 && wire.size() == sizeof(header) + header.used_bytes + header.hole_count * sizeof(XBufferCore::WireHole),
+         "fixture wire has no hole table");
+    std::vector<XBufferCore::WireHole> holes(header.hole_count);
+    std::memcpy(holes.data(), wire.data() + sizeof(header) + header.used_bytes, holes.size() * sizeof(XBufferCore::WireHole));
+    return holes;
+}
 void typed_load_failures() {
     // Both copies exist before any arm; source bytes never belong to loaded state.
     const auto wire = make_wire(); const auto immutable_copy = wire;
+    const auto holes = wire_holes(wire);
     {
         auto warm = XBuffer::load_verified<RangeFailureRoot>(wire); values(warm);
         need(warm.save_verified<RangeFailureRoot>() == wire, "normal typed reload changed normalized wire");
@@ -202,7 +214,9 @@ void typed_load_failures() {
         // Its observed new sequence comes from the monotonic upstream chunks in validation.
         {
             const auto live_before = fail_new::live();
-            { fail_new::Arm arm(-1); wd::verify_structural_wire_graph(warm.root<RangeFailureRoot>(), warm); }
+            // Same arguments as load_verified: the wire hole table, exact coverage.
+            { fail_new::Arm arm(-1); wd::verify_structural_wire_graph(warm.root<RangeFailureRoot>(), warm,
+                std::pmr::new_delete_resource(), holes.data(), holes.size()); }
             need(fail_new::hits == 0 && !fail_new::overflow && fail_new::attempts > 0, "isolated structural traversal did not request upstream chunks");
             summary.graph_new_calls = fail_new::attempts;
             observed_graph_requests = fail_new::requests;
@@ -218,11 +232,21 @@ void typed_load_failures() {
         need(fail_new::hits == 0 && !fail_new::overflow && fail_new::attempts >= summary.graph_new_calls, "typed-load baseline allocation inventory invalid");
         summary.typed_load_new_calls = fail_new::attempts;
         const auto baseline_requests = fail_new::requests;
-        // bind_schema and return perform no further new; the final observed
-        // requests must be the already isolated structural upstream-chunk sequence.
-        const auto graph_start = summary.typed_load_new_calls - summary.graph_new_calls;
-        for (std::size_t i = graph_start; i < summary.typed_load_new_calls; ++i)
-            need(baseline_requests[i] == observed_graph_requests[i - graph_start], "typed-load upstream chunk sequence suffix changed");
+        // V2: the isolated structural upstream-chunk sequence is followed only
+        // by loading the validated hole table into the host free table
+        // (bind_schema and return perform no further new).
+        std::size_t graph_start = summary.typed_load_new_calls;
+        for (std::size_t start = summary.typed_load_new_calls - summary.graph_new_calls + 1; start-- > 0;) {
+            bool same = true;
+            for (std::size_t i = 0; i < summary.graph_new_calls && same; ++i)
+                same = baseline_requests[start + i] == observed_graph_requests[i];
+            if (same) { graph_start = start; break; }
+        }
+        need(graph_start < summary.typed_load_new_calls, "typed-load upstream chunk sequence changed");
+        const auto graph_end = graph_start + summary.graph_new_calls;
+        summary.graph_start = graph_start;
+        summary.free_table_points = summary.typed_load_new_calls - graph_end;
+        need(summary.free_table_points > 0, "typed load did not populate the host free table after validation");
         need(fail_new::live() == outside, "normal typed-load scope retained C++ allocations");
         for (std::size_t point = 0; point < summary.typed_load_new_calls; ++point) {
             const auto live_before = fail_new::live(); bool caught = false, standard = false;
@@ -230,7 +254,8 @@ void typed_load_failures() {
             catch (const std::bad_alloc&) { caught = standard = true; ++summary.typed_bad_alloc; }
             catch (const XBadAlloc&) { caught = true; ++summary.typed_xbad_alloc; }
             need(caught && fail_new::hits == 1 && !fail_new::overflow && fail_new::attempts >= point + 1, "requested real typed-load failpoint was not reached exactly once");
-            if (point >= graph_start) need(standard, "structural bitmap-chunk failure did not propagate std::bad_alloc");
+            if (point >= graph_start && point < graph_end) need(standard, "structural bitmap-chunk failure did not propagate std::bad_alloc");
+            if (point >= graph_end) need(!standard, "host free-table load failure was not reported as XBadAlloc");
             if (baseline_requests[point] == summary.first_upstream_chunk_request_bytes) ++summary.chunk_sized_requests;
             need(fail_new::live() == live_before, "failed typed-load RAII scope leaked a C++ allocation");
             need(wire == immutable_copy, "failed typed load modified the original wire");
@@ -250,7 +275,7 @@ int main() {
         std::cout << "{\"schema\":\"wire-range-real-new-failure-bitmap-v3\",\"status\":\"passed\",\"direct_empty_nonempty_owned_free_points\":" << summary.direct_points
                   << ",\"first_upstream_chunk_request_bytes\":" << summary.first_upstream_chunk_request_bytes << ",\"isolated_structural_graph_new_calls\":" << summary.graph_new_calls
                   << ",\"typed_load_observed_new_points\":" << summary.typed_load_new_calls << ",\"typed_std_bad_alloc\":" << summary.typed_bad_alloc
-                  << ",\"typed_XBadAlloc\":" << summary.typed_xbad_alloc << ",\"chunk_sized_requests_not_stack_attribution\":" << summary.chunk_sized_requests
+                  << ",\"typed_XBadAlloc\":" << summary.typed_xbad_alloc << ",\"free_table_load_points\":" << summary.free_table_points << ",\"chunk_sized_requests_not_stack_attribution\":" << summary.chunk_sized_requests
                   << ",\"original_wire_unchanged_and_reloaded_after_each_failure\":true,\"CXX_allocation_scope_leaks\":0,\"does_not_cover\":[\"all_malloc\",\"all_OS_VM_failures\",\"multi_operation_transactions\"],\"performance_samples\":0}\n";
         return 0;
     } catch (const std::exception& error) { fail_new::watching = false; fail_new::fail_after = -1; std::cerr << error.what() << '\n'; return 1; }

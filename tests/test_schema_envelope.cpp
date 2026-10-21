@@ -1,7 +1,7 @@
 // ============================================================================
 // Test: Fixed-Schema Wire Header Verification
-// Purpose: Validate the verified v1 wire header wrapped around the current
-//          raw XBuffer payload.
+// Purpose: Validate the verified V2 wire header wrapped around the current
+//          raw XBuffer payload (and the hole table that follows it).
 // ============================================================================
 
 #include <cassert>
@@ -106,7 +106,7 @@ bool test_endian_tag_rejection() {
     obj->id = 5;
 
     std::string data = xbuf.save_verified<EnvelopeData>();
-    XWireHeaderV1 header{};
+    XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
     header.endian_tag ^= 0x1;
     std::memcpy(data.data(), &header, sizeof(header));
@@ -123,27 +123,80 @@ bool test_endian_tag_rejection() {
     return true;
 }
 
-bool test_allocator_offset_rejection() {
-    std::cout << "\n[TEST] invalid allocator offset rejected\n";
+namespace {
+bool rejects_with(const std::string& data, const char* expected) {
+    try {
+        (void)XBuffer::load_verified<EnvelopeData>(data);
+    } catch (const XException& e) {
+        return expected == nullptr || std::string(e.what()).find(expected) != std::string::npos;
+    }
+    return false;
+}
 
+std::string envelope_with_hole() {
     XBuffer xbuf(4096);
     auto* obj = xbuf.make<EnvelopeData>();
     obj->id = 8;
+    obj->name = "envelope-with-a-heap-name";
+    obj->items.push_back(1);
+    obj->name = std::string(64, 'n'); // retires the old name block: one hole
+    assert(xbuf.free_block_count() == 1);
+    return xbuf.save_verified<EnvelopeData>();
+}
+}
 
-    std::string data = xbuf.save_verified<EnvelopeData>();
-    XWireHeaderV1 header{};
+// V2 replacement of the retired allocator_offset check: the hole table's
+// envelope (hole_count, hole_bytes, used_bytes) must describe the wire exactly.
+bool test_hole_envelope_rejection() {
+    std::cout << "\n[TEST] inconsistent hole table envelope rejected\n";
+
+    const std::string data = envelope_with_hole();
+    XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
-    header.allocator_offset += 8;
-    std::memcpy(data.data(), &header, sizeof(header));
+    assert(header.hole_count == 1 && header.hole_bytes > 0);
+    assert(data.size() == sizeof(header) + header.used_bytes + header.hole_count * sizeof(XBufferCore::WireHole));
+    (void)XBuffer::load_verified<EnvelopeData>(data);
 
-    bool threw = false;
-    try {
-        (void)XBuffer::load_verified<EnvelopeData>(data);
-    } catch (const XException&) {
-        threw = true;
-    }
+    auto mutate = [&](auto&& edit) {
+        auto copy = data;
+        XWireHeaderV2 h{};
+        std::memcpy(&h, copy.data(), sizeof(h));
+        edit(h);
+        std::memcpy(copy.data(), &h, sizeof(h));
+        return copy;
+    };
+    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_bytes += 8; }), "hole byte count mismatch"));
+    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_bytes = 0; }), "hole byte count mismatch"));
+    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_count += 1; }), "used size mismatch"));
+    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_count = 0; }), "used size mismatch"));
+    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.used_bytes += 8; }), "used size mismatch"));
+    // Dropping the table entry together with its envelope leaves the retired
+    // block unaccounted for: exact coverage fails.
+    auto dropped = mutate([](XWireHeaderV2& h) { h.hole_count = 0; h.hole_bytes = 0; });
+    dropped.resize(dropped.size() - sizeof(XBufferCore::WireHole));
+    assert(rejects_with(dropped, "payload is not exactly covered by live blocks and holes"));
+    std::cout << "  [OK]\n";
+    return true;
+}
 
-    assert(threw);
+bool test_v1_wire_rejected() {
+    std::cout << "\n[TEST] V1 wire format rejected\n";
+
+    XBuffer xbuf(4096);
+    auto* obj = xbuf.make<EnvelopeData>();
+    obj->id = 11;
+    std::string data = xbuf.save_verified<EnvelopeData>();
+
+    auto v1 = data;
+    std::memcpy(v1.data(), XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
+    assert(rejects_with(v1, "unsupported wire format version 1"));
+
+    XWireHeaderV2 header{};
+    std::memcpy(&header, data.data(), sizeof(header));
+    header.format_major = 1;
+    auto major1 = data;
+    std::memcpy(major1.data(), &header, sizeof(header));
+    assert(rejects_with(major1, "unsupported format version"));
     std::cout << "  [OK]\n";
     return true;
 }
@@ -239,7 +292,7 @@ bool test_verified_save_is_normalized_transport() {
     assert(obj->items.capacity() == 8);
 
     std::string data = xbuf.save_verified();
-    XWireHeaderV1 header{};
+    XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
 
     auto loaded = TypedXBuffer<EnvelopeData>::load_verified(data);
@@ -270,7 +323,8 @@ int main() {
     all_passed &= test_magic_rejection();
     all_passed &= test_schema_rejection();
     all_passed &= test_endian_tag_rejection();
-    all_passed &= test_allocator_offset_rejection();
+    all_passed &= test_hole_envelope_rejection();
+    all_passed &= test_v1_wire_rejected();
     all_passed &= test_typed_buffer_verified_api();
     all_passed &= test_verified_span_api();
     all_passed &= test_typed_load_defaults_to_verified();

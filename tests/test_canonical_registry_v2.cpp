@@ -1,4 +1,4 @@
-// Source-only fixture for root's separately integrated canonical-v2 candidate.
+// Canonical-v2 registry fixture (receive owners on the V2 wire).
 #include "xoffsetdatastructure.hpp"
 #include <array>
 #include <atomic>
@@ -42,12 +42,19 @@ namespace{
 void need(bool p,const char* why){if(!p)throw std::runtime_error(why);}
 auto policy(){return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic);}
 std::string wire(){auto b=Buffer::create(32768,policy());auto& r=b.root();r.marker=0xa1200345;r.label="canonical registry";r.values.resize(5);for(unsigned i=0;i<5;++i)r.values[i]=101+i;return b.save_verified();}
+// V2 dense wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
 Token receive(const std::string& bytes){
-    const auto body=bytes.size()-sizeof(xo::XWireHeaderV1);auto t=xo::begin_verified_receive<CanonicalRegistryRoot>(body,policy());
-    auto op=t.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes();
+    xo::XWireHeaderV2 header{};need(bytes.size()>=sizeof(header),"fixture wire too small");
+    std::memcpy(&header,bytes.data(),sizeof(header));
+    const auto body=std::size_t(header.used_bytes);const auto holes=std::size_t(header.hole_count);
+    need(header.extent_count==0&&bytes.size()==sizeof(header)+body+holes*sizeof(xo::XBufferCore::WireHole),
+         "fixture is not a dense V2 wire");
+    auto t=xo::begin_verified_receive<CanonicalRegistryRoot>(body,policy(),holes);
+    auto op=t.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes(),table=op.hole_bytes();
     for(std::size_t i=0;i<h.size();++i)h[i]=std::byte(static_cast<unsigned char>(bytes[i]));
     for(std::size_t i=0;i<p.size();++i)p[i]=std::byte(static_cast<unsigned char>(bytes[h.size()+i]));
-    op.complete(h.size(),p.size());return t;
+    for(std::size_t i=0;i<table.size();++i)table[i]=std::byte(static_cast<unsigned char>(bytes[h.size()+p.size()+i]));
+    op.complete(h.size(),p.size(),table.size());return t;
 }
 void check(Buffer& b){
     auto& r=b.root();need(r.marker==0xa1200345&&r.label=="canonical registry"&&r.values.size()==5&&r.values[4]==105,"complete owner values differ");
@@ -59,7 +66,7 @@ void check(Buffer& b){
     need(end&&reinterpret_cast<std::uintptr_t>(end)==base+b.maximum_capacity(),"canonical one-past extent recovery differs");
     auto a=r.values.binding();auto* p=xo::fixed_detail::allocate_dynamic_bytes(a,24,8);
     xo::fixed_detail::retire_dynamic_bytes(a,p,24);
-    auto* q=xo::fixed_detail::allocate_dynamic_bytes(a,24,8);need(q==p,"freelist reuse did not find original block");
+    auto* q=xo::fixed_detail::allocate_dynamic_bytes(a,24,8);need(q==p,"free-table reuse did not find original block");
     xo::fixed_detail::retire_dynamic_bytes(a,q,24);
 }
 std::array<std::optional<Buffer>,7>* live_owners=nullptr;

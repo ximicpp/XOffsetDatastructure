@@ -1,0 +1,57 @@
+diff -ru meta-w9a/experiments/serialization_comparison/adapters/xoffset/adapter.hpp meta-r3/experiments/serialization_comparison/adapters/xoffset/adapter.hpp
+--- meta-w9a/experiments/serialization_comparison/adapters/xoffset/adapter.hpp	2026-10-20 03:44:41
++++ meta-r3/experiments/serialization_comparison/adapters/xoffset/adapter.hpp	2026-10-20 22:58:54
+@@ -56,7 +56,7 @@
+ struct XOffsetAdapter {
+     using Buffer = XOffsetDatastructure::TypedXBuffer<xo_detail::Snapshot>;
+     using State = std::unique_ptr<Buffer>;
+-    static constexpr std::string_view library_id = "xoffset-mac-w9-flat-v1";
++    static constexpr std::string_view library_id = "xoffset-mac-r3-v2";
+     static constexpr std::string_view commit = "7539433ab96d69c4a07b1db5c0a13786da85cdcd";
+     static constexpr std::string_view trust_mode = "T-trusted-typed-verified-owning-copy-Automatic;U-not-established";
+     static constexpr std::string_view source_archive_sha256 = "5a8647736d1145676c503299d704bc37e2dd035d730ccc2ffca2e5e96a28c658";
+@@ -156,7 +156,7 @@
+                         case MutationCode::append_samples:
+                             for (auto value : op.samples) r.samples.push_back(value);
+                             break;
+-                        case MutationCode::replace_payload: xo_detail::assign_sequence(r.payload, op.bytes); break;
++                        case MutationCode::replace_payload: r.payload.assign(op.bytes.begin(), op.bytes.end()); break;
+                         case MutationCode::replace_attr:
+                         case MutationCode::insert_attr: {
+                             auto pos = xo_detail::attr_lower(r, op.text);
+diff -ru meta-w9a/experiments/serialization_comparison/protocols/contract-v1.json meta-r3/experiments/serialization_comparison/protocols/contract-v1.json
+--- meta-w9a/experiments/serialization_comparison/protocols/contract-v1.json	2026-10-20 03:44:41
++++ meta-r3/experiments/serialization_comparison/protocols/contract-v1.json	2026-10-20 22:59:01
+@@ -19,7 +19,7 @@
+   "mutation_execution": "Ordered trace; per-stage batching allowed only when sequential logical operations and status outcomes are identical; no query occurs within a stage; Python oracle evaluates each operation independently; functional gate audits every stage",
+   "resources": {"maximum_input_bytes":536870912,"xoffset_initial_arena_bytes":4096,"xoffset_maximum_arena_bytes":536870912,"xoffset_growth":"Automatic opt-in; pool disabled","preallocate":"Initial record/sequence size only; not future trace capacity"},
+   "native_profiles": {
+-    "xoffset-mac-w9-flat-v1":"Typed verified load / admitted native arena containers / Automatic opt-in / verified owning save",
++    "xoffset-mac-r3-v2":"Typed verified load / admitted native arena containers / Automatic opt-in / verified owning save",
+     "cista-v0.16":"offset own containers; mode NONE default structural checks; detached private blob copy; later self-allocated heap cleanup; no fmt macro",
+     "flatbuffers-v25.12.19":"Object API UnPack -> modify generated native objects -> Pack; trusted input; no upfront verifier in T profile; U remains unestablished",
+     "capnproto-v1.5.0":"Unpacked flat bytes -> bounded normal Reader -> private MessageBuilder copy; native field/list operations; flatten owning output; no RPC",
+diff -ru meta-w9a/experiments/serialization_comparison/protocols/native-result.schema.json meta-r3/experiments/serialization_comparison/protocols/native-result.schema.json
+--- meta-w9a/experiments/serialization_comparison/protocols/native-result.schema.json	2026-10-20 03:44:41
++++ meta-r3/experiments/serialization_comparison/protocols/native-result.schema.json	2026-10-20 22:59:01
+@@ -6,7 +6,7 @@
+   "properties": {
+     "schema_version":{"const":1},
+     "kind":{"const":"serialization-comparison-native-result"},
+-    "library":{"enum":["xoffset-mac-w9-flat-v1","cista-v0.16","flatbuffers-v25.12.19","capnproto-v1.5.0","cereal-v1.3.2"]},
++    "library":{"enum":["xoffset-mac-r3-v2","cista-v0.16","flatbuffers-v25.12.19","capnproto-v1.5.0","cereal-v1.3.2"]},
+     "status":{"const":"passed"},
+     "phase_ns":{"type":"object","additionalProperties":false,"required":["load","query_before","mutate","emit_after","retire_modified_state","reload","query_after","cleanup"],"properties":{"load":{"$ref":"#/$defs/decimal"},"query_before":{"$ref":"#/$defs/decimal"},"mutate":{"$ref":"#/$defs/decimal"},"emit_after":{"$ref":"#/$defs/decimal"},"retire_modified_state":{"$ref":"#/$defs/decimal"},"reload":{"$ref":"#/$defs/decimal"},"query_after":{"$ref":"#/$defs/decimal"},"cleanup":{"$ref":"#/$defs/decimal"}}},
+     "total_ns":{"$ref":"#/$defs/decimal"},
+diff -ru meta-w9a/tools/serialization_comparison/protocol.py meta-r3/tools/serialization_comparison/protocol.py
+--- meta-w9a/tools/serialization_comparison/protocol.py	2026-10-20 03:44:41
++++ meta-r3/tools/serialization_comparison/protocol.py	2026-10-20 22:59:01
+@@ -12,7 +12,7 @@
+ 
+ LIBRARIES = ("xoffset", "cista", "flatbuffers", "capnproto", "cereal")
+ IDENTITIES = {
+-    "xoffset":("xoffset-mac-w9-flat-v1","7539433ab96d69c4a07b1db5c0a13786da85cdcd"),
++    "xoffset":("xoffset-mac-r3-v2","7539433ab96d69c4a07b1db5c0a13786da85cdcd"),
+     "cista":("cista-v0.16","015b94e66c4c0d7c1ef29742383a024c84fbbba1"),
+     "flatbuffers":("flatbuffers-v25.12.19","7e163021e59cca4f8e1e35a7c828b5c6b7915953"),
+     "capnproto":("capnproto-v1.5.0","373e61ec89e2359f1c362e9b2eadc552f4779306"),

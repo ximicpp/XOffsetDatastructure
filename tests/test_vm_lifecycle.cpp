@@ -45,6 +45,9 @@ struct ShutdownTransfers {
         global_second = std::move(local);
         assert(second->value == 22);
         auto alloc = global_second.allocator<std::int64_t>();
+        // V2: allocation resolves the owner from the host page before the
+        // payload; after the shutdown transfers it names global_second.
+        assert(XBufferCore::owner_from_arena_noexcept(alloc.arena()) == &global_second);
         auto* value = alloc.allocate(1);
         *value = 77;
         assert(*value == 77);

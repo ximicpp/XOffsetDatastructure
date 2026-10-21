@@ -1,8 +1,12 @@
 // Exact-base owner lookup, construction rollback, and allocation-free transfers.
+// V2: allocation resolves its owner from the host page before the payload; the
+// registry remains the identity behind save_verified_into/canonical lookup, so
+// these checks exercise both after every transfer.
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <new>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -38,6 +42,16 @@ XBuffer make_buffer(std::int64_t value) {
     auto buffer = XBuffer::create<RegistryRoot>(4096, XBuffer::maximum_capacity(65536));
     buffer.root<RegistryRoot>().value = value;
     return buffer;
+}
+
+// The registry record (identity used by save_verified_into) follows the owner.
+// The save normalizes the payload extent, so call it after the owner's last
+// allocation in explicit-growth fixtures.
+void check_registry_identity(XBuffer& owner, std::int64_t value) {
+    std::string out;
+    owner.save_verified_into<RegistryRoot>(out);
+    auto loaded = XBuffer::load_verified<RegistryRoot>(out);
+    assert(loaded.root<RegistryRoot>().value == value);
 }
 
 template <class F> void reject_registration(F&& operation) {
@@ -128,6 +142,7 @@ void transfer_matrix() {
         auto& self = first;
         first = std::move(self);
         assert(first.get_address() == original_base && handle->value == 11);
+        assert(XBufferCore::owner_from_arena_noexcept(allocator.arena()) == &first);
     }
     assert(host_allocations.load(std::memory_order_relaxed) == before);
     // The registration failure must remain pending across move/swap/destruction.
@@ -139,6 +154,7 @@ void transfer_matrix() {
     *p = 27;
     assert(*p == 27);
     allocator.deallocate(p, 1);
+    check_registry_identity(first, 11); // last: save normalizes the explicit-growth buffer
 }
 
 void many_owners_and_reused_addresses() {
@@ -163,7 +179,9 @@ void many_owners_and_reused_addresses() {
         *p = i + 5;
         XBuffer moved(std::move(owner));
         assert(*p == i + 5 && moved.root<RegistryRoot>().value == i);
+        assert(XBufferCore::owner_from_arena_noexcept(alloc.arena()) == &moved);
         alloc.deallocate(p, 1);
+        if (i % 50 == 0) check_registry_identity(moved, i);
     }
 }
 
@@ -180,7 +198,9 @@ void independent_threads() {
                 auto* p = alloc.allocate(1);
                 *p = i;
                 assert(b.root<RegistryRoot>().value == id * 1000 + i && *p == i);
+                assert(XBufferCore::owner_from_arena_noexcept(alloc.arena()) == &b);
                 alloc.deallocate(p, 1);
+                if (i % 16 == 0) check_registry_identity(b, id * 1000 + i);
             }
         });
     }

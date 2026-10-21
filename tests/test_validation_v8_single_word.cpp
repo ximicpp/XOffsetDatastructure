@@ -262,7 +262,8 @@ template<class T> void write(std::string& wire,std::size_t p,T value) {
     need(p<=wire.size() && sizeof(T)<=wire.size()-p,"fixture write bounds");
     std::memcpy(wire.data()+p,&value,sizeof(value));
 }
-void point_right_at(std::string& wire,const xo::XWireHeaderV1& h,std::size_t payload_offset) {
+void point_right_at(std::string& wire,const xo::XWireHeaderV2& h,std::size_t payload_offset) {
+    need(h.extent_count==0,"fixture wire is sparse; payload offsets assume a dense wire");
     const auto origin=sizeof(h)+h.root_offset+offsetof(SingleWordRoot,right)+offsetof(xo::XFixedVector<std::uint8_t>,data_delta);
     const auto target=sizeof(h)+payload_offset;
     const auto delta=static_cast<std::int64_t>(target)-static_cast<std::int64_t>(origin);
@@ -280,9 +281,11 @@ void typed_load_malicious_wire() {
     auto& root=buffer.root<SingleWordRoot>();root.left.resize(16);root.right.resize(16);
     for (unsigned i=0;i<16;++i) {root.left[i]=std::uint8_t(i+1);root.right[i]=std::uint8_t(100+i);}
     const auto left_offset=std::size_t(reinterpret_cast<const char*>(root.left.data())-static_cast<const char*>(buffer.get_address()));
-    const auto left_begin=left_offset-sizeof(xo::XBufferCore::AllocationHeader);
-    need(left_begin/64==(left_offset+16-1)/64,"fixture live allocation is not one word");
-    const auto original=buffer.save_verified<SingleWordRoot>();const auto h=read<xo::XWireHeaderV1>(original,0);
+    // V2: no block header; the live block is exactly [data, data+round8(16)).
+    const auto left_begin=left_offset;
+    need(left_begin%8==0 && left_begin/64==(left_offset+16-1)/64,"fixture live allocation is not one word");
+    const auto original=buffer.save_verified<SingleWordRoot>();const auto h=read<xo::XWireHeaderV2>(original,0);
+    need(h.hole_count==0 && h.hole_bytes==0,"fresh fixture unexpectedly has holes");
     auto loaded=xo::XBuffer::load_verified<SingleWordRoot>(original);
     need(loaded.root<SingleWordRoot>().left[7]==8 && loaded.root<SingleWordRoot>().right[7]==107,"valid typed control differs");
     auto live_overlap=original;point_right_at(live_overlap,h,left_offset);
@@ -292,14 +295,13 @@ void typed_load_malicious_wire() {
     auto& r=retired.root<SingleWordRoot>();r.left.resize(16);r.right.resize(16);
     for(unsigned i=0;i<16;++i) {r.left[i]=std::uint8_t(i+1);r.right[i]=std::uint8_t(100+i);}
     r.left.reserve(32); // right is live after old left, so the old16 block retires.
-    const auto valid=retired.save_verified<SingleWordRoot>();const auto header=read<xo::XWireHeaderV1>(valid,0);
-    const auto state=read<xo::XAllocatorStateV1>(valid,sizeof(header)+header.allocator_offset);
-    std::size_t free_payload=0;unsigned heads=0;
-    for (auto offset:state.freelist_head) if(offset) {free_payload=header.allocator_offset+offset;++heads;}
-    need(heads==1,"fixture must contain exactly one retired allocation");
-    const auto block=read<xo::XBufferCore::AllocationHeader>(valid,sizeof(header)+free_payload-sizeof(xo::XBufferCore::AllocationHeader));
-    const auto begin=free_payload-sizeof(xo::XBufferCore::AllocationHeader);
-    need(block.user_bytes==16 && begin/64==(begin+block.total_bytes-1)/64,"fixture retired block is not one word16");
+    const auto valid=retired.save_verified<SingleWordRoot>();const auto header=read<xo::XWireHeaderV2>(valid,0);
+    // V2: the retired block travels in the wire hole table, not an in-arena free list.
+    need(header.hole_count==1 && header.hole_bytes==16,"fixture must contain exactly one retired allocation");
+    const auto hole=read<xo::XBufferCore::WireHole>(valid,sizeof(header)+header.used_bytes);
+    const std::size_t free_payload=hole.offset;
+    const auto begin=free_payload;
+    need(hole.bytes==16 && begin%8==0 && begin/64==(begin+hole.bytes-1)/64,"fixture retired block is not one word16");
     auto good=xo::XBuffer::load_verified<SingleWordRoot>(valid);
     need(good.root<SingleWordRoot>().left[7]==8 && good.root<SingleWordRoot>().right[7]==107,"valid retired typed control differs");
     auto live_free=valid;point_right_at(live_free,header,free_payload);

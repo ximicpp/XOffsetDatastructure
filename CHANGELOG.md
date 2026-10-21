@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (next_cpp26): V2 storage and wire format
+
+Breaking: the V2 format replaces V1. V1 wires are rejected with
+"unsupported wire format version 1"; there is no V1 reader. See
+`docs/V2_FORMAT.md`.
+
+- Blocks carry no headers: extents are derived from container heads
+  (8-byte aligned, multiples of 8); `XAllocatorStateV1` and in-arena free
+  lists are removed.
+- Host-side binned free table with exact reuse and splitting; it travels as
+  the wire hole table, so free space survives reloads and reloads never scan.
+- Validators require live blocks plus holes to tile the payload exactly.
+- Strings of up to 10 bytes are stored inline in their 16-byte head.
+- The owner is found through a host page before the payload (no registry or
+  thread-local lookup on allocate/retire).
+- Sparse wires skip free runs of at least 4 KiB; Darwin outputs of at least
+  1 MiB are prefaulted in 256 KiB chunks.
+- `XFixedVector::assign(first, last)`; move-assignment ownership walk only
+  in debug builds (`XOFFSET_MOVE_OWNERSHIP_CHECKS`).
+
 ## 0.1.0-alpha.1
 
 First alpha packaging of the accepted XOffsetDatastructure implementation.

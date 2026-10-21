@@ -243,8 +243,9 @@ void malicious_typed_alias() {
     const auto left_data_offset=static_cast<std::size_t>(root.left.data()-buffer.data());
     const auto wire=buffer.save_verified<HintAliasRoot>();auto evil=wire;
     const auto delta=static_cast<std::int32_t>(static_cast<std::ptrdiff_t>(left_data_offset)-static_cast<std::ptrdiff_t>(delta_field_offset));
-    need(sizeof(XWireHeaderV1)+delta_field_offset+sizeof(delta)<=evil.size(),"alias fixture field not in wire");
-    std::memcpy(evil.data()+sizeof(XWireHeaderV1)+delta_field_offset,&delta,sizeof(delta));
+    need(sizeof(XWireHeaderV2)+delta_field_offset+sizeof(delta)<=evil.size(),"alias fixture field not in wire");
+    {XWireHeaderV2 h{};std::memcpy(&h,evil.data(),sizeof(h));need(h.extent_count==0,"alias fixture wire is sparse");}
+    std::memcpy(evil.data()+sizeof(XWireHeaderV2)+delta_field_offset,&delta,sizeof(delta));
     const auto unchanged=evil;bool rejected=false;
     try {auto loaded=XBuffer::load_verified<HintAliasRoot>(evil);(void)loaded;}
     catch(const XException& e) {need(category(e.what())==Result::oo,"malicious alias error category changed");rejected=true;}

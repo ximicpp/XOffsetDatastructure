@@ -68,8 +68,6 @@ static_assert(offsetof(RawOwningDescriptor, size) == 8);
 static_assert(offsetof(RawOwningDescriptor, capacity) == 12);
 static_assert(sizeof(RawPayloadHeader) == sizeof(XArena));
 static_assert(alignof(RawPayloadHeader) == alignof(XArena));
-static_assert(std::is_trivially_copyable_v<XAllocatorStateV1>);
-static_assert(std::is_trivially_copyable_v<fixed_detail::FreeBlockHeader>);
 
 // Caller proves the fixed-sized source range before calling this primitive.
 // The copy is to a distinct live POD; it is never a typed wire-head access.
@@ -123,9 +121,9 @@ inline const char* raw_checked_relative(const char* field, std::int32_t delta,
 inline void raw_validate_binding(const char* field, std::int32_t delta,
                                  const WireValidationContext& ctx,
                                  const CanonicalRawBytes* bytes=nullptr) {
+    // V2: a head binds to the payload base (arena header) itself.
     if (delta == 0 ||
-        raw_checked_relative(field, delta, ctx,bytes) !=
-            reinterpret_cast<const char*>(ctx.allocator_state))
+        raw_checked_relative(field, delta, ctx,bytes) != ctx.base)
         throw XException("wire validation: invalid allocator binding");
 }
 
@@ -145,8 +143,17 @@ inline char* raw_verified_relative(char* field, std::int32_t delta,
     return reinterpret_cast<char*>(target);
 }
 
+inline constexpr std::uint32_t raw_inline_string_flag = 0x80000000u;
+inline bool raw_inline_string(const RawOwningDescriptor& head) noexcept {
+    return (head.capacity & raw_inline_string_flag) != 0;
+}
+inline std::uint32_t raw_inline_string_size(const RawOwningDescriptor& head) noexcept {
+    return (head.capacity >> 24) & 0x7fu;
+}
+
 inline std::string_view raw_verified_string(const char* address) noexcept {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
+    if (raw_inline_string(head)) return {address + 4, raw_inline_string_size(head)};
     if (!head.capacity) return {};
     const auto* data = raw_verified_relative(
         const_cast<char*>(address + 4), head.data_delta);
@@ -300,14 +307,20 @@ bool raw_compare_keys(const char* lhs,const char* rhs,const WireValidationContex
             if(bytes) {
                 const auto a=raw_wire_pod<RawOwningDescriptor>(lhs);
                 const auto b=raw_wire_pod<RawOwningDescriptor>(rhs);
-                auto* x=a.capacity?raw_verified_relative(const_cast<char*>(raw_advance(lhs,4,bytes)),a.data_delta,bytes):nullptr;
-                auto* y=b.capacity?raw_verified_relative(const_cast<char*>(raw_advance(rhs,4,bytes)),b.data_delta,bytes):nullptr;
-                for(std::size_t i=0;i<std::min(a.size,b.size);++i) {
+                auto chars=[&](const char* head,const RawOwningDescriptor& d) -> const char* {
+                    if(raw_inline_string(d)) return raw_advance(head,4,bytes);
+                    return d.capacity?raw_verified_relative(const_cast<char*>(raw_advance(head,4,bytes)),d.data_delta,bytes):nullptr;
+                };
+                const auto as=raw_inline_string(a)?raw_inline_string_size(a):a.size;
+                const auto bs=raw_inline_string(b)?raw_inline_string_size(b):b.size;
+                auto* x=chars(lhs,a);
+                auto* y=chars(rhs,b);
+                for(std::size_t i=0;i<std::min(as,bs);++i) {
                     const auto u=raw_wire_pod<unsigned char>(raw_advance(x,i,bytes));
                     const auto v=raw_wire_pod<unsigned char>(raw_advance(y,i,bytes));
                     if(u!=v)return u<v;
                 }
-                return a.size<b.size;
+                return as<bs;
             }
         }
     }
@@ -318,24 +331,24 @@ bool raw_compare_keys(const char* lhs,const char* rhs,const WireValidationContex
 
 inline void raw_register_allocation(const void* pointer,std::size_t n,std::size_t alignment,
         WireValidationContext& ctx,bool free=false,const CanonicalRawBytes* bytes=nullptr) {
-    if(!bytes){register_allocation(pointer,n,alignment,ctx,free);return;}
-    using Header=XBufferCore::AllocationHeader;
-    validate_storage_range(pointer,n,alignment,ctx,"wire validation: allocation out of bounds");
-    const auto offset=bytes->offset(pointer);
-    if(offset<sizeof(Header))throw XException("wire validation: missing allocation header");
-    auto* address=bytes->at(offset-sizeof(Header));
-    validate_storage_range(address,sizeof(Header),alignof(Header),ctx,
-                           "wire validation: invalid allocation header address");
-    const auto header=raw_wire_pod<Header>(address);
-    const auto absolute=reinterpret_cast<std::uintptr_t>(pointer);
-    if(header.user_offset!=offset||header.user_bytes<n||
-       header.total_bytes!=std::uint64_t(header.user_bytes)+sizeof(Header)||
-       header.alignment<alignment||header.alignment>XBufferCore::MAX_PAYLOAD||
-       (header.alignment&(header.alignment-1))!=0||
-       (absolute&(header.alignment-1u))!=0)
-        throw XException("wire validation: invalid allocation metadata");
-    if(free)register_free_range(address,header.total_bytes,ctx,"wire validation: invalid free allocation");
-    else register_owned_range(address,header.total_bytes,ctx,"wire validation: invalid live allocation");
+    // V2: no block header; the extent is derived from the owner (8-aligned,
+    // length rounded to 8). Canonical bytes are contiguous at ctx.base.
+    (void)bytes;
+    register_allocation(pointer,n,alignment,ctx,free);
+}
+
+inline void raw_register_wire_holes(const void* holes,std::size_t count,WireValidationContext& ctx,
+        const CanonicalRawBytes* bytes=nullptr) {
+    const auto used=static_cast<std::uint64_t>(ctx.end-ctx.base);
+    for(std::size_t i=0;i<count;++i) {
+        XBufferCore::WireHole hole;
+        std::memcpy(&hole,static_cast<const char*>(holes)+i*sizeof(hole),sizeof(hole));
+        if(hole.bytes==0||(hole.bytes&7u)!=0||(hole.offset&7u)!=0||
+           hole.offset<sizeof(XArena)||hole.offset>used||hole.bytes>used-hole.offset)
+            throw XException("wire validation failed: invalid hole table entry");
+        register_free_range(raw_advance(ctx.base,hole.offset,bytes),hole.bytes,ctx,
+                            "wire validation failed: invalid hole table entry");
+    }
 }
 
 template<class Key> consteval bool raw_key_order_available() {
@@ -521,12 +534,11 @@ inline RawPayloadHeader read_raw_arena_header(const char* base, std::size_t exte
     if (!base || extent < sizeof(XArena))
         throw XException("XBufferCore: payload too small");
     const auto header = raw_wire_pod<RawPayloadHeader>(base);
-    constexpr char magic[8] = {'X','B','U','F','V','1','\0','\0'};
+    constexpr char magic[8] = {'X','B','U','F','V','2','\0','\0'};
     if (std::memcmp(header.magic, magic, 8) != 0 ||
         header.header_size != sizeof(XArena))
         throw XException("XBufferCore: payload header mismatch");
-    constexpr auto minimum = (sizeof(XArena) + alignof(std::max_align_t) - 1) &
-        ~(std::size_t(alignof(std::max_align_t)) - 1);
+    constexpr auto minimum = sizeof(XArena);
     if (header.used_end < minimum || header.used_end > extent)
         throw XException("XBufferCore: payload used_end out of range");
     return header;
@@ -542,61 +554,16 @@ std::size_t raw_root_offset(const char* base, std::size_t extent,
     return static_cast<std::size_t>(h.root_offset);
 }
 
-inline std::size_t raw_allocator_offset(const char* base, std::size_t extent,
-                                        const RawPayloadHeader& h) {
-    if (!h.allocator_offset || h.allocator_offset > extent ||
-        sizeof(XAllocatorStateV1) > extent - h.allocator_offset ||
-        (reinterpret_cast<std::uintptr_t>(base) + h.allocator_offset) %
-            alignof(XAllocatorStateV1))
-        throw XException("load_verified<T>(): allocator state not found");
-    return static_cast<std::size_t>(h.allocator_offset);
-}
-
-inline void validate_allocator_state_raw(WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
-    if (!ctx.allocator_state)
-        throw XException("wire validation failed: allocator state missing");
-    const auto* address = reinterpret_cast<const char*>(ctx.allocator_state);
-    const auto state = raw_wire_pod<XAllocatorStateV1>(address);
-    if (raw_checked_relative(raw_advance(address,offsetof(XAllocatorStateV1,segment_delta),bytes),
-                             state.segment_delta, ctx,bytes) !=
-            reinterpret_cast<const char*>(ctx.segment) || state.reserved0 != 0)
-        throw XException("wire validation failed: allocator state bound to wrong arena");
-    const auto arena_limit = reinterpret_cast<std::uintptr_t>(ctx.end) -
-        reinterpret_cast<std::uintptr_t>(address);
-    if (state.arena_begin < sizeof(XAllocatorStateV1) ||
-        state.arena_begin > state.arena_end || state.arena_end > arena_limit)
-        throw XException("wire validation failed: allocator state arena bounds invalid");
-    std::uint64_t total_free_bytes = 0;
-    for (std::uint32_t i = 0; i < fixed_detail::freelist_class_count; ++i) {
-        auto offset = state.freelist_head[i];
-        while (offset != 0) {
-            if (offset < state.arena_begin || offset > state.arena_end ||
-                sizeof(fixed_detail::FreeBlockHeader) > state.arena_end - offset)
-                throw XException("wire validation: free-list offset out of bounds");
-            const auto* block_address = raw_advance(address,offset,bytes);
-            validate_storage_range(block_address, sizeof(fixed_detail::FreeBlockHeader),
-                8, ctx, "wire validation: invalid free-list header");
-            const auto block = raw_wire_pod<fixed_detail::FreeBlockHeader>(block_address);
-            if (block.block_bytes < sizeof(fixed_detail::FreeBlockHeader) ||
-                block.block_bytes % 8 != 0 ||
-                block.block_bytes > state.arena_end - offset)
-                throw XException("wire validation failed: invalid free-list block");
-            if (fixed_detail::freelist_size_class(block.block_bytes) != i)
-                throw XException("wire validation failed: free-list block in wrong size class");
-            raw_register_allocation(block_address,block.block_bytes,8,ctx,true,bytes);
-            total_free_bytes += block.block_bytes;
-            offset = block.next_offset;
-        }
-    }
-    if (total_free_bytes != state.free_bytes)
-        throw XException("wire validation failed: allocator state free byte count mismatch");
-}
 
 template<class T> void validate_wire_value_raw(const char*,WireValidationContext&,const CanonicalRawBytes* = nullptr);
 
 inline void validate_string_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
     raw_validate_binding(address,head.arena_delta,ctx,bytes);
+    if (raw_inline_string(head)) {
+        validate_inline_string_bytes(address);
+        return;
+    }
     if (head.size > head.capacity || head.capacity >= XBufferCore::MAX_PAYLOAD)
         throw XException("wire validation failed: XFixedString size exceeds capacity");
     if (!head.capacity) {
@@ -708,8 +675,9 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
 template<class T>
 RawWireVerification verify_structural_wire_graph_raw_at(
         const char* base, std::size_t extent, const RawPayloadHeader& arena,
-        std::size_t root, std::size_t allocator,
-        std::pmr::memory_resource* upstream,const CanonicalRawBytes* bytes=nullptr) {
+        std::size_t root, const void* holes, std::size_t hole_count,
+        std::pmr::memory_resource* upstream,const CanonicalRawBytes* bytes=nullptr,
+        const void* gaps=nullptr,std::size_t gap_count=0) {
     static_assert(receive_raw_supported<T>(), "unsupported raw wire activation domain");
     if(!upstream)throw std::invalid_argument("validation scratch: null upstream");
     auto* resource=upstream;
@@ -717,19 +685,18 @@ RawWireVerification verify_structural_wire_graph_raw_at(
         .base = base,
         .end = raw_advance(base,extent,bytes),
         .segment = reinterpret_cast<XArena*>(const_cast<char*>(base)),
-        .allocator_state = reinterpret_cast<const XAllocatorStateV1*>(raw_advance(base,allocator,bytes)),
         .range_resource = std::pmr::monotonic_buffer_resource{std::size_t{4096}, resource},
         .free_range_resource = std::pmr::monotonic_buffer_resource{std::size_t{4096}, resource}
     };
-    if (arena.flags != 0 || arena.reserved0 != 0)
+    if (arena.flags != 0 || arena.reserved0 != 0 || arena.reserved1 != 0)
         throw XException("wire validation: unsupported arena header flags");
     register_owned_range(base, sizeof(XArena), ctx, "wire validation: invalid arena header");
-    raw_register_allocation(raw_advance(base,allocator,bytes),sizeof(XAllocatorStateV1),
-        alignof(XAllocatorStateV1),ctx,false,bytes);
+    raw_register_wire_holes(holes,hole_count,ctx,bytes);
     raw_register_allocation(raw_advance(base,root,bytes),sizeof(T),alignof(T),ctx,false,bytes);
-    validate_allocator_state_raw(ctx,bytes);
     validate_wire_value_raw<T>(raw_advance(base,root,bytes),ctx,bytes);
-    return {root, allocator, extent};
+    require_exact_coverage(ctx);
+    require_gaps_free(static_cast<const XBufferCore::WireHole*>(gaps), gap_count, ctx);
+    return {root, extent};
 }
 
 template<class T>
@@ -742,9 +709,14 @@ RawWireVerification verify_structural_wire_graph_raw(
     if (arena.used_end != extent)
         throw XException("load_verified<T>(): non-normalized payload extent");
     const auto root = raw_root_offset<T>(base, extent, arena);
-    const auto allocator = raw_allocator_offset(base, extent, arena);
+    // A live owner's free table is its hole table.
+    std::vector<XBufferCore::WireHole> holes;
+    if (!owner.free_table_complete())
+        throw XException("wire validation: free table incomplete");
+    holes.reserve(owner.free_block_count());
+    owner.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
     return verify_structural_wire_graph_raw_at<T>(
-        base, extent, arena, root, allocator, upstream);
+        base, extent, arena, root, holes.data(), holes.size(), upstream);
 }
 
 // These recovery/activation operations preserve ALL received bytes. They
@@ -774,12 +746,6 @@ Pod activate_metadata_raw(char* address) noexcept {
     // library POD types; copying back the complete saved bytes preserves padding.
     std::memcpy(address, &saved, sizeof(Pod));
     return saved;
-}
-inline void activate_allocation_header_raw(char* payload,RawActivationStats& stats,
-                                          const CanonicalRawBytes* bytes=nullptr) noexcept {
-    (void)activate_metadata_raw<XBufferCore::AllocationHeader>(
-        raw_retreat(payload,sizeof(XBufferCore::AllocationHeader),bytes));
-    ++stats.allocation_headers;
 }
 
 // Only inline subobjects whose containing array/ordinary outer was restarted.
@@ -829,9 +795,8 @@ template<class T> void activate_wire_value_raw(char* address,
         object->capacity_ = saved.capacity;
         ++stats.owning_heads;
         if constexpr (is_fixed_string_v<T>) {
-            if(saved.capacity) {
+            if(saved.capacity && !raw_inline_string(saved)) {
                 auto* data=raw_verified_relative(raw_advance(address,4,bytes),saved.data_delta,bytes);
-                activate_allocation_header_raw(data,stats,bytes);
                 (void)raw_recover_array_object<char>(data,std::size_t(saved.capacity)+1,bytes);
                 ++stats.capacity_arrays;
             }
@@ -841,7 +806,6 @@ template<class T> void activate_wire_value_raw(char* address,
             // ALWAYS recover the complete pre-fill parent array, including
             // scalar and size==0/spare capacity. No typed tail values are read.
             if(saved.capacity) {
-                activate_allocation_header_raw(data,stats,bytes);
                 (void)raw_recover_array_object<E>(data,saved.capacity,bytes);
                 ++stats.capacity_arrays;
             }
@@ -882,22 +846,7 @@ RawActivationStats activate_verified_wire_at(char* base,std::size_t root,
     // allocation, user constructor, typed raw-head read, or full-payload copy.
     RawActivationStats stats;
     (void)activate_metadata_raw<XArena>(base); ++stats.arena_headers;
-    const auto arena=raw_wire_pod<RawPayloadHeader>(base);
-    auto* allocator=raw_advance(base,std::size_t(arena.allocator_offset),bytes);
-    activate_allocation_header_raw(allocator,stats,bytes);
-    const auto state=activate_metadata_raw<XAllocatorStateV1>(allocator);
-    ++stats.allocator_states;
-    for(std::uint32_t i=0;i<fixed_detail::freelist_class_count;++i) {
-        auto offset=state.freelist_head[i];
-        while(offset) {
-            auto* block=raw_advance(allocator,offset,bytes);
-            activate_allocation_header_raw(block,stats,bytes);
-            const auto saved=activate_metadata_raw<fixed_detail::FreeBlockHeader>(block);
-            ++stats.free_block_headers;
-            offset=saved.next_offset;
-        }
-    }
-    activate_allocation_header_raw(raw_advance(base,root,bytes),stats,bytes);
+    // V2: no block headers, allocator state or in-payload free lists.
     activate_wire_value_raw<T>(raw_advance(base,root,bytes),stats,bytes);
     return stats;
 }
@@ -928,19 +877,17 @@ void reactivate_inline_prefix(T* data,std::size_t live_count) noexcept {
 
 template<class T> requires(supported_v<T>)
 Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
-                  std::uint64_t wire_allocator_offset,
-                  std::pmr::memory_resource* upstream) {
+                  const void* holes, std::size_t hole_count,
+                  std::pmr::memory_resource* upstream,
+                  const void* gaps, std::size_t gap_count) {
     const auto arena = read_raw_arena_header(base, used);
     if (arena.used_end != used)
         throw XException("load_verified<T>(): non-normalized payload extent");
     const auto root = raw_root_offset<T>(base, used, arena);
     if (root != wire_root_offset)
         throw XException("load_verified<T>(): root offset mismatch");
-    const auto allocator = raw_allocator_offset(base, used, arena);
-    if (allocator != wire_allocator_offset)
-        throw XException("load_verified<T>(): allocator offset mismatch");
     (void)verify_structural_wire_graph_raw_at<T>(
-        base, used, arena, root, allocator, upstream);
+        base, used, arena, root, holes, hole_count, upstream, nullptr, gaps, gap_count);
     // Local scratch and its upstream callbacks have finished before a proof is
     // returned. No pointer into scratch is retained; activation walks the same
     // already-proved byte graph without allocation or a typed raw-head read.
@@ -949,17 +896,15 @@ Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
 
 template<class T> requires(supported_v<T>)
 Proof<T> validate(std::byte* origin,std::size_t maximum,std::size_t used,
-        std::uint64_t wire_root_offset,std::uint64_t wire_allocator_offset,
-        std::pmr::memory_resource* upstream) {
+        std::uint64_t wire_root_offset,const void* holes,std::size_t hole_count,
+        std::pmr::memory_resource* upstream,const void* gaps,std::size_t gap_count) {
     if(!origin||used>maximum)throw XException("XBufferCore: payload too small");
     CanonicalRawBytes bytes{origin,maximum,used};
     const auto arena=read_raw_arena_header(bytes.at(0),used);
     if(arena.used_end!=used)throw XException("load_verified<T>(): non-normalized payload extent");
     const auto root=raw_root_offset<T>(bytes.at(0),used,arena);
     if(root!=wire_root_offset)throw XException("load_verified<T>(): root offset mismatch");
-    const auto allocator=raw_allocator_offset(bytes.at(0),used,arena);
-    if(allocator!=wire_allocator_offset)throw XException("load_verified<T>(): allocator offset mismatch");
-    (void)verify_structural_wire_graph_raw_at<T>(bytes.at(0),used,arena,root,allocator,upstream,&bytes);
+    (void)verify_structural_wire_graph_raw_at<T>(bytes.at(0),used,arena,root,holes,hole_count,upstream,&bytes,gaps,gap_count);
     return Proof<T>(origin,maximum,used,root);
 }
 
