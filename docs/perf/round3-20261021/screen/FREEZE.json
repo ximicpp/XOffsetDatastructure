@@ -1,0 +1,39 @@
+{
+ "schema": "xoffset-mac-screen-v4-c-ownwire",
+ "name": "R3-V2-on-W9a-v4",
+ "description": "Round 3 V2 format (I1 inline strings, headerless blocks, host free table + hole table, owner prefix page, N6, N7 adapter line, E1, N10 sparse wire) vs W9a; rule C; each binary reads its own M input wire",
+ "base_source": "/Volumes/XOffsetCS/candidates/w9a",
+ "candidate_source": "/Volumes/XOffsetCS/r3 @ df876f6c",
+ "base_binary_sha256": "24a51b0afa851e451d0ad7753ef9694eda07a0967ee74678b5fb9b68bf6a54a6",
+ "candidate_binary_sha256": "6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d",
+ "screen_py_sha256": "4b7396d5b386694a0b7c864bb9485939b1614438b6ba2186a88dec1d44075875",
+ "fixture": "M (prepared-v1, regenerated on Mac; S matches golden); base and candidate each read their own encoding of the same M input canonical",
+ "base_input_wire_sha256": "d36de6ad7564f90c54aee35ff965d08d57ed72646b96d5784ca004b4678cbddc",
+ "candidate_input_wire_sha256": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+ "pairs": 72,
+ "order": "36 AB + 36 BA shuffled by random.Random(20261020)",
+ "primary": {
+  "metrics": [
+   "mutate",
+   "load",
+   "reload",
+   "emit_after"
+  ],
+  "rule": "one-sided 95% upper bound of geometric mean cand/base, critical t(1-0.05/4,71); promotion requires every primary upper bound < 1"
+ },
+ "auxiliary": {
+  "metrics": [
+   "query_before",
+   "retire_modified_state",
+   "query_after",
+   "cleanup",
+   "read_sum",
+   "total"
+  ],
+  "rule": "one-sided 95% upper bound per item, critical t(0.95,71), no Bonferroni (user choice C, 2026-10-20 19:44Z); non-inferiority (user D1/Q12): read_sum and query_before/query_after upper bound must be <= 1.01, every other auxiliary upper bound <= 1.02, otherwise promotion is vetoed"
+ },
+ "finality": "single run; no resampling, deletion, trend removal or re-run; child timeout 20 s; any child failure aborts the screen as failed",
+ "host": "macOS-26.3-arm64-arm-64bit",
+ "frozen_epoch": 1792566500.556611,
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+}
