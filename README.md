@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**0.2.0-alpha.1** is an experimental C++26/P2996 library for reflected objects
+**0.3.0-beta.1** is an experimental C++26/P2996 library for reflected objects
 and offset containers stored in an address-stable virtual-memory arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
@@ -121,8 +121,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.3.0-beta.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.3.0-beta.1")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -130,7 +130,7 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 
 Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
 same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
-`XOffset::storage`, and use CMake 3.13+. Alpha packages reject numeric, `EXACT`
+`XOffset::storage`, and use CMake 3.13+. Prerelease packages reject numeric, `EXACT`
 and range version requests; check the complete version string as above.
 
 For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
@@ -146,8 +146,10 @@ Results are profile-specific, not a promise for every compiler on each OS.
 | --- | --- | --- |
 | macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
 | Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
-| Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build and CTest in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | Added after 0.2.0-alpha.1; no sanitizer or performance run with GCC yet |
-| Native Windows x64, MSVC | storage only (V1-era record) | Windows full P2996 unverified |
+| Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No performance run with GCC yet |
+| Linux arm64 (native runner), GCC 16 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | CI is the record ([client-targets.yml](.github/workflows/client-targets.yml)) |
+| Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | MSVC full P2996 unverified; Android and iOS not feasible yet ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
+| Native Windows x64, MSVC | storage only (V1-era record) | MSVC full P2996 unverified |
 
 V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
 ASan+UBSan) with zero disagreements. Earlier V1-era platform records are kept in
