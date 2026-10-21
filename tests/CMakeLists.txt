@@ -95,6 +95,7 @@ set(REFLECTION_TESTS
     test_cross_compiler_wire
     test_schema_pin
     test_wire_hole_zeroing
+    test_implicit_padding
     test_v2_fuzz
 )
 
@@ -140,6 +141,15 @@ add_test(NAME schema_pin_mismatch
 set_tests_properties(schema_pin_mismatch PROPERTIES
     LABELS "reflection"
     PASS_REGULAR_EXPRESSION "XOffset schema pin mismatch \\(K7\\)")
+
+# M6: XOFFSET_REQUIRE_NO_PADDING on a padded type must fail the build.
+add_executable(require_no_padding_fail EXCLUDE_FROM_ALL padding/require_no_padding_fail.cpp)
+configure_xoffset_target(require_no_padding_fail)
+add_test(NAME require_no_padding_fail
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target require_no_padding_fail --config $<CONFIG>)
+set_tests_properties(require_no_padding_fail PROPERTIES
+    LABELS "reflection"
+    PASS_REGULAR_EXPRESSION "has implicit padding bytes")
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
