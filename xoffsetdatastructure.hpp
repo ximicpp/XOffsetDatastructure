@@ -596,6 +596,9 @@ namespace XOffsetDatastructure {
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
             if (address < base || address - base >= buffer_.size()) return;
             const auto offset = static_cast<std::uint32_t>(address - base);
+            // M3 (threat model T5/P1): a block becomes a hole only after its old
+            // contents are cleared, so emitted holes need no per-save scrub.
+            std::memset(ptr, 0, std::min<std::size_t>(bytes, buffer_.size() - offset));
             push_free_block(offset, bytes);
         }
 
@@ -5118,36 +5121,9 @@ namespace XOffsetDatastructure {
             header.extent_count = extents;
         }
 
-        // skip[i]: payload bytes left out of the wire by gaps[0..i).
-        // Empty (no allocation) for a dense wire: the hot output path stays
-        // allocation-free.
-        inline std::vector<std::uint64_t> wire_gap_skip(const std::vector<XBufferCore::WireHole>& gaps) {
-            if (gaps.empty()) return {};
-            std::vector<std::uint64_t> skip(gaps.size() + 1);
-            for (std::size_t i = 0; i < gaps.size(); ++i) skip[i + 1] = skip[i] + gaps[i].bytes;
-            return skip;
-        }
-
-        // M3: hole bytes leave as zero, never as the stale contents of freed
-        // blocks. `extents` is the emitted payload; a hole lies either inside
-        // one gap (not emitted) or wholly outside every gap.
-        inline void zero_emitted_holes(char* extents, const std::vector<XBufferCore::WireHole>& gaps,
-                                       const std::vector<std::uint64_t>& skip,
-                                       const XBufferCore& core) noexcept {
-            core.for_each_free_block([&](XBufferCore::WireHole hole) {
-                const auto next = std::upper_bound(gaps.begin(), gaps.end(), hole.offset,
-                    [](std::uint32_t offset, const XBufferCore::WireHole& gap) { return offset < gap.offset; });
-                const auto index = static_cast<std::size_t>(next - gaps.begin());
-                if (index != 0 && hole.offset < std::uint64_t(gaps[index - 1].offset) + gaps[index - 1].bytes)
-                    return;
-                std::memset(extents + (hole.offset - (skip.empty() ? 0 : skip[index])), 0, hole.bytes);
-            });
-        }
-
         // Writes header, extent table, extents and hole table (no allocation).
         inline void write_wire(char* out, std::size_t output_size, const XWireHeaderV2& header,
                                const std::vector<XBufferCore::WireHole>& gaps,
-                               const std::vector<std::uint64_t>& skip,
                                const char* payload, const XBufferCore& core) noexcept {
             const auto copier = wire_copier(output_size);
             std::memcpy(out, &header, sizeof(header));
@@ -5155,7 +5131,6 @@ namespace XOffsetDatastructure {
             const auto used = static_cast<std::uint32_t>(header.used_bytes);
             if (gaps.empty()) {
                 copier.copy(out, payload, used);
-                zero_emitted_holes(out, gaps, skip, core);
                 out += used;
             } else {
                 std::uint32_t begin = 0;
@@ -5172,7 +5147,6 @@ namespace XOffsetDatastructure {
                     table += sizeof(entry);
                 }
                 out = table;
-                char* const extents = out;
                 begin = 0;
                 for (const auto& gap : gaps) {
                     copier.copy(out, payload + begin, gap.offset - begin);
@@ -5183,7 +5157,6 @@ namespace XOffsetDatastructure {
                     copier.copy(out, payload + begin, used - begin);
                     out += used - begin;
                 }
-                zero_emitted_holes(extents, gaps, skip, core);
             }
             core.write_free_blocks(out);
         }
@@ -6122,7 +6095,6 @@ namespace XOffsetDatastructure {
             const char* base = static_cast<const char*>(this->get_address());
             auto header = wire_header_v2(*root_ptr);
             const auto gaps = detail::wire_sparse_gaps(*this, this->segment_size());
-            const auto skip = detail::wire_gap_skip(gaps);
             detail::wire_apply_gaps(header, gaps);
             const auto output_size = detail::wire_output_size(header, gaps);
             std::string out;
@@ -6130,12 +6102,12 @@ namespace XOffsetDatastructure {
                 throw std::length_error("save_verified<T>(): output size exceeds string limit");
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                detail::write_wire(output, output_size, header, gaps, skip, base, *this);
+                detail::write_wire(output, output_size, header, gaps, base, *this);
                 return output_size;
             });
 #else
             out.resize(output_size);
-            detail::write_wire(out.data(), output_size, header, gaps, skip, base, *this);
+            detail::write_wire(out.data(), output_size, header, gaps, base, *this);
 #endif
             return out;
         }

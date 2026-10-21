@@ -106,7 +106,7 @@
 | --- | --- | --- |
 | M1 | `load_verified` 和 `begin_verified_receive` 不传上限时，用默认上限（64 MiB，可用 `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 调整），超过就在预留前拒绝；需要更大的 wire 时显式传 `maximum_capacity` | 公开 API 行为变化：大于 64 MiB 的 wire 必须显式传上限。读路径性能不变 |
 | M2 | 上限不足时的报错改为 `used_bytes … exceeds maximum_capacity …`（现在是笼统的 `XOffset arena allocation failed`） | 只改诊断 |
-| M3 | 输出时把空洞写成 0（P1） | 改变含空洞 wire 的字节（golden 要更新）；开销只在输出路径，需在性能优化线程实测 |
+| M3 | 块释放时清零，空洞在 arena 里就是 0（P1），输出路径不变 | 改变含空洞 wire 的字节（golden 要更新）；开销在释放路径，与释放的字节数成正比。load 进来的 wire 空洞保留发送方字节，load 后直接 save 会原样转发（不泄漏本端内存，但恶意发送方可借此给下游夹带字节）。最初实现是输出时按空洞补零，实测正式输出慢约 22%，故改为释放时清零 |
 | M4 | 容器缩小时（`clear`、`resize` 变小、`erase`、`pop_back`）把腾出的元素字节清零（P2） | 开销只在修改路径，与删除的字节数成正比；`clear()` 从 O(1) 变成 O(n)，需实测 |
 | M5 | 文档：DEPLOYMENT 写明「只检查 wire 长度不够，必须设上限」，以及 P1–P3 | 无代码影响 |
 | M6 | 填充字节（P3）：编译期检查可选开关，schema 有隐式填充就报错，让用户改成显式字段；或在输出前按反射得到的填充位置清零 | 开关方式没有运行时开销；清零方式要实测 |
