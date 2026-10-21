@@ -124,12 +124,14 @@ Clang P2996 fork (from bloomberg/clang-p2996). Searched at: `/usr/local/bin/clan
 
 - **`next_cpp26`** — active development branch
 - **`main`** — stable branch
-- CI runs automatically only for `main`/`master`; on `next_cpp26` both workflows
-  (`CI`, `CI-Structure`) are manual (Actions tab → workflow_dispatch).
+- `CI` runs automatically on pushes and pull requests to `main`/`master` and
+  `next_cpp26`; `CI-Structure` is manual (Actions tab → workflow_dispatch).
   `.github/workflows/ci.yml` reads the fixed Linux image
   digest from `toolchains/vm-validation.json`, verifies compiler/dependency
   identity, builds, runs CTest and checks signature drift in `tools/sigs/`.
   Separate Linux/macOS/Windows jobs run only the ordinary C++17 OS layer.
+  The `sanitizer` job runs ASan+UBSan in the same image with a pinned
+  compiler-rt package (`tools/validate_vm.py linux --sanitizer address-undefined`).
   A configured job is not a verified platform until its execution passes.
 
 ## OpenSpec Change Process

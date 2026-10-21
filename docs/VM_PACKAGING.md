@@ -1,17 +1,17 @@
-# 0.1.0-alpha.1 源码包、安装包与外部消费
+# 0.2.0-alpha.1 源码包、安装包与外部消费
 
 本 alpha 面向能够固定实验性编译器、依赖与 schema 的试用者。核心功能已完成，
 但 alpha 之间不承诺源码 API、ABI 或任意工具链/layout 的长期 wire 兼容。
-先阅读 [兼容与输入边界](ALPHA_COMPATIBILITY.md)。两个生产头与 V1 格式保持不变；
+先阅读 [兼容与输入边界](ALPHA_COMPATIBILITY.md)。本版本使用 V2 存储与 wire 格式，不读取 V1 wire；
 save/load 仍复制字节，不是零复制接口。
 
 ## 三类交付物
 
 | 交付物 | 内容 | 不包含的环境输入 |
 | --- | --- | --- |
-| `xoffsetdatastructure-0.1.0-alpha.1.tar.gz` 源码包 | 两个生产头、CMake、tests/examples、必要工具与用户文档、固定的 851 个依赖头及许可证 | 编译器、libc++/系统 runtime、SDK、构建输出、实验目录与历史大型证据 |
-| `xoffsetdatastructure-0.1.0-alpha.1-full.tar.gz` 安装包 | 两个生产头、`XOffset::xoffset` 与 `XOffset::storage`、851 个私有依赖头、CMake 配置、版本/兼容文档与许可证 | 编译器、SDK、runtime、原生程序二进制 |
-| `xoffsetdatastructure-0.1.0-alpha.1-storage.tar.gz` 安装包 | OS 头 `xoffset_virtual_memory.hpp`、`XOffset::storage`、CMake 配置、版本/兼容文档与项目许可证 | 完整 XBuffer/容器头、Boost、TypeLayout、编译器、SDK、runtime |
+| `xoffsetdatastructure-0.2.0-alpha.1.tar.gz` 源码包 | 两个生产头、CMake、tests/examples、必要工具与用户文档、固定的 851 个依赖头及许可证 | 编译器、libc++/系统 runtime、SDK、构建输出、实验目录与历史大型证据 |
+| `xoffsetdatastructure-0.2.0-alpha.1-full.tar.gz` 安装包 | 两个生产头、`XOffset::xoffset` 与 `XOffset::storage`、851 个私有依赖头、CMake 配置、版本/兼容文档与许可证 | 编译器、SDK、runtime、原生程序二进制 |
+| `xoffsetdatastructure-0.2.0-alpha.1-storage.tar.gz` 安装包 | OS 头 `xoffset_virtual_memory.hpp`、`XOffset::storage`、CMake 配置、版本/兼容文档与项目许可证 | 完整 XBuffer/容器头、Boost、TypeLayout、编译器、SDK、runtime |
 
 源码包的依赖闭包可在没有 `.git` 的解压目录中通过内容锁检查。它不是完整 Boost
 发行版，也不是包含全部历史原始证据的离线研究档案。源码归档中的
@@ -88,19 +88,19 @@ SDK、标准库 include/library 和运行时搜索路径由调用方 toolchain �
 ```sh
 python3 tools/prepare_alpha_release.py create --source-dir . --out build/alpha-source-release
 python3 tools/prepare_alpha_release.py audit \
-  --archive build/alpha-source-release/xoffsetdatastructure-0.1.0-alpha.1.tar.gz \
-  --manifest build/alpha-source-release/xoffsetdatastructure-0.1.0-alpha.1.manifest.json \
+  --archive build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.tar.gz \
+  --manifest build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.manifest.json \
   --checksums build/alpha-source-release/SHA256SUMS
 python3 tools/prepare_alpha_release.py extract \
-  --archive build/alpha-source-release/xoffsetdatastructure-0.1.0-alpha.1.tar.gz \
+  --archive build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.tar.gz \
   --out build/alpha-source-extracted
 ```
 
 创建输出含 archive、同名 `.manifest.json` 及 `SHA256SUMS`；归档根目录为
-`xoffsetdatastructure-0.1.0-alpha.1/`，内含 `SOURCE_MANIFEST.json`。
+`xoffsetdatastructure-0.2.0-alpha.1/`，内含 `SOURCE_MANIFEST.json`。
 `audit` 可不传外部 manifest/checksums，但对外分发时应另行固定 archive/manifest 身份。
 `extract` 先审计再提取，源码位于
-`build/alpha-source-extracted/xoffsetdatastructure-0.1.0-alpha.1/`。
+`build/alpha-source-extracted/xoffsetdatastructure-0.2.0-alpha.1/`。
 完整性哈希不是签名或来源认证。
 
 已验证的安装 prefix 可分别包装为 full/storage 归档：
@@ -111,12 +111,12 @@ python3 tools/prepare_alpha_release.py pack-prefix --prefix /path/to/verified-fu
 python3 tools/prepare_alpha_release.py pack-prefix --prefix /path/to/verified-storage-prefix \
   --component storage --out build/alpha-storage-release
 python3 tools/prepare_alpha_release.py extract \
-  --archive build/alpha-full-release/xoffsetdatastructure-0.1.0-alpha.1-full.tar.gz \
+  --archive build/alpha-full-release/xoffsetdatastructure-0.2.0-alpha.1-full.tar.gz \
   --out build/alpha-full-extracted
 ```
 
 安装归档同样带外部 `.manifest.json`/`SHA256SUMS`，内部为 `INSTALL_MANIFEST.json`。
-full 解压后 prefix 为 `build/alpha-full-extracted/xoffsetdatastructure-0.1.0-alpha.1-full`，
+full 解压后 prefix 为 `build/alpha-full-extracted/xoffsetdatastructure-0.2.0-alpha.1-full`，
 将它传给消费项目的 `CMAKE_PREFIX_PATH`；storage 的根名以 `-storage` 结尾。
 `audit`/`extract` 同时支持三类 archive。包装/哈希通过不能替代实际解压后的消费构建。
 
@@ -151,8 +151,8 @@ full 安装消费的最小 `CMakeLists.txt`：
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.1.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.1.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -166,11 +166,11 @@ cmake --build build/consumer --config Release
 ```
 
 storage 使用 `COMPONENTS storage`、`XOffset::storage` 和 CMake 3.13+。未指定组件默认
-请求 full。安装配置暴露 `XOffsetDatastructure_VERSION="0.1.0-alpha.1"`、
-`XOffsetDatastructure_VERSION_NUMERIC="0.1.0"`、
+请求 full。安装配置暴露 `XOffsetDatastructure_VERSION="0.2.0-alpha.1"`、
+`XOffsetDatastructure_VERSION_NUMERIC="0.2.0"`、
 `XOffsetDatastructure_VERSION_PRERELEASE="alpha.1"`。
 **任何数字、EXACT 或范围版本请求均保守拒绝**，避免 CMake 把 alpha 当作稳定版本。
-不要写 `find_package(XOffsetDatastructure 0.1.0 ...)`，也不要把带 alpha 的字符串放在
+不要写 `find_package(XOffsetDatastructure 0.2.0 ...)`，也不要把带 alpha 的字符串放在
 CMake 数字版本实参中；采用无版本查找再核对完整字符串。
 
 源码消费：
@@ -181,7 +181,7 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
 
 需要 storage 时，在 `add_subdirectory` 前设置 `XOFFSET_STORAGE_ONLY=ON` 并改链
-`XOffset::storage`。根 `project()` 的版本为数字 `0.1.0`；源码树的完整 prerelease
+`XOffset::storage`。根 `project()` 的版本为数字 `0.2.0`；源码树的完整 prerelease
 变量是 `XOFFSET_VERSION_FULL`，不要把根 project 数字变量当成安装配置的完整版本。
 
 ## 安装内容和许可证
@@ -215,7 +215,7 @@ Windows runner。可指定 `--source-dir`、`--sdk`、`--generator`、`--jobs`�
 并核对源码/安装包前后不变。它不代替 full、sanitizer、TSan 或 wire 验证。
 共享库、动态插件、跨 CRT、混合工具链或混合头版本未获此验收。
 
-以下为发行归档验收之前的已记录基线；归档自身的验收另行报告，不从基线自动继承：
+以下为 0.1.0-alpha.1（V1 格式）时期的已记录基线，不代表 V2；V2 的验证记录见 README 的 Validation scope 与 CI。归档自身的验收另行报告，不从基线自动继承：
 
 | 环境/配置 | 已记录结果 | 口径 |
 | --- | --- | --- |
@@ -226,8 +226,8 @@ Windows runner。可指定 `--source-dir`、`--sdk`、`--generator`、`--jobs`�
 | 历史 macOS arm64，固定 P2996/AppleClang storage | full 48/48；full 与 storage 各 installed 3/3、subproject 3/3 | 以前记录，非本机新跑 |
 | 历史 Linux x86_64 固定 Docker 镜像 | full 安装与源码消费各 3 项 | 在 arm64 宿主模拟执行，仅功能证据 |
 
-完整开发检出中的 `docs/VM_WINDOWS_CURRENT_RESULTS.md`、`VM_LINUX_CURRENT_RESULTS.md`
-和 `VM_FINAL_DELIVERY.md` 保留上述证据与身份，精简源码包不含这些研究记录。
+`docs/VM_FINAL_DELIVERY.md` 保留上述证据与身份（Windows/Linux 当期结果文件已不在仓库中），
+精简源码包不含这些研究记录。
 WSL 或 Docker 可用于后续 Linux 性能工作，不要求独立物理机作为当前准入条件；
 仍须注明虚拟化类别并先取得噪声资格。本次 WSL 唯一 78 进程 F/F 校准的四指标均未通过
 局部 anchor 和 drift 门槛，未建立 2% 比较能力，没有 D/F、ablation 或 adoption 结论。
