@@ -1,0 +1,293 @@
+diff -ruN --exclude=external --exclude=*.orig w9a/tests/test_freelist_index.cpp w9a-alpha-B4/tests/test_freelist_index.cpp
+--- w9a/tests/test_freelist_index.cpp	2026-10-20 03:43:45
++++ w9a-alpha-B4/tests/test_freelist_index.cpp	2026-10-20 09:38:35
+@@ -3,6 +3,9 @@
+ #include <array>
+ #include <cstdint>
+ #include <iostream>
++#include <string_view>
++#include <meta>
++#include <limits>
+ #include <random>
+ #include <stdexcept>
+ #include <vector>
+@@ -287,11 +290,118 @@
+     }
+     static_assert(noexcept(std::declval<dt::FreelistRuntimeCache&>().synchronize(nullptr,0)));
+ }
++// A3/B4: closed-form size class and empty-class run skipping.
++std::uint32_t loop_class(std::uint32_t n) {   // the former doubling loop, verbatim
++    std::uint32_t block = 8, index = 0;
++    while (block < n && index + 1u < 16) { block <<= 1u; ++index; }
++    return block < n ? 16u : index;
+ }
++void size_class_closed_form() {
++    for (std::uint32_t n = 0; n <= (1u << 20); ++n)
++        need(fd::freelist_size_class(n) == loop_class(n), "size class differs below 1 MiB");
++    for (unsigned k = 0; k < 32; ++k) for (std::int64_t d : {-1, 0, 1}) {
++        const auto v = (std::int64_t(1) << k) + d;
++        if (v < 0 || v > std::int64_t(std::numeric_limits<std::uint32_t>::max())) continue;
++        need(fd::freelist_size_class(std::uint32_t(v)) == loop_class(std::uint32_t(v)), "size class differs at power-of-two edge");
++    }
++    need(fd::freelist_size_class(std::numeric_limits<std::uint32_t>::max()) == 16, "size class at UINT32_MAX");
++    std::mt19937 rng(0x45434c53u);
++    for (unsigned i = 0; i < 1000000; ++i) { auto v = static_cast<std::uint32_t>(rng());
++        need(fd::freelist_size_class(v) == loop_class(v), "size class differs for random value"); }
++}
++consteval std::meta::info core_member(std::string_view name) {
++    auto found=^^void; std::size_t count=0;
++    for (const auto item : std::meta::members_of(^^xo::XBufferCore, std::meta::access_context::unchecked()))
++        if (std::meta::has_identifier(item) && std::meta::identifier_of(item)==name) { found=item; ++count; }
++    if (count!=1) throw "exact private Core member missing or ambiguous";
++    return found;
++}
++inline constexpr auto runtime_cache_member = core_member("freelist_runtime_cache_");
++void empty_class_runs() {
++    Arena a; std::mt19937_64 rng(0x454d505459525553ull);
++    // Populate only scattered classes so most searches cross empty runs.
++    const std::uint32_t seeded[] = {24, 900, 40000, 16, 3000, 20000};
++    std::vector<std::pair<void*, std::uint32_t>> live;
++    for (auto n : seeded) for (unsigned j = 0; j < 3; ++j) live.push_back({a.alloc(n), n});
++    for (auto& [p, n] : live) a.retire(p, n);
++    live.clear();
++    const std::uint32_t asks[] = {8, 16, 24, 33, 64, 129, 512, 900, 1025, 4096, 30000, 40000, 65537, 3000, 20000, 136};
++    const std::size_t alignments[] = {1, 8, 16, 64, 256};
++    auto& cache = a.core.[:runtime_cache_member:];
++    std::size_t misses = 0;
++    for (unsigned i = 0; i < 3000; ++i) {
++        if (!live.empty() && (live.size() > 48 || rng() % 2 == 0)) {
++            auto at = rng() % live.size(); a.retire(live[at].first, live[at].second);
++            live.erase(live.begin() + std::ptrdiff_t(at));
++            continue;
++        }
++        const auto n = asks[rng() % 16]; const auto alignment = alignments[rng() % 5];
++        const auto free_before = a.state->free_bytes;
++        live.push_back({a.alloc(n, alignment), n});   // oracle first-fit equality inside
++        if (a.state->free_bytes != free_before) continue;   // hit: later classes were not visited
++        ++misses;
++        // A miss visited every class from the request class up: each EMPTY one
++        // must hold the walk's exact final cursor {bytes, 0, 0, 0, alignment}.
++        const auto bytes = rounded(n, alignment);
++        for (auto k = fd::freelist_size_class(bytes); k < 16; ++k) {
++            if (a.state->freelist_head[k] != 0) continue;
++            const auto& c = cache.cursors[k];
++            need(c.bytes == bytes && c.head == 0 && c.first == 0 && c.last == 0 && c.alignment == alignment,
++                "empty-class cursor differs from the walked final value");
++        }
++    }
++    need(misses > 100, "empty-class run fixture produced too few full misses");
++    maintenance_bound(); emit("empty-class-runs", 3000, a.oracle.visits);
++}
++// A2: the inline no-change fast path must leave exactly the original
++// [arena_begin, arena_end) bookkeeping, including every extension case.
++struct RangeModel {
++    std::uint32_t begin, end;
++    void note(const xo::XAllocatorStateV1* st, const void* p, std::uint32_t n) {
++        const auto off = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(p) - reinterpret_cast<std::uintptr_t>(st));
++        if (begin == 0 || off < begin) begin = off;
++        if (std::uint64_t(off) + n > end) end = off + n;
++    }
++};
++void note_range_bookkeeping() {
++    Arena a; RangeModel m{a.state->arena_begin, a.state->arena_end};
++    need(m.begin == sizeof(xo::XAllocatorStateV1) && m.end == m.begin, "fresh state range");
++    auto same = [&](const char* why) { need(a.state->arena_begin == m.begin && a.state->arena_end == m.end, why); };
++    std::mt19937_64 rng(0x4e4f54452d52414eull);
++    struct Live {void* p;std::uint32_t n;}; std::vector<Live> live;
++    for (unsigned i = 0; i < 4000; ++i) {
++        if (!live.empty() && rng() % 3 == 0) {
++            auto at = rng() % live.size(); auto b = live[at];
++            m.note(a.state, b.p, rounded(b.n)); a.retire(b.p, b.n); live.erase(live.begin() + at);
++            same("retire range differs from original bookkeeping");
++        } else {
++            const std::uint32_t sizes[] = {8, 24, 40, 72, 136, 300, 1000};
++            auto n = sizes[rng() % 7]; auto* p = a.alloc(n);
++            m.note(a.state, p, rounded(n)); live.push_back({p, n});
++            same("allocation range differs from original bookkeeping");
++        }
++    }
++    // A Core block that never passed through this state lies past arena_end:
++    // retiring it must take the slow path and extend the end exactly.
++    auto* outside = a.core.arena()->allocate_aligned(64, 8);
++    need(reinterpret_cast<std::uintptr_t>(outside) - reinterpret_cast<std::uintptr_t>(a.state) >= a.state->arena_end,
++        "test block unexpectedly inside the recorded range");
++    m.note(a.state, outside, 64); a.retire(outside, 64); same("outside block did not extend arena_end");
++    // Raised begin: a block below arena_begin lowers it exactly once.
++    auto* low = a.alloc(24); m.note(a.state, low, 24);
++    const auto low_off = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(low) - reinterpret_cast<std::uintptr_t>(a.state));
++    a.state->arena_begin = low_off + 8; m.begin = low_off + 8;
++    m.note(a.state, low, 24); a.retire(low, 24); same("block below arena_begin did not lower it");
++    // Legacy zero begin: the first noted block sets it.
++    auto* zero = a.alloc(24); m.note(a.state, zero, 24);
++    a.state->arena_begin = 0; m.begin = 0;
++    m.note(a.state, zero, 24); a.retire(zero, 24); same("zero arena_begin was not initialized by the note");
++}
++}
+ int main() {
+     try {
+         for(auto n:{512u,1024u,2048u,4096u}) {mixed(n,false);mixed(n,true);}
+-        actual_M_prefix();query_changes_and_randomized_oracle();middle_removal_with_unchanged_head();lifecycle_and_epoch();multiple_states_before_managed_blocks();late_state_rejected_by_existing_offset_guard();existing_owner_and_invalid_requests();
++        actual_M_prefix();query_changes_and_randomized_oracle();middle_removal_with_unchanged_head();lifecycle_and_epoch();multiple_states_before_managed_blocks();late_state_rejected_by_existing_offset_guard();existing_owner_and_invalid_requests();size_class_closed_form();empty_class_runs();note_range_bookkeeping();
+         std::cout << "{\"status\":\"passed\",\"performance_measurement\":false}\n";
+         return 0;
+     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
+diff -ruN --exclude=external --exclude=*.orig w9a/xoffsetdatastructure.hpp w9a-alpha-B4/xoffsetdatastructure.hpp
+--- w9a/xoffsetdatastructure.hpp	2026-10-20 03:43:45
++++ w9a-alpha-B4/xoffsetdatastructure.hpp	2026-10-20 09:37:55
+@@ -22,6 +22,7 @@
+ #include <cstdint>
+ #include <span>
+ #include <type_traits>
++#include <bit>
+ #include <string>
+ #include <string_view>
+ #include <ostream>
+@@ -1466,17 +1467,33 @@
+             return (value + alignment - 1u) & ~(alignment - 1u);
+         }
+ 
++        // A3: closed form of the former doubling loop -- the smallest k < 16
++        // with (8 << k) >= bytes (0 for bytes <= 8), or 16 when bytes exceeds
++        // 8 << 15. Equal for every uint32_t input (also untrusted wire sizes).
+         inline std::uint32_t freelist_size_class(std::uint32_t bytes) noexcept {
+-            std::uint32_t block = freelist_min_block_bytes;
+-            std::uint32_t index = 0;
+-            while (block < bytes && index + 1u < freelist_class_count) {
+-                block <<= 1u;
+-                ++index;
+-            }
+-            if (block < bytes) return freelist_class_count;
+-            return index;
++            static_assert(std::has_single_bit(freelist_min_block_bytes));
++            if (bytes <= freelist_min_block_bytes) return 0;
++            if (bytes > freelist_max_block_bytes) return freelist_class_count;
++            return static_cast<std::uint32_t>(std::bit_width(bytes - 1u)) -
++                   static_cast<std::uint32_t>(std::countr_zero(freelist_min_block_bytes));
+         }
+ 
++        // B4: the complete effect of the former per-class walk on an EMPTY
++        // class (head 0): optional reset, empty walk, first = last = head = 0.
++        // The final cursor is always {bytes, 0, 0, 0, alignment}. Diagnostic
++        // builds replay the walk's exact comparison/reset counts.
++        inline void normalize_empty_freelist_cursor(detail::FreelistSearchCursor& cursor,
++                                                    std::uint32_t bytes,
++                                                    std::size_t alignment) noexcept {
++#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
++            if (!detail::freelist_index_equal(cursor.bytes, bytes) ||
++                !detail::freelist_index_equal(cursor.alignment, alignment) ||
++                !detail::freelist_index_equal(cursor.head, std::uint32_t{0}))
++                detail::freelist_index_count(&detail::FreelistIndexStats::query_resets);
++#endif
++            cursor = detail::FreelistSearchCursor{bytes, 0u, 0u, 0u, alignment};
++        }
++
+         inline std::uint32_t freelist_offset_from_state(
+             const XAllocatorStateV1* state, const void* ptr) {
+             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+@@ -1516,7 +1533,12 @@
+             if (segment) segment->reset_freelist_runtime_cache();
+         }
+ 
+-        inline void note_allocator_block(
++#if defined(_MSC_VER)
++        __declspec(noinline)
++#elif defined(__clang__) || defined(__GNUC__)
++        __attribute__((noinline))
++#endif
++        inline void note_allocator_block_update(
+             XAllocatorStateV1* state, const void* ptr, std::uint32_t bytes) {
+             if (!state || !ptr || bytes == 0) return;
+             auto offset = freelist_offset_from_state(state, ptr);
+@@ -1533,6 +1555,25 @@
+             }
+         }
+ 
++        // A2: inline no-change fast path. If the block already lies inside the
++        // recorded range (arena_begin != 0, offset >= arena_begin and
++        // offset + bytes <= arena_end), the original body stores nothing and
++        // cannot throw; every other case runs the unchanged original body.
++        inline void note_allocator_block(
++            XAllocatorStateV1* state, const void* ptr, std::uint32_t bytes) {
++            if (!state || !ptr || bytes == 0) return;
++            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
++            const auto origin = reinterpret_cast<std::uintptr_t>(state);
++            const auto delta = address - origin;
++            if (address > origin && delta <= std::numeric_limits<std::uint32_t>::max()) {
++                const auto offset = static_cast<std::uint32_t>(delta);
++                const auto end = static_cast<std::uint64_t>(offset) + bytes;
++                if (state->arena_begin != 0 && offset >= state->arena_begin &&
++                    end <= state->arena_end) return;
++            }
++            note_allocator_block_update(state, ptr, bytes);
++        }
++
+         inline void release_cached_blocks(XAllocatorStateV1* state) noexcept {
+             auto* arena = allocator_arena(state);
+             if (!state || !arena) return;
+@@ -1589,6 +1630,58 @@
+                 detail::freelist_index_count(&detail::FreelistIndexStats::lookup_calls);
+                 auto class_index = freelist_size_class(aligned_bytes);
+                 if (class_index < freelist_class_count) {
++                    // B4 fast path (block choice identical to the walk below,
++                    // see w9a-alpha-PROOF.md). Nonempty-class mask from the 16
++                    // heads (one line). Nothing is modified before deciding.
++                    std::uint32_t nonempty = 0;
++                    for (std::uint32_t k = 0; k < freelist_class_count; ++k)
++                        nonempty |= std::uint32_t(state->freelist_head[k] != 0u) << k;
++                    nonempty &= ~((std::uint32_t{1} << class_index) - 1u);
++                    if (nonempty == 0u) {
++                        // (b) every class at/above the request is empty: the
++                        // walk would only normalize their cursors and fall
++                        // through to the Core tail allocation.
++                        for (std::uint32_t k = class_index; k < freelist_class_count; ++k)
++                            normalize_empty_freelist_cursor(cache.cursors[k], aligned_bytes, alignment);
++                        goto core_allocation;
++                    }
++                    {
++                        // (a) first nonempty class j: if its head fits (and is
++                        // not the start of a memo interval), the walk would
++                        // pick exactly this head.
++                        const auto j = static_cast<std::uint32_t>(std::countr_zero(nonempty));
++                        const auto head = state->freelist_head[j];
++                        auto* block = freelist_block_from_offset(state, head);
++                        auto& cursor = cache.cursors[j];
++                        const bool reset = cursor.bytes != aligned_bytes || cursor.alignment != alignment ||
++                                           cursor.head != head;
++                        const auto old_first = reset ? 0u : cursor.first;
++                        if (block->block_bytes >= aligned_bytes &&
++                            reinterpret_cast<std::uintptr_t>(block) % alignment == 0 &&
++                            !(old_first != 0u && old_first == head)) {
++#if defined(XOFFSET_FREELIST_INDEX_DIAGNOSTICS) && XOFFSET_FREELIST_INDEX_DIAGNOSTICS
++                            detail::freelist_index_count(&detail::FreelistIndexStats::node_visits);
++                            if (reset) detail::freelist_index_count(&detail::FreelistIndexStats::query_resets);
++#endif
++                            for (std::uint32_t k = class_index; k < j; ++k)
++                                normalize_empty_freelist_cursor(cache.cursors[k], aligned_bytes, alignment);
++                            const auto old_last = reset ? 0u : cursor.last;
++                            if (reset) {
++                                cursor = {};
++                                cursor.bytes = aligned_bytes;
++                                cursor.alignment = alignment;
++                            }
++                            state->freelist_head[j] = block->next_offset;
++                            state->free_bytes -= block->block_bytes;
++                            ++state->epoch;
++                            cache.epoch = state->epoch;
++                            cursor.first = old_first;
++                            cursor.last = old_last;
++                            cursor.head = state->freelist_head[j];
++                            std::destroy_at(block); // last header read precedes reuse
++                            return static_cast<void*>(block);
++                        }
++                    }
+                     for (std::uint32_t i = class_index; i < freelist_class_count; ++i) {
+                         auto& cursor = cache.cursors[i];
+                         // Different requests can remove a middle node without
+@@ -1652,6 +1745,7 @@
+                 }
+             }
+ 
++        core_allocation:
+             if (!owner) owner = &XBufferCore::owner_from_payload_ptr(arena);
+             const auto identity = owner->owner_record_;
+             // G: nullptr exactly where allocate_aligned_impl(..., false) threw
