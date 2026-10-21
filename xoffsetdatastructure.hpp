@@ -31,6 +31,7 @@
 #include <string_view>
 #include <ostream>
 #include <utility>
+#include <array>
 #include <vector>
 #include <cstring>
 #include <algorithm>
@@ -71,6 +72,7 @@ namespace XOffsetDatastructure {
     class XBadAlloc : public XException {
     public:
         XBadAlloc() : XException("XOffset arena allocation failed") {}
+        explicit XBadAlloc(const std::string& what) : XException(what) {}
     };
 
     namespace detail {
@@ -85,6 +87,7 @@ namespace XOffsetDatastructure {
         template<class T> consteval bool shift_relocate_supported();
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
+        template<class T> void zero_implicit_padding(T*) noexcept;
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -1699,6 +1702,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst);
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T, typename Src, typename Alloc>
@@ -1730,6 +1734,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, static_cast<const CleanSrc&>(src));
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T, typename Alloc, typename... Args>
@@ -1756,6 +1761,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, std::forward<Args>(args)...);
             }
+            detail::zero_implicit_padding(dst);
         }
 
         template <typename T>
@@ -2012,8 +2018,9 @@ namespace XOffsetDatastructure {
                 store_inline(nullptr, 0);
                 return;
             }
+            // M4: old characters never stay behind as spare capacity.
+            if (auto* ptr = data()) std::memset(ptr, 0, std::size_t(size_) + 1u);
             size_ = 0;
-            if (auto* ptr = data()) ptr[0] = '\0';
         }
 
         void reserve(std::size_t requested) {
@@ -2070,8 +2077,10 @@ namespace XOffsetDatastructure {
             }
             auto* old_data = data();
             if (new_size <= capacity_) {
+                const auto old_size = size_;
                 std::memmove(old_data, rhs.data(), rhs.size());
-                old_data[new_size] = '\0';
+                // M4: zero the terminator and any old characters after it.
+                std::memset(old_data + new_size, 0, std::size_t(old_size > new_size ? old_size - new_size : 0) + 1u);
                 size_ = new_size;
                 return;
             }
@@ -2359,8 +2368,10 @@ namespace XOffsetDatastructure {
         const T& back() const noexcept { return data()[size_ - 1]; }
 
         void clear() noexcept {
+            const auto old_size = size_;
             fixed_detail::destroy_n(data(), size_);
             size_ = 0;
+            scrub(0, old_size);
         }
 
         void reserve(std::size_t requested) {
@@ -2410,8 +2421,10 @@ namespace XOffsetDatastructure {
             ensure_bound();
             const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
             if (count <= capacity_) {
+                const auto old_size = size_;
                 std::memmove(data(), values.data(), bytes);
                 size_ = count;
+                scrub(count, old_size);
                 return;
             }
             auto alloc = binding();
@@ -2534,6 +2547,7 @@ namespace XOffsetDatastructure {
                 }
             }
             size_ = write; // publication follows the complete no-throw commit
+            scrub(write, original_size);
             return removed;
         }
 
@@ -2541,6 +2555,7 @@ namespace XOffsetDatastructure {
             if (size_ == 0) return;
             fixed_detail::destroy_n(data() + (size_ - 1), 1);
             --size_;
+            scrub(size_, size_ + 1);
         }
 
         T& emplace_back() {
@@ -2660,6 +2675,7 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
                 --size_;
+                scrub(size_, size_ + 1);
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // SHIFT: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
@@ -2671,6 +2687,7 @@ namespace XOffsetDatastructure {
                 detail::empty_vacated_slot(items + size_ - 1);
                 std::destroy_at(items + size_ - 1);
                 --size_;
+                scrub(size_, size_ + 1);
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 std::destroy_at(data() + index);
                 for (size_type i = index; i + 1 < size_; ++i) {
@@ -2678,6 +2695,7 @@ namespace XOffsetDatastructure {
                     std::destroy_at(data() + i + 1);
                 }
                 --size_;
+                scrub(size_, size_ + 1);
             } else {
                 rebuild(size_ - 1, capacity_, [&](T* dst, size_type i) {
                     fixed_detail::transfer_construct(dst, data()[i < index ? i : i + 1], binding());
@@ -2725,7 +2743,9 @@ namespace XOffsetDatastructure {
         void resize_default_scalar(size_type count) requires std::is_scalar_v<T> {
             if (count > max_size()) throw XBadAlloc();
             if (count <= size_) {
+                const auto old_size = size_;
                 size_ = count;
+                scrub(count, old_size);
                 return;
             }
             const auto old_size = size_;
@@ -2810,6 +2830,14 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // M4 (threat model T5/P2): storage of destroyed elements is zeroed, so
+        // a later save never emits the old values as spare capacity.
+        void scrub(size_type from, size_type to) noexcept {
+            if (to <= from) return;
+            if (auto* items = data())
+                std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+        }
+
         void copy_from(const XFixedVector& other) {
             if (other.size_ == 0) return;
             reserve(other.size_);
@@ -3059,6 +3087,7 @@ namespace XOffsetDatastructure {
                 std::destroy_at(&dst->first);
                 throw;
             }
+            detail::zero_implicit_padding(dst);  // between key and value (M6)
         }
     };
 
@@ -4720,6 +4749,7 @@ namespace XOffsetDatastructure {
                     constexpr auto member = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
                     relocate_construct(&((*dst).[:member:]), src.[:member:]);
                 });
+                detail::zero_implicit_padding(dst);
             }
         }
     } // namespace fixed_detail
@@ -4955,6 +4985,17 @@ namespace XOffsetDatastructure {
                 throw XException(std::string(who) + ": hole byte count mismatch");
         }
 
+        // M2: names the limit a wire exceeds, before any reservation.
+        inline void require_wire_within_capacity(std::size_t used, std::size_t limit,
+                                                 bool explicit_limit, const char* who) {
+            if (used <= limit) return;
+            throw XBadAlloc(std::string(who) + ": wire used_bytes " + std::to_string(used) +
+                            " exceeds " + (explicit_limit ? "maximum_capacity " :
+                                           "the default maximum_capacity ") +
+                            std::to_string(limit) +
+                            (explicit_limit ? "" : "; pass XBuffer::maximum_capacity() for larger wires"));
+        }
+
         // Validates sizes, the extent table and the hole byte sum of a wire
         // whose header passed check_wire_format. Does not touch the payload.
         inline WireLayout parse_wire_layout(const XWireHeaderV2& header,
@@ -5077,9 +5118,36 @@ namespace XOffsetDatastructure {
             header.extent_count = extents;
         }
 
+        // skip[i]: payload bytes left out of the wire by gaps[0..i).
+        // Empty (no allocation) for a dense wire: the hot output path stays
+        // allocation-free.
+        inline std::vector<std::uint64_t> wire_gap_skip(const std::vector<XBufferCore::WireHole>& gaps) {
+            if (gaps.empty()) return {};
+            std::vector<std::uint64_t> skip(gaps.size() + 1);
+            for (std::size_t i = 0; i < gaps.size(); ++i) skip[i + 1] = skip[i] + gaps[i].bytes;
+            return skip;
+        }
+
+        // M3: hole bytes leave as zero, never as the stale contents of freed
+        // blocks. `extents` is the emitted payload; a hole lies either inside
+        // one gap (not emitted) or wholly outside every gap.
+        inline void zero_emitted_holes(char* extents, const std::vector<XBufferCore::WireHole>& gaps,
+                                       const std::vector<std::uint64_t>& skip,
+                                       const XBufferCore& core) noexcept {
+            core.for_each_free_block([&](XBufferCore::WireHole hole) {
+                const auto next = std::upper_bound(gaps.begin(), gaps.end(), hole.offset,
+                    [](std::uint32_t offset, const XBufferCore::WireHole& gap) { return offset < gap.offset; });
+                const auto index = static_cast<std::size_t>(next - gaps.begin());
+                if (index != 0 && hole.offset < std::uint64_t(gaps[index - 1].offset) + gaps[index - 1].bytes)
+                    return;
+                std::memset(extents + (hole.offset - (skip.empty() ? 0 : skip[index])), 0, hole.bytes);
+            });
+        }
+
         // Writes header, extent table, extents and hole table (no allocation).
         inline void write_wire(char* out, std::size_t output_size, const XWireHeaderV2& header,
                                const std::vector<XBufferCore::WireHole>& gaps,
+                               const std::vector<std::uint64_t>& skip,
                                const char* payload, const XBufferCore& core) noexcept {
             const auto copier = wire_copier(output_size);
             std::memcpy(out, &header, sizeof(header));
@@ -5087,6 +5155,7 @@ namespace XOffsetDatastructure {
             const auto used = static_cast<std::uint32_t>(header.used_bytes);
             if (gaps.empty()) {
                 copier.copy(out, payload, used);
+                zero_emitted_holes(out, gaps, skip, core);
                 out += used;
             } else {
                 std::uint32_t begin = 0;
@@ -5103,6 +5172,7 @@ namespace XOffsetDatastructure {
                     table += sizeof(entry);
                 }
                 out = table;
+                char* const extents = out;
                 begin = 0;
                 for (const auto& gap : gaps) {
                     copier.copy(out, payload + begin, gap.offset - begin);
@@ -5113,6 +5183,7 @@ namespace XOffsetDatastructure {
                     copier.copy(out, payload + begin, used - begin);
                     out += used - begin;
                 }
+                zero_emitted_holes(extents, gaps, skip, core);
             }
             core.write_free_blocks(out);
         }
@@ -5524,6 +5595,161 @@ namespace XOffsetDatastructure {
         return detail::wire_abi_signature<T>();
     }
 
+    // M6 (threat model T5/P3): implicit padding inside a wire type is copied
+    // into the arena as whatever bytes the source object held, and from there
+    // into every emitted wire. has_implicit_padding_v<T> is true when T, or any
+    // record, array element or container element type reachable from it, has
+    // bytes not covered by a field.
+    namespace detail {
+        template <typename T>
+        consteval bool has_implicit_padding();
+
+        template <typename U, std::size_t... Is>
+        consteval bool record_has_implicit_padding(std::index_sequence<Is...>) {
+            using namespace std::meta;
+            std::size_t covered = 0;
+            bool padded = false;
+            auto field = [&]<std::size_t I>() {
+                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
+                using FieldType = [:type_of(member):];
+                if (offset_of(member).bytes != covered) padded = true;
+                covered = offset_of(member).bytes + sizeof(FieldType);
+                if (has_implicit_padding<FieldType>()) padded = true;
+            };
+            (field.template operator()<Is>(), ...);
+            return padded || covered != sizeof(U);
+        }
+
+        template <typename T>
+        consteval bool has_implicit_padding() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (fixed_size_scalar<U> || std::is_enum_v<U> || is_fixed_string_v<U>) {
+                return false;
+            } else if constexpr (std::is_array_v<U>) {
+                return has_implicit_padding<std::remove_extent_t<U>>();
+            } else if constexpr (is_fixed_vector_v<U>) {
+                // The 16-byte head is four u32 fields; elements live in the arena.
+                return has_implicit_padding<typename U::value_type>();
+            } else if constexpr (is_xkeyvalue_v<U>) {
+                return record_has_implicit_padding<U>(std::make_index_sequence<2>{});
+            } else if constexpr (std::is_class_v<U>) {
+                static_assert(reflected_base_count<U>() == 0,
+                    "has_implicit_padding_v does not support base classes");
+                return record_has_implicit_padding<U>(
+                    std::make_index_sequence<reflected_member_count<U>()>{});
+            } else {
+                static_assert(sizeof(U) == 0, "has_implicit_padding_v: non-admitted wire type");
+            }
+        }
+    } // namespace detail
+
+    template <typename T>
+    inline constexpr bool has_implicit_padding_v = detail::has_implicit_padding<T>();
+
+    // M6: the library zeroes implicit padding of every container element it
+    // constructs or relocates, so neither stale arena bytes nor the caller's
+    // stack (a copied temporary) reach the wire through padding. Covers
+    // records, arrays and XKeyValue (map entries); padding of a record that
+    // the caller assigns directly is outside the library's reach.
+    namespace detail {
+        // `count` runs of `bytes` padding bytes, `stride` apart from `offset`.
+        // An array contributes its element's ranges once, repeated by count,
+        // so a large array costs no more compile time than one element.
+        struct PaddingRange { std::size_t offset; std::size_t bytes; std::size_t stride = 0; std::size_t count = 1; };
+
+        template <typename T>
+        consteval std::vector<PaddingRange> merged_padding();
+
+        template <typename T>
+        consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base);
+
+        template <typename U, std::size_t... Is>
+        consteval void collect_record_padding(std::vector<PaddingRange>& out, std::size_t base,
+                                              std::index_sequence<Is...>) {
+            using namespace std::meta;
+            std::size_t covered = 0;
+            auto field = [&]<std::size_t I>() {
+                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
+                using FieldType = [:type_of(member):];
+                constexpr std::size_t offset = offset_of(member).bytes;
+                if (offset > covered) out.push_back({base + covered, offset - covered, 0, 1});
+                collect_padding<FieldType>(out, base + offset);
+                if (offset + sizeof(FieldType) > covered) covered = offset + sizeof(FieldType);
+            };
+            (field.template operator()<Is>(), ...);
+            if (covered < sizeof(U)) out.push_back({base + covered, sizeof(U) - covered, 0, 1});
+        }
+
+        template <typename T>
+        consteval void collect_padding(std::vector<PaddingRange>& out, std::size_t base) {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_array_v<U>) {
+                using B = std::remove_all_extents_t<U>;
+                constexpr std::size_t total = sizeof(U) / sizeof(B);
+                if constexpr (std::is_class_v<B>) {
+                    for (const auto& r : merged_padding<B>()) {
+                        if (r.count == 1) {
+                            out.push_back({base + r.offset, r.bytes, sizeof(B), total});
+                        } else {
+                            for (std::size_t i = 0; i < total; ++i)
+                                out.push_back({base + i * sizeof(B) + r.offset, r.bytes, r.stride, r.count});
+                        }
+                    }
+                }
+            } else if constexpr (is_xkeyvalue_v<U>) {
+                collect_record_padding<U>(out, base, std::make_index_sequence<2>{});
+            } else if constexpr (std::is_class_v<U> && !is_fixed_string_v<U> && !is_fixed_vector_v<U>) {
+                // Records with bases are left alone (layout of base subobjects
+                // is not walked here).
+                if constexpr (reflected_base_count<U>() == 0)
+                    collect_record_padding<U>(out, base,
+                        std::make_index_sequence<reflected_member_count<U>()>{});
+            }
+        }
+
+        template <typename T>
+        consteval std::vector<PaddingRange> merged_padding() {
+            std::vector<PaddingRange> raw, merged;
+            collect_padding<T>(raw, 0);
+            for (const auto& r : raw) {
+                if (r.count == 1 && !merged.empty() && merged.back().count == 1 &&
+                    merged.back().offset + merged.back().bytes == r.offset)
+                    merged.back().bytes += r.bytes;
+                else
+                    merged.push_back(r);
+            }
+            return merged;
+        }
+
+        template <typename T>
+        inline constexpr auto padding_ranges = [] {
+            constexpr std::size_t n = merged_padding<T>().size();
+            std::array<PaddingRange, n> ranges{};
+            const auto v = merged_padding<T>();
+            for (std::size_t i = 0; i < n; ++i) ranges[i] = v[i];
+            return ranges;
+        }();
+
+        template <class T>
+        void zero_implicit_padding(T* object) noexcept {
+            if constexpr (!std::is_class_v<std::remove_cv_t<T>> && !std::is_array_v<std::remove_cv_t<T>>) {
+                (void)object;
+            } else if constexpr (padding_ranges<T>.size() == 0) {
+                (void)object;
+            } else {
+                auto* bytes = reinterpret_cast<unsigned char*>(object);
+                for (const auto& r : padding_ranges<T>)
+                    for (std::size_t i = 0; i < r.count; ++i) std::memset(bytes + r.offset + i * r.stride, 0, r.bytes);
+            }
+        }
+    } // namespace detail
+
+    // Opt-in per type: fails compilation when T carries implicit padding.
+#define XOFFSET_REQUIRE_NO_PADDING(Type) \
+    static_assert(!::XOffsetDatastructure::has_implicit_padding_v<Type>, \
+        "XOffset: " #Type " has implicit padding bytes, which can carry stale memory into a wire " \
+        "(threat model T5/P3); add explicit fields")
+
     template <typename T>
     consteval std::uint64_t wire_schema_hash_v() {
         return detail::wire_schema_hash<T>();
@@ -5880,6 +6106,10 @@ namespace XOffsetDatastructure {
         std::string save_verified() {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+            static_assert(!has_implicit_padding_v<T>,
+                "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
             require_typed_root_access("save_verified<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
             this->shrink_to_fit();
@@ -5892,6 +6122,7 @@ namespace XOffsetDatastructure {
             const char* base = static_cast<const char*>(this->get_address());
             auto header = wire_header_v2(*root_ptr);
             const auto gaps = detail::wire_sparse_gaps(*this, this->segment_size());
+            const auto skip = detail::wire_gap_skip(gaps);
             detail::wire_apply_gaps(header, gaps);
             const auto output_size = detail::wire_output_size(header, gaps);
             std::string out;
@@ -5899,12 +6130,12 @@ namespace XOffsetDatastructure {
                 throw std::length_error("save_verified<T>(): output size exceeds string limit");
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                detail::write_wire(output, output_size, header, gaps, base, *this);
+                detail::write_wire(output, output_size, header, gaps, skip, base, *this);
                 return output_size;
             });
 #else
             out.resize(output_size);
-            detail::write_wire(out.data(), output_size, header, gaps, base, *this);
+            detail::write_wire(out.data(), output_size, header, gaps, skip, base, *this);
 #endif
             return out;
         }
@@ -5964,7 +6195,12 @@ namespace XOffsetDatastructure {
             XWireHeaderV2 header{};
             const auto layout = admit_wire_header<T>(data, header, who);
             const auto used = static_cast<std::size_t>(header.used_bytes);
-            const auto capacity = cap ? *cap : MaximumCapacity{capacity_from_hint(used, used)};
+            // M1: without an explicit limit a wire may claim at most the
+            // default maximum; a sparse wire of a few hundred bytes could
+            // otherwise make the receiver reserve up to MAX_PAYLOAD.
+            const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
+            detail::require_wire_within_capacity(used, capacity.value, cap.has_value(),
+                                                 "load_verified<T>()");
             XBuffer xbuf = layout.extent_count == 0
                 ? XBuffer(layout.stored, used, capacity)
                 : XBuffer(SparsePayload{layout.stored, layout.extents, layout.extent_count}, used, capacity);
