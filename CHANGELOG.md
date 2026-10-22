@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Nightly fuzz reporting (threat model F4): nightly and manual `Fuzz` runs end
+  with a `report` job (`tools/fuzz_report.py`). Each crash signature gets one
+  issue labelled `fuzz-crash`: a new signature opens it, a repeat comments on
+  it, a signature whose issue was closed reopens it as a regression. The
+  minimized input is pushed to a `fuzz-crash/<signature>` branch as
+  `tests/fuzz/regressions/<target>/<signature>`, ready for the fix PR. Jobs
+  that fail without a finding go to one rolling `fuzz-infra` issue, which the
+  next all-green nightly closes. Crash issues are only closed by their fix.
+  Pushes to next_cpp26 run `nightly-watch`: it re-enables the main-branch
+  dispatcher (`nightly-fuzz-dispatch.yml`, 18:23 UTC) against GitHub's 60-day
+  inactivity disable and comments on `fuzz-infra` when the newest nightly run
+  is more than 36 hours old.
+
 ## 0.3.0-beta.1: production-readiness beta
 
 Release gates G1–G8 (`PRODUCTION_READINESS_GOAL`): K1–K7 mapped to tests, two

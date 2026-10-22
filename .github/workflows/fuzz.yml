@@ -21,6 +21,12 @@ name: Fuzz
 # signature by tools/fuzz_findings.py, which writes findings.json into the
 # fuzz-<target> artifact. A job fails when it has findings, not on the
 # fuzzer's exit code alone.
+#
+# Nightly and manual runs end with `report` (tools/fuzz_report.py): one issue
+# per crash signature (labels fuzz-crash), the input pushed to a
+# fuzz-crash/<signature> branch under tests/fuzz/regressions/, and failures
+# without a finding on the rolling fuzz-infra issue. Pushes to next_cpp26 run
+# `nightly-watch`, which flags a nightly older than 36 hours.
 
 on:
   push:
@@ -342,3 +348,74 @@ jobs:
             echo "::error::$T: fuzzer exited with '$CODE' and left no crash, leak, timeout or oom input"; exit 1
           fi
           echo "$T: no findings"
+
+  # Nightly and manual runs only, so a pull request run never holds these
+  # write permissions. Files one issue per crash signature, pushes the input
+  # to fuzz-crash/<signature> and keeps the fuzz-infra issue
+  # (tools/fuzz_report.py).
+  report:
+    name: Report findings
+    needs: [ libfuzzer ]
+    if: always() && github.event_name == 'workflow_dispatch' && (inputs.mode == 'nightly' || inputs.mode == 'manual')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # fuzz-crash/<signature> branches
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # A job that died before uploading leaves nothing here; the report
+      # counts it as an infrastructure failure.
+      - name: Download findings
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: fuzz-*
+          path: build/fuzz-results
+
+      - name: Issues and regression branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/fuzz-results
+          printf '%s' "$NEEDS" > build/needs.json
+          # One findings.json per libfuzzer matrix entry.
+          python3 tools/fuzz_report.py report --mode "$XOFFSET_FUZZ_MODE" \
+            --findings-dir build/fuzz-results --needs-json build/needs.json \
+            --expect libfuzzer-v2_wire,libfuzzer-wire_schemas
+
+  # Pushes to next_cpp26, and manual runs given watch_hours (drill). Keeps the
+  # main-branch dispatcher enabled (GitHub disables scheduled workflows after
+  # 60 days without repository activity) and comments on fuzz-infra when the
+  # newest nightly run is older than 36 hours.
+  nightly-watch:
+    name: Nightly watch
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/next_cpp26')
+      || (github.event_name == 'workflow_dispatch' && inputs.watch_hours != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write   # gh workflow enable
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Re-enable the dispatcher, check the last nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WATCH_HOURS: ${{ inputs.watch_hours }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            python3 tools/fuzz_report.py watch --manual --hours "$WATCH_HOURS" --run-url "$RUN_URL"
+          else
+            python3 tools/fuzz_report.py watch --hours 36 --run-url "$RUN_URL"
+          fi
