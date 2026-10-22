@@ -23,6 +23,8 @@
 #   EXTRA_SLG    "zpp_cista" also builds the zpp_bits and cista columns (secondary, report only)
 #   DEPS_PREFIX  dependency install prefix (default <out>/deps); point a second build at the first
 #                build's prefix to reuse its libraries (the -O2 build does)
+#   SDKROOT      macOS only (host mode for the Mac bridge's native build; steps "deps slg"):
+#                the SDK path, passed as CMAKE_OSX_SYSROOT
 #   OPT          optimisation flags replacing Release's default (-O3 -DNDEBUG), e.g. "-O2 -DNDEBUG"
 #                for the secondary GCC -O2 vs -O3 run (H1 section 5.6)
 #
@@ -52,12 +54,16 @@ case "$TC" in
     CC_=$CLANG_ROOT/bin/clang; CXX_=$CLANG_ROOT/bin/clang++
     STDFLAGS="-stdlib=libc++"
     # Runtime libc++ next to the toolchain (dynamic, H1 section 4.6).
-    LIBCXX_DIR=$(dirname "$("$CXX_" $STDFLAGS -print-file-name=libc++.so)")
+    if [ "$(uname -s)" = Darwin ]; then SO=dylib; else SO=so; fi
+    LIBCXX=$("$CXX_" $STDFLAGS -print-file-name=libc++.$SO)
+    if [ ! -e "$LIBCXX" ]; then echo "libc++.$SO not found next to $CXX_ (got '$LIBCXX')" >&2; exit 1; fi
+    LIBCXX_DIR=$(cd "$(dirname "$LIBCXX")" && pwd)
     # Runtime libraries for a runtime container without the toolchain: mount <out>/clang-rt at
     # the path in <out>/libcxx_dir.txt (the binaries' rpath).
     mkdir -p "$OUT/clang-rt"
-    cp -a "$LIBCXX_DIR"/libc++.so* "$LIBCXX_DIR"/libc++abi.so* "$OUT/clang-rt/"
-    cp -a "$LIBCXX_DIR"/libunwind.so* "$OUT/clang-rt/" 2>/dev/null || true
+    cp -a "$LIBCXX_DIR"/libc++.*$SO* "$LIBCXX_DIR"/libc++abi.*$SO* "$OUT/clang-rt/" 2>/dev/null ||
+      cp -a "$LIBCXX_DIR"/libc++*.$SO* "$OUT/clang-rt/"
+    cp -a "$LIBCXX_DIR"/libunwind*.$SO* "$OUT/clang-rt/" 2>/dev/null || true
     echo "$LIBCXX_DIR" > "$OUT/libcxx_dir.txt"
     ;;
   *) echo "unknown toolchain $TC" >&2; exit 2 ;;
@@ -65,6 +71,11 @@ esac
 
 COMMON=(-G "$GENERATOR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$CC_" -DCMAKE_CXX_COMPILER="$CXX_"
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
+# macOS host (the Mac bridge's native build, steps "deps slg"): SDK from SDKROOT.
+if [ "$(uname -s)" = Darwin ]; then
+  : "${SDKROOT:?set SDKROOT to the macOS SDK (e.g. MacOSX26.5.sdk) on macOS}"
+  COMMON+=(-DCMAKE_OSX_SYSROOT="$SDKROOT")
+fi
 if [ -n "${OPT:-}" ]; then COMMON+=(-DCMAKE_CXX_FLAGS_RELEASE="$OPT" -DCMAKE_C_FLAGS_RELEASE="$OPT"); fi
 if [ -n "$STDFLAGS" ]; then
   COMMON+=(-DCMAKE_CXX_FLAGS="$STDFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$STDFLAGS -Wl,-rpath,$LIBCXX_DIR"
