@@ -54,7 +54,7 @@ if [ "${MAPDEMO_SKIP_EVIL:-0}" != 1 ]; then
     echo "== evil (online failure inputs)"
     MAPDEMO_PORT_A=$PORT MAPDEMO_PORT_B=$(( PORT + 1 )) MAPDEMO_CLIENT_ARGS=--evil \
         "$HERE/run_tier.sh" "$BIN" 100 "$OUT_ROOT/evil" 200 || FAILED=1
-    REJECTED=$(grep -c 'rejected:' "$OUT_ROOT/evil/a.log" 2>/dev/null || true)
+    REJECTED=$(grep -c '^rejected:' "$OUT_ROOT/evil/a.log" 2>/dev/null || true)
     echo "a_rejected_lines=${REJECTED:-0}" >> "$OUT_ROOT/evil/exit_codes.txt"
     echo "evil: A logged ${REJECTED:-0} rejected line(s)"
 fi
