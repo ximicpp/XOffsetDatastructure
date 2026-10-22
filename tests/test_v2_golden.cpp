@@ -35,11 +35,14 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // format change (and say so in the change description). 2026-10-21: hole
 // bytes and spare container capacity are emitted as zero (threat model M3/M4);
 // retired blocks are cleared, so bytes a reused block does not overwrite are
-// zero too.
-#define GOLDEN_DENSE_SIZE 1800u
-#define GOLDEN_DENSE_FNV 0x6457288a053030adull
-#define GOLDEN_SPARSE_SIZE 1856u
-#define GOLDEN_SPARSE_FNV 0x03194efaf8964445ull
+// zero too. 2026-10-22 (G1): appending to a full vector of records builds the
+// new element in the grown block instead of a staged slot, so allocation
+// placement changes (dense 1800 -> 1792, 7 -> 5 holes; sparse 1856 -> 1800,
+// 8 -> 5 holes, 2 -> 1 extents). The format itself is unchanged.
+#define GOLDEN_DENSE_SIZE 1792u
+#define GOLDEN_DENSE_FNV 0xf9823cefa179f71aull
+#define GOLDEN_SPARSE_SIZE 1800u
+#define GOLDEN_SPARSE_FNV 0xbe289a9e7e47e1fcull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;

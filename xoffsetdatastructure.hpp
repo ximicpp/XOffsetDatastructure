@@ -2736,6 +2736,8 @@ namespace XOffsetDatastructure {
             if (index == size_ && size_ < capacity_) {
                 construct(data() + size_);
                 ++size_;
+            } else if (index == size_ && append_grow(construct)) {
+                // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 // A native temporary is safe only for types without arena bindings.
                 alignas(T) std::byte storage[sizeof(T)];
@@ -2826,6 +2828,52 @@ namespace XOffsetDatastructure {
                     if (i == index) construct(dst);
                     else fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
+            }
+        }
+
+        // Append to a full vector without a staged element: grow the block
+        // (in place at the arena tail, else a fresh block), build the new
+        // element directly at its final slot, then relocate the old run.
+        // The new element is built while the old run is still intact, so
+        // arguments that alias old elements stay valid. If construct
+        // throws, a fresh block is retired and the old run is untouched; a
+        // tail expansion stays, as after a successful reserve. Returns false
+        // for types that keep the general paths in insert_construct.
+        template <typename Construct>
+        bool append_grow(Construct& construct) {
+            if constexpr (std::is_trivially_copyable_v<T> ||
+                          !fixed_detail::can_relocate_without_allocation<T>()) {
+                return false;
+            } else {
+                const auto new_cap = grown_capacity();
+                auto alloc = binding();
+                const auto new_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
+                if (fixed_detail::try_expand_dynamic_bytes(
+                        alloc, data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)), new_bytes, alignof(T))) {
+                    (void)detail::rebuild_dynamic_array<T>(data(), new_cap, size_);
+                    capacity_ = new_cap;
+                    construct(data() + size_);
+                    ++size_;
+                    return true;
+                }
+                auto* fresh = detail::begin_dynamic_array<T>(
+                    fixed_detail::allocate_dynamic_bytes(alloc, new_bytes, alignof(T)), new_cap);
+                std::int32_t delta = 0;
+                try {
+                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    construct(fresh + size_);
+                } catch (...) {
+                    fixed_detail::retire_dynamic_bytes(alloc, fresh, new_bytes);
+                    throw;
+                }
+                auto* old = data();
+                const auto old_cap = capacity_;
+                relocate_live_run(fresh, old);
+                data_delta = delta;
+                capacity_ = new_cap;
+                ++size_;
+                fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+                return true;
             }
         }
 
