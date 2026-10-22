@@ -7,8 +7,10 @@ report plus a JSON summary. Exit 0 only when every verdict passes.
 
 Verdicts per tier:
   * a, b and client exited 0;
+  * every metric name of INTERFACES.md section 6 recorded (headless: no draw);
   * a_steps.csv has at least --min-steps rows, ticks consecutive, check_ok all 1;
   * a_checks.csv and client_checks.csv exist, non-empty, every row "pass";
+    a_checks.csv has the six fixed row names;
   * every snapshot request id logged by A was logged by the client and vice
     versa, with equal tick, category, visible, wire_bytes and digest;
   * normal, full and empty categories each sampled on both sides; every
@@ -65,6 +67,10 @@ VIEW_METRICS = (
     ("c.visible_count", "visible units (client)"),
     ("c.catalog_load_us", "client catalog load_verified (once)"),
 )
+
+# Row names server A writes to a_checks.csv (INTERFACES.md, 85ac689).
+A_CHECK_NAMES = ("batch_roundtrip", "reference_model", "modification_coverage",
+                 "view_snapshot", "snapshot_paths", "rejected_requests")
 
 # INTERFACES.md section 6; the headless client has no draw / present.
 HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
@@ -196,6 +202,11 @@ def summarize_tier(root, name, min_steps):
     a_checks = read_csv(os.path.join(d, "a_checks.csv"))
     c_checks = read_csv(os.path.join(d, "client_checks.csv"))
     check_rows(v, scope, "a_checks", a_checks)
+    if a_checks is not None:
+        names = set(r.get("check") for r in a_checks)
+        absent = [n for n in A_CHECK_NAMES if n not in names]
+        v.add(scope, "a_checks has every fixed row", not absent,
+              "missing: " + ", ".join(absent) if absent else ", ".join(A_CHECK_NAMES))
     check_rows(v, scope, "client_checks", c_checks)
 
     a_snap = read_csv(os.path.join(d, "a_snapshots.csv")) or []

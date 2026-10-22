@@ -73,7 +73,7 @@ wait_for() {
     fi
 } > "$OUT/meta.txt"
 
-"$BIN/mapdemo_b" --port "$PORT_B" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &
+"$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &
 B_PID=$!
 "$BIN/mapdemo_a" --units "$UNITS" --seed "$SEED" --steps "$STEPS" --check \
     --port "$PORT_A" --b-port "$PORT_B" --csv-dir "$OUT" > "$OUT/a.log" 2>&1 &
