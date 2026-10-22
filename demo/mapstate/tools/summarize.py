@@ -422,7 +422,7 @@ def render_overview(lines, tiers):
     mrow("B destroy (us)", "b.destroy_us")
     for cat in CATEGORIES:
         crow("{} snapshot wire (bytes)".format(cat), cat, "wire_bytes", "_bytes")
-        crow("{} snapshot visible units".format(cat), cat, "visible", "_count")
+        crow("{} snapshot visible units".format(cat), cat, "visible")
         crow("{} view round trip (us)".format(cat), cat, "c.rtt_us")
         crow("{} A snapshot build (us)".format(cat), cat, "a.build_us")
         crow("{} client load_verified (us)".format(cat), cat, "c.load_us")
