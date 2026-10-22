@@ -1,0 +1,4 @@
+{
+  "comment": "clang-p2996 d77eff1 builds from p2996-toolchain.yml used by perf-gcc16.yml. Empty arm64 = GCC-only arm64 jobs.",
+  "arm64": {}
+}
