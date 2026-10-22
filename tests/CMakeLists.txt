@@ -52,6 +52,7 @@ set(REFLECTION_TESTS
     test_validation_v5_bounds
     test_validation_v4
     test_string_replace
+    test_hot_path_constants
     test_wire_bitmap
     test_resize_growth
     test_validation_resource
