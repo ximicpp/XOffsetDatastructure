@@ -15,9 +15,13 @@
 #   bench/runner.hpp     SLG_IR_COUNT callgrind toggles (origin 3aecd8bcc8d58d1f46963849413c9bcf41a61b96f162b31c68b66a102df2473c)
 #   bench/slg_bench.cpp  sets slg::ir_cycle() under SLG_IR_COUNT (origin d6527ce92d9abf2bf6fc3f5d23836b85f66293c5e3b5de2a0d07336433a042e9)
 #   README.md            added
+# Intentional benchmark changes (bench/perf/ledger.json):
+#   include/slg/model_xoffset.hpp  2026-10-22: every xm record type declared an
+#                        ordinary record (was March only), as a user following the
+#                        guide would (origin 0c056aba4e88b0cfb579f383f2f7fdcfdf7631f9681073a2a77e468b85847e65)
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
-# reuse protocol (c) (SLG_REUSE=1), March StableEraseOrdinaryMembers opt-in in
-# include/slg/model_xoffset.hpp. No T4 adapter.
+# reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
+# record type in include/slg/model_xoffset.hpp. No T4 adapter.
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
 fffeb26223e5b10a3f0d11e19766d15f2fcc8cce09152cba08bcee1978eb1d77  README.md
 0f306ee47ffe88ae9094f1b4babf9c8dd63776a65edaf7bfc440d31d1215d6fb  adapters/cereal_format.hpp
@@ -35,7 +39,7 @@ ca78dc903b3c6665bc3c56515456cc917a3447117aba40483742b7a1cc44f3bc  bench/runner.h
 81103b56f9c6c0e89e42c16ba2ded491b2d0eb14b379fae373947aa8bc65328c  include/slg/generic.hpp
 320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
 d51467c9c67b8861345ebc5f53593f03b71622dd0a3d4cea7a672f1ad794dc9f  include/slg/model_std.hpp
-0c056aba4e88b0cfb579f383f2f7fdcfdf7631f9681073a2a77e468b85847e65  include/slg/model_xoffset.hpp
+e42c49cf847fa97d5e26cbc95053862f88e4fdfc7b73dbdcef4e74ab56c22d99  include/slg/model_xoffset.hpp
 d140559cf74c0c48ea7078a7e652d224c07d6909c3c0acfc731c5b1d7bc4f8c2  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
 234159b81efcb07c0ab826a5f0a56b7f72a86a4ecb597ca7900f089cbb798723  schema/slg.fbs
