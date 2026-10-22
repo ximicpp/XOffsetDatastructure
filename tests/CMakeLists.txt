@@ -89,6 +89,7 @@ set(REFLECTION_TESTS
     test_owner_identity
     test_owner_registry
     test_tail_expansion
+    test_regrow_used_range
     test_storage_policies
     test_allocator_model
     test_allocator_failures
