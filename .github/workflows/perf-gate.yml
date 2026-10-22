@@ -33,7 +33,7 @@ on:
         default: 'both'
 
 concurrency:
-  group: perf-gate-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name }}
+  group: perf-gate-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name }}-${{ inputs.base }}-${{ inputs.head }}-${{ inputs.anchor }}
   cancel-in-progress: true
 
 permissions:
