@@ -760,7 +760,7 @@ def cmd_compare(a):
             continue
         row["functions"] = d
         if d["inline_suspect"]:
-            notes.append(f"{row['metric']}：疑似内联变化（见函数差异表）")
+            notes.append(f"{row['metric']}：疑似内联变化（只是诊断，不放行；见函数差异表）")
 
     # Largest-changing phase per scenario (head/base), for the summary.
     biggest = {}
@@ -836,7 +836,7 @@ def render_summary(out, plan, biggest):
             L += [f"{head}：同 `{shown[ident]}`", ""]
             continue
         shown[ident] = row["metric"]
-        L.append(head + ("：⚠️ 疑似内联变化" if d["inline_suspect"] else ""))
+        L.append(head + ("：⚠️ 疑似内联变化（只是诊断，不放行）" if d["inline_suspect"] else ""))
         L += [f"- {x}" for x in d["suspects"]]
         L += ["", f"| 函数 | {d['ref']} | head | 变化 |", "| --- | --- | --- | --- |"]
         for t in d["top"]:
