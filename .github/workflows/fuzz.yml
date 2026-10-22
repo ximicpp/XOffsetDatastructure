@@ -21,6 +21,13 @@ name: Fuzz
 # signature by tools/fuzz_findings.py, which writes findings.json into the
 # fuzz-<target> artifact. A job fails when it has findings, not on the
 # fuzzer's exit code alone.
+#
+# Nightly and manual runs add two GCC 16 ASan+UBSan jobs (GCC 16 is the
+# production compiler): gcc16-diff runs the seeded differential fuzz
+# test_v2_fuzz, and gcc16-replay replays the merged libFuzzer corpora, the
+# regression inputs and the seeds through fuzz_<target>_replay. Both write
+# findings.json through tools/fuzz_gcc16.py into fuzz-gcc16-diff and
+# fuzz-gcc16-replay.
 
 on:
   push:
@@ -226,7 +233,7 @@ jobs:
               -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
               -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6
             cmake --build build/fuzz --parallel 4 --target ${{ matrix.build }}
-            ctest --test-dir build/fuzz -R '^fuzz_${T}_' --output-on-failure" \
+            ctest --test-dir build/fuzz -R '^fuzz_${T}_(seeds|smoke)$' --output-on-failure" \
             2>&1 | tee "build/build-$T.log"
 
       # The fuzzer's exit code is recorded, not acted on here: a crash in pr
@@ -342,3 +349,239 @@ jobs:
             echo "::error::$T: fuzzer exited with '$CODE' and left no crash, leak, timeout or oom input"; exit 1
           fi
           echo "$T: no findings"
+
+  # Nightly and manual only. GCC 16 is the production compiler: the seeded
+  # differential fuzz (test_v2_fuzz) runs there for most of the budget, four
+  # processes, seeds YYYYMMDD*10 + i, with the sanitizer flags of ci.yml's
+  # gcc16-sanitizer job (plus -O1 for throughput). A failing process dumps its input wire
+  # (XOFFSET_FUZZ_DUMP_DIR) and names its `test_v2_fuzz --replay` command;
+  # tools/fuzz_gcc16.py turns that into findings.json.
+  gcc16-diff:
+    name: GCC 16 differential fuzz (ASan+UBSan)
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'pr'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.mode == 'manual' && 330 || 90 }}
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Budget, seeds and Docker wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$XOFFSET_FUZZ_MODE" in
+            nightly) SECS=2700 ;;
+            manual)  SECS="${{ inputs.seconds }}" ;;
+            *) echo "::error::gcc16-diff does not run in mode '$XOFFSET_FUZZ_MODE'"; exit 1 ;;
+          esac
+          if ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ] || [ "$SECS" -gt 16200 ]; then
+            echo "::error::seconds must be an integer from 10 to 16200, got '$SECS'"; exit 1
+          fi
+          DAY=$(date -u +%Y%m%d)
+          SEEDS="$((DAY * 10)) $((DAY * 10 + 1)) $((DAY * 10 + 2)) $((DAY * 10 + 3))"
+          { echo "DIFF_SECONDS=$SECS"; echo "DIFF_SEEDS=$SEEDS"; } >> "$GITHUB_ENV"
+          echo "$XOFFSET_FUZZ_MODE: $SECS s, seeds $SEEDS"
+          mkdir -p build/gcc16-diff/logs build/gcc16-diff/report
+          cat > build/gcc-docker <<EOF
+          #!/bin/bash
+          exec docker run --rm --platform linux/amd64 \\
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \\
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \\
+            -e XOFFSET_GCC_SANITIZE -e XOFFSET_FUZZ_DUMP_DIR \\
+            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:handle_abort=1 \\
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \\
+            "$XOFFSET_GCC_IMAGE" "\$@"
+          EOF
+          chmod +x build/gcc-docker
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Build test_v2_fuzz
+        shell: bash
+        run: |
+          set -o pipefail
+          build/gcc-docker bash -euo pipefail -c '
+            g++ --version | head -n 1
+            cmake -S . -B build/gcc16-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+              "-DCMAKE_CXX_FLAGS=-O1 $XOFFSET_GCC_SANITIZE" \
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined \
+              -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
+            cmake --build build/gcc16-asan --parallel 4 --target test_v2_fuzz' \
+            2>&1 | tee build/gcc16-diff/build.log
+
+      # Per-case cost from one process: 2000 cases minus the fixed part (pool
+      # and the 1505 page boundary cases), then 90 % for four processes
+      # sharing four vCPUs.
+      - name: Calibrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEED=${DIFF_SEEDS%% *}
+          timed() {
+            local a b
+            a=$(date +%s.%N)
+            build/gcc-docker build/gcc16-asan/bin/Debug/test_v2_fuzz "$1" "$SEED" > "build/gcc16-diff/logs/calibrate-$1.log" 2>&1
+            b=$(date +%s.%N)
+            echo "$a $b" | awk '{printf "%.2f", $2 - $1}' > "build/gcc16-diff/logs/calibrate-$1.time"
+          }
+          timed 0
+          timed 2000
+          T0=$(cat build/gcc16-diff/logs/calibrate-0.time)
+          T1=$(cat build/gcc16-diff/logs/calibrate-2000.time)
+          CASES=$(python3 -c "import sys; t0, t1, s = map(float, sys.argv[1:]); per = max((t1 - t0) / 2000, 1e-6); print(max(1000, int((s - t0) / per * 0.9)))" "$T0" "$T1" "$DIFF_SECONDS")
+          echo "DIFF_CASES=$CASES" >> "$GITHUB_ENV"
+          echo "fixed part ${T0}s, 2000 cases ${T1}s: $CASES cases per process for ${DIFF_SECONDS}s"
+
+      # A process still running at twice the budget (plus 5 minutes) is
+      # killed and reported as a timeout.
+      - name: Differential fuzz
+        id: diff
+        shell: bash
+        run: |
+          set -uo pipefail
+          LIMIT=$((DIFF_SECONDS * 2 + 300))
+          i=0
+          for SEED in $DIFF_SEEDS; do
+            ( XOFFSET_FUZZ_DUMP_DIR=build/gcc16-diff/dump/p$i build/gcc-docker \
+                timeout -s KILL "$LIMIT" build/gcc16-asan/bin/Debug/test_v2_fuzz "$DIFF_CASES" "$SEED" \
+                > "build/gcc16-diff/logs/p$i.log" 2>&1
+              echo $? > "build/gcc16-diff/logs/p$i.exit" ) &
+            i=$((i + 1))
+          done
+          wait
+          for f in build/gcc16-diff/logs/p*.exit; do echo "$f: $(cat "$f")"; tail -n 3 "${f%.exit}.log"; done
+
+      - name: Findings
+        if: always() && steps.diff.outcome == 'success'
+        run: >-
+          python3 tools/fuzz_gcc16.py diff --logs build/gcc16-diff/logs --seeds "$DIFF_SEEDS"
+          --cases "$DIFF_CASES" --image "$XOFFSET_GCC_IMAGE" --out build/gcc16-diff/report
+
+      - name: Upload logs and findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-gcc16-diff
+          path: |
+            build/gcc16-diff/report/
+            build/gcc16-diff/logs/
+            build/gcc16-diff/build.log
+
+      - name: Verdict
+        if: always() && steps.diff.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' build/gcc16-diff/report/findings.json)
+          if [ "$N" != 0 ]; then echo "::error::gcc16-diff: $N finding(s), see the fuzz-gcc16-diff artifact"; exit 1; fi
+          echo "gcc16-diff: no findings"
+
+  # Nightly and manual only, after the libFuzzer jobs: the merged corpus of
+  # each target (fuzz-corpus-<target>, uploaded by the libfuzzer job), the
+  # regression inputs and the seed corpus, replayed through the harnesses
+  # built by GCC 16 with ASan+UBSan (fuzz_<target>_replay, no libFuzzer).
+  # A target whose corpus upload is missing (drill run, failed job) replays
+  # the rest.
+  gcc16-replay:
+    name: GCC 16 replay of the libFuzzer corpus (ASan+UBSan)
+    needs: libfuzzer
+    if: "!cancelled() && github.event_name == 'workflow_dispatch' && inputs.mode != 'pr'"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download the merged corpora
+        continue-on-error: true   # none in a drill run or when both uploads failed
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fuzz-corpus-*
+          path: build/gcc16-replay/corpus
+
+      - name: Docker wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gcc16-replay/report
+          cat > build/gcc-docker <<EOF
+          #!/bin/bash
+          exec docker run --rm --platform linux/amd64 \\
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \\
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \\
+            -e XOFFSET_GCC_SANITIZE \\
+            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:handle_abort=1 \\
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \\
+            "$XOFFSET_GCC_IMAGE" "\$@"
+          EOF
+          chmod +x build/gcc-docker
+          for T in v2_wire wire_schemas; do
+            echo "$T: $(find "build/gcc16-replay/corpus/fuzz-corpus-$T" -type f 2>/dev/null | wc -l) corpus files"
+          done
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Build the replay targets and write the seeds
+        shell: bash
+        run: |
+          set -o pipefail
+          build/gcc-docker bash -euo pipefail -c '
+            g++ --version | head -n 1
+            cmake -S . -B build/gcc16-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+              "-DCMAKE_CXX_FLAGS=-O1 $XOFFSET_GCC_SANITIZE" \
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined \
+              -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
+            cmake --build build/gcc16-asan --parallel 4 --target fuzz_v2_wire_replay fuzz_wire_schemas_replay
+            for T in v2_wire wire_schemas; do
+              build/gcc16-asan/bin/Debug/fuzz_${T}_replay --write-seeds build/gcc16-replay/seeds/$T
+            done' \
+            2>&1 | tee build/gcc16-replay/build.log
+
+      - name: Replay
+        id: replay
+        run: >-
+          python3 tools/fuzz_gcc16.py replay --image "$XOFFSET_GCC_IMAGE" --out build/gcc16-replay/report
+          --spec v2_wire:build/gcc16-asan/bin/Debug/fuzz_v2_wire_replay:build/gcc16-replay/corpus/fuzz-corpus-v2_wire:tests/fuzz/regressions/v2_wire:build/gcc16-replay/seeds/v2_wire
+          --spec wire_schemas:build/gcc16-asan/bin/Debug/fuzz_wire_schemas_replay:build/gcc16-replay/corpus/fuzz-corpus-wire_schemas:tests/fuzz/regressions/wire_schemas:build/gcc16-replay/seeds/wire_schemas
+
+      - name: Upload logs and findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-gcc16-replay
+          path: |
+            build/gcc16-replay/report/
+            build/gcc16-replay/build.log
+
+      - name: Verdict
+        if: always() && steps.replay.outcome != 'skipped'
+        shell: bash
+        run: |
+          set -euo pipefail
+          N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' build/gcc16-replay/report/findings.json)
+          if [ "$N" != 0 ]; then echo "::error::gcc16-replay: $N finding(s), see the fuzz-gcc16-replay artifact"; exit 1; fi
+          echo "gcc16-replay: no findings"
