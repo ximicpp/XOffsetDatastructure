@@ -1,0 +1,41 @@
+name: P2996 toolchain (d77eff1, Linux)
+
+# Builds clang-p2996 d77eff1 (clang + libc++/libc++abi/libunwind) for Linux and
+# publishes it as an artifact for the H1 GCC 16 measurements (beta.2): aarch64
+# is the deliverable; x86_64 is a second, optional entry that never fails the run.
+# Artifacts: p2996-d77eff1-linux-<arch> (tar.xz + .sha256 + BUILDINFO.txt).
+# A rebuild only happens when the recipe changes (the package is cached).
+on:
+  push:
+    branches: [ 'claude/p2996-toolchain-*' ]
+    paths:
+      - '.github/workflows/p2996-toolchain*.yml'
+      - 'tools/p2996-toolchain/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aarch64:
+    uses: ./.github/workflows/p2996-toolchain-arch.yml
+    with:
+      arch: aarch64
+      runner: ubuntu-24.04-arm
+      llvm_target: AArch64
+      docker_platform: linux/arm64
+      cmake_platform: linux-aarch64
+      # gcc:16 (16.2.0) linux/arm64/v8, same digest as client-targets.yml
+      gcc_image: gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a
+
+  x86_64:
+    uses: ./.github/workflows/p2996-toolchain-arch.yml
+    with:
+      arch: x86_64
+      runner: ubuntu-latest
+      llvm_target: X86
+      docker_platform: linux/amd64
+      cmake_platform: linux-x86_64
+      # gcc:16 (16.2.0) linux/amd64, same digest as ci.yml
+      gcc_image: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      optional: true

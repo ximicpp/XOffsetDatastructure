@@ -1,0 +1,198 @@
+name: P2996 toolchain (one architecture)
+
+# Called by p2996-toolchain.yml once per architecture. Builds clang-p2996 with
+# tools/p2996-toolchain/build_toolchain.sh inside ubuntu:22.04 (the Dockerfile
+# recipe), packages it as <name>.tar.xz + .sha256, then smoke-tests the
+# package inside the pinned gcc:16 runtime container.
+on:
+  workflow_call:
+    inputs:
+      arch: { type: string, required: true }            # aarch64 | x86_64
+      runner: { type: string, required: true }
+      llvm_target: { type: string, required: true }     # AArch64 | X86
+      docker_platform: { type: string, required: true }
+      cmake_platform: { type: string, required: true }  # tools/prepare_vm_cmake.py --platform
+      gcc_image: { type: string, required: true }
+      optional: { type: boolean, default: false }       # failure does not fail the run
+
+env:
+  CLANG_P2996_COMMIT: d77eff1cbd78fd065668acf93b1f5f400d39134d
+  BUILDER_IMAGE: ubuntu:22.04
+
+jobs:
+  build:
+    name: Build clang-p2996 d77eff1 (${{ inputs.arch }})
+    runs-on: ${{ inputs.runner }}
+    continue-on-error: ${{ inputs.optional }}
+    timeout-minutes: 350
+    outputs:
+      name: ${{ steps.meta.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package name and cache key
+        id: meta
+        run: |
+          name="p2996-${CLANG_P2996_COMMIT:0:7}-linux-${{ inputs.arch }}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "key=$name-${{ hashFiles('tools/p2996-toolchain/build_toolchain.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore a package built from the same recipe
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: dist
+          key: ${{ steps.meta.outputs.key }}
+
+      - name: Free disk space
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          docker system prune -af > /dev/null || true
+          df -h /
+          nproc; free -g; lscpu | head -n 20
+
+      - name: Build in ${{ env.BUILDER_IMAGE }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail  # pipefail: a failed build fails the step despite tee
+          mkdir -p out/p2996-toolchain out/logs "$RUNNER_TEMP/work"
+          docker pull --platform ${{ inputs.docker_platform }} "$BUILDER_IMAGE"
+          docker image inspect --format '{{index .RepoDigests 0}}' "$BUILDER_IMAGE" | tee out/logs/builder-image.txt
+          docker run --rm --platform ${{ inputs.docker_platform }} \
+            -e CLANG_P2996_COMMIT -e LLVM_TARGET=${{ inputs.llvm_target }} \
+            -e PREFIX=/opt/p2996-toolchain -e LOGDIR=/logs -e WORK=/work \
+            -v "$PWD/tools/p2996-toolchain:/recipe:ro" \
+            -v "$PWD/out/p2996-toolchain:/opt/p2996-toolchain" \
+            -v "$PWD/out/logs:/logs" -v "$RUNNER_TEMP/work:/work" \
+            "$BUILDER_IMAGE" bash /recipe/build_toolchain.sh 2>&1 | tee out/logs/build.log
+          df -h /
+
+      - name: Package
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=${{ steps.meta.outputs.name }}
+          tc=out/p2996-toolchain
+          triple=$(ls "$tc/lib" | grep -- '-linux-gnu$')
+          mkdir -p dist
+          {
+            echo "package: $name"
+            echo "source: https://github.com/bloomberg/clang-p2996 $CLANG_P2996_COMMIT"
+            echo "recipe: tools/p2996-toolchain/build_toolchain.sh at ${{ github.sha }} (repo Dockerfile clang-builder stage, LLVM_TARGETS_TO_BUILD=${{ inputs.llvm_target }})"
+            echo "built by: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} on ${{ inputs.runner }}"
+            echo "builder image: $(cat out/logs/builder-image.txt)"
+            echo "top-level directory: p2996-toolchain/ (unpack with --strip-components=1 into any prefix; clang is relocatable)"
+            echo "target triple: $triple"
+            echo "runtime library dir: lib/$triple (LD_LIBRARY_PATH or -Wl,-rpath)"
+            echo
+            echo "## clang++ --version"; "$tc/bin/clang++" --version || file "$tc/bin/clang-"*
+            echo
+            echo "## __config_site"; grep -n 'HARDENING_MODE_DEFAULT\|ABI_VERSION' "$tc"/include/*/c++/v1/__config_site
+            echo
+            echo "## cmake cache"; cat out/logs/cmake-cache.txt
+            echo
+            echo "## file sha256"
+            (cd "$tc" && sha256sum bin/clang-[0-9]* lib/"$triple"/*.so.*)
+          } > dist/BUILDINFO.txt
+          cat dist/BUILDINFO.txt
+          tar -C out -cf - p2996-toolchain | xz -T0 -6 > "dist/$name.tar.xz"
+          (cd dist && sha256sum "$name.tar.xz" > "$name.tar.xz.sha256" && cat "$name.tar.xz.sha256")
+          ls -l dist
+
+      - name: Save the package for later runs of the same recipe
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: dist
+          key: ${{ steps.meta.outputs.key }}
+
+      - name: Show the package
+        run: |
+          cat dist/BUILDINFO.txt
+          cat dist/*.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: dist/
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload build logs
+        if: always() && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}-build-logs
+          path: out/logs/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  smoke:
+    name: Smoke d77eff1 in gcc:16 (${{ inputs.arch }})
+    needs: build
+    runs-on: ${{ inputs.runner }}
+    continue-on-error: ${{ inputs.optional }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}
+          path: dist
+
+      - name: Verify and unpack the package
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum -c *.sha256)
+          mkdir -p "$RUNNER_TEMP/tc"
+          tar -C "$RUNNER_TEMP/tc" --strip-components=1 -xJf dist/*.tar.xz
+          ls "$RUNNER_TEMP/tc" "$RUNNER_TEMP/tc/bin"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform ${{ inputs.cmake_platform }} --out build/cmake-tool
+
+      - name: Fetch the frozen SLG tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          source tools/p2996-toolchain/slg_source.env
+          if [ -n "${SLG_COMMIT:-}" ]; then
+            git fetch --depth 1 origin "$SLG_COMMIT"
+            mkdir -p build/slg-src
+            git archive "$SLG_COMMIT" "$SLG_PATH" | tar -x -C build/slg-src --strip-components=$(echo "$SLG_PATH" | tr -cd / | wc -c | awk '{print $1+1}')
+            ls build/slg-src
+            echo "SLG_SRC=/workspace/build/slg-src" >> "$GITHUB_ENV"
+          fi
+
+      - name: Smoke (identity, reflection probe, Release CTest, SLG verify)
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform ${{ inputs.docker_platform }} \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -v "$RUNNER_TEMP/tc:/opt/p2996-toolchain:ro" \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e CLANG_P2996_COMMIT -e SLG_SRC -e TC=/opt/p2996-toolchain -e OUT=/workspace/build/p2996-smoke \
+            "${{ inputs.gcc_image }}" bash tools/p2996-toolchain/smoke.sh 2>&1 | tee build/smoke.log
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.name }}-smoke
+          path: |
+            build/smoke.log
+            build/p2996-smoke/*.txt
+            build/p2996-smoke/xoffset-rel/Testing/Temporary/*.log
+            build/p2996-smoke/xoffset-rel/compile_commands.json
+          retention-days: 90
+          if-no-files-found: ignore
