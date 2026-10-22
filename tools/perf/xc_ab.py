@@ -577,7 +577,10 @@ def markdown_xcomp(res, names=None):
     p(f"- A = {na}，B = {nb}，A* = A 的逐字节副本。比值一律 B ÷ A。")
     p(f"- 每次运行平均耗时：" + "，".join(f"{l} {v:.1f} s" for l, v in sorted(res["wall_s"].items())))
     if res.get("aborted"): p(f"- **中止**：{res['aborted']}")
-    p(f"- 批次有效性：**{'有效' if res['valid'] else '无效'}**（A/A 几何均值在 ±{res['aa_range'] * 100:.1f}% 内且区间含 1；漂移在 ±{res['drift_range'] * 100:.1f}% 内）\n")
+    if res["aa_pairs"]:
+        p(f"- 批次有效性：**{'有效' if res['valid'] else '无效'}**（A/A 几何均值在 ±{res['aa_range'] * 100:.1f}% 内且区间含 1；漂移在 ±{res['drift_range'] * 100:.1f}% 内）\n")
+    else:
+        p("- 这一批没有 A/A 控制，只作报告，不作判定。\n")
     p(f"## A/A 与漂移（{subj} 场景合计）\n")
     p("| 场景 | A*÷A | 95% 区间（k=4） | sd(log) | 有效 | 漂移（末块÷首块） | 漂移有效 |")
     p("| --- | ---: | --- | ---: | --- | ---: | --- |")
@@ -636,28 +639,42 @@ def markdown_xcomp(res, names=None):
     return "\n".join(out) + "\n"
 
 
-def aa_budget(doc, subject="xoffset", baselines=DEFAULT_BASELINES, a="A", aa="A*", budget_min=20.0, alpha=0.05):
-    """From an A/A-only batch: per-scenario process-to-process noise, and the 95% half-width reachable in
-    budget_min minutes of paired (ABBA) runs and of unpaired (Welch, equal group sizes) runs."""
+def _pooled_sd(groups):
+    """Pooled within-group standard deviation of lists of values."""
+    ss = sum(sum((v - statistics.mean(g)) ** 2 for v in g) for g in groups if len(g) > 1)
+    df = sum(len(g) - 1 for g in groups if len(g) > 1)
+    return (math.sqrt(ss / df) if df > 0 else None), df
+
+
+def aa_budget(doc, subject="xoffset", baselines=DEFAULT_BASELINES, a="A", b="B", budget_min=20.0, alpha=0.05):
+    """Process-to-process noise of a batch and the 95% half-width reachable in budget_min minutes.
+    Process sd is pooled within each label (A, A*, B), so it holds for a batch of two different binaries
+    too; pair sd is the sd of log(B/A) over adjacent pairs. Predictions: paired ABBA with budget/2 pairs,
+    and unpaired Welch with budget/2 processes per side (raw scenario total and the per-cycle
+    normalisation by the baselines' geometric mean, H3 design section 7.4)."""
     runs = doc["runs"]
     labels = [r["label"] for r in runs]
     wall = statistics.mean(r["wall_s"] for r in runs)
     n_runs = max(4, int(budget_min * 60 / wall))
     out = {"wall_s": wall, "budget_min": budget_min, "runs_in_budget": n_runs, "scenarios": {}}
-    pairs = adjacent_pairs(labels, a, aa)
+    pairs = adjacent_pairs(labels, a, b)
     for s in SCENARIOS:
         key = s + ".total"
-        vals = [math.log(r["_med"][subject][key]) for r in runs if key in r["_med"].get(subject, {})]
-        norm = [norm_log_mean(r["_ns"], subject, baselines, s) for r in runs
-                if all(b in r["_ns"] for b in baselines) and subject in r["_ns"]]
-        pr = [math.log(runs[j]["_med"][subject][key] / runs[i]["_med"][subject][key]) for i, j in pairs]
-        rec = {"sd_log_process": statistics.stdev(vals) if len(vals) > 1 else None,
-               "sd_log_process_norm": statistics.stdev(norm) if len(norm) > 1 else None,
-               "sd_log_pair": statistics.stdev(pr) if len(pr) > 1 else None, "n_runs": len(vals), "n_pairs": len(pr)}
+        raw_g, norm_g = defaultdict(list), defaultdict(list)
+        for r in runs:
+            if key not in r["_med"].get(subject, {}): continue
+            raw_g[r["label"]].append(math.log(r["_med"][subject][key]))
+            if all(x in r["_ns"] for x in baselines):
+                norm_g[r["label"]].append(norm_log_mean(r["_ns"], subject, baselines, s))
+        sd_raw, df_raw = _pooled_sd(raw_g.values())
+        sd_norm, _ = _pooled_sd(norm_g.values())
+        pr = [math.log(runs[i]["_med"][subject][key] / runs[j]["_med"][subject][key]) for i, j in pairs]
+        rec = {"sd_log_process": sd_raw, "sd_log_process_norm": sd_norm, "df_process": df_raw,
+               "sd_log_pair": statistics.stdev(pr) if len(pr) > 1 else None, "n_pairs": len(pr)}
         npair = n_runs // 2
         if rec["sd_log_pair"]:
             rec["halfwidth_paired"] = math.exp(t_ppf(1 - alpha / 2, npair - 1) * rec["sd_log_pair"] / math.sqrt(npair)) - 1
-        for name, sd in (("halfwidth_welch", rec["sd_log_process"]), ("halfwidth_welch_norm", rec["sd_log_process_norm"])):
+        for name, sd in (("halfwidth_welch", sd_raw), ("halfwidth_welch_norm", sd_norm)):
             if sd:
                 m = n_runs // 2
                 rec[name] = math.exp(t_ppf(1 - alpha / 2, 2 * m - 2) * sd * math.sqrt(2.0 / m)) - 1
@@ -792,6 +809,7 @@ def cmd_analyze(a):
 def cmd_aa_budget(a):
     doc = load_runs(a.outdir)
     r = aa_budget(doc, a.subject, tuple(a.baselines.split(",")), budget_min=a.budget_min)
+    print(f"# A/A budget: {a.outdir}")
     if a.json:
         with open(a.json, "w") as f: json.dump(r, f, indent=1)
     print(f"mean run {r['wall_s']:.1f} s -> {r['runs_in_budget']} runs in {r['budget_min']:.0f} min")

@@ -21,6 +21,10 @@
 #   SLG_SRC      SLG tree (default: <checkout>/bench/slg)
 #   FB_GEN       directory with a shared slg_generated.h (written by the first build if empty)
 #   EXTRA_SLG    "zpp_cista" also builds the zpp_bits and cista columns (secondary, report only)
+#   DEPS_PREFIX  dependency install prefix (default <out>/deps); point a second build at the first
+#                build's prefix to reuse its libraries (the -O2 build does)
+#   OPT          optimisation flags replacing Release's default (-O3 -DNDEBUG), e.g. "-O2 -DNDEBUG"
+#                for the secondary GCC -O2 vs -O3 run (H1 section 5.6)
 #
 # Fairness rules (H1 design section 4): CMake Release (-O3 -DNDEBUG), no -march/-mcpu, no LTO,
 # identical CMake arguments for both toolchains except the compiler and -stdlib=libc++.
@@ -49,17 +53,24 @@ case "$TC" in
     STDFLAGS="-stdlib=libc++"
     # Runtime libc++ next to the toolchain (dynamic, H1 section 4.6).
     LIBCXX_DIR=$(dirname "$("$CXX_" $STDFLAGS -print-file-name=libc++.so)")
+    # Runtime libraries for a runtime container without the toolchain: mount <out>/clang-rt at
+    # the path in <out>/libcxx_dir.txt (the binaries' rpath).
+    mkdir -p "$OUT/clang-rt"
+    cp -a "$LIBCXX_DIR"/libc++.so* "$LIBCXX_DIR"/libc++abi.so* "$OUT/clang-rt/"
+    cp -a "$LIBCXX_DIR"/libunwind.so* "$OUT/clang-rt/" 2>/dev/null || true
+    echo "$LIBCXX_DIR" > "$OUT/libcxx_dir.txt"
     ;;
   *) echo "unknown toolchain $TC" >&2; exit 2 ;;
 esac
 
 COMMON=(-G "$GENERATOR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER="$CC_" -DCMAKE_CXX_COMPILER="$CXX_"
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
+if [ -n "${OPT:-}" ]; then COMMON+=(-DCMAKE_CXX_FLAGS_RELEASE="$OPT" -DCMAKE_C_FLAGS_RELEASE="$OPT"); fi
 if [ -n "$STDFLAGS" ]; then
   COMMON+=(-DCMAKE_CXX_FLAGS="$STDFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$STDFLAGS -Wl,-rpath,$LIBCXX_DIR"
            -DCMAKE_SHARED_LINKER_FLAGS="$STDFLAGS")
 fi
-PREFIX=$OUT/deps
+PREFIX=${DEPS_PREFIX:-$OUT/deps}
 
 fetch() {  # fetch <dir> <url> <tag> <commit>
   local d=$DEPS_SRC/$1
@@ -128,6 +139,9 @@ step_tests() {
   "$CMAKE" -S "$ROOT" -B "$OUT/b-tests" "${COMMON[@]}"
   "$CMAKE" --build "$OUT/b-tests" --parallel "$JOBS"
 }
+
+"$CXX_" --version > "$OUT/compiler_version.txt"
+"$CXX_" -v -E -x c++ -std=c++26 $STDFLAGS /dev/null -o /dev/null > "$OUT/compiler_v.txt" 2>&1 || true
 
 for s in $STEPS; do
   t0=$(date +%s)
