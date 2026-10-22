@@ -1,0 +1,83 @@
+{
+  "files": {
+    "final.canonical.bin": {
+      "bytes": 10272,
+      "sha256": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669"
+    },
+    "input.canonical.bin": {
+      "bytes": 8354,
+      "sha256": "214846fb2114e65cb7e765d1dccfaf2b34c565de372223a93952c50884b8a25e"
+    },
+    "query-after.bin": {
+      "bytes": 4400,
+      "sha256": "89c23c0d58999a85ecf8f80b7d3cadba1875d29d7d60ba8b8ef81f46da4b21e8"
+    },
+    "query-before.bin": {
+      "bytes": 4400,
+      "sha256": "1a023c9d443156b28dee301d8e78729a76acffb4dbc907a15a156888d9803d1c"
+    },
+    "trace.bin": {
+      "bytes": 15682,
+      "sha256": "ed00787c1c92f3b3128495bc3851513affcd9d89c2b83cb3c874a1b814ed0f59"
+    }
+  },
+  "final_digest": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669",
+  "input_digest": "214846fb2114e65cb7e765d1dccfaf2b34c565de372223a93952c50884b8a25e",
+  "model_version": 1,
+  "mutation_count": 29,
+  "n": 17,
+  "query_after_digest": "89c23c0d58999a85ecf8f80b7d3cadba1875d29d7d60ba8b8ef81f46da4b21e8",
+  "query_before_digest": "1a023c9d443156b28dee301d8e78729a76acffb4dbc907a15a156888d9803d1c",
+  "query_count": 60,
+  "query_name": "query-v1",
+  "schema": "sc-fixture-v1",
+  "seed": "xoffset-competitor-v1",
+  "stages": [
+    {
+      "canonical_sha256": "8cdd557387ec5acd77a2aa09b267936eb78b8319f67e178e92e705639b2ffc8a",
+      "mutation_count": 4,
+      "stage": 1
+    },
+    {
+      "canonical_sha256": "38fc6d51135d4c9ba753f1b5c1ac9f4d8f883e5c67dee68a368456fc7e9846de",
+      "mutation_count": 4,
+      "stage": 2
+    },
+    {
+      "canonical_sha256": "7b6027ed8862e9e06771b666281bfe45c614349172b13ab02d708dc25c02de37",
+      "mutation_count": 4,
+      "stage": 3
+    },
+    {
+      "canonical_sha256": "2e415f086b2c2f4bc28ec1dc95dc9ec8c96eabab04cea9ca0e8e8a6cc0cc84d1",
+      "mutation_count": 4,
+      "stage": 4
+    },
+    {
+      "canonical_sha256": "f622f87e53b58ef4eea940f255990bec88b48b43d78a475d57d5083f5317a501",
+      "mutation_count": 4,
+      "stage": 5
+    },
+    {
+      "canonical_sha256": "029f28126141928d876d7a5617539a7194b9efccda4928492f37eb7ba27debe8",
+      "mutation_count": 4,
+      "stage": 6
+    },
+    {
+      "canonical_sha256": "50d073be97198f3df8574d08e6d40bdcb80eaa144b4600aaa758b569cac129d5",
+      "mutation_count": 2,
+      "stage": 7
+    },
+    {
+      "canonical_sha256": "ce2684878916e4610aefd8480d1ae9d5c824a12a96eed1d01e20b9a24ea384a5",
+      "mutation_count": 2,
+      "stage": 8
+    },
+    {
+      "canonical_sha256": "3db757637fc7bd0dc2b5fc87b454c7302e27d18ce9a5385a01ad4a982f1f5669",
+      "mutation_count": 1,
+      "stage": 9
+    }
+  ],
+  "trace_name": "mixed-growth-v1"
+}

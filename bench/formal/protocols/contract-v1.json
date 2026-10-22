@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "serialization-comparison-contract",
+  "model": "V1",
+  "cell": "V1-M-mixed-growth-trusted-detached",
+  "authority": "User 2026-10-17: 制定实施方案，并开始实施。",
+  "datasets": {"S":128,"M":16384,"L":131072},
+  "canonical_magic": "SCCAN001",
+  "trace_magic": "SCTRAC01",
+  "query_result_magic": "SCQUERY1",
+  "query_pair_magic": "SCQPAIR1",
+  "oracle": "model/reference.py; independent Python and C++ canonical/query implementations; stage expected digests are evidence and are never substituted for native operations",
+  "source_lock": "docs/coordination/competitor-benchmark-20261017/candidate-lock.json",
+  "trust": "trusted producer output bound by frozen functional evidence and file SHA256; native API checks explicitly disclosed, no equal-untrusted-safety claim",
+  "language_dialect": "GNU++26 for all measured runtime/adapter translation units: pinned Cap'n Proto CMake rejects CXX_EXTENSIONS=OFF. Preserve that initial configure failure; use fresh build directory without editing upstream checks. Host generators retain their separately recorded dialect.",
+  "ownership": "input owner is freed immediately after detached load; final owning wire produced; modified state destroyed before detached reload; reload state destroyed after final query; final wire retained by harness",
+  "owning_output": "Keep each library API's native owning string, byte vector, DetachedBuffer or flat word array; wire_view exposes read-only bytes without forcing an artificial vector conversion. File output and independent audit are identical.",
+  "phase_order": ["load","query_before","mutate","emit_after","retire_modified_state","reload","query_after","cleanup"],
+  "mutation_execution": "Ordered trace; per-stage batching allowed only when sequential logical operations and status outcomes are identical; no query occurs within a stage; Python oracle evaluates each operation independently; functional gate audits every stage",
+  "resources": {"maximum_input_bytes":536870912,"xoffset_initial_arena_bytes":4096,"xoffset_maximum_arena_bytes":536870912,"xoffset_growth":"Automatic opt-in; pool disabled","preallocate":"Initial record/sequence size only; not future trace capacity"},
+  "native_profiles": {
+    "xoffset-mac-r3-v2":"Typed verified load / admitted native arena containers / Automatic opt-in / verified owning save",
+    "cista-v0.16":"offset own containers; mode NONE default structural checks; detached private blob copy; later self-allocated heap cleanup; no fmt macro",
+    "flatbuffers-v25.12.19":"Object API UnPack -> modify generated native objects -> Pack; trusted input; no upfront verifier in T profile; U remains unestablished",
+    "capnproto-v1.5.0":"Unpacked flat bytes -> bounded normal Reader -> private MessageBuilder copy; native field/list operations; flatten owning output; no RPC",
+    "cereal-v1.3.2":"BinaryArchive -> native DTO containers -> ordinary mutations -> BinaryArchive owning output; no PortableBinaryArchive"
+  },
+  "capability_policy": "First complete functional gate is trusted-detached mutable V1. Additional borrowed/adopt/U-read/U-mutable/native graph/mmap are explicitly unsupported or not_established until independently probed, and cannot be counted as passes.",
+  "performance_policy": "Only root may execute the one preregistered 285-child maximum campaign after actual executable locks, all five functional gates and harness review; earlier N3 failure unchanged; no retry to qualify"
+}

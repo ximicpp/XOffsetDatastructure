@@ -1,0 +1,22 @@
+namespace sc_fb;
+
+table Attr {
+  key:string;
+  value:[ubyte];
+}
+table Record {
+  id:ulong;
+  revision:uint;
+  score:long;
+  name:string;
+  samples:[uint];
+  payload:[ubyte];
+  attrs:[Attr];
+}
+table Snapshot {
+  schema_version:uint = 1;
+  epoch:ulong;
+  records:[Record];
+}
+root_type Snapshot;
+file_identifier "SCF1";

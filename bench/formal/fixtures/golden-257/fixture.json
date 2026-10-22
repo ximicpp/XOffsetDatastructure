@@ -1,0 +1,83 @@
+{
+  "files": {
+    "final.canonical.bin": {
+      "bytes": 153316,
+      "sha256": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476"
+    },
+    "input.canonical.bin": {
+      "bytes": 126503,
+      "sha256": "30de5a2766c2b07e508133403536b2c1cb02c920f6060bf648171e3420784634"
+    },
+    "query-after.bin": {
+      "bytes": 63530,
+      "sha256": "9fed16da182ab24d500344eace80a567b153bcb51cbc46040ba8a0a20014fa37"
+    },
+    "query-before.bin": {
+      "bytes": 63530,
+      "sha256": "6185fe3e58dea4f757a5d5b030f01feb8afe7fc9ebefbdc49cbe9aa743166c45"
+    },
+    "trace.bin": {
+      "bytes": 227835,
+      "sha256": "aa25dc9db02295bad2453f1a66b29f9a16bbfb9797cdc6bf066bef2aef7bbf58"
+    }
+  },
+  "final_digest": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476",
+  "input_digest": "30de5a2766c2b07e508133403536b2c1cb02c920f6060bf648171e3420784634",
+  "model_version": 1,
+  "mutation_count": 449,
+  "n": 257,
+  "query_after_digest": "9fed16da182ab24d500344eace80a567b153bcb51cbc46040ba8a0a20014fa37",
+  "query_before_digest": "6185fe3e58dea4f757a5d5b030f01feb8afe7fc9ebefbdc49cbe9aa743166c45",
+  "query_count": 870,
+  "query_name": "query-v1",
+  "schema": "sc-fixture-v1",
+  "seed": "xoffset-competitor-v1",
+  "stages": [
+    {
+      "canonical_sha256": "efe220382cf04db71871c695f1ec4ed14d6428e90bb0131668fcc0e82bba32a4",
+      "mutation_count": 64,
+      "stage": 1
+    },
+    {
+      "canonical_sha256": "487fd8dbe303805128da7365c62b33091f196baef4dcbc0ba5795108f16a59e1",
+      "mutation_count": 64,
+      "stage": 2
+    },
+    {
+      "canonical_sha256": "894b2b48e18064056ba74cc338a05a60412ec8bdcbeadbef544306c15c1992c5",
+      "mutation_count": 64,
+      "stage": 3
+    },
+    {
+      "canonical_sha256": "5acac6740df3b069cf1e15b1eccc67d7dcae0bfb8147dc97884d2d0a6356676b",
+      "mutation_count": 64,
+      "stage": 4
+    },
+    {
+      "canonical_sha256": "4c2f5a8e71bdc394c571b955029c9cb80552b755b80d0e8fd01678cfb5c1662e",
+      "mutation_count": 64,
+      "stage": 5
+    },
+    {
+      "canonical_sha256": "ee6f71a1f73876186b2147ee4ca3f001e439ad9e05ad9c35b4944f22efc98beb",
+      "mutation_count": 64,
+      "stage": 6
+    },
+    {
+      "canonical_sha256": "e565f5f6c0fa8c555291c365ccc1b10cf0cf41334acf8b1d4d7d81b992e865d9",
+      "mutation_count": 32,
+      "stage": 7
+    },
+    {
+      "canonical_sha256": "9f608a0db8c8b3fb8cc4329182bc111f9caef74d72463f44ae7863676fb409e7",
+      "mutation_count": 32,
+      "stage": 8
+    },
+    {
+      "canonical_sha256": "d066cb2f2fd3cfe994c2e114d22ca4d1b0414682cfbb44a0372f65035eca5476",
+      "mutation_count": 1,
+      "stage": 9
+    }
+  ],
+  "trace_name": "mixed-growth-v1"
+}

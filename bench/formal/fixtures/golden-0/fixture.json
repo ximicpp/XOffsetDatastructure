@@ -1,0 +1,83 @@
+{
+  "files": {
+    "final.canonical.bin": {
+      "bytes": 28,
+      "sha256": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301"
+    },
+    "input.canonical.bin": {
+      "bytes": 28,
+      "sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0"
+    },
+    "query-after.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "query-before.bin": {
+      "bytes": 239,
+      "sha256": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af"
+    },
+    "trace.bin": {
+      "bytes": 1023,
+      "sha256": "3fd23f7abe064e1d3c464974740ea8cc94feac76f83cfd60dcf6997b84020870"
+    }
+  },
+  "final_digest": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301",
+  "input_digest": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+  "model_version": 1,
+  "mutation_count": 1,
+  "n": 0,
+  "query_after_digest": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af",
+  "query_before_digest": "79f9e6fdf1ae8c498e076ebe28668563867cf27dcf84b4219bad58b7d0db10af",
+  "query_count": 3,
+  "query_name": "query-v1",
+  "schema": "sc-fixture-v1",
+  "seed": "xoffset-competitor-v1",
+  "stages": [
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 1
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 2
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 3
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 4
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 5
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 6
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 7
+    },
+    {
+      "canonical_sha256": "76018ee6fccada0f84030dc84cbd8a35ba06e2fa1ad131502adba4db4c2d2ea0",
+      "mutation_count": 0,
+      "stage": 8
+    },
+    {
+      "canonical_sha256": "e022c7882351d1fa149c5b5524174ae05a2d226868cca1401d5fe4f640843301",
+      "mutation_count": 1,
+      "stage": 9
+    }
+  ],
+  "trace_name": "mixed-growth-v1"
+}

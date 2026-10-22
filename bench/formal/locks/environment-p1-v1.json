@@ -1,0 +1,752 @@
+{
+  "schema_version": 1,
+  "phase": "P1",
+  "status": "environment-and-five-small-probes-passed",
+  "benchmark_contract_gate_passed": false,
+  "performance_qualified": false,
+  "performance_measurement": false,
+  "platform_class": "wsl2-vm-x86_64",
+  "kernel": "6.6.87.2-microsoft-standard-WSL2",
+  "base": "/root/xoffset-serialization-comparison/20261017/p1-v1",
+  "lock_dir": "/mnt/c/Users/gzsufanchen/Documents/ChatGPT/xoffsetdatastructure\u5f00\u53d1/build/vm-coordination",
+  "dialect": "gnu++26",
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "PATH": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/cmake/bin:/usr/bin:/bin"
+  },
+  "paths": {
+    "compiler_wrapper": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+    "base_wrapper": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++",
+    "real_compiler": "/opt/p2996-toolchain/bin/clang++",
+    "cmake": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/cmake/bin/cmake",
+    "ninja": "/usr/bin/ninja",
+    "loader": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+    "host_runtime": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+    "libcxx": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu",
+    "flatc": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc",
+    "capnproto_prefix": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto",
+    "sources": {
+      "cista-v0.16": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cista-v0.16",
+      "flatbuffers-v25.12.19": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/flatbuffers-v25.12.19",
+      "capnproto-v1.5.0": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/capnproto-v1.5.0",
+      "cereal-v1.3.2": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cereal-v1.3.2"
+    },
+    "xoffset_source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1"
+  },
+  "sources": [
+    {
+      "id": "cista-v0.16",
+      "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cista-v0.16",
+      "commit": "015b94e66c4c0d7c1ef29742383a024c84fbbba1",
+      "tree": "70b20e85f23e813d15b8ca09d0322a5fbb51604a",
+      "manifest": "/root/xoffset-serialization-comparison/20261017/p1-v1/inputs/cista-v0.16-source-manifest.json",
+      "manifest_sha256": "5a0d88dc96d495ec11c7d60a337610b353750c02e4de501e7483092b255a58a1",
+      "tracked_members": 160,
+      "unmaterialized_gitlinks": [],
+      "license_members": 1
+    },
+    {
+      "id": "flatbuffers-v25.12.19",
+      "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/flatbuffers-v25.12.19",
+      "commit": "7e163021e59cca4f8e1e35a7c828b5c6b7915953",
+      "tree": "972544cfb52f07e3be930ddfae630e54968ba380",
+      "manifest": "/root/xoffset-serialization-comparison/20261017/p1-v1/inputs/flatbuffers-v25.12.19-source-manifest.json",
+      "manifest_sha256": "e5f1515e8d1b13e84a4c099ff3a79e59cd0af704685255e94dfee466431fc845",
+      "tracked_members": 1912,
+      "unmaterialized_gitlinks": [],
+      "license_members": 3
+    },
+    {
+      "id": "capnproto-v1.5.0",
+      "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/capnproto-v1.5.0",
+      "commit": "373e61ec89e2359f1c362e9b2eadc552f4779306",
+      "tree": "537ddf79a54220f0cfe1511b5ddabbcc06f9aa68",
+      "manifest": "/root/xoffset-serialization-comparison/20261017/p1-v1/inputs/capnproto-v1.5.0-source-manifest.json",
+      "manifest_sha256": "95c511dc746e0e5d7b0741474fbf45fc1e40211be112004a534a7acecb968b7c",
+      "tracked_members": 494,
+      "unmaterialized_gitlinks": [],
+      "license_members": 2
+    },
+    {
+      "id": "cereal-v1.3.2",
+      "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cereal-v1.3.2",
+      "commit": "ebef1e929807629befafbb2918ea1a08c7194554",
+      "tree": "287b7fdeff3cde510d3b1c7b4891aa7f4cc84243",
+      "manifest": "/root/xoffset-serialization-comparison/20261017/p1-v1/inputs/cereal-v1.3.2-source-manifest.json",
+      "manifest_sha256": "28e1c585b8ace4215b3c363bdfe1030a5638f718f7e356fcd6db88739ba4f354",
+      "tracked_members": 209,
+      "unmaterialized_gitlinks": [],
+      "license_members": 5
+    }
+  ],
+  "xoffset": {
+    "archive": "/root/xoffset-serialization-comparison/20261017/p1-v1/inputs/xoffsetdatastructure-0.1.0-alpha.1.tar.gz",
+    "sha256": "5a8647736d1145676c503299d704bc37e2dd035d730ccc2ffca2e5e96a28c658",
+    "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1"
+  },
+  "source_postchecks": [
+    {
+      "id": "cista-v0.16",
+      "commit_tree_worktree_and_bytes": "passed",
+      "members": 160
+    },
+    {
+      "id": "flatbuffers-v25.12.19",
+      "commit_tree_worktree_and_bytes": "passed",
+      "members": 1912
+    },
+    {
+      "id": "capnproto-v1.5.0",
+      "commit_tree_worktree_and_bytes": "passed",
+      "members": 494
+    },
+    {
+      "id": "cereal-v1.3.2",
+      "commit_tree_worktree_and_bytes": "passed",
+      "members": 209
+    }
+  ],
+  "toolchain_record": {
+    "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/toolchain.json",
+    "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/toolchain.json",
+    "size": 4720,
+    "sha256": "14d44ff5a8b9f4d801e1241d4f7c7194fd1ad9f1f105eebad8fd348f57acf89d"
+  },
+  "include_roots": [
+    "/opt/p2996-toolchain/include/x86_64-unknown-linux-gnu/c++/v1",
+    "/opt/p2996-toolchain/include/c++/v1",
+    "/opt/p2996-toolchain/lib/clang/21/include",
+    "/usr/local/include",
+    "/usr/include/x86_64-linux-gnu",
+    "/usr/include",
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/include",
+    "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/include",
+    "/usr/lib/llvm-14/lib/clang/14.0.0/include"
+  ],
+  "include_inventory": {
+    "file": "docs/coordination/competitor-implementation-20261017/P1-evidence/include-tree-inventories.json.gz",
+    "sha256": "8fe982c0dada2035a01b2f39509098427a3bcc509ce04afd4adaf092d3b54c3b",
+    "uncompressed_sha256": "89be3162e4ddfc0578ad03a51794a1ec17dfd5f990d7ee0b3eff3c56cdbde7e6",
+    "uncompressed_size": 984807,
+    "members": 5113
+  },
+  "file_closure": [
+    {
+      "path": "/lib/x86_64-linux-gnu/Scrt1.o",
+      "resolved": "/usr/lib/x86_64-linux-gnu/Scrt1.o",
+      "size": 1656,
+      "sha256": "9438d15c4bac893a0e3aad2c2c86ccbceb59d5872bd07101949f237ee1c92a8b"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/crt1.o",
+      "resolved": "/usr/lib/x86_64-linux-gnu/crt1.o",
+      "size": 1792,
+      "sha256": "5cfb30db1d2c92a9a818f6c015ad7fcd6519afaa1b88148e831504fe6e299479"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/crti.o",
+      "resolved": "/usr/lib/x86_64-linux-gnu/crti.o",
+      "size": 1192,
+      "sha256": "077ccb6c68db1794da3ee262c4a16a3c6f8e902845dd0829110ad4b7065e5aa3"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/crtn.o",
+      "resolved": "/usr/lib/x86_64-linux-gnu/crtn.o",
+      "size": 760,
+      "sha256": "a2266079f95b84ccc2162ebbf279bcd78858a748aa1882e0bdb912316c76a58f"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/libatomic.so.1",
+      "resolved": "/usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0",
+      "size": 30960,
+      "sha256": "d4a3c900a38ad280bb34003fbf8326fff53229d4bc4fc368bd48783b74680a36"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/libz.so.1",
+      "resolved": "/usr/lib/x86_64-linux-gnu/libz.so.1.2.11",
+      "size": 108936,
+      "sha256": "64c206f0146cc58bbddc4f22054436f4ff278f5a554aa3ce6921ddf7e9133370"
+    },
+    {
+      "path": "/opt/p2996-toolchain/bin/clang++",
+      "resolved": "/opt/p2996-toolchain/bin/clang-21",
+      "size": 148204096,
+      "sha256": "c7fa55437d34c43201da37960251d7d3dab1e06fc92273efe6f6d88f6dae7c6e"
+    },
+    {
+      "path": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+      "resolved": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1.0",
+      "size": 1340256,
+      "sha256": "63cff563a2fbd508551fc8051bfada2b93928e8822093cd5ef3409808e6dd9c6"
+    },
+    {
+      "path": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1.0",
+      "resolved": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1.0",
+      "size": 1340256,
+      "sha256": "63cff563a2fbd508551fc8051bfada2b93928e8822093cd5ef3409808e6dd9c6"
+    },
+    {
+      "path": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+      "resolved": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1.0",
+      "size": 401848,
+      "sha256": "a8cc5ffb0160493a57521ea32ed22ade5db9e5c371fb89d0a14c1e79d0fb744c"
+    },
+    {
+      "path": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1.0",
+      "resolved": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1.0",
+      "size": 401848,
+      "sha256": "a8cc5ffb0160493a57521ea32ed22ade5db9e5c371fb89d0a14c1e79d0fb744c"
+    },
+    {
+      "path": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+      "resolved": "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1.0",
+      "size": 69216,
+      "sha256": "febf8eace78f748639cfe8ee0c46220f364ce5af92dfd9dd1aa987ea0fa7ba95"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto",
+      "size": 436808,
+      "sha256": "dcddee0eb9514dacb635f4473999e6f664eb847b2c5aff1c0d4139310d839a4c"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal",
+      "size": 31360,
+      "sha256": "4746158522e0a3438bcadffafc860be976692021005f44abe41dd8afa3725c26"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista",
+      "size": 44384,
+      "sha256": "7c66f94eb6458b33ad159b253b4b055aa450808a65e132cbe1fd1dfaba3fc7f8"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers",
+      "size": 23144,
+      "sha256": "af69f5d4a33d02f583b4fca1a463886e5c8d1254ed2b98b964384285d7c4ef5c"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset",
+      "size": 76880,
+      "sha256": "6eb10e96654f87776a717eef78efa2ef973f2501cfb1f28d790ea78b11dca13d"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnp",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnp",
+      "size": 2318192,
+      "sha256": "8eac3cae604d81658769ceb2abcf97a91b43e221eb1fd7c67a7f6f258045d9b5"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnpc-c++",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnpc-c++",
+      "size": 1906480,
+      "sha256": "c0d71d885e41adf0bb6f7dfacb7836076998c1b491d9546680a5c4961202fe4e"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-json.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-json.a",
+      "size": 346410,
+      "sha256": "4fc6863fccdd00a64afb0840908dbe712a66680f654a655e4a1547e5c85d25b3"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-rpc.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-rpc.a",
+      "size": 2290672,
+      "sha256": "356175b4975c8794dabcafa1efbad4604652bbc3c68fc82947d4843d8be4ae10"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-websocket.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp-websocket.a",
+      "size": 69264,
+      "sha256": "abf69f7c35eda852afbb2a12b6f934bdc69ec46d1b4b477e1609d63d09271869"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnp.a",
+      "size": 1350222,
+      "sha256": "a9c5651fad56da4009e307721dda0008e334fa36b1ae1533ed89c5b2641576b2"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnpc.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libcapnpc.a",
+      "size": 1218676,
+      "sha256": "bbdf17ce74aaca6e0277c51cfd9e2872b29943886bfb8e4ba6fdfd37bb865c15"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-async.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-async.a",
+      "size": 1844144,
+      "sha256": "a55d37330bbc69095974dbe02d1af95e89f957a1e91dc269da1eca89f99bd1d4"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-http.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-http.a",
+      "size": 2255180,
+      "sha256": "a3a8c2314956eb203c4d52e084d828e49c6aefff545139dc10fdb5f5b64c9551"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-test.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj-test.a",
+      "size": 59804,
+      "sha256": "081df2ef003c50e2302e9ed593f5a5aa098ad64f7e91c8648002bf3ba364fa4f"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/lib/libkj.a",
+      "size": 1177310,
+      "sha256": "ceed0828fb442bebb8a6677c96375c8ef6823cbb5e6cbe0d9657dc9cbbaf653d"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc",
+      "size": 4780768,
+      "sha256": "117a39919e1b0fea91dd7a4ee35069b573ba9475fefac9986414e55ff0a5c56c"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/lib/libflatbuffers.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/lib/libflatbuffers.a",
+      "size": 1240090,
+      "sha256": "f2016f467390e6c8ebd9a55acbed98143c358f363b9cc2a5bc47c3f1813c8c6e"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/cmake/bin/cmake",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/cmake/bin/cmake",
+      "size": 18015136,
+      "sha256": "eab793b7f3bf89867ec9127c130f9ab7693edefe6d45ddee6880edce05a3070d"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang",
+      "size": 64,
+      "sha256": "0a7f14a9cbb83c193744f44f60d773363b50fb7d1bea82f764c663a28eb4b1d8"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++",
+      "size": 1462,
+      "sha256": "b970d582c872afbdc6095c56ad235c5f8cf65245ac53b0a51194d6b46fd27ee8"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+      "size": 61,
+      "sha256": "c8ea06a7c58557e3b89d09873dc88457d7b0c5d9af3f08cf0449093f2fbd1b87"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "size": 236616,
+      "sha256": "1d7133d7b9f94465978b2ae8d21ca3751c8dfaaecaa2d462aeaf1ec50e5c3a90"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so",
+      "size": 443,
+      "sha256": "a6d49a8934c29efd1f853c0f16f52100167fa01037020b6d7c4537c6096b79c3"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+      "size": 2125328,
+      "sha256": "269ffadc51484e5e2cbcb9100a5e1cd78a72493c0e3e7b0611a5a4778718d8e9"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc_nonshared.a",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc_nonshared.a",
+      "size": 5594,
+      "sha256": "3341391290ddd596521a61152b4e2612f4625cc85f737d875b918f6cfb2b2786"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "size": 182944,
+      "sha256": "4f502dd464a54d841973a22d6f2585ec548c1950507ab1c89e3efae4f542b2cd"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so",
+      "size": 290,
+      "sha256": "a2298995b45a3775a42b2c0d86dc5dcaf0a7a5663152aba8f46cbac5a6d02a2e"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+      "size": 952616,
+      "sha256": "4e7324196b5d12cc5040d71b17fefb9891d103611f5e66debc7225d1884b0505"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+      "size": 1018144,
+      "sha256": "fc4955f08671736ac3bfef9c2c00f83600b66251adf68ba3889eaeb5e148ed58"
+    },
+    {
+      "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libstdc++.so.6",
+      "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33",
+      "size": 2592144,
+      "sha256": "f7a4a80945521165ee52c335f04205dd930c46157b24e8e8689e0089326151f7"
+    },
+    {
+      "path": "/usr/bin/ld",
+      "resolved": "/usr/bin/x86_64-linux-gnu-ld.bfd",
+      "size": 1736184,
+      "sha256": "58937fc20c21e147883b4fdaa0fc7438a8e8f2bb886cfcaa4896100ca91139e7"
+    },
+    {
+      "path": "/usr/bin/ninja",
+      "resolved": "/usr/bin/ninja",
+      "size": 248056,
+      "sha256": "a9ddfbf7e365a2e5026ed44f9173e498e37d8b71ec5e259b2c2a684f16cfa862"
+    },
+    {
+      "path": "/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o",
+      "resolved": "/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o",
+      "size": 2752,
+      "sha256": "98ebe44533aa4fabd0acf2404d8872c70f972642166bb0c88be53f33540222c5"
+    },
+    {
+      "path": "/usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o",
+      "resolved": "/usr/lib/gcc/x86_64-linux-gnu/11/crtendS.o",
+      "size": 1168,
+      "sha256": "98ac1d1fbb060865f24d2968437a9ccc34349f933c549158f624cbddf1b3d890"
+    },
+    {
+      "path": "/usr/lib/gcc/x86_64-linux-gnu/11/libgcc_s.so",
+      "resolved": "/usr/lib/gcc/x86_64-linux-gnu/11/libgcc_s.so",
+      "size": 132,
+      "sha256": "69a56a9993b7729b29b274e65016031c81f2397f176ed5ad44d59bd50425e0bd"
+    }
+  ],
+  "dynamic_dependencies": {
+    "compiler": {
+      "binary": {
+        "path": "/opt/p2996-toolchain/bin/clang++",
+        "resolved": "/opt/p2996-toolchain/bin/clang-21",
+        "size": 148204096,
+        "sha256": "c7fa55437d34c43201da37960251d7d3dab1e06fc92273efe6f6d88f6dae7c6e"
+      },
+      "resolved_dynamic_libraries": [
+        "/lib/x86_64-linux-gnu/libz.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libstdc++.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/opt/p2996-toolchain/bin/clang++"
+      ]
+    },
+    "flatc": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc",
+        "size": 4780768,
+        "sha256": "117a39919e1b0fea91dd7a4ee35069b573ba9475fefac9986414e55ff0a5c56c"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/bin/flatc"
+      ]
+    },
+    "capnp": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnp",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnp",
+        "size": 2318192,
+        "sha256": "8eac3cae604d81658769ceb2abcf97a91b43e221eb1fd7c67a7f6f258045d9b5"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnp"
+      ]
+    },
+    "capnpc-c++": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnpc-c++",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnpc-c++",
+        "size": 1906480,
+        "sha256": "c0d71d885e41adf0bb6f7dfacb7836076998c1b491d9546680a5c4961202fe4e"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/bin/capnpc-c++"
+      ]
+    },
+    "xoffset": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset",
+        "size": 76880,
+        "sha256": "6eb10e96654f87776a717eef78efa2ef973f2501cfb1f28d790ea78b11dca13d"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset"
+      ]
+    },
+    "cista": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista",
+        "size": 44384,
+        "sha256": "7c66f94eb6458b33ad159b253b4b055aa450808a65e132cbe1fd1dfaba3fc7f8"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista"
+      ]
+    },
+    "flatbuffers": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers",
+        "size": 23144,
+        "sha256": "af69f5d4a33d02f583b4fca1a463886e5c8d1254ed2b98b964384285d7c4ef5c"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers"
+      ]
+    },
+    "capnproto": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto",
+        "size": 436808,
+        "sha256": "dcddee0eb9514dacb635f4473999e6f664eb847b2c5aff1c0d4139310d839a4c"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto"
+      ]
+    },
+    "cereal": {
+      "binary": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal",
+        "resolved": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal",
+        "size": 31360,
+        "sha256": "4746158522e0a3438bcadffafc860be976692021005f44abe41dd8afa3725c26"
+      },
+      "resolved_dynamic_libraries": [
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libc++abi.so.1",
+        "/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libm.so.6",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib/x86_64-linux-gnu/libatomic.so.1"
+      ],
+      "loader_argv": [
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--library-path",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/host-runtime/usr/lib/x86_64-linux-gnu",
+        "--list",
+        "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal"
+      ]
+    }
+  },
+  "probes": {
+    "schema_version": 1,
+    "status": "all-five-small-roundtrip-probes-passed",
+    "not_benchmark_functional_gate": true,
+    "performance_measurement": false,
+    "dialect": "gnu++26",
+    "compiler_wrapper": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx",
+    "compile_commands": [
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/xoffset.cpp",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1 -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/container/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/core/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/config/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/throw_exception/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/static_assert/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/container_hash/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/type_traits/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/winapi/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/intrusive/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/boost/libs/predef/include -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/sources/xoffset-source/xoffsetdatastructure-0.1.0-alpha.1/external/typelayout/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -freflection -fexpansion-statements -stdlib=libc++ -o CMakeFiles/probe-xoffset.dir/xoffset.cpp.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/xoffset.cpp"
+      },
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/cista.cpp",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cista-v0.16/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -o CMakeFiles/probe-cista.dir/cista.cpp.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/cista.cpp"
+      },
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/flatbuffers.cpp",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/generated -I/root/xoffset-serialization-comparison/20261017/p1-v1/install/flatbuffers/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -o CMakeFiles/probe-flatbuffers.dir/flatbuffers.cpp.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/flatbuffers.cpp"
+      },
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/capnproto.cpp",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/generated -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -o CMakeFiles/probe-capnproto.dir/capnproto.cpp.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/capnproto.cpp"
+      },
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/generated/probe.capnp.c++",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/generated -isystem /root/xoffset-serialization-comparison/20261017/p1-v1/install/capnproto/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -o CMakeFiles/probe-capnproto.dir/generated/probe.capnp.c++.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/generated/probe.capnp.c++"
+      },
+      {
+        "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/cereal.cpp",
+        "std_flags": [
+          "-std=gnu++26"
+        ],
+        "command": "/root/xoffset-serialization-comparison/20261017/p1-v1/tools/p2996-profile/bin/clang++-libcxx -I/root/xoffset-serialization-comparison/20261017/p1-v1/sources/cereal-v1.3.2/include -stdlib=libc++ -pthread -O3 -DNDEBUG -std=gnu++26 -o CMakeFiles/probe-cereal.dir/cereal.cpp.o -c /root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3/cereal.cpp"
+      }
+    ],
+    "source": "/root/xoffset-serialization-comparison/20261017/p1-v1/probe-source-v3",
+    "build": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3",
+    "binaries": {
+      "xoffset": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-xoffset",
+        "size": 76880,
+        "sha256": "6eb10e96654f87776a717eef78efa2ef973f2501cfb1f28d790ea78b11dca13d"
+      },
+      "cista": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cista",
+        "size": 44384,
+        "sha256": "7c66f94eb6458b33ad159b253b4b055aa450808a65e132cbe1fd1dfaba3fc7f8"
+      },
+      "flatbuffers": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-flatbuffers",
+        "size": 23144,
+        "sha256": "af69f5d4a33d02f583b4fca1a463886e5c8d1254ed2b98b964384285d7c4ef5c"
+      },
+      "capnproto": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-capnproto",
+        "size": 436808,
+        "sha256": "dcddee0eb9514dacb635f4473999e6f664eb847b2c5aff1c0d4139310d839a4c"
+      },
+      "cereal": {
+        "path": "/root/xoffset-serialization-comparison/20261017/p1-v1/build/probes-v3/probe-cereal",
+        "size": 31360,
+        "sha256": "4746158522e0a3438bcadffafc860be976692021005f44abe41dd8afa3725c26"
+      }
+    }
+  },
+  "build_configuration": {
+    "flatc_host_dialect": "c++26",
+    "capnproto_runtime_dialect": "gnu++26",
+    "capnproto_WITH_OPENSSL": false,
+    "capnproto_WITH_ZLIB": false,
+    "capnproto_BUILD_TESTING": false,
+    "xoffset_experiment_only_override": "remove interface -std=c++26; keep reflection, expansion, libc++"
+  },
+  "preserved_failures": [
+    {
+      "case": "capnp-configure-v1",
+      "reason": "upstream requires CMAKE_CXX_EXTENSIONS ON",
+      "log": "/root/xoffset-serialization-comparison/20261017/p1-v1/logs/configure-capnproto.stderr"
+    }
+  ],
+  "limitations": [
+    "Small P1 probes are not canonical workload/adapters or functional P4 acceptance.",
+    "Host C/system headers remain Ubuntu 22.04; private userspace is glibc 2.39, not a full private sysroot.",
+    "Header/source inventories identify content but do not contain source/runtime bodies for offline rebuilding.",
+    "Source manifests include upstream license-named members; embedded third-party notices remain in fixed source bodies."
+  ]
+}

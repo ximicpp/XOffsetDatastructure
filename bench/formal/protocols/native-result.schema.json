@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","kind","library","status","phase_ns","total_ns","input_sha256","trace_sha256","final_wire_sha256","final_canonical_sha256","queries_sha256","query_before_sha256","query_after_sha256","peak_rss_before_audit_kib","peak_rss_after_audit_kib","cpu_ns","minor_faults","major_faults","record_count"],
+  "properties": {
+    "schema_version":{"const":1},
+    "kind":{"const":"serialization-comparison-native-result"},
+    "library":{"enum":["xoffset-mac-r3-v2","cista-v0.16","flatbuffers-v25.12.19","capnproto-v1.5.0","cereal-v1.3.2"]},
+    "status":{"const":"passed"},
+    "phase_ns":{"type":"object","additionalProperties":false,"required":["load","query_before","mutate","emit_after","retire_modified_state","reload","query_after","cleanup"],"properties":{"load":{"$ref":"#/$defs/decimal"},"query_before":{"$ref":"#/$defs/decimal"},"mutate":{"$ref":"#/$defs/decimal"},"emit_after":{"$ref":"#/$defs/decimal"},"retire_modified_state":{"$ref":"#/$defs/decimal"},"reload":{"$ref":"#/$defs/decimal"},"query_after":{"$ref":"#/$defs/decimal"},"cleanup":{"$ref":"#/$defs/decimal"}}},
+    "total_ns":{"$ref":"#/$defs/decimal"},
+    "input_sha256":{"$ref":"#/$defs/sha256"},"trace_sha256":{"$ref":"#/$defs/sha256"},"final_wire_sha256":{"$ref":"#/$defs/sha256"},"final_canonical_sha256":{"$ref":"#/$defs/sha256"},"queries_sha256":{"$ref":"#/$defs/sha256"},"query_before_sha256":{"$ref":"#/$defs/sha256"},"query_after_sha256":{"$ref":"#/$defs/sha256"},
+    "peak_rss_before_audit_kib":{"$ref":"#/$defs/decimal"},"peak_rss_after_audit_kib":{"$ref":"#/$defs/decimal"},"cpu_ns":{"$ref":"#/$defs/decimal"},"minor_faults":{"$ref":"#/$defs/decimal"},"major_faults":{"$ref":"#/$defs/decimal"},"record_count":{"$ref":"#/$defs/decimal"}
+  },
+  "$defs":{"decimal":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}
+}
