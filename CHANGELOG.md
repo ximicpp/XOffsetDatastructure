@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
+  without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
+  (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
+  `tests/fuzz/regressions/<target>/` and each harness's seed corpus in every
+  CI job. `test_v2_fuzz` draws each case from its own stream of
+  (seed, case), reruns one case with `--replay <seed> <case>`, and with
+  `XOFFSET_FUZZ_DUMP_DIR` set writes a failing input wire before aborting.
+  `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
+  with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
+  given seed now generates different cases than in 0.3.0-beta.1.
 - Performance: verified loads index the payload with one bit per 8-byte
   granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
   block, retained by `reload_verified`) instead of the paged byte index and two
