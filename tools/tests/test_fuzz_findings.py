@@ -32,7 +32,28 @@ DIFF = '''v2 fuzz FAILED: case 4711: typed=accept, reload=reject(bad header 0x10
 '''
 
 
+# Shape of a real drill crash (fuzz.yml run 39783623036): frames without a
+# function name (libc, no symbols) sit between symbolized ones.
+INJECT = '''XOFFSET_FUZZ_INJECT_CRASH: injected crash (drill input)
+==116== ERROR: libFuzzer: deadly signal
+    #0 0x5620090fb555 in __sanitizer_print_stack_trace (/workspace/build/fuzz/bin/Debug/fuzz_wire_schemas+0x170555)
+    #2 0x56200902ebc7 in fuzzer::Fuzzer::CrashCallback() (/workspace/build/fuzz/bin/Debug/fuzz_wire_schemas+0xa3bc7)
+    #3 0x78962515e32f  (/lib/x86_64-linux-gnu/libc.so.6+0x4532f) (BuildId: 8e9fd827446c24067541ac5390e6f527fb5947bb)
+    #6 0x7896251418fe in abort (/lib/x86_64-linux-gnu/libc.so.6+0x288fe) (BuildId: 8e9fd827446c24067541ac5390e6f527fb5947bb)
+    #7 0x56200913776c in (anonymous namespace)::inject_crash_drill(unsigned char const*, unsigned long) /workspace/tests/fuzz/v2_fuzz_core.hpp:115:9
+    #8 0x56200913776c in LLVMFuzzerTestOneInput /workspace/tests/fuzz/fuzz_wire_schemas.cpp:206:5
+    #9 0x56200903019f in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) (/workspace/build/fuzz/bin/Debug/fuzz_wire_schemas+0xa519f)
+
+NOTE: libFuzzer has rudimentary signal handlers.
+'''
+
+
 class Signature(unittest.TestCase):
+    def test_unnamed_frames_do_not_end_the_stack(self):
+        info = ff.classify('wire_schemas', 'crash', INJECT)
+        self.assertEqual(info['error_type'], 'deadly signal')
+        self.assertEqual(info['top_frames'], ['{anon}::inject_crash_drill', 'LLVMFuzzerTestOneInput'])
+
     def test_asan_frames_skip_external_and_build(self):
         info = ff.classify('v2_wire', 'crash', ASAN)
         self.assertEqual(info['error_type'], 'asan: heap-buffer-overflow')
