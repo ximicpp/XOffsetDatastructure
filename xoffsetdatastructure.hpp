@@ -2612,15 +2612,28 @@ namespace XOffsetDatastructure {
         // W1: appending into spare capacity of a bound vector is decided
         // inline; it is insert_construct(size_)'s first branch (size_ <
         // capacity_ <= max_size()). Growth and the unbound error stay there.
+        // Only a trivially copyable T is also constructed inline; a T with
+        // members to bind (strings, nested containers: reflective
+        // initialization) keeps its construction in one out-of-line
+        // function, so the caller's loop does not carry all of it.
         template <typename Construct>
         XOFFSET_DETAIL_MOVE_INLINE T& append_construct(Construct&& construct) {
             if (is_bound() && size_ < capacity_) [[likely]] {
                 T* slot = data() + size_;
-                construct(slot);
+                if constexpr (std::is_trivially_copyable_v<T>) construct(slot);
+                else construct_appended(slot, construct);
                 ++size_;
                 return *slot;
             }
             return *insert_construct(size_, construct);
+        }
+
+        template <typename Construct>
+#if defined(__clang__) || defined(__GNUC__)
+        [[gnu::noinline]]
+#endif
+        static void construct_appended(T* slot, Construct& construct) {
+            construct(slot);
         }
 
         static size_type checked_count(std::size_t count) {
