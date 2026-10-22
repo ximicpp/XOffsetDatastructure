@@ -601,7 +601,7 @@ namespace XOffsetDatastructure {
                         check_owner_resolves();
                         const auto offset = exact.back();
                         exact.pop_back();
-                        if (exact.empty()) table->nonempty[bin / 64u] &= ~(std::uint64_t(1) << (bin % 64u));
+                        if (exact.empty()) table->clear_nonempty(bin);
                         table->bytes -= bytes;
                         --table->count;
                         return payload_byte_address(offset);
@@ -654,7 +654,7 @@ namespace XOffsetDatastructure {
                     // M3, as in retire_block_general.
                     zero_retired(ptr, bytes);
                     slot.push_back(static_cast<std::uint32_t>(address - base));
-                    table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    table->mark_nonempty(bin);
                     table->bytes += bytes;
                     ++table->count;
                     return;
@@ -718,7 +718,7 @@ namespace XOffsetDatastructure {
                     if (hole.bytes <= FreeTable::small_max) {
                         const auto bin = hole.bytes / 8u - 1u;
                         table->bins[bin].push_back(hole.offset);
-                        table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table->mark_nonempty(bin);
                         table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     } else {
                         table->large.emplace(hole.bytes, hole.offset);
@@ -747,12 +747,25 @@ namespace XOffsetDatastructure {
             static constexpr std::uint32_t small_bins = small_max / 8;
             std::vector<std::uint32_t> bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
+            // Bit w is set exactly when nonempty[w] != 0, so a search for a
+            // larger bin skips empty words without loading them.
+            std::uint32_t nonempty_words = 0;
             // Bins that may own storage (set whenever a bin gets storage,
             // never cleared by removal), so recycling visits only those bins.
             std::uint64_t touched[small_bins / 64] = {};
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
+
+            void mark_nonempty(std::uint32_t bin) noexcept {
+                nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                nonempty_words |= 1u << (bin / 64u);
+            }
+            void clear_nonempty(std::uint32_t bin) noexcept {
+                auto& word = nonempty[bin / 64u];
+                word &= ~(std::uint64_t(1) << (bin % 64u));
+                if (word == 0) nonempty_words &= ~(1u << (bin / 64u));
+            }
         };
 
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
@@ -800,6 +813,7 @@ namespace XOffsetDatastructure {
                     table->nonempty[word] = 0;
                     table->touched[word] = 0;
                 }
+                table->nonempty_words = 0;
                 table->large.clear();
                 table->bytes = 0;
                 table->count = 0;
@@ -892,7 +906,7 @@ namespace XOffsetDatastructure {
             if (slot.size() == slot.capacity()) return false;
             check_owner_resolves();
             slot.push_back(offset);
-            table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+            table->mark_nonempty(bin);
             table->bytes += bytes;
             ++table->count;
             return true;
@@ -934,7 +948,7 @@ namespace XOffsetDatastructure {
                             table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         }
                         slot.push_back(offset);
-                        table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table.mark_nonempty(bin);
                     }
                     table.bytes += bytes;
                     ++table.count;
@@ -990,23 +1004,32 @@ namespace XOffsetDatastructure {
                 if (!exact.empty()) {
                     found_offset = exact.back();
                     exact.pop_back();
-                    if (exact.empty()) table.nonempty[bin / 64u] &= ~(std::uint64_t(1) << (bin % 64u));
+                    if (exact.empty()) table.clear_nonempty(bin);
                     table.bytes -= bytes;
                     --table.count;
                     return payload_byte_address(found_offset);
                 }
-                // Smallest larger nonempty bin.
-                for (auto word = (bin + 1u) / 64u; word < FreeTable::small_bins / 64u; ++word) {
-                    auto bits = table.nonempty[word];
-                    if (word == (bin + 1u) / 64u) bits &= ~std::uint64_t(0) << ((bin + 1u) % 64u);
-                    if (bits == 0) continue;
+                // Smallest larger nonempty bin: the rest of bin's own word,
+                // then the first nonempty word after it.
+                const auto first = (bin + 1u) / 64u;
+                std::uint64_t bits = 0;
+                std::uint32_t word = first;
+                if (first < FreeTable::small_bins / 64u)
+                    bits = table.nonempty[first] & (~std::uint64_t(0) << ((bin + 1u) % 64u));
+                if (bits == 0) {
+                    const auto later = table.nonempty_words & (~0u << first << 1u);
+                    if (later != 0) {
+                        word = static_cast<std::uint32_t>(std::countr_zero(later));
+                        bits = table.nonempty[word];
+                    }
+                }
+                if (bits != 0) {
                     const auto larger = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     auto& source = table.bins[larger];
                     found_offset = source.back();
                     found_bytes = (larger + 1u) * 8u;
                     source.pop_back();
-                    if (source.empty()) table.nonempty[larger / 64u] &= ~(std::uint64_t(1) << (larger % 64u));
-                    break;
+                    if (source.empty()) table.clear_nonempty(larger);
                 }
             }
             if (found_bytes == 0) {
