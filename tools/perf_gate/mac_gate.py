@@ -45,17 +45,31 @@ SLG_BASELINES = ['cereal', 'protobuf', 'flatbuffers']
 SCEN = ['A', 'B', 'C', 'D']
 
 # On-disk names: all the same length, so argv and path sizes do not differ between the
-# binaries (A/A on the formal harness showed a ~1% mutate offset between two copies of
-# one binary named xoffset_cand and xoffset_cand_aa).  Labels in raw.jsonl stay long.
+# binaries.  Labels in raw.jsonl stay long.  Each binary and wire is stored as COPIES
+# separate files (head0 head1 head2 ...) and round r runs copy r % COPIES: the A/A
+# (head_aa/head) mutate offset of ~1% survived equal-length names in W0b and varies
+# between freezes (-0.7% .. +1.2% over 6 freezes), so it looks like a per-file effect
+# (e.g. page-cache placement of the text pages); rotating copies averages it out.
 FN = {'head': 'head', 'head_aa': 'hdaa', 'anchor': 'anch', 'r3': 'r3fz',
       'cista': 'cist', 'flatbuffers': 'flat', 'capnproto': 'capn', 'cereal': 'cere'}
+COPIES = 3  # = rounds per cycle, so every cycle runs every copy once
+
+# Screen and remote-desktop load: W0b ran with WindowServer >=30% in 429 of 483 samples and
+# UURemoteServer at 15-18% (a remote viewer was attached); A/A per-round sd on mutate was
+# 0.10-0.12 against 0.06-0.08 in quiet historical batches.
+SCREEN_MAX = {'WindowServer': 20.0}
+REMOTE_PROCS = ('UURemoteServer', 'screensharingd', 'ScreensharingAgent', 'AnyDesk', 'TeamViewer', 'ToDesk',
+                'SunloginClient', 'RustDesk', 'parsecd')
+REMOTE_MAX = 5.0
+SCREEN_HOLD_S = 60.0
 
 # Pre-registered rules (copied into FREEZE.json; analysis reads them back from there).
 RULES = {
     'formal': {
         'cycles': 65, 'rounds_per_cycle': 3, 'warmup_cycles': 1, 'batches': 2,
         'seed': 'random.Random(20261022 + 1000 * (batch - 1) + round).shuffle(order of the 8 binaries)',
-        'child_timeout_s': 30, 'file_names': FN,
+        'child_timeout_s': 30, 'file_names': FN, 'copies': COPIES,
+        'copy_rule': 'every binary and wire is stored as `copies` separate files <name><i>; round r runs copy r % copies',
         'child_env': 'every child gets the same environment and the same working directory (the batch '
                      'directory); its temporary directory names have a fixed length',
         'gate': {
@@ -110,7 +124,9 @@ RULES = {
                         'per-cycle bound of the first head process',
     },
     'quiet': 'before each batch and before the SLG part: no compiler process for 3 minutes and 1-minute '
-             'load < 3; on timeout nothing is timed',
+             'load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20% and every remote-desktop '
+             'process < 5%; on timeout (30 min) nothing is timed',
+    'screen': {'max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS, 'remote_max': REMOTE_MAX, 'hold_s': SCREEN_HOLD_S},
 }
 
 h = lambda p: hashlib.sha256(open(p, 'rb').read()).hexdigest()
@@ -157,7 +173,8 @@ def cmd_freeze(a):
         sys.exit('freeze refused, nothing timed:\n  ' + '\n  '.join(problems))
     os.makedirs(D + '/bin'); os.makedirs(D + '/wire'); os.makedirs(D + '/prep')
     for k, (b, w) in src.items():
-        shutil.copy2(b, f'{D}/bin/{FN[k]}'); shutil.copy2(w, f'{D}/wire/{FN[k]}.input.wire')
+        for i in range(COPIES):  # separate files, not links: each copy gets its own page-cache pages
+            shutil.copy2(b, f'{D}/bin/{FN[k]}{i}'); shutil.copy2(w, f'{D}/wire/{FN[k]}{i}.input.wire')
     shutil.copy2(a.slg_head, D + '/bin/slg_head'); shutil.copy2(a.slg_anchor, D + '/bin/slg_anch')
     for item in a.prep or []:
         path = item.split('=', 1)[1].rsplit(':', 1)[0]; shutil.copy2(path, D + '/prep/' + os.path.basename(path))
@@ -169,7 +186,7 @@ def cmd_freeze(a):
         'schema': SCHEMA, 'name': os.path.basename(os.path.normpath(D)),
         'head': {'commit': a.head_commit, 'desc': a.head_desc}, 'anchor': {'commit': a.anchor_commit, 'desc': a.anchor_desc},
         'lib_identity_note': a.lib_note,
-        'binaries': {k: h(f'{D}/bin/{FN[k]}') for k in src}, 'input_wires': {k: h(f'{D}/wire/{FN[k]}.input.wire') for k in src},
+        'binaries': {k: h(f'{D}/bin/{FN[k]}0') for k in src}, 'input_wires': {k: h(f'{D}/wire/{FN[k]}0.input.wire') for k in src},
         'slg': {'head': h(D + '/bin/slg_head'), 'anchor': h(D + '/bin/slg_anch'), 'tree': a.slg_tree, 'tree_sha256': a.slg_tree_sha},
         'r3_dir': a.r3_dir, 'trace': a.trace, 'trace_sha256': h(a.trace),
         'mac_gate_py_sha256': h(D + '/mac_gate.py'), 'xc_ab_py_sha256': h(D + '/xc_ab.py'),
@@ -178,6 +195,10 @@ def cmd_freeze(a):
         'host': platform.platform(), 'frozen_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
         'pmset_therm': therm,
     }
+    for k in src:
+        for i in range(1, COPIES):
+            if h(f'{D}/bin/{FN[k]}{i}') != fr['binaries'][k] or h(f'{D}/wire/{FN[k]}{i}.input.wire') != fr['input_wires'][k]:
+                sys.exit(f'freeze: copy {i} of {k} differs from copy 0')
     json.dump(fr, open(D + '/FREEZE.json', 'w'), indent=1)
     print(f'FREEZE.json written: {D}')
     for k, v in fr['binaries'].items(): print(f'  {k:12s} {v}')
@@ -191,12 +212,41 @@ def start_sampler(D, label):
     return sm
 
 
+def screen_load():
+    """pcpu (ps) of WindowServer and of remote-desktop processes; {} where ps is unavailable."""
+    try: txt = subprocess.run(['ps', '-A', '-o', 'pcpu=,comm='], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError): return {}
+    out = {}
+    for line in txt.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) != 2: continue
+        name = os.path.basename(parts[1].strip())
+        if name in SCREEN_MAX or name.startswith(REMOTE_PROCS):
+            try: out[name] = round(out.get(name, 0.0) + float(parts[0]), 1)
+            except ValueError: pass
+    return out
+
+
+def screen_problems(load):
+    return [f'{n} {v:.0f}%' for n, v in sorted(load.items()) if v >= SCREEN_MAX.get(n, REMOTE_MAX)]
+
+
 def quiet_or_exit(D, label, sampler, timeout_s, quiet_s=180.0):
     """Block until the start conditions hold (xc_ab.quiet_gate: the sampler has seen no compiler for
-    180 s and the 1-minute load is < 3); on timeout record it and exit without timing anything."""
+    180 s and the 1-minute load is < 3; then WindowServer and remote-desktop processes below their
+    limits for 60 s); on timeout record it and exit without timing anything."""
     utc = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+    t0 = time.time(); hold = min(SCREEN_HOLD_S, quiet_s); ok_since = None; bad = []
     try:
-        info = xc_ab.quiet_gate(sampler, load_max=3.0, quiet_s=quiet_s, timeout_s=timeout_s)()
+        while True:
+            info = xc_ab.quiet_gate(sampler, load_max=3.0, quiet_s=quiet_s, timeout_s=max(0.0, timeout_s - (time.time() - t0)))()
+            screen = screen_load(); bad = screen_problems(screen); now = time.time()
+            ok_since = None if bad else (ok_since or now)
+            if ok_since is not None and now - ok_since >= hold: break
+            if now - t0 > timeout_s:
+                raise xc_ab.GateTimeout(f'screen or remote desktop busy after {timeout_s:.0f} s: {", ".join(bad) or "not held " + str(hold) + " s"}')
+            time.sleep(5)
+        info = {**info, 'waited_s': round(time.time() - t0, 1), 'screen': screen}
         ok = True
     except xc_ab.GateTimeout as e:
         info, ok = {'reason': str(e)}, False
@@ -233,8 +283,9 @@ def cmd_formal(a):
     D = a.dir; fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']['formal']
     B = f'{D}/formal-{a.batch}'
     if os.path.exists(B): sys.exit(f'{B} exists (no reruns into the same directory)')
+    C = R['copies']
     for k in LIBS:
-        if h(f'{D}/bin/{FN[k]}') != fr['binaries'][k]: sys.exit(f'{k}: binary changed since FREEZE')
+        if any(h(f'{D}/bin/{FN[k]}{i}') != fr['binaries'][k] for i in range(C)): sys.exit(f'{k}: binary changed since FREEZE')
     cycles = a.cycles or R['cycles']; smoke = cycles != R['cycles'] or a.quiet_s != 180.0
     sampler = start_sampler(D, f'formal-{a.batch}')
     quiet_or_exit(D, f'formal-{a.batch}', sampler, a.quiet_timeout, a.quiet_s)
@@ -247,8 +298,8 @@ def cmd_formal(a):
             for rnd in range(cycles * R['rounds_per_cycle']):
                 order = list(LIBS); random.Random(20261022 + 1000 * (a.batch - 1) + rnd).shuffle(order)
                 for k in order:
-                    f.write(json.dumps({'round': rnd, 'cycle': rnd // R['rounds_per_cycle'], 'lib': k,
-                                        'phase_ns': run_formal_child(D, B, k, fr['trace'], R['child_timeout_s'])}) + '\n')
+                    f.write(json.dumps({'round': rnd, 'cycle': rnd // R['rounds_per_cycle'], 'lib': k, 'copy': rnd % C,
+                                        'phase_ns': run_formal_child(D, B, k, rnd % C, fr['trace'], R['child_timeout_s'])}) + '\n')
     finally:
         sampler.stop()
     meta['end_utc'] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'); meta['load_end'] = os.getloadavg()
@@ -259,8 +310,8 @@ def cmd_formal(a):
           f'old {b["old"]["passed"]}/12, cpu {meta["cpu"]}  (the gate verdict needs the pooled batches: run analyze)')
 
 
-def run_formal_child(D, B, k, trace, timeout):
-    f = FN[k]
+def run_formal_child(D, B, k, copy, trace, timeout):
+    f = f'{FN[k]}{copy}'
     with tempfile.TemporaryDirectory(dir=B) as d:
         p = subprocess.run([f'{D}/bin/{f}', 'run', '--wire', f'{D}/wire/{f}.input.wire', '--trace', trace, '--wire-out', d + '/w',
                             '--canonical-out', d + '/c', '--queries-out', d + '/q', '--result', d + '/r.json'],
@@ -341,6 +392,7 @@ def analyze_formal_batch(B, R):
     res = {'batch_dir': os.path.basename(B), 'df': df, 'cycles': ncyc}
     g = gate_block(data, R); res['gate'] = {k: g[k] for k in ('phases', 'max_upper', 'verdict')}; res['aa'] = g['aa']
     res['report'] = report_block(data, R)
+    res['aa_detail'] = aa_detail(data[0][0], ncyc, R)
     q1 = tq(1 - 0.05 / 12, df); passed = 0; items = {}
     for comp in RIVALS:
         for m, goal in GOALS:
@@ -361,6 +413,18 @@ def analyze_formal_batch(B, R):
     res['medians_ms'] = {lib: {m: st.median(by[rr][lib][m] for rr in keep) / 1e6 for m in PHASES8 + ['read_sum', 'total']} for lib in LIBS}
     json.dump(res, open(B + '/RESULT.json', 'w'), indent=1)
     return res
+
+
+def aa_detail(by, ncyc, R):
+    """Report only: per gate phase, the sd of the per-round log(head_aa/head) (noise level; quiet
+    historical batches had 0.06-0.08 on mutate) and the A/A geometric mean per copy index."""
+    rpc, C = R['rounds_per_cycle'], R.get('copies', 1)
+    rr = range(R['warmup_cycles'] * rpc, ncyc * rpc); out = {}
+    for m in GATE_PHASES:
+        x = {r: math.log(by[r]['head_aa'][m] / by[r]['head'][m]) for r in rr}
+        out[m] = {'round_sd': st.stdev(x.values()),
+                  'by_copy': {str(c): math.exp(st.mean(v for r, v in x.items() if r % C == c)) for c in range(C)}}
+    return out
 
 
 def formal_overall(bdirs, batches, R):
@@ -493,8 +557,11 @@ def render_md(fr, res):
     p(f'- **结论：{res["verdict"]}**。正式部分 {ov["verdict"]}（合并 {ov["batches"]} 批），SLG {res["slg"]["verdict"] if res["slg"] else "未跑"}。')
     for b in bs:
         if b['excluded'] is not None: p(f'- {b["batch_dir"]} 未计入合并：{b["excluded"]}')
+    C = R.get('copies', 1)
     p(f'- 8 个二进制在磁盘上用等长文件名（{", ".join(f"{k}→{v}" for k, v in R["file_names"].items())}）；raw 里的标签不变。'
-      '以前的 formal_r3.py 批次用 xoffset_cand / xoffset_cand_aa，同一二进制的 A/A 在 mutate 上有约 1% 的偏差（m3ctl 两批 1.009/1.013，mitigation 1.008–1.011），疑似路径长度效应。')
+      + (f'每个二进制和 wire 各存 {C} 份独立文件，第 r 轮用第 r % {C} 份（W0b 等长文件名后 A/A mutate 仍偏 1.2%，'
+         '历次冻结之间在 -0.7% 到 +1.2% 之间变化，像是按文件的效应，轮换副本把它平均掉）。' if C > 1 else
+         '以前的 formal_r3.py 批次用 xoffset_cand / xoffset_cand_aa，同一二进制的 A/A 在 mutate 上有约 1% 的偏差，疑似路径长度效应。'))
     p(f'- FREEZE.json sha256 `{res["freeze_sha256"]}`；mac_gate.py `{fr["mac_gate_py_sha256"]}`；xc_ab.py `{fr["xc_ab_py_sha256"]}`\n')
     p('## 1. 新口径：head÷anchor（门禁）\n')
     p('逐周期 log 比值，各批周期合并；单侧 95% 上界，Bonferroni k=3。三项最大上界 ≤1.02 通过，1.02–1.03 待定（诊断后加跑一批、三批合并再判，>1.02 即失败），>1.03 失败。'
@@ -572,6 +639,11 @@ def render_md(fr, res):
     for b in bs:
         m = b.get('meta', {})
         if m: p(f'- {b["batch_dir"]}：{m.get("start_utc")} → {m.get("end_utc")}，load {m.get("load_start")} → {m.get("load_end")}，CPU 采样 {m.get("cpu")}')
+    for b in bs:
+        d = b.get('aa_detail')
+        if d: p(f'- {b["batch_dir"]} A/A 逐轮 log 比值 sd（噪声；历史安静批次 mutate 约 0.06–0.08）：'
+                + '，'.join(f'{m} {f3(v["round_sd"])}' for m, v in d.items())
+                + (f'；mutate 按副本 ' + ' / '.join(f4(x) for x in d['mutate']['by_copy'].values()) if len(d['mutate']['by_copy']) > 1 else ''))
     p(f'- host {fr["host"]}；冻结 {fr["frozen_utc"]}')
     p('- 二进制 sha256：' + '；'.join(f'{k} `{v[:16]}…`' for k, v in fr['binaries'].items()))
     p(f'- SLG 树 {fr["slg"]["tree"]}（sha256 `{fr["slg"]["tree_sha256"]}`），slg_head `{fr["slg"]["head"][:16]}…`，slg_anch `{fr["slg"]["anchor"][:16]}…`')
@@ -616,7 +688,7 @@ def synth_formal(B, R, rng, effect, aa_effect=None, cycles=None):
                 eff = effect if k in ('head', 'head_aa') else {}
                 if k == 'head_aa' and aa_effect: eff = {m: eff.get(m, 1.0) * aa_effect.get(m, 1.0) for m in base}
                 ph = {m: int(v * scale[k] * drift * eff.get(m, 1.0) * math.exp(rng.gauss(0, 0.05))) for m, v in base.items()}
-                f.write(json.dumps({'round': rnd, 'cycle': rnd // 3, 'lib': k, 'phase_ns': ph}) + '\n')
+                f.write(json.dumps({'round': rnd, 'cycle': rnd // 3, 'lib': k, 'copy': rnd % COPIES, 'phase_ns': ph}) + '\n')
 
 
 def cmd_selftest(a):
@@ -688,6 +760,11 @@ def cmd_selftest(a):
     chk('3% gap between batches -> pending, not pooled', res['formal_overall']['verdict'] == 'pending' and res['formal_overall']['inconsistent'])
     cmd_analyze(argparse.Namespace(dir=D2, exclude=['2:diagnosed'])); res = json.load(open(D2 + '/RESULT.json'))
     chk('excluding a batch leaves one -> incomplete', res['formal_overall']['verdict'] == 'incomplete')
+    d = res['formal_batches'][0]['aa_detail']['mutate']
+    chk(f'A/A detail: round sd near 0.07 ({d["round_sd"]:.3f}), {COPIES} copies', abs(d['round_sd'] - 0.0707) < 0.01 and len(d['by_copy']) == COPIES)
+    chk('screen limits', screen_problems({'WindowServer': 36.3, 'UURemoteServer': 16.0, 'screensharingd': 0.4}) == ['UURemoteServer 16%', 'WindowServer 36%']
+        and screen_problems({'WindowServer': 8.0}) == [])
+    chk('screen_load parses ps', isinstance(screen_load(), dict))
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
 
