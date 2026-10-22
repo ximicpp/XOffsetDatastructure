@@ -86,15 +86,14 @@ jobs:
           echo "head=$head" >> "$GITHUB_OUTPUT"
           echo "base=$base" >> "$GITHUB_OUTPUT"
           echo "anchor=${IN_ANCHOR:-}" >> "$GITHUB_OUTPUT"
-          # Benchmarks come from the head tree; bench sources and ANCHOR are added with the gate.
-          if git cat-file -e "$head:bench/slg/bench/slg_bench.cpp" 2>/dev/null &&
-             git cat-file -e "$head:bench/formal/driver.cpp" 2>/dev/null &&
-             git cat-file -e "$head:bench/perf/ANCHOR" 2>/dev/null; then
+          # Benchmarks (and the default ANCHOR) come from the checkout: the head itself for PRs and
+          # pushes, the dispatched ref for replays of older commits that predate bench/.
+          if [ -f bench/slg/bench/slg_bench.cpp ] && [ -f bench/formal/driver.cpp ] && [ -f bench/perf/ANCHOR ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::bench/slg, bench/formal or bench/perf/ANCHOR is missing in $head; perf gate skipped."
-            echo "指令数门禁跳过：head 里还没有 bench/slg、bench/formal 或 bench/perf/ANCHOR。" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::bench/slg, bench/formal or bench/perf/ANCHOR is missing in the checkout; perf gate skipped."
+            echo "指令数门禁跳过：检出的树里还没有 bench/slg、bench/formal 或 bench/perf/ANCHOR。" >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "anchor=${IN_ANCHOR:-(bench/perf/ANCHOR)} base=$base head=$head"
 
@@ -111,7 +110,8 @@ jobs:
           anchor_arg=()
           [ -n "${{ steps.refs.outputs.anchor }}" ] && anchor_arg=(--anchor "${{ steps.refs.outputs.anchor }}")
           python3 tools/perf_gate/perf_gate.py prepare --work "$WORK" "${anchor_arg[@]}" \
-            --base "${{ steps.refs.outputs.base }}" --head "${{ steps.refs.outputs.head }}"
+            --base "${{ steps.refs.outputs.base }}" --head "${{ steps.refs.outputs.head }}" \
+            --bench-root "$GITHUB_WORKSPACE"
           git clone --quiet https://github.com/USCiLab/cereal.git "$WORK/cereal"
           git -C "$WORK/cereal" checkout --quiet "$CEREAL_COMMIT"
 
