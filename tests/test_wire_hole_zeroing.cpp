@@ -4,7 +4,8 @@
 // every hole byte is zero and every payload byte equals the arena byte. Holes a
 // loaded wire brought in keep the sender's bytes (forwarded unchanged); a block
 // the receiver retires is cleared. Also checks the M1/M2 limits on declared
-// wire sizes.
+// wire sizes, and (W1) that M4 zeroes exactly the vacated elements for every
+// byte count around the inline 8..64-byte zeroing bands.
 #include "xoffsetdatastructure.hpp"
 
 #include <array>
@@ -30,9 +31,17 @@ struct Root {
     xo::XVector<std::uint64_t> filler;
     xo::XVector<xo::XString> big;
 };
+struct alignas(8) Wide { std::uint64_t a{}, b{}, c{}; };
+struct Bands {
+    xo::XVector<std::uint8_t> u8;
+    xo::XVector<std::uint32_t> u32;
+    xo::XVector<std::uint64_t> u64;
+    xo::XVector<Wide> wide;
+};
 } // namespace hz
 
 XOFFSET_REGISTER_SCHEMA_NAME(hz::Root, "test.wire_hole_zeroing.root")
+XOFFSET_REGISTER_SCHEMA_NAME(hz::Bands, "test.wire_hole_zeroing.bands")
 namespace XOffsetDatastructure {
 template<> struct wire_record_layout<hz::Entry> { static constexpr bool ordinary_members = true; };
 template<> struct wire_record_layout<hz::Root> { static constexpr bool ordinary_members = true; };
@@ -240,6 +249,89 @@ void declared_size_limits() {
     auto large = Buffer::load(inflate_sparse(base, 96u << 20), xo::XBuffer::maximum_capacity(128u << 20));
     if (large.arena()->used_end != (96u << 20)) fail("explicit limit did not admit 96 MiB");
 }
+
+// W1: clear/pop_back/erase/resize zero exactly the vacated elements (M4), for
+// every vacated byte count from 0 to past the 64-byte inline band, while live
+// elements and bytes past the old size are untouched. Also pins the inline
+// reserve/emplace_back fast paths to the old outcomes.
+template <class T, class Fill>
+void check_vector_scrub(xo::XVector<T>& v, const char* what, Fill&& fill) {
+    constexpr std::size_t kCap = 24;
+    auto spare = [&](std::size_t from) {
+        const auto* bytes = reinterpret_cast<const unsigned char*>(v.data());
+        for (std::size_t i = from * sizeof(T); i < v.capacity() * sizeof(T); ++i)
+            if (bytes[i] != 0) return false;
+        return true;
+    };
+    auto refill = [&](std::size_t n) {
+        v.clear();
+        v.reserve(kCap);
+        for (std::size_t i = 0; i < n; ++i) fill(v.emplace_back(), i);
+        if (v.size() != n || v.capacity() != kCap) fail(std::string(what) + ": refill shape");
+    };
+    auto live_ok = [&](std::size_t n, std::size_t skip) {
+        for (std::size_t i = 0, j = 0; i < v.size(); ++i, ++j) {
+            if (j == skip) ++j;
+            T expect{};
+            fill(expect, j);
+            if (std::memcmp(&v[static_cast<std::uint32_t>(i)], &expect, sizeof(T)) != 0) return false;
+        }
+        return v.size() == n;
+    };
+    for (std::size_t n = 0; n <= kCap; ++n) {
+        refill(n);
+        if (!spare(n)) fail(std::string(what) + ": spare capacity not zero after refill, n=" + std::to_string(n));
+        v.clear();
+        if (!spare(0)) fail(std::string(what) + ": clear left bytes, n=" + std::to_string(n));
+        for (std::size_t keep = 0; keep <= n; ++keep) {
+            refill(n);
+            v.resize(keep);
+            if (!live_ok(keep, kCap) || !spare(keep))
+                fail(std::string(what) + ": resize " + std::to_string(n) + "->" + std::to_string(keep));
+        }
+        if (n == 0) continue;
+        refill(n);
+        v.pop_back();
+        if (!live_ok(n - 1, kCap) || !spare(n - 1)) fail(std::string(what) + ": pop_back, n=" + std::to_string(n));
+        refill(n);
+        v.erase(v.begin());
+        if (!live_ok(n - 1, 0) || !spare(n - 1)) fail(std::string(what) + ": erase front, n=" + std::to_string(n));
+    }
+    // reserve below capacity is a no-op; growth keeps contents.
+    refill(5);
+    const auto* before = v.data();
+    v.reserve(3);
+    v.reserve(kCap);
+    if (v.data() != before || v.capacity() != kCap || !live_ok(5, kCap)) fail(std::string(what) + ": no-op reserve");
+    v.reserve(kCap * 3);
+    if (v.capacity() != kCap * 3 || !live_ok(5, kCap) || !spare(5)) fail(std::string(what) + ": growing reserve");
+    while (v.size() < v.capacity()) fill(v.emplace_back(), v.size());
+    fill(v.emplace_back(), v.size());           // full: takes the growth path
+    if (v.size() != kCap * 3 + 1 || !live_ok(kCap * 3 + 1, kCap * 3 + 2)) fail(std::string(what) + ": growth append");
+}
+
+void spare_capacity_scrub_bands() {
+    auto b = xo::TypedXBuffer<hz::Bands>::create(65536, cap());
+    auto& r = b.root();
+    check_vector_scrub(r.u8, "u8", [](std::uint8_t& e, std::size_t i) { e = std::uint8_t(0xA0 + i); });
+    check_vector_scrub(r.u32, "u32", [](std::uint32_t& e, std::size_t i) { e = 0xC1C2C300u + std::uint32_t(i); });
+    check_vector_scrub(r.u64, "u64", [](std::uint64_t& e, std::size_t i) { e = 0xD1D2D3D4D5D6D700ull + i; });
+    check_vector_scrub(r.wide, "wide", [](hz::Wide& e, std::size_t i) {
+        e.a = 0xE1E2E3E4E5E6E700ull + i; e.b = ~e.a; e.c = e.a ^ 0x5555u;
+    });
+    const auto wire = b.save_verified();
+    auto again = xo::TypedXBuffer<hz::Bands>::load(wire, cap());
+    if (again.save_verified() != wire) fail("bands fixture did not round-trip");
+
+    // Unbound vectors keep the old errors on the inline paths.
+    xo::XVector<std::uint32_t> loose;
+    bool threw = false;
+    try { loose.reserve(0); } catch (const xo::XException&) { threw = true; }
+    if (!threw) fail("reserve(0) on an unbound vector no longer throws");
+    threw = false;
+    try { loose.emplace_back(); } catch (const xo::XException&) { threw = true; }
+    if (!threw) fail("emplace_back on an unbound vector no longer throws");
+}
 } // namespace
 
 int main() {
@@ -247,6 +339,7 @@ int main() {
     frozen_segments_are_zero();
     loaded_holes_keep_sender_bytes();
     declared_size_limits();
-    std::cout << "wire hole zeroing and declared-size limits: 4 groups passed\n";
+    spare_capacity_scrub_bands();
+    std::cout << "wire hole zeroing, declared-size limits and spare-capacity bands: 5 groups passed\n";
     return 0;
 }
