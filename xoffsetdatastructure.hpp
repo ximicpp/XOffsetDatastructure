@@ -48,6 +48,10 @@
 #include <map>
 #include <unordered_map>
 #include "xoffset_virtual_memory.hpp"
+#if defined(__linux__)
+#include <fcntl.h>
+#include <sys/stat.h>
+#endif
 
 // TypeLayout library — the authoritative byte-copy-safety engine.
 // XOffset uses TypeLayout for recursive admission and safety checks.
@@ -457,6 +461,29 @@ namespace XOffsetDatastructure {
         XBufferCore(SparsePayload sparse, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
             init_from_extents(sparse.stored, sparse.extents, sparse.extent_count, size, cap.value, cap.pool);
         }
+
+#if defined(__linux__)
+        // X4 prototype: payload pages of a sealed file, mapped copy-on-write
+        // (VirtualMemoryStorage::from_sealed_fd). Never pooled.
+        struct SealedPayload {
+            int fd;
+            std::size_t file_offset;
+        };
+        // X4 prototype: a fresh arena whose payload is a shared memfd mapping, so
+        // release_sealed() can hand it to another process without a copy.
+        struct SharedFileArena {};
+        XBufferCore(SharedFileArena, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+            init_fresh(size, cap.value, {}, true);
+        }
+        XBufferCore(SealedPayload sealed, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+            // init_from_storage only null-checks its data argument; the bytes
+            // come from the mapping.
+            init_from_storage("", size, cap.value, [&] {
+                return detail::VirtualMemoryStorage::from_sealed_fd(sealed.fd, sealed.file_offset,
+                                                                    size, cap.value);
+            });
+        }
+#endif
 
         uint64_t epoch() const noexcept { return m_epoch; }
 
@@ -1187,13 +1214,18 @@ namespace XOffsetDatastructure {
             return sizeof(arena_header); // 48: a multiple of 8 on every platform
         }
 
-        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
+        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
+                        bool shared_file = false) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
             size = std::max(size, min_payload_size());
             if (size > max_reserved) throw XBadAlloc();
             try {
                 free_table_.reset();
                 free_table_lost_ = false;
+#if defined(__linux__)
+                if (shared_file) buffer_ = detail::VirtualMemoryStorage::shared_file(size, max_reserved);
+                else
+#endif
                 buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
@@ -1522,6 +1554,20 @@ namespace XOffsetDatastructure {
             sm->reserved1 = 0;
             if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
         }
+
+#if defined(__linux__)
+        // X4 prototype: give up a shared-file payload. This owner becomes empty
+        // (as after a move), the registration is dropped before the unmap, and
+        // the file comes back with the payload at offset page_size.
+        int detach_shared_file() {
+            if (!buffer_.shared_file())
+                throw XException("release_sealed<T>(): buffer is not on a shared-file arena");
+            XBufferCore retired;
+            retired.swap(*this);
+            retired.unregister_registry();
+            return retired.buffer_.detach_file();
+        }
+#endif
 
         // Storage-associated access/schema state belongs to the owner so even
         // transfers through XBufferCore cannot leave derived flags behind.
@@ -6070,6 +6116,15 @@ namespace XOffsetDatastructure {
             typed_root_access_allowed_ = false;
         }
 
+#if defined(__linux__)
+        XBuffer(SealedPayload sealed, std::size_t size, MaximumCapacity cap)
+            : XBufferCore(sealed, size, cap) {
+            typed_root_access_allowed_ = false;
+        }
+        XBuffer(SharedFileArena tag, std::size_t size, MaximumCapacity cap)
+            : XBufferCore(tag, size, cap) {}
+#endif
+
         /// Legacy minimum reservation hint. Use maximum_capacity() for a hard limit.
         struct MaxCapacity { std::size_t value; };
         static MaxCapacity max_capacity(std::size_t bytes) { return {bytes}; }
@@ -6366,6 +6421,164 @@ namespace XOffsetDatastructure {
             xbuf.finish_verified_load<T>(header, layout, upstream, who);
             return xbuf;
         }
+
+#if defined(__linux__)
+        // ---- X4 prototype: same-host handoff through a sealed memfd ----------
+        // Branch claude/mutable-relocatable-positioning only; Linux only.
+        //
+        // File layout ("sealed wire", prototype): the V2 wire header at offset 0,
+        // the dense payload at offset page_size, the hole table right after the
+        // payload rounded up to a page. Seals: SHRINK | GROW | WRITE | SEAL.
+        //
+        // save_sealed copies the payload once into a new memfd, seals it and
+        // returns the descriptor (the caller passes it on, e.g. SCM_RIGHTS, and
+        // closes it). The source buffer is unchanged and can keep mutating.
+        template <typename T>
+        int save_sealed() {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "save_sealed<T>() requires an admitted fixed-schema wire type.");
+            constexpr const char* who = "save_sealed<T>()";
+            require_typed_root_access("save_sealed<T>(): unverified payload cannot be relabeled as verified");
+            require_schema_match<T>("save_sealed<T>(): schema mismatch for requested root type");
+            this->shrink_to_fit();
+            auto* root_ptr = detail::find_root<T>(*this);
+            if (!root_ptr) throw XException(std::string(who) + ": no root object of requested type");
+            ensure_hole_table(*root_ptr);
+            const auto header = wire_header_v2(*root_ptr);
+            const auto page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+            const auto used = static_cast<std::size_t>(header.used_bytes);
+            const auto holes_offset = page + (used + page - 1) / page * page;
+            const auto hole_bytes = static_cast<std::size_t>(header.hole_count) * sizeof(WireHole);
+            std::vector<char> holes(hole_bytes);
+            if (hole_bytes) this->write_free_blocks(holes.data());
+            const int fd = ::memfd_create("xoffset-sealed-wire", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+            if (fd < 0) throw XException(std::string(who) + ": memfd_create failed");
+            auto put = [&](const void* bytes, std::size_t n, std::size_t offset) {
+                const char* p = static_cast<const char*>(bytes);
+                while (n) {
+                    const auto w = ::pwrite(fd, p, n, static_cast<off_t>(offset));
+                    if (w <= 0) return false;
+                    p += w; n -= std::size_t(w); offset += std::size_t(w);
+                }
+                return true;
+            };
+            if (::ftruncate(fd, static_cast<off_t>(holes_offset + hole_bytes)) != 0 ||
+                !put(&header, sizeof(header), 0) ||
+                !put(this->get_address(), used, page) ||
+                !put(holes.data(), hole_bytes, holes_offset) ||
+                ::fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) != 0) {
+                ::close(fd);
+                throw XException(std::string(who) + ": writing or sealing the memfd failed");
+            }
+            return fd;
+        }
+
+        // create_shared + release_sealed: the zero-copy sender. The arena lives
+        // in a shared memfd from the start; release_sealed moves the payload
+        // out of this process: it unmaps it here (this buffer becomes empty, as
+        // after a move), writes the header page and the hole table around the
+        // payload, cuts the file to size, seals it and returns the descriptor.
+        // No payload byte is copied.
+        template <typename T>
+        static XBuffer create_shared(std::size_t initial_bytes, MaximumCapacity cap) {
+            XBuffer xbuf(SharedFileArena{}, initial_bytes, cap);
+            (void)xbuf.template make<T>();
+            return xbuf;
+        }
+
+        template <typename T>
+        int release_sealed() {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "release_sealed<T>() requires an admitted fixed-schema wire type.");
+            constexpr const char* who = "release_sealed<T>()";
+            require_typed_root_access("release_sealed<T>(): unverified payload cannot be relabeled as verified");
+            require_schema_match<T>("release_sealed<T>(): schema mismatch for requested root type");
+            this->shrink_to_fit();
+            auto* root_ptr = detail::find_root<T>(*this);
+            if (!root_ptr) throw XException(std::string(who) + ": no root object of requested type");
+            ensure_hole_table(*root_ptr);
+            const auto header = wire_header_v2(*root_ptr);
+            const auto page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+            const auto used = static_cast<std::size_t>(header.used_bytes);
+            const auto payload_pages = (used + page - 1) / page * page;
+            const auto holes_offset = page + payload_pages;
+            const auto hole_bytes = static_cast<std::size_t>(header.hole_count) * sizeof(WireHole);
+            // Hole table and the zero tail of the last payload page, built
+            // while the buffer is still intact.
+            std::vector<char> tail(payload_pages - used + hole_bytes, 0);
+            if (hole_bytes) this->write_free_blocks(tail.data() + (payload_pages - used));
+            const int fd = this->detach_shared_file();
+            const char* p = tail.data();
+            std::size_t n = tail.size(), offset = page + used;
+            bool ok = ::pwrite(fd, &header, sizeof(header), 0) == static_cast<ssize_t>(sizeof(header));
+            while (ok && n) {
+                const auto w = ::pwrite(fd, p, n, static_cast<off_t>(offset));
+                ok = w > 0;
+                if (ok) { p += w; n -= std::size_t(w); offset += std::size_t(w); }
+            }
+            if (!ok || ::ftruncate(fd, static_cast<off_t>(holes_offset + hole_bytes)) != 0 ||
+                ::fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) != 0) {
+                ::close(fd);
+                throw XException(std::string(who) + ": writing or sealing the memfd failed (the buffer is gone)");
+            }
+            return fd;
+        }
+
+        // load_verified_sealed adopts the payload pages of a sealed file without
+        // copying them: checks the seals (no writer can change the bytes after
+        // validation, and the file cannot shrink under the mapping), admits the
+        // header exactly like load_verified, maps the payload copy-on-write and
+        // runs the same full structural validation in place. The descriptor
+        // stays owned by the caller; the mapping keeps the pages alive.
+        template <typename T>
+        static XBuffer load_verified_sealed(int fd, std::optional<MaximumCapacity> cap = std::nullopt,
+                                            std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "load_verified_sealed<T>() requires an admitted fixed-schema wire type.");
+            constexpr const char* who = "load_verified_sealed<T>()";
+            auto fail = [&](const char* what) { throw XException(std::string(who) + what); };
+            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+            constexpr int required = F_SEAL_SHRINK | F_SEAL_WRITE;
+            const int seals = ::fcntl(fd, F_GET_SEALS);
+            if (seals < 0 || (seals & required) != required)
+                fail(": descriptor is not a file sealed against writes and shrinking");
+            struct ::stat st{};
+            if (::fstat(fd, &st) != 0 || st.st_size < 0) fail(": fstat failed");
+            const auto file_size = static_cast<std::uint64_t>(st.st_size);
+            const auto page = static_cast<std::uint64_t>(::sysconf(_SC_PAGESIZE));
+            XWireHeaderV2 header{};
+            if (file_size < page || ::pread(fd, &header, sizeof(header), 0) != static_cast<ssize_t>(sizeof(header)))
+                fail(": file too small");
+            detail::check_wire_format(header, who);
+            if (header.root_type_id != detail::wire_root_type_id<T>()) fail(": root type id mismatch");
+            if (header.schema_hash_lo != detail::wire_schema_hash<T>() || header.schema_hash_hi != 0)
+                fail(": schema hash mismatch");
+            if (header.extent_count != 0) fail(": sealed payload must be dense");
+            const auto used = header.used_bytes;
+            if (used > XBufferCore::MAX_PAYLOAD) fail(": used size mismatch");
+            const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
+            detail::require_wire_within_capacity(static_cast<std::size_t>(used), capacity.value,
+                                                 cap.has_value(), who);
+            const auto holes_offset = page + (used + page - 1) / page * page;
+            if (header.hole_count > XBufferCore::MAX_PAYLOAD / sizeof(WireHole) ||
+                file_size != holes_offset + header.hole_count * sizeof(WireHole))
+                fail(": file size does not match the header");
+            if (header.root_offset >= used) fail(": root offset out of bounds");
+            std::vector<char> holes(static_cast<std::size_t>(header.hole_count) * sizeof(WireHole));
+            if (!holes.empty() &&
+                ::pread(fd, holes.data(), holes.size(), static_cast<off_t>(holes_offset)) !=
+                    static_cast<ssize_t>(holes.size()))
+                fail(": short read of the hole table");
+            detail::WireLayout layout;
+            layout.holes = holes.data();
+            layout.hole_count = static_cast<std::size_t>(header.hole_count);
+            detail::check_hole_byte_sum(header, layout.holes, layout.hole_count, who);
+            XBuffer xbuf(SealedPayload{fd, static_cast<std::size_t>(page)},
+                         static_cast<std::size_t>(used), capacity);
+            xbuf.finish_verified_load<T>(header, layout, upstream, who);
+            return xbuf;
+        }
+#endif
 
         /// Verified load INTO this buffer, reusing its mapping, maximum
         /// capacity and owner registration (no new reservation, pool round

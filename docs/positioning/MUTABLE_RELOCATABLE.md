@@ -184,7 +184,7 @@ C++ 圈里的 "relocatable" 默认指对象级的平凡重定位（P1144、P2786
 | X1 | 重定位税微基准：Q6 列的操作，XOffset 容器对 std 容器，用 GCC 16 docker 构建 | Q1、Q6：差距出在哪些操作上 | 云端完成（2.5 节） |
 | X2 | 同进程整块复制：嵌套状态的 std 深拷贝，对 XOffset 现有的 save + load_unverified，再对 `clone()` 原型（一次 memcpy + 复制空闲表） | Q5：B1 值不值得做成一等 API | 云端完成（2.5 节）；原型在本分支的库头文件 |
 | X3 | 失效规则表：逐个操作按代码核对 | 第 3 节的地址契约 | 草案完成：`docs/positioning/INVALIDATION_RULES.md` |
-| X4 | R3 Linux memfd 封印页交接原型 | Q5 的 B2 | Q5 已定，进行中 |
+| X4 | R3 Linux memfd 封印页交接原型 | Q5 的 B2 | 云端完成：`experiments/mutable_relocatable/RESULT_X4_20261022.md`。共享 arena 整块交给另一个进程，两边都不复制，接收方只读时是 socket 流式的 0.39–0.55 倍（890 KB、3.55 MB）；接收方大面积修改时写时复制吃回收益；11.5 KB 的小状态不划算 |
 | X5 | R5 原地滑动压实 | 长期运行后的碎片整理 | 研究项 |
 
 云端是 Firecracker 虚拟机，只看比例和量级。要对外引用的数字仍按 `PERF_GOAL.md` 的口径在 Mac 上测，经协调者排队。
