@@ -72,6 +72,12 @@ mapdemo_selftest [--csv-dir DIR]
 | Illegal / malformed request | A answers `Error(text)` (bad wire or illegal rect) or closes the connection (bad header, oversize length), logs `rejected: ...`, keeps running |
 | End | A `Bye` to B and client |
 
+`net` behaviour (src/net.cpp, 76afcb6; headers unchanged):
+- `recv` / `try_recv` return an `Error` frame only when `Error` is in `allowed`;
+  otherwise an `Error` frame throws `ProtocolError("peer error: <text>")`.
+- `Listener::bind` sets `SO_REUSEADDR`. On a non-blocking listener `accept()`
+  returns a `Conn` that is not open when nobody is waiting; check `is_open()`.
+
 Receivers call `load_verified<T>(payload, cap_*())` with the caps in `schema.hpp`.
 Every snapshot and every received batch is its own `XBuffer` (no pool, no reuse).
 
