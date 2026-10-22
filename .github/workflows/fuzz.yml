@@ -243,11 +243,15 @@ jobs:
             $BIN/${{ matrix.seeds }} build/fuzz-seeds/$T
             if [ "$XOFFSET_FUZZ_INJECT" = true ]; then
               # Run the drill input on its own: fork mode drops crashing
-              # initial-corpus inputs without saving them as artifacts.
+              # initial-corpus inputs without saving them as artifacts, and
+              # libFuzzer never saves an input file it is given directly, so
+              # a crash is copied into the artifacts here.
               mkdir -p build/fuzz-inject
-              printf "XOFFSET-INJECT" > build/fuzz-inject/XOFFSET-INJECT
-              $FUZZER $FUZZ_FLAGS -artifact_prefix=build/fuzz-artifacts/$T- build/fuzz-inject/XOFFSET-INJECT \
-                || echo "inject input crashed (exit $?)"
+              IN=build/fuzz-inject/XOFFSET-INJECT
+              printf "XOFFSET-INJECT" > $IN
+              if ! $FUZZER $FUZZ_FLAGS $IN; then
+                cp $IN build/fuzz-artifacts/$T-crash-$(sha1sum < $IN | cut -c1-40)
+              fi
             fi
             if [ -n "$FUZZ_MODE_FLAGS" ]; then
               # Fork mode also skips crashing initial-corpus inputs silently,
