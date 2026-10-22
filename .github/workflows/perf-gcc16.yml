@@ -54,6 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Runner
         run: |
@@ -155,7 +156,9 @@ jobs:
             "$IMG" bash -c "
               /opt/p2996-toolchain/bin/clang++ --version | head -2 &&
               grep -h _LIBCPP_HARDENING_MODE_DEFAULT \$(find /opt/p2996-toolchain/include -name __config_site) &&
-              grep -hE '_LIBCPP_HARDENING_MODE_DEFAULT[[:space:]]+_LIBCPP_HARDENING_MODE_NONE' \$(find /opt/p2996-toolchain/include -name __config_site) &&
+              printf '#include <cstddef>\\nstatic_assert(_LIBCPP_HARDENING_MODE == _LIBCPP_HARDENING_MODE_NONE);\\n' |
+                /opt/p2996-toolchain/bin/clang++ -std=c++26 -stdlib=libc++ -fsyntax-only -x c++ - &&
+              echo 'libc++ hardening: none' &&
               tools/perf/h1_build.sh clang $W/clang 'deps slg audit tests' &&
               ctest --test-dir $W/clang/b-tests --output-on-failure --parallel 4 --timeout 900" \
             2>&1 | tee "$W-clang-build.log"
@@ -176,6 +179,8 @@ jobs:
           docker run --rm --platform ${{ matrix.docker_platform }} "${RT[@]}" \
             -v "${{ github.workspace }}:${{ github.workspace }}" -w "${{ github.workspace }}" \
             -e GCC_OUT="$W/gcc" -e CLANG_OUT="$CL" -e O2_OUT="$O2" -e PAIRS -e PAIRS_SEC -e PAIRS_O2 -e CYCLES \
+            -e LIB_COMMIT="$(python3 -c 'import json; print(json.load(open("tools/perf/h1_toolchains.json"))["library_commit"])')" \
+            -e RUNTIME_IMAGE="${{ matrix.gcc_image }}" \
             "${{ matrix.gcc_image }}" bash -c "tools/perf/h1_linux_batch.sh $W/batch" 2>&1 | tee "$W-batch.log"
           cat "$W/batch/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
 

@@ -824,7 +824,7 @@ def cmd_aa_budget(a):
 
 def _git(*args):
     try:
-        return subprocess.run(["git", *args], capture_output=True, text=True, check=True,
+        return subprocess.run(["git", "-c", "safe.directory=*", *args], capture_output=True, text=True, check=True,
                               cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
     except Exception:
         return None
@@ -878,10 +878,10 @@ def cmd_freeze(a):
         },
     }
     if lib and head:
-        diff = subprocess.run(["git", "-c", "core.abbrev=7", "diff", f"{lib}..{head}"], capture_output=True,
+        diff = subprocess.run(["git", "-c", "safe.directory=*", "-c", "core.abbrev=7", "diff", f"{lib}..{head}"], capture_output=True,
                               cwd=os.path.dirname(os.path.abspath(__file__)))
         doc["diff_lib_to_head_sha256"] = hashlib.sha256(diff.stdout).hexdigest()
-        code = subprocess.run(["git", "diff", lib, head, "--", ".", ":!bench", ":!tools/perf", ":!.github"],
+        code = subprocess.run(["git", "-c", "safe.directory=*", "diff", lib, head, "--", ".", ":!bench", ":!tools/perf", ":!.github"],
                               capture_output=True, cwd=os.path.dirname(os.path.abspath(__file__)))
         doc["library_code_diff_bytes"] = len(code.stdout)
         if code.stdout:

@@ -1,4 +1,5 @@
 {
-  "comment": "clang-p2996 d77eff1 builds from p2996-toolchain.yml used by perf-gcc16.yml. Empty arm64 = GCC-only arm64 jobs.",
+  "comment": "library_commit: the measured next_cpp26 commit (FREEZE). arm64: clang-p2996 d77eff1 build from p2996-toolchain.yml used by perf-gcc16.yml; empty = GCC-only arm64 jobs.",
+  "library_commit": "30bb5ca2487c88bb65ce0bab548b4c1d1d6fe563",
   "arm64": {}
 }
