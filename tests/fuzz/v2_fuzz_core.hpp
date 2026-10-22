@@ -564,7 +564,8 @@ void fix_header_sizes(std::string& w) {
 std::optional<std::size_t> file_pos(const std::string& w, std::uint64_t off) {
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
     if (h.extent_count == 0) return kHeader + off;
-    if (kHeader + h.extent_count * 8 > w.size()) return std::nullopt;
+    // Division form: extent_count * 8 can wrap after a header mutation.
+    if (h.extent_count > (w.size() - kHeader) / 8) return std::nullopt;
     std::uint64_t cum = 0;
     for (std::uint64_t i = 0; i < h.extent_count; ++i) {
         std::uint32_t eo, eb; std::memcpy(&eo, w.data() + kHeader + i * 8, 4); std::memcpy(&eb, w.data() + kHeader + i * 8 + 4, 4);
@@ -650,7 +651,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         if (rng() & 1) fix_header_sizes(w);
         break; }
     case 10: { // extent table entry
-        if (h.extent_count == 0 || kHeader + h.extent_count * 8 > w.size()) break;
+        if (h.extent_count == 0 || h.extent_count > (w.size() - kHeader) / 8) break;
         const auto e = kHeader + std::size_t(rng() % h.extent_count) * 8 + (rng() & 1) * 4;
         put32(w, e, rng() % 2 ? get32(w, e) + 8 : get32(w, e) - 8);
         break; }
