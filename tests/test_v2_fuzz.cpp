@@ -20,6 +20,8 @@
 
 #include <charconv>
 
+static_assert(kInlineBitmapExtent == xo::detail::WireGranuleIndex::inline_extent);
+
 namespace {
 constexpr int kBoundaryMutants = 301; // per page boundary wire, the first unmutated
 constexpr std::uint64_t kBoundaryStream = std::uint64_t(1) << 63;
