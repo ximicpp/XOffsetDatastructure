@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <memory_resource>
 #include <optional>
@@ -32,6 +33,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace xo = XOffsetDatastructure;
@@ -71,9 +73,60 @@ constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 // declare a huge payload).
 constexpr std::size_t kLimit = std::size_t(1) << 22;
 
+// What fail() reports besides its message. test_v2_fuzz sets these per case:
+// the input wire under test, a file-name tag and the command that replays the
+// case. The libFuzzer targets leave them empty (libFuzzer saves the input).
+struct FailContext {
+    const std::string* wire = nullptr;
+    std::string tag;
+    std::string replay;
+};
+FailContext g_fail;
+
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "v2 fuzz FAILED: " << message << "\n";
+    if (!g_fail.replay.empty()) std::cerr << "v2 fuzz replay: " << g_fail.replay << "\n";
+    // XOFFSET_FUZZ_DUMP_DIR: keep the failing input (<tag>.wire) and the report
+    // (<tag>.txt) for the nightly report job, which has no other copy of it.
+    const char* dir = std::getenv("XOFFSET_FUZZ_DUMP_DIR");
+    if (dir && *dir && g_fail.wire) {
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        const std::string base = std::string(dir) + "/" + (g_fail.tag.empty() ? "v2fuzz" : g_fail.tag);
+        const std::string report = "v2 fuzz FAILED: " + message + "\nreplay: " + g_fail.replay + "\n";
+        bool ok = true;
+        for (const auto& [path, bytes] : {std::pair{base + ".wire", g_fail.wire}, std::pair{base + ".txt", &report}}) {
+            std::FILE* f = std::fopen(path.c_str(), "wb");
+            ok = f && std::fwrite(bytes->data(), 1, bytes->size(), f) == bytes->size() && std::fclose(f) == 0 && ok;
+        }
+        std::cerr << "v2 fuzz dump: " << base << ".wire" << (ok ? "" : " (write FAILED)") << "\n";
+    }
     std::abort(); // libFuzzer records abort as a crash and saves the input
+}
+
+// Drill builds only (CMake -DXOFFSET_FUZZ_INJECT_CRASH=ON): an input starting
+// with XOFFSET-INJECT crashes the harness, so the nightly crash pipeline can be
+// exercised end to end without a real bug.
+inline void inject_crash_drill([[maybe_unused]] const std::uint8_t* data, [[maybe_unused]] std::size_t size) {
+#ifdef XOFFSET_FUZZ_INJECT_CRASH
+    constexpr char marker[] = "XOFFSET-INJECT";
+    if (size >= sizeof(marker) - 1 && std::memcmp(data, marker, sizeof(marker) - 1) == 0) {
+        std::cerr << "XOFFSET_FUZZ_INJECT_CRASH: injected crash (drill input)\n";
+        std::abort();
+    }
+#endif
+}
+
+// Per-case random stream of test_v2_fuzz: case `id` of a run with `seed`
+// depends on nothing else, so `test_v2_fuzz --replay <seed> <id>` reruns it
+// alone (splitmix64 finalizer over both values).
+std::mt19937_64 case_rng(std::uint64_t seed, std::uint64_t id) {
+    auto mix = [](std::uint64_t z) {
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+        return z ^ (z >> 31);
+    };
+    return std::mt19937_64(mix(seed ^ mix(id + 0x9e3779b97f4a7c15ull)));
 }
 
 // ---------------------------------------------------------------------------
@@ -685,27 +738,27 @@ enum class Outcome { Accepted, HeaderReject, PayloadReject };
 
 // One input through the oracle and all library acceptors. They must agree;
 // an accepted input is then read, mutated and re-saved (see exercise()).
-Outcome check_case(const std::string& w, std::mt19937_64& rng, std::size_t id) {
+Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string& id) {
     const auto o = oracle(w);
     std::string terr, rerr, verr;
     auto typed = typed_load(w, &terr);
     if (bool(typed) != o.ok)
-        fail("case " + std::to_string(id) + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
+        fail("case " + id + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
              " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     std::string lerr;
     if (reload_accepts(w, &lerr) != bool(typed))
-        fail("case " + std::to_string(id) + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
+        fail("case " + id + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
-    compare_direct(w, typed, terr, "case " + std::to_string(id));
+    compare_direct(w, typed, terr, "case " + id);
     if (o.ok || o.stage == Oracle::Stage::Payload) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
         if (raw != o.ok)
-            fail("case " + std::to_string(id) + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
+            fail("case " + id + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
         if (recv != o.ok)
-            fail("case " + std::to_string(id) + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
+            fail("case " + id + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     }
     if (o.ok) { exercise(*typed, rng); return Outcome::Accepted; }
@@ -786,5 +839,21 @@ std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
     out.push_back(std::move(shorter));
     out.push_back(std::move(longer));
     return out;
+}
+
+// Seed corpus for fuzz_v2_wire: the golden pool plus the page boundary wires,
+// one file per wire. Returns the number written.
+std::size_t write_v2_seed_corpus(const std::string& dir) {
+    std::mt19937_64 rng(20261021);
+    std::filesystem::create_directories(dir);
+    auto pool = seed_pool(rng, 64);
+    for (auto& w : page_boundary_wires(rng)) pool.push_back(std::move(w));
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        const auto path = dir + "/seed-" + std::to_string(i) + ".wire";
+        std::FILE* f = std::fopen(path.c_str(), "wb");
+        if (!f || std::fwrite(pool[i].data(), 1, pool[i].size(), f) != pool[i].size() || std::fclose(f) != 0)
+            fail("cannot write " + path);
+    }
+    return pool.size();
 }
 } // namespace
