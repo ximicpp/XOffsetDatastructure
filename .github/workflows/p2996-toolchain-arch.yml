@@ -183,6 +183,16 @@ jobs:
             -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
             -e CLANG_P2996_COMMIT -e SLG_SRC -e TC=/opt/p2996-toolchain -e OUT=/workspace/build/p2996-smoke \
             "${{ inputs.gcc_image }}" bash tools/p2996-toolchain/smoke.sh 2>&1 | tee build/smoke.log
+          rc=$?
+          # Put the outcome in an annotation too: it is readable through the
+          # checks API where log and artifact downloads are not.
+          tail_text=$(tail -n 60 build/smoke.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=smoke passed (${{ inputs.arch }})::$(grep -E 'reflection probe:|tests passed|^cycle 1 xoffset|smoke:' build/smoke.log | sed ':a;N;$!ba;s/\n/%0A/g')"
+          else
+            echo "::error title=smoke failed (${{ inputs.arch }}, exit $rc)::$tail_text"
+          fi
+          exit $rc
 
       - name: Upload smoke logs
         if: always()

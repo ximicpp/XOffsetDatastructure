@@ -30,8 +30,9 @@ config_site=$(find "$TC/include" -name __config_site | head -n 1)
 test -n "$config_site" || { echo "no __config_site under $TC/include"; exit 1; }
 echo "__config_site: $config_site"
 grep -n 'HARDENING_MODE_DEFAULT\|_LIBCPP_ABI_VERSION\|_LIBCPP_ASSERTION' "$config_site" | tee "$OUT/config-site.txt"
-grep -Eq '^#define _LIBCPP_HARDENING_MODE_DEFAULT _LIBCPP_HARDENING_MODE_NONE$' "$config_site" \
-    || { echo "libc++ hardening default is not none"; exit 1; }
+# libc++ writes the mode as a number: none = (1 << 1) = 2 (libcxx/include/__config).
+grep -Eq '^#define _LIBCPP_HARDENING_MODE_DEFAULT 2$' "$config_site" \
+    || { echo "libc++ hardening default is not none (2)"; exit 1; }
 "$TC/bin/clang++" -v -fsyntax-only -x c++ /dev/null 2>&1 | grep -i 'gcc installation' | tee "$OUT/gcc-installation.txt"
 "$TC/bin/clang++" -### -std=c++26 -stdlib=libc++ -x c++ /dev/null -o /dev/null 2>&1 | tee "$OUT/driver.txt" | tail -n 3
 ls -l "$LIBDIR"
