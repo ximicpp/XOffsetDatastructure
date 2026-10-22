@@ -114,6 +114,10 @@ std::string_view who = r.name.view();
   余量照样保留、接着改不变慢。代价是发送时多扫描一遍 payload；payload 不足 4 KiB
   或省不到 max(256 B, payload 的 1/16) 时自动退回稠密。同机共享内存或进程内传递保持默认。
   接收方不需要任何设置，两种 wire 都接受。
+- 一发多收或接收方只读时可以用 `save_compact<Profile>()`（或 `save_compact_into<Profile>(out)`）：
+  它直接按校验顺序遍历对象图写出紧凑 wire（容量等于长度、无空洞），不建临时 buffer，
+  与 `XCompactor::compact<Profile>(b).save_verified<Profile>()` 逐字节相同，源 buffer 不变。
+  代价是接收方第一次增长容器时要搬家，所以接收后还要频繁修改的场景仍用默认或零段省略。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。

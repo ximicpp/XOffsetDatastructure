@@ -15,6 +15,13 @@
   equivalent). Earlier N10 wires still load (receive-only golden).
 - `save_verified_into` into an output whose capacity already holds the dense
   wire examines and normalizes the source once instead of twice.
+- New `save_compact<T>()` / `save_compact_into<T>(out)` write the canonical
+  compact wire (preorder layout, capacity == size, no holes) by direct traversal
+  of the source graph, with no temporary buffer; the bytes are identical to
+  `XCompactor::compact<T>(b).save_verified<T>()` (tested over 600 random
+  models). The source is not modified. On the cloud box it is faster than
+  compact-then-save (7x on an 840 KB shard, 85x on a 1.6 KB one). The
+  receiver's first growth relocates, so it fits one-to-many or read-only sends.
 
 ## 0.3.0-beta.1: production-readiness beta
 

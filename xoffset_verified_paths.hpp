@@ -119,6 +119,237 @@ namespace detail {
     }
 }
 
+namespace detail {
+    // ---- save_compact: canonical wire by direct traversal ----------------
+    // Canonical layout: arena header, root at offset 48, then every block in
+    // validation (pre)order, each starting where the previous one ends:
+    // capacity == size, strings of at most 10 bytes inline, empty containers
+    // without storage, no holes. This is the layout XCompactor builds, written
+    // straight from the source graph into the output string.
+    template <class U> consteval bool compact_has_heads();
+    template <class U> consteval bool compact_direct_supported();
+
+    template <class U, std::size_t N = 0>
+    consteval bool compact_members_have_heads() {
+        if constexpr (N >= reflected_member_count<U>()) {
+            return false;
+        } else {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^U, std::meta::access_context::unchecked())[N];
+            using M = [:std::meta::type_of(member):];
+            return compact_has_heads<M>() || compact_members_have_heads<U, N + 1>();
+        }
+    }
+    template <class U, std::size_t N = 0>
+    consteval bool compact_members_supported() {
+        if constexpr (N >= reflected_member_count<U>()) {
+            return true;
+        } else {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^U, std::meta::access_context::unchecked())[N];
+            using M = [:std::meta::type_of(member):];
+            return compact_direct_supported<M>() && compact_members_supported<U, N + 1>();
+        }
+    }
+    template <class U> consteval bool compact_has_heads() {
+        using C = std::remove_cv_t<U>;
+        if constexpr (is_fixed_string_v<C> || is_fixed_vector_v<C>) return true;
+        else if constexpr (std::is_array_v<C>) return compact_has_heads<std::remove_all_extents_t<C>>();
+        else if constexpr (std::is_class_v<C>) return compact_members_have_heads<C>(); // admitted: no bases
+        else return false;
+    }
+    // Blocks are 8-aligned and padded to 8, so canonical packing needs every
+    // stored type to be at most 8-aligned (wire admission already requires it).
+    template <class U> consteval bool compact_direct_supported() {
+        using C = std::remove_cv_t<U>;
+        if constexpr (alignof(C) > 8) return false;
+        else if constexpr (is_fixed_string_v<C>) return true;
+        else if constexpr (is_fixed_vector_v<C>) return compact_direct_supported<typename C::value_type>();
+        else if constexpr (std::is_array_v<C>) return compact_direct_supported<std::remove_all_extents_t<C>>();
+        else if constexpr (std::is_class_v<C>) return compact_members_supported<C>();
+        else return true;
+    }
+
+    struct CompactWriter {
+        char* base;              // destination payload
+        std::size_t cursor;      // next block offset
+        std::size_t limit;       // destination payload capacity
+        bool overflow = false;   // the source graph did not fit (corrupted source)
+        void put32(std::size_t at, std::int32_t v) noexcept { std::memcpy(base + at, &v, sizeof(v)); }
+        void putu32(std::size_t at, std::uint32_t v) noexcept { std::memcpy(base + at, &v, sizeof(v)); }
+        // Reserves a block of `bytes` (padded to 8, padding zeroed).
+        bool block(std::size_t bytes, std::size_t& at) noexcept {
+            const auto padded = (bytes + 7u) & ~std::size_t(7u);
+            if (overflow || padded > limit - cursor) { overflow = true; return false; }
+            at = cursor;
+            cursor += padded;
+            if (padded != bytes) std::memset(base + at + bytes, 0, padded - bytes);
+            return true;
+        }
+        // Head at `at`: bound to the payload base, empty.
+        void empty_head(std::size_t at) noexcept {
+            put32(at, -static_cast<std::int32_t>(at));
+            put32(at + 4u, 0);
+            putu32(at + 8u, 0);
+            putu32(at + 12u, 0);
+        }
+    };
+    static_assert(offsetof(XFixedString, arena_delta) == 0 && offsetof(XFixedString, data_delta) == 4 &&
+                  offsetof(XFixedString, size_) == 8 && offsetof(XFixedString, capacity_) == 12);
+    static_assert(offsetof(XFixedVector<int>, arena_delta) == 0 && offsetof(XFixedVector<int>, data_delta) == 4 &&
+                  offsetof(XFixedVector<int>, size_) == 8 && offsetof(XFixedVector<int>, capacity_) == 12);
+
+    // `src` is a source value whose bytes were already copied to payload
+    // offset `at`; rewrites every head inside it for the canonical layout.
+    template <class U>
+    void compact_value(const U& src, std::size_t at, CompactWriter& w) noexcept;
+
+    inline void compact_string(const XFixedString& src, std::size_t at, CompactWriter& w) noexcept {
+        const auto text = src.view();
+        const auto n = static_cast<std::uint32_t>(text.size());
+        w.empty_head(at);
+        if (n == 0) return;
+        if (n <= XFixedString::inline_max) {
+            char bytes[12] = {};
+            std::memcpy(bytes, text.data(), n);
+            bytes[11] = static_cast<char>(0x80u | n);
+            std::memcpy(w.base + at + 4u, bytes, sizeof(bytes));
+            return;
+        }
+        std::size_t data = 0;
+        if (!w.block(std::size_t(n) + 1u, data)) return;
+        std::memcpy(w.base + data, text.data(), n);
+        w.base[data + n] = '\0';
+        w.put32(at + 4u, static_cast<std::int32_t>(data - (at + 4u)));
+        w.putu32(at + 8u, n);
+        w.putu32(at + 12u, n);
+    }
+
+    template <class E>
+    void compact_vector(const XFixedVector<E>& src, std::size_t at, CompactWriter& w) noexcept {
+        const auto n = src.size_;
+        w.empty_head(at);
+        if (n == 0) return;
+        const auto bytes = std::size_t(n) * sizeof(E);
+        std::size_t data = 0;
+        if (!w.block(bytes, data)) return;
+        std::memcpy(w.base + data, static_cast<const void*>(src.data()), bytes);
+        w.put32(at + 4u, static_cast<std::int32_t>(data - (at + 4u)));
+        w.putu32(at + 8u, n);
+        w.putu32(at + 12u, n);
+        if constexpr (compact_has_heads<E>()) {
+            const E* elements = src.data();
+            for (std::uint32_t i = 0; i < n; ++i) compact_value(elements[i], data + std::size_t(i) * sizeof(E), w);
+        }
+    }
+
+    template <class U, std::size_t N>
+    void compact_member_at(const U& src, std::size_t at, CompactWriter& w) noexcept {
+        constexpr auto member = std::meta::nonstatic_data_members_of(
+            ^^U, std::meta::access_context::unchecked())[N];
+        using M = [:std::meta::type_of(member):];
+        if constexpr (compact_has_heads<M>())
+            compact_value(src.[:member:], at + std::meta::offset_of(member).bytes, w);
+    }
+
+    template <class U>
+    void compact_value(const U& src, std::size_t at, CompactWriter& w) noexcept {
+        using C = std::remove_cv_t<U>;
+        if constexpr (!compact_has_heads<C>()) {
+            return;
+        } else if constexpr (is_fixed_string_v<C>) {
+            compact_string(static_cast<const XFixedString&>(src), at, w);
+        } else if constexpr (is_fixed_vector_v<C>) {
+            compact_vector(static_cast<const XFixedVector<typename C::value_type>&>(src), at, w);
+        } else if constexpr (std::is_array_v<C>) {
+            using Elem = std::remove_extent_t<C>;
+            for (std::size_t i = 0; i < std::extent_v<C>; ++i) compact_value(src[i], at + i * sizeof(Elem), w);
+        } else {
+            static_for<reflected_member_count<C>()>([&](auto index) {
+                compact_member_at<C, decltype(index)::value>(src, at, w);
+            });
+        }
+    }
+
+    // Writes the canonical wire of `root` (of `source`) into `out`, which
+    // holds at least sizeof(XWireHeaderV2) + `limit` bytes; returns the
+    // bytes written, or 0 if the graph did not fit. No allocation.
+    template <class T>
+    std::size_t write_compact_wire(char* out, std::size_t limit, XWireHeaderV2 header,
+                                   const XBufferCore::arena_header& source_arena, const T& root) noexcept {
+        constexpr std::size_t arena = sizeof(XBufferCore::arena_header);
+        constexpr std::size_t root_bytes = (sizeof(T) + 7u) & ~std::size_t(7u);
+        if (limit < arena + root_bytes) return 0;
+        char* payload = out + sizeof(XWireHeaderV2);
+        CompactWriter w{payload, arena + root_bytes, limit};
+        std::memcpy(payload + arena, static_cast<const void*>(&root), sizeof(T));
+        if (root_bytes != sizeof(T)) std::memset(payload + arena + sizeof(T), 0, root_bytes - sizeof(T));
+        compact_value(root, arena, w);
+        if (w.overflow) return 0;
+        XBufferCore::arena_header h{};
+        std::memcpy(h.magic, source_arena.magic, sizeof(h.magic));
+        h.header_size = static_cast<std::uint32_t>(arena);
+        h.root_offset = arena;
+        h.used_end = w.cursor;
+        std::memcpy(payload, &h, sizeof(h));
+        header.used_bytes = w.cursor;
+        header.root_offset = arena;
+        header.hole_count = 0;
+        header.hole_bytes = 0;
+        header.extent_count = 0;
+        std::memcpy(out, &header, sizeof(header));
+        return sizeof(XWireHeaderV2) + w.cursor;
+    }
+
+    template<class T>
+    void VerifiedPathsAccess::save_compact_into(XBufferCore& source, std::string& out) {
+        static_assert(compact_direct_supported<T>(),
+            "save_compact<T>(): every stored type must be at most 8-byte aligned");
+        const auto token = identity(source);
+        auto* current = &owner(token);
+        auto check_alias = [&](XBufferCore& candidate) {
+            if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
+                throw std::length_error("save_compact_into: output capacity overflows alias range");
+            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
+                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
+                throw XException("save_compact_into: output aliases source storage");
+        };
+        check_alias(*current);
+        // The canonical payload is never larger than the source's used
+        // bytes: each live block shrinks to its size, holes vanish.
+        auto h = header<T>(*current, false);
+        current = &owner(token); // header may have recomputed the free table
+        check_alias(*current);
+        const auto bound = std::size_t(h.used_bytes);
+        const auto size = sizeof(XWireHeaderV2) + bound;
+        if (size > out.max_size())
+            throw std::length_error("save_compact_into: output size exceeds string limit");
+        if (size > out.capacity()) {
+            out.reserve(size); // only output-allocation/callback boundary
+            current = &owner(token);
+            check_alias(*current);
+            h = header<T>(*current, false);
+            if (std::size_t(h.used_bytes) != bound)
+                throw XException("save_compact_into: source changed beyond prepared output capacity");
+        }
+        const T& root = *find_root<T>(*current);
+        const auto& source_arena = *current->arena();
+        std::size_t written = 0;
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+        out.resize_and_overwrite(size, [&](char* destination, std::size_t) noexcept {
+            written = write_compact_wire(destination, bound, h, source_arena, root);
+            return written;
+        });
+#else
+        out.resize(size);
+        written = write_compact_wire(out.data(), bound, h, source_arena, root);
+        out.resize(written);
+#endif
+        if (written == 0)
+            throw XException("save_compact_into: source graph exceeds its payload");
+    }
+}
+
 template<class T> class VerifiedSnapshot;
 template<class T>
 VerifiedSnapshot<T> freeze_verified(TypedXBuffer<T>&& source,
