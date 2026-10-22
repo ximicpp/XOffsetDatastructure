@@ -289,6 +289,50 @@ jobs:
             build/corpus-gcc/*.xwire
           if-no-files-found: ignore
 
+  validation-differential:
+    name: Validation differential (PR base vs PR, GCC 16 Docker)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Check out the PR base
+        run: git worktree add --detach build/pr-base "${{ github.event.pull_request.base.sha }}"
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      # Same mutated wires through typed load, reload, raw validation and
+      # verified receive of both libraries: K4's accept/reject set and first
+      # error messages must not change unless a PR means to change them.
+      - name: Compare validation outcomes
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            "$XOFFSET_GCC_IMAGE" \
+            tools/validation_differential.sh /workspace/build/pr-base /workspace 200000 1 2 \
+            2>&1 | tee build/validation-differential.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-differential
+          path: |
+            build/validation-differential.log
+            build/validation-differential/*.txt
+          if-no-files-found: ignore
+
   gcc16-sanitizer:
     name: ASan+UBSan (GCC 16 Docker, Linux)
     runs-on: ubuntu-latest

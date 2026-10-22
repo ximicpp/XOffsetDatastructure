@@ -57,9 +57,10 @@ for (...) {
 复用不会自动归还已提交的页：先收一条大消息、再收小消息时，大消息用过的页仍然提交着。
 需要归还时调用 `reclaim_tail_pages()`（释放逻辑末尾之后的整页），或者销毁 buffer。
 
-`reload_verified(wire)`（不带资源参数的形式）的校验临时内存来自这个 buffer
-自己的小块缓存：最多 8 块、每块不超过 64 KiB，按大小和对齐原样复用，所以循环
-reload 时每条消息不再向宿主分配器申请校验内存。这些块只是宿主侧临时内存，
-不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
-`release_reload_scratch()` 提前归还。`reload_verified_with_resource` 照常使用
-调用方给的资源。
+校验用两张位图（每 8 字节一位，活块一张、空洞一张）。payload 不超过 32 KiB 时
+位图在栈上，不申请任何宿主内存。更大的 payload：`reload_verified(wire)`（不带资源
+参数的形式）用这个 buffer 自己保留的一块位图内存，按收到过的最大 payload 增长、
+之后原样复用，所以循环 reload 时每条消息不再向宿主分配器申请校验内存。这块内存
+只是宿主侧临时内存，不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
+`release_reload_scratch()` 提前归还。`load_verified_with_resource` 和
+`reload_verified_with_resource` 向调用方给的资源申请一块。

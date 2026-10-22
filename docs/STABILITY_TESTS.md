@@ -13,7 +13,7 @@ K1–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | `test_mutation_failures`、`test_allocator_failures` | 分配失败时单次修改是原子的 |
 | K3 | 独立输出：`save_verified` 发出调用方独占的副本，发完可以继续改 | `test_stability_contract`（K3 部分） | 保存后修改、扩容、清空、销毁源 buffer，已发出的 wire 不变且仍能加载出原内容 |
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
-| K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_wire_range_failures`、`test_validation_v4`、`test_validation_v5`、`test_validation_v5_bounds`、`test_validation_v6_dense_fusion`、`test_validation_v8_single_word` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
+| K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
 | | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive 三条路径对变异 wire 的接受/拒绝一致 |
 | | | `test_receive_raw`、`test_verified_receive` | 原始接收与分段接收路径 |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | `test_stability_contract`（K5 部分） | 重新加载后释放再分配复用空洞、尾部不增长；接收方的分配决定与发送方逐字节一致；第二跳同样成立 |

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
+
 ## 0.3.0-beta.1: production-readiness beta
 
 Release gates G1–G8 (`PRODUCTION_READINESS_GOAL`): K1–K7 mapped to tests, two
