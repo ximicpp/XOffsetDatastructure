@@ -2624,9 +2624,17 @@ namespace XOffsetDatastructure {
         }
 
         void push_back(const T& value) {
-            insert_construct(size_, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, value, binding());
-            });
+            const size_type n = size_;
+            if (n < capacity_) [[likely]] {
+                // As insert_construct's append fast path, kept here so the
+                // caller's loop builds no closure for the general call.
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                fixed_detail::transfer_construct(slot, value, binding());
+                size_ = n + 1u;
+                return;
+            }
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
+            else push_back_general<const T&>(value);
         }
 
         void push_back(T&& value) {
@@ -2717,6 +2725,15 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // push_back beyond capacity or on an unbound head. A small trivially
+        // copyable value arrives by value (registers), not by reference.
+        template <typename V>
+        XOFFSET_DETAIL_NOINLINE void push_back_general(V value) {
+            insert_construct(size_, [&](T* dst) {
+                fixed_detail::transfer_construct(dst, static_cast<const T&>(value), binding());
+            });
+        }
+
         static size_type checked_count(std::size_t count) {
             if (count > max_size()) throw XBadAlloc();
             return static_cast<size_type>(count);
