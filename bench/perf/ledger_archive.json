@@ -1,0 +1,17 @@
+{
+  "schema": "xoffset-perf-ledger-archive-v1",
+  "note": "门禁不读这个文件。anchor 前移或条目失效时把条目从 ledger.json 移到这里。",
+  "entries": [
+    {
+      "id": "reloc-bench-added",
+      "pr": 65,
+      "metric": "reloc.*",
+      "compiler": "*",
+      "max_ratio": 1.001,
+      "reason": "有意的基准变更：新增 bench/reloc（PERF_GOAL G9 重定位税，28 项，XOffset ÷ std 逐轮配对，flat_map/flat_set 为主基线，键每轮换新，复用键与未声明 ordinary 的版本并列）。这不是回退放行：门禁目前不测 reloc.*，本条不匹配任何指标；max_ratio 取 schema 允许的最小值附近的 1.001。接入门禁时把本条移到 ledger_archive.json。",
+      "evidence": "bench/reloc/README.md、bench/reloc/MANIFEST（来源 reloc_tax.cpp 0add6b90…，分支 claude/mutable-relocatable-positioning 2b64ab0）；/mnt/project-files/mutable-relocatable-20261022/RESULT_X1_X2_20261022.md；PR 描述里的云端试跑与 Ir 确定性检查",
+      "approved_by": "「性能优化」（2026-10-22，G9 入库请求）",
+      "archived": "2026-10-22：门禁开始测 reloc.*（PR 接入 bench/reloc），按本条说明移入存档"
+    }
+  ]
+}
