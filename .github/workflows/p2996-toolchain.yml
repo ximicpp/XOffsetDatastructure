@@ -5,12 +5,8 @@ name: P2996 toolchain (d77eff1, Linux)
 # is the deliverable; x86_64 is a second, optional entry that never fails the run.
 # Artifacts: p2996-d77eff1-linux-<arch> (tar.xz + .sha256 + BUILDINFO.txt).
 # A rebuild only happens when the recipe changes (the package is cached).
+# Manual only: the account's Actions minutes are limited (susu, 2026-10-22).
 on:
-  push:
-    branches: [ 'claude/p2996-toolchain-*' ]
-    paths:
-      - '.github/workflows/p2996-toolchain*.yml'
-      - 'tools/p2996-toolchain/**'
   workflow_dispatch:
 
 permissions:
