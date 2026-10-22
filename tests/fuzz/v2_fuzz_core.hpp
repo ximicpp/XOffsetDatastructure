@@ -70,6 +70,8 @@ constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 // more is a header-stage rejection (threat model R1: a short sparse wire may
 // declare a huge payload).
 constexpr std::size_t kLimit = std::size_t(1) << 22;
+// Payloads up to this size keep the validator's granule bitmaps inline.
+constexpr std::uint64_t kInlineBitmapExtent = 32 * 1024;
 
 // What fail() reports besides its message. test_v2_fuzz sets these per case:
 // the input wire under test, a file-name tag and the command that replays the
@@ -792,7 +794,9 @@ std::string sized_wire(std::mt19937_64 rng, std::size_t vals) {
 // to used = page - 1 (last payload byte dropped) and page + 1 (one zero byte
 // appended); they are mutated inputs.
 std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
-    constexpr std::uint64_t page = xo::detail::WireGranuleIndex::inline_extent;
+    // WireGranuleIndex::inline_extent (test_v2_fuzz checks it); spelled out so
+    // the core also builds against libraries without it (validation_outcomes).
+    constexpr std::uint64_t page = kInlineBitmapExtent;
     const auto content = rng;
     rng.discard(1);
     std::vector<std::string> out;
