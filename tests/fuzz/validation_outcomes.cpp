@@ -7,8 +7,9 @@
 //
 // usage: validation_outcomes <cases> <seed>             digest per 10000 cases
 //        validation_outcomes <cases> <seed> <from> <to> one line per case in [from, to)
-// The pool mixes the fuzz core's wires (dense and sparse, with holes) with
-// wires of 30-46 KiB, so payloads on both sides of 32 KiB are validated.
+// The pool mixes the fuzz core's wires (dense and sparse, with holes, and
+// compacted) with wires of 30-46 KiB (some compacted), so payloads on both
+// sides of 32 KiB are validated.
 #include "v2_fuzz_core.hpp"
 
 #include <map>
@@ -30,6 +31,11 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 12; ++i) {
         auto w = sized_wire(rng, 15000 + std::size_t(rng() % 8000));
         check_golden(w, "large " + std::to_string(i));
+        if (i % 3 == 0) {
+            auto c = canonical_wire(w);
+            check_golden(c, "large canonical " + std::to_string(i));
+            pool.push_back(std::move(c));
+        }
         pool.push_back(std::move(w));
     }
     std::map<std::string, std::size_t> histogram;

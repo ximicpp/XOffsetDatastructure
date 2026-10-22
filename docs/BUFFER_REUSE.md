@@ -64,3 +64,5 @@ for (...) {
 只是宿主侧临时内存，不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
 `release_reload_scratch()` 提前归还。`load_verified_with_resource` 和
 `reload_verified_with_resource` 向调用方给的资源申请一块。
+规范布局的 wire（没有空洞，块按访问顺序首尾相接，例如 `XCompactor::compact` 的
+结果）走游标路径，只记一个偏移，不碰位图，任何大小都不申请校验内存。

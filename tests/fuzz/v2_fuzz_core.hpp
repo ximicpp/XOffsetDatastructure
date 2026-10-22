@@ -693,11 +693,24 @@ void check_golden(const std::string& w, const std::string& where) {
     if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
 }
 
+// The same content compacted: blocks in visiting preorder, no holes.
+std::string canonical_wire(const std::string& w) {
+    auto loaded = xo::XBuffer::load_verified<fz::Root>(w);
+    auto compact = xo::XCompactor::compact<fz::Root>(loaded);
+    return compact.save_verified<fz::Root>();
+}
+
+// count built wires, and the compacted form of every second one.
 std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
     std::vector<std::string> pool;
     for (std::size_t i = 0; i < count; ++i) {
         auto w = build_wire(rng);
         check_golden(w, "golden " + std::to_string(i));
+        if (i % 2 == 0) {
+            auto c = canonical_wire(w);
+            check_golden(c, "canonical " + std::to_string(i));
+            pool.push_back(std::move(c));
+        }
         pool.push_back(std::move(w));
     }
     return pool;
