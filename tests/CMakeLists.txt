@@ -82,6 +82,7 @@ set(REFLECTION_TESTS
     test_shift_relocate
     test_free_table_policy
     test_range_hint
+    test_lower_bound_index
     test_validation_ascending_run
     test_stable_storage
     test_vm_lifecycle

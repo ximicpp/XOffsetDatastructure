@@ -1966,6 +1966,22 @@ namespace XOffsetDatastructure {
         template <typename Elem, typename KeyLike, typename KeyFn>
         std::uint32_t lower_bound_index(const Elem* data, std::uint32_t size,
                                         const KeyLike& key, KeyFn&& key_fn) {
+            if constexpr (std::is_scalar_v<std::remove_cvref_t<decltype(key_fn(*data))>> &&
+                          std::is_scalar_v<KeyLike>) {
+                // Scalar keys: branch-free halving (conditional move), same
+                // index as the loop below. Random keys made the loop's
+                // data-dependent branch mispredict about half the time.
+                if (size == 0) return 0;
+                const Elem* base = data;
+                std::uint32_t n = size;
+                while (n > 1) {
+                    const std::uint32_t half = n / 2;
+                    base = ordered_less(key_fn(base[half - 1]), key) ? base + half : base;
+                    n -= half;
+                }
+                return static_cast<std::uint32_t>(base - data) +
+                       static_cast<std::uint32_t>(ordered_less(key_fn(*base), key));
+            }
             std::uint32_t first = 0;
             std::uint32_t count = size;
             while (count > 0) {
