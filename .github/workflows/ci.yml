@@ -342,9 +342,9 @@ jobs:
           path: build/gcc16-asan.log
 
   mapdemo-gcc16:
-    name: Map state demo (GCC 16 Docker, Release + ASan/UBSan)
+    name: Map state demo (GCC 16 + P2996 Docker, Release + ASan/UBSan)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
       # Same exclusions as gcc16-sanitizer (consteval reflection code).
@@ -386,6 +386,29 @@ jobs:
               demo/mapstate/tools/run_all_tiers.sh build/mapdemo/bin/Release build/mapdemo-results' \
             2>&1 | tee build/mapdemo-release.log
 
+      # The same Release run built with the pinned P2996 Clang (the Mac
+      # toolchain family), so clang-only compile errors show up here first.
+      - name: P2996 Clang Release build and three tiers
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -o pipefail
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/bin:/usr/bin:/bin \
+            -e LD_LIBRARY_PATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:/opt/p2996-toolchain/lib \
+            -e MAPDEMO_LABEL="CI P2996 Clang Release (smoke)" \
+            "$IMAGE" bash -c '
+              clang++ --version | head -n 1 &&
+              cmake -S . -B build/mapdemo-clang -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ -DXOFFSET_BUILD_DEMOS=ON \
+                -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF &&
+              cmake --build build/mapdemo-clang --parallel 4 &&
+              demo/mapstate/tools/run_all_tiers.sh build/mapdemo-clang/bin/Release build/mapdemo-clang-results' \
+            2>&1 | tee build/mapdemo-clang.log
+
       # ASan+UBSan: self-test, the 100-unit tier and --evil.
       - name: ASan+UBSan build, 100-unit tier and evil
         if: success() || failure()
@@ -409,7 +432,8 @@ jobs:
       - name: Result tables
         if: always()
         run: |
-          for f in build/mapdemo-results/RESULT_TABLES.md build/mapdemo-asan-results/RESULT_TABLES.md; do
+          for f in build/mapdemo-results/RESULT_TABLES.md build/mapdemo-clang-results/RESULT_TABLES.md \
+                   build/mapdemo-asan-results/RESULT_TABLES.md; do
             if [ -f "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; fi
           done
 
@@ -420,8 +444,10 @@ jobs:
           name: mapdemo-gcc16-results
           path: |
             build/mapdemo-release.log
+            build/mapdemo-clang.log
             build/mapdemo-asan.log
             build/mapdemo-results/
+            build/mapdemo-clang-results/
             build/mapdemo-asan-results/
           if-no-files-found: ignore
 
