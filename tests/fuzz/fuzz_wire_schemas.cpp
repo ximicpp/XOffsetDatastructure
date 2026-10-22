@@ -7,8 +7,9 @@
 // reject. An accepted wire must re-save byte-identically, and after an edit
 // must re-save to a wire that loads again and re-saves identically.
 //
-// Built twice: as the fuzzer, and with XOFFSET_FUZZ_SEED_MAIN as
-// fuzz_wire_schemas_seeds, which writes a seed corpus.
+// Built three times: as the fuzzer; with XOFFSET_FUZZ_SEED_MAIN as
+// fuzz_wire_schemas_seeds, which writes a seed corpus; and without libFuzzer,
+// linked with replay_main.cpp, as fuzz_wire_schemas_replay (any compiler).
 #include "v2_fuzz_core.hpp"
 
 #include <filesystem>
@@ -167,12 +168,10 @@ std::string seed(std::mt19937_64& rng) {
     for (int i = int(1 + rng() % 12); i > 0; --i) edit(b.root(), rng);
     return b.save_verified();
 }
-} // namespace
-
-#ifdef XOFFSET_FUZZ_SEED_MAIN
-int main(int argc, char** argv) {
-    if (argc != 2) { std::cerr << "usage: fuzz_wire_schemas_seeds <dir>\n"; return 2; }
-    std::filesystem::create_directories(argv[1]);
+// Seed corpus: 48 wires over the three schemas, each prefixed by its tag byte.
+// Returns the number written.
+int write_schema_seeds(const std::string& dir) {
+    std::filesystem::create_directories(dir);
     std::mt19937_64 rng(20261021);
     int written = 0;
     for (int i = 0; i < 48; ++i) {
@@ -181,18 +180,30 @@ int main(int argc, char** argv) {
         // Every seed must pass the check itself.
         std::mt19937_64 local(i);
         if (tag == 0) check<ms::Fixed>(w, local); else if (tag == 1) check<ms::Maps>(w, local); else check<ms::Deep>(w, local);
-        const auto path = std::string(argv[1]) + "/seed-" + std::to_string(i) + ".bin";
+        const auto path = dir + "/seed-" + std::to_string(i) + ".bin";
         std::FILE* f = std::fopen(path.c_str(), "wb");
         if (!f || std::fwrite(&tag, 1, 1, f) != 1 || std::fwrite(w.data(), 1, w.size(), f) != w.size() ||
             std::fclose(f) != 0)
             fail("cannot write " + path);
         ++written;
     }
-    std::cout << "fuzz_wire_schemas_seeds: wrote " << written << " seeds to " << argv[1] << "\n";
+    return written;
+}
+} // namespace
+
+extern "C" int XOffsetFuzzWriteSeeds(const char* dir) {
+    std::cout << "fuzz_wire_schemas: wrote " << write_schema_seeds(dir) << " seeds to " << dir << "\n";
     return 0;
+}
+
+#ifdef XOFFSET_FUZZ_SEED_MAIN
+int main(int argc, char** argv) {
+    if (argc != 2) { std::cerr << "usage: fuzz_wire_schemas_seeds <dir>\n"; return 2; }
+    return XOffsetFuzzWriteSeeds(argv[1]);
 }
 #else
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
+    inject_crash_drill(data, size);
     if (size == 0) return 0;
     const std::string wire(reinterpret_cast<const char*>(data) + 1, size - 1);
     std::uint64_t h = 0xcbf29ce484222325ull;
