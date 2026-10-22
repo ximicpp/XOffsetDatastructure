@@ -8,11 +8,26 @@
 #include <map>
 #include <sstream>
 #include <sys/resource.h>
+#if SC_IR_COUNT
+#include <cstdlib>
+#include <cstring>
+#include <valgrind/callgrind.h>
+#endif
 
 namespace {
 using A=SC_ADAPTER_TYPE;
 using Clock=std::chrono::steady_clock;
 using Opts=std::map<std::string,std::string>;
+#if SC_IR_COUNT
+// Instruction-count build (-DSC_IR_COUNT=1) for the CI performance gate: under
+// valgrind --tool=callgrind --collect-atstart=no, `run` collects only the phase
+// named by SC_IR_PHASE (load, query_before, mutate, emit_after, retire, reload,
+// query_after, cleanup). The default build has no toggles in the timed region.
+const char* ir_phase(){static const char* p=std::getenv("SC_IR_PHASE");return p;}
+#define SC_IR(name) do{if(ir_phase()&&!std::strcmp(ir_phase(),name))CALLGRIND_TOGGLE_COLLECT;}while(0)
+#else
+#define SC_IR(name) do{}while(0)
+#endif
 sc::Bytes read(const std::string& p){
     const auto n=std::filesystem::file_size(p);
     if(n>sc::wire_limit)throw std::runtime_error("input exceeds 512 MiB");
@@ -67,14 +82,14 @@ void run(const Opts& o){
     // state, query answer or final wire is prepared before the primary timer.
     std::vector<sc::QueryResult> before(trace.queries.size()),after(trace.queries.size());
     auto initial_usage=usage();const auto t0=Clock::now();
-    auto state=A::load(input);sc::Bytes{}.swap(input);const auto t1=Clock::now();
-    A::query(state,trace.queries,before);const auto t2=Clock::now();
-    A::mutate(state,trace.mutations);const auto t3=Clock::now();
-    auto final_wire=A::emit(state);const auto t4=Clock::now();
-    state={};const auto t5=Clock::now();
-    auto reloaded=A::load(sc::wire_view(final_wire));const auto t6=Clock::now();
-    A::query(reloaded,trace.queries,after);const auto t7=Clock::now();
-    reloaded={};const auto t8=Clock::now();auto primary_usage=usage();
+    SC_IR("load");auto state=A::load(input);sc::Bytes{}.swap(input);SC_IR("load");const auto t1=Clock::now();
+    SC_IR("query_before");A::query(state,trace.queries,before);SC_IR("query_before");const auto t2=Clock::now();
+    SC_IR("mutate");A::mutate(state,trace.mutations);SC_IR("mutate");const auto t3=Clock::now();
+    SC_IR("emit_after");auto final_wire=A::emit(state);SC_IR("emit_after");const auto t4=Clock::now();
+    SC_IR("retire");state={};SC_IR("retire");const auto t5=Clock::now();
+    SC_IR("reload");auto reloaded=A::load(sc::wire_view(final_wire));SC_IR("reload");const auto t6=Clock::now();
+    SC_IR("query_after");A::query(reloaded,trace.queries,after);SC_IR("query_after");const auto t7=Clock::now();
+    SC_IR("cleanup");reloaded={};SC_IR("cleanup");const auto t8=Clock::now();auto primary_usage=usage();
     need(before==trace.before&&after==trace.after,"timed adapter query result mismatch");
     // Post-audit depends solely on published owning bytes. No old state survives.
     auto audited=A::load(sc::wire_view(final_wire));sc::Bytes canonical;std::uint64_t record_count=0;
