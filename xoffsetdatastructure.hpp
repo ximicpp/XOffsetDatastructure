@@ -1700,6 +1700,13 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
 
+        // delta != 0 is known (a head with capacity names a live block).
+        template <typename T>
+        T* resolve_rel32_live(const std::int32_t* origin, std::int32_t delta) noexcept {
+            auto* base = reinterpret_cast<const char*>(origin);
+            return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
+        }
+
         template <typename T>
         const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
@@ -2174,6 +2181,21 @@ namespace XOffsetDatastructure {
         }
 
         void assign(std::string_view rhs) {
+            if (!is_inline() && rhs.size() - 1u < capacity_) [[likely]] {
+                // Nonempty and fits the out-of-line block. capacity_ != 0
+                // without the inline flag implies a bound head with a live
+                // block, and capacity_ < MAX_PAYLOAD: the checks below are
+                // implied. rhs may alias the block (memmove).
+                auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+                const auto new_size = static_cast<std::uint32_t>(rhs.size());
+                const auto old_size = size_;
+                std::memmove(chars, rhs.data(), new_size);
+                chars[new_size] = '\0';
+                // M4: zero the old characters after the terminator.
+                if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
+                size_ = new_size;
+                return;
+            }
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
