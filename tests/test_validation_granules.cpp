@@ -43,7 +43,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(BigRoot, "tests.validation.granules.big")
 namespace {
 void need(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
 std::size_t oracle_operations{}, priority_cases{}, derived_cases{}, gap_cases{}, storage_cases{},
-    typed_rejections{}, failpoints{};
+    typed_rejections{}, failpoints{}, cursor_operations{};
 
 struct Resource final : std::pmr::memory_resource {
     std::size_t allocations{}, deallocations{}, requested{}, live{};
@@ -67,17 +67,30 @@ struct State {
     std::vector<char> live, dead;
     bool operator==(const State&) const = default;
 };
+// Granule membership as the validator sees it: the cursor's live range
+// [0, cursor) while the cursor path runs, the bitmaps after it.
+bool live_at(const wd::WireValidationContext& c, std::size_t g) {
+    if (c.cursor != wd::WireValidationContext::no_cursor && g * 8 < c.cursor) return true;
+    return c.granules.prepared() && c.granules.member(false, g);
+}
+bool dead_at(const wd::WireValidationContext& c, std::size_t g) {
+    return c.granules.prepared() && c.granules.member(true, g);
+}
 State save(const wd::WireValidationContext& c) {
     State s{c.owned_bytes, c.free_bytes, {}, {}};
-    if (c.granules.prepared())
-        for (std::size_t g = 0; g < c.granules.granules(); ++g) {
-            s.live.push_back(char(c.granules.member(false, g)));
-            s.dead.push_back(char(c.granules.member(true, g)));
-        }
+    for (std::size_t g = 0; g < c.extent() / 8; ++g) {
+        s.live.push_back(char(live_at(c, g)));
+        s.dead.push_back(char(dead_at(c, g)));
+    }
     return s;
 }
 
 using Ranges = std::vector<std::pair<std::size_t, std::size_t>>;
+bool owned_is_prefix(const Ranges& owned, std::size_t prefix) {
+    std::size_t total = 0;
+    for (auto [l, h] : owned) { if (h > prefix) return false; total += h - l; }
+    return total == prefix;
+}
 bool hits(const Ranges& ranges, std::size_t b, std::size_t e) {
     for (auto [l, h] : ranges) if (l < e && b < h) return true;
     return false;
@@ -92,23 +105,30 @@ constexpr const char* free_live = "wire validation detected free-list overlap wi
 constexpr const char* free_free = "wire validation detected overlapping free-list ranges";
 
 // Random registrations (aligned, unaligned, out of bounds, multiword) against
-// unsorted byte intervals. Payload extents straddle the inline limit.
+// unsorted byte intervals. Payload extents straddle the inline limit. With the
+// cursor path on, the first registrations mostly continue the live prefix, so
+// the cursor runs for a while and then hands over to the bitmaps mid-stream.
 void pairwise_oracle() {
+    for (bool cursor : {false, true})
     for (std::size_t extent : {std::size_t{48}, std::size_t{4100}, wd::WireGranuleIndex::inline_extent,
                                wd::WireGranuleIndex::inline_extent + 8, std::size_t{70001}}) {
         std::vector<std::uint64_t> storage(extent / 8 + 2);
         const char* base = reinterpret_cast<const char*>(storage.data());
         Resource upstream;
         {
-            wd::WireValidationContext ctx{.base = base, .end = base + extent, .upstream = &upstream};
+            wd::WireValidationContext ctx{.base = base, .end = base + extent, .upstream = &upstream,
+                                          .cursor = cursor ? 0 : wd::WireValidationContext::no_cursor};
             Ranges owned, free;
+            std::size_t prefix = 0; // end of the contiguous live prefix while only it was registered
             std::uint64_t seed = 0x9e3779b97f4a7c15ULL ^ extent;
             for (std::size_t i = 0; i < 3000; ++i) {
                 seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17;
-                const bool f = seed & 1;
+                const bool extend = cursor && i < 400 && (seed >> 52) % 64 != 0;
+                const bool f = !extend && (seed & 1);
                 std::size_t b = std::size_t((seed >> 8) % (extent + 64));
                 std::size_t n = std::size_t((seed >> 32) % 9 == 0 ? (seed >> 40) % 2048 : (seed >> 40) % 64);
                 if ((seed >> 20) % 8) { b &= ~std::size_t(7); n &= ~std::size_t(7); }
+                if (extend) b = prefix;
                 const char* expected = nullptr;
                 if (n) {
                     if (b > extent || n > extent - b) expected = "granule test: bounds";
@@ -126,14 +146,18 @@ void pairwise_oracle() {
                 need(rejected == (expected != nullptr), "oracle acceptance differs");
                 if (rejected) need(save(ctx) == before, "rejection changed index state");
                 else if (n) (f ? free : owned).emplace_back(b, b + n);
+                if (!rejected && n && !f && b == prefix && free.empty()) prefix += n;
+                if (cursor && ctx.cursor != wd::WireValidationContext::no_cursor)
+                    need(ctx.cursor == prefix && free.empty() && owned_is_prefix(owned, prefix), "cursor is not the live prefix");
+                if (cursor && ctx.cursor != wd::WireValidationContext::no_cursor) ++cursor_operations;
                 std::uint64_t ob = 0, fb = 0;
                 for (auto [l, h] : owned) ob += h - l;
                 for (auto [l, h] : free) fb += h - l;
                 need(ctx.owned_bytes == ob && ctx.free_bytes == fb, "coverage byte counts differ");
-                if (i % 97 == 0 && ctx.granules.prepared())
-                    for (std::size_t g = 0; g < ctx.granules.granules(); ++g) {
-                        need(ctx.granules.member(false, g) == hits(owned, g * 8, g * 8 + 8), "live bitmap differs");
-                        need(ctx.granules.member(true, g) == hits(free, g * 8, g * 8 + 8), "free bitmap differs");
+                if (i % 97 == 0 || (cursor && i < 450))
+                    for (std::size_t g = 0; g < extent / 8; ++g) {
+                        need(live_at(ctx, g) == hits(owned, g * 8, g * 8 + 8), "live bitmap differs");
+                        need(dead_at(ctx, g) == hits(free, g * 8, g * 8 + 8), "free bitmap differs");
                     }
                 ++oracle_operations;
             }
@@ -187,9 +211,8 @@ void derived_extent_error_order() {
             const auto block = (request + 7u) & ~std::size_t(7u);
             for (std::size_t g = 0; g < 512; ++g) {
                 const bool inside = g * 8 >= begin && g * 8 < begin + block;
-                const bool was = ctx.granules.prepared() && !before.live.empty() &&
-                    (incoming_free ? before.dead[g] : before.live[g]);
-                need(ctx.granules.member(incoming_free, g) == (inside || was), "derived extent is not round8(request)");
+                const bool was = incoming_free ? before.dead[g] : before.live[g];
+                need((incoming_free ? dead_at(ctx, g) : live_at(ctx, g)) == (inside || was), "derived extent is not round8(request)");
             }
             need((incoming_free ? ctx.free_bytes - before.free : ctx.owned_bytes - before.owned) == block,
                  "coverage byte count is not the derived extent");
@@ -438,17 +461,19 @@ void typed_head_checks() {
     }
 }
 
-std::string big_wire(bool holes) {
+// Payloads above 32 KiB. Preorder: values, then tail, right after the root
+// (the cursor path validates it). Holes: a retired block before the tail.
+// Reversed: no holes, tail before values (the bitmaps validate it).
+enum class Big { preorder, holes, reversed };
+std::string big_wire(Big kind) {
     auto buffer = xo::XBuffer::create<BigRoot>(1u << 16,
         xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
     auto& r = buffer.root<BigRoot>();
-    if (holes) {
-        r.values.reserve(4);
-        r.tail = std::string(100, 'z');
-    }
+    if (kind == Big::holes) r.values.reserve(4);
+    if (kind != Big::preorder) r.tail = std::string(100, 'z');
     r.values.reserve(6000); // with holes: the 4-element block retires before the tail
     for (std::uint64_t i = 0; i < 6000; ++i) r.values.push_back(i * 3);
-    if (!holes) r.tail = std::string(100, 'z');
+    if (kind == Big::preorder) r.tail = std::string(100, 'z');
     return buffer.save_verified<BigRoot>();
 }
 
@@ -457,9 +482,9 @@ std::string big_wire(bool holes) {
 // next load recovers. A reload loop over a hole-free large wire allocates
 // nothing after its first reload.
 void typed_new_failures() {
-    for (bool holes : {false, true}) {
-        const auto wire = big_wire(holes), copy = wire;
-        need((read_at<xo::XWireHeaderV2>(wire, 0).hole_count != 0) == holes, "big fixture hole table");
+    for (Big kind : {Big::preorder, Big::holes, Big::reversed}) {
+        const auto wire = big_wire(kind), copy = wire;
+        need((read_at<xo::XWireHeaderV2>(wire, 0).hole_count != 0) == (kind == Big::holes), "big fixture hole table");
         const auto outside = fail_new::live();
         { fail_new::Arm arm(-1); auto loaded = xo::XBuffer::load_verified<BigRoot>(wire); }
         const auto points = fail_new::attempts;
@@ -477,7 +502,16 @@ void typed_new_failures() {
             ++failpoints;
         }
         need(fail_new::live() == outside, "typed-load sweep retained allocations");
-        if (!holes) {
+        if (kind == Big::preorder) {
+            // The cursor path needs no bitmap words, even with none retained.
+            auto reloader = xo::XBuffer::create<BigRoot>(4096, xo::XBuffer::maximum_capacity(1u << 22));
+            reloader.reload_verified<BigRoot>(wire);
+            reloader.release_reload_scratch();
+            { fail_new::Arm arm(-1); reloader.reload_verified<BigRoot>(wire); }
+            need(fail_new::attempts == 0, "cursor path reload of a large preorder wire allocated host memory");
+            need(reloader.save_verified<BigRoot>() == copy, "cursor path reload differs");
+        }
+        if (kind == Big::reversed) {
             auto reloader = xo::XBuffer::create<BigRoot>(4096, xo::XBuffer::maximum_capacity(1u << 22));
             reloader.reload_verified<BigRoot>(wire);
             { fail_new::Arm arm(-1); reloader.reload_verified<BigRoot>(wire); reloader.reload_verified<BigRoot>(wire); }
@@ -511,6 +545,7 @@ int main() {
         pairwise_oracle(); global_priority(); derived_extent_error_order(); gaps_and_recomputed_runs();
         storage(); typed_head_checks(); typed_new_failures(); alignment_fallback();
         std::cout << "{\"status\":\"passed\",\"oracle_operations\":" << oracle_operations
+                  << ",\"cursor_operations\":" << cursor_operations
                   << ",\"priority_cases\":" << priority_cases << ",\"derived_extent_cases\":" << derived_cases
                   << ",\"gap_cases\":" << gap_cases << ",\"storage_cases\":" << storage_cases
                   << ",\"typed_rejections\":" << typed_rejections << ",\"typed_new_failpoints\":" << failpoints

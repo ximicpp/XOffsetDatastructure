@@ -48,6 +48,30 @@ std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
     out.push_back(std::move(longer));
     return out;
 }
+// Every acceptor's outcome ("ok" or the exact error) for one input.
+std::string outcomes(const std::string& w) {
+    std::string terr, lerr, rerr, verr;
+    std::string line = std::string("T:") + (typed_load(w, &terr) ? "ok" : terr) +
+                       " L:" + (reload_accepts(w, &lerr) ? "ok" : lerr);
+    const auto o = oracle(w);
+    if (o.ok || o.stage == Oracle::Stage::Payload) {
+        line += std::string(" R:") + (raw_accepts(w, &rerr) ? "ok" : rerr);
+        line += std::string(" V:") + (receive_accepts(w, &verr) ? "ok" : verr);
+    }
+    return line;
+}
+
+// The cursor path is a shortcut of the bitmaps: with it off, every outcome
+// and every first error must be the same.
+std::size_t cursor_compared = 0;
+void compare_cursor_off(const std::string& w, std::size_t id) {
+    const auto on = outcomes(w);
+    xo::detail::wire_validation_cursor = false;
+    const auto off = outcomes(w);
+    xo::detail::wire_validation_cursor = true;
+    if (on != off) fail("case " + std::to_string(id) + ": cursor on {" + on + "} off {" + off + "}");
+    ++cursor_compared;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -89,6 +113,7 @@ int main(int argc, char** argv) {
         auto w = base;
         const int n = 1 + int(rng() % 3);
         for (int k = 0; k < n; ++k) mutate_wire(w, rng, heads);
+        compare_cursor_off(w, c);
         switch (check_case(w, rng, c)) {
         case Outcome::Accepted: ++accepted; break;
         case Outcome::HeaderReject: ++header_rejects; break;
@@ -102,6 +127,7 @@ int main(int argc, char** argv) {
         for (int m = 0; m <= 300; ++m) {
             auto w = base;
             for (int k = m == 0 ? 0 : 1 + int(rng() % 3); k > 0; --k) mutate_wire(w, rng, heads);
+            compare_cursor_off(w, cases + boundary_cases);
             switch (check_case(w, rng, cases + boundary_cases++)) {
             case Outcome::Accepted: ++accepted; break;
             case Outcome::HeaderReject: ++header_rejects; break;
@@ -112,6 +138,6 @@ int main(int argc, char** argv) {
     if (sparse == 0) fail("no sparse wire in the pool");
     std::cout << "test_v2_fuzz: golden=" << pool.size() << " sparse=" << sparse << " cases=" << cases << " boundary_cases=" << boundary_cases << " accepted=" << accepted
               << " header_rejects=" << header_rejects << " payload_rejects=" << payload_rejects
-              << " inconsistencies=0\n";
+              << " cursor_off_compared=" << cursor_compared << " inconsistencies=0\n";
     return 0;
 }

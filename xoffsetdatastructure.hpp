@@ -46,6 +46,10 @@
 #include <atomic>
 #include <map>
 #include <unordered_map>
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+#include <cstdio>
+#include <typeinfo>
+#endif
 #include "xoffset_virtual_memory.hpp"
 
 // TypeLayout library — the authoritative byte-copy-safety engine.
@@ -3535,6 +3539,11 @@ namespace XOffsetDatastructure {
             return is_v1_wire_admitted_impl<std::remove_cvref_t<T>>::value;
         }
 
+        // Validation errors leave the hot path through one out-of-line call.
+        [[noreturn, gnu::cold, gnu::noinline]] inline void wire_reject(const char* what) {
+            throw XException(what);
+        }
+
         // Retained validation words of one long-lived reload buffer: the
         // bitmaps of payloads above WireGranuleIndex::inline_extent reuse
         // them message after message instead of a fresh host block. They grow
@@ -3689,7 +3698,50 @@ namespace XOffsetDatastructure {
             std::uint64_t inline_[2 * inline_words];
         };
 
+        // Test switch for the cursor path below (differential on/off runs).
+        inline constinit bool wire_validation_cursor = true;
+
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+        // Diagnostic build only: layout classes, per root type, of the wires
+        // that pass verified validation, printed to stderr at exit.
+        // canonical: the cursor path validated the whole graph. ascending:
+        // live blocks in visiting order at rising offsets, with holes between
+        // them. out_of_order: some block starts below the end of the previous
+        // one (first_offset_sum adds the payload offset of the first such
+        // block, out_of_order_blocks counts them all).
+        struct WireLayoutStats {
+            const char* type = nullptr;
+            WireLayoutStats* next = nullptr;
+            std::uint64_t canonical = 0, ascending = 0, out_of_order = 0;
+            std::uint64_t out_of_order_blocks = 0, first_offset_sum = 0;
+        };
+        inline WireLayoutStats* wire_layout_stats_list = nullptr;
+        struct WireLayoutStatsReport {
+            ~WireLayoutStatsReport() {
+                for (auto* s = wire_layout_stats_list; s; s = s->next)
+                    std::fprintf(stderr,
+                        "xoffset layout stats %s: canonical %llu ascending %llu out_of_order %llu"
+                        " out_of_order_blocks %llu first_offset_sum %llu\n", s->type,
+                        (unsigned long long)s->canonical, (unsigned long long)s->ascending,
+                        (unsigned long long)s->out_of_order, (unsigned long long)s->out_of_order_blocks,
+                        (unsigned long long)s->first_offset_sum);
+            }
+        };
+        inline WireLayoutStatsReport wire_layout_stats_report;
+        template <typename T> inline WireLayoutStats wire_layout_stats_of{};
+        template <typename T> WireLayoutStats& wire_layout_stats() {
+            auto& s = wire_layout_stats_of<T>;
+            if (!s.type) {
+                s.type = typeid(T).name();
+                s.next = wire_layout_stats_list;
+                wire_layout_stats_list = &s;
+            }
+            return s;
+        }
+#endif
+
         struct WireValidationContext {
+            static constexpr std::size_t no_cursor = ~std::size_t(0);
             const char* base{};
             const char* end{};
             XArena* segment{};
@@ -3702,7 +3754,19 @@ namespace XOffsetDatastructure {
             // buffer's retained words when set, else one upstream block.
             std::pmr::memory_resource* upstream = std::pmr::new_delete_resource();
             WireValidationScratch* retained = nullptr;
+            // Cursor path: while no hole is registered and every live block
+            // starts where the previous one ended (canonical preorder), the
+            // live set is exactly [0, cursor) and no bitmap is touched. At the
+            // first block elsewhere, or the first hole, the live bitmap is set
+            // to [0, cursor) (the state the bitmaps would have reached) and
+            // validation continues on the bitmaps, so accept/reject and the
+            // first error are unchanged. no_cursor: bitmaps only.
+            std::size_t cursor = wire_validation_cursor ? 0 : no_cursor;
             WireGranuleIndex granules;
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            std::size_t stats_end = 0, stats_first = no_cursor;
+            std::uint64_t stats_out_of_order = 0;
+#endif
 
             std::size_t extent() const noexcept {
                 return static_cast<std::size_t>(reinterpret_cast<std::uintptr_t>(end) -
@@ -3711,6 +3775,15 @@ namespace XOffsetDatastructure {
             WireGranuleIndex& index() {
                 if (!granules.prepared()) granules.prepare(extent(), upstream, retained);
                 return granules;
+            }
+            // The bitmaps with the cursor's live range folded in.
+            WireGranuleIndex& general() {
+                auto& bits = index();
+                if (cursor != no_cursor) {
+                    if (cursor) bits.mark(false, 0, cursor / 8u);
+                    cursor = no_cursor;
+                }
+                return bits;
             }
         };
 
@@ -3727,32 +3800,53 @@ namespace XOffsetDatastructure {
                                            const char* what) {
             if (bytes == 0) return;
             if (!ptr) {
-                throw XException(what);
+                wire_reject(what);
             }
             auto begin = reinterpret_cast<std::uintptr_t>(ptr);
             auto base = reinterpret_cast<std::uintptr_t>(ctx.base);
             auto end = reinterpret_cast<std::uintptr_t>(ctx.end);
             if (begin < base || begin > end || bytes > end - begin) {
-                throw XException(what);
+                wire_reject(what);
             }
             if ((reinterpret_cast<std::uintptr_t>(ptr) % alignment) != 0) {
-                throw XException(what);
+                wire_reject(what);
             }
         }
+
+        void register_owned_bitmap(std::size_t begin, std::size_t bytes, WireValidationContext& ctx);
 
         // Registers granules [begin, begin + bytes) of a range that is already
         // known to lie in the payload on 8-byte granules.
         XOFFSET_DETAIL_V4_INLINE void register_owned_granules(std::size_t begin, std::size_t bytes,
                                                               WireValidationContext& ctx) {
-            auto& index = ctx.index();
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            if (begin < ctx.stats_end) {
+                if (ctx.stats_first == WireValidationContext::no_cursor) ctx.stats_first = begin;
+                ++ctx.stats_out_of_order;
+            }
+            ctx.stats_end = begin + bytes;
+#endif
+            if (begin == ctx.cursor) [[likely]] {
+                ctx.cursor += bytes;
+                ctx.owned_bytes += bytes;
+                return;
+            }
+            register_owned_bitmap(begin, bytes, ctx);
+        }
+
+        // Bitmap registration, kept out of line so that the validators the
+        // cursor path inlines into stay small.
+        [[gnu::noinline]] inline void register_owned_bitmap(std::size_t begin, std::size_t bytes,
+                                                            WireValidationContext& ctx) {
+            auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
             const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
-                throw XException(
+                wire_reject(
                     "wire validation detected overlapping dynamic ranges");
             }
             if (overlap == 2) {
-                throw XException("wire validation detected live/free overlap");
+                wire_reject("wire validation detected live/free overlap");
             }
             index.mark(false, g0, g1);
             ctx.owned_bytes += bytes;
@@ -3768,7 +3862,7 @@ namespace XOffsetDatastructure {
             const auto begin = static_cast<std::size_t>(
                 reinterpret_cast<std::uintptr_t>(ptr) -
                 reinterpret_cast<std::uintptr_t>(ctx.base));
-            if (((begin | bytes) & 7u) != 0) throw XException(what);
+            if (((begin | bytes) & 7u) != 0) wire_reject(what);
             return begin;
         }
 
@@ -3786,15 +3880,15 @@ namespace XOffsetDatastructure {
             if (bytes == 0 || !ptr) return;
             validate_storage_range(ptr, bytes, 1, ctx, what);
             const auto begin = granule_range_offset(ptr, bytes, ctx, what);
-            auto& index = ctx.index();
+            auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
             const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
-                throw XException(
+                wire_reject(
                     "wire validation detected free-list overlap with live ranges");
             }
             if (overlap == 2) {
-                throw XException(
+                wire_reject(
                     "wire validation detected overlapping free-list ranges");
             }
             index.mark(true, g0, g1);
@@ -3812,7 +3906,7 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_V4_INLINE void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
             if (delta == 0 || checked_relative(delta, ctx) != ctx.base) {
-                throw XException("wire validation: invalid allocator binding");
+                wire_reject("wire validation: invalid allocator binding");
             }
         }
 
@@ -3869,7 +3963,7 @@ namespace XOffsetDatastructure {
                 if (hole.bytes == 0 || (hole.bytes & 7u) != 0 || (hole.offset & 7u) != 0 ||
                     hole.offset < sizeof(XArena) || hole.offset > used ||
                     hole.bytes > used - hole.offset) {
-                    throw XException("wire validation failed: invalid hole table entry");
+                    wire_reject("wire validation failed: invalid hole table entry");
                 }
                 register_free_range(ctx.base + hole.offset, hole.bytes, ctx,
                                     "wire validation failed: invalid hole table entry");
@@ -3884,17 +3978,17 @@ namespace XOffsetDatastructure {
             for (std::size_t i = 0; i < count; ++i) {
                 const auto gap = gaps[i];
                 if (gap.bytes == 0) continue;
-                const auto& index = ctx.index();
+                const auto& index = ctx.general();
                 const auto g0 = std::size_t(gap.offset) / 8u;
                 const auto g1 = (std::size_t(gap.offset) + gap.bytes + 7u) / 8u;
                 if (g1 > index.granules() || !index.all_free(g0, g1))
-                    throw XException("wire validation failed: sparse gap is not free");
+                    wire_reject("wire validation failed: sparse gap is not free");
             }
         }
 
         inline void require_exact_coverage(const WireValidationContext& ctx) {
             if (ctx.owned_bytes + ctx.free_bytes != static_cast<std::uint64_t>(ctx.end - ctx.base)) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: payload is not exactly covered by live blocks and holes");
             }
         }
@@ -3905,7 +3999,7 @@ namespace XOffsetDatastructure {
         template <typename Fn>
         void for_each_unowned_run(WireValidationContext& ctx, Fn&& fn) {
             const auto used = ctx.extent();
-            const auto& index = ctx.index();
+            const auto& index = ctx.general();
             std::size_t g = 0;
             const auto count = index.granules();
             while (g < count) {
@@ -3972,10 +4066,10 @@ namespace XOffsetDatastructure {
             std::memcpy(bytes, head + 4, sizeof(bytes));
             const unsigned length = bytes[11] & 0x7fu;
             if (length > XFixedString::inline_max)
-                throw XException("wire validation failed: inline XFixedString length exceeds 10");
+                wire_reject("wire validation failed: inline XFixedString length exceeds 10");
             for (unsigned i = length; i < 11; ++i) {
                 if (bytes[i] != 0)
-                    throw XException("wire validation failed: inline XFixedString has nonzero padding");
+                    wire_reject("wire validation failed: inline XFixedString has nonzero padding");
             }
         }
 
@@ -3987,12 +4081,12 @@ namespace XOffsetDatastructure {
                 return;
             }
             if (value.size_ > value.capacity_ || value.capacity_ >= XBufferCore::MAX_PAYLOAD) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedString size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    throw XException(
+                    wire_reject(
                         "wire validation failed: empty XFixedString has invalid payload");
                 }
                 return;
@@ -4008,7 +4102,7 @@ namespace XOffsetDatastructure {
                 register_allocation(data, block, 8, ctx);
             }
             if (data[value.size_] != '\0') {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedString missing terminator");
             }
         }
@@ -4019,12 +4113,12 @@ namespace XOffsetDatastructure {
             check_binding(value.arena_delta, ctx);
             if (value.size_ > value.capacity_ ||
                 value.capacity_ > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(T)) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedVector size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    throw XException(
+                    wire_reject(
                         "wire validation failed: empty XFixedVector has invalid payload");
                 }
                 return;
@@ -4074,7 +4168,7 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_same_v<CleanT, bool>) {
                 unsigned char bits;
                 std::memcpy(&bits, &value, 1);
-                if (bits > 1) throw XException("wire validation: invalid bool representation");
+                if (bits > 1) wire_reject("wire validation: invalid bool representation");
             } else if constexpr (std::is_array_v<CleanT>) {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
                     for (const auto& elem : value) validate_wire_value(elem, ctx);
@@ -4083,17 +4177,19 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
-                for (std::uint32_t i = 1; i < value.size(); ++i) {
-                    if (!fixed_detail::ordered_less(value.data()[i - 1], value.data()[i]))
-                        throw XException("wire validation: set keys not strictly ordered");
-                }
+                // No early exit: one error, and the loop vectorizes.
+                bool unordered = false;
+                for (std::uint32_t i = 1; i < value.size(); ++i)
+                    unordered |= !fixed_detail::ordered_less(value.data()[i - 1], value.data()[i]);
+                if (unordered) wire_reject("wire validation: set keys not strictly ordered");
             } else if constexpr (is_fixed_flat_map_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
-                for (std::uint32_t i = 1; i < value.size(); ++i) {
-                    if (!fixed_detail::ordered_less(value.data()[i - 1].first, value.data()[i].first))
-                        throw XException("wire validation: map keys not strictly ordered");
-                }
+                // No early exit: one error, and the loop vectorizes.
+                bool unordered = false;
+                for (std::uint32_t i = 1; i < value.size(); ++i)
+                    unordered |= !fixed_detail::ordered_less(value.data()[i - 1].first, value.data()[i].first);
+                if (unordered) wire_reject("wire validation: map keys not strictly ordered");
             } else if constexpr (is_fixed_vector_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
@@ -4127,7 +4223,7 @@ namespace XOffsetDatastructure {
             // allocator/load invariant), so it only turns a corrupted extent
             // into this error instead of an out-of-bounds validation context.
             if (used > xbuf.segment_size())
-                throw XException("wire validation: payload extent out of bounds");
+                wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             WireValidationContext ctx{
                 .base = static_cast<const char*>(xbuf.get_address()),
@@ -4137,7 +4233,7 @@ namespace XOffsetDatastructure {
                 .retained = retained
             };
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
-                throw XException("wire validation: unsupported arena header flags");
+                wire_reject("wire validation: unsupported arena header flags");
             }
             register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header");
             if (holes) register_wire_holes(holes, hole_count, ctx);
@@ -4145,6 +4241,18 @@ namespace XOffsetDatastructure {
             validate_wire_value(root, ctx);
             if (check_coverage) require_exact_coverage(ctx);
             if (gaps) require_gaps_free(gaps->data(), gaps->size(), ctx);
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            auto& stats = wire_layout_stats<T>();
+            if (ctx.cursor != WireValidationContext::no_cursor) {
+                ++stats.canonical;
+            } else if (ctx.stats_out_of_order == 0) {
+                ++stats.ascending;
+            } else {
+                ++stats.out_of_order;
+                stats.out_of_order_blocks += ctx.stats_out_of_order;
+                stats.first_offset_sum += ctx.stats_first;
+            }
+#endif
             if (recomputed) {
                 // Every byte not covered by a live block is free.
                 recomputed->clear();
