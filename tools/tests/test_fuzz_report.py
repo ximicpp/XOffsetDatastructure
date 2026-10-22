@@ -199,6 +199,38 @@ class Report(unittest.TestCase):
         [crash] = [i for i in self.gh.issues_list if 'fuzz-crash' in i['labels']]
         self.assertIn('not pushed, the finding has no input file', crash['body'])
 
+    def test_reads_what_fuzz_findings_writes(self):
+        """End to end with tools/fuzz_findings.py and a wrapper that prints a drill crash."""
+        import subprocess
+        artifacts = Path(self.root) / 'fuzz-artifacts'
+        artifacts.mkdir()
+        (artifacts / 'v2_wire-crash-1234').write_bytes(b'XOFFSET-INJECT')
+        wrapper = Path(self.root) / 'wrapper'
+        wrapper.write_text('#!/bin/sh\n'
+                           'echo "XOFFSET_FUZZ_INJECT_CRASH: injected crash (drill input)"\n'
+                           'echo "==1==ERROR: AddressSanitizer: ABRT on unknown address 0x1 (pc 0x2 bp 0x3 sp 0x4 T0)"\n'
+                           'echo "    #0 0x5 in abort (/lib/x86_64-linux-gnu/libc.so.6+0x1)"\n'
+                           'echo "    #1 0x6 in inject_crash_drill(unsigned char const*, unsigned long) '
+                           '/workspace/tests/fuzz/v2_fuzz_core.hpp:115:9"\n'
+                           'echo "    #2 0x7 in LLVMFuzzerTestOneInput /workspace/tests/fuzz/fuzz_v2_wire.cpp:12:5"\n'
+                           'exit 1\n')
+        wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
+        out = Path(self.root) / 'art' / 'fuzz-v2_wire' / 'fuzz-report' / 'v2_wire'
+        subprocess.run([sys.executable, str(SCRIPT.parent / 'fuzz_findings.py'), 'findings', '--target', 'v2_wire',
+                        '--bin', 'build/fuzz/bin/Debug/fuzz_v2_wire', '--flags=-timeout=30',
+                        '--artifacts', str(artifacts), '--out', str(out), '--wrapper', str(wrapper),
+                        '--minimize-seconds', '1'], check=True, capture_output=True)
+        (out / 'stats.json').write_text(json.dumps({'fuzzer_exit': '0'}))
+        write_job(self.root, 'wire_schemas')
+        result = self.run_report(needs={'libfuzzer': {'result': 'failure'}})
+        self.assertEqual(result['infra_failures'], [])
+        [issue] = self.gh.issues_list
+        self.assertRegex(issue['title'], r'^\[fuzz\] v2_wire: asan: ABRT in inject_crash_drill \([0-9a-f]{10}\)$')
+        [(branch, (sha, path, content))] = self.gh.branches.items()
+        self.assertEqual((sha, content), (SHA, b'XOFFSET-INJECT'))
+        self.assertEqual(path, 'tests/fuzz/regressions/v2_wire/' + branch.split('/')[1])
+        self.assertIn('build/xo-docker build/fuzz/bin/Debug/fuzz_v2_wire -timeout=30 fuzz-repro/v2_wire-', issue['body'])
+
 
 def watch_args(**kwargs):
     base = dict(hours=36, manual=False, workflow='fuzz.yml', branch='next_cpp26',
