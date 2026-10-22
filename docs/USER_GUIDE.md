@@ -70,10 +70,11 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 （SLG 原型里 2000 条行军每 tick 逐条删除，每周期约 160 万次元素搬移）。
 
 - 批量删除用 `stable_erase_if`：一次遍历，保持原顺序，每个保留的元素最多挪一次。
-- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，下面两个声明会打开更快的
-  路径。它们是对**源码**的承诺：记录只有普通的非静态成员，没有基类、`union`、
-  位域、`[[no_unique_address]]`，成员互不重叠。库不靠反射猜测这些性质，声明错了
-  是未定义行为。
+- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，用 `XOFFSET_ORDINARY_RECORDS`
+  声明这些记录类型（连同它们作为成员用到的记录类型），会打开更快的路径：中间
+  `erase`/`insert`、追加扩容和 `reserve` 都用一次 memmove/memcpy 挪动整段元素，只重建
+  内联容器头；`stable_erase_if` 也随之可用。声明是对**源码**的承诺：记录只有普通的非静态
+  成员，没有基类、`union`、位域、`[[no_unique_address]]`，成员互不重叠。
 
 ```cpp
 struct Troop { std::int32_t type{}; std::int32_t count{}; };
@@ -83,18 +84,19 @@ struct March {
     XVector<Troop> troops;
 };
 
-namespace XOffsetDatastructure {
-// 中间 erase/insert 一次 memmove 挪动，只重建内联容器头（成员类型也要声明）。
-template<> struct wire_record_layout<Troop> { static constexpr bool ordinary_members = true; };
-template<> struct wire_record_layout<March> { static constexpr bool ordinary_members = true; };
-// 允许对 XVector<March> 调用 stable_erase_if。
-template<> struct StableEraseOrdinaryMembers<March> : std::true_type {};
-}
+// 全局作用域，放在类型定义之后、第一次在容器里使用之前。
+XOFFSET_ORDINARY_RECORDS(Troop, March)
 
 marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 ```
 
-- 不写这些声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
+- 宏对每个类型做编译期检查：必须是类（不是 `union`），没有基类和位域，成员的
+  `[偏移, 偏移 + sizeof)` 两两不相交。共享存储的 `[[no_unique_address]]` 成员会被
+  查出来；但「可以重叠、只是这次没重叠」的成员查不出来，所以声明仍然是源码承诺，
+  声明错了是未定义行为。库不会在没有声明时自动认定。
+- 宏展开成 `wire_record_layout<T>::ordinary_members = true` 和
+  `StableEraseOrdinaryMembers<T>` 两个特化；手写这两个特化效果相同，但没有检查。
+- 不写声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
   `stable_erase_if` 不可用（编译期报错）。两条路径输出的 wire 字节相同。
 
 ## 4. 保存与加载
