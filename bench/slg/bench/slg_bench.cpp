@@ -176,6 +176,9 @@ int main(int argc, char** argv) {
     std::vector<SampleWires> keep(rs.size());
 
     for (int c = 0; c < cycles; ++c) {
+#if SLG_IR_COUNT
+        ir_cycle() = c;
+#endif
         for (std::size_t i = order.size(); i > 1; --i) std::swap(order[i - 1], order[std::size_t(shuffle_rng.below(int(i)))]);
         std::vector<CycleStats> st(rs.size());
         const bool keep_wires = mode == "verify" && c + 1 == cycles;
