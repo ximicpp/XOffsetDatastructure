@@ -227,6 +227,43 @@ void query_changes_and_randomized_oracle() {
     emit("seeded-size-alignment-switching", 3000, a.oracle);
 }
 
+// D3: allocate_block and retire_block decide the exact-bin hit, the unpadded
+// bump and the retire into a bin with spare capacity inline; every other
+// request takes the general path. A long seeded sequence that switches
+// between both (repeated small sizes, bins that fill and grow, splits, large
+// blocks, alignment above 8) must match the policy oracle after every
+// operation, and every retired block (inline or general) reads as zero.
+void inline_and_general_paths_interleaved() {
+    Arena a; std::mt19937_64 rng(0x44335f696e6c696eull);
+    struct Live { void* p; std::uint32_t n; }; std::vector<Live> live;
+    const std::uint32_t sizes[] = {8, 16, 16, 24, 32, 32, 48, 64, 64, 72, 96, 128, 4096, 4104, 6000};
+    std::size_t aligned = 0;
+    for (unsigned i = 0; i < 20000; ++i) {
+        const auto pick = rng() % 8;
+        if (!live.empty() && (pick < 3 || live.size() > 600)) {
+            const auto at = rng() % live.size(); const auto b = live[at];
+            a.retire(b.p, b.n);
+            const auto* bytes = static_cast<const unsigned char*>(b.p);
+            need(std::all_of(bytes, bytes + block_of(b.n), [](unsigned char c) { return c == 0; }),
+                 "retired block was not zeroed");
+            live[at] = live.back(); live.pop_back();
+        } else {
+            const auto n = sizes[rng() % 15];
+            const std::size_t alignment = rng() % 16 == 0 ? (++aligned, std::size_t{16} << (rng() % 3))
+                                                          : std::size_t{1} << (rng() % 4);
+            auto* p = a.alloc(n, alignment);
+            std::memset(p, 0xa5, block_of(n));
+            live.push_back({p, n});
+        }
+        if (i % 101 == 0) a.check_tiling();
+    }
+    for (const auto& b : live) a.retire(b.p, b.n);
+    a.check_tiling();
+    need(a.oracle.reused > 5000 && a.oracle.splits > 0 && a.oracle.bumped > 500 && aligned > 0,
+         "interleaved workload did not exercise both paths");
+    emit("inline-and-general-paths-interleaved", 20000, a.oracle);
+}
+
 // Replaces the V1 "middle removal with unchanged head" cursor case: a larger
 // free block is split, never handed out whole, and the remainder is reused.
 void split_and_remainder_reuse() {
@@ -368,7 +405,8 @@ void existing_owner_and_invalid_requests() {
 int main() {
     try {
         for (auto n : {512u, 1024u, 2048u, 4096u}) { mixed(n, false); mixed(n, true); }
-        actual_M_prefix(); query_changes_and_randomized_oracle(); split_and_remainder_reuse();
+        actual_M_prefix(); query_changes_and_randomized_oracle(); inline_and_general_paths_interleaved();
+        split_and_remainder_reuse();
         tail_alignment_and_expansion(); lifecycle_move_swap_reload(); existing_owner_and_invalid_requests();
         std::cout << "{\"status\":\"passed\",\"performance_measurement\":false}\n";
         return 0;

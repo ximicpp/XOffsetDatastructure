@@ -1,0 +1,22 @@
+// SLG prototype: FlatBuffers schema mirroring include/slg/model_std.hpp.
+// Fixed-size records are structs (stored inline); maps are sorted vectors of key/value structs.
+namespace slg.fb;
+
+struct Buff  { id:int; stacks:int; expire_ms:long; }
+struct Skill { id:int; level:int; }
+struct Troop { type:int; count:int; wounded:int; }
+struct Event { round:int; hero_id:int; skill_id:int; target:int; damage:int; }
+struct Tile  { x:int; y:int; terrain:int; level:int; owner:long; }
+struct KV32  { k:int; v:int; }
+struct KV64  { k:int; v:long; }
+
+table Hero { id:int; level:int; star:int; name:string; skills:[Skill]; buffs:[Buff]; }
+table Army { army_id:long; owner_id:long; x:int; y:int; heroes:[Hero]; troops:[Troop]; buffs:[Buff]; }
+table City { city_id:long; level:int; buildings:[KV32]; resources:[KV64]; }
+table PlayerState { player_id:long; name:string; city:City; armies:[Army]; heroes:[Hero]; research:[KV32]; items:[KV64]; }
+table Report { battle_id:long; summary:string; events:[Event]; }
+table BattleMsg { battle_id:long; seed:long; winner:int; attacker:Army; defender:Army; report:Report; }
+table March { march_id:long; owner:long; from_x:int; from_y:int; to_x:int; to_y:int; eta:int; troops:[Troop]; }
+table ShardState { shard_id:int; tick:long; width:int; tiles:[Tile]; cities:[City]; marches:[March]; }
+
+root_type BattleMsg;
