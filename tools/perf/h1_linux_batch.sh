@@ -13,6 +13,8 @@
 #   PAIRS (16) PAIRS_SEC (8) PAIRS_O2 (8) AA_PAIRS (3) AA_RANGE (0.05) DRIFT_RANGE (0.05)
 #   PIN_CPU (2) QUIET_S (60) LOAD_MAX (3)
 #   CYCLES (41) SCALE (M) FORMATS (xoffset,cereal,protobuf,flatbuffers)
+#   LIB_COMMIT  measured next_cpp26 commit (required; the freeze refuses library-code differences)
+#   RUNTIME_IMAGE  runtime image digest, recorded in the freeze
 set -euo pipefail
 W=$(mkdir -p "$1" && cd "$1" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -62,6 +64,16 @@ else
   echo "V6 path_audit: GCC only ($(grep -vc '^#' "$W/path_audit_gcc.txt") lines), no clang to compare" | tee "$W/v6.txt"
 fi
 "$GCC_OUT/slg_strlen" --scale "$SCALE" --cycles "$CYCLES" > "$W/strlen.txt"
+
+# Pre-registration for this machine (H1 section 5.7), written before the first timed run.
+FZ=(--out "$W/FREEZE.json" --lib-commit "${LIB_COMMIT:?}" --bin "$NA=$A" --bin "$NB=$B"
+    --compiler gcc="g++" --pairs "$PAIRS" --pairs-secondary "$PAIRS_SEC" --aa-pairs "$AA_PAIRS" --pin-cpu "$PIN_CPU"
+    --aa-range "$AA_RANGE" --drift-range "$DRIFT_RANGE" --repeats 3
+    --bench-args "${BENCH[*]}" --formats "$FORMATS" --extra "runtime_image=${RUNTIME_IMAGE:-}" --extra "platform=$(uname -m)")
+[ -n "$CLANG_OUT" ] && FZ+=(--extra "clang=$(head -1 "$CLANG_OUT/compiler_version.txt")")
+for f in "$HERE/xc_ab.py" "$HERE/h1_build.sh" "$HERE/h1_linux_batch.sh"; do FZ+=(--file "$(basename "$f")=$f"); done
+[ -f "$HERE/../../bench/slg/MANIFEST" ] && FZ+=(--file "bench/slg/MANIFEST=$HERE/../../bench/slg/MANIFEST")
+$XC freeze "${FZ[@]}"
 
 # Primary protocol (c): SLG_REUSE=1.
 $XC run --protocol xcomp --pairs "$PAIRS" --aa-pairs "$AA_PAIRS" --a "$A" --b "$B" --aa-copy "$W/bin/aa_copy" \
