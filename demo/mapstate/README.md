@@ -112,7 +112,8 @@ client's snapshot logs identical per request id (tick, category, visible
 count, wire bytes, digest); normal, full-scene and empty requests all sampled,
 empty ones with 0 units and full-scene ones with every unit; every metric
 name of INTERFACES.md section 6 present. Self-test: exit 0, every row passing.
-Evil: all three processes exit 0 and A logged at least three `rejected:` lines.
+Evil: all three processes exit 0, A logged at least three `rejected:` lines and
+every row of the evil client's `client_checks.csv` passes.
 
 ## Deterministic generation (design section 3)
 
