@@ -820,6 +820,25 @@ namespace XOffsetDatastructure {
             return FreeTablePtr(new FreeTable());
         }
 
+        // Prototype (branch claude/mutable-relocatable-positioning): a copy of
+        // an exact table. Entries are payload offsets, so they stay valid at the
+        // destination address. Only non-empty bins are copied.
+        static FreeTablePtr copy_free_table(const FreeTable& src) {
+            auto table = make_free_table();
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = src.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    table->bins[bin] = src.bins[bin];
+                }
+                table->nonempty[word] = src.nonempty[word];
+                table->touched[word] |= src.nonempty[word];
+            }
+            table->large = src.large;
+            table->bytes = src.bytes;
+            table->count = src.count;
+            return table;
+        }
+
         // The general allocation and retirement paths (see allocate_block
         // and retire_block, which decide the common outcomes inline).
         XOFFSET_DETAIL_NOINLINE void* allocate_block_general(std::uint32_t bytes, std::size_t alignment,
@@ -1452,6 +1471,36 @@ namespace XOffsetDatastructure {
 
         void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
             reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
+        }
+
+        // Prototype (branch claude/mutable-relocatable-positioning): same-lineage
+        // relocation. Copies src's used payload into this owner's storage and
+        // carries the host free table and the typed-access state over, so no
+        // hole table is built and nothing is verified: src is a live buffer of
+        // this process. Invalidates references into this owner like reload.
+        void clone_state_from(const XBufferCore& src) {
+            if (this == &src) throw XException("clone: source and destination are the same buffer");
+            const auto* sm = src.arena();
+            if (!sm) throw XException("clone: source has no arena");
+            const auto used = static_cast<size_type>(sm->used_end);
+            try {
+                reinit_from_bytes(reinterpret_cast<const char*>(sm), used);
+                if (!src.free_table_lost_) {
+                    free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
+                    free_table_lost_ = false;
+                }
+            } catch (const std::bad_alloc&) {
+                reset_arena(0);
+                throw XBadAlloc();
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+            typed_root_access_allowed_ = src.typed_root_access_allowed_;
+            schema_bound_ = src.schema_bound_;
+            bound_root_type_id_ = src.bound_root_type_id_;
+            bound_schema_hash_ = src.bound_schema_hash_;
+            root_type_identity_ = src.root_type_identity_;
         }
 
         // Empty arena: header only, no root, empty exact free table. Bytes
@@ -6389,6 +6438,25 @@ namespace XOffsetDatastructure {
             reset_arena(this->get_size());
             if (!this->arena()) throw XException("reset<T>(): buffer has no arena");
             return *this->template make<T>();
+        }
+
+        /// Prototype (branch claude/mutable-relocatable-positioning, not in
+        /// next_cpp26): an independent copy of this buffer in the same process.
+        /// One copy of the used payload into a new owner with this buffer's
+        /// maximum capacity and growth policy; the free table, typed root
+        /// access and schema binding come along. No wire, no verification.
+        XBuffer clone() const {
+            if (!this->arena()) throw XException("clone(): buffer has no arena");
+            XBuffer out(static_cast<std::size_t>(this->arena()->used_end),
+                        maximum_capacity(this->maximum_capacity()).with_growth(this->growth_policy()));
+            out.clone_state_from(*this);
+            return out;
+        }
+
+        /// Prototype: the same copy into an existing buffer, reusing its
+        /// storage (like reload_verified). References into dst are invalidated.
+        void clone_into(XBuffer& dst) const {
+            dst.clone_state_from(*this);
         }
         template <typename T>
         static XBuffer load_verified(const std::string& data,
