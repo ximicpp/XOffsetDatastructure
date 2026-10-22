@@ -1,0 +1,52 @@
+reloc_tax: reps=201 (median of paired reps; ratio column = median(xoffset)/median(std), p10/p90 of per-rep ratios)
+
+== X1 micro: ns per operation, ratio = XOffset / std ==
+case                                  std ns/op      xoffset     ratio       p10       p90
+vec.push_back(cleared)                     0.95         2.46     2.571     1.949     2.975
+vec.push_back(empty,growth)                0.80         2.78     3.496     3.129     3.870
+vec.iterate_sum                            0.32         0.32     1.002     0.919     1.111
+vec.random_index                           0.61         0.61     1.002     0.924     1.085
+vec<int>.mid_insert+erase                 49.48        46.64     0.943     0.935     0.997
+vec<Hero>.mid_erase+emplace              335.75       537.84     1.602     1.572     1.800
+str.assign_short(8B)                       7.06        15.25     2.159     1.896     2.701
+str.assign_long(~40B)                      6.47        10.45     1.614     1.395     1.762
+map.insert512(vs std::map)                39.47        36.02     0.913     0.743     1.182
+map.find512(vs std::map)                  42.32        49.81     1.177     0.834     1.619
+map.inc_existing(vs std::map)             36.85        48.12     1.306     0.880     1.956
+map.erase512(vs std::map)                 76.87        56.79     0.739     0.540     1.003
+map.insert512(vs std::flat_map)           45.28        48.20     1.065     0.746     1.826
+map.find512(vs std::flat_map)             10.92        20.66     1.892     1.467     2.395
+map.erase512(vs std::flat_map)            69.49        59.57     0.857     0.624     1.049
+
+== X1 SLG logic in place (no transport): ns per call, ratio = XOffset / std ==
+case                                     std ns      xoffset     ratio       p10       p90
+A.build_msg                              404.00       865.00     2.141     0.773     3.722
+A.reset_only                              33.00       151.00     4.576     4.471     4.750
+A.simulate                              3687.00      4097.00     1.111     1.020     1.276
+A.apply(first pass, 512 calls)           250.00       381.00     1.524     1.171    15.987
+A.apply(steady)                          181.00       249.00     1.376     1.126     1.797
+B.season_edits(64 ops)                  8897.00     10024.00     1.127     0.943     1.333
+C.ticks(10)                           362607.00    358564.00     0.989     0.747     1.624
+D.query                                    5.34         5.45     1.020     0.983     1.156
+
+== X2 in-process whole copy: ns per copy, ratio = XOffset / std deep copy ==
+
+-- player: payload used 11480 B, free blocks 22 (2248 B) --
+case                                     std ns      xoffset     ratio       p10       p90
+player.memcpy_floor                     1457.00       170.00     0.117     0.066     0.150
+player.save+load_unverified             6228.00     11062.00     1.776     1.346     2.281
+player.save_v_into+reload_v             1653.00      3705.00     2.241     1.997     2.797
+player.clone(new owner)                 6837.00      8285.00     1.212     1.083     1.793
+player.clone_into(reused)               1516.00       389.00     0.257     0.143     0.312
+(reference column: construct = std copy constructor into a new object; assign = copy assignment into an existing copy)
+
+-- shard: payload used 889832 B, free blocks 1497 (48304 B) --
+case                                     std ns      xoffset     ratio       p10       p90
+shard.memcpy_floor                    179822.00     66156.00     0.368     0.183     0.570
+shard.save+load_unverified            344331.00    424740.00     1.234     1.093     1.538
+shard.save_v_into+reload_v            202354.00    331592.00     1.639     1.109     1.877
+shard.clone(new owner)                334442.00    372716.00     1.114     0.901     1.253
+shard.clone_into(reused)              187092.00     67298.00     0.360     0.151     0.504
+(reference column: construct = std copy constructor into a new object; assign = copy assignment into an existing copy)
+
+checks: all passed
