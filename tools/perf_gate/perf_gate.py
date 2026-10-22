@@ -116,6 +116,8 @@ def cmd_prepare(a):
     work.mkdir(parents=True, exist_ok=True)
     head = sh(["git", "-C", str(repo), "rev-parse", a.head + "^{commit}"]).strip()
     anchor_ref = a.anchor
+    if not anchor_ref and a.bench_root and (Path(a.bench_root) / ANCHOR_FILE).is_file():
+        anchor_ref = (Path(a.bench_root) / ANCHOR_FILE).read_text().split()[0]
     if not anchor_ref:
         anchor_ref = sh(["git", "-C", str(repo), "show", f"{head}:{ANCHOR_FILE}"]).split()[0]
     anchor = sh(["git", "-C", str(repo), "rev-parse", anchor_ref + "^{commit}"]).strip()
@@ -680,7 +682,8 @@ def main():
     sp.add_argument("--anchor", default="", help="default: the head's bench/perf/ANCHOR")
     sp.add_argument("--base", required=True)
     sp.add_argument("--head", default="HEAD")
-    sp.add_argument("--bench-root", default="", help="benchmark sources (default: the head tree)")
+    sp.add_argument("--bench-root", default="",
+                    help="benchmark sources and default ANCHOR (default: the head tree); replays pass the checkout")
     sp.add_argument("--slg-dir", default=SLG_DIR)
     sp.add_argument("--formal-dir", default=FORMAL_DIR)
     sp.add_argument("--ledger", default="", help="override the head's ledger file")

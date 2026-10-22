@@ -9,7 +9,7 @@
 `.github/workflows/perf-gate.yml` 在 PR 指向 `next_cpp26`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `next_cpp26` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
 
 1. 在同一个作业里导出三份库代码：**anchor**（`bench/perf/ANCHOR`）、**base**（PR 是 merge-base，push 是第一父提交）、**head**。
-2. 三份都用 **head 里的基准代码**（`bench/slg/`、`bench/formal/`）编译 `slg_bench` 和 `sc_xoffset`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败，但这个 PR 合并前要跑一次 Mac L2。
+2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`）编译 `slg_bench` 和 `sc_xoffset`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败，但这个 PR 合并前要跑一次 Mac L2。
 3. 计数前先查正确性：SLG `--mode verify --scale S`（xoffset 与 cereal 一致，复用协议和逐条协议各一次）；正式 harness 用各自的 `encode` 生成 S、M 输入 wire，`validate` S 和 M。head 任何一项失败，门禁直接失败，不出数字。
 4. 在 valgrind callgrind 下数每个阶段的指令数（Ir），`--collect-atstart=no`，只在被测阶段里打开收集。各阶段一个进程，`nproc` 个并行。
 5. head 的一个 SLG 阶段和正式 mutate 各多跑一次，两次 Ir 必须逐位相同，否则门禁失败（结果不可信）。
@@ -74,7 +74,7 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
 
 ## 6. 手动触发与回放
 
-Actions → "Perf gate (instruction counts)" → Run workflow，输入 `base`、`head`、`anchor`（可选）、`compilers`。用来回放历史或给 Mac 候选预检。回放 GCC 16 支持合入之前的提交时，GCC 一侧不可比，只看 P2996。回放历史提交时把 `anchor` 设成 `base`，否则 head÷anchor 比的是一个更新的提交。
+Actions → "Perf gate (instruction counts)" → Run workflow，选一个带 `bench/` 的分支（通常是 next_cpp26），输入 `base`、`head`、`anchor`（可选，默认取该分支的 `bench/perf/ANCHOR`）、`compilers`。基准代码取自所选分支，所以可以回放 `bench/` 入库之前的提交，也可以给 Mac 候选预检。回放 GCC 16 支持合入之前的提交时，GCC 一侧不可比，只看 P2996。回放历史提交时把 `anchor` 设成 `base`，否则 head÷anchor 比的是一个更新的提交。
 
 本地（需要 GCC 16 或 P2996 Clang、valgrind、python3）：
 
