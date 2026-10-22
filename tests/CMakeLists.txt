@@ -64,6 +64,7 @@ set(REFLECTION_TESTS
     test_wire_admission
     test_enum_support
     test_xstring_direct_assign
+    test_string_append
     test_xhandle
     test_schema_envelope
     test_fixed_layout_containers
