@@ -1,0 +1,40 @@
+# bench/slg: frozen SLG benchmark tree. Check: python3 bench/check_manifest.py
+# Origin: the tree frozen by the zpp_bits/cista comparison (S1), 2026-10-22:
+#   slg-reuse-20261021 + S3 trace (S3_combined_trace.diff, erase_probe.cpp)
+#   + small_msg_probe.cpp (p2, 730a66f6...) + slg_s1.diff (a7b42069...f908).
+#   22 files, git tree 05fef377c10198534c2c9f853f39aacfb0298060,
+#   origin content id (git ls-files -z | xargs -0 sha256sum | sha256sum)
+#   916f8d09f35f297eead203d00b7bb0405f2fdae48b84eb42e1b99c3d88a2dd9a.
+#   Imported verbatim in commit "bench/slg: import the frozen SLG prototype tree verbatim".
+# Changed since origin (repository integration; default build keeps the timing path):
+#   CMakeLists.txt       XOFFSET_ROOT defaults to the repository; SLG_IR_COUNT and
+#                        SLG_BUILD_PROBES options (origin 141062ffebc6e2c4c27f8385fd28d8d994292b2d4397ed14b331c96148db75e3)
+#   bench/runner.hpp     SLG_IR_COUNT callgrind toggles (origin 3aecd8bcc8d58d1f46963849413c9bcf41a61b96f162b31c68b66a102df2473c)
+#   bench/slg_bench.cpp  sets slg::ir_cycle() under SLG_IR_COUNT (origin d6527ce92d9abf2bf6fc3f5d23836b85f66293c5e3b5de2a0d07336433a042e9)
+#   README.md            added
+# Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
+# reuse protocol (c) (SLG_REUSE=1), March StableEraseOrdinaryMembers opt-in in
+# include/slg/model_xoffset.hpp. No T4 adapter.
+4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
+fffeb26223e5b10a3f0d11e19766d15f2fcc8cce09152cba08bcee1978eb1d77  README.md
+0f306ee47ffe88ae9094f1b4babf9c8dd63776a65edaf7bfc440d31d1215d6fb  adapters/cereal_format.hpp
+ac03936eed1724d80efc668aea4cac38c14a6da9648a76fac154bdc27eeea7cc  adapters/flatbuffers_format.hpp
+bc2571e0ad90ff1e864735696aa039d3b7ab307c527b3d031e491a1c5acb1b91  adapters/protobuf_format.hpp
+61fce58cd26e87f1c003b9cf55b690a9e553a7bde47b7e0e287e85c813ede0c9  adapters/zpp_bits_format.hpp
+b298d2effb508bd362cec1a46797cbe53f06ba46f37d2903fc47be29c8c22686  bench/cista_runner.hpp
+f5e58fceecd0c7b22503a4b0652b4164aea055ee31fc24b859efa48496cd245f  bench/erase_probe.cpp
+621964927a5bd85a907736e4f05201b89a36b704115cd55fd78ac869fc4b2130  bench/runner.hpp
+63505e708ed84a8ffa1d6136fef17af72f6d807b00f009b206f145e7c9497a74  bench/slg_bench.cpp
+730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
+371cd935d934ed2fb94781381ab86332d05fee833bd19857f20fb11e77faeb07  bench/std_runner.hpp
+0fb41b68a1debe7db18842ed0a5d1cb843d718c3e1676c5b25689a84941c7d04  bench/xoffset_runner.hpp
+12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
+81103b56f9c6c0e89e42c16ba2ded491b2d0eb14b379fae373947aa8bc65328c  include/slg/generic.hpp
+320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
+d51467c9c67b8861345ebc5f53593f03b71622dd0a3d4cea7a672f1ad794dc9f  include/slg/model_std.hpp
+0c056aba4e88b0cfb579f383f2f7fdcfdf7631f9681073a2a77e468b85847e65  include/slg/model_xoffset.hpp
+d140559cf74c0c48ea7078a7e652d224c07d6909c3c0acfc731c5b1d7bc4f8c2  include/slg/model_xoffset_optin.hpp
+36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
+234159b81efcb07c0ab826a5f0a56b7f72a86a4ecb597ca7900f089cbb798723  schema/slg.fbs
+12bcdc8273ae57e4485346e679f9e51cf06266c168527198f8abd0e277a1836d  schema/slg.proto
+e9ac06bbe56ecd0ed3b237e095ad0d0c56b81036e8dca45806d7bf3c23a1df0c  tools/analyze.py
