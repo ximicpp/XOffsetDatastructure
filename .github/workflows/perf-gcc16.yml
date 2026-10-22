@@ -3,6 +3,7 @@
 #
 # Each matrix job is one independent run on its own VM: build both toolchains, gates V1-V6,
 # then the xcomp batch (tools/perf/h1_linux_batch.sh). Three repetitions per platform.
+# Manual only (workflow_dispatch): no automatic runs (GitHub Actions minutes, susu 2026-10-22).
 #   x86-64  clang = CI P2996 image (a5270822), GCC = gcc:16 (x86-64 digest)
 #   arm64   GCC-only (Q1 + A/A) until tools/perf/h1_toolchains.json names the
 #           clang-p2996 d77eff1 aarch64 artifact from p2996-toolchain.yml; then Q2 as well
@@ -14,9 +15,6 @@ on:
       pairs:
         description: "A/B pairs of the primary protocol"
         default: "16"
-  push:
-    branches: [ 'claude/h1-gcc16-perf-*' ]
-    paths: [ '.github/workflows/perf-gcc16.yml', 'tools/perf/**', 'bench/slg/**' ]
 
 permissions:
   contents: read
