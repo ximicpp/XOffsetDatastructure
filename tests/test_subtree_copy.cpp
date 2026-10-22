@@ -1,8 +1,9 @@
 // ============================================================================
 // Test: T4 subtree copy (differential)
 // Purpose: container copy assignment and allocator-extended copy construction
-//          take one allocation + memcpy + fix-up walk when the source subtree
-//          is one contiguous range. Each case clones one random arena three
+//          copy the source subtree into one fresh segment: memcpy + fix-up walk
+//          when the source is one contiguous range, otherwise a compacting
+//          preorder walk (packed, capacity = size). Each case clones one random arena three
 //          times: A and A2 run with the fast path, B with the element-wise
 //          reference path (XOFFSET_TEST_HOOKS switch). Checked:
 //   a. determinism: A and A2 payload, free table and save bytes are equal
@@ -19,7 +20,8 @@
 //      and logically unchanged (the fast path falls back before any change);
 //   h. aliasing: self, siblings, cousins in one root, another arena, element
 //      push_back from the same vector;
-//   i. coverage: hits and every fallback/retirement kind occur, > 4096 B too;
+//   i. coverage: whole and compact copies, every skip/fallback/retirement
+//      kind, > 4096 B segments; a compacted copy is one packed range;
 //   j. steady state: repeated same-shape assignment stops growing used_end
 //      from the third assignment (reported for B as well).
 //
@@ -498,7 +500,7 @@ void mutate(sc::Root& r, sc::Root& other, Rng& rng) {
 }
 
 struct Coverage {
-    std::size_t cases = 0, large_hits = 0, explicit_throws = 0, explicit_only_b = 0;
+    std::size_t cases = 0, large_hits = 0, explicit_throws = 0, explicit_only_b = 0, packed_checks = 0;
 };
 
 xd::SubtreeCopyStats& stats() { return xd::subtree_copy_stats; }
@@ -517,11 +519,22 @@ void run_case(std::size_t index, Rng& rng, Coverage& cov) {
     const auto op = choose_op(rng, a.root(), s.root());
     const auto ma_before = a.root().ma.size();
 
-    const auto hits_before = stats().hits;
+    const auto hits_before = stats().whole_hits + stats().compact_hits;
+    const auto compact_before = stats().compact_hits;
     const auto bytes_before = stats().bytes;
     std::string src_a, src_a2, src_b;
     src_a = apply_op(a.root(), s.root(), op);
-    if (stats().hits > hits_before && stats().bytes - bytes_before > 4096) ++cov.large_hits;
+    // A compacted copy is one packed preorder range with no spare capacity,
+    // so the next copy from it can take the whole path.
+    if (op.kind == 0 && stats().compact_hits == compact_before + 1) {
+        const auto& ma = a.root().ma;
+        xd::SubtreeExtent extent;
+        xd::subtree_measure_elements<sc::Mid>(ma.data(), ma.size_, ma.capacity_, extent);
+        if (!extent.contiguous() || extent.sum != extent.exact || extent.sum != stats().bytes - bytes_before)
+            fail(where + ": compacted copy is not one packed range");
+        ++cov.packed_checks;
+    }
+    if (stats().whole_hits + stats().compact_hits > hits_before && stats().bytes - bytes_before > 4096) ++cov.large_hits;
     src_a2 = apply_op(a2.root(), s.root(), op);
     xd::subtree_copy_hook_enabled = false;
     src_b = apply_op(b.root(), s.root(), op);
@@ -618,7 +631,7 @@ void steady_state(Rng& rng) {
         const bool fast = side == 0;
         auto dst = load(build_wire(rng));
         xd::subtree_copy_hook_enabled = fast;
-        const auto hits_before = stats().hits;
+        const auto hits_before = stats().whole_hits;
         std::vector<std::uint64_t> curve;
         for (int k = 0; k < 100; ++k) {
             dst.root().ma = source.root().mb;
@@ -626,7 +639,7 @@ void steady_state(Rng& rng) {
         }
         xd::subtree_copy_hook_enabled = true;
         if (fast) {
-            if (stats().hits - hits_before != 100) fail("steady state: not every assignment took the fast path");
+            if (stats().whole_hits - hits_before != 100) fail("steady state: not every assignment took the whole path");
             for (std::size_t k = 2; k < curve.size(); ++k)
                 if (curve[k] != curve[1]) fail("steady state: used_end grew at assignment " + std::to_string(k + 1));
         }
@@ -669,17 +682,17 @@ int main(int argc, char** argv) {
     for (std::size_t c = 0; c < cases; ++c) run_case(c, rng, cov);
     for (std::size_t c = 0; c < cases / 4 + 50; ++c) run_explicit_case(c, rng, cov);
     const auto st = stats();
-    std::cout << "  hits=" << st.hits << " pod_hits=" << st.pod_hits << " bytes=" << st.bytes
-              << " large_hits=" << cov.large_hits << "\n"
-              << "  fallback layout=" << st.fallback_layout << " slack=" << st.fallback_slack
-              << " type=" << st.fallback_type << " alloc=" << st.fallback_alloc << "\n"
+    std::cout << "  whole_hits=" << st.whole_hits << " compact_hits=" << st.compact_hits
+              << " pod_hits=" << st.pod_hits << " bytes=" << st.bytes << " large_hits=" << cov.large_hits << "\n"
+              << "  whole skipped: layout=" << st.whole_skipped_layout << " slack=" << st.whole_skipped_slack
+              << "  element-wise: type=" << st.fallback_type << " alloc=" << st.fallback_alloc << "\n"
               << "  retire whole=" << st.whole_retires << " piecewise=" << st.piecewise_retires
               << " explicit_throws=" << cov.explicit_throws
-              << " explicit_only_b=" << cov.explicit_only_b << "\n";
+              << " explicit_only_b=" << cov.explicit_only_b << " packed_checks=" << cov.packed_checks << "\n";
     // i. coverage
-    if (!st.hits || !st.pod_hits || !st.fallback_layout || !st.fallback_slack ||
-        !st.fallback_alloc || !st.whole_retires || !st.piecewise_retires || !cov.large_hits ||
-        !cov.explicit_throws)
+    if (!st.whole_hits || !st.compact_hits || !st.pod_hits || !st.whole_skipped_layout ||
+        !st.whole_skipped_slack || !st.fallback_alloc || !st.whole_retires || !st.piecewise_retires || !cov.large_hits ||
+        !cov.explicit_throws || !cov.packed_checks)
         fail("coverage: a hit, fallback or retirement kind never occurred");
     steady_state(rng);
     std::cout << "test_subtree_copy: " << cov.cases << " differential cases passed\n";
