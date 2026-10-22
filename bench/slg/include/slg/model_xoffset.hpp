@@ -74,11 +74,38 @@ struct alignas(8) ShardState {
 
 } // namespace slg::xm
 
-namespace XOffsetDatastructure {
-// Audited: March has only ordinary members, no bases or [[no_unique_address]].
-// Lets the shard ticks remove arrived marches with stable_erase_if.
-template<> struct StableEraseOrdinaryMembers<slg::xm::March> : std::true_type {};
-}
+// Audited: every record above has only ordinary members (no bases, bit-fields,
+// unions or [[no_unique_address]]), so all are declared ordinary records, as a
+// user following the guide would. Element vectors (Hero, Skill, Buff, March...)
+// then relocate by SHIFT on erase/reserve, and the shard ticks remove arrived
+// marches with stable_erase_if. Before 2026-10-22 only March was declared
+// (StableEraseOrdinaryMembers); see bench/slg/MANIFEST.
+#ifdef XOFFSET_ORDINARY_RECORDS
+XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
+                         slg::xm::City, slg::xm::PlayerState, slg::xm::Event, slg::xm::Report,
+                         slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState)
+#else
+// Libraries without the macro: its two specializations, written out.
+#define SLG_XM_ORDINARY_RECORD(T)                                                      \
+    template<> struct XOffsetDatastructure::wire_record_layout<T> {                    \
+        static constexpr bool ordinary_members = true;                                 \
+    };                                                                                 \
+    template<> struct XOffsetDatastructure::StableEraseOrdinaryMembers<T> : std::true_type {};
+SLG_XM_ORDINARY_RECORD(slg::xm::Buff)
+SLG_XM_ORDINARY_RECORD(slg::xm::Skill)
+SLG_XM_ORDINARY_RECORD(slg::xm::Troop)
+SLG_XM_ORDINARY_RECORD(slg::xm::Hero)
+SLG_XM_ORDINARY_RECORD(slg::xm::Army)
+SLG_XM_ORDINARY_RECORD(slg::xm::City)
+SLG_XM_ORDINARY_RECORD(slg::xm::PlayerState)
+SLG_XM_ORDINARY_RECORD(slg::xm::Event)
+SLG_XM_ORDINARY_RECORD(slg::xm::Report)
+SLG_XM_ORDINARY_RECORD(slg::xm::BattleMsg)
+SLG_XM_ORDINARY_RECORD(slg::xm::Tile)
+SLG_XM_ORDINARY_RECORD(slg::xm::March)
+SLG_XM_ORDINARY_RECORD(slg::xm::ShardState)
+#undef SLG_XM_ORDINARY_RECORD
+#endif
 
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerState, "slg.PlayerState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
