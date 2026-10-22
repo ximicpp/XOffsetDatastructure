@@ -7,12 +7,16 @@
 # reported as not comparable.
 #
 # usage: tools/validation_differential.sh <base dir> <head dir> <cases> <seed>...
-# Needs g++ with -freflection (the GCC 16 image). Both checkouts use the
-# dependency include trees of HEAD_DIR.
+# Compiler: $CXX (default g++, as in the GCC 16 image) with $XOFFSET_DIFF_FLAGS
+# (default -std=c++26 -freflection; P2996 Clang needs
+# "-std=c++26 -freflection -fexpansion-statements -stdlib=libc++"). Both
+# checkouts use the dependency include trees of HEAD_DIR.
 set -euo pipefail
 base=$1 head=$2 cases=$3
 shift 3
 out=${XOFFSET_DIFF_OUT:-$head/build/validation-differential}
+cxx=${CXX:-g++}
+read -r -a lang <<< "${XOFFSET_DIFF_FLAGS:--std=c++26 -freflection}"
 mkdir -p "$out"
 flags() {
     printf -- '-I%s -isystem %s/external/typelayout/include' "$1" "$head"
@@ -21,9 +25,9 @@ flags() {
     done
 }
 # shellcheck disable=SC2046
-g++ -O2 -std=c++26 -freflection $(flags "$base") "$head/tests/fuzz/validation_outcomes.cpp" -o "$out/outcomes-base"
+"$cxx" -O2 "${lang[@]}" $(flags "$base") "$head/tests/fuzz/validation_outcomes.cpp" -o "$out/outcomes-base"
 # shellcheck disable=SC2046
-g++ -O2 -std=c++26 -freflection $(flags "$head") "$head/tests/fuzz/validation_outcomes.cpp" -o "$out/outcomes-head"
+"$cxx" -O2 "${lang[@]}" $(flags "$head") "$head/tests/fuzz/validation_outcomes.cpp" -o "$out/outcomes-head"
 status=0
 for seed in "$@"; do
     "$out/outcomes-base" "$cases" "$seed" > "$out/base-$seed.txt" &
