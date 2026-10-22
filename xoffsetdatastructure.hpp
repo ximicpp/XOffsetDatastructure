@@ -4152,6 +4152,8 @@ namespace XOffsetDatastructure {
             // they had been inserted one by one.
             struct DeferredOwned {
                 static constexpr std::size_t capacity = 128;
+                // Payloads above this (one byte-index page) skip the run.
+                static constexpr std::size_t max_extent = 4096;
                 bool enabled = false;
                 std::uint32_t count = 0;
                 std::size_t run_end = 0; // every live range so far ends at or below this
@@ -4597,7 +4599,11 @@ namespace XOffsetDatastructure {
             if (holes) register_wire_holes(holes, hole_count, ctx);
             // Every free range is registered; live ranges from here on may be
             // deferred while they ascend (see WireValidationContext).
-            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned;
+            // Measured on payloads of at most one byte-index page (SLG battle
+            // and report messages); on larger payloads (player state, shard
+            // snapshots) the run cost more than it saved.
+            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned &&
+                used <= WireValidationContext::DeferredOwned::max_extent;
             ctx.deferred_owned.run_end = ctx.owned_ranges.coverage_bounds().second;
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
