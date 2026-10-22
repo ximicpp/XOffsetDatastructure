@@ -289,6 +289,67 @@ jobs:
             build/corpus-gcc/*.xwire
           if-no-files-found: ignore
 
+  bench-smoke:
+    name: Benchmark trees smoke (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc16, p2996]
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      CEREAL_COMMIT: ebef1e929807629befafbb2918ea1a08c7194554
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select image
+        run: |
+          if [ "${{ matrix.compiler }}" = gcc16 ]; then
+            echo "BENCH_IMAGE=$XOFFSET_GCC_IMAGE" >> "$GITHUB_ENV"
+            echo "BENCH_CXX=g++" >> "$GITHUB_ENV"
+            echo "BENCH_PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin" >> "$GITHUB_ENV"
+          else
+            echo "BENCH_IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')" >> "$GITHUB_ENV"
+            echo "BENCH_CXX=/opt/p2996-toolchain/bin/clang++" >> "$GITHUB_ENV"
+            echo "BENCH_PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/bin:/usr/bin:/bin" >> "$GITHUB_ENV"
+          fi
+
+      - name: Pull image
+        run: docker pull --platform linux/amd64 "$BENCH_IMAGE"
+
+      - name: Prepare pinned CMake, cereal v1.3.2 and valgrind headers
+        run: |
+          python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+          git clone --quiet --depth 1 --branch v1.3.2 https://github.com/USCiLab/cereal build/cereal-v1.3.2
+          test "$(git -C build/cereal-v1.3.2 rev-parse HEAD)" = "$CEREAL_COMMIT"
+          sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
+          mkdir -p build/valgrind-include && cp -r /usr/include/valgrind build/valgrind-include/
+
+      - name: Build and smoke-test bench/slg and bench/formal
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH="$BENCH_PATH" \
+            -e LD_LIBRARY_PATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:/opt/p2996-toolchain/lib \
+            "$BENCH_IMAGE" bash bench/ci_smoke.sh "$BENCH_CXX" /workspace/build/cereal-v1.3.2/include \
+              /workspace/build/valgrind-include build/bench-${{ matrix.compiler }} \
+            2>&1 | tee build/bench-smoke-${{ matrix.compiler }}.log
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-smoke-${{ matrix.compiler }}
+          path: build/bench-smoke-${{ matrix.compiler }}.log
+          if-no-files-found: ignore
+
   gcc16-sanitizer:
     name: ASan+UBSan (GCC 16 Docker, Linux)
     runs-on: ubuntu-latest
@@ -502,7 +563,7 @@ jobs:
             --compiler /opt/p2996-toolchain/bin/clang++ --platform linux/amd64 \
             --cmake-root build/cmake-tool/root \
             --sanitizer address-undefined --runtime-dir build/asan-resource \
-            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,test_free_table_policy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
+            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,fuzz_v2_wire_replay,fuzz_wire_schemas_replay,test_free_table_policy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
             --jobs 2 --out build/sanitizer-result
 
       - name: Upload sanitizer results
