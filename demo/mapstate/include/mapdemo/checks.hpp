@@ -5,6 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "mapdemo/schema.hpp"
 #include "mapdemo/std_model.hpp"
 
@@ -35,6 +36,8 @@ struct Coverage {
     bool grow_shrink_grow = false;   // some unit grew, then shrank, then grew again
     void observe(const UnitStateBatch& before, const UnitStateBatch& after);
     bool complete() const noexcept;
+private:
+    std::vector<std::uint8_t> stage_;   // per unit index: 0, 1 grew, 2 grew then shrank (additive, 10-22)
 };
 
 // Server A: snapshot built from the batch of tick T versus the reference model
