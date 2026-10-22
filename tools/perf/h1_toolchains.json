@@ -1,6 +1,6 @@
 {
   "comment": "library_commit: the measured next_cpp26 commit (FREEZE). arm64: clang-p2996 d77eff1 build from p2996-toolchain.yml used by perf-gcc16.yml; empty = GCC-only arm64 jobs.",
-  "library_commit": "df5249212749f152b8d64a5183009e31d872cb4b",
+  "library_commit": "723c0ffdfa98323ba270a32a573aeb62ddde9f2b",
   "arm64": {
     "run_id": "39780376623",
     "artifact": "p2996-d77eff1-linux-aarch64",
