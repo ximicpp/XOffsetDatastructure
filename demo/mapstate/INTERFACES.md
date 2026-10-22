@@ -41,7 +41,7 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
 ## 3. Processes and command lines
 
 ```
-mapdemo_b      [--port 47702] [--csv-dir DIR]
+mapdemo_b      [--port 47702] [--seed 1] [--csv-dir DIR]
 mapdemo_a      [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
                [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
                [--check | --no-check] [--csv-dir DIR]
@@ -51,6 +51,8 @@ mapdemo_selftest [--csv-dir DIR]
 ```
 
 - Start order B, A, client; connections retry for 5 s.
+- The rules depend on the seed, so B must get the same `--seed` as A (added
+  03:19Z 10-22); a mismatch shows up as a `reference_model` check failure on A.
 - `--steps 0` and `--duration-s 0` mean unlimited. A stops after whichever limit
   is reached, sends `Bye` to B and the client, writes its CSV files, exits.
 - `--check` defaults: on for A and the headless client, off for the window client.
@@ -113,6 +115,9 @@ Files in `--csv-dir` (comma separated, header row first):
 | `a_snapshots.csv` | `request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,req_load_us,filter_us,build_us,save_us,destroy_us,check_ok` |
 | `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok` |
 | `a_checks.csv`, `client_checks.csv`, `selftest_checks.csv` | `check,result,detail` (`result` is `pass` or `fail`; coverage counts go in `detail`) |
+
+`a_checks.csv` rows, in this order: `batch_roundtrip`, `reference_model`,
+`modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`.
 
 `category` is `normal`, `full`, or `empty`; `digest` is 16 lowercase hex digits
 of `checks::snapshot_digest`; `check_ok` is `1` or `0`.
