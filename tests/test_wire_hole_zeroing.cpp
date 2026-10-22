@@ -305,8 +305,9 @@ void check_vector_scrub(xo::XVector<T>& v, const char* what, Fill&& fill) {
     if (v.data() != before || v.capacity() != kCap || !live_ok(5, kCap)) fail(std::string(what) + ": no-op reserve");
     v.reserve(kCap * 3);
     if (v.capacity() != kCap * 3 || !live_ok(5, kCap) || !spare(5)) fail(std::string(what) + ": growing reserve");
-    while (v.size() < v.capacity()) fill(v.emplace_back(), v.size());
-    fill(v.emplace_back(), v.size());           // full: takes the growth path
+    while (v.size() < v.capacity()) { const std::size_t i = v.size(); fill(v.emplace_back(), i); }
+    const std::size_t last = v.size();
+    fill(v.emplace_back(), last);               // full: takes the growth path
     if (v.size() != kCap * 3 + 1 || !live_ok(kCap * 3 + 1, kCap * 3 + 2)) fail(std::string(what) + ": growth append");
 }
 
