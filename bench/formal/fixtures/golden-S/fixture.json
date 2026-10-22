@@ -1,0 +1,83 @@
+{
+  "files": {
+    "final.canonical.bin": {
+      "bytes": 76545,
+      "sha256": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f"
+    },
+    "input.canonical.bin": {
+      "bytes": 63028,
+      "sha256": "ac6c05bd3b3d25afa252db48e8ffff93e4060cf151cd57bcb638f2f9e1468427"
+    },
+    "query-after.bin": {
+      "bytes": 31775,
+      "sha256": "98ea09ec8e050a7faf24d45057b8ccc9658fcfaa03b5f8bbf305cf1a0c6e6b82"
+    },
+    "query-before.bin": {
+      "bytes": 31775,
+      "sha256": "acb553006c498fc20f1522fbab1669689a6479c8b2d73e7e286bd05eacd027d2"
+    },
+    "trace.bin": {
+      "bytes": 114292,
+      "sha256": "6a8ef1cb303f9338a94b7364169753a8dffb4610287ec3161596e2dcd62f5296"
+    }
+  },
+  "final_digest": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f",
+  "input_digest": "ac6c05bd3b3d25afa252db48e8ffff93e4060cf151cd57bcb638f2f9e1468427",
+  "model_version": 1,
+  "mutation_count": 225,
+  "n": 128,
+  "query_after_digest": "98ea09ec8e050a7faf24d45057b8ccc9658fcfaa03b5f8bbf305cf1a0c6e6b82",
+  "query_before_digest": "acb553006c498fc20f1522fbab1669689a6479c8b2d73e7e286bd05eacd027d2",
+  "query_count": 435,
+  "query_name": "query-v1",
+  "schema": "sc-fixture-v1",
+  "seed": "xoffset-competitor-v1",
+  "stages": [
+    {
+      "canonical_sha256": "da3caa9a2638b8a9886ebe9ff4d41215254e83988ef05b9de49f093a6f1e5af0",
+      "mutation_count": 32,
+      "stage": 1
+    },
+    {
+      "canonical_sha256": "e8238ba165fb06ddde24b96eafaf59af0a47ad3395a9b5c4b0e632758cfcd5a0",
+      "mutation_count": 32,
+      "stage": 2
+    },
+    {
+      "canonical_sha256": "36e247a4db3b3f7ead39bc42d374440ec5ed888a82b8a65caf07a26606b22f0a",
+      "mutation_count": 32,
+      "stage": 3
+    },
+    {
+      "canonical_sha256": "5bfd7cd8ee54c0661a613689cdf81ddefaf98e0a093ce552539b29c8105d2b44",
+      "mutation_count": 32,
+      "stage": 4
+    },
+    {
+      "canonical_sha256": "c600def54879da560ec2e95563cc85c8a7a6aec62fca5df5076da1eb74bbb03d",
+      "mutation_count": 32,
+      "stage": 5
+    },
+    {
+      "canonical_sha256": "8b354d552395c327456efb32eebfce5e7a57b923fee8dc6142d82dbda10f4644",
+      "mutation_count": 32,
+      "stage": 6
+    },
+    {
+      "canonical_sha256": "120738bc5a30d79ed4c11a2e174ef5de1db320c2a78b2194a39c14c23e6925e0",
+      "mutation_count": 16,
+      "stage": 7
+    },
+    {
+      "canonical_sha256": "6980d6ae4a72e8b776771dac36b978f2519f1988fa2e16cd027778e7fd8a019e",
+      "mutation_count": 16,
+      "stage": 8
+    },
+    {
+      "canonical_sha256": "3923d827228422d0f6be44c0b306e3cae4f5aed15001dfb390bb88a58ef8dc3f",
+      "mutation_count": 1,
+      "stage": 9
+    }
+  ],
+  "trace_name": "mixed-growth-v1"
+}
