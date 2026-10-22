@@ -1,0 +1,25 @@
+name: Nightly fuzz dispatch
+
+# GitHub reads `schedule` only from the default branch (main, V2). This file
+# only starts .github/workflows/fuzz.yml on next_cpp26; all fuzzing lives
+# there, so this file should not need to change when the nightly does.
+# next_cpp26's nightly-watch job runs `gh workflow enable` on this workflow
+# so GitHub's 60-day inactivity disable does not stop the nightly.
+
+on:
+  schedule:
+    - cron: '23 18 * * *'   # 02:23 Asia/Shanghai; odd minute avoids the top-of-hour queue
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start fuzz.yml on next_cpp26
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run fuzz.yml --repo "$GITHUB_REPOSITORY" --ref next_cpp26 -f mode=nightly
