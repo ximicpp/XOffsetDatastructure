@@ -375,6 +375,9 @@ public:
     std::size_t capacity() const noexcept { return maximum_capacity_; }
     std::size_t maximum_capacity() const noexcept { return maximum_capacity_; }
     std::size_t reserved_bytes() const noexcept { return reserved_bytes_; }
+    // Bytes at or beyond this offset have not been exposed since the OS
+    // supplied them; growth below it zeroes what it exposes.
+    std::size_t zero_from() const noexcept { return zero_from_; }
     std::size_t accessible_bytes() const noexcept { return accessible_bytes_; }
     std::size_t page_size() const noexcept { return page_size_; }
     std::size_t reservation_granularity() const noexcept { return reservation_granularity_; }
