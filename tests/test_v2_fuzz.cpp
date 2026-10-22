@@ -9,6 +9,47 @@
 
 #include <filesystem>
 
+namespace {
+// Wires around the validator's inline bitmap limit (payloads up to
+// inline_extent keep both granule bitmaps inside the context, larger ones take
+// host words). [0, 3): valid wires with used = page - 8, page, page + 8.
+// Library wires keep used a multiple of 8, so [3, 5) patch the page-sized wire
+// to used = page - 1 (last payload byte dropped) and page + 1 (one zero byte
+// appended); they are mutated inputs.
+std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
+    constexpr std::uint64_t page = xo::detail::WireGranuleIndex::inline_extent;
+    const auto content = rng;
+    rng.discard(1);
+    std::vector<std::string> out;
+    // Two bytes per value; the rest of the root is well under 1200 bytes.
+    for (std::size_t vals = page / 2 - 600; out.size() < 3; ++vals) {
+        auto w = sized_wire(content, vals);
+        xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+        const auto target = page - 8 + 8 * out.size();
+        if (h.used_bytes > page + 8) fail("no library wire with used = " + std::to_string(target));
+        if (h.used_bytes != target) continue;
+        if (h.extent_count != 0) fail("page boundary wire is sparse");
+        check_golden(w, "page boundary used=" + std::to_string(target));
+        out.push_back(std::move(w));
+    }
+    const auto& at_page = out[1];
+    xo::XWireHeaderV2 h; std::memcpy(&h, at_page.data(), kHeader);
+    auto shorter = at_page;
+    shorter.erase(kHeader + page - 1, 1);
+    h.used_bytes = page - 1;
+    std::memcpy(shorter.data(), &h, kHeader);
+    fix_header_sizes(shorter);
+    auto longer = at_page;
+    longer.insert(kHeader + page, 1, '\0');
+    h.used_bytes = page + 1;
+    std::memcpy(longer.data(), &h, kHeader);
+    fix_header_sizes(longer);
+    out.push_back(std::move(shorter));
+    out.push_back(std::move(longer));
+    return out;
+}
+} // namespace
+
 int main(int argc, char** argv) {
     if (argc == 3 && std::string_view(argv[1]) == "--write-corpus") {
         // Seed corpus for fuzz_v2_wire: the golden pool, one file per wire.
@@ -54,7 +95,7 @@ int main(int argc, char** argv) {
         case Outcome::PayloadReject: ++payload_rejects; break;
         }
     }
-    // Both sides of the ascending live run's size gate, each also mutated.
+    // Both sides of the inline bitmap limit, each also mutated.
     std::size_t boundary_cases = 0;
     for (const auto& base : page_boundary_wires(rng)) {
         const auto heads = oracle(base, true).heads;
