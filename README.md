@@ -165,6 +165,10 @@ against cista, FlatBuffers, Cap'n Proto and cereal; see
 data and adapter notes. Treat those numbers as specific to that machine,
 workload and adapter set. No Linux or Windows performance figures are claimed.
 
+For bottleneck analysis and follow-up research ideas, see the
+[round-4 research reference](docs/perf/round4-20261022/ANALYSIS_AND_NEXT_STEPS.md).
+It records evidence and hypotheses; it contains no new performance results.
+
 ## Storage and ownership rules
 
 - A strict per-buffer limit is `XBuffer::maximum_capacity(bytes)`. The default is
