@@ -341,6 +341,116 @@ jobs:
           name: gcc16-sanitizer-result
           path: build/gcc16-asan.log
 
+  mapdemo-gcc16:
+    name: Map state demo (GCC 16 + P2996 Docker, Release + ASan/UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      # Same exclusions as gcc16-sanitizer (consteval reflection code).
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+      MAPDEMO_CONFIGURE: >-
+        -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_BUILD_DEMOS=ON -DXOFFSET_BUILD_TESTS=OFF
+        -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      # Self-test, 1 / 100 / 10000 units x 500 steps with every check on, the
+      # --evil online failure-input run, then summarize.py. Cloud numbers are
+      # smoke only; formal timing runs on the Mac.
+      - name: Release build and three tiers
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e MAPDEMO_CONFIGURE -e MAPDEMO_LABEL="CI GCC 16 Release (smoke)" \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              g++ --version | head -n 1 &&
+              cmake -S . -B build/mapdemo -DCMAKE_BUILD_TYPE=Release $MAPDEMO_CONFIGURE &&
+              cmake --build build/mapdemo --parallel 4 &&
+              demo/mapstate/tools/run_all_tiers.sh build/mapdemo/bin/Release build/mapdemo-results' \
+            2>&1 | tee build/mapdemo-release.log
+
+      # The same Release run built with the pinned P2996 Clang (the Mac
+      # toolchain family), so clang-only compile errors show up here first.
+      - name: P2996 Clang Release build and three tiers
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -o pipefail
+          IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          docker pull --platform linux/amd64 "$IMAGE"
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/bin:/usr/bin:/bin \
+            -e LD_LIBRARY_PATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu:/opt/p2996-toolchain/lib \
+            -e MAPDEMO_LABEL="CI P2996 Clang Release (smoke)" \
+            "$IMAGE" bash -c '
+              clang++ --version | head -n 1 &&
+              cmake -S . -B build/mapdemo-clang -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ -DXOFFSET_BUILD_DEMOS=ON \
+                -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF &&
+              cmake --build build/mapdemo-clang --parallel 4 &&
+              demo/mapstate/tools/run_all_tiers.sh build/mapdemo-clang/bin/Release build/mapdemo-clang-results' \
+            2>&1 | tee build/mapdemo-clang.log
+
+      # ASan+UBSan: self-test, the 100-unit tier and --evil.
+      - name: ASan+UBSan build, 100-unit tier and evil
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "${{ github.workspace }}:/workspace" -w /workspace \
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e MAPDEMO_CONFIGURE -e XOFFSET_GCC_SANITIZE \
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+            -e MAPDEMO_TIERS=100 -e MAPDEMO_LABEL="CI GCC 16 Debug ASan+UBSan" \
+            "$XOFFSET_GCC_IMAGE" bash -c '
+              cmake -S . -B build/mapdemo-asan -DCMAKE_BUILD_TYPE=Debug $MAPDEMO_CONFIGURE \
+                "-DCMAKE_CXX_FLAGS=$XOFFSET_GCC_SANITIZE" \
+                -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined &&
+              cmake --build build/mapdemo-asan --parallel 4 &&
+              demo/mapstate/tools/run_all_tiers.sh build/mapdemo-asan/bin/Debug build/mapdemo-asan-results' \
+            2>&1 | tee build/mapdemo-asan.log
+
+      - name: Result tables
+        if: always()
+        run: |
+          for f in build/mapdemo-results/RESULT_TABLES.md build/mapdemo-clang-results/RESULT_TABLES.md \
+                   build/mapdemo-asan-results/RESULT_TABLES.md; do
+            if [ -f "$f" ]; then cat "$f" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapdemo-gcc16-results
+          path: |
+            build/mapdemo-release.log
+            build/mapdemo-clang.log
+            build/mapdemo-asan.log
+            build/mapdemo-results/
+            build/mapdemo-clang-results/
+            build/mapdemo-asan-results/
+          if-no-files-found: ignore
+
   sanitizer:
     name: ASan+UBSan (P2996 Docker, Linux)
     runs-on: ubuntu-latest
