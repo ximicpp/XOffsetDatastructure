@@ -811,6 +811,19 @@ namespace XOffsetDatastructure {
                 table.bytes = 0;
                 table.count = 0;
             }
+
+            // Removes every entry but keeps the bins' storage (touched stays
+            // set), so refilling the table needs no host allocation.
+            static void clear_entries(FreeTable& table) noexcept {
+                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                    for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u)
+                        table.bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
+                    table.nonempty[word] = 0;
+                }
+                table.large.clear();
+                table.bytes = 0;
+                table.count = 0;
+            }
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
 
@@ -1412,10 +1425,11 @@ namespace XOffsetDatastructure {
         void begin_reinit(bool keep_table = false) noexcept {
             ++m_epoch;
             if (keep_table && free_table_) {
-                // Emptied detached (host deallocation may reenter), then kept:
-                // the next hole needs no fresh 12 KiB table.
+                // Emptied detached (releasing map nodes may reenter), then
+                // kept with its bin storage: the next holes need neither a
+                // fresh 12 KiB table nor fresh bins.
                 FreeTablePtr kept = std::move(free_table_);
-                FreeTableRecycler::empty(*kept);
+                FreeTableRecycler::clear_entries(*kept);
                 if (!free_table_) free_table_ = std::move(kept);
             } else {
                 free_table_.reset();
