@@ -1,7 +1,809 @@
-// Map state demo: server A. OWNER: server thread. STUB until implemented.
+// Map state demo: server A (MAP_DEMO_DESIGN section 4.3). OWNER: server thread.
+//
+// A is the only owner of the unit state. Single thread, one poll() loop over
+// the client listener, every client connection and the connection to B; all
+// XOffset state is touched only on this thread, so publishing a new batch and
+// reading the current one are serialised by construction (no locks).
+//
+//   mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
+//             [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
+//             [--check | --no-check] [--csv-dir DIR]
+//
+// Each step: save_verified(cur) -> StepReq to B -> StepRes -> load_verified ->
+// (checks) -> the loaded buffer becomes cur, the old one is destroyed. At most
+// one step is in flight; steps are paced at 20 Hz and never bunched up when
+// A falls behind. View requests are answered from cur (the last completed
+// tick) also while a step is in flight.
+#include <poll.h>
+#include <csignal>
+#include <cerrno>
+#include <cinttypes>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <exception>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+#include "mapdemo/checks.hpp"
+#include "mapdemo/metrics.hpp"
+#include "mapdemo/net.hpp"
+#include "mapdemo/rules.hpp"
+#include "mapdemo/schema.hpp"
+#include "mapdemo/std_model.hpp"
 
-int main() {
-    std::fprintf(stderr, "server_a: not implemented yet\n");
+namespace {
+
+using namespace mapdemo;
+using net::MsgType;
+using net::ViewCategory;
+
+constexpr std::uint64_t kStepPeriodNs = 50'000'000ull;   // 20 Hz (kStepSeconds)
+constexpr std::uint64_t kByeFlushNs = 2'000'000'000ull;
+
+volatile std::sig_atomic_t g_stop_signal = 0;
+extern "C" void on_stop_signal(int) { g_stop_signal = 1; }
+
+struct Options {
+    std::uint32_t units = kDefaultUnits;
+    std::uint64_t seed = kDefaultSeed;
+    std::uint64_t steps = 0;        // 0 = unlimited
+    double duration_s = 0;          // 0 = unlimited
+    std::uint16_t port = net::kDefaultPortA;
+    std::string b_host = "127.0.0.1";
+    std::uint16_t b_port = net::kDefaultPortB;
+    bool check = true;
+    std::string csv_dir;
+};
+
+[[noreturn]] void usage_error(const std::string& what) {
+    std::fprintf(stderr,
+        "error: %s\n"
+        "usage: mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]\n"
+        "                 [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]\n"
+        "                 [--check | --no-check] [--csv-dir DIR]\n", what.c_str());
+    std::exit(2);
+}
+
+std::uint64_t parse_u64(const char* flag, const char* text, std::uint64_t max) {
+    char* end = nullptr;
+    errno = 0;
+    const unsigned long long v = std::strtoull(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || text[0] == '-' || v > max)
+        usage_error(std::string("bad value for ") + flag + ": " + text);
+    return v;
+}
+
+Options parse(int argc, char** argv) {
+    Options o;
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view a = argv[i];
+        auto value = [&]() -> const char* {
+            if (i + 1 >= argc) usage_error(std::string("missing value for ") + argv[i]);
+            return argv[++i];
+        };
+        if (a == "--units") o.units = std::uint32_t(parse_u64("--units", value(), UINT32_MAX));
+        else if (a == "--seed") o.seed = parse_u64("--seed", value(), UINT64_MAX);
+        else if (a == "--steps") o.steps = parse_u64("--steps", value(), UINT64_MAX);
+        else if (a == "--duration-s") {
+            const char* t = value();
+            char* end = nullptr;
+            o.duration_s = std::strtod(t, &end);
+            if (end == t || *end != '\0' || !std::isfinite(o.duration_s) || o.duration_s < 0)
+                usage_error(std::string("bad value for --duration-s: ") + t);
+        }
+        else if (a == "--port") o.port = std::uint16_t(parse_u64("--port", value(), 65535));
+        else if (a == "--b-host") o.b_host = value();
+        else if (a == "--b-port") o.b_port = std::uint16_t(parse_u64("--b-port", value(), 65535));
+        else if (a == "--check") o.check = true;
+        else if (a == "--no-check") o.check = false;
+        else if (a == "--csv-dir") o.csv_dir = value();
+        else usage_error(std::string("unknown argument ") + argv[i]);
+    }
+    return o;
+}
+
+// An explicit stop with an exit code (1 = check failed, 2 = protocol/IO/capacity).
+struct Fatal {
+    int code;
+    std::string text;
+};
+
+const char* category_name(std::uint16_t flags) {
+    switch (static_cast<ViewCategory>(flags)) {
+    case ViewCategory::Normal: return "normal";
+    case ViewCategory::FullScene: return "full";
+    case ViewCategory::Empty: return "empty";
+    }
+    return nullptr;
+}
+
+std::string hex16(std::uint64_t v) {
+    char buf[17];
+    std::snprintf(buf, sizeof buf, "%016" PRIx64, v);
+    return std::string(buf, 16);
+}
+
+std::string fmt_us(double v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.3f", v);
+    return buf;
+}
+
+std::string fmt_f(float v) {
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%.9g", double(v));
+    return buf;
+}
+
+// One row of a_checks.csv.
+struct CheckRow {
+    std::string check;
+    bool ok = true;
+    std::string detail;
+};
+
+struct Client {
+    std::uint64_t id = 0;
+    net::Conn conn;
+    bool hello_done = false;
+    bool close_after_flush = false;
+};
+
+class ServerA {
+public:
+    explicit ServerA(Options opt) : opt_(std::move(opt)), rec_("a") {}
+    int run();
+
+private:
+    // setup
+    void open_csv();
+    void build_catalog();
+    void build_initial_batch();
+    void connect_b();
+    // step path
+    bool may_send_step(std::uint64_t now) const;
+    void send_step(std::uint64_t now);
+    void on_step_result(net::Frame frame);
+    // clients
+    void accept_clients();
+    void on_client_readable(Client& c);
+    void on_client_frame(Client& c, net::Frame frame);
+    void serve_view(Client& c, net::Frame frame);
+    void reject(Client& c, const std::string& why, bool close_conn);
+    // shutdown
+    void finish();
+    void flush_all_blocking(std::uint64_t budget_ns);
+    void write_results();
+    void fail_check(const std::string& check, const std::string& detail);
+
+    UnitStateBatch& cur_root() { return cur_.root<UnitStateBatch>(); }
+
+    Options opt_;
+    metrics::Recorder rec_;
+
+    std::string catalog_wire_;
+    XBuffer cur_;                       // last completed tick
+    std::unique_ptr<stdm::UnitStateBatch> ref_;   // reference model (--check)
+    checks::Coverage coverage_;
+
+    net::Listener listener_;
+    net::Conn b_;
+    std::vector<std::unique_ptr<Client>> clients_;
+    std::uint64_t next_client_id_ = 1;
+
+    bool inflight_ = false;
+    std::uint64_t inflight_tick_ = 0;
+    std::uint64_t send_start_ns_ = 0;
+    double inflight_save_us_ = 0;
+    std::size_t inflight_req_bytes_ = 0;
+    std::uint64_t steps_sent_ = 0;
+    std::uint64_t steps_done_ = 0;
+    std::uint64_t next_due_ns_ = 0;
+    std::uint64_t first_send_ns_ = 0;
+    std::uint64_t last_done_ns_ = 0;
+    std::uint64_t deadline_ns_ = 0;     // 0 = none
+    bool stopping_ = false;
+
+    // checks and coverage counters
+    std::vector<CheckRow> failures_;
+    std::uint64_t step_checks_ = 0;
+    std::uint64_t snap_checks_ = 0;
+    std::uint64_t snaps_by_cat_[3] = {0, 0, 0};
+    std::uint64_t snaps_nonempty_ = 0;
+    std::uint64_t snaps_zero_ = 0;
+    std::uint64_t rejected_ = 0;
+
+    bool csv_ = false;
+    metrics::CsvFile steps_csv_;
+    metrics::CsvFile snaps_csv_;
+};
+
+// ---------------------------------------------------------------- setup
+
+void ServerA::open_csv() {
+    if (opt_.csv_dir.empty()) return;
+    csv_ = true;
+    const std::string steps_path = opt_.csv_dir + "/a_steps.csv";
+    const std::string snaps_path = opt_.csv_dir + "/a_snapshots.csv";
+    if (!steps_csv_.open(steps_path,
+            "tick,req_bytes,res_bytes,ab_rtt_us,save_us,load_us,destroy_us,free_blocks,free_bytes,check_ok"))
+        throw Fatal{2, "cannot open " + steps_path};
+    if (!snaps_csv_.open(snaps_path,
+            "request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,"
+            "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok"))
+        throw Fatal{2, "cannot open " + snaps_path};
+}
+
+void ServerA::build_catalog() {
+    try {
+        XBuffer cat = XBuffer::create<MapCatalog>(4096, cap_catalog());
+        rules::build_catalog(cat.root<MapCatalog>(), opt_.seed);
+        catalog_wire_ = cat.save_verified<MapCatalog>();
+    } catch (const XBadAlloc& e) {
+        throw Fatal{2, std::string("capacity: MapCatalog cap ") + std::to_string(kCapCatalog >> 20) +
+                       " MiB exceeded (" + e.what() + ")"};
+    }
+}
+
+void ServerA::build_initial_batch() {
+    try {
+        cur_ = XBuffer::create<UnitStateBatch>(4096 + std::size_t(opt_.units) * 128, cap_batch());
+        rules::init_batch(cur_root(), opt_.units, opt_.seed);
+        // The initial batch must also fit on the wire under the receive cap.
+        (void)cur_.save_verified<UnitStateBatch>();
+    } catch (const XBadAlloc& e) {
+        throw Fatal{2, "capacity: --units " + std::to_string(opt_.units) + " exceeds the UnitStateBatch cap of " +
+                       std::to_string(kCapBatch >> 20) + " MiB (" + e.what() + ")"};
+    } catch (const std::length_error& e) {
+        throw Fatal{2, "capacity: --units " + std::to_string(opt_.units) + " exceeds the UnitStateBatch cap of " +
+                       std::to_string(kCapBatch >> 20) + " MiB (" + e.what() + ")"};
+    }
+    if (opt_.check) {
+        ref_ = std::make_unique<stdm::UnitStateBatch>();
+        rules::init_batch(*ref_, opt_.units, opt_.seed);
+        metrics::Stopwatch sw;
+        checks::Result inv = checks::batch_invariants(cur_root(), opt_.units, 0);
+        if (!inv.ok) fail_check("batch_roundtrip", "initial batch: " + inv.detail);
+        checks::Result cmp = checks::compare_with_reference(cur_root(), *ref_);
+        if (!cmp.ok) fail_check("reference_model", "initial batch: " + cmp.detail);
+        rec_.add("a.check_us", sw.us());
+    }
+}
+
+void ServerA::connect_b() {
+    b_ = net::Conn::connect(opt_.b_host, opt_.b_port);
+    b_.send(MsgType::Hello, 0, net::hello_payload());
+    net::Frame res = b_.recv({MsgType::HelloOk, MsgType::Error});
+    if (res.type == MsgType::Error) throw Fatal{2, "hello: B rejected the handshake: " + res.payload};
+    b_.set_nonblocking(true);
+}
+
+// ---------------------------------------------------------------- step path
+
+bool ServerA::may_send_step(std::uint64_t now) const {
+    if (inflight_ || stopping_) return false;
+    if (opt_.steps != 0 && steps_sent_ >= opt_.steps) return false;
+    return now >= next_due_ns_;
+}
+
+void ServerA::send_step(std::uint64_t now) {
+    metrics::Stopwatch sw;
+    std::string wire = cur_.save_verified<UnitStateBatch>();
+    inflight_save_us_ = sw.us();
+    rec_.add("a.save_us", inflight_save_us_);
+    inflight_req_bytes_ = wire.size();
+    rec_.add("a.step_req_bytes", double(wire.size()));
+
+    inflight_tick_ = cur_root().tick;
+    send_start_ns_ = net::now_ns();
+    if (first_send_ns_ == 0) {
+        first_send_ns_ = send_start_ns_;
+        if (opt_.duration_s > 0) deadline_ns_ = first_send_ns_ + std::uint64_t(opt_.duration_s * 1e9);
+    }
+    b_.enqueue(MsgType::StepReq, inflight_tick_, std::move(wire));
+    b_.flush();
+    inflight_ = true;
+    ++steps_sent_;
+    // 20 Hz pacing; when behind, send the next step as soon as this one returns
+    // instead of bunching up (the real ticks/s is reported).
+    next_due_ns_ += kStepPeriodNs;
+    if (next_due_ns_ < now) next_due_ns_ = now;
+}
+
+void ServerA::on_step_result(net::Frame frame) {
+    const std::uint64_t done_ns = net::now_ns();
+    if (frame.type == MsgType::Error) throw Fatal{2, "B reported: " + frame.payload};
+    if (!inflight_) throw Fatal{2, "protocol: StepRes without a StepReq in flight"};
+    const double rtt_us = double(done_ns - send_start_ns_) / 1e3;
+    rec_.add("a.ab_rtt_us", rtt_us);
+    const std::size_t res_bytes = frame.payload.size();
+    rec_.add("a.step_res_bytes", double(res_bytes));
+    const std::uint64_t expect = inflight_tick_ + 1;
+    if (frame.correlation != expect)
+        throw Fatal{2, "protocol: StepRes correlation " + std::to_string(frame.correlation) +
+                       ", expected " + std::to_string(expect)};
+
+    metrics::Stopwatch sw;
+    XBuffer next;
+    try {
+        next = XBuffer::load_verified<UnitStateBatch>(frame.payload, cap_batch());
+    } catch (const std::exception& e) {
+        throw Fatal{2, std::string("rejected StepRes from B: ") + e.what()};
+    }
+    const double load_us = sw.us();
+    rec_.add("a.load_us", load_us);
+
+    bool check_ok = true;
+    if (opt_.check) {
+        sw.restart();
+        auto& nb = next.root<UnitStateBatch>();
+        rules::step_batch(*ref_, opt_.seed);
+        checks::Result inv = checks::batch_invariants(nb, opt_.units, expect);
+        if (!inv.ok) { check_ok = false; fail_check("batch_roundtrip", "tick " + std::to_string(expect) + ": " + inv.detail); }
+        checks::Result cmp = checks::compare_with_reference(nb, *ref_);
+        if (!cmp.ok) { check_ok = false; fail_check("reference_model", "tick " + std::to_string(expect) + ": " + cmp.detail); }
+        coverage_.observe(cur_root(), nb);
+        ++step_checks_;
+        rec_.add("a.check_us", sw.us());
+    } else if (next.root<UnitStateBatch>().tick != expect) {
+        throw Fatal{2, "protocol: StepRes batch tick " + std::to_string(next.root<UnitStateBatch>().tick) +
+                       ", expected " + std::to_string(expect)};
+    }
+
+    // Publish: the loaded buffer becomes the current state; the old one dies.
+    cur_.swap(next);
+    sw.restart();
+    next = XBuffer();
+    std::string().swap(frame.payload);
+    const double destroy_us = sw.us();
+    rec_.add("a.destroy_us", destroy_us);
+
+    inflight_ = false;
+    ++steps_done_;
+    last_done_ns_ = done_ns;
+
+    if (csv_) {
+        char line[256];
+        std::snprintf(line, sizeof line, "%" PRIu64 ",%zu,%zu,%s,%s,%s,%s,%zu,%" PRIu64 ",%d",
+            expect, inflight_req_bytes_, res_bytes, fmt_us(rtt_us).c_str(), fmt_us(inflight_save_us_).c_str(),
+            fmt_us(load_us).c_str(), fmt_us(destroy_us).c_str(), cur_.free_block_count(),
+            std::uint64_t(cur_.free_block_bytes()), check_ok ? 1 : 0);
+        steps_csv_.row(line);
+    }
+    if (!check_ok) throw Fatal{1, "check failed at tick " + std::to_string(expect)};
+}
+
+// ---------------------------------------------------------------- clients
+
+void ServerA::accept_clients() {
+    for (;;) {
+        pollfd p{listener_.fd(), POLLIN, 0};
+        if (::poll(&p, 1, 0) <= 0 || !(p.revents & POLLIN)) return;
+        auto c = std::make_unique<Client>();
+        c->id = next_client_id_++;
+        c->conn = listener_.accept();
+        c->conn.set_nonblocking(true);
+        std::fprintf(stderr, "a: client %" PRIu64 " connected\n", c->id);
+        clients_.push_back(std::move(c));
+    }
+}
+
+void ServerA::reject(Client& c, const std::string& why, bool close_conn) {
+    ++rejected_;
+    std::fprintf(stderr, "rejected: client %" PRIu64 ": %s\n", c.id, why.c_str());
+    if (close_conn) {
+        c.conn.close();
+        return;
+    }
+    c.conn.enqueue(MsgType::Error, 0, why.substr(0, net::max_payload(MsgType::Error)));
+    c.conn.flush();
+}
+
+void ServerA::on_client_readable(Client& c) {
+    for (;;) {
+        std::optional<net::Frame> f;
+        try {
+            f = c.conn.try_recv({MsgType::Hello, MsgType::ViewReq});
+        } catch (const net::ProtocolError& e) {
+            // Bad header, unexpected type, oversize declared length, or EOF:
+            // the payload buffer was never allocated; drop this connection.
+            const std::string what = e.what();
+            if (what.find("EOF") != std::string::npos || what.find("closed") != std::string::npos) {
+                std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
+                c.conn.close();
+            } else {
+                reject(c, what, true);
+            }
+            return;
+        }
+        if (!f) return;
+        on_client_frame(c, std::move(*f));
+        if (!c.conn.is_open() || c.close_after_flush) return;
+    }
+}
+
+void ServerA::on_client_frame(Client& c, net::Frame frame) {
+    if (frame.type == MsgType::Hello) {
+        if (c.hello_done) { reject(c, "second Hello", true); return; }
+        if (!net::hello_matches(frame.payload)) {
+            reject(c, "hello: schema hash mismatch", false);
+            c.close_after_flush = true;
+            return;
+        }
+        c.hello_done = true;
+        c.conn.enqueue(MsgType::HelloOk, 0, std::string());
+        c.conn.enqueue(MsgType::Catalog, 0, catalog_wire_);
+        c.conn.flush();
+        return;
+    }
+    if (!c.hello_done) { reject(c, "ViewReq before Hello", true); return; }
+    serve_view(c, std::move(frame));
+}
+
+void ServerA::serve_view(Client& c, net::Frame frame) {
+    const char* cat = category_name(frame.flags);
+    if (cat == nullptr) {
+        reject(c, "ViewReq: unknown category flags " + std::to_string(frame.flags), false);
+        return;
+    }
+
+    metrics::Stopwatch sw;
+    XBuffer req_buf;
+    try {
+        req_buf = XBuffer::load_verified<ViewRequest>(frame.payload, cap_view_request());
+    } catch (const std::exception& e) {
+        reject(c, std::string("ViewReq: bad wire: ") + e.what(), false);
+        return;
+    }
+    const double req_load_us = sw.us();
+    const ViewRequest& req = req_buf.root<ViewRequest>();
+    if (req.request_id != frame.correlation) {
+        reject(c, "ViewReq: request_id " + std::to_string(req.request_id) + " does not match correlation " +
+                  std::to_string(frame.correlation), false);
+        return;
+    }
+    if (req.scene_id != kSceneId || !rules::rect_is_legal(req.rect, scene_bounds())) {
+        reject(c, "ViewReq: illegal rect or scene", false);
+        return;
+    }
+    rec_.add("a.req_load_us", req_load_us);
+
+    // Filter: plain scan of the current batch (no spatial index, design 4.3).
+    sw.restart();
+    const auto& units = cur_root().units;
+    std::vector<std::uint32_t> hits;
+    const std::uint32_t n = std::uint32_t(units.size());
+    for (std::uint32_t i = 0; i < n; ++i) {
+        const auto& u = units[i];
+        if (u.scene_id == req.scene_id && rules::contains(req.rect, u.pos)) hits.push_back(i);
+    }
+    const double filter_us = sw.us();
+    rec_.add("a.filter_us", filter_us);
+
+    // Build the snapshot in its own arena from the public fields only.
+    sw.restart();
+    XBuffer snap_buf;
+    try {
+        snap_buf = XBuffer::create<ViewSnapshot>(4096 + hits.size() * 64, cap_snapshot());
+        auto& s = snap_buf.root<ViewSnapshot>();
+        s.request_id = req.request_id;
+        s.tick = cur_root().tick;
+        s.scene_id = req.scene_id;
+        s.rect = req.rect;
+        s.units.reserve(std::uint32_t(hits.size()));
+        for (std::uint32_t i : hits) {
+            const auto& u = units[i];
+            auto& v = s.units.emplace_back();
+            v.id = u.id;
+            v.hp = u.hp;
+            v.pos = u.pos;
+            v.behavior = u.behavior;
+            v.name = u.name.view();
+        }
+    } catch (const XBadAlloc& e) {
+        // Never drop units to fit: report the cap explicitly.
+        reject(c, std::string("capacity: ViewSnapshot cap ") + std::to_string(kCapSnapshot >> 20) +
+                  " MiB exceeded for " + std::to_string(hits.size()) + " units (" + e.what() + ")", false);
+        std::fprintf(stderr, "error: capacity: ViewSnapshot cap %zu MiB exceeded\n", kCapSnapshot >> 20);
+        return;
+    }
+    const double build_us = sw.us();
+    rec_.add("a.snap_build_us", build_us);
+
+    sw.restart();
+    std::string wire = snap_buf.save_verified<ViewSnapshot>();
+    const double save_us = sw.us();
+    rec_.add("a.snap_save_us", save_us);
+    const std::size_t wire_bytes = wire.size();
+    rec_.add("a.snap_bytes", double(wire_bytes));
+    rec_.add("a.visible_count", double(hits.size()));
+
+    c.conn.enqueue(MsgType::ViewSnapshot, req.request_id, std::move(wire), frame.flags);
+    c.conn.flush();
+
+    // Checks and digest stay outside the timed regions.
+    const ViewSnapshot& snap = snap_buf.root<ViewSnapshot>();
+    const std::uint64_t digest = checks::snapshot_digest(snap);
+    bool check_ok = true;
+    if (opt_.check) {
+        metrics::Stopwatch cw;
+        checks::Result r = checks::compare_snapshot(snap, req, *ref_);
+        if (!r.ok) {
+            check_ok = false;
+            fail_check("view_snapshot", "request " + std::to_string(req.request_id) + ": " + r.detail);
+        }
+        ++snap_checks_;
+        rec_.add("a.check_us", cw.us());
+    }
+    const auto category = static_cast<std::size_t>(frame.flags);
+    ++snaps_by_cat_[category];
+    if (hits.empty()) ++snaps_zero_; else ++snaps_nonempty_;
+
+    const std::uint64_t request_id = req.request_id;
+    const std::uint64_t tick = snap.tick;
+    const Rect rect = req.rect;
+    const std::size_t visible = hits.size();
+
+    sw.restart();
+    snap_buf = XBuffer();
+    req_buf = XBuffer();
+    const double destroy_us = sw.us();
+    rec_.add("a.snap_destroy_us", destroy_us);
+
+    if (csv_) {
+        std::string row;
+        row.reserve(256);
+        row += std::to_string(request_id); row += ',';
+        row += std::to_string(tick); row += ',';
+        row += cat; row += ',';
+        row += fmt_f(rect.min.x); row += ',';
+        row += fmt_f(rect.min.y); row += ',';
+        row += fmt_f(rect.max.x); row += ',';
+        row += fmt_f(rect.max.y); row += ',';
+        row += std::to_string(visible); row += ',';
+        row += std::to_string(wire_bytes); row += ',';
+        row += hex16(digest); row += ',';
+        row += fmt_us(req_load_us); row += ',';
+        row += fmt_us(filter_us); row += ',';
+        row += fmt_us(build_us); row += ',';
+        row += fmt_us(save_us); row += ',';
+        row += fmt_us(destroy_us); row += ',';
+        row += check_ok ? '1' : '0';
+        snaps_csv_.row(row);
+    }
+    if (!check_ok) throw Fatal{1, "snapshot check failed for request " + std::to_string(request_id)};
+}
+
+// ---------------------------------------------------------------- shutdown
+
+void ServerA::fail_check(const std::string& check, const std::string& detail) {
+    std::fprintf(stderr, "error: check %s failed: %s\n", check.c_str(), detail.c_str());
+    failures_.push_back(CheckRow{check, false, detail});
+}
+
+void ServerA::flush_all_blocking(std::uint64_t budget_ns) {
+    const std::uint64_t until = net::now_ns() + budget_ns;
+    for (;;) {
+        std::vector<pollfd> fds;
+        std::vector<net::Conn*> conns;
+        auto add = [&](net::Conn& c) {
+            if (!c.is_open()) return;
+            bool done = false;
+            try { done = c.flush(); } catch (const std::exception&) { c.close(); return; }
+            if (!done) { fds.push_back(pollfd{c.fd(), POLLOUT, 0}); conns.push_back(&c); }
+        };
+        add(b_);
+        for (auto& c : clients_) add(c->conn);
+        if (fds.empty()) return;
+        const std::uint64_t now = net::now_ns();
+        if (now >= until) return;
+        ::poll(fds.data(), fds.size(), int((until - now) / 1'000'000ull) + 1);
+    }
+}
+
+void ServerA::finish() {
+    if (b_.is_open()) b_.enqueue(MsgType::Bye, 0, std::string());
+    for (auto& c : clients_)
+        if (c->conn.is_open() && c->hello_done) c->conn.enqueue(MsgType::Bye, 0, std::string());
+    flush_all_blocking(kByeFlushNs);
+}
+
+void ServerA::write_results() {
+    const std::uint64_t end_ns = last_done_ns_ != 0 ? last_done_ns_ : net::now_ns();
+    const double elapsed_s = first_send_ns_ != 0 ? double(end_ns - first_send_ns_) / 1e9 : 0.0;
+    const double tps = elapsed_s > 0 ? double(steps_done_) / elapsed_s : 0.0;
+    rec_.add("a.units_count", double(opt_.units));
+    rec_.add("a.ticks_per_s", tps);
+    std::fprintf(stderr, "a: done, ticks=%" PRIu64 " in %.2f s (%.2f ticks/s), snapshots=%" PRIu64
+                 " (normal %" PRIu64 ", full %" PRIu64 ", empty %" PRIu64 "), rejected=%" PRIu64 "\n",
+                 steps_done_, elapsed_s, tps, snaps_by_cat_[0] + snaps_by_cat_[1] + snaps_by_cat_[2],
+                 snaps_by_cat_[0], snaps_by_cat_[1], snaps_by_cat_[2], rejected_);
+
+    std::vector<CheckRow> rows;
+    if (opt_.check) {
+        auto failed = [&](const char* name) -> const CheckRow* {
+            for (const auto& f : failures_) if (f.check == name) return &f;
+            return nullptr;
+        };
+        auto add = [&](const char* name, bool extra_ok, const std::string& detail) {
+            const CheckRow* f = failed(name);
+            rows.push_back(CheckRow{name, f == nullptr && extra_ok, f ? f->detail : detail});
+        };
+        const bool steps_ok = opt_.steps == 0 || steps_done_ == opt_.steps;
+        add("batch_roundtrip", steps_ok && steps_done_ > 0,
+            "units=" + std::to_string(opt_.units) + " ticks=" + std::to_string(steps_done_) +
+            " checked=" + std::to_string(step_checks_) +
+            (steps_ok ? "" : " (stopped before --steps)"));
+        add("reference_model", step_checks_ > 0, "compared=" + std::to_string(step_checks_) + " batches bitwise");
+        {
+            const auto& cv = coverage_;
+            const std::string detail =
+                "name_to_long=" + std::to_string(cv.name_to_long) + " name_to_short=" + std::to_string(cv.name_to_short) +
+                " path_grow=" + std::to_string(cv.path_grow) + " path_shrink=" + std::to_string(cv.path_shrink) +
+                " hp_changes=" + std::to_string(cv.hp_changes) + " behavior_changes=" + std::to_string(cv.behavior_changes) +
+                " grow_shrink_grow=" + (cv.grow_shrink_grow ? "1" : "0");
+            rows.push_back(CheckRow{"modification_coverage", cv.complete(), detail});
+        }
+        add("view_snapshot", snap_checks_ > 0,
+            "compared=" + std::to_string(snap_checks_) + " normal=" + std::to_string(snaps_by_cat_[0]) +
+            " full=" + std::to_string(snaps_by_cat_[1]) + " empty=" + std::to_string(snaps_by_cat_[2]) +
+            " nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_));
+        rows.push_back(CheckRow{"snapshot_paths", snaps_nonempty_ > 0 && snaps_zero_ > 0,
+            "nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_)});
+    }
+    rows.push_back(CheckRow{"rejected_requests", true, "count=" + std::to_string(rejected_)});
+
+    for (const auto& r : rows)
+        if (!r.ok) std::fprintf(stderr, "error: check %s: %s\n", r.check.c_str(), r.detail.c_str());
+
+    if (opt_.csv_dir.empty()) return;
+    if (!rec_.write_csv(opt_.csv_dir + "/a_metrics.csv"))
+        throw Fatal{2, "cannot write " + opt_.csv_dir + "/a_metrics.csv"};
+    metrics::CsvFile checks_csv;
+    if (!checks_csv.open(opt_.csv_dir + "/a_checks.csv", "check,result,detail"))
+        throw Fatal{2, "cannot write " + opt_.csv_dir + "/a_checks.csv"};
+    for (const auto& r : rows) {
+        std::string detail = r.detail;
+        for (char& ch : detail) if (ch == ',' || ch == '\n') ch = ';';
+        checks_csv.row(r.check + "," + (r.ok ? "pass" : "fail") + "," + detail);
+    }
+}
+
+// ---------------------------------------------------------------- main loop
+
+int ServerA::run() {
+    open_csv();
+    build_catalog();
+    build_initial_batch();
+    if (!failures_.empty()) throw Fatal{1, "initial batch failed its checks"};
+
+    listener_ = net::Listener::bind("127.0.0.1", opt_.port);
+    std::fprintf(stderr, "a: listening on 127.0.0.1:%u, units=%u seed=%" PRIu64 " check=%s\n",
+                 unsigned(opt_.port), opt_.units, opt_.seed, opt_.check ? "on" : "off");
+    connect_b();
+    std::fprintf(stderr, "a: connected to B at %s:%u\n", opt_.b_host.c_str(), unsigned(opt_.b_port));
+
+    next_due_ns_ = net::now_ns();
+    std::uint64_t last_report = next_due_ns_;
+    int exit_code = 0;
+    try {
+        for (;;) {
+            const std::uint64_t now = net::now_ns();
+            if (g_stop_signal) stopping_ = true;
+            if (deadline_ns_ != 0 && now >= deadline_ns_) stopping_ = true;
+            if (opt_.steps != 0 && steps_done_ >= opt_.steps) stopping_ = true;
+            if (stopping_ && !inflight_) break;
+
+            if (may_send_step(now)) send_step(now);
+
+            // poll set: listener, B, clients
+            std::vector<pollfd> fds;
+            fds.push_back(pollfd{listener_.fd(), POLLIN, 0});
+            fds.push_back(pollfd{b_.fd(), short(POLLIN | (b_.want_write() ? POLLOUT : 0)), 0});
+            for (auto& c : clients_)
+                fds.push_back(pollfd{c->conn.fd(), short(POLLIN | (c->conn.want_write() ? POLLOUT : 0)), 0});
+
+            int timeout_ms = 1000;
+            const std::uint64_t now2 = net::now_ns();
+            if (!inflight_ && !stopping_ && (opt_.steps == 0 || steps_sent_ < opt_.steps))
+                timeout_ms = next_due_ns_ > now2 ? int((next_due_ns_ - now2 + 999'999) / 1'000'000) : 0;
+            if (deadline_ns_ != 0) {
+                const int to_deadline = deadline_ns_ > now2 ? int((deadline_ns_ - now2 + 999'999) / 1'000'000) : 0;
+                if (to_deadline < timeout_ms) timeout_ms = to_deadline;
+            }
+            const int rc = ::poll(fds.data(), fds.size(), timeout_ms);
+            if (rc < 0) {
+                if (errno == EINTR) continue;
+                throw Fatal{2, std::string("poll: ") + std::strerror(errno)};
+            }
+
+            // B
+            const short brev = fds[1].revents;
+            if (brev & POLLOUT) b_.flush();
+            if (brev & (POLLIN | POLLHUP | POLLERR)) {
+                for (;;) {
+                    std::optional<net::Frame> f = b_.try_recv({MsgType::StepRes, MsgType::Error});
+                    if (!f) break;
+                    on_step_result(std::move(*f));
+                }
+            }
+
+            // clients (indices shift only after the sweep below)
+            for (std::size_t i = 0; i < clients_.size(); ++i) {
+                Client& c = *clients_[i];
+                const short rev = fds[2 + i].revents;
+                if (!c.conn.is_open()) continue;
+                if (rev & POLLOUT) {
+                    try { c.conn.flush(); } catch (const std::exception&) { c.conn.close(); continue; }
+                }
+                if (c.close_after_flush) {
+                    if (!c.conn.want_write()) c.conn.close();
+                    continue;
+                }
+                if (rev & (POLLIN | POLLHUP | POLLERR)) on_client_readable(c);
+            }
+            std::erase_if(clients_, [](const std::unique_ptr<Client>& c) { return !c->conn.is_open(); });
+
+            if (fds[0].revents & POLLIN) accept_clients();
+
+            const std::uint64_t t = net::now_ns();
+            if (t - last_report >= 1'000'000'000ull) {
+                last_report = t;
+                std::fprintf(stderr, "a: tick=%" PRIu64 " clients=%zu ", steps_done_, clients_.size());
+                rec_.print_line(stderr, {"a.ab_rtt_us", "a.save_us", "a.load_us", "a.step_res_bytes",
+                                         "a.snap_build_us", "a.visible_count"});
+            }
+        }
+    } catch (const Fatal& f) {
+        std::fprintf(stderr, "error: %s\n", f.text.c_str());
+        exit_code = f.code;
+    } catch (const XBadAlloc& e) {
+        std::fprintf(stderr, "error: capacity: %s\n", e.what());
+        exit_code = 2;
+    } catch (const net::ProtocolError& e) {
+        std::fprintf(stderr, "error: protocol: %s\n", e.what());
+        exit_code = 2;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "error: %s\n", e.what());
+        exit_code = 2;
+    }
+
+    finish();
+    write_results();
+    if (exit_code != 0) return exit_code;
+    if (!failures_.empty()) return 1;
+    if (opt_.check) {
+        // Coverage and snapshot-path checks are judged at the end of the run.
+        if (!coverage_.complete() || snaps_nonempty_ == 0 || snaps_zero_ == 0) return 1;
+        if (opt_.steps != 0 && steps_done_ != opt_.steps) return 1;
+    }
+    return 0;
+}
+
+} // namespace
+
+int main(int argc, char** argv) {
+    Options opt = parse(argc, argv);
+    std::signal(SIGINT, on_stop_signal);
+    std::signal(SIGTERM, on_stop_signal);
+    std::signal(SIGPIPE, SIG_IGN);
+    try {
+        ServerA a(std::move(opt));
+        return a.run();
+    } catch (const Fatal& f) {
+        std::fprintf(stderr, "error: %s\n", f.text.c_str());
+        return f.code;
+    } catch (const XBadAlloc& e) {
+        std::fprintf(stderr, "error: capacity: %s\n", e.what());
+    } catch (const net::ProtocolError& e) {
+        std::fprintf(stderr, "error: protocol: %s\n", e.what());
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "error: %s\n", e.what());
+    }
     return 2;
 }
