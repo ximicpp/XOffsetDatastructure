@@ -216,6 +216,7 @@ private:
     std::uint64_t snaps_by_cat_[3] = {0, 0, 0};
     std::uint64_t snaps_nonempty_ = 0;
     std::uint64_t snaps_zero_ = 0;
+    std::uint64_t category_mismatch_ = 0;
     std::uint64_t rejected_ = 0;
 
     bool csv_ = false;
@@ -543,6 +544,16 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     const auto category = static_cast<std::size_t>(frame.flags);
     ++snaps_by_cat_[category];
     if (hits.empty()) ++snaps_zero_; else ++snaps_nonempty_;
+    const ViewCategory vc = static_cast<ViewCategory>(frame.flags);
+    if ((vc == ViewCategory::Empty && !hits.empty()) ||
+        (vc == ViewCategory::FullScene && hits.size() != std::size_t(opt_.units))) {
+        ++category_mismatch_;
+        if (opt_.check) {
+            check_ok = false;
+            fail_check("snapshot_paths", "request " + std::to_string(req.request_id) + ": category " + cat +
+                       " got " + std::to_string(hits.size()) + " units");
+        }
+    }
 
     const std::uint64_t request_id = req.request_id;
     const std::uint64_t tick = snap.tick;
@@ -649,13 +660,18 @@ void ServerA::write_results() {
                 " grow_shrink_grow=" + (cv.grow_shrink_grow ? "1" : "0");
             rows.push_back(CheckRow{"modification_coverage", cv.complete(), detail});
         }
-        // Category coverage (non-empty and zero-visible paths per tier) is
-        // judged by tools/summarize.py from a_snapshots.csv, since runs such as
-        // the --evil test legitimately serve only a few snapshots.
         add("view_snapshot", true,
             "compared=" + std::to_string(snap_checks_) + " normal=" + std::to_string(snaps_by_cat_[0]) +
             " full=" + std::to_string(snaps_by_cat_[1]) + " empty=" + std::to_string(snaps_by_cat_[2]) +
             " nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_));
+        // Each served category hit its expected path: Empty -> zero units,
+        // FullScene -> every unit. Whether a run covered both the non-empty
+        // and the zero-visible path is judged per tier by tools/summarize.py
+        // (the --evil run legitimately serves only a few snapshots).
+        rows.push_back(CheckRow{"snapshot_paths", category_mismatch_ == 0,
+            "nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_) +
+            " full=" + std::to_string(snaps_by_cat_[1]) + " empty=" + std::to_string(snaps_by_cat_[2]) +
+            " category_mismatch=" + std::to_string(category_mismatch_)});
     }
     rows.push_back(CheckRow{"rejected_requests", true, "count=" + std::to_string(rejected_)});
 
