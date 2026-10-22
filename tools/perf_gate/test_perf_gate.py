@@ -20,9 +20,13 @@ BASE_FORMAL = {"load": 52_000_000, "query_before": 29_000_000, "mutate": 43_000_
 CHECKS = {"ok": True, "wire_M_sha256": "2bf0c071" + "0" * 56}
 
 
-def tree(slg=None, formal=None, checks=None, functions=None):
+BASE_RELOC = {"vec.push_back": 300_000, "map.insert.fresh": 900_000}
+
+
+def tree(slg=None, formal=None, checks=None, functions=None, reloc=None, reloc_status="ok"):
     t = {"checks": copy.deepcopy(checks or CHECKS), "slg_keys": sorted(slg or BASE_SLG),
-         "slg": dict(slg or BASE_SLG), "formal": dict(formal or BASE_FORMAL)}
+         "slg": dict(slg or BASE_SLG), "formal": dict(formal or BASE_FORMAL),
+         "reloc_status": reloc_status, "reloc": dict(BASE_RELOC if reloc is None else reloc)}
     if functions is not None:
         t["functions"] = functions
     return t
@@ -202,6 +206,24 @@ def main():
     fh = dict(keys, **{"slg.D.read": prof({"write(int, bool)": 932_000, "other": 100_000})})
     rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb2))
     expect("a signature change is not inlining", not row(out, "slg.D")["functions"]["inline_suspect"])
+
+    r = dict(BASE_RELOC, **{"map.insert.fresh": int(900_000 * 1.06)})
+    rc, out = run_case(tree(reloc=r))
+    expect("reloc case +6% fails as a phase", rc == 1 and row(out, "reloc.map.insert.fresh")["verdict"] == "fail"
+           and row(out, "reloc.map.insert.fresh")["class"] == "phase")
+
+    r = dict(BASE_RELOC, **{"vec.push_back": int(300_000 * 1.03)})
+    rc, out = run_case(tree(reloc=r))
+    expect("reloc case +3% warns", rc == 0 and row(out, "reloc.vec.push_back")["verdict"] == "warn")
+
+    rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="absent"))
+    expect("reloc cases new in head are not judged", rc == 0 and row(out, "reloc.vec.push_back")["verdict"] == "new")
+
+    rc, out = run_case(tree(reloc={}, reloc_status="verify_failed"))
+    expect("head reloc verify failure fails", rc == 1 and any("reloc_bench" in x for x in out["failures"]))
+
+    rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="failed"))
+    expect("base that cannot build reloc_bench warns", rc == 0 and any("reloc_bench" in x for x in out["warnings"]))
 
     print(f"{len(failures)} failures")
     return 1 if failures else 0
