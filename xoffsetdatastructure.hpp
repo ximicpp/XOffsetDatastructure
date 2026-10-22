@@ -5163,6 +5163,8 @@ namespace XOffsetDatastructure {
         inline void write_wire(char* out, std::size_t output_size, const XWireHeaderV2& header,
                                const std::vector<XBufferCore::WireHole>& gaps,
                                const char* payload, const XBufferCore& core) noexcept {
+            // DELIBERATE REGRESSION (perf gate acceptance, do not merge): clear the whole output first.
+            std::memset(out, 0, output_size);
             const auto copier = wire_copier(output_size);
             std::memcpy(out, &header, sizeof(header));
             out += sizeof(header);
