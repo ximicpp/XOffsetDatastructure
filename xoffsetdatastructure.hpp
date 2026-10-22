@@ -75,6 +75,8 @@ namespace XOffsetDatastructure {
         explicit XBadAlloc(const std::string& what) : XException(what) {}
     };
 
+    template <typename T> struct XFixedVector;
+
     namespace detail {
         template<class T> T* begin_dynamic_array(void*, std::size_t) noexcept;
         template<class T> T* rebuild_dynamic_array(void*, std::size_t, std::uint32_t) noexcept;
@@ -88,6 +90,31 @@ namespace XOffsetDatastructure {
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
         template<class T> void zero_implicit_padding(T*) noexcept;
+        template<class T> consteval bool subtree_copy_supported();
+        template<class T> bool subtree_copy_assign(XFixedVector<T>&, const XFixedVector<T>&);
+#if defined(XOFFSET_TEST_HOOKS)
+        // T4 test hooks: a per-thread switch that sends container copy
+        // assignment down the element-wise reference path, and counters.
+        struct SubtreeCopyStats {
+            std::uint64_t hits = 0;              // whole-subtree copies
+            std::uint64_t pod_hits = 0;          // trivially copyable element copies
+            std::uint64_t fallback_layout = 0;   // source not one contiguous range
+            std::uint64_t fallback_slack = 0;    // source spare bytes over the bound
+            std::uint64_t fallback_type = 0;     // element type not admitted
+            std::uint64_t fallback_alloc = 0;    // one range did not fit (XBadAlloc)
+            std::uint64_t whole_retires = 0;     // old content retired as one range
+            std::uint64_t piecewise_retires = 0; // old content retired block by block
+            std::uint64_t bytes = 0;             // bytes copied by hits
+        };
+        inline thread_local bool subtree_copy_hook_enabled = true;
+        inline thread_local SubtreeCopyStats subtree_copy_stats{};
+        inline bool subtree_copy_enabled() noexcept { return subtree_copy_hook_enabled; }
+#define XOFFSET_DETAIL_SUBTREE_COUNT(field, n) \
+        (::XOffsetDatastructure::detail::subtree_copy_stats.field += (n))
+#else
+        constexpr bool subtree_copy_enabled() noexcept { return true; }
+#define XOFFSET_DETAIL_SUBTREE_COUNT(field, n) ((void)0)
+#endif
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -589,7 +616,9 @@ namespace XOffsetDatastructure {
             return true;
         }
 
-        // ptr/bytes must name exactly one live block of this arena.
+        // ptr/bytes must name exactly one live block of this arena, or a run
+        // of adjacent live blocks released together (T4 subtree retirement):
+        // blocks have no headers and the table records only holes.
         void retire_block(void* ptr, std::uint32_t bytes) noexcept {
             if (!ptr || bytes == 0 || buffer_.empty()) return;
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
@@ -2288,6 +2317,20 @@ namespace XOffsetDatastructure {
             if (this == &other) return *this;
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
+            // T4: a trivially copyable element is one range copy; any other
+            // admitted subtree is one block when its source is contiguous.
+            if constexpr (detail::subtree_copy_supported<T>()) {
+                if (detail::subtree_copy_enabled()) {
+                    if constexpr (std::is_trivially_copyable_v<T>) {
+                        assign_trivial_copy(other);
+                        return *this;
+                    } else if (other.size_ != 0 && detail::subtree_copy_assign(*this, other)) {
+                        return *this;
+                    }
+                }
+            } else {
+                XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
+            }
             rebuild(other.size_, std::max(capacity_, other.size_), [&](T* dst, size_type i) {
                 fixed_detail::transfer_construct(dst, other.data()[i], binding());
             });
@@ -2854,6 +2897,18 @@ namespace XOffsetDatastructure {
 
         void copy_from(const XFixedVector& other) {
             if (other.size_ == 0) return;
+            if constexpr (detail::subtree_copy_supported<T>()) {
+                if (detail::subtree_copy_enabled()) {
+                    if constexpr (std::is_trivially_copyable_v<T>) {
+                        assign_trivial_copy(other);
+                        return;
+                    } else if (detail::subtree_copy_assign(*this, other)) {
+                        return;
+                    }
+                }
+            } else {
+                XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
+            }
             reserve(other.size_);
             size_type constructed = 0;
             try {
@@ -2867,6 +2922,15 @@ namespace XOffsetDatastructure {
                 throw;
             }
             size_ = other.size_;
+        }
+
+        // T4 POD: assign_range (in place when the capacity suffices, else one
+        // exact block), then the M6 padding zeroing transfer_construct does.
+        void assign_trivial_copy(const XFixedVector& other) {
+            assign_range(std::span<const T>(other.data(), other.size_));
+            auto* items = data();
+            for (size_type i = 0; i < size_; ++i) detail::zero_implicit_padding(items + i);
+            XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
         }
 
         void release() noexcept {

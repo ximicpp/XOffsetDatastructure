@@ -249,4 +249,250 @@ void empty_vacated_slot(T* slot) noexcept {
     }
 }
 
+
+// T4 SUBTREE COPY: copy assignment of a container whose source subtree (its
+// block plus every block reachable from its live elements) tiles one byte
+// range is one allocation, one memcpy and a fix-up walk. The domain is the
+// SHIFT domain extended into container elements: plain heads, scalars, arrays
+// and ordinary records, every alignment <= 8, no custom activation/lifetime.
+template<class T>
+consteval bool subtree_copy_domain() {
+    if constexpr (alignof(T) > 8 || wire_activation<T>::enabled ||
+                  future_custom_lifetime_supported<T>()) return false;
+    else if constexpr (fixed_detail::is_owning_head<T>::value) {
+        if constexpr (!raw_descriptor_layout<T>()) return false;
+        else if constexpr (is_fixed_string_v<T>) return true;
+        else return subtree_copy_domain<typename T::value_type>();
+    } else if constexpr (std::is_array_v<T>) return subtree_copy_domain<std::remove_extent_t<T>>();
+    else if constexpr (std::is_scalar_v<T>) return true;
+    else if constexpr (std::is_class_v<T>) {
+        if constexpr (reflected_base_count<T>() != 0) return false;
+        else if constexpr (!std::is_trivially_copyable_v<T> &&
+                           !ordinary_outer_lifetime_supported<T>()) return false;
+        else return []<std::size_t... I>(std::index_sequence<I...>) {
+            return ([] {
+                constexpr auto member = std::meta::nonstatic_data_members_of(
+                    ^^T, std::meta::access_context::unchecked())[I];
+                if constexpr (std::meta::is_bit_field(member)) return false;
+                else {
+                    using M = [:std::meta::type_of(member):];
+                    return subtree_copy_domain<M>();
+                }
+            }() && ...);
+        }(std::make_index_sequence<reflected_member_count<T>()>{});
+    } else return false;
+}
+
+// T is a container element type. A trivially copyable T takes the range copy
+// (assign_range plus padding zeroing); others need the subtree domain.
+template<class T>
+consteval bool subtree_copy_supported() {
+    if constexpr (wire_activation<T>::enabled || future_custom_lifetime_supported<T>()) return false;
+    else if constexpr (std::is_trivially_copyable_v<T>)
+        return !std::is_const_v<T> && !std::is_volatile_v<T> &&
+               std::is_trivially_copy_constructible_v<T> && std::is_trivially_destructible_v<T>;
+    else return subtree_copy_domain<T>();
+}
+
+// Blocks of one subtree. Live blocks of a valid arena are disjoint, so
+// hi - lo == sum exactly when they tile [lo, hi) with no hole or foreign block.
+struct SubtreeExtent {
+    std::uintptr_t lo = (std::numeric_limits<std::uintptr_t>::max)();
+    std::uintptr_t hi = 0;
+    std::uint64_t sum = 0;    // block bytes
+    std::uint64_t exact = 0;  // block bytes an element-wise copy would allocate
+
+    void add(const void* block, std::uint32_t bytes) noexcept {
+        const auto at = reinterpret_cast<std::uintptr_t>(block);
+        lo = (std::min)(lo, at);
+        hi = (std::max)(hi, at + bytes);
+        sum += bytes;
+    }
+    bool contiguous() const noexcept {
+        // Every block offset is 8-aligned, so the copy keeps each alignment.
+        return sum != 0 && hi - lo == sum && (lo & 7u) == 0 &&
+               sum <= XBufferCore::MAX_PAYLOAD;
+    }
+};
+
+template<class T> void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept;
+
+template<class E>
+void subtree_measure_elements(const E* data, std::uint32_t size, std::uint32_t capacity,
+                              SubtreeExtent& extent) noexcept {
+    if (!data || capacity == 0) return;
+    extent.add(data, fixed_detail::block_bytes_of(static_cast<std::uint32_t>(capacity * sizeof(E))));
+    if (size != 0) extent.exact += fixed_detail::block_bytes_of(static_cast<std::uint32_t>(size * sizeof(E)));
+    if constexpr (raw_needs_activation<E>())
+        for (std::uint32_t i = 0; i < size; ++i) subtree_measure_value<E>(data[i], extent);
+}
+
+template<class T>
+void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept {
+    if constexpr (is_fixed_string_v<T>) {
+        const XFixedString& head = value;
+        if ((head.capacity_ & XFixedString::inline_flag) != 0 || head.capacity_ == 0) return;
+        const auto* data = fixed_detail::resolve_rel32_const<char>(&head.data_delta, head.data_delta);
+        if (!data) return;
+        extent.add(data, fixed_detail::block_bytes_of(head.capacity_ + 1u));
+        if (head.size_ > XFixedString::inline_max) extent.exact += fixed_detail::block_bytes_of(head.size_ + 1u);
+    } else if constexpr (fixed_detail::is_owning_head<T>::value) {
+        using E = typename T::value_type;
+        const XFixedVector<E>& head = value;
+        subtree_measure_elements<E>(head.data(), head.size_, head.capacity_, extent);
+    } else if constexpr (std::is_array_v<T>) {
+        for (const auto& element : value) subtree_measure_value(element, extent);
+    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_activation<M>()) subtree_measure_value<M>(value.[:member:], extent);
+        });
+    }
+}
+
+// Heads live in one bounded arena, so a rebound delta stays in rel32 range;
+// an impossible overflow ends the program as set_rel32 in a noexcept walk does.
+inline std::int32_t subtree_rel32(const void* origin, const void* target) noexcept {
+    const std::int64_t delta = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(target)) -
+                               static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(origin));
+    if (delta < (std::numeric_limits<std::int32_t>::min)() ||
+        delta > (std::numeric_limits<std::int32_t>::max)()) [[unlikely]] std::terminate();
+    return static_cast<std::int32_t>(delta);
+}
+
+template<class T> void subtree_fix_value(char* address, XArena* arena) noexcept;
+
+// The memcpy created the arrays, ordinary outers and scalars of the copy.
+// Restart each live head (nonimplicit lifetime) and rebind it to the
+// destination arena; data_delta moves with its block and is kept. Live
+// elements get the M6 padding zeroing of the element-wise path.
+template<class E>
+void subtree_fix_elements(char* data, std::uint32_t size, XArena* arena) noexcept {
+    if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
+        for (std::uint32_t i = 0; i < size; ++i) {
+            char* element = data + std::size_t(i) * sizeof(E);
+            if constexpr (raw_needs_activation<E>()) subtree_fix_value<E>(element, arena);
+            if constexpr (padding_ranges<E>.size() != 0)
+                zero_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
+        }
+    }
+}
+
+template<class T>
+void subtree_fix_value(char* address, XArena* arena) noexcept {
+    if constexpr (fixed_detail::is_owning_head<T>::value) {
+        // Descriptor layout is checked by raw_descriptor_layout<T>().
+        std::int32_t data_delta;
+        std::uint32_t size, capacity;
+        std::memcpy(&data_delta, address + 4, 4);
+        std::memcpy(&size, address + 8, 4);
+        std::memcpy(&capacity, address + 12, 4);
+        auto* object = ::new (static_cast<void*>(address)) T;
+        object->arena_delta = subtree_rel32(&object->arena_delta, arena);
+        object->data_delta = data_delta;
+        object->size_ = size;
+        object->capacity_ = capacity;
+        if constexpr (!is_fixed_string_v<T>) {
+            if (data_delta != 0 && capacity != 0)
+                subtree_fix_elements<typename T::value_type>(address + 4 + data_delta, size, arena);
+        }
+    } else if constexpr (std::is_array_v<T>) {
+        using E = std::remove_extent_t<T>;
+        if constexpr (raw_needs_activation<E>())
+            for (std::size_t i = 0; i < std::extent_v<T>; ++i)
+                subtree_fix_value<E>(address + i * sizeof(E), arena);
+    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_activation<M>())
+                subtree_fix_value<M>(address + std::meta::offset_of(member).bytes, arena);
+        });
+    }
+}
+
+// Releases replaced content. A contiguous old subtree is retired as one range
+// (one hole the next same-shape copy reuses, so a reuse loop alternates two
+// ranges instead of growing); its objects end as their storage is reused and
+// their destructors would only retire the same blocks. Otherwise block by block.
+template<class T>
+void subtree_release(fixed_detail::allocator_ref alloc, T* old, std::uint32_t size,
+                     std::uint32_t capacity) noexcept {
+    if (!old || capacity == 0) return;
+    SubtreeExtent extent;
+    subtree_measure_elements<T>(old, size, capacity, extent);
+    if (extent.contiguous()) {
+        fixed_detail::retire_dynamic_bytes(alloc, reinterpret_cast<void*>(extent.lo),
+                                           static_cast<std::uint32_t>(extent.sum));
+        XOFFSET_DETAIL_SUBTREE_COUNT(whole_retires, 1);
+    } else {
+        fixed_detail::destroy_n(old, size);
+        fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(capacity * sizeof(T)));
+        XOFFSET_DETAIL_SUBTREE_COUNT(piecewise_retires, 1);
+    }
+}
+
+// Returns false, with nothing changed, when the source is not one contiguous
+// range, carries too much spare capacity or the range does not fit; the caller
+// then copies element-wise. Strong guarantee: past the allocation only an
+// impossible rel32 overflow can throw, and it retires the fresh range first.
+// The source is fully copied before the destination is published or its old
+// content released, so the source may be this head's ancestor or descendant.
+template<class T>
+bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
+    static_assert(subtree_copy_supported<T>() && !std::is_trivially_copyable_v<T>);
+    XArena* arena = dst.arena();
+    if (!arena || src.size_ == 0) return false;
+    SubtreeExtent extent;
+    subtree_measure_elements<T>(src.data(), src.size_, src.capacity_, extent);
+    if (!extent.contiguous()) {
+        XOFFSET_DETAIL_SUBTREE_COUNT(fallback_layout, 1);
+        return false;
+    }
+    // Spare bytes the copy would carry beyond an element-wise copy's blocks.
+    if (extent.sum - extent.exact > (std::max<std::uint64_t>)(64u, extent.sum / 4u)) {
+        XOFFSET_DETAIL_SUBTREE_COUNT(fallback_slack, 1);
+        return false;
+    }
+    const auto bytes = static_cast<std::uint32_t>(extent.sum);
+    const auto alloc = dst.binding();
+    const auto* first = reinterpret_cast<const char*>(extent.lo);
+    const auto top_offset = reinterpret_cast<const char*>(src.data()) - first;
+    const auto size = src.size_;
+    const auto capacity = src.capacity_;
+    char* fresh = nullptr;
+    try {
+        fresh = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(alloc, bytes, 8));
+    } catch (const XBadAlloc&) {
+        // No room for one range (an Explicit arena, or only smaller holes):
+        // nothing changed, and the element-wise copy may still fit or fails
+        // exactly as it did before this path existed.
+        XOFFSET_DETAIL_SUBTREE_COUNT(fallback_alloc, 1);
+        return false;
+    }
+    std::memcpy(fresh, first, bytes);
+    char* top = fresh + top_offset;
+    subtree_fix_elements<T>(top, size, arena);
+    std::int32_t delta = 0;
+    try {
+        fixed_detail::set_rel32(delta, &dst.data_delta, top);
+    } catch (...) {
+        fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
+        throw;
+    }
+    T* old = dst.data();
+    const auto old_size = dst.size_;
+    const auto old_capacity = dst.capacity_;
+    dst.data_delta = delta;
+    dst.size_ = size;
+    dst.capacity_ = capacity;
+    subtree_release<T>(alloc, old, old_size, old_capacity);
+    XOFFSET_DETAIL_SUBTREE_COUNT(hits, 1);
+    XOFFSET_DETAIL_SUBTREE_COUNT(bytes, bytes);
+    return true;
+}
+
 } // namespace XOffsetDatastructure::detail
