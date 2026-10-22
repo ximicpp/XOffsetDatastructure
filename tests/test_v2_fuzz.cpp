@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
         // Seed corpus for fuzz_v2_wire: the golden pool, one file per wire.
         std::mt19937_64 rng(20261021);
         std::filesystem::create_directories(argv[2]);
-        const auto pool = seed_pool(rng, 64);
+        auto pool = seed_pool(rng, 64);
+        for (auto& w : page_boundary_wires(rng)) pool.push_back(std::move(w));
         for (std::size_t i = 0; i < pool.size(); ++i) {
             const auto path = std::string(argv[2]) + "/seed-" + std::to_string(i) + ".wire";
             std::FILE* f = std::fopen(path.c_str(), "wb");
@@ -53,8 +54,22 @@ int main(int argc, char** argv) {
         case Outcome::PayloadReject: ++payload_rejects; break;
         }
     }
+    // Both sides of the ascending live run's size gate, each also mutated.
+    std::size_t boundary_cases = 0;
+    for (const auto& base : page_boundary_wires(rng)) {
+        const auto heads = oracle(base, true).heads;
+        for (int m = 0; m <= 300; ++m) {
+            auto w = base;
+            for (int k = m == 0 ? 0 : 1 + int(rng() % 3); k > 0; --k) mutate_wire(w, rng, heads);
+            switch (check_case(w, rng, cases + boundary_cases++)) {
+            case Outcome::Accepted: ++accepted; break;
+            case Outcome::HeaderReject: ++header_rejects; break;
+            case Outcome::PayloadReject: ++payload_rejects; break;
+            }
+        }
+    }
     if (sparse == 0) fail("no sparse wire in the pool");
-    std::cout << "test_v2_fuzz: golden=" << pool.size() << " sparse=" << sparse << " cases=" << cases << " accepted=" << accepted
+    std::cout << "test_v2_fuzz: golden=" << pool.size() << " sparse=" << sparse << " cases=" << cases << " boundary_cases=" << boundary_cases << " accepted=" << accepted
               << " header_rejects=" << header_rejects << " payload_rejects=" << payload_rejects
               << " inconsistencies=0\n";
     return 0;
