@@ -5883,6 +5883,7 @@ namespace XOffsetDatastructure {
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
             template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static void save_compact_into(XBufferCore&, std::string&);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
             static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
@@ -6076,6 +6077,28 @@ namespace XOffsetDatastructure {
         template <typename T>
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
+        }
+
+        // Canonical (compacted) wire written by direct traversal: capacity ==
+        // size, strings of at most 10 bytes inline, no holes. Smallest wire
+        // and the receiver's canonical fast path, but the receiver's first
+        // growth of any container relocates it: for one-to-many, stored or
+        // read-mostly receivers. Same checks as save_verified; the source is
+        // not changed. A valid V2 wire: every receiver accepts it.
+        template <typename T>
+        void save_compact_into(std::string& out) {
+            require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
+            require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+            if (!detail::find_root<T>(*this))
+                throw XException("save_compact<T>(): no root object of requested type");
+            detail::VerifiedPathsAccess::save_compact_into<T>(*this, out);
+        }
+
+        template <typename T>
+        std::string save_compact() {
+            std::string out;
+            save_compact_into<T>(out);
+            return out;
         }
 
         // V2: if a host allocation failure (or an unverified load) left the
@@ -6451,6 +6474,8 @@ namespace XOffsetDatastructure {
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             XBuffer::save_verified_into<T>(out, options);
         }
+        std::string save_compact() { return XBuffer::save_compact<T>(); }
+        void save_compact_into(std::string& out) { XBuffer::save_compact_into<T>(out); }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
