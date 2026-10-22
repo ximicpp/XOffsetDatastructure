@@ -4180,12 +4180,16 @@ namespace XOffsetDatastructure {
             // Ascending live run (verify_structural_wire_graph only). While
             // every live range starts at or after the end of all earlier live
             // ranges, it cannot overlap any of them, so it is only recorded
-            // here; it is checked against the free set as usual. The first
-            // live range that starts lower, or a full run, writes the recorded
-            // ranges into owned_ranges (flush_deferred_owned) and the general
-            // path continues, exactly as if they had been inserted one by one.
+            // here; it is checked against the free set as usual. A live range
+            // that starts lower is checked against the run and then takes the
+            // general path into owned_ranges, so the run keeps going. A full
+            // run, a free range or the recomputed gap walk writes the recorded
+            // ranges into owned_ranges (flush_deferred_owned), exactly as if
+            // they had been inserted one by one.
             struct DeferredOwned {
                 static constexpr std::size_t capacity = 128;
+                // Payloads above this (one byte-index page) skip the run.
+                static constexpr std::size_t max_extent = 4096;
                 bool enabled = false;
                 std::uint32_t count = 0;
                 std::size_t run_end = 0; // every live range so far ends at or below this
@@ -4245,6 +4249,19 @@ namespace XOffsetDatastructure {
             d.count = 0;
         }
 
+        // True when [begin, end) intersects a recorded range of the run.
+        inline bool deferred_owned_overlaps(const WireValidationContext::DeferredOwned& d,
+                                            std::size_t begin, std::size_t end) {
+            // First recorded range that ends after begin; ends ascend with begins.
+            std::uint32_t lo = 0, hi = d.count;
+            while (lo < hi) {
+                const std::uint32_t mid = lo + (hi - lo) / 2;
+                if (d.end[mid] <= begin) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo < d.count && d.begin[lo] < end;
+        }
+
         inline void stop_deferring_owned(WireValidationContext& ctx) {
             flush_deferred_owned(ctx);
             ctx.deferred_owned.enabled = false;
@@ -4280,7 +4297,13 @@ namespace XOffsetDatastructure {
                     /* XBV3: owned-registered */
                     return;
                 }
-                stop_deferring_owned(ctx);
+                // A lower range (a block that grew and moved, for example)
+                // takes the general path below; it must also miss the
+                // recorded run, which is sorted and pairwise disjoint.
+                if (deferred_owned_overlaps(d, begin_offset, end_offset)) {
+                    throw XException(
+                        "wire validation detected overlapping dynamic ranges");
+                }
             }
             unsigned overlap = 0;
             const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
@@ -4612,7 +4635,11 @@ namespace XOffsetDatastructure {
             if (holes) register_wire_holes(holes, hole_count, ctx);
             // Every free range is registered; live ranges from here on may be
             // deferred while they ascend (see WireValidationContext).
-            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned;
+            // Measured on payloads of at most one byte-index page (SLG battle
+            // and report messages); on larger payloads (player state, shard
+            // snapshots) the run cost more than it saved.
+            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned &&
+                used <= WireValidationContext::DeferredOwned::max_extent;
             ctx.deferred_owned.run_end = ctx.owned_ranges.coverage_bounds().second;
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
