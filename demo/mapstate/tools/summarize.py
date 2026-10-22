@@ -17,7 +17,8 @@ Verdicts per tier:
     empty snapshot has visible == 0; every full-scene snapshot has
     visible == units; check_ok all 1 on both sides.
 Self-test: exit 0 and every selftest_checks.csv row "pass".
-Evil: a, b, client exited 0 and A logged at least 3 "rejected:" lines.
+Evil: a, b, client exited 0, A logged at least 3 "rejected:" lines and every
+row of the evil client's client_checks.csv passes.
 
 Per-category numbers are computed here from the per-request rows
 (nearest-rank percentiles); whole-run numbers come from the processes'
@@ -458,6 +459,8 @@ def main():
         exit_code_verdicts(overall, "evil", ev, ("a", "b", "client"))
         rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
         overall.add("evil", "A logged >= 3 rejected requests", rej >= 3, "{} line(s)".format(rej))
+        check_rows(overall, "evil", "evil client_checks",
+                   read_csv(os.path.join(root, "evil", "client_checks.csv")))
 
     all_items = list(overall.items)
     for t in tiers:
