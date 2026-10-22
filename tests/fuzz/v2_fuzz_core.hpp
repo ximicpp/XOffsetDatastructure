@@ -711,22 +711,79 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, std::size_t id) {
     return o.stage == Oracle::Stage::Header ? Outcome::HeaderReject : Outcome::PayloadReject;
 }
 
-// Library-generated valid wires; each must pass the oracle and be golden
+// A library-generated valid wire must pass the oracle and be golden
 // (load -> save byte-identical).
+void check_golden(const std::string& w, const std::string& where) {
+    const auto o = oracle(w);
+    if (!o.ok) fail(where + ": oracle rejects a library-generated wire: " + o.why);
+    auto loaded = typed_load(w);
+    if (!loaded) fail(where + ": typed load rejects a library-generated wire");
+    if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
+    compare_direct(w, loaded, "", where);
+    compare_reload(*loaded);
+    if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
+}
+
 std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
     std::vector<std::string> pool;
     for (std::size_t i = 0; i < count; ++i) {
         auto w = build_wire(rng);
-        const auto o = oracle(w);
-        if (!o.ok) fail("oracle rejects a library-generated wire: " + o.why);
-        auto loaded = typed_load(w);
-        if (!loaded) fail("typed load rejects a library-generated wire");
-        if (!reload_accepts(w, nullptr)) fail("reload_verified rejects a library-generated wire");
-        compare_direct(w, loaded, "", "golden " + std::to_string(i));
-        compare_reload(*loaded);
-        if (loaded->save_verified() != w) fail("golden write-read-write not byte stable");
+        check_golden(w, "golden " + std::to_string(i));
         pool.push_back(std::move(w));
     }
     return pool;
+}
+
+// Same content for every call with the same rng; only the vector length varies.
+std::string sized_wire(std::mt19937_64 rng, std::size_t vals) {
+    auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
+    auto& r = buf.root();
+    r.epoch = rng();
+    r.title = random_text(rng, 30);
+    for (int i = int(rng() % 4); i > 0; --i) r.tags.emplace_back(random_text(rng, 20), r.tags.get_stored_allocator());
+    for (int i = int(rng() % 6); i > 0; --i) r.keys.insert(std::uint32_t(rng() % 1000));
+    auto& it = r.items.emplace_back();
+    it.id = std::uint32_t(rng());
+    it.name = random_text(rng, 30);
+    it.vals.reserve(vals);
+    for (std::size_t i = 0; i < vals; ++i) it.vals.push_back(std::uint16_t(rng()));
+    return buf.save_verified();
+}
+
+// Wires around the size gate of the ascending live run (used <= max_extent
+// takes the run, larger payloads insert directly). [0, 3): valid wires with
+// used = page - 8, page, page + 8. Library wires keep used a multiple of 8, so
+// [3, 5) patch the page-sized wire to used = page - 1 (last payload byte
+// dropped) and page + 1 (one zero byte appended); they are mutated inputs.
+std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
+    constexpr std::uint64_t page = xo::detail::WireValidationContext::DeferredOwned::max_extent;
+    const auto content = rng;
+    rng.discard(1);
+    std::vector<std::string> out;
+    for (std::size_t vals = 0; out.size() < 3; ++vals) {
+        auto w = sized_wire(content, vals);
+        xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+        const auto target = page - 8 + 8 * out.size();
+        if (h.used_bytes > page + 8) fail("no library wire with used = " + std::to_string(target));
+        if (h.used_bytes != target) continue;
+        if (h.extent_count != 0) fail("page boundary wire is sparse");
+        check_golden(w, "page boundary used=" + std::to_string(target));
+        out.push_back(std::move(w));
+    }
+    const auto& at_page = out[1];
+    xo::XWireHeaderV2 h; std::memcpy(&h, at_page.data(), kHeader);
+    auto shorter = at_page;
+    shorter.erase(kHeader + page - 1, 1);
+    h.used_bytes = page - 1;
+    std::memcpy(shorter.data(), &h, kHeader);
+    fix_header_sizes(shorter);
+    auto longer = at_page;
+    longer.insert(kHeader + page, 1, '\0');
+    h.used_bytes = page + 1;
+    std::memcpy(longer.data(), &h, kHeader);
+    fix_header_sizes(longer);
+    out.push_back(std::move(shorter));
+    out.push_back(std::move(longer));
+    return out;
 }
 } // namespace
