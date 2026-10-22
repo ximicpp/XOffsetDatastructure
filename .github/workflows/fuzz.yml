@@ -218,7 +218,10 @@ jobs:
           BYTES=$(find "$DIR" -type f -printf '%s\n' | awk '{s += $1} END {print s + 0}')
           echo "$FILES $BYTES $SOURCE" | tee "build/fuzz-report/$T/before.txt"
 
-      - name: Build and smoke
+      # No CTest smoke here: the 20000-run smoke is a short fuzz from the same
+      # seeds, and a crash it found would fail this step instead of reaching
+      # the findings below. The Fuzz step covers it.
+      - name: Build
         shell: bash
         run: |
           set -o pipefail
@@ -231,8 +234,7 @@ jobs:
               -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
               -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
               -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6 -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT
-            cmake --build build/fuzz --parallel 4 --target ${{ matrix.build }}
-            ctest --test-dir build/fuzz -R '^fuzz_${T}_(seeds|smoke)\$' --output-on-failure" \
+            cmake --build build/fuzz --parallel 4 --target ${{ matrix.build }}" \
             2>&1 | tee "build/build-$T.log"
 
       # The fuzzer's exit code is recorded, not acted on here: a crash in pr
