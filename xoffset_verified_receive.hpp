@@ -28,6 +28,9 @@ namespace detail {
             } catch (const std::bad_alloc&) { throw XBadAlloc(); }
         }
         static void publish_node(XBufferCore& source, PendingOwner& pending) {
+            // Only canonical owners enter the index; unregister_registry
+            // detaches exactly the records marked here.
+            pending.record->indexed = true;
             bool inserted = false;
             {
                 std::lock_guard lock(pending.registry->mutex);

@@ -154,16 +154,17 @@ foreach(exit_mode ${VM_EXIT_MODES})
     set_tests_properties(test_vm_lifecycle_${exit_mode} PROPERTIES LABELS "reflection;lifecycle")
 endforeach()
 
-# Real host allocation failures inside unordered_map, independently of the
-# pre-registration fault hook. Rehash needs a fresh process/bucket inventory.
+# Real host allocation failure of an ordinary owner's identity record,
+# independently of the pre-registration fault hook, and the check that an
+# ordinary owner allocates nothing else (it is not indexed). Fresh processes.
 set(REGISTRY_FAILURE_MODES
-    node
-    rehash
+    fail-record
+    record-only
 )
 foreach(failure_mode ${REGISTRY_FAILURE_MODES})
-    add_test(NAME test_owner_registry_fail_${failure_mode}
-        COMMAND $<TARGET_FILE:test_owner_registry> --fail-${failure_mode})
-    set_tests_properties(test_owner_registry_fail_${failure_mode} PROPERTIES LABELS "reflection;registry")
+    add_test(NAME test_owner_registry_${failure_mode}
+        COMMAND $<TARGET_FILE:test_owner_registry> --${failure_mode})
+    set_tests_properties(test_owner_registry_${failure_mode} PROPERTIES LABELS "reflection;registry")
 endforeach()
 
 # K7: a schema pin that disagrees with the compiled layout must fail the build.
