@@ -21,6 +21,7 @@
 #include <experimental/meta>
 #endif
 #include <cstddef>
+#include <cstdlib>
 #include <compare>
 #include <concepts>
 #include <functional>
@@ -190,6 +191,24 @@ namespace XOffsetDatastructure {
     enum class XGrowPolicy { Explicit, Automatic };
     using XBufferPool = detail::VmStoragePool;
 
+
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_MOVE_INLINE __forceinline
+#define XOFFSET_DETAIL_MOVE_COLD __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_MOVE_INLINE inline __attribute__((always_inline))
+#define XOFFSET_DETAIL_MOVE_COLD __attribute__((noinline, cold))
+#else
+#define XOFFSET_DETAIL_MOVE_INLINE inline
+#define XOFFSET_DETAIL_MOVE_COLD
+#endif
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_NOINLINE __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_NOINLINE __attribute__((noinline))
+#else
+#define XOFFSET_DETAIL_NOINLINE
+#endif
 
     namespace fixed_detail {
         struct StableEraseOwnerWitness;
@@ -566,17 +585,45 @@ namespace XOffsetDatastructure {
         // (best fit) before the tail grows. A block is never handed out larger
         // than requested, so every live extent equals the size its owner
         // derives from its head and passes back to retire/try_expand.
-        void* allocate_block(std::uint32_t bytes, std::size_t alignment, bool allow_growth = true) {
-            if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
-                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
-            if (alignment <= 8 && free_table_) {
-                FreeSplit split;
-                if (void* reused = take_free_block(*free_table_, bytes, split)) {
-                    finish_free_split(split);
-                    return reused;
+        //
+        // D3: the two outcomes that need no host allocation and run no host
+        // callback are decided inline: an exact-bin hit (no split remainder,
+        // no map node) and a bump without padding inside the current extent.
+        // Their owner cannot change, so the identity copy and re-resolution of
+        // the general path are skipped. Placement is the general path's
+        // (exact bin, larger bin, large block, bump); every other request
+        // takes it unchanged.
+        XOFFSET_DETAIL_MOVE_INLINE void* allocate_block(std::uint32_t bytes, std::size_t alignment,
+                                                        bool allow_growth = true) {
+            if (bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
+                alignment - 1u < 8u && (alignment & (alignment - 1u)) == 0) [[likely]] {
+                FreeTable* table = free_table_.get();
+                if (table && table->count != 0) {
+                    const auto bin = bytes / 8u - 1u;
+                    auto& exact = table->bins[bin];
+                    if (!exact.empty()) [[likely]] {
+                        check_owner_resolves();
+                        const auto offset = exact.back();
+                        exact.pop_back();
+                        if (exact.empty()) table->nonempty[bin / 64u] &= ~(std::uint64_t(1) << (bin % 64u));
+                        table->bytes -= bytes;
+                        --table->count;
+                        return payload_byte_address(offset);
+                    }
+                } else if (auto* sm = arena()) {
+                    // No free block: bump_block, whose start is the current
+                    // end when that address is already 8-byte aligned.
+                    const size_type start = used_end_clamped();
+                    if (((reinterpret_cast<std::uintptr_t>(buffer_.data()) + start) & 7u) == 0 &&
+                        start <= MAX_PAYLOAD && bytes <= MAX_PAYLOAD - start &&
+                        bytes <= buffer_.size() - start) [[likely]] {
+                        check_owner_resolves();
+                        sm->used_end = start + bytes;
+                        return payload_byte_address(start);
+                    }
                 }
             }
-            return bump_block(bytes, alignment, allow_growth);
+            return allocate_block_general(bytes, alignment, allow_growth);
         }
 
         bool try_expand_block(void* ptr, std::uint32_t old_bytes, std::uint32_t new_bytes) {
@@ -594,16 +641,30 @@ namespace XOffsetDatastructure {
         }
 
         // ptr/bytes must name exactly one live block of this arena.
-        void retire_block(void* ptr, std::uint32_t bytes) noexcept {
-            if (!ptr || bytes == 0 || buffer_.empty()) return;
+        // D3: a small block entering a bin that already has spare capacity
+        // needs no host allocation and runs no host callback; it is published
+        // inline. Everything else takes retire_block_general unchanged.
+        XOFFSET_DETAIL_MOVE_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
-            if (address < base || address - base >= buffer_.size()) return;
-            const auto offset = static_cast<std::uint32_t>(address - base);
-            // M3 (threat model T5/P1): a block becomes a hole only after its old
-            // contents are cleared, so emitted holes need no per-save scrub.
-            std::memset(ptr, 0, std::min<std::size_t>(bytes, buffer_.size() - offset));
-            push_free_block(offset, bytes);
+            FreeTable* table = free_table_.get();
+            if (table && ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
+                address >= base && address - base < buffer_.size() &&
+                bytes <= buffer_.size() - (address - base)) [[likely]] {
+                const auto bin = bytes / 8u - 1u;
+                auto& slot = table->bins[bin];
+                if (slot.size() < slot.capacity()) [[likely]] {
+                    check_owner_resolves();
+                    // M3, as in retire_block_general.
+                    zero_retired(ptr, bytes);
+                    slot.push_back(static_cast<std::uint32_t>(address - base));
+                    table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    table->bytes += bytes;
+                    ++table->count;
+                    return;
+                }
+            }
+            retire_block_general(ptr, bytes);
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
@@ -761,6 +822,55 @@ namespace XOffsetDatastructure {
                 if (cache.count) return FreeTablePtr(cache.tables[--cache.count]);
             }
             return FreeTablePtr(new FreeTable());
+        }
+
+        // The general allocation and retirement paths (see allocate_block
+        // and retire_block, which decide the common outcomes inline).
+        XOFFSET_DETAIL_NOINLINE void* allocate_block_general(std::uint32_t bytes, std::size_t alignment,
+                                                             bool allow_growth) {
+            if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
+                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
+            if (alignment <= 8 && free_table_) {
+                FreeSplit split;
+                if (void* reused = take_free_block(*free_table_, bytes, split)) {
+                    finish_free_split(split);
+                    return reused;
+                }
+            }
+            return bump_block(bytes, alignment, allow_growth);
+        }
+
+        XOFFSET_DETAIL_NOINLINE void retire_block_general(void* ptr, std::uint32_t bytes) noexcept {
+            if (!ptr || bytes == 0 || buffer_.empty()) return;
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (address < base || address - base >= buffer_.size()) return;
+            const auto offset = static_cast<std::uint32_t>(address - base);
+            // M3 (threat model T5/P1): a block becomes a hole only after its old
+            // contents are cleared, so emitted holes need no per-save scrub.
+            std::memset(ptr, 0, std::min<std::size_t>(bytes, buffer_.size() - offset));
+            push_free_block(offset, bytes);
+        }
+
+        // M3 zeroing of a retired block: 8..64 bytes (most blocks) use two
+        // overlapping fixed-size stores instead of a memset call.
+        static XOFFSET_DETAIL_MOVE_INLINE void zero_retired(void* p, std::size_t n) noexcept {
+            auto* bytes = static_cast<unsigned char*>(p);
+            if (n >= 8u && n <= 64u) {
+                if (n <= 16u) { std::memset(bytes, 0, 8); std::memset(bytes + n - 8u, 0, 8); }
+                else if (n <= 32u) { std::memset(bytes, 0, 16); std::memset(bytes + n - 16u, 0, 16); }
+                else { std::memset(bytes, 0, 32); std::memset(bytes + n - 32u, 0, 32); }
+                return;
+            }
+            std::memset(bytes, 0, n);
+        }
+
+        // The inline paths run no host callback, so a registered Core is
+        // still its record's owner (the general paths re-resolve instead).
+        XOFFSET_DETAIL_MOVE_INLINE void check_owner_resolves() const noexcept {
+#if !defined(NDEBUG)
+            if (owner_record_ && record_owner(owner_record_) != this) std::abort();
+#endif
         }
 
         // Records one free block. Host allocation (table, bin growth, map
@@ -1569,16 +1679,6 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         bool move_assignment_owns_address(const T& value, const void* address) noexcept;
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_MOVE_INLINE __forceinline
-#define XOFFSET_DETAIL_MOVE_COLD __declspec(noinline)
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_MOVE_INLINE inline __attribute__((always_inline))
-#define XOFFSET_DETAIL_MOVE_COLD __attribute__((noinline, cold))
-#else
-#define XOFFSET_DETAIL_MOVE_INLINE inline
-#define XOFFSET_DETAIL_MOVE_COLD
-#endif
         // MV: result-identical to move_assignment_owns_address; leaf heads are
         // evaluated inline at the move-assignment call site.
         template <typename T>
