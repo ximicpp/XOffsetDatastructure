@@ -47,6 +47,8 @@ fi
   echo "## machine"; uname -a; nproc; (lscpu 2>/dev/null || true); cat /proc/loadavg
 } > "$W/environment.txt" 2>&1
 
+for f in "$A" "$B"; do echo "ldd $f:"; ldd "$f"; done
+
 # V3/V4: every format agrees inside each binary; per-cycle state digests and wire tables agree across binaries.
 $XC verify --bin "$A" --bin "$B" --scales S,M --protocols reuse,per_message --json "$W/verify.json" | tee "$W/verify.txt"
 

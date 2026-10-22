@@ -12,8 +12,8 @@
 #include <type_traits>
 #include "slg/model_xoffset.hpp"
 #include "slg/model_xoffset_optin.hpp"
-#if __has_include("formal_model.hpp")
-#include "formal_model.hpp"
+#if __has_include("xoffset/adapter.hpp")
+#include "xoffset/adapter.hpp"  // bench/formal: the formal acceptance model (sc::xo_detail)
 #define H1_FORMAL_MODEL 1
 #endif
 
@@ -103,7 +103,11 @@ int main() {
     H1_MODEL(slg::xm)
     H1_MODEL(slg::xmr)
 #if H1_FORMAL_MODEL
-    H1_FORMAL_AUDIT
+    audit<sc::xo_detail::Attr>("sc::xo_detail::Attr");
+    audit<sc::xo_detail::Record>("sc::xo_detail::Record");
+    audit<sc::xo_detail::Snapshot>("sc::xo_detail::Snapshot");
+#else
+    std::printf("# formal model not found (bench/formal)\n");
 #endif
     return 0;
 }

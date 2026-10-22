@@ -394,8 +394,10 @@ def _safe(label):
 def run_schedule(schedule, argv_by_label, env=None, outdir=".", gate=None, pin_cpu=None, path_map=None,
                  binaries=None, log=print):
     """Run each label of `schedule` as one process, in order. argv_by_label[label] is the full argv; the
-    token '{out}' is replaced by the raw-file path (else '--out <path>' is appended). path_map=(host, inside)
-    rewrites that path for wrapped runs (docker exec ...). gate() is called before every run; GateTimeout
+    token '{out}' is replaced by the raw-file path (else '--out <path>' is appended). path_map=(host, inside),
+    or {label: (host, inside)} for some arms only, rewrites that path for wrapped runs (docker exec ...).
+    `env` is set on this process; a wrapper (docker exec) does not forward it, so wrapped argv must carry
+    it themselves (cmd_run inserts 'env K=V' before the binary of a wrapped arm). gate() is called before every run; GateTimeout
     stops the schedule (nothing more is timed). A non-zero exit raises. Returns the list of run records,
     also written to outdir/runs.json after every run."""
     os.makedirs(os.path.join(outdir, "raw"), exist_ok=True)
@@ -417,7 +419,8 @@ def run_schedule(schedule, argv_by_label, env=None, outdir=".", gate=None, pin_c
     save()
     for idx, label in enumerate(schedule):
         raw = os.path.abspath(os.path.join(outdir, "raw", f"{idx:03d}_{_safe(label)}.jsonl"))
-        raw_arg = raw.replace(path_map[0], path_map[1], 1) if path_map else raw
+        pm = path_map.get(label) if isinstance(path_map, dict) else path_map
+        raw_arg = raw.replace(pm[0], pm[1], 1) if pm else raw
         argv = [s.replace("{out}", raw_arg) for s in argv_by_label[label]]
         if not any("{out}" in s for s in argv_by_label[label]): argv += ["--out", raw_arg]
         g = None
@@ -713,11 +716,14 @@ def cmd_verify(a):
             if proto == "reuse": env["SLG_REUSE"] = "1"
             per_bin = []
             for b in a.bin:
-                argv = prefix + [b, "--mode", "verify", "--scale", scale] + (["--formats", a.formats] if a.formats else [])
+                envarg = (["env", "SLG_REUSE=1"] if proto == "reuse" else ["env", "-u", "SLG_REUSE"]) if prefix else []
+                argv = prefix + envarg + [b, "--mode", "verify", "--scale", scale] + (["--formats", a.formats] if a.formats else [])
                 if a.cycles: argv += ["--cycles", str(a.cycles)]
                 p = subprocess.run(argv, env=env, capture_output=True, text=True)
                 states, wire = parse_verify(p.stdout)
                 agree = p.returncode == 0 and "verify: all formats agree" in p.stderr
+                if not agree:
+                    print(f"verify {scale} {proto} {b}: rc={p.returncode}\n" + "\n".join(p.stderr.strip().splitlines()[-15:]))
                 per_bin.append({"bin": b, "rc": p.returncode, "agree": agree, "states": states, "wire": wire,
                                 "stderr_tail": p.stderr.strip().splitlines()[-3:]})
                 ok &= agree
@@ -765,13 +771,24 @@ def cmd_run(a):
     prefix = shlex.split(a.prefix) if a.prefix else []
     inside = dict(x.split("=", 1) for x in a.bin_inside) if a.bin_inside else {}
     cmds = {"A": a.a_cmd, "B": a.b_cmd, "A*": a.aa_cmd}
-    argv = {}
+    env = dict(x.split("=", 1) for x in a.env)
+    argv, wrapped = {}, set()
     for l, p in bins.items():
         # --a-cmd/--b-cmd/--aa-cmd: the whole command for that arm (wrapper and binary), e.g.
         # "docker exec h1rt taskset -c 2 /work/out/clang/slg_bench"; else prefix + binary.
-        argv[l] = (shlex.split(cmds[l]) if cmds.get(l) else prefix + [inside.get(l, p)]) + bench
-    env = dict(x.split("=", 1) for x in a.env)
-    path_map = tuple(a.path_map.split("=", 1)) if a.path_map else None
+        if cmds.get(l):
+            cmd = shlex.split(cmds[l])
+            if len(cmd) > 1: wrapped.add(l)
+        elif prefix:
+            cmd = prefix + [inside.get(l, p)]; wrapped.add(l)
+        else:
+            cmd = [p]
+        if l in wrapped and env:
+            # The wrapper does not forward this process's environment: pass it explicitly.
+            cmd = cmd[:-1] + ["env"] + [f"{k}={v}" for k, v in env.items()] + cmd[-1:]
+        argv[l] = cmd + bench
+    pm = tuple(a.path_map.split("=", 1)) if a.path_map else None
+    path_map = {l: pm for l in wrapped} if pm else None
     sampler = gate = None
     if not a.no_gate or a.sample_threshold:
         sampler = CpuSampler(os.path.join(a.outdir, "cpu.jsonl"), 2.0, a.sample_threshold)

@@ -15,7 +15,11 @@ endif()
 add_subdirectory(${XOFFSET_ROOT} xoffset EXCLUDE_FROM_ALL)
 
 add_executable(path_audit path_audit.cpp)
+set(FORMAL_SRC "${XOFFSET_ROOT}/bench/formal" CACHE PATH "formal acceptance harness tree")
 target_include_directories(path_audit PRIVATE ${SLG_SRC}/include)
+if(EXISTS "${FORMAL_SRC}/adapters/xoffset/adapter.hpp")
+  target_include_directories(path_audit PRIVATE ${FORMAL_SRC}/include ${FORMAL_SRC}/adapters)
+endif()
 target_link_libraries(path_audit PRIVATE XOffset::xoffset)
 
 find_path(CEREAL_INCLUDE cereal/cereal.hpp)
