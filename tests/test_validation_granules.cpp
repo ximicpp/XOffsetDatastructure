@@ -164,8 +164,9 @@ void global_priority() {
 // register_allocation: the derived block (8-aligned, round8(request)) is the
 // registered and bounds-checked range; bounds precede overlap.
 void derived_extent_error_order() {
-    std::vector<std::uint64_t> storage(512);
-    const char* base = reinterpret_cast<const char*>(storage.data());
+    // The 64-byte alignment cases below are relative to base: keep it 64-aligned.
+    alignas(64) static const std::uint64_t storage[512] = {};
+    const char* base = reinterpret_cast<const char*>(storage);
     constexpr const char* bounds = "wire validation: allocation out of bounds";
     auto one = [&](const char* ptr, std::size_t request, std::size_t alignment, bool incoming_free,
                    const char* expected, std::size_t fixture_offset = 0, std::size_t fixture_bytes = 0,
