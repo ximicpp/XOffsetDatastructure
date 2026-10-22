@@ -197,7 +197,7 @@ int run_gui(const Options& opt) {
         }
 
         // ---- HUD
-        DrawRectangle(8, 8, 470, 118, Color{20, 20, 20, 200});
+        DrawRectangle(8, 8, 520, 122, Color{20, 20, 20, 200});
         if (have) {
             const ViewSnapshot& v = s.holder().view();
             DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B", std::uint64_t(v.tick),
