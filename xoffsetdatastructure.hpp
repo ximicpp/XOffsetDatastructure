@@ -96,15 +96,16 @@ namespace XOffsetDatastructure {
         // T4 test hooks: a per-thread switch that sends container copy
         // assignment down the element-wise reference path, and counters.
         struct SubtreeCopyStats {
-            std::uint64_t hits = 0;              // whole-subtree copies
+            std::uint64_t whole_hits = 0;        // contiguous source: one memcpy
+            std::uint64_t compact_hits = 0;      // any other source: compacted
             std::uint64_t pod_hits = 0;          // trivially copyable element copies
-            std::uint64_t fallback_layout = 0;   // source not one contiguous range
-            std::uint64_t fallback_slack = 0;    // source spare bytes over the bound
-            std::uint64_t fallback_type = 0;     // element type not admitted
-            std::uint64_t fallback_alloc = 0;    // one range did not fit (XBadAlloc)
+            std::uint64_t whole_skipped_layout = 0; // source not one contiguous range
+            std::uint64_t whole_skipped_slack = 0;  // contiguous, spare bytes over the bound
+            std::uint64_t fallback_type = 0;     // element type not admitted: element-wise
+            std::uint64_t fallback_alloc = 0;    // segment did not fit (XBadAlloc): element-wise
             std::uint64_t whole_retires = 0;     // old content retired as one range
             std::uint64_t piecewise_retires = 0; // old content retired block by block
-            std::uint64_t bytes = 0;             // bytes copied by hits
+            std::uint64_t bytes = 0;             // segment bytes of whole and compact copies
         };
         inline thread_local bool subtree_copy_hook_enabled = true;
         inline thread_local SubtreeCopyStats subtree_copy_stats{};
@@ -2318,7 +2319,7 @@ namespace XOffsetDatastructure {
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
             // T4: a trivially copyable element is one range copy; any other
-            // admitted subtree is one block when its source is contiguous.
+            // admitted subtree is copied into one fresh segment.
             if constexpr (detail::subtree_copy_supported<T>()) {
                 if (detail::subtree_copy_enabled()) {
                     if constexpr (std::is_trivially_copyable_v<T>) {

@@ -250,11 +250,12 @@ void empty_vacated_slot(T* slot) noexcept {
 }
 
 
-// T4 SUBTREE COPY: copy assignment of a container whose source subtree (its
-// block plus every block reachable from its live elements) tiles one byte
-// range is one allocation, one memcpy and a fix-up walk. The domain is the
-// SHIFT domain extended into container elements: plain heads, scalars, arrays
-// and ordinary records, every alignment <= 8, no custom activation/lifetime.
+// T4 SUBTREE COPY: copy assignment of a container copies its source subtree
+// (its block plus every block reachable from its live elements) into one
+// fresh segment: one memcpy plus a fix-up walk when the source tiles one byte
+// range, otherwise a compacting preorder walk. The domain is the SHIFT domain
+// extended into container elements: plain heads, scalars, arrays and ordinary
+// records, every alignment <= 8, no custom activation/lifetime.
 template<class T>
 consteval bool subtree_copy_domain() {
     if constexpr (alignof(T) > 8 || wire_activation<T>::enabled ||
@@ -435,12 +436,105 @@ void subtree_release(fixed_detail::allocator_ref alloc, T* old, std::uint32_t si
     }
 }
 
-// Returns false, with nothing changed, when the source is not one contiguous
-// range, carries too much spare capacity or the range does not fit; the caller
-// then copies element-wise. Strong guarantee: past the allocation only an
-// impossible rel32 overflow can throw, and it retires the fresh range first.
-// The source is fully copied before the destination is published or its old
-// content released, so the source may be this head's ancestor or descendant.
+// COMPACT: copies the source subtree in preorder into one fresh segment of
+// SubtreeExtent::exact bytes, whatever the source layout. Each block holds
+// only its live prefix (capacity = size), strings of at most inline_max bytes
+// become inline, and empty containers own no block: the element-wise copy's
+// shape, packed with no holes. The segment's bytes were zero (fresh tail or a
+// hole zeroed on retirement), so block tails need no clearing.
+template<class E>
+char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* arena,
+                               char*& cursor) noexcept;
+
+template<class T>
+void subtree_compact_value(char* address, const T& source, XArena* arena, char*& cursor) noexcept {
+    if constexpr (is_fixed_string_v<T>) {
+        const XFixedString& from = source;
+        auto* head = ::new (static_cast<void*>(address)) T;
+        head->arena_delta = subtree_rel32(&head->arena_delta, arena);
+        const auto view = from.view();
+        const auto size = static_cast<std::uint32_t>(view.size());
+        if (size == 0) {
+            head->data_delta = 0;
+            head->size_ = 0;
+            head->capacity_ = 0;
+        } else if (size <= XFixedString::inline_max) {
+            // Inline layout of store_inline: bytes 4..14 characters then
+            // zeros, byte 15 = 0x80 | length.
+            char bytes[12] = {};
+            std::memcpy(bytes, view.data(), size);
+            bytes[11] = static_cast<char>(0x80u | size);
+            std::memcpy(address + 4, bytes, sizeof(bytes));
+        } else {
+            char* block = cursor;
+            cursor += fixed_detail::block_bytes_of(size + 1u);
+            std::memcpy(block, view.data(), size);
+            head->data_delta = subtree_rel32(&head->data_delta, block);
+            head->size_ = size;
+            head->capacity_ = size;
+        }
+    } else if constexpr (fixed_detail::is_owning_head<T>::value) {
+        using E = typename T::value_type;
+        const XFixedVector<E>& from = source;
+        const auto size = from.size_;
+        auto* head = ::new (static_cast<void*>(address)) T;
+        head->arena_delta = subtree_rel32(&head->arena_delta, arena);
+        if (size == 0) {
+            head->data_delta = 0;
+            head->size_ = 0;
+            head->capacity_ = 0;
+        } else {
+            char* block = subtree_compact_elements<E>(from.data(), size, arena, cursor);
+            head->data_delta = subtree_rel32(&head->data_delta, block);
+            head->size_ = size;
+            head->capacity_ = size;
+        }
+    } else if constexpr (std::is_array_v<T>) {
+        using E = std::remove_extent_t<T>;
+        if constexpr (raw_needs_activation<E>())
+            for (std::size_t i = 0; i < std::extent_v<T>; ++i)
+                subtree_compact_value<E>(address + i * sizeof(E), source[i], arena, cursor);
+    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+        static_for<reflected_member_count<T>()>([&](auto index) {
+            constexpr auto member = std::meta::nonstatic_data_members_of(
+                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
+            using M = [:std::meta::type_of(member):];
+            if constexpr (raw_needs_activation<M>())
+                subtree_compact_value<M>(address + std::meta::offset_of(member).bytes,
+                                         source.[:member:], arena, cursor);
+        });
+    }
+}
+
+// The memcpy of the live prefix creates the array, ordinary outers and
+// scalars; heads are then restarted and pointed at their compacted children.
+template<class E>
+char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* arena,
+                               char*& cursor) noexcept {
+    char* block = cursor;
+    const auto live = static_cast<std::uint32_t>(size * sizeof(E));
+    cursor += fixed_detail::block_bytes_of(live);
+    std::memcpy(block, static_cast<const void*>(source), live);
+    if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
+        for (std::uint32_t i = 0; i < size; ++i) {
+            char* element = block + std::size_t(i) * sizeof(E);
+            if constexpr (raw_needs_activation<E>()) subtree_compact_value<E>(element, source[i], arena, cursor);
+            if constexpr (padding_ranges<E>.size() != 0)
+                zero_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
+        }
+    }
+    return block;
+}
+
+// Returns false, with nothing changed, only when the new segment does not fit
+// (XBadAlloc); the caller then copies element-wise, which may still fit in
+// smaller holes or fails exactly as it did before this path existed. A source
+// whose blocks tile one range with bounded spare bytes is copied whole (one
+// memcpy plus a fix-up walk, source capacities kept); any other source is
+// compacted. Strong guarantee: past the allocation only an impossible rel32
+// overflow can throw, and it retires the fresh segment first. The source is
+// fully copied before the destination is published or its old content
+// released, so the source may live inside the destination's old content.
 template<class T>
 bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     static_assert(subtree_copy_supported<T>() && !std::is_trivially_copyable_v<T>);
@@ -448,34 +542,42 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     if (!arena || src.size_ == 0) return false;
     SubtreeExtent extent;
     subtree_measure_elements<T>(src.data(), src.size_, src.capacity_, extent);
-    if (!extent.contiguous()) {
-        XOFFSET_DETAIL_SUBTREE_COUNT(fallback_layout, 1);
-        return false;
+    bool whole = extent.contiguous();
+    if (!whole) {
+        XOFFSET_DETAIL_SUBTREE_COUNT(whole_skipped_layout, 1);
+    } else if (extent.sum - extent.exact > (std::max<std::uint64_t>)(64u, extent.sum / 4u)) {
+        // Spare bytes a whole copy would carry beyond the compacted shape.
+        whole = false;
+        XOFFSET_DETAIL_SUBTREE_COUNT(whole_skipped_slack, 1);
     }
-    // Spare bytes the copy would carry beyond an element-wise copy's blocks.
-    if (extent.sum - extent.exact > (std::max<std::uint64_t>)(64u, extent.sum / 4u)) {
-        XOFFSET_DETAIL_SUBTREE_COUNT(fallback_slack, 1);
-        return false;
-    }
-    const auto bytes = static_cast<std::uint32_t>(extent.sum);
+    const auto total = whole ? extent.sum : extent.exact;
+    if (total > XBufferCore::MAX_PAYLOAD) return false;
+    const auto bytes = static_cast<std::uint32_t>(total);
     const auto alloc = dst.binding();
-    const auto* first = reinterpret_cast<const char*>(extent.lo);
-    const auto top_offset = reinterpret_cast<const char*>(src.data()) - first;
     const auto size = src.size_;
-    const auto capacity = src.capacity_;
     char* fresh = nullptr;
     try {
         fresh = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(alloc, bytes, 8));
     } catch (const XBadAlloc&) {
-        // No room for one range (an Explicit arena, or only smaller holes):
-        // nothing changed, and the element-wise copy may still fit or fails
-        // exactly as it did before this path existed.
         XOFFSET_DETAIL_SUBTREE_COUNT(fallback_alloc, 1);
         return false;
     }
-    std::memcpy(fresh, first, bytes);
-    char* top = fresh + top_offset;
-    subtree_fix_elements<T>(top, size, arena);
+    char* top;
+    std::uint32_t capacity;
+    if (whole) {
+        const auto* first = reinterpret_cast<const char*>(extent.lo);
+        std::memcpy(fresh, first, bytes);
+        top = fresh + (reinterpret_cast<const char*>(src.data()) - first);
+        capacity = src.capacity_;
+        subtree_fix_elements<T>(top, size, arena);
+        XOFFSET_DETAIL_SUBTREE_COUNT(whole_hits, 1);
+    } else {
+        char* cursor = fresh;
+        top = subtree_compact_elements<T>(src.data(), size, arena, cursor);
+        capacity = size;
+        if (cursor != fresh + bytes) [[unlikely]] std::terminate();  // measure/compact disagree
+        XOFFSET_DETAIL_SUBTREE_COUNT(compact_hits, 1);
+    }
     std::int32_t delta = 0;
     try {
         fixed_detail::set_rel32(delta, &dst.data_delta, top);
@@ -490,7 +592,6 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     dst.size_ = size;
     dst.capacity_ = capacity;
     subtree_release<T>(alloc, old, old_size, old_capacity);
-    XOFFSET_DETAIL_SUBTREE_COUNT(hits, 1);
     XOFFSET_DETAIL_SUBTREE_COUNT(bytes, bytes);
     return true;
 }
