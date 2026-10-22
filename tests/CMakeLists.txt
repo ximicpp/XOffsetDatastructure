@@ -102,6 +102,7 @@ set(REFLECTION_TESTS
     test_implicit_padding
     test_v2_fuzz
     test_reload_reset
+    test_reset_used_range
 )
 
 foreach(test_name ${REFLECTION_TESTS})
