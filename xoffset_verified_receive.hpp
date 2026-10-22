@@ -115,7 +115,9 @@ template<class T> class VerifiedReceiveToken;
 // V2: `holes` / `extents` are the wire header's hole_count / extent_count.
 // The transport writes the hole table into Operation::hole_bytes() and, for a
 // sparse wire, the extent table into Operation::extent_bytes() and each extent
-// at its payload offset inside Operation::payload_bytes() (gaps stay untouched).
+// at its payload offset inside Operation::payload_bytes(). Gaps stay untouched
+// and read as zero (receive storage starts zeroed); the payload actually held
+// is what is validated.
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
 VerifiedReceiveToken<T> begin_verified_receive(std::size_t,
     std::optional<XBufferCore::MaximumCapacity> = std::nullopt, std::size_t holes = 0,

@@ -1,9 +1,9 @@
 // Cross-compiler wire corpus.
 //
 // Builds a fixed set of V2 wires from deterministic inputs: every container
-// kind, inline and heap strings, holes left by mutation, a sparse wire, enum
-// keys ordered only by operator<=>, nested records, arrays, bool and floating
-// point fields. The same source must produce byte-identical wires with every
+// kind, inline and heap strings, holes left by mutation, a zero-run-elided
+// (sparse) wire, enum keys ordered only by operator<=>, nested records,
+// arrays, bool and floating point fields. The same source must produce byte-identical wires with every
 // supported compiler (P2996 Clang with libc++, GCC 16 with libstdc++), and each
 // compiler must accept the other's wires through load_verified.
 //
@@ -186,8 +186,8 @@ std::vector<Case> cases() {
             fill(r, in, 8);
             r.labels.emplace_back(std::string(64 * 1024, 'x'));
             r.items.emplace_back().name = "after the large block";
-            r.labels.pop_back(); // frees a 64 KiB run: emitted as a sparse gap
-            return b.save_verified();
+            r.labels.pop_back(); // frees a 64 KiB run: skipped as a zero run
+            return b.save_verified(xo::XSaveOptions{.elide_zero_runs = true});
         }},
     };
 }
@@ -200,8 +200,10 @@ std::string read_file(const std::filesystem::path& path) {
 
 void check_wire(const char* name, const std::string& wire, const std::string& expected) {
     try {
+        xo::XWireHeaderV2 header{};
+        std::memcpy(&header, wire.data(), sizeof(header));
         auto loaded = Buffer::load(wire, cap());
-        if (loaded.save_verified() != wire)
+        if (loaded.save_verified(xo::XSaveOptions{.elide_zero_runs = header.extent_count != 0}) != wire)
             fail(std::string(name) + ": load_verified -> save_verified is not byte-identical");
     } catch (const std::exception& e) {
         fail(std::string(name) + ": load_verified rejected the wire: " + e.what());

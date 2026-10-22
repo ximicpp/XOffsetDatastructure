@@ -107,7 +107,13 @@ const Profile& r = in.root<Profile>();
 std::string_view who = r.name.view();
 ```
 
-- wire 由 96 字节头、payload 和空洞表组成；空闲区不小于 4 KiB 时稀疏输出。
+- wire 由 96 字节头、payload 和空洞表组成，默认稠密输出（payload 一次拷贝）。
+- 跨机器发送时可以打开零段省略：`save_verified<Profile>(XSaveOptions{.elide_zero_runs = true})`
+  （`save_verified_into` 同样接受这个参数）。它跳过不短于 64 字节的全零段（容器余量、
+  空洞、为 0 的字段），接收方按原偏移填零，装载后的 payload 与稠密 wire 逐字节相同，
+  余量照样保留、接着改不变慢。代价是发送时多扫描一遍 payload；payload 不足 4 KiB
+  或省不到 max(256 B, payload 的 1/16) 时自动退回稠密。同机共享内存或进程内传递保持默认。
+  接收方不需要任何设置，两种 wire 都接受。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。

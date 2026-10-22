@@ -1,15 +1,19 @@
 // V2 golden wire gate (N4): a deterministic model must serialize to the
 // pinned bytes (size + FNV-1a fingerprint), and write-read-write must be
-// byte-stable for dense and sparse emissions. A V1 wire header is rejected
-// with an explicit "format version 1" error.
+// byte-stable for dense and zero-run-elided (sparse) emissions. The pinned
+// N10 sparse wire of earlier releases (a >= 4 KiB free run skipped) must
+// still load to the same payload. A V1 wire header is rejected with an
+// explicit "format version 1" error.
 #include "xoffsetdatastructure.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace xo = XOffsetDatastructure;
 
@@ -36,10 +40,17 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // bytes and spare container capacity are emitted as zero (threat model M3/M4);
 // retired blocks are cleared, so bytes a reused block does not overwrite are
 // zero too.
+// 2026-10-22: the default emission is always dense (N10 hole skipping
+// removed); sparse wires come from XSaveOptions::elide_zero_runs. The N10
+// pin of build(true) is kept as a receive-only golden.
 #define GOLDEN_DENSE_SIZE 1800u
 #define GOLDEN_DENSE_FNV 0x6457288a053030adull
-#define GOLDEN_SPARSE_SIZE 1856u
-#define GOLDEN_SPARSE_FNV 0x03194efaf8964445ull
+#define GOLDEN_LARGE_DENSE_SIZE 10032u
+#define GOLDEN_LARGE_DENSE_FNV 0xfbe17178398d9717ull
+#define GOLDEN_ELIDED_SIZE 1688u
+#define GOLDEN_ELIDED_FNV 0x5202003544116936ull
+#define GOLDEN_N10_SIZE 1856u
+#define GOLDEN_N10_FNV 0x03194efaf8964445ull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;
@@ -61,8 +72,8 @@ std::string text(std::uint32_t seed, std::size_t n) {
     return s;
 }
 
-// Deterministic content; `sparse` frees a >= 4 KiB block before saving.
-std::string build(bool sparse) {
+// Deterministic content; `large` frees a >= 4 KiB block before saving.
+std::string build(bool large, xo::XSaveOptions options = {}) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic));
     auto& m = buf.root();
     m.version = 7;
@@ -81,7 +92,7 @@ std::string build(bool sparse) {
     m.entries[3].label = text(99, 40);
     m.entries[5].values.push_back(5);
     m.entries.erase(m.entries.begin() + 7);
-    if (sparse) {
+    if (large) {
         auto& big = m.entries.emplace_back();
         big.label = text(5, 30);
         for (std::uint32_t j = 0; j < 2000; ++j) big.values.push_back(j);
@@ -89,8 +100,10 @@ std::string build(bool sparse) {
         tail.label = text(6, 30);
         m.entries.erase(m.entries.begin() + std::ptrdiff_t(m.entries.size() - 2));
     }
-    return buf.save_verified();
+    return buf.save_verified(options);
 }
+
+constexpr xo::XSaveOptions kElide{.elide_zero_runs = true};
 
 void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size, std::uint64_t pinned_hash) {
     xo::XWireHeaderV2 h;
@@ -101,21 +114,70 @@ void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size,
         std::cerr << "size=" << wire.size() << " fnv=0x" << std::hex << fnv1a(wire) << std::dec << "\n";
         fail("golden bytes changed");
     }
+    const auto options = expect_sparse ? kElide : xo::XSaveOptions{};
     auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(wire));
-    if (loaded.save_verified() != wire) fail("write-read-write not byte stable");
+    if (loaded.save_verified(options) != wire) fail("write-read-write not byte stable");
     // Again through a growable reload and a no-op mutation cycle.
     auto again = Buffer(xo::XBuffer::load_verified<golden::Model>(
         wire, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic)));
-    if (again.root().entries.size() == 0 || again.save_verified() != wire) fail("second rewrite differs");
+    if (again.root().entries.size() == 0 || again.save_verified(options) != wire) fail("second rewrite differs");
+}
+
+struct Hole { std::uint32_t offset, bytes; };
+
+// The N10 emission of earlier releases: maximal runs of adjacent holes of at
+// least 4 KiB are skipped through the extent table.
+std::string n10_wire(const std::string& dense) {
+    xo::XWireHeaderV2 h;
+    std::memcpy(&h, dense.data(), sizeof(h));
+    const std::size_t used = std::size_t(h.used_bytes), at_holes = sizeof(h) + used;
+    std::vector<Hole> holes(std::size_t(h.hole_count));
+    std::memcpy(holes.data(), dense.data() + at_holes, holes.size() * sizeof(Hole));
+    auto sorted = holes;
+    std::sort(sorted.begin(), sorted.end(), [](Hole a, Hole b) { return a.offset < b.offset; });
+    std::vector<Hole> gaps;
+    for (std::size_t i = 0; i < sorted.size();) {
+        std::size_t end = sorted[i].offset + std::size_t(sorted[i].bytes), j = i + 1;
+        while (j < sorted.size() && sorted[j].offset == end) end += sorted[j++].bytes;
+        if (end - sorted[i].offset >= 4096) gaps.push_back({sorted[i].offset, std::uint32_t(end - sorted[i].offset)});
+        i = j;
+    }
+    std::string table, data;
+    std::size_t begin = 0;
+    auto extent = [&](std::size_t from, std::size_t to) {
+        const Hole e{std::uint32_t(from), std::uint32_t(to - from)};
+        table.append(reinterpret_cast<const char*>(&e), sizeof(e));
+        data.append(dense, sizeof(h) + from, to - from);
+    };
+    for (auto g : gaps) { extent(begin, g.offset); begin = g.offset + std::size_t(g.bytes); }
+    if (begin < used) extent(begin, used);
+    h.extent_count = table.size() / 8;
+    std::string out(reinterpret_cast<const char*>(&h), sizeof(h));
+    return out + table + data + dense.substr(at_holes);
 }
 } // namespace
 
 int main() {
     const auto dense = build(false);
-    const auto sparse = build(true);
-    if (build(false) != dense || build(true) != sparse) fail("emission is not deterministic");
+    const auto large = build(true);
+    const auto sparse = build(true, kElide);
+    if (build(false) != dense || build(true) != large || build(true, kElide) != sparse)
+        fail("emission is not deterministic");
+    if (build(false, kElide) != dense) fail("a payload below 4 KiB must stay dense");
     check(dense, false, GOLDEN_DENSE_SIZE, GOLDEN_DENSE_FNV);
-    check(sparse, true, GOLDEN_SPARSE_SIZE, GOLDEN_SPARSE_FNV);
+    check(large, false, GOLDEN_LARGE_DENSE_SIZE, GOLDEN_LARGE_DENSE_FNV);
+    check(sparse, true, GOLDEN_ELIDED_SIZE, GOLDEN_ELIDED_FNV);
+    {   // Receive-only: the earlier N10 sparse emission of the same model.
+        const auto n10 = n10_wire(large);
+        xo::XWireHeaderV2 h;
+        std::memcpy(&h, n10.data(), sizeof(h));
+        if (h.extent_count == 0 || n10.size() != GOLDEN_N10_SIZE || fnv1a(n10) != GOLDEN_N10_FNV) {
+            std::cerr << "n10 size=" << n10.size() << " fnv=0x" << std::hex << fnv1a(n10) << std::dec << "\n";
+            fail("N10 golden bytes changed");
+        }
+        auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(n10));
+        if (loaded.save_verified() != large) fail("N10 wire does not load the dense payload");
+    }
 
     // V1 rejection: a V1 header in front of the same bytes.
     auto v1 = dense;
@@ -128,6 +190,7 @@ int main() {
         if (std::string(e.what()).find("format version 1") == std::string::npos)
             fail(std::string("V1 wire rejected with an unclear error: ") + e.what());
     }
-    std::cout << "test_v2_golden: dense=" << dense.size() << " sparse=" << sparse.size() << " ok\n";
+    std::cout << "test_v2_golden: dense=" << dense.size() << " large=" << large.size()
+              << " elided=" << sparse.size() << " ok\n";
     return 0;
 }

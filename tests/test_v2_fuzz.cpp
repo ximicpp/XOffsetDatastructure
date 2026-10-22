@@ -69,8 +69,9 @@ int main(int argc, char** argv) {
         }
     }
     if (sparse == 0) fail("no sparse wire in the pool");
+    if (inflated_comparisons == 0) fail("no sparse wire was compared with its dense payload");
     std::cout << "test_v2_fuzz: golden=" << pool.size() << " sparse=" << sparse << " cases=" << cases << " boundary_cases=" << boundary_cases << " accepted=" << accepted
               << " header_rejects=" << header_rejects << " payload_rejects=" << payload_rejects
-              << " inconsistencies=0\n";
+              << " sparse_vs_dense=" << inflated_comparisons << " inconsistencies=0\n";
     return 0;
 }

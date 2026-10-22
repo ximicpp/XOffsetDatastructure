@@ -65,56 +65,56 @@ namespace detail {
         return result;
     }
 
-    inline std::size_t verified_wire_size(const XWireHeaderV2& h) {
-        const auto holes = std::size_t(h.hole_count) * sizeof(XBufferCore::WireHole);
-        if (std::size_t(h.used_bytes) > (std::numeric_limits<std::size_t>::max)() - sizeof(XWireHeaderV2) ||
-            holes > (std::numeric_limits<std::size_t>::max)() - sizeof(XWireHeaderV2) - std::size_t(h.used_bytes))
-            throw std::length_error("save_verified_into: output size exceeds string limit");
-        return sizeof(XWireHeaderV2) + std::size_t(h.used_bytes) + holes;
-    }
-
     template<class T>
-    void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out) {
+    void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out, XSaveOptions options) {
         // A shared record is an identity, not a mapping pin. Resolve it after
         // reserve/new_handler; a moved owner may even be a plain XBufferCore.
         const auto token = identity(source);
-        auto& initial = owner(token);
-        auto check_alias = [&](XBufferCore& current) {
+        auto* current = &owner(token);
+        auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
                 throw std::length_error("save_verified_into: output capacity overflows alias range");
-            if (verified_paths_intersect(&out, sizeof(out), current.get_address(), current.segment_size()) ||
-                verified_paths_intersect(out.data(), out.capacity() + 1, current.get_address(), current.segment_size()))
+            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
+                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
                 throw XException("save_verified_into: output aliases source storage");
         };
-        check_alias(initial);
-        auto initial_header = header<T>(initial, false);
-        const auto initial_gaps = wire_sparse_gaps(initial, std::size_t(initial_header.used_bytes));
-        wire_apply_gaps(initial_header, initial_gaps);
-        const auto prepared_size = wire_output_size(initial_header, initial_gaps);
-        if (prepared_size > out.max_size())
-            throw std::length_error("save_verified_into: output size exceeds string limit");
-        out.reserve(prepared_size); // only output-allocation/callback boundary
-
-        auto& current = owner(token);
-        check_alias(current);
-        // The source cannot change between these steps (no callback); the
-        // gap list computed before reserve still describes it.
-        auto final_header = header<T>(current, true);
-        wire_apply_gaps(final_header, initial_gaps);
-        const auto final_size = wire_output_size(final_header, initial_gaps);
-        if (final_size > out.capacity() || final_size != prepared_size)
-            throw XException("save_verified_into: source changed beyond prepared output capacity");
-        const auto* base = static_cast<const char*>(current.get_address());
+        check_alias(*current);
+        // The dense size bounds every emission. A reused output that already
+        // holds it needs no reserve (the only output-allocation/callback
+        // boundary), so the source is examined and normalized once.
+        XWireHeaderV2 final_header{};
+        std::size_t final_size = 0;
+        const auto* arena = current->arena();
+        if (arena && current->free_table_complete() &&
+            sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end) +
+                std::uint64_t(current->free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) {
+            final_header = header<T>(*current, true);
+            final_size = wire_dense_size(final_header, "save_verified_into");
+        }
+        if (final_size == 0 || final_size > out.capacity()) {
+            const auto initial = header<T>(*current, false);
+            const auto prepared_size = wire_dense_size(initial, "save_verified_into");
+            if (prepared_size > out.max_size())
+                throw std::length_error("save_verified_into: output size exceeds string limit");
+            out.reserve(prepared_size);
+            current = &owner(token);
+            check_alias(*current);
+            final_header = header<T>(*current, true);
+            final_size = wire_dense_size(final_header, "save_verified_into");
+            if (final_size > out.capacity() || final_size != prepared_size)
+                throw XException("save_verified_into: source changed beyond prepared output capacity");
+        }
+        const auto* base = static_cast<const char*>(current->get_address());
+        const auto& core = *current;
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
         // Supported string implementation must honor its existing reserved
         // capacity. No host allocation or user callback may occur in this copy.
         out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
-            write_wire(destination, final_size, final_header, initial_gaps, base, current);
-            return final_size;
+            return write_wire(destination, final_header, base, core, options.elide_zero_runs);
         });
 #else
         out.resize(final_size);
-        write_wire(out.data(), final_size, final_header, initial_gaps, base, current);
+        out.resize(write_wire(out.data(), final_header, base, core, options.elide_zero_runs));
 #endif
     }
 }

@@ -490,8 +490,12 @@ int main() {
     }
 
     // ---- Sparse wire (extent_count != 0) -----------------------------------
-    // A retired block of at least 4 KiB is skipped on output: header | extent
-    // table | concatenated extents | hole table. Every gap must lie in holes.
+    // Zero-run elision skips zero runs (here the retired 8 KiB block and the
+    // slack of the values block): header | extent table | concatenated
+    // extents | hole table. Gap bytes load as zero wherever they lie. A gap
+    // is never by itself a reason to reject: this is a relaxed encoding rule,
+    // not a relaxed payload check (K4). A sparse wire is accepted exactly
+    // when the dense wire of the same loaded payload is, with the same error.
     {
         auto sbuf = XBuffer::create<CheckedRoot>(65536);
         auto& s = sbuf.root<CheckedRoot>();
@@ -502,52 +506,131 @@ int main() {
         s.map.try_emplace(1, 11);
         s.map.try_emplace(2, 22);
         s.values.reserve(4096);  // retires the 8 KiB block
-        const auto wire = sbuf.save_verified<CheckedRoot>();
-        const auto sh = read<XWireHeaderV2>(wire, 0);
-        need(sh.extent_count == 2 && sh.hole_count == 1 && sh.hole_bytes == 8192, "sparse fixture layout");
+        const XSaveOptions elide{.elide_zero_runs = true};
+        const auto dense = sbuf.save_verified<CheckedRoot>();
+        const auto wire = sbuf.save_verified<CheckedRoot>(elide);
+        const auto sh = read<XWireHeaderV2>(dense, 0);
+        const auto wh = read<XWireHeaderV2>(wire, 0);
+        need(sh.extent_count == 0 && sh.hole_count == 1 && sh.hole_bytes == 8192, "dense fixture layout");
+        need(wh.extent_count >= 2 && wh.used_bytes == sh.used_bytes && wh.hole_count == 1 &&
+             wh.hole_bytes == 8192 && wire.size() + 8192 < dense.size(), "sparse fixture layout");
         const std::size_t table = sizeof(XWireHeaderV2);
-        const auto e0 = read<Hole>(wire, table), e1 = read<Hole>(wire, table + 8);
-        const auto shole = read<Hole>(wire, wire.size() - sizeof(Hole));
-        need(e0.offset == 0 && shole.offset == e0.bytes && e1.offset == shole.offset + shole.bytes &&
-             std::uint64_t(e1.offset) + e1.bytes == sh.used_bytes &&
-             wire.size() == table + 16 + e0.bytes + e1.bytes + sizeof(Hole), "sparse fixture extents");
+        const std::size_t count = static_cast<std::size_t>(wh.extent_count);
+        std::vector<Hole> ext;
+        std::size_t stored = 0;
+        for (std::size_t i = 0; i < count; ++i) {
+            ext.push_back(read<Hole>(wire, table + i * 8));
+            stored += ext.back().bytes;
+            need(i == 0 ? ext[i].offset == 0 : ext[i].offset > ext[i - 1].offset + ext[i - 1].bytes,
+                 "sparse fixture extents");
+        }
+        need(wire.size() == table + count * 8 + stored + sizeof(Hole), "sparse fixture size");
+        // Inflates a sparse wire with a well-formed extent table to the
+        // dense wire of the payload it loads (gap bytes zero).
+        auto inflate = [&](const std::string& sparse) {
+            const auto h = read<XWireHeaderV2>(sparse, 0);
+            Parts p;
+            p.header = h;
+            p.header.extent_count = 0;
+            p.payload.assign(static_cast<std::size_t>(h.used_bytes), '\0');
+            std::size_t at = table + std::size_t(h.extent_count) * 8;
+            for (std::size_t i = 0; i < h.extent_count; ++i) {
+                const auto e = read<Hole>(sparse, table + i * 8);
+                need(e.offset + std::size_t(e.bytes) <= p.payload.size() && at + e.bytes <= sparse.size(),
+                     "inflate: extent out of range");
+                std::memcpy(p.payload.data() + e.offset, sparse.data() + at, e.bytes);
+                at += e.bytes;
+            }
+            std::string out = build(p, false);
+            out.append(sparse, at, std::string::npos);
+            return out;
+        };
+        auto outcome = [](const std::string& bytes) -> std::string {
+            try { (void)XBuffer::load_verified<CheckedRoot>(bytes); return "accepted"; }
+            catch (const XException& e) { return e.what(); }
+        };
+        need(inflate(wire) == dense, "sparse wire does not load the dense payload");
         accept(wire, "sparse wire must load");
         {
             auto b = XBuffer::load_verified<CheckedRoot>(wire);
             const auto& v = b.root<CheckedRoot>();
             need(v.values.size() == 1 && v.values[0] == 5 && v.map.size() == 2 && v.map.find(2)->second == 22,
                  "sparse wire values differ");
-            need(b.save_verified<CheckedRoot>() == wire, "sparse write-read-write is not byte-stable");
+            need(b.save_verified<CheckedRoot>(elide) == wire, "sparse write-read-write is not byte-stable");
+            need(b.save_verified<CheckedRoot>() == dense, "sparse load -> dense save differs from the dense wire");
+            std::string into;
+            b.save_verified_into<CheckedRoot>(into, elide);
+            need(into == wire, "save_verified_into differs from save_verified for a sparse wire");
         }
         auto with_extent = [&](std::size_t index, Hole e) {
             auto bytes = wire;
             write(bytes, table + index * 8, e);
             return bytes;
         };
-        reject(with_extent(0, {8, e0.bytes - 8}), "invalid extent table");          // first extent not at 0
-        reject(with_extent(0, {0, e0.bytes - 4}), "invalid extent table");          // not a multiple of 8
-        reject(with_extent(1, {e1.offset, e1.bytes + 8}), "invalid extent table");  // past used_bytes
-        reject(with_extent(1, {e0.bytes - 8, e1.bytes}), "invalid extent table");   // overlaps extent 0
-        reject(with_extent(1, {e1.offset, 0}), "invalid extent table");
+        const auto last = ext.back();
+        reject(with_extent(0, {8, ext[0].bytes - 8}), "invalid extent table");            // first extent not at 0
+        reject(with_extent(0, {0, ext[0].bytes - 4}), "invalid extent table");            // not a multiple of 8
+        reject(with_extent(count - 1, {last.offset, std::uint32_t(sh.used_bytes - last.offset + 8)}),
+               "invalid extent table");                                                    // past used_bytes
+        reject(with_extent(1, {ext[0].bytes - 8, ext[1].bytes}), "invalid extent table");  // overlaps extent 0
+        reject(with_extent(1, {ext[1].offset, 0}), "invalid extent table");
         {
             auto bytes = wire;
-            auto h2 = sh;
+            auto h2 = wh;
             h2.extent_count = 0; // the extent table is not payload
             write(bytes, 0, h2);
             reject(bytes, "used size mismatch");
         }
-        {   // A gap that also covers the first 8 bytes of the live block after
-            // the hole: the bytes would load as zero, so it must be rejected
-            // even though live blocks plus holes still tile the payload.
+        // Gaps over live bytes: an extent loses its first or last 8 bytes,
+        // or one 8-byte word inside an extent is cut out into a new gap.
+        // Each loads those bytes as zero; the outcome must equal the dense
+        // wire's. Some of these payloads are valid and some are not.
+        std::size_t gap_cases = 0, gap_accepted = 0;
+        auto shrink = [&](std::size_t index, bool front) {
+            auto e = ext[index];
+            if (e.bytes < 16 || (front && index == 0)) return;
             auto bytes = wire;
-            write(bytes, table + 8, Hole{e1.offset + 8, e1.bytes - 8});
-            bytes.erase(table + 16 + e0.bytes, 8);
-            reject(bytes, "wire validation failed: sparse gap is not free");
+            const std::size_t data = table + count * 8;
+            std::size_t at = data;
+            for (std::size_t i = 0; i < index; ++i) at += ext[i].bytes;
+            bytes.erase(front ? at : at + e.bytes - 8, 8);
+            write(bytes, table + index * 8, Hole{front ? e.offset + 8 : e.offset, e.bytes - 8});
+            const auto got = outcome(bytes), want = outcome(inflate(bytes));
+            if (got != want) {
+                std::cerr << "sparse '" << got << "' vs dense '" << want << "'\n";
+                throw std::runtime_error("sparse gap outcome differs from its dense payload");
+            }
+            ++gap_cases;
+            gap_accepted += got == "accepted";
+        };
+        for (std::size_t i = 0; i < count; ++i) { shrink(i, true); shrink(i, false); }
+        for (std::size_t word = 8; word + 8 < ext[0].bytes; word += 8) {
+            // Split extent 0 around one word: {0, word} gap {word + 8, rest}.
+            auto bytes = wire;
+            std::string t;
+            const Hole a{0, std::uint32_t(word)}, b{std::uint32_t(word + 8), ext[0].bytes - std::uint32_t(word + 8)};
+            t.append(reinterpret_cast<const char*>(&a), 8);
+            t.append(reinterpret_cast<const char*>(&b), 8);
+            bytes.replace(table, 8, t);
+            bytes.erase(table + (count + 1) * 8 + word, 8);
+            auto h2 = wh;
+            h2.extent_count = count + 1;
+            write(bytes, 0, h2);
+            const auto got = outcome(bytes), want = outcome(inflate(bytes));
+            if (got != want) {
+                std::cerr << "word " << word << ": sparse '" << got << "' vs dense '" << want << "'\n";
+                throw std::runtime_error("sparse gap outcome differs from its dense payload");
+            }
+            ++gap_cases;
+            gap_accepted += got == "accepted";
         }
-        {   // The hole that covers the gap shrinks: coverage fails first.
+        need(gap_cases > 8 && gap_accepted > 0 && gap_accepted < gap_cases,
+             "sparse gap cases must include accepted and rejected payloads");
+        {   // The hole shrinks: coverage fails first, sparse or dense.
             auto bytes = wire;
+            const auto shole = read<Hole>(wire, wire.size() - sizeof(Hole));
             write(bytes, wire.size() - sizeof(Hole), Hole{shole.offset + 8, shole.bytes - 8});
-            auto h2 = sh;
+            auto h2 = wh;
             h2.hole_bytes -= 8;
             write(bytes, 0, h2);
             reject(bytes, kCoverage);

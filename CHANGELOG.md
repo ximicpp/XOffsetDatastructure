@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Send path: `save_verified` / `save_verified_into` always emit a dense wire
+  by default; the N10 emission (skip free runs of at least 4 KiB, which built
+  a 1 bit / 8 B free bitmap on every save of a buffer with 4 KiB of holes) is
+  removed. New `XSaveOptions{.elide_zero_runs = true}` skips every zero run of
+  at least 64 bytes (capacity slack, holes, zero fields) through the existing
+  extent table, for cross-machine sends; the receiver loads a byte-identical
+  payload, so spare capacity is kept (K5 unchanged). Receivers no longer
+  require gap bytes to lie in holes: gaps load as zero and the payload is
+  validated as before, so the payload-level accept/reject set is unchanged
+  (fuzzed: every sparse wire has the outcome and error of its dense
+  equivalent). Earlier N10 wires still load (receive-only golden).
+- `save_verified_into` into an output whose capacity already holds the dense
+  wire examines and normalizes the source once instead of twice.
+
 ## 0.3.0-beta.1: production-readiness beta
 
 Release gates G1–G8 (`PRODUCTION_READINESS_GOAL`): K1–K7 mapped to tests, two

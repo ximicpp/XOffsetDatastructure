@@ -78,10 +78,22 @@ hole table: hole_count x {u32 offset, u32 bytes}
 | `reserved0` | 0 |
 | `extent_count` | |
 
-**Sparse wire.** When the free table contains a run of free bytes of at least
-4 KiB, emission skips that run. The extents and their gaps tile `[0, used_bytes)`,
-and the first extent starts at 0. Every gap byte must lie inside a hole, and gaps
-load as zero bytes. `freeze_verified` always emits dense wires.
+**Sparse wire.** The extents and their gaps tile `[0, used_bytes)`, and the
+first extent starts at 0. Gaps load as zero bytes wherever they lie; the loaded
+payload is then validated exactly like a dense one, so a sparse wire is
+accepted exactly when the dense wire of the same payload is, with the same
+error. (Before 2026-10-22 every gap byte also had to lie inside a hole; that
+encoding rule is dropped, the payload-level accept/reject set is unchanged.)
+
+**Emission.** `save_verified` and `save_verified_into` emit a dense wire (one
+copy of the payload) by default. `XSaveOptions{.elide_zero_runs = true}` skips
+zero runs of at least 64 bytes (capacity slack, holes, zero fields): a run is
+found from a 64-byte aligned all-zero block and extended word by word on both
+sides. Payloads below 4 KiB, and emissions that would save less than
+max(256 B, used_bytes / 16), stay dense. The loaded payload is byte-identical
+either way, so spare capacity survives the transfer. `freeze_verified` always
+emits dense wires. (Earlier releases skipped free runs of at least 4 KiB by
+default, N10; such wires still load.)
 
 **Output.** On Darwin, outputs of at least 1 MiB are copied in 256 KiB chunks.
 Each chunk is preceded by `madvise(MADV_WILLNEED)` on its destination pages.
@@ -135,7 +147,8 @@ The typed validator, the raw validator and the receive path apply the same check
   length of at most 10 and zero padding.
 - **Other values:** `bool` must be 0 or 1; sets and maps must be strictly ordered.
 - **Coverage:** live bytes plus hole bytes must equal `used_end`.
-- **Sparse wires:** every gap byte must be free.
+- **Sparse wires:** gap bytes are zero in the loaded payload; there is no
+  separate gap check.
 
 These checks are not weaker than V1's. V1 detected a corrupted block pointer
 through the per-block header self-check. In V2, a redirected pointer leaves its

@@ -71,6 +71,8 @@ constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 // declare a huge payload).
 constexpr std::size_t kLimit = std::size_t(1) << 22;
 
+inline std::size_t inflated_comparisons = 0; // sparse vs dense-payload checks run
+
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "v2 fuzz FAILED: " << message << "\n";
     std::abort(); // libFuzzer records abort as a crash and saves the input
@@ -215,19 +217,20 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
     // Extent table (sparse) -> gaps; stored bytes.
     const auto* table = reinterpret_cast<const unsigned char*>(wire.data()) + kHeader;
     std::uint64_t stored = h.used_bytes, end = 0;
-    std::vector<std::pair<std::uint64_t, std::uint64_t>> extents, gaps;
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> extents;
+    bool gap = false;
     if (h.extent_count) {
         stored = 0;
         for (std::uint64_t i = 0; i < h.extent_count; ++i) {
             std::uint32_t off, b; std::memcpy(&off, table + i * 8, 4); std::memcpy(&b, table + i * 8 + 4, 4);
             if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != 0 : off <= end) || std::uint64_t(off) + b > h.used_bytes)
                 return reject(Oracle::Stage::Header, "extent table");
-            if (i) gaps.push_back({end, off});
+            gap |= i != 0;
             extents.push_back({off, b});
             end = std::uint64_t(off) + b; stored += b;
         }
-        if (end < h.used_bytes) gaps.push_back({end, h.used_bytes});
-        if (gaps.empty()) return reject(Oracle::Stage::Header, "extent table");
+        gap |= end < h.used_bytes;
+        if (!gap) return reject(Oracle::Stage::Header, "extent table");
     }
     const auto tbytes = h.extent_count * 8;
     if (stored > body - tbytes) return reject(Oracle::Stage::Header, "sizes");
@@ -280,18 +283,8 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
         covered += run.ranges[i].end - run.ranges[i].begin;
     }
     if (covered != run.used) return preject("coverage");
-    // Every gap byte inside a hole.
-    std::vector<std::pair<std::uint64_t, std::uint64_t>> free;
-    for (std::uint64_t i = 0; i < h.hole_count; ++i) {
-        std::uint32_t off, b; std::memcpy(&off, holes + i * 8, 4); std::memcpy(&b, holes + i * 8 + 4, 4);
-        free.push_back({off, std::uint64_t(off) + b});
-    }
-    std::sort(free.begin(), free.end());
-    for (auto [gb, ge] : gaps) {
-        std::uint64_t pos = gb;
-        for (auto [fb, fe] : free) { if (fb <= pos && fe > pos) pos = fe; if (pos >= ge) break; }
-        if (pos < ge) return preject("gap not free");
-    }
+    // Gap bytes load as zero wherever they lie: a gap is not itself a reason
+    // to reject (zero-run elision), the payload above decides.
     return result;
 }
 
@@ -527,7 +520,14 @@ std::string build_wire(std::mt19937_64& rng) {
         after.name = random_text(rng, 40);
         r.items.erase(r.items.begin() + std::ptrdiff_t(r.items.size() - 2));
     }
-    return buf.save_verified();
+    // Half the wires elide zero runs (sparse once the payload reaches 4 KiB).
+    return buf.save_verified(xo::XSaveOptions{.elide_zero_runs = (rng() & 1) != 0});
+}
+
+// The emission options that reproduce a library wire byte for byte.
+xo::XSaveOptions options_of(const std::string& w) {
+    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+    return xo::XSaveOptions{.elide_zero_runs = h.extent_count != 0};
 }
 
 // ---------------------------------------------------------------------------
@@ -582,6 +582,84 @@ std::uint32_t get32(const std::string& w, std::size_t at) {
     std::uint32_t v = 0; if (at + 4 <= w.size()) std::memcpy(&v, w.data() + at, 4); return v;
 }
 
+using Range = std::pair<std::uint64_t, std::uint64_t>; // payload [begin, end)
+
+// Extents of a wire whose extent table is well formed (the oracle's header
+// rules) and whose framing adds up; {[0, used)} for a dense wire.
+std::optional<std::vector<Range>> extents_of(const std::string& w) {
+    if (w.size() < kHeader) return std::nullopt;
+    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+    if (h.used_bytes > kLimit || !data_bytes(w, h)) return std::nullopt;
+    if (h.extent_count == 0) return std::vector<Range>{{0, h.used_bytes}};
+    std::vector<Range> out;
+    std::uint64_t end = 0;
+    for (std::uint64_t i = 0; i < h.extent_count; ++i) {
+        const auto off = get32(w, kHeader + i * 8), b = get32(w, kHeader + i * 8 + 4);
+        if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != 0 : off <= end) || std::uint64_t(off) + b > h.used_bytes)
+            return std::nullopt;
+        out.push_back({off, std::uint64_t(off) + b});
+        end = std::uint64_t(off) + b;
+    }
+    if (out.size() == 1 && end == h.used_bytes) return std::nullopt; // no gap: invalid table
+    return out;
+}
+
+// The dense wire of the payload a sparse wire loads (gap bytes zero).
+std::optional<std::string> inflate(const std::string& w) {
+    const auto ext = extents_of(w);
+    if (!ext) return std::nullopt;
+    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+    std::string payload(std::size_t(h.used_bytes), '\0');
+    std::size_t at = kHeader + std::size_t(h.extent_count) * 8;
+    for (auto [b, e] : *ext) { std::memcpy(payload.data() + b, w.data() + at, e - b); at += e - b; }
+    h.extent_count = 0;
+    std::string out(reinterpret_cast<const char*>(&h), kHeader);
+    return out + payload + w.substr(at);
+}
+
+// Re-emits a dense wire with `gaps` (sorted, disjoint, nonadjacent, inside
+// [8, used)) skipped through an extent table.
+std::string sparsify(const std::string& dense, const std::vector<Range>& gaps) {
+    xo::XWireHeaderV2 h; std::memcpy(&h, dense.data(), kHeader);
+    const auto used = h.used_bytes;
+    std::string table, data;
+    std::uint64_t begin = 0;
+    auto extent = [&](std::uint64_t from, std::uint64_t to) {
+        const std::uint32_t e[2] = {std::uint32_t(from), std::uint32_t(to - from)};
+        table.append(reinterpret_cast<const char*>(e), 8);
+        data.append(dense, kHeader + std::size_t(from), std::size_t(to - from));
+    };
+    for (auto [b, e] : gaps) { extent(begin, b); begin = e; }
+    if (begin < used) extent(begin, used);
+    h.extent_count = table.size() / 8;
+    std::string out(reinterpret_cast<const char*>(&h), kHeader);
+    return out + table + data + dense.substr(kHeader + std::size_t(used));
+}
+
+// Adds one gap of 8..512 bytes at a random aligned payload offset >= 8 to a
+// wire with a well-formed extent table: those bytes now load as zero.
+void cut_gap(std::string& w, std::mt19937_64& rng) {
+    const auto ext = extents_of(w);
+    const auto dense = inflate(w);
+    if (!ext || !dense) return;
+    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+    const auto used = h.used_bytes;
+    if (used < 24 || used % 8) return;
+    std::vector<Range> gaps;
+    std::uint64_t begin = 0;
+    for (auto [b, e] : *ext) { if (b > begin) gaps.push_back({begin, b}); begin = e; }
+    if (begin < used) gaps.push_back({begin, used});
+    const std::uint64_t a = 8 * (1 + rng() % (used / 8 - 1));
+    gaps.push_back({a, std::min<std::uint64_t>(used, a + 8 * (1 + rng() % 64))});
+    std::sort(gaps.begin(), gaps.end());
+    std::vector<Range> merged;
+    for (auto g : gaps) {
+        if (!merged.empty() && g.first <= merged.back().second) merged.back().second = std::max(merged.back().second, g.second);
+        else merged.push_back(g);
+    }
+    w = sparsify(*dense, merged);
+}
+
 void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::size_t>& heads) {
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
     const auto used = std::size_t(std::min<std::uint64_t>(h.used_bytes, w.size() - kHeader));
@@ -591,7 +669,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
     static const std::uint32_t interesting[] = {
         0u, 1u, 4u, 7u, 8u, 9u, 10u, 11u, 16u, 24u, 0x7ffffff8u, 0x7fffffffu, 0x80000000u,
         0x85000000u, 0x8a000000u, 0x8b000000u, 0xff000000u, 0xfffffff8u, 0xfffffff0u};
-    switch (rng() % 11) {
+    switch (rng() % 13) {
     case 0: { // random bit flip anywhere
         const auto at = std::size_t(rng() % w.size());
         w[at] = char(w[at] ^ (1u << (rng() % 8)));
@@ -655,6 +733,9 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         const auto e = kHeader + std::size_t(rng() % h.extent_count) * 8 + (rng() & 1) * 4;
         put32(w, e, rng() % 2 ? get32(w, e) + 8 : get32(w, e) - 8);
         break; }
+    case 11: case 12: // a gap over arbitrary payload bytes
+        cut_gap(w, rng);
+        break;
     case 9: { // payload header field
         static const std::size_t fields[] = {8, 12, 16, 24, 32, 40};
         const auto mapped = file_pos(w, fields[rng() % 6]);
@@ -681,6 +762,25 @@ void exercise(Buffer& buf, std::mt19937_64& rng) {
     if (again->save_verified() != saved) fail("write-read-write not byte stable after mutation");
 }
 
+// A sparse wire must have exactly the outcome (and error) of the dense wire
+// of the payload it loads, and an accepted one must load that payload.
+template <class O>
+void compare_inflated(const std::string& w, std::optional<Buffer>& typed, const std::string& terr,
+                      const O& o, const std::string& where) {
+    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), std::min(w.size(), kHeader));
+    if (w.size() < kHeader || h.extent_count == 0 || o.stage == Oracle::Stage::Header) return;
+    const auto dense = inflate(w);
+    if (!dense) fail(where + ": header-valid sparse wire does not inflate");
+    std::string derr;
+    auto d = typed_load(*dense, &derr);
+    if (bool(d) != bool(typed) || derr != terr)
+        fail(where + ": sparse " + (typed ? "accept" : "reject(" + terr + ")") + " vs dense " +
+             (d ? "accept" : "reject(" + derr + ")"));
+    if (typed && typed->save_verified() != d->save_verified())
+        fail(where + ": sparse and dense wires loaded different payloads");
+    ++inflated_comparisons;
+}
+
 enum class Outcome { Accepted, HeaderReject, PayloadReject };
 
 // One input through the oracle and all library acceptors. They must agree;
@@ -698,6 +798,7 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, std::size_t id) {
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
     compare_direct(w, typed, terr, "case " + std::to_string(id));
+    compare_inflated(w, typed, terr, o, "case " + std::to_string(id));
     if (o.ok || o.stage == Oracle::Stage::Payload) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
@@ -722,7 +823,7 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
     compare_direct(w, loaded, "", where);
     compare_reload(*loaded);
-    if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
+    if (loaded->save_verified(options_of(w)) != w) fail(where + ": golden write-read-write not byte stable");
 }
 
 std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
