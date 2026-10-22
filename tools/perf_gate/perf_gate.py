@@ -19,6 +19,7 @@ Subcommands (run in this order, or use `run` for all of them):
 from __future__ import annotations
 
 import argparse
+import collections
 import concurrent.futures
 import fnmatch
 import hashlib
@@ -55,6 +56,10 @@ FORMAL_TOTALS = ("read_sum", "mutate", "emit_after", "load", "reload")
 FORMAL_REPORT_ONLY = ("retire", "cleanup")
 
 FIRST_LINE = "指令数只用于拦截回退，计时结论以 Mac 正式批次为准。"
+
+FN_TOP = 10                                    # functions listed per flagged metric
+FN_NAME_MAX = 110                              # display width of a function name
+FN_SUSPECT_MIN = 0.10                          # inlining suspects move >= 10% of the metric's change
 
 
 def log(*a):
@@ -246,7 +251,7 @@ COLLECTED = re.compile(r"Collected\s*:\s*(\d+)")
 
 
 def callgrind(valgrind, cmd, env, tmp: Path):
-    """Run `cmd` under callgrind with collection off at start; return the collected Ir."""
+    """Run `cmd` under callgrind with collection off at start; return the collected Ir and the profile."""
     logf = tmp / "vg.log"
     full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no",
                                     f"--callgrind-out-file={tmp / 'cg.out'}", f"--log-file={logf}"] + cmd
@@ -255,7 +260,59 @@ def callgrind(valgrind, cmd, env, tmp: Path):
     m = COLLECTED.search(text)
     if r.returncode != 0 or not m:
         raise RuntimeError(f"callgrind failed ({r.returncode}): {shlex.join(cmd)}\n{r.stderr[-2000:]}\n{text[-2000:]}")
-    return int(m.group(1))
+    return int(m.group(1)), fn_profile(tmp / "cg.out")
+
+
+CG_COMPRESSED = re.compile(r"^\((\d+)\)(?:\s(.*))?$")
+CG_CLONE = re.compile(r"(?: \[clone [^\]]+\])+$")
+
+
+def fn_profile(path: Path):
+    """Self Ir per function, and caller/callee pairs, from one callgrind out file.
+
+    Self Ir is what `callgrind_annotate --inclusive=no` lists. GCC clone suffixes
+    (`[clone .constprop.0]`) are dropped so that a clone and its original match.
+    """
+    names = {}
+
+    def name_of(v):
+        m = CG_COMPRESSED.match(v)
+        if not m:
+            return CG_CLONE.sub("", v)
+        i, n = m.groups()
+        if n is not None:
+            names[i] = CG_CLONE.sub("", n)
+        return names.get(i, f"({i})")
+
+    self_ir = collections.Counter()
+    edges = set()
+    npos, fn, callee, call_cost = 1, None, None, False
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            if line[0].isdigit() or line[0] in "+-*":
+                parts = line.split()
+                ir = int(parts[npos]) if len(parts) > npos else 0
+                if call_cost:  # inclusive cost of the call that the calls= line announced
+                    call_cost = False
+                    if ir and fn and callee:
+                        edges.add((fn, callee))
+                elif fn:
+                    self_ir[fn] += ir
+                continue
+            if line.startswith("positions:"):
+                npos = len(line.split(":", 1)[1].split())
+                continue
+            key, _, val = line.partition("=")
+            if key == "fn":
+                fn = name_of(val)
+            elif key == "cfn":
+                callee = name_of(val)
+            elif key == "calls":
+                call_cost = True
+    return {"self": {k: v for k, v in self_ir.items() if v}, "edges": sorted([a, b] for a, b in edges)}
 
 
 def slg_env(**extra):
@@ -337,7 +394,7 @@ def cmd_measure(a):
         t2 = scratch / f"keys-{short(sha)}"
         t2.mkdir()
         keys = discover_slg_keys(Path(b["dir"]) / "slg_bench", t2) if chk["ok"] else []
-        result["trees"][sha] = {"checks": chk, "slg_keys": keys, "slg": {}, "formal": {}}
+        result["trees"][sha] = {"checks": chk, "slg_keys": keys, "slg": {}, "formal": {}, "functions": {}}
         log(f"checks {short(sha)}: {'ok' if chk['ok'] else 'FAILED'}; {len(keys)} SLG keys")
 
     tasks = []
@@ -363,17 +420,17 @@ def cmd_measure(a):
         tmp = Path(tempfile.mkdtemp(prefix=f"{kind}-", dir=scratch))
         try:
             if kind == "slg":
-                ir = callgrind(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
+                ir, prof = callgrind(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
                                slg_env(SLG_IR_KEYS=key, SLG_IR_SKIP_CYCLES=SLG_SKIP_CYCLES), tmp)
             else:
                 env = dict(os.environ, SC_IR_PHASE=key)
-                ir = callgrind(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
+                ir, prof = callgrind(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
                                             "--trace", str(fx / "M" / "trace.bin"), "--wire-out", str(tmp / "w"),
                                             "--canonical-out", str(tmp / "c"), "--queries-out", str(tmp / "q"),
                                             "--result", str(tmp / "r.json")], env, tmp)
-            return task, ir, None
+            return task, ir, prof, None
         except Exception as e:  # noqa: BLE001 - reported per task
-            return task, None, str(e)
+            return task, None, None, str(e)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -381,7 +438,7 @@ def cmd_measure(a):
     errors = []
     repeats = {}
     with concurrent.futures.ThreadPoolExecutor(a.jobs) as ex:
-        for (sha, kind, key, rep), ir, err in ex.map(run, tasks):
+        for (sha, kind, key, rep), ir, prof, err in ex.map(run, tasks):
             if err:
                 errors.append(f"{short(sha)} {kind} {key}: {err}")
                 continue
@@ -389,6 +446,7 @@ def cmd_measure(a):
                 repeats[f"{kind}.{key}"] = ir
             else:
                 result["trees"][sha][kind][key] = ir
+                result["trees"][sha]["functions"][f"{kind}.{key}"] = prof
     det = {}
     for k, ir in repeats.items():
         kind, key = k.split(".", 1)
@@ -485,6 +543,92 @@ def validate_ledger(entries):
     return problems
 
 
+def metric_keys(metric, tree):
+    """The callgrind runs (keys of a tree's "functions") that a gate metric adds up."""
+    kind, _, rest = metric.partition(".")
+    if kind == "slg":
+        if rest in SLG_TOTALS:
+            return sorted(f"slg.{k}" for k in tree.get("slg", {}) if k.startswith(rest + "."))
+        return [metric]
+    if rest == "read_sum":
+        return ["formal.query_before", "formal.query_after"]
+    if rest == "total":
+        return [f"formal.{p}" for p in FORMAL_PHASES]
+    return [metric]
+
+
+def merged_profile(tree, keys):
+    fns = (tree or {}).get("functions") or {}
+    if not keys or not all(k in fns for k in keys):
+        return None
+    self_ir, edges = collections.Counter(), set()
+    for k in keys:
+        self_ir.update(fns[k]["self"])
+        edges.update(tuple(e) for e in fns[k]["edges"])
+    return self_ir, edges
+
+
+def short_fn(name):
+    if len(name) > FN_NAME_MAX and name.endswith(")"):
+        depth = 0
+        for i in range(len(name) - 1, -1, -1):  # drop the parameter list
+            depth += {")": 1, "(": -1}.get(name[i], 0)
+            if depth == 0:
+                name = name[:i] + "(…)"
+                break
+    return name if len(name) <= FN_NAME_MAX else name[:FN_NAME_MAX - 1] + "…"
+
+
+def fn_diff(ref_tree, head_tree, metric, ref_role):
+    """Functions whose self Ir changed most between the reference tree and head, and inlining suspects.
+
+    A change is "suspected inlining" when, among the listed functions,
+      - one exists on one side only and a caller or callee of it moved the other way by at least
+        half as much (it was inlined into, or out of, that function), or
+      - a caller/callee pair moves in opposite directions and the change of their sum is less
+        than half of their combined movement (|d1 + d2| < (|d1| + |d2|) / 2).
+    A function that is new or gone without such a partner is new or removed code, not inlining;
+    one whose name survives with another parameter list on the other side changed its signature.
+    Either rule only counts when the function (or the larger of the pair) moved at least
+    FN_SUSPECT_MIN of the metric's whole change, so that a few stray instructions are not reported.
+    """
+    keys = metric_keys(metric, head_tree)
+    ref, head = merged_profile(ref_tree, keys), merged_profile(head_tree, keys)
+    if ref is None or head is None:
+        return None
+    (r, re_), (h, he) = ref, head
+    delta = {f: h.get(f, 0) - r.get(f, 0) for f in set(r) | set(h)}
+    floor = max(1, FN_SUSPECT_MIN * abs(sum(delta.values())))
+    top = sorted((f for f, d in delta.items() if d), key=lambda f: (-abs(delta[f]), f))[:FN_TOP]
+    edges = re_ | he
+    partners = collections.defaultdict(set)
+    for x, y in edges:
+        partners[x].add(y)
+        partners[y].add(x)
+    bare = lambda f: f.split("(", 1)[0]  # noqa: E731 - name without the parameter list
+    rows, suspects = [], []
+    for f in top:
+        only = "head" if not r.get(f) else (ref_role if not h.get(f) else None)
+        rows.append({"function": f, "ref": r.get(f, 0), "head": h.get(f, 0), "delta": delta[f], "only": only})
+        if not only or abs(delta[f]) < floor:
+            continue
+        other = r if only == "head" else h
+        if any(bare(g) == bare(f) and g != f for g in other):
+            continue  # same name, other parameters: a signature change
+        moved = sorted(g for g in partners[f] if g != f and delta.get(g, 0) * delta[f] < 0
+                       and abs(delta[g]) >= abs(delta[f]) / 2)
+        if moved:
+            suspects.append(f"`{short_fn(f)}` 只在 {only} 出现，`{short_fn(moved[0])}` 反向变化 {delta[moved[0]]:+,}")
+    listed = set(top)
+    for x, y in sorted(edges):
+        if x != y and x in listed and y in listed:
+            dx, dy = delta[x], delta[y]
+            if dx * dy < 0 and abs(dx + dy) < (abs(dx) + abs(dy)) / 2 and max(abs(dx), abs(dy)) >= floor:
+                suspects.append(f"`{short_fn(x)}` 调用 `{short_fn(y)}`，自身 Ir 一升一降（{dx:+,} / {dy:+,}）")
+    return {"ref": ref_role, "keys": keys, "delta": sum(delta.values()), "top": rows,
+            "inline_suspect": bool(suspects), "suspects": suspects}
+
+
 def fmt_ratio(r):
     return "—" if r is None else f"{r:.4f}"
 
@@ -574,6 +718,7 @@ def cmd_compare(a):
             if rb > fail_t:
                 allow = ledger_matches(new_entries, metric, a.compiler)
                 cap = max((float(e["max_ratio"]) for e in allow), default=None)
+                row["trigger"] = "base"
                 if cap is not None and rb <= cap:
                     row["verdict"] = "allowed"
                     row["ledger"] = [e["id"] for e in allow]
@@ -582,6 +727,7 @@ def cmd_compare(a):
                     row["verdict"] = "fail"
                     fail(f"{metric} head÷base {rb:.4f} > {fail_t}" + (f"（超过 ledger 上限 {cap}）" if cap else ""))
             elif rb > warn_t:
+                row["trigger"] = "base"
                 row["verdict"] = "warn"
                 warn(f"{metric} head÷base {rb:.4f} > {warn_t}")
             if cls == "total" and rb < DROP_NOTE:
@@ -593,6 +739,8 @@ def cmd_compare(a):
                 credit *= float(e["max_ratio"])
             net = ra / credit
             row["head_anchor_net"] = net
+            if net > ANCHOR_WARN:
+                row.setdefault("trigger", "anchor")
             if net > ANCHOR_FAIL:
                 row["verdict"] = "fail"
                 fail(f"{metric} head÷anchor {ra:.4f}（扣除 ledger 后 {net:.4f}）> {ANCHOR_FAIL}")
@@ -601,6 +749,18 @@ def cmd_compare(a):
                     row["verdict"] = "warn"
                 warn(f"{metric} head÷anchor {ra:.4f}（扣除 ledger 后 {net:.4f}）> {ANCHOR_WARN}")
         rows.append(row)
+
+    # Function-level difference for every metric that warns, fails or needs the ledger (design 5.3).
+    for row in rows:
+        ref_role = row.get("trigger")
+        if not ref_role or row["verdict"] not in ("warn", "fail", "allowed"):
+            continue
+        d = fn_diff(ir["trees"].get(roles[ref_role]), head_tree, row["metric"], ref_role)
+        if d is None:
+            continue
+        row["functions"] = d
+        if d["inline_suspect"]:
+            notes.append(f"{row['metric']}：疑似内联变化（见函数差异表）")
 
     # Largest-changing phase per scenario (head/base), for the summary.
     biggest = {}
@@ -661,6 +821,27 @@ def render_summary(out, plan, biggest):
         L += ["", "**各场景变化最大的阶段（head÷base）**", ""]
         for scen, row in sorted(biggest.items()):
             L.append(f"- {scen}: `{row['metric']}` {row['head_base']:.4f}")
+    shown = {}
+    for row in out["rows"]:
+        d = row.get("functions")
+        if not d:
+            continue
+        if not shown:
+            L += ["", "**函数差异**（自身 Ir，即 `callgrind_annotate --inclusive=no`，变化最大的 "
+                  f"{FN_TOP} 个）", ""]
+        ident = (d["ref"], tuple(d["keys"]))
+        ratio = row["head_base"] if d["ref"] == "base" else row["head_anchor"]
+        head = f"`{row['metric']}`（head÷{d['ref']} {fmt_ratio(ratio)}，{d['delta']:+,}）"
+        if ident in shown:
+            L += [f"{head}：同 `{shown[ident]}`", ""]
+            continue
+        shown[ident] = row["metric"]
+        L.append(head + ("：⚠️ 疑似内联变化" if d["inline_suspect"] else ""))
+        L += [f"- {x}" for x in d["suspects"]]
+        L += ["", f"| 函数 | {d['ref']} | head | 变化 |", "| --- | --- | --- | --- |"]
+        for t in d["top"]:
+            L.append(f"| `{short_fn(t['function'])}` | {t['ref']:,} | {t['head']:,} | {t['delta']:+,} |")
+        L.append("")
     L += ["", "占比 < 5% 的阶段只在 JSON 里报。门槛和 ledger 见 `docs/PERF_GATE.md`。", ""]
     return "\n".join(L)
 
