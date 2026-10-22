@@ -625,8 +625,11 @@ def cmd_compare(a):
     if a.summary:
         with open(a.summary, "a", encoding="utf-8") as f:
             f.write(md)
-    else:
-        print(md)
+    # Also in the job log, with every row's raw counts, since artifacts may be out of reach.
+    print(md)
+    for row in rows:
+        print(f"IR {a.compiler} {row['metric']} anchor={row['anchor']} base={row['base']} head={row['head']} "
+              f"class={row['class']} verdict={row['verdict']}")
     log(f"verdict {verdict}: {len(failures)} failures, {len(warnings)} warnings -> {json_path}")
     return 1 if verdict == "fail" else 0
 
