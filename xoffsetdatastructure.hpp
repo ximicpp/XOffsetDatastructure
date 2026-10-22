@@ -1628,6 +1628,19 @@ namespace XOffsetDatastructure {
             field = static_cast<std::int32_t>(delta);
         }
 
+        // W1: zeroes exactly [p, p + n). 8..64 bytes (a few small elements)
+        // use two overlapping fixed-size stores instead of a memset call.
+        XOFFSET_DETAIL_MOVE_INLINE void zero_bytes(void* p, std::size_t n) noexcept {
+            auto* bytes = static_cast<unsigned char*>(p);
+            if (n >= 8u && n <= 64u) {
+                if (n <= 16u) { std::memset(bytes, 0, 8); std::memset(bytes + n - 8u, 0, 8); }
+                else if (n <= 32u) { std::memset(bytes, 0, 16); std::memset(bytes + n - 16u, 0, 16); }
+                else { std::memset(bytes, 0, 32); std::memset(bytes + n - 32u, 0, 32); }
+                return;
+            }
+            std::memset(bytes, 0, n);
+        }
+
         inline std::uint32_t round_up_to_alignment(std::uint32_t value,
                                                    std::uint32_t alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
@@ -2388,7 +2401,15 @@ namespace XOffsetDatastructure {
             scrub(0, old_size);
         }
 
-        void reserve(std::size_t requested) {
+        // W1: the no-op case (bound, already large enough) is decided inline;
+        // it is the same outcome as ensure_bound() + checked_count() below.
+        XOFFSET_DETAIL_MOVE_INLINE void reserve(std::size_t requested) {
+            if (is_bound() && requested <= capacity_) [[likely]] return;
+            reserve_grow(requested);
+        }
+
+    private:
+        void reserve_grow(std::size_t requested) {
             ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
@@ -2420,6 +2441,7 @@ namespace XOffsetDatastructure {
             }
         }
 
+    public:
         // Replaces all elements from stable live T objects. Self/subrange and
         // other live containers (including another arena) may overlap. Private
         // allocator control bytes that allocation itself mutates are not a
@@ -2494,7 +2516,7 @@ namespace XOffsetDatastructure {
         }
 
         void push_back(const T& value) {
-            insert_construct(size_, [&](T* dst) {
+            append_construct([&](T* dst) {
                 fixed_detail::transfer_construct(dst, value, binding());
             });
         }
@@ -2573,7 +2595,7 @@ namespace XOffsetDatastructure {
         }
 
         T& emplace_back() {
-            return *insert_construct(size_, [&](T* dst) {
+            return append_construct([&](T* dst) {
                 fixed_detail::default_construct(dst, binding());
             });
         }
@@ -2581,12 +2603,26 @@ namespace XOffsetDatastructure {
         template <typename... Args>
             requires (sizeof...(Args) > 0)
         T& emplace_back(Args&&... args) {
-            return *insert_construct(size_, [&](T* dst) {
+            return append_construct([&](T* dst) {
                 fixed_detail::construct_bound(dst, binding(), std::forward<Args>(args)...);
             });
         }
 
     protected:
+        // W1: appending into spare capacity of a bound vector is decided
+        // inline; it is insert_construct(size_)'s first branch (size_ <
+        // capacity_ <= max_size()). Growth and the unbound error stay there.
+        template <typename Construct>
+        XOFFSET_DETAIL_MOVE_INLINE T& append_construct(Construct&& construct) {
+            if (is_bound() && size_ < capacity_) [[likely]] {
+                T* slot = data() + size_;
+                construct(slot);
+                ++size_;
+                return *slot;
+            }
+            return *insert_construct(size_, construct);
+        }
+
         static size_type checked_count(std::size_t count) {
             if (count > max_size()) throw XBadAlloc();
             return static_cast<size_type>(count);
@@ -2846,10 +2882,10 @@ namespace XOffsetDatastructure {
     private:
         // M4 (threat model T5/P2): storage of destroyed elements is zeroed, so
         // a later save never emits the old values as spare capacity.
-        void scrub(size_type from, size_type to) noexcept {
+        XOFFSET_DETAIL_MOVE_INLINE void scrub(size_type from, size_type to) noexcept {
             if (to <= from) return;
             if (auto* items = data())
-                std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+                fixed_detail::zero_bytes(static_cast<void*>(items + from), std::size_t(to - from) * sizeof(T));
         }
 
         void copy_from(const XFixedVector& other) {
