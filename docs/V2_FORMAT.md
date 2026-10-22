@@ -95,12 +95,14 @@ either way, so spare capacity survives the transfer. `freeze_verified` always
 emits dense wires. (Earlier releases skipped free runs of at least 4 KiB by
 default, N10; such wires still load.)
 
-`save_compact` emits the canonical compact wire directly: the root at offset
-48, then every block in validation (preorder) order, each container with
-capacity equal to size, strings of at most 10 bytes inline, empty containers
-without storage, no holes and no extents. The bytes equal
-`XCompactor::compact` followed by `save_verified`; it is an ordinary dense wire
-and loads with no special handling.
+`save_compact` emits a compact wire directly: the root at offset 48, then
+every block in validation (preorder) order, strings of at most 10 bytes
+inline, empty containers without storage, no holes and no extents. With
+`XCompactOptions{.slack_div = 0}` every container has capacity equal to size
+and the bytes equal `XCompactor::compact` followed by `save_verified`. The
+default (`slack_div = 8`) gives vectors of at least 8 elements (not strings)
+size / 8 + 1 zeroed spare elements. Either is an ordinary dense wire and loads
+with no special handling.
 
 **Output.** On Darwin, outputs of at least 1 MiB are copied in 256 KiB chunks.
 Each chunk is preceded by `madvise(MADV_WILLNEED)` on its destination pages.
