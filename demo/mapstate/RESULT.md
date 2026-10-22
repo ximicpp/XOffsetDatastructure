@@ -10,8 +10,9 @@ verified snapshot directly and how long each buffer lives.
 | --- | --- | --- |
 | Functional + smoke numbers | cloud x86-64 VM, GCC 16.2 (Docker `gcc:16`), Release | all 64 verdicts pass (commit `ac67703`) |
 | Sanitizers | same, Debug, ASan+UBSan: self-test, 100-unit tier, evil | all 26 verdicts pass (commit `ac67703`) |
-| CI | job `mapdemo-gcc16` (both of the above on every PR to next_cpp26) | CI_STATUS |
-| Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release | MAC_STATUS |
+| CI | job `mapdemo-gcc16` on every PR to next_cpp26: GCC 16 Release three tiers + evil, the same run built with the pinned P2996 Clang, and the ASan+UBSan run | green on PR #34 (`e6d72bc`), with the other 12 checks |
+| Window client, headless display | cloud Xvfb, GCC 16, 10000 units, `--auto-drag --check` | screenshots at frames 60 / 180 / 420 show units moving, the event-driven name changes and another area after the drag; `direct_read` 69 / 69 snapshots (32,441 records and names in the live buffer) |
+| Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release | pending: queued as one Mac task (build, window screenshots, two rounds of the three tiers); added in a follow-up |
 
 Cloud numbers are smoke numbers on a shared VM: they show the shape of the
 costs, not formal timings. Every timing is a process-local steady-clock
@@ -91,7 +92,7 @@ same batch takes 1-6 us. Per-unit work only shows at 10000 units. A's checks
 (reference model, `a.check_us`: 1.3 ms mean at 10000 units) run outside every
 timed path.
 
-MAC_TABLE
+Formal Mac timing (Apple M4, clang-p2996 d77eff1): pending, see the status table above.
 
 ## 4. Client direct read and buffer lifetime
 
