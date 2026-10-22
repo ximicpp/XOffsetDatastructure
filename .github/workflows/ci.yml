@@ -563,7 +563,7 @@ jobs:
             --compiler /opt/p2996-toolchain/bin/clang++ --platform linux/amd64 \
             --cmake-root build/cmake-tool/root \
             --sanitizer address-undefined --runtime-dir build/asan-resource \
-            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,fuzz_v2_wire_replay,fuzz_wire_schemas_replay,test_free_table_policy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
+            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,fuzz_v2_wire_replay,fuzz_wire_schemas_replay,test_free_table_policy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize,test_reset_used_range \
             --jobs 2 --out build/sanitizer-result
 
       - name: Upload sanitizer results
