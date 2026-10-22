@@ -150,6 +150,39 @@ void growth_probe_without_host_allocation() {
         auto frame=b.save_verified<AllocatorFailureRoot>(); (void)XBuffer::load_verified<AllocatorFailureRoot>(frame);
     }
 }
+// D3: an exact-bin hit, an unpadded bump inside the extent and a retire into
+// a bin with spare capacity make no host allocation (a failure armed at the
+// first one is never reached). A retire into a full bin is the general path:
+// its growth is a real host allocation whose failure is recorded as an
+// incomplete table, exactly as before.
+void inline_paths_without_host_allocation() {
+    auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
+    std::array<void*,16> blocks{};
+    for(auto& p:blocks) p=b.arena()->allocate_aligned(64,8);
+    for(auto p:blocks) b.arena()->deallocate(p,64); // table + bin storage (16 entries) exist now
+    require(b.free_table_complete() && b.free_block_count()==16,"fixture free table");
+    attempts=hits=0;fail_after=0;watch=true;
+    for(auto& p:blocks) p=b.arena()->allocate_aligned(64,8);   // exact-bin hits
+    for(auto p:blocks) b.arena()->deallocate(p,64);            // bin has capacity 16
+    for(auto& p:blocks) p=b.arena()->allocate_aligned(64,8);
+    std::array<void*,8> tail{};
+    for(auto& p:tail) p=b.arena()->allocate_aligned(72,8);     // bin 72 empty: bump
+    watch=false;fail_after=-1;
+    require(attempts==0 && hits==0,"an inline allocator path attempted a host allocation");
+    require(b.free_table_complete() && b.free_block_count()==0,"inline paths changed the free table");
+    for(auto p:tail) b.arena()->deallocate(p,72);              // bin 72 gets storage (8 entries)
+    for(std::size_t i=0;i<8;++i) b.arena()->deallocate(blocks[i],64);
+    attempts=hits=0;fail_after=0;watch=true;
+    b.arena()->deallocate(blocks[8],64);                       // 64 bin: capacity 16, holds 8
+    require(attempts==0,"retire into spare capacity attempted a host allocation");
+    for(std::size_t i=9;i<16;++i) b.arena()->deallocate(blocks[i],64);
+    auto* extra=b.arena()->allocate_aligned(80,8); b.arena()->deallocate(extra,80); // new bin: general path
+    watch=false;fail_after=-1;
+    require(hits==1 && !b.free_table_complete(),"general-path bin growth failure was not recorded");
+    require(b.free_block_count()==8+16,"inline retires lost an entry");
+    auto again=XBuffer::load_verified<AllocatorFailureRoot>(b.save_verified<AllocatorFailureRoot>());
+    require(again.free_block_bytes()>=8*72+16*64+80,"lost block not recovered as a hole");
+}
 // V1 released cached in-arena blocks exactly once before growing. V2 keeps
 // free blocks in the host table: an allocation no free block can serve grows
 // the tail (or fails under Explicit) without consuming or losing them, and the
@@ -181,5 +214,5 @@ int main() {try {
             require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
     }
     points+=hole_table_load();
-    lazy_load(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
+    lazy_load(); inline_paths_without_host_allocation(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
 } catch(const std::exception& e) {watch=false;std::cerr<<e.what()<<'\n';return 1;} }
