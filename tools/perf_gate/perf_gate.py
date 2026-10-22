@@ -40,8 +40,8 @@ ROLES = ("anchor", "base", "head")
 
 SLG_SEED = "20261021"
 SLG_SCALE = "S"
-SLG_CYCLES = "3"
-SLG_SKIP_CYCLES = "1"
+SLG_CYCLES = "8"
+SLG_SKIP_CYCLES = "4"
 FORMAL_PHASES = ("load", "query_before", "mutate", "emit_after", "retire", "reload", "query_after", "cleanup")
 
 # Thresholds (docs/PERF_GATE.md, design H3 section 5.3).
