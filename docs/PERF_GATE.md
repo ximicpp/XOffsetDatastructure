@@ -21,7 +21,7 @@
 
 | 来源 | 设置 | 指标名 |
 | --- | --- | --- |
-| SLG | S 规模，seed 20261021，`SLG_REUSE=1`（口径 c），3 个周期，只收集第 1、2 周期 | 每个计时阶段 `slg.<键>`（如 `slg.A.apply`、`slg.S.ticks_middle`）；场景合计 `slg.A`…`slg.D` = 该场景各阶段之和 |
+| SLG | S 规模，seed 20261021，`SLG_REUSE=1`（口径 c），8 个周期，只收集第 4–7 周期（前几个周期还在预热，30bb5ca 的 A 场景第 4–7 周期每周期 Ir 只有第 1–2 周期的 74%；Mac 正式 SLG 量的是稳态） | 每个计时阶段 `slg.<键>`（如 `slg.A.apply`、`slg.S.ticks_middle`）；场景合计 `slg.A`…`slg.D` = 该场景各阶段之和 |
 | 正式 harness | M fixture（`bench/formal/model/reference.py --scale M`，默认 seed） | `formal.load`、`formal.query_before`、`formal.mutate`、`formal.emit_after`、`formal.retire`、`formal.reload`、`formal.query_after`、`formal.cleanup`；`formal.read_sum` = query_before + query_after；`formal.total` 只报 |
 
 SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规模的 SLG 在 valgrind 下会超出地址空间（512 × 256 MiB 预留），所以用 S。正式 harness 的 M 输入 wire 由每份二进制自己编码并记录 sha256；与 anchor 不同时摘要会写"M 输入 wire 变了"，格式改动要 susu 定。
@@ -107,14 +107,14 @@ python3 tools/perf_gate/test_perf_gate.py   # 判定逻辑自测，不需要编�
 
 只改内存访问、不改指令数的变化：#27 让 Mac 上的正式修改快 3.0%，Ir 只变 −0.1%；新 M3 在 Mac 上让 B.season_edits 慢 2–3%，x86 Ir 却是 −5%。x86 与 Mac 的方向可能相反。所以 L0 只是合并前的过滤器，Mac L2（tag 前必跑、每周一次、ledger 放行 > 1% 的 PR 合并前）才出结论。
 
-## 9. 历史回放（云端，GCC 16 x86-64，valgrind 3.22）
+## 9. 历史回放（云端，GCC 16 x86-64，valgrind 3.22，SLG 第 4–7 周期，基准代码取自 next_cpp26 的 `bench/`）
 
 | 变化 | 结果 | 失败项 |
 | --- | --- | --- |
-| 旧 M3（b3a694e → ea885e5） | 失败 | formal.emit_after 1.305、formal.mutate 1.032、slg.A 1.024、A.apply 1.063、B.out_encode 1.104、B.back_encode 1.147、S.ticks_middle 1.058 |
-| 新 M3（b3a694e → 70ee1c4） | 失败 | formal.mutate 1.056、slg.A 1.020、A.apply 1.071、S.ticks_middle 1.071；B.season_edits 0.950（Mac +2–3%，漏掉，平台差异） |
-| #26（ea885e5 → 70ee1c4） | 失败 | formal.mutate 1.024（要 ledger 写明"换回输出 −23%"，emit_after 0.766） |
+| 旧 M3（b3a694e → ea885e5） | 失败 | formal.emit_after 1.305、formal.mutate 1.030、slg.A 1.021、slg.C 1.012、A.apply 1.101、B.out_encode 1.130、B.back_encode 1.128、C.snapshot 1.052、C.snapshot2 1.053、S.ticks_middle 1.060 |
+| 新 M3（b3a694e → 70ee1c4） | 失败 | formal.mutate 1.056、slg.A 1.017、A.apply 1.114、S.ticks_middle 1.073；B.season_edits 0.946（Mac +2–3%，漏掉，平台差异） |
+| #26（ea885e5 → 70ee1c4） | 失败 | formal.mutate 1.026（要 ledger 写明"换回输出 −23%"，emit_after 0.766） |
 | #27（f0768ad → b3ab3a3） | 通过 | — |
-| #29（b3ab3a3 → 30bb5ca） | 通过 | 说明：slg.A 0.956、formal.load 0.967 指令数下降 |
+| #29（b3ab3a3 → 30bb5ca） | 失败 | slg.D 1.032、slg.B 1.014、A.req_decode 1.092；slg.A 0.951。Mac 上 A–D 都变快（0.951 / 0.991 / 0.985 / 0.969）：#29 让超过 4096 字节的载荷不走升序快路径，指令多了、时间少了。按现在的规则这类取舍要写 ledger 条目，D 超过 2% 要 susu 确认 |
 
-正式 harness 各阶段的 Ir 与设计探针逐位相同（例如旧 M3 emit_after 3,912,698、新 M3 mutate 43,729,847），M 输入 wire 都是 `2bf0c0717767f377…`。
+旧窗口（3 个周期，收第 1、2 周期）下 #29 通过，其余结论相同。正式 harness 不受窗口影响；入库版 harness 的 Ir 与设计探针只差几条指令（旧 M3 emit_after 3,912,706 对 3,912,698，新 M3 mutate 43,729,854 对 43,729,847），M 输入 wire 都是 `2bf0c0717767f377…`。
