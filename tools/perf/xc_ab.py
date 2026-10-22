@@ -898,7 +898,8 @@ def cmd_freeze(a):
         diff = subprocess.run(["git", "-c", "safe.directory=*", "-c", "core.abbrev=7", "diff", f"{lib}..{head}"], capture_output=True,
                               cwd=os.path.dirname(os.path.abspath(__file__)))
         doc["diff_lib_to_head_sha256"] = hashlib.sha256(diff.stdout).hexdigest()
-        code = subprocess.run(["git", "-c", "safe.directory=*", "diff", lib, head, "--", ".", ":!bench", ":!tools/perf", ":!.github"],
+        code = subprocess.run(["git", "-c", "safe.directory=*", "diff", lib, head, "--",
+                               ":(top)", ":(top,exclude)bench", ":(top,exclude)tools/perf", ":(top,exclude).github"],
                               capture_output=True, cwd=os.path.dirname(os.path.abspath(__file__)))
         doc["library_code_diff_bytes"] = len(code.stdout)
         if code.stdout:
