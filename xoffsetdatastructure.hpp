@@ -1310,17 +1310,7 @@ namespace XOffsetDatastructure {
         // Same admission as init_from_storage, against this owner's maximum.
         template <typename Assign>
         void reinit_from_storage(const char* data, size_type size, Assign&& assign) {
-            if (buffer_.empty() && buffer_.maximum_capacity() == 0)
-                throw XException("XBufferCore: buffer has no storage");
-            begin_reinit();
-            if (size > MAX_PAYLOAD) throw XBadAlloc();
-            if (!data || size < sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload too small");
-            }
-            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
-            // Holes are unknown until verification supplies the hole table.
-            free_table_lost_ = true;
+            admit_reinit(size, data != nullptr);
             try {
                 assign();
             } catch (const std::bad_alloc&) {
@@ -1328,6 +1318,24 @@ namespace XOffsetDatastructure {
             } catch (const std::length_error&) {
                 throw XBadAlloc();
             }
+            check_reinit_payload();
+        }
+
+        void admit_reinit(size_type size, bool has_source = true) {
+            if (buffer_.empty() && buffer_.maximum_capacity() == 0)
+                throw XException("XBufferCore: buffer has no storage");
+            begin_reinit();
+            if (size > MAX_PAYLOAD) throw XBadAlloc();
+            if (!has_source || size < sizeof(arena_header)) {
+                throw XException(
+                    "XBufferCore: payload too small");
+            }
+            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
+            // Holes are unknown until verification supplies the hole table.
+            free_table_lost_ = true;
+        }
+
+        void check_reinit_payload() const {
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
@@ -1346,6 +1354,18 @@ namespace XOffsetDatastructure {
 
         void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
             reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
+        }
+
+        // In-place direct receive (XBuffer::begin_verified_reload): the
+        // admission of reinit, then [0, size) exposed to the writer without
+        // clearing. Returns the offset from which bytes are still zero.
+        std::size_t reinit_for_overwrite(size_type size) {
+            admit_reinit(size);
+            try {
+                return buffer_.expose_for_overwrite(size);
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            }
         }
 
         // Empty arena: header only, no root, empty exact free table. Bytes
@@ -3561,20 +3581,27 @@ namespace XOffsetDatastructure {
             std::uint64_t* words(std::size_t count) {
                 if (count > capacity_) {
                     auto* fresh = new std::uint64_t[count];
-                    release();
+                    delete[] words_; // the tables may be in use (direct reload)
                     words_ = fresh;
                     capacity_ = count;
                 }
                 return words_;
             }
-            void release() noexcept {
+            // Header, extent table and hole table of a direct reload.
+            std::byte* tables(std::size_t bytes) {
+                if (bytes > tables_.size()) tables_.resize(bytes);
+                return tables_.data();
+            }
+            void release(bool tables = true) noexcept {
                 delete[] words_;
                 words_ = nullptr;
                 capacity_ = 0;
+                if (tables) std::vector<std::byte>().swap(tables_);
             }
         private:
             std::uint64_t* words_ = nullptr;
             std::size_t capacity_ = 0;
+            std::vector<std::byte> tables_;
         };
 
         // V2 validation index: one bit per 8-byte granule of the payload, one
@@ -5535,6 +5562,10 @@ namespace XOffsetDatastructure {
         };
     }
 
+    // XBuffer::begin_verified_reload / VerifiedReloadToken are available.
+#define XOFFSET_VERIFIED_RELOAD_API 1
+    template <typename T> class VerifiedReloadToken;
+
     class XBuffer : public XBufferCore {
     public:
         XBuffer() = default;
@@ -5578,6 +5609,7 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             XBufferCore::swap(other);
             reload_scratch_.swap(other.reload_scratch_);
+            std::swap(direct_reload_open_, other.direct_reload_open_);
         }
 
         friend void swap(XBuffer& a, XBuffer& b) noexcept { a.swap(b); }
@@ -5896,7 +5928,8 @@ namespace XOffsetDatastructure {
 
         /// Returns the retained reload scratch words to the host allocator.
         void release_reload_scratch() noexcept {
-            if (reload_scratch_) reload_scratch_->release();
+            // An open direct reload keeps its tables until it finishes.
+            if (reload_scratch_) reload_scratch_->release(!direct_reload_open_);
         }
 
     private:
@@ -5923,9 +5956,56 @@ namespace XOffsetDatastructure {
             }
         }
 
+        detail::WireValidationScratch& retained_reload_scratch() {
+            if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::WireValidationScratch>();
+            return *reload_scratch_;
+        }
+
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
+        bool direct_reload_open_ = false;
+        template <typename> friend class VerifiedReloadToken;
 
     public:
+        /// Direct receive into this buffer: reload_verified<T>() without the
+        /// library copy. The transport writes the wire's sections into the
+        /// token's spans (header; extent table; the payload, densely or each
+        /// extent at its offset with gaps untouched; hole table), calls
+        /// complete() with the byte counts it wrote, then finish().
+        /// `payload_bytes`, `holes` and `extents` are the header's used_bytes,
+        /// hole_count and extent_count. Admission, verification, rejection
+        /// and the result are exactly those of reload_verified<T>() on the
+        /// same wire; a length that disagrees with the header, an incomplete
+        /// transfer, or a token dropped before finish() rejects. From begin
+        /// until finish() succeeds the buffer has no typed root access, and
+        /// after any failure it is left empty as after a failed reload.
+        /// The buffer must not be used, moved or destroyed while the token is
+        /// open; one token per buffer at a time. No host allocation per
+        /// message once the retained scratch has grown (sparse wires excepted).
+        template <typename T>
+        VerifiedReloadToken<T> begin_verified_reload(std::size_t payload_bytes,
+                                                     std::size_t holes = 0,
+                                                     std::size_t extents = 0) {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "begin_verified_reload<T>() requires an admitted fixed-schema wire type.");
+            if (direct_reload_open_)
+                throw XException("begin_verified_reload<T>(): a direct reload is already open");
+            try {
+                // Holes and extents are disjoint, non-empty 8-byte multiples
+                // inside the payload, so larger counts never verify; they
+                // are refused before the tables are sized.
+                if (holes > payload_bytes / 8u || extents > payload_bytes / 8u)
+                    throw XException("reload_verified<T>(): used size mismatch");
+                const auto clean_from = reinit_for_overwrite(payload_bytes);
+                auto* tables = retained_reload_scratch().tables(
+                    sizeof(XWireHeaderV2) + extents * 8u + holes * sizeof(WireHole));
+                direct_reload_open_ = true;
+                return VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from);
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+        }
+
         /// Empties this buffer and constructs a fresh root of type T in it,
         /// reusing the mapping and owner registration; equivalent to
         /// `*this = create<T>(get_size(), this buffer's MaximumCapacity)`.
@@ -6028,6 +6108,109 @@ namespace XOffsetDatastructure {
             }
         }
 
+    };
+
+    // Open direct reload of one XBuffer (XBuffer::begin_verified_reload).
+    template <typename T>
+    class VerifiedReloadToken {
+    public:
+        VerifiedReloadToken(VerifiedReloadToken&& other) noexcept
+            : buffer_(std::exchange(other.buffer_, nullptr)), tables_(other.tables_),
+              payload_(other.payload_), holes_(other.holes_), extents_(other.extents_),
+              clean_from_(other.clean_from_), received_(other.received_), complete_(other.complete_) {}
+        VerifiedReloadToken& operator=(VerifiedReloadToken&&) = delete;
+        VerifiedReloadToken(const VerifiedReloadToken&) = delete;
+        VerifiedReloadToken& operator=(const VerifiedReloadToken&) = delete;
+        ~VerifiedReloadToken() { if (buffer_) abort(); }
+
+        explicit operator bool() const noexcept { return buffer_ != nullptr; }
+        std::span<std::byte> header_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_, sizeof(XWireHeaderV2)) : std::span<std::byte>{};
+        }
+        std::span<std::byte> extent_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2), extents_ * 8u)
+                           : std::span<std::byte>{};
+        }
+        std::span<std::byte> payload_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()), payload_)
+                           : std::span<std::byte>{};
+        }
+        std::span<std::byte> hole_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u,
+                                                  holes_ * sizeof(XBufferCore::WireHole))
+                           : std::span<std::byte>{};
+        }
+        // payload_bytes counts the logical payload including sparse gaps.
+        void complete(std::size_t header_bytes, std::size_t payload_bytes,
+                      std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
+            received_ = {header_bytes, payload_bytes, hole_bytes, extent_bytes};
+            complete_ = true;
+        }
+
+        /// Verifies and publishes the received wire; consumes the token.
+        void finish() {
+            constexpr const char* who = "reload_verified<T>()";
+            auto* buffer = std::exchange(buffer_, nullptr);
+            if (!buffer) throw XException("verified reload: token consumed");
+            struct Close { XBuffer& b; ~Close() { b.direct_reload_open_ = false; } } close{*buffer};
+            try {
+                if (!complete_ || received_[0] != sizeof(XWireHeaderV2) || received_[1] != payload_ ||
+                    received_[2] != holes_ * sizeof(XBufferCore::WireHole) || received_[3] != extents_ * 8u)
+                    throw XException("verified reload: incomplete input");
+                XWireHeaderV2 header{};
+                std::memcpy(&header, tables_, sizeof(header));
+                // admit_wire_header and parse_wire_layout, with the section
+                // lengths fixed by begin instead of read from one wire.
+                detail::check_wire_format(header, who);
+                if (header.root_type_id != detail::wire_root_type_id<T>())
+                    throw XException(std::string(who) + ": root type id mismatch");
+                if (header.schema_hash_lo != detail::wire_schema_hash<T>() || header.schema_hash_hi != 0)
+                    throw XException(std::string(who) + ": schema hash mismatch");
+                if (header.used_bytes != payload_ || header.extent_count != extents_ ||
+                    header.hole_count != holes_)
+                    throw XException(std::string(who) + ": used size mismatch");
+                detail::WireLayout layout;
+                layout.extent_count = extents_;
+                if (extents_) layout.extents = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2));
+                (void)detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps);
+                if (header.root_offset >= header.used_bytes)
+                    throw XException(std::string(who) + ": root offset out of bounds");
+                layout.holes = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u);
+                layout.hole_count = holes_;
+                detail::check_hole_byte_sum(header, layout.holes, holes_, who);
+                // Gaps read as zero, as in assign_extents: clear what an
+                // earlier content may have left below clean_from_.
+                auto* base = buffer->data();
+                for (const auto& gap : layout.gaps) {
+                    const auto end = std::min<std::size_t>(std::size_t(gap.offset) + gap.bytes, clean_from_);
+                    if (gap.offset < end) std::memset(base + gap.offset, 0, end - gap.offset);
+                }
+                buffer->check_reinit_payload();
+                buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(), who,
+                                                         &buffer->retained_reload_scratch());
+            } catch (...) {
+                buffer->reset_arena(0);
+                throw;
+            }
+        }
+
+    private:
+        friend class XBuffer;
+        VerifiedReloadToken(XBuffer& buffer, std::byte* tables, std::size_t payload, std::size_t holes,
+                            std::size_t extents, std::size_t clean_from) noexcept
+            : buffer_(&buffer), tables_(tables), payload_(payload), holes_(holes), extents_(extents),
+              clean_from_(clean_from) {}
+        void abort() noexcept {
+            auto* buffer = std::exchange(buffer_, nullptr);
+            buffer->reset_arena(0);
+            buffer->direct_reload_open_ = false;
+        }
+
+        XBuffer* buffer_;
+        std::byte* tables_;
+        std::size_t payload_, holes_, extents_, clean_from_;
+        std::array<std::size_t, 4> received_{};
+        bool complete_ = false;
     };
 
     // ========================================================================

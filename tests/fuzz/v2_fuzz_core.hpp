@@ -329,23 +329,132 @@ bool reload_accepts(const std::string& wire, std::string* error) {
     }
 }
 
-// Accepted reload vs fresh load of the same wire.
-void compare_reload(Buffer& fresh) {
-    auto& again = reloader();
+// Accepted reload (or direct reload) vs fresh load of the same wire.
+void compare_reload(Buffer& fresh, Buffer& again, const char* who) {
     const auto a = fresh.get_buffer(), b = again.get_buffer();
     if (a.size() != b.size() || std::memcmp(a.data(), b.data(), a.size()) != 0)
-        fail("reload_verified payload differs from load_verified (stale bytes?)");
+        fail(std::string(who) + " payload differs from load_verified (stale bytes?)");
     if (fresh.free_block_count() != again.free_block_count() ||
         fresh.free_block_bytes() != again.free_block_bytes())
-        fail("reload_verified free table differs from load_verified");
+        fail(std::string(who) + " free table differs from load_verified");
     // Newly exposed tail bytes must read as zero after any earlier content.
     const auto size = again.get_size();
-    if (!again.grow(4096)) fail("reloaded buffer cannot grow");
+    if (!again.grow(4096)) fail(std::string(who) + ": buffer cannot grow");
     for (std::size_t i = size; i < again.get_size(); ++i)
-        if (again.data()[i] != 0) fail("stale byte exposed after reload_verified growth");
+        if (again.data()[i] != 0) fail(std::string("stale byte exposed after ") + who + " growth");
     if (again.save_verified() != fresh.save_verified())
-        fail("reload_verified re-save differs from load_verified re-save");
+        fail(std::string(who) + " re-save differs from load_verified re-save");
 }
+void compare_reload(Buffer& fresh) { compare_reload(fresh, reloader(), "reload_verified"); }
+
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
+// Acceptor 6: direct reload (XBuffer::begin_verified_reload) into ONE
+// long-lived buffer, delivered the way a transport would: the section lengths
+// come from the wire header, each extent lands at the offset its (not yet
+// verified) table entry names, and a message the header does not frame
+// exactly is dropped or completed with the counts actually written. It must
+// accept exactly what load_verified accepts. The other modes must reject:
+//   Abort:    the token is dropped after half the payload;
+//   Short:    complete() reports one payload granule less than written;
+//   Mismatch: begin declares a used/hole/extent count other than the header's.
+// After every reject the buffer has no root.
+enum class DirectMode { Whole, Abort, Short, Mismatch };
+
+Buffer& direct_slot() {
+    static Buffer buffer = Buffer::create(
+        4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
+    return buffer;
+}
+
+bool direct_deliver(const std::string& wire, DirectMode mode, std::string* error) {
+    if (wire.size() < kHeader) { if (error) *error = "transport: short header"; return false; }
+    xo::XWireHeaderV2 h{};
+    std::memcpy(&h, wire.data(), kHeader);
+    std::size_t used = h.used_bytes, holes = h.hole_count, extents = h.extent_count;
+    if (mode == DirectMode::Mismatch) {
+        switch (wire.size() % 3) {
+        case 0: used = used ? used - 8 : 8; break;
+        case 1: holes += 1; break;
+        default: extents = extents ? extents - 1 : 1; break;
+        }
+    }
+    try {
+        auto token = direct_slot().begin_verified_reload<fz::Root>(used, holes, extents);
+        std::size_t at = kHeader;
+        // Copies up to n bytes of the message into to[off, off + n) as far
+        // as both reach; returns the bytes copied.
+        auto take = [&](std::span<std::byte> to, std::size_t off, std::size_t n) {
+            n = std::min(n, wire.size() - at);
+            n = off <= to.size() ? std::min(n, to.size() - off) : 0;
+            if (n) std::memcpy(to.data() + off, wire.data() + at, n);
+            at += n;
+            return n;
+        };
+        std::memcpy(token.header_bytes().data(), wire.data(), kHeader);
+        const auto table = token.extent_bytes();
+        const auto eb = take(table, 0, table.size());
+        const auto payload = token.payload_bytes();
+        std::size_t pb = 0;
+        if (extents == 0) {
+            const auto n = mode == DirectMode::Abort ? used / 2 : used;
+            pb = take(payload, 0, n);
+            if (mode == DirectMode::Abort) {
+                if (error) *error = "transport: aborted";
+                return false; // token dropped mid-payload
+            }
+        } else {
+            bool landed = eb == table.size();
+            for (std::size_t i = 0; landed && i < eb / 8u; ++i) {
+                std::uint32_t e[2];
+                std::memcpy(e, table.data() + i * 8u, sizeof(e));
+                landed = e[0] <= payload.size() && e[1] <= payload.size() - e[0] && take(payload, e[0], e[1]) == e[1];
+                if (mode == DirectMode::Abort && i * 2 + 1 >= eb / 8u) {
+                    if (error) *error = "transport: aborted";
+                    return false;
+                }
+            }
+            pb = landed ? used : 0;
+        }
+        const auto lb = take(token.hole_bytes(), 0, token.hole_bytes().size());
+        if (at != wire.size()) {
+            if (error) *error = "transport: message length differs from its header";
+            return false; // token dropped
+        }
+        if (mode == DirectMode::Short) pb = pb >= 8 ? pb - 8 : pb + 8;
+        token.complete(kHeader, pb, lb, eb);
+        token.finish();
+        return true;
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+        return false;
+    }
+}
+
+bool direct_accepts(const std::string& wire, std::string* error, DirectMode mode = DirectMode::Whole) {
+    const bool ok = direct_deliver(wire, mode, error);
+    if (!ok) {
+        bool refused = false;
+        try { (void)direct_slot().root(); } catch (const xo::XException&) { refused = true; }
+        if (!refused) fail("root() succeeded after a rejected direct reload");
+        if (direct_slot().has_root()) fail("has_root() after a rejected direct reload");
+    }
+    return ok;
+}
+
+// Every interrupted form rejects; then the whole wire must match `accepted`
+// (load_verified's outcome), and an accepted payload must equal `fresh`.
+void check_direct(const std::string& w, bool accepted, Buffer* fresh, std::size_t id) {
+    for (auto mode : {DirectMode::Abort, DirectMode::Mismatch, DirectMode::Short})
+        if (direct_accepts(w, nullptr, mode))
+            fail("case " + std::to_string(id) + ": interrupted direct reload (mode " +
+                 std::to_string(int(mode)) + ") accepted");
+    std::string derr;
+    if (direct_accepts(w, &derr) != accepted)
+        fail("case " + std::to_string(id) + ": direct=" + (accepted ? "reject(" + derr + ")" : "accept") +
+             " typed=" + (accepted ? "accept" : "reject"));
+    if (fresh) compare_reload(*fresh, direct_slot(), "direct reload");
+}
+#endif
 
 // Header-valid wire -> {aligned payload with gaps zeroed, gaps, hole pointer}.
 struct Unpacked {
@@ -667,6 +776,9 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, std::size_t id) {
         fail("case " + std::to_string(id) + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
+    check_direct(w, bool(typed), typed ? &*typed : nullptr, id);
+#endif
     if (o.ok || o.stage == Oracle::Stage::Payload) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
@@ -690,6 +802,9 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!loaded) fail(where + ": typed load rejects a library-generated wire");
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
     compare_reload(*loaded);
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
+    check_direct(w, true, &*loaded, 0);
+#endif
     if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
 }
 
