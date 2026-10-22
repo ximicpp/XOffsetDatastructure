@@ -30,7 +30,7 @@ REPO_ROOT = '/workspace/'
 NOT_REPO = ('/workspace/build/', '/workspace/external/')
 LOG_LINES = 60
 
-FRAME = re.compile(r'^\s*#(\d+)\s+0x[0-9a-fA-F]+\s+in\s+(.*)\s+(\S+)$')
+FRAME = re.compile(r'^\s*#(\d+)\s+0x[0-9a-fA-F]+\s+(?:in\s+(.*)\s+)?(\S+)$')
 BUILD_ID = re.compile(r'\s+\(BuildId: [0-9a-fA-F]+\)\s*$')
 
 
@@ -78,14 +78,14 @@ def repo_frames(lines, start, count=3):
     """First `count` in-repository function names of the first stack at or after `start`."""
     frames, seen_stack = [], False
     for line in lines[start:]:
-        m = FRAME.match(BUILD_ID.sub('', line))
+        m = FRAME.match(BUILD_ID.sub('', line.rstrip()))
         if not m:
             if seen_stack:
                 break
             continue
         seen_stack = True
         location = m.group(3)
-        if location.startswith(REPO_ROOT) and not location.startswith(NOT_REPO):
+        if m.group(2) and location.startswith(REPO_ROOT) and not location.startswith(NOT_REPO):
             frames.append(function_name(m.group(2)))
             if len(frames) == count:
                 break
