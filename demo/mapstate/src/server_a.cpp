@@ -388,6 +388,7 @@ void ServerA::accept_clients() {
         auto c = std::make_unique<Client>();
         c->id = next_client_id_++;
         c->conn = listener_.accept();
+        if (!c->conn.is_open()) return;
         c->conn.set_nonblocking(true);
         std::fprintf(stderr, "a: client %" PRIu64 " connected\n", c->id);
         clients_.push_back(std::move(c));
@@ -414,7 +415,7 @@ void ServerA::on_client_readable(Client& c) {
             // Bad header, unexpected type, oversize declared length, or EOF:
             // the payload buffer was never allocated; drop this connection.
             const std::string what = e.what();
-            if (what.find("EOF") != std::string::npos || what.find("closed") != std::string::npos) {
+            if (what == "connection closed by peer" || what.find("reset by peer") != std::string::npos) {
                 std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
                 c.conn.close();
             } else {
