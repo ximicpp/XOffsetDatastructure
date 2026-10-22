@@ -12,6 +12,11 @@
 //      accepted reload must hold byte-identical payload (in particular gap and
 //      tail bytes left by every earlier reload read as zero) and re-save
 //      byte-identically; after a reject typed root access must throw.
+//   6. the direct reload (begin_verified_reload) into one long-lived buffer,
+//      plus interrupted deliveries that must all reject;
+//   7. (R1) the same on slot storage: a fresh load, a reload and a direct
+//      reload on movable slots must equal the VM load byte for byte, and the
+//      same mutations on a pinned slot must re-save the same wire.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
@@ -370,19 +375,20 @@ Buffer& reloader() {
     return buffer;
 }
 
-bool reload_accepts(const std::string& wire, std::string* error) {
+bool reload_accepts(Buffer& target, const std::string& wire, std::string* error) {
     try {
-        reloader().reload_verified(wire);
+        target.reload_verified(wire);
         return true;
     } catch (const xo::XException& e) {
         if (error) *error = e.what();
         bool refused = false;
-        try { (void)reloader().root(); } catch (const xo::XException&) { refused = true; }
+        try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
         if (!refused) fail("root() succeeded after a rejected reload_verified");
-        if (reloader().has_root()) fail("has_root() after a rejected reload_verified");
+        if (target.has_root()) fail("has_root() after a rejected reload_verified");
         return false;
     }
 }
+bool reload_accepts(const std::string& wire, std::string* error) { return reload_accepts(reloader(), wire, error); }
 
 // Accepted reload (or direct reload) vs fresh load of the same wire.
 void compare_reload(Buffer& fresh, Buffer& again, const char* who) {
@@ -421,7 +427,7 @@ Buffer& direct_slot() {
     return buffer;
 }
 
-bool direct_deliver(const std::string& wire, DirectMode mode, std::string* error) {
+bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, std::string* error) {
     if (wire.size() < kHeader) { if (error) *error = "transport: short header"; return false; }
     xo::XWireHeaderV2 h{};
     std::memcpy(&h, wire.data(), kHeader);
@@ -434,7 +440,7 @@ bool direct_deliver(const std::string& wire, DirectMode mode, std::string* error
         }
     }
     try {
-        auto token = direct_slot().begin_verified_reload<fz::Root>(used, holes, extents);
+        auto token = target.begin_verified_reload<fz::Root>(used, holes, extents);
         std::size_t at = kHeader;
         // Copies up to n bytes of the message into to[off, off + n) as far
         // as both reach; returns the bytes copied.
@@ -485,15 +491,19 @@ bool direct_deliver(const std::string& wire, DirectMode mode, std::string* error
     }
 }
 
-bool direct_accepts(const std::string& wire, std::string* error, DirectMode mode = DirectMode::Whole) {
-    const bool ok = direct_deliver(wire, mode, error);
+bool direct_accepts(Buffer& target, const std::string& wire, std::string* error,
+                    DirectMode mode = DirectMode::Whole) {
+    const bool ok = direct_deliver(target, wire, mode, error);
     if (!ok) {
         bool refused = false;
-        try { (void)direct_slot().root(); } catch (const xo::XException&) { refused = true; }
+        try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
         if (!refused) fail("root() succeeded after a rejected direct reload");
-        if (direct_slot().has_root()) fail("has_root() after a rejected direct reload");
+        if (target.has_root()) fail("has_root() after a rejected direct reload");
     }
     return ok;
+}
+bool direct_accepts(const std::string& wire, std::string* error, DirectMode mode = DirectMode::Whole) {
+    return direct_accepts(direct_slot(), wire, error, mode);
 }
 
 // Every interrupted form rejects; then the whole wire must match `accepted`
@@ -509,6 +519,50 @@ void check_direct(const std::string& w, bool accepted, Buffer* fresh, const std:
              " typed=" + (accepted ? "accept" : "reject"));
     if (fresh) compare_reload(*fresh, direct_slot(), "direct reload");
 }
+#endif
+
+#if defined(XOFFSET_SLOT_STORAGE_API)
+// Acceptor 7 (R1). Movable slots: Explicit growth, maximum kLimit, starting
+// in the smallest class, so reloads keep moving the owner to larger slots
+// (and to VM above SLOT_MAX). Each accepted payload must equal `fresh` (a VM
+// load) byte for byte, including the free table, the zero tail exposed by
+// growth (which may move it again) and the re-save.
+Buffer& slot_reloader() {
+    static Buffer buffer = Buffer::create(512, xo::XBuffer::maximum_capacity(kLimit));
+    return buffer;
+}
+Buffer& slot_direct() {
+    static Buffer buffer = Buffer::create(512, xo::XBuffer::maximum_capacity(kLimit));
+    return buffer;
+}
+
+void check_slots(const std::string& w, bool accepted, Buffer* fresh, const std::string& where) {
+    std::optional<Buffer> loaded;
+    std::string error;
+    try {
+        loaded.emplace(xo::XBuffer::load_verified<fz::Root>(w, xo::XBuffer::maximum_capacity(kLimit)));
+    } catch (const xo::XException& e) { error = e.what(); }
+    if (bool(loaded) != accepted)
+        fail(where + ": slot load=" + (loaded ? "accept" : "reject(" + error + ")") +
+             " typed=" + (accepted ? "accept" : "reject"));
+    if (loaded) {
+        const bool small = loaded->get_size() <= xo::XBufferCore::SLOT_MAX;
+        if (small != (loaded->storage_kind() == xo::XStorageKind::MovableSlot))
+            fail(where + ": slot load picked the wrong storage");
+        compare_reload(*fresh, *loaded, "slot load");
+    }
+    if (reload_accepts(slot_reloader(), w, &error) != accepted)
+        fail(where + ": slot reload=" + (accepted ? "reject(" + error + ")" : "accept"));
+    if (accepted) compare_reload(*fresh, slot_reloader(), "slot reload");
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
+    if (direct_accepts(slot_direct(), w, nullptr, DirectMode::Mismatch))
+        fail(where + ": interrupted direct reload on a slot accepted");
+    if (direct_accepts(slot_direct(), w, &error) != accepted)
+        fail(where + ": slot direct=" + (accepted ? "reject(" + error + ")" : "accept"));
+    if (accepted) compare_reload(*fresh, slot_direct(), "slot direct reload");
+#endif
+}
+
 #endif
 
 // Header-valid wire -> {aligned payload with gaps zeroed, gaps, hole pointer}.
@@ -798,7 +852,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
     }
 }
 
-void exercise(Buffer& buf, std::mt19937_64& rng) {
+std::string exercise(Buffer& buf, std::mt19937_64& rng) {
     auto& r = buf.root();
     std::uint64_t sink = r.epoch + r.title.size();
     for (const auto& it : r.items) { sink += it.id + it.name.size(); for (auto v : it.vals) sink += v; }
@@ -813,7 +867,21 @@ void exercise(Buffer& buf, std::mt19937_64& rng) {
     if (!again) fail("re-saved wire after mutating an accepted input was rejected");
     if (dump(again->root()) != before) fail("re-saved wire changed semantics");
     if (again->save_verified() != saved) fail("write-read-write not byte stable after mutation");
+    return saved;
 }
+
+#if defined(XOFFSET_SLOT_STORAGE_API)
+// The mutations `exercise` applies to a VM buffer, applied with the same rng
+// to a pinned slot: the re-saved wire must be the same bytes.
+void check_slot_mutation(const std::string& w, std::mt19937_64 rng, const std::string& saved_vm,
+                         const std::string& where) {
+    const auto cap = xo::XBuffer::maximum_capacity(xo::XBufferCore::SLOT_MAX).with_growth(xo::XGrowPolicy::Automatic);
+    auto slot = Buffer(xo::XBuffer::load_verified<fz::Root>(w, cap));
+    if (slot.storage_kind() != xo::XStorageKind::PinnedSlot) fail(where + ": expected a pinned slot");
+    mutate_valid(slot.root(), rng);
+    if (slot.save_verified() != saved_vm) fail(where + ": mutation on a pinned slot re-saves a different wire");
+}
+#endif
 
 enum class Outcome { Accepted, HeaderReject, PayloadReject };
 
@@ -844,7 +912,18 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
             fail("case " + id + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     }
+#if defined(XOFFSET_SLOT_STORAGE_API)
+    check_slots(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
+    if (o.ok) {
+        const auto before = rng;
+        const bool fits = typed->get_size() <= xo::XBufferCore::SLOT_MAX / 4;
+        const auto saved = exercise(*typed, rng);
+        if (fits) check_slot_mutation(w, before, saved, "case " + id);
+        return Outcome::Accepted;
+    }
+#else
     if (o.ok) { exercise(*typed, rng); return Outcome::Accepted; }
+#endif
     return o.stage == Oracle::Stage::Header ? Outcome::HeaderReject : Outcome::PayloadReject;
 }
 
@@ -859,6 +938,9 @@ void check_golden(const std::string& w, const std::string& where) {
     compare_reload(*loaded);
 #if defined(XOFFSET_VERIFIED_RELOAD_API)
     check_direct(w, true, &*loaded, where);
+#endif
+#if defined(XOFFSET_SLOT_STORAGE_API)
+    check_slots(w, true, &*loaded, where);
 #endif
     if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
 }
