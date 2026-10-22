@@ -695,7 +695,6 @@ RawWireVerification verify_structural_wire_graph_raw_at(
     raw_register_allocation(raw_advance(base,root,bytes),sizeof(T),alignof(T),ctx,false,bytes);
     validate_wire_value_raw<T>(raw_advance(base,root,bytes),ctx,bytes);
     require_exact_coverage(ctx);
-    require_gaps_free(static_cast<const XBufferCore::WireHole*>(gaps), gap_count, ctx);
     return {root, extent};
 }
 

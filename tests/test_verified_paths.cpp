@@ -198,7 +198,7 @@ void freeze_transaction_and_lease() {
 
 // V2: the free table travels as the wire hole table. save_verified_into and
 // save_verified emit identical bytes; a snapshot's third segment is the hole
-// table and a snapshot stays dense even when a save would be sparse (N10).
+// table and a snapshot stays dense even when a save elides zero runs.
 xo::XWireHeaderV2 header_of(const std::string& wire) {
     need(wire.size()>=sizeof(xo::XWireHeaderV2),"wire too small");
     xo::XWireHeaderV2 h{};std::memcpy(&h,wire.data(),sizeof(h));return h;
@@ -223,20 +223,23 @@ void hole_table_paths() {
     need(join(frozen)==saved,"snapshot segments differ from the saved V2 wire");
     auto io=frozen.acquire_io_lease();need(io.segments()[2].data()==segments[2].data(),"lease hole segment differs");
     io.complete();need(io.segments()[2].empty(),"completed lease kept the hole segment");
-    // A >= 4 KiB free run: save may skip it (sparse), the snapshot stays dense.
+    // An 8 KiB hole and 16 KiB of slack: zero-run elision skips them (sparse
+    // wire), the default emission and the snapshot stay dense.
     auto large=make();large.root().blob.resize(8192);
     for(std::size_t i=0;i<80;++i)large.root().blob[i]=std::uint8_t(i+1);
     large.root().labels.reserve(8); // keeps the blob block off the arena tail
     large.root().blob.reserve(16384); // relocates: the old 8 KiB block becomes a hole
-    const auto sparse=large.save_verified();const auto sh=header_of(sparse);
-    std::string sparse_into;large.save_verified_into(sparse_into);
+    const xo::XSaveOptions elide{.elide_zero_runs=true};
+    need(header_of(large.save_verified()).extent_count==0,"default emission is not dense");
+    const auto sparse=large.save_verified(elide);const auto sh=header_of(sparse);
+    std::string sparse_into;large.save_verified_into(sparse_into,elide);
     need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");
     auto from_sparse=xo::XBuffer::load_verified<PathsRoot>(sparse);check(from_sparse.root<PathsRoot>());
     auto dense_snapshot=xo::freeze_verified(std::move(large));
     const auto dense=join(dense_snapshot);const auto dh=header_of(dense);
     need(dh.extent_count==0&&dense_snapshot.segments()[1].size()==dh.used_bytes&&dh.used_bytes==sh.used_bytes&&
          dh.hole_count==sh.hole_count&&dh.hole_bytes==sh.hole_bytes,"snapshot of a sparse-saving source is not dense");
-    need(sh.extent_count!=0&&sparse.size()<dense.size(),"save did not skip its >= 4 KiB free run (sparse wire)");
+    need(sh.extent_count!=0&&sparse.size()+8192<dense.size(),"elided save did not skip its zero runs (sparse wire)");
     auto from_dense=xo::XBuffer::load_verified<PathsRoot>(dense);check(from_dense.root<PathsRoot>());
     need(from_dense.root<PathsRoot>().blob.size()==8192,"dense snapshot reload differs");
     // A lost retirement (host OOM in the free table) is recomputed before emission.

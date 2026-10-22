@@ -4365,18 +4365,6 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // N10: every byte skipped by a sparse wire must lie inside a hole.
-        inline void require_gaps_free(const XBufferCore::WireHole* gaps, std::size_t count,
-                                      const WireValidationContext& ctx) {
-            for (std::size_t i = 0; i < count; ++i) {
-                const auto gap = gaps[i];
-                ctx.free_ranges.for_each_gap(gap.offset, std::size_t(gap.offset) + gap.bytes,
-                    [](std::size_t, std::size_t) {
-                        throw XException("wire validation failed: sparse gap is not free");
-                    });
-            }
-        }
-
         inline void require_exact_coverage(const WireValidationContext& ctx) {
             if (ctx.owned_bytes + ctx.free_bytes != static_cast<std::uint64_t>(ctx.end - ctx.base)) {
                 throw XException(
@@ -4608,7 +4596,6 @@ namespace XOffsetDatastructure {
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
             if (check_coverage) require_exact_coverage(ctx);
-            if (gaps) require_gaps_free(gaps->data(), gaps->size(), ctx);
             if (recomputed) {
                 stop_deferring_owned(ctx);
                 // Every byte not covered by a live block is free.
@@ -4939,11 +4926,22 @@ namespace XOffsetDatastructure {
         std::uint32_t reserved0;
         // 0: the payload follows as used_bytes contiguous bytes. Otherwise an
         // extent table (extent_count x {u32 offset, u32 bytes}) precedes the
-        // concatenated extents; the gaps between extents (N10 sparse wire)
-        // must lie entirely inside holes and load as zero bytes.
+        // concatenated extents; the gaps between extents load as zero bytes
+        // (sparse wire). A gap may cover any payload bytes: the loaded
+        // payload is validated exactly like a dense one.
         std::uint64_t extent_count;
     };
     static_assert(sizeof(XWireHeaderV2) == 96 && alignof(XWireHeaderV2) == 8);
+
+    // Emission options of save_verified / save_verified_into. Receivers
+    // accept every form; the loaded payload is byte-identical.
+    struct XSaveOptions {
+        // Skip zero runs of at least 64 bytes (capacity slack, holes, zero
+        // fields) through the sparse wire's extent table. Payloads below
+        // 4 KiB, or where it would save less than max(256 B, 1/16 of the
+        // payload), stay dense. Default: dense, one copy of the payload.
+        bool elide_zero_runs = false;
+    };
 
     inline constexpr char XWIRE_MAGIC_V1[8] = {'X', 'O', 'F', 'F', 'V', '1', '\0', '\0'};
     inline constexpr char XWIRE_MAGIC_V2[8] = {'X', 'O', 'F', 'F', 'V', '2', '\0', '\0'};
@@ -4978,7 +4976,6 @@ namespace XOffsetDatastructure {
         }
 
         // ---- V2 wire layout (dense or sparse) -----------------------------
-        inline constexpr std::size_t wire_sparse_min_gap = 4096;
 
         struct WireLayout {
             const char* stored = nullptr;   // payload bytes (dense) or concatenated extents
@@ -5063,46 +5060,6 @@ namespace XOffsetDatastructure {
             return layout;
         }
 
-        // N10: payload ranges skipped by a sparse emission: maximal runs of
-        // free bytes of at least wire_sparse_min_gap.
-        inline std::vector<XBufferCore::WireHole> wire_sparse_gaps(const XBufferCore& core,
-                                                                   std::size_t used) {
-            std::vector<XBufferCore::WireHole> gaps;
-            if (core.free_block_bytes() < wire_sparse_min_gap || used == 0) return gaps;
-            const std::size_t units = used / 8u; // all offsets/sizes are multiples of 8
-            std::vector<std::uint64_t> bits((units + 63u) / 64u);
-            core.for_each_free_block([&](XBufferCore::WireHole hole) {
-                std::size_t b = hole.offset / 8u;
-                const std::size_t e = (std::size_t(hole.offset) + hole.bytes) / 8u;
-                while (b < e) {
-                    const auto word = b / 64u, bit = b % 64u;
-                    const auto n = std::min<std::size_t>(64u - bit, e - b);
-                    const auto mask = n == 64u ? ~std::uint64_t(0) : ((std::uint64_t(1) << n) - 1u) << bit;
-                    bits[word] |= mask;
-                    b += n;
-                }
-            });
-            // A run of at least min_units (>= 512) bits contains at least
-            // seven all-ones words: scan for all-ones stretches and extend
-            // each into its neighbouring partial words.
-            const std::size_t min_units = wire_sparse_min_gap / 8u;
-            const std::size_t words = bits.size();
-            constexpr auto full = ~std::uint64_t(0);
-            for (std::size_t w = 0; w < words;) {
-                if (bits[w] != full) { ++w; continue; }
-                std::size_t e = w + 1;
-                while (e < words && bits[e] == full) ++e;
-                std::size_t start = w * 64u, stop = std::min(units, e * 64u);
-                if (w != 0) start -= static_cast<std::size_t>(std::countl_one(bits[w - 1]));
-                if (e < words) stop = std::min(units, stop + static_cast<std::size_t>(std::countr_one(bits[e])));
-                if (stop - start >= min_units)
-                    gaps.push_back({static_cast<std::uint32_t>(start * 8u),
-                                    static_cast<std::uint32_t>((stop - start) * 8u)});
-                w = e;
-            }
-            return gaps;
-        }
-
         // E1 (N8): on Darwin, outputs of at least 1 MiB are copied in 256 KiB
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
         struct WireCopier {
@@ -5139,64 +5096,107 @@ namespace XOffsetDatastructure {
             return copier;
         }
 
-        inline std::size_t wire_output_size(const XWireHeaderV2& header,
-                                            const std::vector<XBufferCore::WireHole>& gaps) {
-            std::uint64_t skipped = 0;
-            for (const auto& gap : gaps) skipped += gap.bytes;
-            const std::uint64_t total = sizeof(XWireHeaderV2) + header.extent_count * 8u +
-                (header.used_bytes - skipped) + header.hole_count * 8u;
+        // Dense wire size: header, used_bytes of payload, hole table. A
+        // zero-run-elided emission is never larger (see write_wire).
+        inline std::size_t wire_dense_size(const XWireHeaderV2& header, const char* who) {
+            const std::uint64_t total = sizeof(XWireHeaderV2) + header.used_bytes +
+                header.hole_count * sizeof(XBufferCore::WireHole);
             if (total > (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error("save_verified<T>(): output size exceeds string limit");
+                throw std::length_error(std::string(who) + ": output size exceeds string limit");
             return static_cast<std::size_t>(total);
         }
 
-        // Header must already carry used/holes; sets extent_count from gaps.
-        inline void wire_apply_gaps(XWireHeaderV2& header,
-                                    const std::vector<XBufferCore::WireHole>& gaps) {
-            if (gaps.empty()) { header.extent_count = 0; return; }
-            std::size_t extents = gaps.size();
-            if (std::uint64_t(gaps.back().offset) + gaps.back().bytes < header.used_bytes) ++extents;
-            header.extent_count = extents;
+        // ---- Zero-run elision (XSaveOptions::elide_zero_runs) ---------------
+        // Payloads below wire_zero_scan_min_payload are not scanned. A run is
+        // found from a 64-byte aligned all-zero block and extended word by
+        // word on both sides; every skipped run is at least
+        // wire_zero_run_min bytes. The sparse form is used only when it saves
+        // at least max(wire_zero_min_saving, used / 16) bytes.
+        inline constexpr std::size_t wire_zero_run_min = 64;
+        inline constexpr std::size_t wire_zero_scan_min_payload = 4096;
+        inline constexpr std::size_t wire_zero_min_saving = 256;
+
+        // Writes the extent table of `payload` (8-aligned, `used` a multiple
+        // of 8) at `table` and returns the extent count, or 0 when no run is
+        // skipped. The table never exceeds `used` bytes: every extent holds
+        // at least one nonzero word. The first extent starts at 0 and holds
+        // the arena header (whose magic is never zero).
+        inline std::size_t wire_zero_run_extents(const char* payload, std::size_t used,
+                                                 char* table, std::uint64_t& skipped) noexcept {
+            auto word = [&](std::size_t at) noexcept {
+                std::uint64_t w;
+                std::memcpy(&w, payload + at, sizeof(w));
+                return w;
+            };
+            auto block_zero = [&](std::size_t block) noexcept {
+                std::uint64_t w[8];
+                std::memcpy(w, payload + block * 64u, sizeof(w));
+                return ((w[0] | w[1]) | (w[2] | w[3]) | (w[4] | w[5]) | (w[6] | w[7])) == 0;
+            };
+            std::size_t count = 0, cursor = 0;
+            auto emit = [&](std::size_t begin, std::size_t end) noexcept {
+                const std::uint32_t entry[2] = {static_cast<std::uint32_t>(begin),
+                                                static_cast<std::uint32_t>(end - begin)};
+                std::memcpy(table + count * 8u, entry, sizeof(entry));
+                ++count;
+            };
+            skipped = 0;
+            const std::size_t blocks = used / 64u;
+            for (std::size_t b = 0; b < blocks;) {
+                if (!block_zero(b)) { ++b; continue; }
+                std::size_t start = b * 64u;
+                while (start > cursor && word(start - 8u) == 0) start -= 8u;
+                std::size_t e = b + 1u;
+                while (e < blocks && block_zero(e)) ++e;
+                std::size_t stop = e * 64u;
+                while (stop < used && word(stop) == 0) stop += 8u;
+                if (start < 8u) start = 8u;
+                if (stop - start >= wire_zero_run_min) {
+                    emit(cursor, start);
+                    skipped += stop - start;
+                    cursor = stop;
+                }
+                // The block holding `stop` has a nonzero word at `stop`.
+                b = stop / 64u + 1u;
+            }
+            if (count == 0) return 0;
+            if (cursor < used) emit(cursor, used);
+            return count;
         }
 
-        // Writes header, extent table, extents and hole table (no allocation).
-        inline void write_wire(char* out, std::size_t output_size, const XWireHeaderV2& header,
-                               const std::vector<XBufferCore::WireHole>& gaps,
-                               const char* payload, const XBufferCore& core) noexcept {
-            const auto copier = wire_copier(output_size);
+        // Writes the wire for `header` (extent_count is set here) into `out`,
+        // which holds at least wire_dense_size(header) bytes, and returns the
+        // bytes written. No allocation and no callback.
+        inline std::size_t write_wire(char* out, XWireHeaderV2 header, const char* payload,
+                                      const XBufferCore& core, bool elide_zero_runs) noexcept {
+            const auto used = static_cast<std::size_t>(header.used_bytes);
+            char* at = out + sizeof(XWireHeaderV2);
+            std::size_t extents = 0;
+            std::uint64_t skipped = 0;
+            if (elide_zero_runs && used >= wire_zero_scan_min_payload) {
+                extents = wire_zero_run_extents(payload, used, at, skipped);
+                if (extents && skipped - extents * 8u < (std::max)(std::uint64_t(wire_zero_min_saving),
+                                                                    std::uint64_t(used / 16u)))
+                    extents = 0;
+            }
+            header.extent_count = extents;
             std::memcpy(out, &header, sizeof(header));
-            out += sizeof(header);
-            const auto used = static_cast<std::uint32_t>(header.used_bytes);
-            if (gaps.empty()) {
-                copier.copy(out, payload, used);
-                out += used;
+            if (extents == 0) {
+                wire_copier(sizeof(XWireHeaderV2) + used).copy(at, payload, used);
+                at += used;
             } else {
-                std::uint32_t begin = 0;
-                char* table = out;
-                for (const auto& gap : gaps) {
-                    const std::uint32_t entry[2] = {begin, gap.offset - begin};
-                    std::memcpy(table, entry, sizeof(entry));
-                    table += sizeof(entry);
-                    begin = gap.offset + gap.bytes;
-                }
-                if (begin < used) {
-                    const std::uint32_t entry[2] = {begin, used - begin};
-                    std::memcpy(table, entry, sizeof(entry));
-                    table += sizeof(entry);
-                }
-                out = table;
-                begin = 0;
-                for (const auto& gap : gaps) {
-                    copier.copy(out, payload + begin, gap.offset - begin);
-                    out += gap.offset - begin;
-                    begin = gap.offset + gap.bytes;
-                }
-                if (begin < used) {
-                    copier.copy(out, payload + begin, used - begin);
-                    out += used - begin;
+                const char* table = at;
+                at += extents * 8u;
+                for (std::size_t i = 0; i < extents; ++i) {
+                    std::uint32_t entry[2];
+                    std::memcpy(entry, table + i * 8u, sizeof(entry));
+                    std::memcpy(at, payload + entry[0], entry[1]);
+                    at += entry[1];
                 }
             }
-            core.write_free_blocks(out);
+            core.write_free_blocks(at);
+            return static_cast<std::size_t>(at - out) +
+                core.free_block_count() * sizeof(XBufferCore::WireHole);
         }
     }
 
@@ -5882,7 +5882,7 @@ namespace XOffsetDatastructure {
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
             template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
-            template<class T> static void save_into(XBufferCore&, std::string&);
+            template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
             static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
@@ -6074,8 +6074,8 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        void save_verified_into(std::string& out) {
-            detail::VerifiedPathsAccess::save_into<T>(*this, out);
+        void save_verified_into(std::string& out, XSaveOptions options = {}) {
+            detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
         }
 
         // V2: if a host allocation failure (or an unverified load) left the
@@ -6114,7 +6114,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        std::string save_verified() {
+        std::string save_verified(XSaveOptions options = {}) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
@@ -6131,21 +6131,18 @@ namespace XOffsetDatastructure {
             }
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
-            auto header = wire_header_v2(*root_ptr);
-            const auto gaps = detail::wire_sparse_gaps(*this, this->segment_size());
-            detail::wire_apply_gaps(header, gaps);
-            const auto output_size = detail::wire_output_size(header, gaps);
+            const auto header = wire_header_v2(*root_ptr);
+            const auto output_size = detail::wire_dense_size(header, "save_verified<T>()");
             std::string out;
             if (output_size > out.max_size())
                 throw std::length_error("save_verified<T>(): output size exceeds string limit");
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                detail::write_wire(output, output_size, header, gaps, base, *this);
-                return output_size;
+                return detail::write_wire(output, header, base, *this, options.elide_zero_runs);
             });
 #else
             out.resize(output_size);
-            detail::write_wire(out.data(), output_size, header, gaps, base, *this);
+            out.resize(detail::write_wire(out.data(), header, base, *this, options.elide_zero_runs));
 #endif
             return out;
         }
@@ -6446,12 +6443,14 @@ namespace XOffsetDatastructure {
             return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
-        std::string save_verified() { return XBuffer::save_verified<T>(); }
+        std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
         T& reset() { return XBuffer::reset<T>(); }
 
-        void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
+        void save_verified_into(std::string& out, XSaveOptions options = {}) {
+            XBuffer::save_verified_into<T>(out, options);
+        }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
