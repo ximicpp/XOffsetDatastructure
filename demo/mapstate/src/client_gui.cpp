@@ -206,7 +206,7 @@ int run_gui(const Options& opt) {
         } else {
             DrawText("waiting for the first snapshot...", 16, 14, 16, RAYWHITE);
         }
-        DrawText(TextFormat("view rtt %.2f ms   load_verified %.1f us   %d fps", s.last_rtt_us() / 1000.0,
+        DrawText(TextFormat("view rtt %.2f ms (frame-paced)   load_verified %.1f us   %d fps", s.last_rtt_us() / 1000.0,
                             s.last_load_us(), GetFPS()),
                  16, 36, 16, RAYWHITE);
         DrawText(TextFormat("camera (%d, %d)   drag with the left mouse button", int(cam.min.x), int(cam.min.y)), 16, 58,
@@ -237,6 +237,10 @@ int run_gui(const Options& opt) {
             std::fflush(stdout);
             while (next_shot < opt.screenshot_at.size() && opt.screenshot_at[next_shot] <= frame) ++next_shot;
         }
+
+        // Read a snapshot that arrived while drawing (it is installed at the next
+        // frame start), so the window's view rtt is not padded by the vsync wait.
+        s.pump(0);
 
         metrics::Stopwatch present_sw;
         EndDrawing();
