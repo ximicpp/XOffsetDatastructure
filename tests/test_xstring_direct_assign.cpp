@@ -200,6 +200,72 @@ bool test_player_direct_assign() {
     return true;
 }
 
+// Reassigning a heap string that fits its block: the block is kept, the new
+// characters and terminator are written, and every byte after the terminator
+// up to the end of the block is zero (M4), for every old and new length and
+// for views of the string's own characters.
+bool test_heap_reassign_in_place() {
+    std::cout << "\n[TEST] Heap XString reassignment in place\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    constexpr std::size_t cap = 40;
+    auto pattern = [](std::size_t length, unsigned seed) {
+        std::string out;
+        for (std::size_t i = 0; i < length; ++i) out.push_back(static_cast<char>(0x21 + (seed * 7 + i * 13) % 90));
+        return out;
+    };
+    XBuffer xbuf(64 * 1024);
+    auto* data = xbuf.make<StringTestData>();
+    auto& s = data->name;
+    s = std::string_view(pattern(cap, 1));
+    assert(!s.is_inline() && s.capacity() == cap);
+    const char* block = s.data();
+    auto check = [&](const std::string& want) {
+        assert(s.view() == want);
+        assert(s.data() == block && s.capacity() == cap);
+        for (std::size_t i = want.size(); i <= cap; ++i) assert(block[i] == '\0');
+    };
+
+    std::cout << "Test 14: Every old and new length... ";
+    std::size_t cases = 0;
+    for (std::size_t before = 1; before <= cap; ++before) {
+        for (std::size_t length = 1; length <= cap; ++length) {
+            const std::string old_value = pattern(before, unsigned(before));
+            s = std::string_view(old_value);
+            check(old_value);
+            const std::string want = pattern(length, unsigned(length + 3));
+            s = std::string_view(want);
+            check(want);
+            ++cases;
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+
+    std::cout << "Test 15: Views of the string's own characters... ";
+    cases = 0;
+    for (std::size_t length = 1; length <= cap; ++length) {
+        for (std::size_t from = 0; from < length; ++from) {
+            for (std::size_t count = 1; from + count <= length; ++count) {
+                const std::string old_value = pattern(length, unsigned(length));
+                s = std::string_view(old_value);
+                s = std::string_view(s.data() + from, count);
+                check(old_value.substr(from, count));
+                ++cases;
+            }
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+
+    std::cout << "Test 16: Longer than the block, then empty... ";
+    const std::string longer = pattern(cap + 1, 9);
+    s = std::string_view(longer);
+    assert(s.view() == longer && s.capacity() == cap + 1);
+    s = std::string_view();
+    assert(s.empty() && s.data()[0] == '\0');
+    std::cout << "[OK]\n";
+    return true;
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "  XString Direct Assignment Test\n";
@@ -210,6 +276,7 @@ int main() {
     all_passed &= test_serialization_roundtrip();
     all_passed &= test_vector_of_strings();
     all_passed &= test_player_direct_assign();
+    all_passed &= test_heap_reassign_in_place();
 
     std::cout << "\n========================================\n";
     if (all_passed) {
