@@ -159,13 +159,18 @@ int run_gui(const Options& opt) {
 
         const Vector2 mouse = GetMousePosition();
         const VisibleUnit* hover = nullptr;
+        unsigned in_view[4] = {0, 0, 0, 0};   // Patrol, Hold, Alert, out of range
+        unsigned marked = 0, marked_long = 0; // id % 100 == 0 units and those with the long name
         if (have) {
             char name[96];
             float best = 8.0f * 8.0f;
             for (const VisibleUnit& u : s.holder().view().units) {
                 if (!rules::contains(cam, u.pos)) continue;
                 float sx = u.pos.x - cam.min.x, sy = u.pos.y - cam.min.y;
+                ++in_view[static_cast<std::uint32_t>(u.behavior) < 3 ? static_cast<std::uint32_t>(u.behavior) : 3];
                 if (u.id % kEventIdModulo == 0) {
+                    ++marked;
+                    if (u.name.view().size() > 10) ++marked_long;
                     DrawText(cstr(u.name.view(), name), int(sx) + 5, int(sy) - 5, 10, Color{50, 45, 40, 255});
                     DrawCircleLines(int(sx), int(sy), 5.0f, Color{50, 45, 40, 255});
                 }
@@ -192,7 +197,7 @@ int run_gui(const Options& opt) {
         }
 
         // ---- HUD
-        DrawRectangle(8, 8, 430, 96, Color{20, 20, 20, 200});
+        DrawRectangle(8, 8, 470, 118, Color{20, 20, 20, 200});
         if (have) {
             const ViewSnapshot& v = s.holder().view();
             DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B", std::uint64_t(v.tick),
@@ -214,6 +219,9 @@ int run_gui(const Options& opt) {
         DrawText("Alert", 176, 81, 14, RAYWHITE);
         DrawCircle(232, 88, 5, rgba(behavior_rgba(static_cast<Behavior>(99))));
         DrawText("out of range", 242, 81, 14, RAYWHITE);
+        DrawText(TextFormat("in view: %u patrol  %u hold  %u alert  %u other   labelled %u (%u long names)", in_view[0],
+                            in_view[1], in_view[2], in_view[3], marked, marked_long),
+                 16, 103, 14, Color{200, 200, 200, 255});
 
         s.recorder().add("c.draw_us", draw_sw.us());
 
