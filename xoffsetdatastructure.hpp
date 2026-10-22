@@ -633,6 +633,25 @@ namespace XOffsetDatastructure {
             for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
         }
 
+        // Visits only free blocks of at least min_bytes (bins from min_bytes
+        // upward, then large blocks), in no particular offset order.
+        template <typename Fn>
+        void for_each_free_block_at_least(std::uint32_t min_bytes, Fn&& fn) const {
+            if (!free_table_) return;
+            const auto& table = *free_table_;
+            const std::uint32_t first = min_bytes <= 8u ? 0u : (min_bytes + 7u) / 8u - 1u;
+            for (std::uint32_t word = first / 64u; word < FreeTable::small_bins / 64u; ++word) {
+                auto bits = table.nonempty[word];
+                if (word == first / 64u) bits &= ~std::uint64_t(0) << (first % 64u);
+                for (; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    const auto bytes = (bin + 1u) * 8u;
+                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+                }
+            }
+            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
+        }
+
         // Writes free_block_count() little-endian entries.
         void write_free_blocks(char* out) const noexcept {
             for_each_free_block([&](WireHole hole) {
@@ -4933,14 +4952,24 @@ namespace XOffsetDatastructure {
     };
     static_assert(sizeof(XWireHeaderV2) == 96 && alignof(XWireHeaderV2) == 8);
 
-    // Emission options of save_verified / save_verified_into. Receivers
+    // Emission forms of save_verified / save_verified_into. Receivers
     // accept every form; the loaded payload is byte-identical.
+    enum class XWireEmission : std::uint8_t {
+        // Default. Skips each run of at least 4 KiB of adjacent free blocks
+        // of at least 256 B (one large deletion, for example); everything
+        // else is copied. Skipped bytes are all holes, so every V2 receiver
+        // accepts it.
+        free_runs,
+        // One copy of the whole payload.
+        dense,
+        // Skips every zero run of at least 64 bytes (capacity slack, holes,
+        // zero fields), for cross-machine sends. Costs a scan of the payload.
+        // Payloads below 4 KiB, or where it would save less than max(256 B,
+        // 1/16 of the payload), stay dense.
+        zero_runs,
+    };
     struct XSaveOptions {
-        // Skip zero runs of at least 64 bytes (capacity slack, holes, zero
-        // fields) through the sparse wire's extent table. Payloads below
-        // 4 KiB, or where it would save less than max(256 B, 1/16 of the
-        // payload), stay dense. Default: dense, one copy of the payload.
-        bool elide_zero_runs = false;
+        XWireEmission emission = XWireEmission::free_runs;
     };
 
     // Options of save_compact / save_compact_into.
@@ -5106,8 +5135,8 @@ namespace XOffsetDatastructure {
             return copier;
         }
 
-        // Dense wire size: header, used_bytes of payload, hole table. A
-        // zero-run-elided emission is never larger (see write_wire).
+        // Dense wire size: header, used_bytes of payload, hole table. Every
+        // other emission is smaller (see write_wire).
         inline std::size_t wire_dense_size(const XWireHeaderV2& header, const char* who) {
             const std::uint64_t total = sizeof(XWireHeaderV2) + header.used_bytes +
                 header.hole_count * sizeof(XBufferCore::WireHole);
@@ -5116,7 +5145,70 @@ namespace XOffsetDatastructure {
             return static_cast<std::size_t>(total);
         }
 
-        // ---- Zero-run elision (XSaveOptions::elide_zero_runs) ---------------
+        // ---- Free-run emission (XWireEmission::free_runs, the default) ------
+        // Candidates are free blocks of at least wire_free_run_min_block
+        // bytes (only those bins and the large blocks are visited); sorted by
+        // offset (LSD radix, 11-bit digits), adjacent candidates merge, and
+        // every merged run of at least wire_free_run_min_gap is skipped.
+        inline constexpr std::uint32_t wire_free_run_min_block = 256;
+        inline constexpr std::uint32_t wire_free_run_min_gap = 4096;
+
+        struct WireGaps {
+            std::vector<XBufferCore::WireHole> runs; // ascending, disjoint
+            std::uint64_t skipped = 0;
+            std::size_t extent_count = 0;
+        };
+
+        inline WireGaps wire_free_runs(const XBufferCore& core, std::uint64_t used) {
+            WireGaps gaps;
+            if (core.free_block_bytes() < wire_free_run_min_gap || used == 0) return gaps;
+            std::vector<XBufferCore::WireHole> candidates;
+            std::uint64_t total = 0;
+            core.for_each_free_block_at_least(wire_free_run_min_block, [&](XBufferCore::WireHole hole) {
+                candidates.push_back(hole);
+                total += hole.bytes;
+            });
+            if (total < wire_free_run_min_gap) return gaps;
+            std::vector<XBufferCore::WireHole> sorted(candidates.size());
+            unsigned bits = 0;
+            while (bits < 32u && (std::uint64_t(1) << bits) < used) ++bits;
+            for (unsigned shift = 0; shift < bits; shift += 11u) {
+                std::uint32_t count[2049] = {};
+                for (const auto& hole : candidates) ++count[((hole.offset >> shift) & 2047u) + 1u];
+                for (std::size_t i = 0; i < 2048u; ++i) count[i + 1u] += count[i];
+                for (const auto& hole : candidates) sorted[count[(hole.offset >> shift) & 2047u]++] = hole;
+                candidates.swap(sorted);
+            }
+            std::uint64_t start = 0, end = 0;
+            auto close = [&] {
+                if (end - start >= wire_free_run_min_gap) {
+                    gaps.runs.push_back({static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(end - start)});
+                    gaps.skipped += end - start;
+                }
+            };
+            for (const auto& hole : candidates) {
+                if (hole.offset == end && end != 0) { end += hole.bytes; continue; }
+                close();
+                start = hole.offset;
+                end = std::uint64_t(hole.offset) + hole.bytes;
+            }
+            close();
+            if (!gaps.runs.empty()) {
+                // The arena header is live, so no run starts at 0.
+                const auto& last = gaps.runs.back();
+                gaps.extent_count = gaps.runs.size() + (std::uint64_t(last.offset) + last.bytes < used ? 1u : 0u);
+            }
+            return gaps;
+        }
+
+        // Exact wire size of a free-run emission (dense when `gaps` is empty).
+        inline std::size_t wire_free_run_size(const XWireHeaderV2& header, const WireGaps& gaps,
+                                              const char* who) {
+            return wire_dense_size(header, who) - static_cast<std::size_t>(gaps.skipped) +
+                gaps.extent_count * 8u;
+        }
+
+        // ---- Zero-run elision (XWireEmission::zero_runs) ---------------
         // Payloads below wire_zero_scan_min_payload are not scanned. A run is
         // found from a 64-byte aligned all-zero block and extended word by
         // word on both sides; every skipped run is at least
@@ -5175,15 +5267,32 @@ namespace XOffsetDatastructure {
         }
 
         // Writes the wire for `header` (extent_count is set here) into `out`,
-        // which holds at least wire_dense_size(header) bytes, and returns the
-        // bytes written. No allocation and no callback.
+        // which holds at least wire_free_run_size(header, gaps) bytes, or
+        // wire_dense_size(header) for zero_runs, and returns the bytes
+        // written. `gaps` comes from wire_free_runs (free_runs) or is empty.
+        // No allocation and no callback.
         inline std::size_t write_wire(char* out, XWireHeaderV2 header, const char* payload,
-                                      const XBufferCore& core, bool elide_zero_runs) noexcept {
+                                      const XBufferCore& core, XWireEmission emission,
+                                      const WireGaps& gaps) noexcept {
             const auto used = static_cast<std::size_t>(header.used_bytes);
             char* at = out + sizeof(XWireHeaderV2);
             std::size_t extents = 0;
-            std::uint64_t skipped = 0;
-            if (elide_zero_runs && used >= wire_zero_scan_min_payload) {
+            if (emission == XWireEmission::free_runs && gaps.extent_count) {
+                extents = gaps.extent_count;
+                std::uint32_t begin = 0;
+                for (const auto& gap : gaps.runs) {
+                    const std::uint32_t entry[2] = {begin, gap.offset - begin};
+                    std::memcpy(at, entry, sizeof(entry));
+                    at += sizeof(entry);
+                    begin = gap.offset + gap.bytes;
+                }
+                if (begin < used) {
+                    const std::uint32_t entry[2] = {begin, static_cast<std::uint32_t>(used - begin)};
+                    std::memcpy(at, entry, sizeof(entry));
+                }
+                at = out + sizeof(XWireHeaderV2);
+            } else if (emission == XWireEmission::zero_runs && used >= wire_zero_scan_min_payload) {
+                std::uint64_t skipped = 0;
                 extents = wire_zero_run_extents(payload, used, at, skipped);
                 if (extents && skipped - extents * 8u < (std::max)(std::uint64_t(wire_zero_min_saving),
                                                                     std::uint64_t(used / 16u)))
@@ -5191,8 +5300,9 @@ namespace XOffsetDatastructure {
             }
             header.extent_count = extents;
             std::memcpy(out, &header, sizeof(header));
+            const auto copier = wire_copier(sizeof(XWireHeaderV2) + used);
             if (extents == 0) {
-                wire_copier(sizeof(XWireHeaderV2) + used).copy(at, payload, used);
+                copier.copy(at, payload, used);
                 at += used;
             } else {
                 const char* table = at;
@@ -5200,7 +5310,7 @@ namespace XOffsetDatastructure {
                 for (std::size_t i = 0; i < extents; ++i) {
                     std::uint32_t entry[2];
                     std::memcpy(entry, table + i * 8u, sizeof(entry));
-                    std::memcpy(at, payload + entry[0], entry[1]);
+                    copier.copy(at, payload + entry[0], entry[1]);
                     at += entry[1];
                 }
             }
@@ -6165,17 +6275,21 @@ namespace XOffsetDatastructure {
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
             const auto header = wire_header_v2(*root_ptr);
-            const auto output_size = detail::wire_dense_size(header, "save_verified<T>()");
+            detail::WireGaps gaps;
+            if (options.emission == XWireEmission::free_runs) gaps = detail::wire_free_runs(*this, header.used_bytes);
+            const auto output_size = options.emission == XWireEmission::zero_runs
+                ? detail::wire_dense_size(header, "save_verified<T>()")
+                : detail::wire_free_run_size(header, gaps, "save_verified<T>()");
             std::string out;
             if (output_size > out.max_size())
                 throw std::length_error("save_verified<T>(): output size exceeds string limit");
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                return detail::write_wire(output, header, base, *this, options.elide_zero_runs);
+                return detail::write_wire(output, header, base, *this, options.emission, gaps);
             });
 #else
             out.resize(output_size);
-            out.resize(detail::write_wire(out.data(), header, base, *this, options.elide_zero_runs));
+            out.resize(detail::write_wire(out.data(), header, base, *this, options.emission, gaps));
 #endif
             return out;
         }

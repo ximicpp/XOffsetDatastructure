@@ -107,13 +107,16 @@ const Profile& r = in.root<Profile>();
 std::string_view who = r.name.view();
 ```
 
-- wire 由 96 字节头、payload 和空洞表组成，默认稠密输出（payload 一次拷贝）。
-- 跨机器发送时可以打开零段省略：`save_verified<Profile>(XSaveOptions{.elide_zero_runs = true})`
+- wire 由 96 字节头、payload 和空洞表组成。默认只跳过「不短于 4 KiB、由不小于 256 B 的
+  空闲块连成」的段（例如一次删掉大量记录留下的空洞），其余 payload 一次拷贝。
+  `XSaveOptions{.emission = XWireEmission::dense}` 强制整段拷贝。
+- 跨机器发送时可以打开零段省略：
+  `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
   （`save_verified_into` 同样接受这个参数）。它跳过不短于 64 字节的全零段（容器余量、
   空洞、为 0 的字段），接收方按原偏移填零，装载后的 payload 与稠密 wire 逐字节相同，
   余量照样保留、接着改不变慢。代价是发送时多扫描一遍 payload；payload 不足 4 KiB
   或省不到 max(256 B, payload 的 1/16) 时自动退回稠密。同机共享内存或进程内传递保持默认。
-  接收方不需要任何设置，两种 wire 都接受。
+  接收方不需要任何设置，三种 wire 都接受。
 - 想让 wire 更小时可以用 `save_compact<Profile>()`（或 `save_compact_into<Profile>(out)`）：
   它直接按校验顺序遍历对象图写出紧凑 wire（无空洞），不建临时 buffer，源 buffer 不变。
   默认给不少于 8 个元素的容器（字符串除外）留 size/8+1 个余量，接收方修改时不必马上搬家。

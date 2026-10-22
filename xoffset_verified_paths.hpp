@@ -79,29 +79,53 @@ namespace detail {
                 throw XException("save_verified_into: output aliases source storage");
         };
         check_alias(*current);
-        // The dense size bounds every emission. A reused output that already
-        // holds it needs no reserve (the only output-allocation/callback
-        // boundary), so the source is examined and normalized once.
+        // Host allocations (the free-run list, reserve) are the callback
+        // boundaries: the owner is re-resolved after them, and the source
+        // must be unchanged when the wire is written. A reused output that
+        // already holds the dense size (which bounds every emission) needs no
+        // reserve, so the source is examined and normalized once.
+        const auto emission = options.emission;
+        auto size_of = [&](const XWireHeaderV2& h, const WireGaps& g) {
+            return emission == XWireEmission::zero_runs ? wire_dense_size(h, "save_verified_into")
+                                                        : wire_free_run_size(h, g, "save_verified_into");
+        };
+        auto gaps_of = [&](const XBufferCore& core, std::uint64_t used) {
+            return emission == XWireEmission::free_runs ? wire_free_runs(core, used) : WireGaps{};
+        };
+        auto same_holes = [](const XWireHeaderV2& a, const XWireHeaderV2& b) {
+            return a.used_bytes == b.used_bytes && a.hole_count == b.hole_count && a.hole_bytes == b.hole_bytes;
+        };
         XWireHeaderV2 final_header{};
+        WireGaps gaps;
         std::size_t final_size = 0;
         const auto* arena = current->arena();
         if (arena && current->free_table_complete() &&
             sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end) +
                 std::uint64_t(current->free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) {
+            gaps = gaps_of(*current, arena->used_end);
+            current = &owner(token);
+            check_alias(*current);
+            const auto used = current->arena() ? current->arena()->used_end : 0;
+            const auto holes = current->free_block_count();
+            const auto hole_bytes = current->free_block_bytes();
             final_header = header<T>(*current, true);
-            final_size = wire_dense_size(final_header, "save_verified_into");
+            if (final_header.used_bytes != used || final_header.hole_count != holes ||
+                final_header.hole_bytes != hole_bytes)
+                throw XException("save_verified_into: source changed while preparing the output");
+            final_size = size_of(final_header, gaps);
         }
         if (final_size == 0 || final_size > out.capacity()) {
             const auto initial = header<T>(*current, false);
-            const auto prepared_size = wire_dense_size(initial, "save_verified_into");
+            gaps = gaps_of(*current, initial.used_bytes);
+            const auto prepared_size = size_of(initial, gaps);
             if (prepared_size > out.max_size())
                 throw std::length_error("save_verified_into: output size exceeds string limit");
             out.reserve(prepared_size);
             current = &owner(token);
             check_alias(*current);
             final_header = header<T>(*current, true);
-            final_size = wire_dense_size(final_header, "save_verified_into");
-            if (final_size > out.capacity() || final_size != prepared_size)
+            final_size = size_of(final_header, gaps);
+            if (final_size > out.capacity() || final_size != prepared_size || !same_holes(initial, final_header))
                 throw XException("save_verified_into: source changed beyond prepared output capacity");
         }
         const auto* base = static_cast<const char*>(current->get_address());
@@ -110,11 +134,11 @@ namespace detail {
         // Supported string implementation must honor its existing reserved
         // capacity. No host allocation or user callback may occur in this copy.
         out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
-            return write_wire(destination, final_header, base, core, options.elide_zero_runs);
+            return write_wire(destination, final_header, base, core, emission, gaps);
         });
 #else
         out.resize(final_size);
-        out.resize(write_wire(out.data(), final_header, base, core, options.elide_zero_runs));
+        out.resize(write_wire(out.data(), final_header, base, core, emission, gaps));
 #endif
     }
 }

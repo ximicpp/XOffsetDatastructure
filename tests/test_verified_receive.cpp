@@ -384,7 +384,7 @@ void sparse_wire_receive(){
     r.tail.resize(12288);for(std::size_t i=0;i<r.tail.size();++i)r.tail[i]=std::uint8_t(i%251+1);
     r.numbers.reserve(16);r.numbers.resize(3,77u); // keeps the tail block off the arena tail
     r.tail.reserve(20000); // relocates: the old 12 KiB block becomes one hole
-    const xo::XSaveOptions elide{.elide_zero_runs=true};
+    const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
     const auto wire=source.save_verified(elide);const auto f=framing_of(wire);
     need(f.extents!=0&&f.holes!=0,"sparse fixture produced a dense wire");
     need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload,"sparse wire did not skip its free run");
