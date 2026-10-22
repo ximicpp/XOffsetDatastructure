@@ -14,6 +14,7 @@ option(XOFFSET_BUILD_EXAMPLES "Build XOffset examples" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_BUILD_DEMOS "Build the map state demo (demo/mapstate)" OFF)
 option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_BUILD_FUZZERS "Build libFuzzer targets (needs clang -fsanitize=fuzzer)" OFF)
+option(XOFFSET_FUZZ_INJECT_CRASH "Fuzz drill builds only: inputs starting with XOFFSET-INJECT crash the fuzz harnesses" OFF)
 
 if(XOFFSET_BUILD_TESTS)
     enable_testing()
