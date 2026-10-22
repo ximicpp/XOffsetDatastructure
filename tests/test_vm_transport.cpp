@@ -92,7 +92,9 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
     assert(source.save_verified<TransportRoot>() == wire);
     assert(source.get_address() == source_base && source.epoch() == epoch && handle.get() == root);
 
-    auto loaded = XBuffer::load_verified<TransportRoot>(wire);
+    // Pinned: the growth loop below checks that the address does not change.
+    auto loaded = XBuffer::load_verified<TransportRoot>(wire,
+        XBuffer::maximum_capacity(XBufferCore::DEFAULT_MAXIMUM_CAPACITY).with_storage(XStorage::Pinned));
     check_root(loaded.root<TransportRoot>(), length);
     assert(loaded.copy_bytes() == payload && loaded.save_verified<TransportRoot>() == wire);
     auto exact = XBuffer::load_verified<TransportRoot>(wire,
@@ -173,10 +175,13 @@ void load_failures_preserve_target() {
     const auto* base = target.get_address();
     const auto before = target.copy_bytes();
     const auto epoch = target.epoch();
+    // Pinned loads: Enable is a VM page-permission step a slot does not have.
+    const auto pinned = XBuffer::maximum_capacity(XBufferCore::DEFAULT_MAXIMUM_CAPACITY)
+        .with_storage(XStorage::Pinned);
     for (const auto failure : {detail::VmOperation::Reserve, detail::VmOperation::Enable,
                                detail::VmOperation::Prepare}) {
         detail::fail_next_vm_operation(failure);
-        require_rejection([&] { target = XBuffer::load_verified<TransportRoot>(wire); });
+        require_rejection([&] { target = XBuffer::load_verified<TransportRoot>(wire, pinned); });
         assert(target.get_address() == base && target.epoch() == epoch && handle.get() == root);
         assert(target.copy_bytes() == before);
         auto retry = XBuffer::load_verified<TransportRoot>(wire);
