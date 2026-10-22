@@ -176,7 +176,7 @@ jobs:
       - name: Smoke (identity, reflection probe, Release CTest, SLG verify)
         shell: bash
         run: |
-          set -o pipefail
+          set +e -o pipefail  # keep going after a failure to annotate it
           docker run --rm --platform ${{ inputs.docker_platform }} \
             -v "${{ github.workspace }}:/workspace" -w /workspace \
             -v "$RUNNER_TEMP/tc:/opt/p2996-toolchain:ro" \
