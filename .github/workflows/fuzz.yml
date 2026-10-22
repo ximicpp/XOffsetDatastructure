@@ -38,7 +38,7 @@ on:
         description: 'manual: fuzzing seconds per target (at most 16200)'
         default: '3600'
       inject_crash:
-        description: 'Drill: build with XOFFSET_FUZZ_INJECT_CRASH and feed the XOFFSET-INJECT input'
+        description: 'Drill: build with -DXOFFSET_FUZZ_INJECT_CRASH=ON and feed the XOFFSET-INJECT input'
         type: boolean
         default: false
       watch_hours:
@@ -216,17 +216,17 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          EXTRA_CXX=""
-          if [ "$XOFFSET_FUZZ_INJECT" = true ]; then EXTRA_CXX="-DXOFFSET_FUZZ_INJECT_CRASH=1"; fi
+          INJECT=OFF
+          if [ "$XOFFSET_FUZZ_INJECT" = true ]; then INJECT=ON; fi
           build/xo-docker bash -euo pipefail -c "
             cmake -S . -B build/fuzz -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ \
-              '-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime $EXTRA_CXX' \
+              '-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime' \
               -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
               -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
-              -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6
+              -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6 -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT
             cmake --build build/fuzz --parallel 4 --target ${{ matrix.build }}
-            ctest --test-dir build/fuzz -R '^fuzz_${T}_' --output-on-failure" \
+            ctest --test-dir build/fuzz -R '^fuzz_${T}_(seeds|smoke)\$' --output-on-failure" \
             2>&1 | tee "build/build-$T.log"
 
       # The fuzzer's exit code is recorded, not acted on here: a crash in pr
