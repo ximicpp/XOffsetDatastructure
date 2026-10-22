@@ -878,6 +878,27 @@ namespace XOffsetDatastructure {
         // directly. On host OOM the entry is lost and the table is marked
         // incomplete (save_verified recomputes it from the live graph).
         bool insert_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            return insert_free_block_inline(offset, bytes) || insert_free_block_general(offset, bytes);
+        }
+
+        // A small block entering a bin that already has spare capacity needs
+        // no host allocation and runs no host callback (as D3's retire_block),
+        // so it is published without copying the owner record.
+        bool insert_free_block_inline(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            FreeTable* table = free_table_.get();
+            if (!table || bytes > FreeTable::small_max) return false;
+            const auto bin = bytes / 8u - 1u;
+            auto& slot = table->bins[bin];
+            if (slot.size() == slot.capacity()) return false;
+            check_owner_resolves();
+            slot.push_back(offset);
+            table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+            table->bytes += bytes;
+            ++table->count;
+            return true;
+        }
+
+        XOFFSET_DETAIL_NOINLINE bool insert_free_block_general(std::uint32_t offset, std::uint32_t bytes) noexcept {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
             std::vector<std::uint32_t> spare_bin;
@@ -936,7 +957,25 @@ namespace XOffsetDatastructure {
 
         // Remainder publication and release of the extracted map node may run
         // host callbacks; the reused block was already removed from the table.
+        // The two common outcomes run none and are published directly:
+        //  - a large remainder of a large block reuses the extracted map node
+        //    (a node insert lands after equal keys, as the emplace would);
+        //  - a small remainder of a small block enters a bin with room.
         void finish_free_split(FreeSplit& split) {
+            if (split.node) {
+                if (split.bytes > FreeTable::small_max) {
+                    check_owner_resolves();
+                    auto& table = *free_table_;
+                    split.node.key() = split.bytes;
+                    split.node.mapped() = split.offset;
+                    table.large.insert(std::move(split.node));
+                    table.bytes += split.bytes;
+                    ++table.count;
+                    return;
+                }
+            } else if (split.bytes == 0 || insert_free_block_inline(split.offset, split.bytes)) {
+                return;
+            }
             const auto identity = owner_record_;
             { auto released = std::move(split.node); }
             if (split.bytes) push_free_block(split.offset, split.bytes);
