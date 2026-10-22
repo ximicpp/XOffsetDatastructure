@@ -1,0 +1,138 @@
+handoff: reps=101, page 4096 B (median of round trips; child is a forked process)
+
+-- player: in-process pieces (median ns) --
+   sender save_verified                                164
+   sender save_sealed (+close)                        8277
+   receiver load_verified (from memory)              18345
+   receiver load_verified_sealed (same fd)           16934
+   sender release_sealed (shared arena, +close)      11900
+  check adopted digest                                       ok
+  check adopted free table                                   ok
+  check adopted buffer saves the same wire                   ok
+  check edits after adoption stay private                    ok
+  check adopted buffer keeps mutating and round-trips        ok
+   (payload 11480 -> 13528 B after 64 edit rounds)
+  check sender buffer empty after release_sealed             ok
+  check released file is sealed                              ok
+  check moved digest                                         ok
+  check moved buffer saves the same wire                     ok
+  check unsealed memfd rejected                              ok
+  check memfd sealed only against shrinking rejected         ok
+  check schema hash mismatch rejected                        ok
+  check file size mismatch rejected                          ok
+   corrupted root words: 5 of 8 rejected; sealed and wire paths agree on 8 of 8
+  check sealed path rejects exactly what load_verified rejects ok
+
+-- player: payload 11480 B, 22 free blocks --
+   child action: load (touch the root only)
+   ack only (1-byte round trip)                                  23140 ns
+   stream (save_verified+write / read+load_verified)             63694 ns   minus ack      40554 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)           88025 ns   minus ack      64885 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                    84730 ns   minus ack      61590 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                  91354 ns   minus ack      68214 ns
+  check child saw the same digest every time                 ok
+   child action: edit (SLG edits after load)
+   ack only (1-byte round trip)                                  23312 ns
+   stream (save_verified+write / read+load_verified)             61392 ns   minus ack      38080 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)           90424 ns   minus ack      67112 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                    99385 ns   minus ack      76073 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                 105898 ns   minus ack      82586 ns
+  check child saw the same digest every time                 ok
+
+-- shard M: in-process pieces (median ns) --
+   sender save_verified                              34661
+   sender save_sealed (+close)                      175884
+   receiver load_verified (from memory)             524323
+   receiver load_verified_sealed (same fd)          204610
+   sender release_sealed (shared arena, +close)      34081
+  check adopted digest                                       ok
+  check adopted free table                                   ok
+  check adopted buffer saves the same wire                   ok
+  check edits after adoption stay private                    ok
+  check adopted buffer keeps mutating and round-trips        ok
+   (payload 889832 -> 894952 B after 64 edit rounds)
+  check sender buffer empty after release_sealed             ok
+  check released file is sealed                              ok
+  check moved digest                                         ok
+  check moved buffer saves the same wire                     ok
+  check unsealed memfd rejected                              ok
+  check memfd sealed only against shrinking rejected         ok
+  check schema hash mismatch rejected                        ok
+  check file size mismatch rejected                          ok
+   corrupted root words: 5 of 8 rejected; sealed and wire paths agree on 8 of 8
+  check sealed path rejects exactly what load_verified rejects ok
+
+-- shard M: payload 889832 B, 1497 free blocks --
+   child action: load (touch the root only)
+   ack only (1-byte round trip)                                  23080 ns
+   stream (save_verified+write / read+load_verified)           1047605 ns   minus ack    1024525 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)         1297701 ns   minus ack    1274621 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                   762481 ns   minus ack     739401 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                 589367 ns   minus ack     566287 ns
+  check child saw the same digest every time                 ok
+   child action: edit (SLG edits after load)
+   ack only (1-byte round trip)                                  22972 ns
+   stream (save_verified+write / read+load_verified)           1069018 ns   minus ack    1046046 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)         1489413 ns   minus ack    1466441 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                  1433936 ns   minus ack    1410964 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                1233259 ns   minus ack    1210287 ns
+  check child saw the same digest every time                 ok
+
+-- shard L: in-process pieces (median ns) --
+   sender save_verified                             308639
+   sender save_sealed (+close)                      903563
+   receiver load_verified (from memory)            2244693
+   receiver load_verified_sealed (same fd)          919435
+   sender release_sealed (shared arena, +close)     103530
+  check adopted digest                                       ok
+  check adopted free table                                   ok
+  check adopted buffer saves the same wire                   ok
+  check edits after adoption stay private                    ok
+  check adopted buffer keeps mutating and round-trips        ok
+   (payload 3550920 -> 3581128 B after 64 edit rounds)
+  check sender buffer empty after release_sealed             ok
+  check released file is sealed                              ok
+  check moved digest                                         ok
+  check moved buffer saves the same wire                     ok
+  check unsealed memfd rejected                              ok
+  check memfd sealed only against shrinking rejected         ok
+  check schema hash mismatch rejected                        ok
+  check file size mismatch rejected                          ok
+   corrupted root words: 5 of 8 rejected; sealed and wire paths agree on 8 of 8
+  check sealed path rejects exactly what load_verified rejects ok
+
+-- shard L: payload 3550920 B, 6009 free blocks --
+   child action: load (touch the root only)
+   ack only (1-byte round trip)                                  48718 ns
+   stream (save_verified+write / read+load_verified)           5172240 ns   minus ack    5123522 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)         5309762 ns   minus ack    5261044 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                  2853301 ns   minus ack    2804583 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                2072324 ns   minus ack    2023606 ns
+  check child saw the same digest every time                 ok
+   child action: edit (SLG edits after load)
+   ack only (1-byte round trip)                                   8853 ns
+   stream (save_verified+write / read+load_verified)           5340540 ns   minus ack    5331687 ns
+  check child saw the same digest every time                 ok
+   fd+copy (wire in sealed memfd / mmap+load_verified)         7030675 ns   minus ack    7021822 ns
+  check child saw the same digest every time                 ok
+   adopt (save_sealed / load_verified_sealed)                  5201902 ns   minus ack    5193049 ns
+  check child saw the same digest every time                 ok
+   move (release_sealed / load_verified_sealed)                5239792 ns   minus ack    5230939 ns
+  check child saw the same digest every time                 ok
+
+all checks passed (0 failed checks)

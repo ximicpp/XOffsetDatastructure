@@ -295,6 +295,72 @@ public:
         return owner;
     }
 
+#if defined(__linux__)
+    // X4 prototype (branch claude/mutable-relocatable-positioning only): adopt
+    // `length` payload bytes at page-aligned `file_offset` of a sealed file
+    // (memfd with F_SEAL_WRITE | F_SEAL_SHRINK, checked by the caller) without
+    // copying. The file pages are mapped MAP_PRIVATE over the start of a normal
+    // reservation, so writes copy only the pages they touch and never reach the
+    // file; the rest of the reservation grows as anonymous pages as usual. The
+    // tail of the last file page may hold file bytes: zero_from_ starts at the
+    // file end, so growth into it zeroes, and reclaim_tail never discards a
+    // file page (MADV_DONTNEED would bring back file bytes, not zeros).
+    static VirtualMemoryStorage from_sealed_fd(int fd, std::size_t file_offset,
+                                               std::size_t length,
+                                               std::size_t maximum_capacity) {
+        if (length > maximum_capacity) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        VirtualMemoryStorage owner(0, maximum_capacity, VmStoragePool{}, false);
+        if (length == 0) return owner;
+        std::size_t mapped = 0;
+        if (!checked_vm_round_up(length, owner.page_size_, mapped) ||
+            mapped > owner.reserved_bytes_ || file_offset % owner.page_size_ != 0) {
+            throw std::bad_alloc();
+        }
+        if (::mmap(owner.base_, mapped, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED,
+                   fd, static_cast<off_t>(file_offset)) != owner.base_) {
+            throw std::bad_alloc();
+        }
+        owner.accessible_bytes_ = mapped;
+        owner.logical_bytes_ = length;
+        owner.zero_from_ = mapped;
+        owner.file_end_ = mapped;
+        return owner;
+    }
+
+    // X4 prototype, sender side: the whole payload reservation is a MAP_SHARED
+    // mapping of a private memfd (sized to the reservation, sparse until pages
+    // are touched), so the payload can later leave this process without a copy
+    // (detach_file). Never pooled; tail pages are never reclaimed.
+    static VirtualMemoryStorage shared_file(std::size_t logical_bytes, std::size_t maximum_capacity) {
+        if (logical_bytes > maximum_capacity) {
+            throw std::invalid_argument("VM initial length exceeds maximum capacity");
+        }
+        VirtualMemoryStorage owner(0, maximum_capacity, VmStoragePool{}, false);
+        if (!owner.base_) return owner;
+        owner.file_fd_ = ::memfd_create("xoffset-shared-arena", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (owner.file_fd_ < 0 ||
+            ::ftruncate(owner.file_fd_, static_cast<off_t>(owner.page_size_ + owner.reserved_bytes_)) != 0 ||
+            ::mmap(owner.base_, owner.reserved_bytes_, PROT_NONE, MAP_SHARED | MAP_FIXED, owner.file_fd_,
+                   static_cast<off_t>(owner.page_size_)) != owner.base_ ||
+            !owner.grow_to(logical_bytes)) {
+            throw std::bad_alloc();
+        }
+        return owner;
+    }
+    bool shared_file() const noexcept { return file_fd_ >= 0; }
+    // Unmaps everything (no writable mapping of the file remains, as
+    // F_SEAL_WRITE requires) and hands the file to the caller. The payload is at
+    // file offset page_size(); the owner is left empty.
+    int detach_file() noexcept {
+        const int fd = file_fd_;
+        file_fd_ = -1;
+        release_mapping();
+        return fd;
+    }
+#endif
+
     // In-place reload: replace the logical content of this owner with
     // `length` bytes, keeping the reservation, its accessible pages and the
     // payload address. Bytes beyond `length` that the old content exposed
@@ -423,6 +489,9 @@ public:
         std::size_t retained = 0;
         if (!checked_vm_round_up(logical_bytes_, page_size_, retained) ||
             retained > accessible_bytes_) return {VmReclaimStatus::Failed};
+        if (retained < file_end_) retained = file_end_;
+        // Shared file pages keep their bytes after MADV_DONTNEED: never discard.
+        if (file_fd_ >= 0) return {};
         const auto bytes = accessible_bytes_ - retained;
         if (bytes == 0) return {};
         VmReclaimResult result{VmReclaimStatus::Failed, bytes, 0, 0};
@@ -477,6 +546,8 @@ private:
         swap(accessible_bytes_, other.accessible_bytes_);
         swap(logical_bytes_, other.logical_bytes_);
         swap(zero_from_, other.zero_from_);
+        swap(file_end_, other.file_end_);
+        swap(file_fd_, other.file_fd_);
         swap(page_size_, other.page_size_);
         swap(reservation_granularity_, other.reservation_granularity_);
     }
@@ -536,6 +607,11 @@ private:
         canonical_byte_origin_ = nullptr;
         reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         zero_from_ = 0;
+        file_end_ = 0;
+#if defined(__linux__)
+        if (file_fd_ >= 0) ::close(file_fd_);
+#endif
+        file_fd_ = -1;
         page_size_ = reservation_granularity_ = 0;
     }
 
@@ -548,6 +624,11 @@ private:
     // Lowest offset from which every reserved byte is known to be OS-zero.
     // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned.
     std::size_t zero_from_{0};
+    // X4 prototype: end of the MAP_PRIVATE file pages at the payload start
+    // (0 when the owner has none). Only from_sealed_fd sets it.
+    std::size_t file_end_{0};
+    // X4 prototype: the memfd behind a shared_file() payload, or -1.
+    int file_fd_{-1};
     std::size_t page_size_{0};
     std::size_t reservation_granularity_{0};
     VmStoragePool pool_;
