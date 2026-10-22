@@ -1,4 +1,25 @@
 {
   "schema": "xoffset-perf-ledger-v1",
-  "entries": []
+  "entries": [
+    {
+      "id": "slg-ordinary-records",
+      "pr": 63,
+      "metric": "slg.B.writeback",
+      "compiler": "*",
+      "max_ratio": 1.01,
+      "reason": "有意的基准变更：bench/slg/include/slg/model_xoffset.hpp 给全部 13 个 xm 记录类型补上 ordinary/StableErase 声明（原来只有 March），按使用指南写用户会写的样子。旧基准 → 新基准（GCC 16，S，口径 c，第 4–7 周期）：slg.B 0.941、slg.S.ticks_middle 0.921、slg.B.season_edits 0.722，slg.A/C/D 1.000；只有占比 < 5% 的 slg.B.writeback 1.0068（+640 Ir）和 slg.C.replace 1.0068（+20 Ir）上升，本条只记 B.writeback。门禁三份都用 head 的基准代码编，anchor 30bb5ca 同样受益（slg.B 0.942、S.ticks_middle 0.952），所以场景合计不需要放行，head÷anchor 仍可比。",
+      "evidence": "/mnt/project-files/container-ops-impl-20261022/reloc-tax-leads/RELOC_TAX_LEADS_4_5_20261022.md（Hero 中间删除 1.60× → 0.74× std，B.season_edits 1.16 → 0.92）；PR 描述里的 Ir 表；verify S/M 两种口径输出与旧基准逐字节相同；Mac 下一批新旧两版各一轮并列报告",
+      "approved_by": "「性能优化」（2026-10-22，基准变更请求）"
+    },
+    {
+      "id": "reloc-bench-added",
+      "pr": 65,
+      "metric": "reloc.*",
+      "compiler": "*",
+      "max_ratio": 1.001,
+      "reason": "有意的基准变更：新增 bench/reloc（PERF_GOAL G9 重定位税，28 项，XOffset ÷ std 逐轮配对，flat_map/flat_set 为主基线，键每轮换新，复用键与未声明 ordinary 的版本并列）。这不是回退放行：门禁目前不测 reloc.*，本条不匹配任何指标；max_ratio 取 schema 允许的最小值附近的 1.001。接入门禁时把本条移到 ledger_archive.json。",
+      "evidence": "bench/reloc/README.md、bench/reloc/MANIFEST（来源 reloc_tax.cpp 0add6b90…，分支 claude/mutable-relocatable-positioning 2b64ab0）；/mnt/project-files/mutable-relocatable-20261022/RESULT_X1_X2_20261022.md；PR 描述里的云端试跑与 Ir 确定性检查",
+      "approved_by": "「性能优化」（2026-10-22，G9 入库请求）"
+    }
+  ]
 }
