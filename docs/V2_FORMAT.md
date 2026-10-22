@@ -85,15 +85,21 @@ accepted exactly when the dense wire of the same payload is, with the same
 error. (Before 2026-10-22 every gap byte also had to lie inside a hole; that
 encoding rule is dropped, the payload-level accept/reject set is unchanged.)
 
-**Emission.** `save_verified` and `save_verified_into` emit a dense wire (one
-copy of the payload) by default. `XSaveOptions{.elide_zero_runs = true}` skips
-zero runs of at least 64 bytes (capacity slack, holes, zero fields): a run is
-found from a 64-byte aligned all-zero block and extended word by word on both
-sides. Payloads below 4 KiB, and emissions that would save less than
-max(256 B, used_bytes / 16), stay dense. The loaded payload is byte-identical
-either way, so spare capacity survives the transfer. `freeze_verified` always
-emits dense wires. (Earlier releases skipped free runs of at least 4 KiB by
-default, N10; such wires still load.)
+**Emission.** `XSaveOptions{.emission}` selects the form; `save_verified` and
+`save_verified_into` emit the same bytes for the same state.
+
+- `free_runs` (default): free blocks of at least 256 B are sorted by offset,
+  adjacent ones merge, and every merged run of at least 4 KiB is skipped.
+  Skipped bytes are all holes. (Earlier releases, N10, merged free blocks of
+  every size; on runs without small neighbours the two agree.)
+- `dense`: one copy of the payload.
+- `zero_runs`: zero runs of at least 64 bytes (capacity slack, holes, zero
+  fields) are skipped; a run is found from a 64-byte aligned all-zero block and
+  extended word by word on both sides. Payloads below 4 KiB, and emissions that
+  would save less than max(256 B, used_bytes / 16), stay dense.
+
+The loaded payload is byte-identical in every form, so spare capacity survives
+the transfer. `freeze_verified` always emits dense wires.
 
 `save_compact` emits a compact wire directly: the root at offset 48, then
 every block in validation (preorder) order, strings of at most 10 bytes

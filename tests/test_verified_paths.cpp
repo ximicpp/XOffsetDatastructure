@@ -223,14 +223,20 @@ void hole_table_paths() {
     need(join(frozen)==saved,"snapshot segments differ from the saved V2 wire");
     auto io=frozen.acquire_io_lease();need(io.segments()[2].data()==segments[2].data(),"lease hole segment differs");
     io.complete();need(io.segments()[2].empty(),"completed lease kept the hole segment");
-    // An 8 KiB hole and 16 KiB of slack: zero-run elision skips them (sparse
-    // wire), the default emission and the snapshot stay dense.
+    // An 8 KiB hole and 16 KiB of slack: zero-run elision skips both, the
+    // default (free-run) emission skips only the hole, dense emission and the
+    // snapshot skip nothing.
     auto large=make();large.root().blob.resize(8192);
     for(std::size_t i=0;i<80;++i)large.root().blob[i]=std::uint8_t(i+1);
     large.root().labels.reserve(8); // keeps the blob block off the arena tail
     large.root().blob.reserve(16384); // relocates: the old 8 KiB block becomes a hole
-    const xo::XSaveOptions elide{.elide_zero_runs=true};
-    need(header_of(large.save_verified()).extent_count==0,"default emission is not dense");
+    const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
+    const auto runs=large.save_verified();
+    const auto dense_saved=large.save_verified(xo::XSaveOptions{.emission=xo::XWireEmission::dense});
+    need(header_of(dense_saved).extent_count==0,"dense emission is not dense");
+    need(header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-8192+16,"default emission did not skip the 8 KiB hole");
+    std::string runs_into;large.save_verified_into(runs_into);
+    need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");
     const auto sparse=large.save_verified(elide);const auto sh=header_of(sparse);
     std::string sparse_into;large.save_verified_into(sparse_into,elide);
     need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");

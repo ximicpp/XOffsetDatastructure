@@ -40,9 +40,10 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // bytes and spare container capacity are emitted as zero (threat model M3/M4);
 // retired blocks are cleared, so bytes a reused block does not overwrite are
 // zero too.
-// 2026-10-22: the default emission is always dense (N10 hole skipping
-// removed); sparse wires come from XSaveOptions::elide_zero_runs. The N10
-// pin of build(true) is kept as a receive-only golden.
+// 2026-10-22: the default emission skips runs of at least 4 KiB of adjacent
+// free blocks of at least 256 B (free_runs, which replaced N10); on this
+// model its bytes equal the earlier N10 pin of build(true). XWireEmission::
+// dense and ::zero_runs have their own pins.
 #define GOLDEN_DENSE_SIZE 1800u
 #define GOLDEN_DENSE_FNV 0x6457288a053030adull
 #define GOLDEN_LARGE_DENSE_SIZE 10032u
@@ -103,9 +104,11 @@ std::string build(bool large, xo::XSaveOptions options = {}) {
     return buf.save_verified(options);
 }
 
-constexpr xo::XSaveOptions kElide{.elide_zero_runs = true};
+constexpr xo::XSaveOptions kElide{.emission = xo::XWireEmission::zero_runs};
+constexpr xo::XSaveOptions kDense{.emission = xo::XWireEmission::dense};
 
-void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size, std::uint64_t pinned_hash) {
+void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size, std::uint64_t pinned_hash,
+           xo::XSaveOptions options) {
     xo::XWireHeaderV2 h;
     std::memcpy(&h, wire.data(), sizeof(h));
     if ((h.extent_count != 0) != expect_sparse) fail("unexpected dense/sparse emission");
@@ -114,7 +117,6 @@ void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size,
         std::cerr << "size=" << wire.size() << " fnv=0x" << std::hex << fnv1a(wire) << std::dec << "\n";
         fail("golden bytes changed");
     }
-    const auto options = expect_sparse ? kElide : xo::XSaveOptions{};
     auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(wire));
     if (loaded.save_verified(options) != wire) fail("write-read-write not byte stable");
     // Again through a growable reload and a no-op mutation cycle.
@@ -125,8 +127,9 @@ void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size,
 
 struct Hole { std::uint32_t offset, bytes; };
 
-// The N10 emission of earlier releases: maximal runs of adjacent holes of at
-// least 4 KiB are skipped through the extent table.
+// The N10 emission of earlier releases, built independently of the library:
+// maximal runs of adjacent holes of at least 4 KiB are skipped through the
+// extent table.
 std::string n10_wire(const std::string& dense) {
     xo::XWireHeaderV2 h;
     std::memcpy(&h, dense.data(), sizeof(h));
@@ -159,24 +162,25 @@ std::string n10_wire(const std::string& dense) {
 
 int main() {
     const auto dense = build(false);
-    const auto large = build(true);
+    const auto large = build(true);              // default: free runs
+    const auto large_dense = build(true, kDense);
     const auto sparse = build(true, kElide);
-    if (build(false) != dense || build(true) != large || build(true, kElide) != sparse)
+    if (build(false) != dense || build(true) != large || build(true, kDense) != large_dense ||
+        build(true, kElide) != sparse)
         fail("emission is not deterministic");
-    if (build(false, kElide) != dense) fail("a payload below 4 KiB must stay dense");
-    check(dense, false, GOLDEN_DENSE_SIZE, GOLDEN_DENSE_FNV);
-    check(large, false, GOLDEN_LARGE_DENSE_SIZE, GOLDEN_LARGE_DENSE_FNV);
-    check(sparse, true, GOLDEN_ELIDED_SIZE, GOLDEN_ELIDED_FNV);
-    {   // Receive-only: the earlier N10 sparse emission of the same model.
-        const auto n10 = n10_wire(large);
-        xo::XWireHeaderV2 h;
-        std::memcpy(&h, n10.data(), sizeof(h));
-        if (h.extent_count == 0 || n10.size() != GOLDEN_N10_SIZE || fnv1a(n10) != GOLDEN_N10_FNV) {
-            std::cerr << "n10 size=" << n10.size() << " fnv=0x" << std::hex << fnv1a(n10) << std::dec << "\n";
-            fail("N10 golden bytes changed");
+    if (build(false, kElide) != dense || build(false, kDense) != dense)
+        fail("a payload without a free run, or below 4 KiB, must stay dense");
+    check(dense, false, GOLDEN_DENSE_SIZE, GOLDEN_DENSE_FNV, {});
+    check(large, true, GOLDEN_N10_SIZE, GOLDEN_N10_FNV, {});
+    check(large_dense, false, GOLDEN_LARGE_DENSE_SIZE, GOLDEN_LARGE_DENSE_FNV, kDense);
+    check(sparse, true, GOLDEN_ELIDED_SIZE, GOLDEN_ELIDED_FNV, kElide);
+    {   // The earlier N10 emission (built here, independently) is the same
+        // wire, and every form loads the dense payload.
+        if (n10_wire(large_dense) != large) fail("free-run emission differs from N10 on the golden model");
+        for (const auto* wire : {&large, &sparse}) {
+            auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(*wire));
+            if (loaded.save_verified(kDense) != large_dense) fail("sparse wire does not load the dense payload");
         }
-        auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(n10));
-        if (loaded.save_verified() != large) fail("N10 wire does not load the dense payload");
     }
 
     // V1 rejection: a V1 header in front of the same bytes.
@@ -191,6 +195,6 @@ int main() {
             fail(std::string("V1 wire rejected with an unclear error: ") + e.what());
     }
     std::cout << "test_v2_golden: dense=" << dense.size() << " large=" << large.size()
-              << " elided=" << sparse.size() << " ok\n";
+              << " large dense=" << large_dense.size() << " elided=" << sparse.size() << " ok\n";
     return 0;
 }

@@ -506,8 +506,9 @@ int main() {
         s.map.try_emplace(1, 11);
         s.map.try_emplace(2, 22);
         s.values.reserve(4096);  // retires the 8 KiB block
-        const XSaveOptions elide{.elide_zero_runs = true};
-        const auto dense = sbuf.save_verified<CheckedRoot>();
+        const XSaveOptions elide{.emission = XWireEmission::zero_runs};
+        const XSaveOptions dense_only{.emission = XWireEmission::dense};
+        const auto dense = sbuf.save_verified<CheckedRoot>(dense_only);
         const auto wire = sbuf.save_verified<CheckedRoot>(elide);
         const auto sh = read<XWireHeaderV2>(dense, 0);
         const auto wh = read<XWireHeaderV2>(wire, 0);
@@ -550,6 +551,13 @@ int main() {
             catch (const XException& e) { return e.what(); }
         };
         need(inflate(wire) == dense, "sparse wire does not load the dense payload");
+        {   // The default (free-run) emission skips exactly the 8 KiB hole.
+            const auto runs = sbuf.save_verified<CheckedRoot>();
+            const auto rh = read<XWireHeaderV2>(runs, 0);
+            need(rh.extent_count == 2 && runs.size() == dense.size() - 8192 + 16 && inflate(runs) == dense,
+                 "free-run emission did not skip exactly the 8 KiB hole");
+            accept(runs, "free-run wire must load");
+        }
         accept(wire, "sparse wire must load");
         {
             auto b = XBuffer::load_verified<CheckedRoot>(wire);
@@ -557,7 +565,7 @@ int main() {
             need(v.values.size() == 1 && v.values[0] == 5 && v.map.size() == 2 && v.map.find(2)->second == 22,
                  "sparse wire values differ");
             need(b.save_verified<CheckedRoot>(elide) == wire, "sparse write-read-write is not byte-stable");
-            need(b.save_verified<CheckedRoot>() == dense, "sparse load -> dense save differs from the dense wire");
+            need(b.save_verified<CheckedRoot>(dense_only) == dense, "sparse load -> dense save differs from the dense wire");
             std::string into;
             b.save_verified_into<CheckedRoot>(into, elide);
             need(into == wire, "save_verified_into differs from save_verified for a sparse wire");

@@ -520,14 +520,10 @@ std::string build_wire(std::mt19937_64& rng) {
         after.name = random_text(rng, 40);
         r.items.erase(r.items.begin() + std::ptrdiff_t(r.items.size() - 2));
     }
-    // Half the wires elide zero runs (sparse once the payload reaches 4 KiB).
-    return buf.save_verified(xo::XSaveOptions{.elide_zero_runs = (rng() & 1) != 0});
-}
-
-// The emission options that reproduce a library wire byte for byte.
-xo::XSaveOptions options_of(const std::string& w) {
-    xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
-    return xo::XSaveOptions{.elide_zero_runs = h.extent_count != 0};
+    // Every emission form: free runs (default), dense, zero-run elision.
+    constexpr xo::XWireEmission forms[] = {xo::XWireEmission::free_runs, xo::XWireEmission::dense,
+                                           xo::XWireEmission::zero_runs};
+    return buf.save_verified(xo::XSaveOptions{.emission = forms[rng() % 3]});
 }
 
 // ---------------------------------------------------------------------------
@@ -823,7 +819,35 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
     compare_direct(w, loaded, "", where);
     compare_reload(*loaded);
-    if (loaded->save_verified(options_of(w)) != w) fail(where + ": golden write-read-write not byte stable");
+    const auto again = loaded->save_verified();
+    if (again != w && loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense}) != w &&
+        loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != w)
+        fail(where + ": golden write-read-write not byte stable");
+    // The default emission skips only runs of at least 4 KiB made of holes.
+    const auto ext = extents_of(again);
+    if (!ext) fail(where + ": default emission has a malformed extent table");
+    xo::XWireHeaderV2 h; std::memcpy(&h, again.data(), kHeader);
+    std::uint64_t stored = 0;
+    for (auto [b, e] : *ext) stored += e - b;
+    std::vector<Range> holes;
+    for (std::uint64_t i = 0, at = kHeader + h.extent_count * 8 + stored; i < h.hole_count; ++i, at += 8)
+        holes.push_back({get32(again, at), std::uint64_t(get32(again, at)) + get32(again, at + 4)});
+    std::sort(holes.begin(), holes.end());
+    auto check_gap = [&](std::uint64_t from, std::uint64_t to) {
+        if (to - from < 4096) fail(where + ": default emission skipped a run below 4 KiB");
+        std::uint64_t covered = from;
+        for (auto [hb, he] : holes)
+            if (hb <= covered && he > covered) covered = he;
+        if (covered < to) fail(where + ": default emission skipped bytes outside holes");
+    };
+    std::uint64_t prev = 0;
+    for (auto [b, e] : *ext) {
+        if (b > prev) check_gap(prev, b);
+        prev = e;
+    }
+    if (prev < h.used_bytes) check_gap(prev, h.used_bytes);
+    if (inflate(again).value_or(again) != loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense}))
+        fail(where + ": default emission does not load the dense payload");
 }
 
 std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
