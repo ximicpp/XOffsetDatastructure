@@ -20,7 +20,8 @@ FREEZE.json before the first timed run and never change afterwards.
 Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
   freeze   DIR  check inputs, copy binaries, write FREEZE.json
   formal   DIR --batch N   one formal batch (waits for the quiet gate first)
-  slg      DIR  the SLG alternating processes (waits for the quiet gate first)
+  slg      DIR  the SLG alternating processes (waits for the quiet gate first); --group 2 only after pending
+  amend-slg DIR  write the SLG pending-band rule into a run frozen before it existed
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
   selftest      synthetic data through the whole analysis
@@ -121,6 +122,12 @@ RULES = {
         'ratio': 'head/anchor = exp(mean head values - mean anchor values), Welch t interval, two-sided 95%, '
                  'Bonferroni k=4 (A-D)',
         'gate': 'A, B, C upper bound <=1.02; D report only', 'pass_le': 1.02,
+        'fail_gt': 1.03, 'max_groups': 2,
+        'pending': 'frozen by 性能优化 2026-10-23 11:53Z: max upper bound of A, B, C in (1.02, 1.03] -> pending: run '
+                   'one extra ABBA x3 group (slg-2), pool both groups (Welch on all processes): <=1.02 pass, '
+                   'otherwise fail; >1.03 fail. No further groups (no rerun until pass)',
+        'trend_adjusted': 'per group, OLS of the process value on process order plus a head indicator; two-sided '
+                          '95% k=4; report only (diagnosis of in-session drift), never part of the verdict',
         'old_protocol': 'G1-G3: head processes pooled; per process geo log ratio xoffset/rival on the scenario '
                         'total, run-level t (df = processes-1), one-sided 95%, k=12; plus analyze.py-style '
                         'per-cycle bound of the first head process',
@@ -447,14 +454,44 @@ def formal_overall(bdirs, batches, R):
 SLG_LABELS = {'head': 'head', 'anch': 'anchor'}  # equal-length labels: raw paths in argv have the same length
 
 
+def slg_rules(D, fr):
+    """The SLG rules in force: FREEZE.json's, or RULES_AMEND.json's when the rule was amended before an extra group."""
+    p = D + '/RULES_AMEND.json'
+    return json.load(open(p))['slg'] if os.path.exists(p) else fr['rules']['slg']
+
+
+def slg_groups(D):
+    return [S for S in [D + '/slg'] + [f'{D}/slg-{g}' for g in range(2, 10)] if os.path.exists(S + '/runs.json')]
+
+
+def cmd_amend_slg(a):
+    """Write the current SLG rule (with the pending band) into a directory frozen before it existed."""
+    D = a.dir; fr = json.load(open(D + '/FREEZE.json'))
+    if 'fail_gt' in fr['rules']['slg']: sys.exit('FREEZE.json already has the SLG pending band; nothing to amend')
+    if os.path.exists(D + '/RULES_AMEND.json'): sys.exit('RULES_AMEND.json exists')
+    if len(slg_groups(D)) != 1: sys.exit('amend only between the first SLG group and the extra one')
+    am = {'utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'), 'reason': a.reason,
+          'slg': RULES['slg'], 'mac_gate_py_sha256': h(os.path.abspath(__file__))}
+    json.dump(am, open(D + '/RULES_AMEND.json', 'w'), indent=1)
+    shutil.copy2(os.path.abspath(__file__), D + '/mac_gate_amend.py')
+    print(f'RULES_AMEND.json written: {D}')
+
+
 def cmd_slg(a):
     D = a.dir; fr = json.load(open(D + '/FREEZE.json'))
-    S = D + '/slg'
+    S = D + '/slg' if a.group == 1 else f'{D}/slg-{a.group}'
     if os.path.exists(S): sys.exit(f'{S} exists (no reruns into the same directory)')
+    if a.group > 1:  # only the pre-registered extra group after a pending first group
+        Rs = slg_rules(D, fr)
+        if a.group > Rs.get('max_groups', 1): sys.exit(f'group {a.group}: the rule allows {Rs.get("max_groups", 1)} group(s)')
+        if len(slg_groups(D)) != a.group - 1: sys.exit(f'group {a.group} needs groups 1..{a.group - 1} first')
+        v = analyze_slg(D, Rs)['verdict']
+        if v != 'pending': sys.exit(f'SLG so far is {v}, not pending: no extra group')
     for k, f in [('head', 'slg_head'), ('anchor', 'slg_anch')]:
         if h(f'{D}/bin/{f}') != fr['slg'][k]: sys.exit(f'{f}: binary changed since FREEZE')
-    sampler = start_sampler(D, 'slg')
-    quiet_or_exit(D, 'slg', sampler, a.quiet_timeout, a.quiet_s)
+    lab = os.path.basename(S)
+    sampler = start_sampler(D, lab)
+    quiet_or_exit(D, lab, sampler, a.quiet_timeout, a.quiet_s)
     cycles = a.cycles or 41
     sched = xc_ab.abba(blocks=3, a='head', b='anch')
     argv = {lab: [f'{D}/bin/slg_{lab}', '--mode', 'bench', '--scale', 'M', '--cycles', str(cycles), '--formats', SLG_FORMATS]
@@ -466,12 +503,12 @@ def cmd_slg(a):
     finally:
         sampler.stop()
     doc = json.load(open(S + '/runs.json')); doc['smoke'] = cycles != 41 or a.quiet_s != 180.0
-    doc['cpu'] = cpu_summary(f'{D}/cpu/slg.jsonl', doc['started'], doc.get('finished', time.time()))
+    doc['cpu'] = cpu_summary(f'{D}/cpu/{lab}.jsonl', doc['started'], doc.get('finished', time.time()))
     json.dump(doc, open(S + '/runs.json', 'w'), indent=1)
-    res = analyze_slg(S)
+    res = analyze_slg(D, slg_rules(D, fr))
     if res.get('aborted'): sys.exit(f'slg aborted: {res["aborted"]}')
     print('slg: ' + '  '.join(f'{s} {res["new"][s]["geo"]:.4f} [{res["new"][s]["low"]:.4f}, {res["new"][s]["high"]:.4f}]' for s in SCEN)
-          + f'  verdict {res["verdict"]}')
+          + f'  verdict {res["verdict"]} ({res["groups"]} group(s) pooled)')
 
 
 def welch(xs, ys, k):
@@ -479,40 +516,87 @@ def welch(xs, ys, k):
     return {'geo': r['ratio'], 'low': r['lo'], 'high': r['hi'], 'df': r.get('df'), 'n': r['n']}
 
 
-def analyze_slg(S):
+def trend_adjusted(order, is_head, y, k=4):
+    """OLS y = a + b*order + d*is_head; returns exp(d) with a two-sided t interval (report only)."""
+    X = [(1.0, float(t), float(hh)) for t, hh in zip(order, is_head)]; n = len(X)
+    if n < 5: return None
+    xtx = [[sum(r[i] * r[j] for r in X) for j in range(3)] for i in range(3)]
+    xty = [sum(r[i] * v for r, v in zip(X, y)) for i in range(3)]
+    det = lambda m: (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                     + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]))
+    dt = det(xtx)
+    if abs(dt) < 1e-12: return None
+    inv = [[0.0] * 3 for _ in range(3)]
+    for i in range(3):
+        for j in range(3):
+            minor = [[xtx[r][c] for c in range(3) if c != i] for r in range(3) if r != j]
+            inv[i][j] = (-1) ** (i + j) * (minor[0][0] * minor[1][1] - minor[0][1] * minor[1][0]) / dt
+    beta = [sum(inv[i][j] * xty[j] for j in range(3)) for i in range(3)]
+    res = [v - sum(bb * xx for bb, xx in zip(beta, r)) for r, v in zip(X, y)]
+    s2 = sum(e * e for e in res) / (n - 3); se = math.sqrt(s2 * inv[2][2]); q = xc_ab.t_ppf(1 - 0.05 / (2 * k), n - 3)
+    return {'geo': math.exp(beta[2]), 'low': math.exp(beta[2] - q * se), 'high': math.exp(beta[2] + q * se),
+            'drift_per_process': math.exp(beta[1]), 'df': n - 3}
+
+
+def slg_group(S):
+    """Per-process values of one SLG group (one ABBA x3 run directory)."""
     doc = json.load(open(S + '/runs.json'))
-    vals = {'head': [], 'anchor': []}; rival = []; first_head = None; med = {'head': [], 'anchor': []}
-    for r in doc['runs']:
+    g = {'dir': os.path.basename(S), 'aborted': doc.get('aborted'), 'smoke': doc.get('smoke', False), 'cpu': doc.get('cpu'),
+         'vals': {'head': [], 'anchor': []}, 'order': {'head': [], 'anchor': []}, 'med': {'head': [], 'anchor': []}, 'rival': [], 'first_head': None}
+    for i, r in enumerate(doc['runs']):
         lab = SLG_LABELS.get(r['label'], r['label'])
         ns = xc_ab.read_slg_raw(os.path.join(S, r['raw']))
-        vals[lab].append({s: xc_ab.norm_log_mean(ns, 'xoffset', SLG_BASELINES, s) for s in SCEN})
-        med[lab].append({s: st.median(ns['xoffset'][s + '.total'].values()) / 1e6 for s in SCEN})
+        g['vals'][lab].append({sc: xc_ab.norm_log_mean(ns, 'xoffset', SLG_BASELINES, sc) for sc in SCEN}); g['order'][lab].append(i)
+        g['med'][lab].append({sc: st.median(ns['xoffset'][sc + '.total'].values()) / 1e6 for sc in SCEN})
         if lab == 'head':
-            rival.append({f'{s}/{b}': xc_ab.paired_log_ratio([(ns['xoffset'][s + '.total'][c], ns[b][s + '.total'][c])
-                                                              for c in sorted(set(ns['xoffset'][s + '.total']) & set(ns[b][s + '.total']))])['ratio']
-                          for s in SCEN for b in SLG_BASELINES})
-            if first_head is None: first_head = ns
-    res = {'aborted': doc.get('aborted'), 'smoke': doc.get('smoke', False), 'cpu': doc.get('cpu'),
-           'n': {k: len(v) for k, v in vals.items()}, 'process_values': vals, 'xoffset_median_ms': med}
+            g['rival'].append({f'{sc}/{b}': xc_ab.paired_log_ratio([(ns['xoffset'][sc + '.total'][c], ns[b][sc + '.total'][c])
+                                                                    for c in sorted(set(ns['xoffset'][sc + '.total']) & set(ns[b][sc + '.total']))])['ratio']
+                               for sc in SCEN for b in SLG_BASELINES})
+            if g['first_head'] is None: g['first_head'] = ns
+    return g
+
+
+def analyze_slg(D, Rs=None):
+    """SLG part: every group under D (slg, slg-2) pooled for the verdict; per-group numbers and the
+    trend-adjusted fit are reported only."""
+    Rs = Rs or RULES['slg']
+    gs = [slg_group(S) for S in slg_groups(D)]
+    vals = {lab: [v for g in gs for v in g['vals'][lab]] for lab in ('head', 'anchor')}
+    res = {'groups': len(gs), 'group_dirs': [g['dir'] for g in gs], 'rules': {k: Rs.get(k) for k in ('pass_le', 'fail_gt', 'max_groups')},
+           'aborted': next((g['aborted'] for g in gs if g['aborted']), None), 'smoke': any(g['smoke'] for g in gs),
+           'cpu': [g['cpu'] for g in gs], 'n': {k: len(v) for k, v in vals.items()}, 'process_values': vals,
+           'xoffset_median_ms': {lab: [m for g in gs for m in g['med'][lab]] for lab in ('head', 'anchor')}}
     if min(res['n'].values()) < 2:
-        res.update(verdict='incomplete'); json.dump(res, open(S + '/RESULT.json', 'w'), indent=1); return res
-    new = {s: welch([v[s] for v in vals['head']], [v[s] for v in vals['anchor']], k=4) for s in SCEN}
-    gate = {s: new[s]['high'] <= RULES['slg']['pass_le'] for s in 'ABC'}
+        res.update(verdict='incomplete'); return res
+    new = {sc: welch([v[sc] for v in vals['head']], [v[sc] for v in vals['anchor']], k=4) for sc in SCEN}
+    gate = {sc: new[sc]['high'] <= Rs['pass_le'] for sc in 'ABC'}
+    mx = max(new[sc]['high'] for sc in 'ABC')
+    if mx <= Rs['pass_le']: verdict = 'pass'
+    elif 'fail_gt' in Rs and mx <= Rs['fail_gt'] and len(gs) < Rs.get('max_groups', 1): verdict = 'pending'
+    else: verdict = 'fail'
+    per_group = []
+    for g in gs:
+        pg = {'dir': g['dir'], 'n': {k: len(v) for k, v in g['vals'].items()}}
+        if min(pg['n'].values()) >= 2:
+            pg['new'] = {sc: welch([v[sc] for v in g['vals']['head']], [v[sc] for v in g['vals']['anchor']], k=4) for sc in SCEN}
+            order = g['order']['head'] + g['order']['anchor']; ish = [1] * len(g['order']['head']) + [0] * len(g['order']['anchor'])
+            pg['trend_adjusted'] = {sc: trend_adjusted(order, ish, [v[sc] for v in g['vals']['head'] + g['vals']['anchor']]) for sc in SCEN}
+            pg['drift_last_over_first'] = {lab: {sc: math.exp(v[-1][sc] - v[0][sc]) for sc in SCEN} for lab, v in g['vals'].items()}
+        per_group.append(pg)
+    rival = [x for g in gs for x in g['rival']]
     old = {}
-    for s in SCEN:  # run-level: one geometric-mean ratio per head process, t across processes
+    for sc in SCEN:  # run-level: one geometric-mean ratio per head process, t across processes
         for b in SLG_BASELINES:
-            r = xc_ab.paired_log_ratio([(v[f'{s}/{b}'], 1.0) for v in rival], alpha=0.05, k=12, sided='upper')
-            old[f'{s}/{b}'] = {'geo': r['ratio'], 'upper': r['hi']}
+            r = xc_ab.paired_log_ratio([(v[f'{sc}/{b}'], 1.0) for v in rival], alpha=0.05, k=12, sided='upper')
+            old[f'{sc}/{b}'] = {'geo': r['ratio'], 'upper': r['hi']}
     per_cycle = {}
-    for s in SCEN:  # tools/analyze.py's per-cycle bound for the first head process (continuity)
+    for sc in SCEN:  # tools/analyze.py's per-cycle bound for the first head process (continuity)
         for b in SLG_BASELINES:
-            r = xc_ab.per_cycle_ratio(first_head, 'xoffset', b, s + '.total', alpha=0.05, k=12, sided='upper')
-            per_cycle[f'{s}/{b}'] = {'geo': r['ratio'], 'upper': r['hi']}
-    drift = {lab: {s: math.exp(v[-1][s] - v[0][s]) for s in SCEN} for lab, v in vals.items()}
-    res.update(new=new, gate=gate, verdict='pass' if all(gate.values()) else 'fail', old_pooled=old,
-               old_first_head_per_cycle=per_cycle, drift_last_over_first=drift)
+            r = xc_ab.per_cycle_ratio(gs[0]['first_head'], 'xoffset', b, sc + '.total', alpha=0.05, k=12, sided='upper')
+            per_cycle[f'{sc}/{b}'] = {'geo': r['ratio'], 'upper': r['hi']}
+    res.update(new=new, gate=gate, max_upper=mx, verdict=verdict, per_group=per_group, old_pooled=old,
+               old_first_head_per_cycle=per_cycle, drift_last_over_first=per_group[0].get('drift_last_over_first', {}))
     if res['aborted']: res['verdict'] = 'incomplete'
-    json.dump(res, open(S + '/RESULT.json', 'w'), indent=1)
     return res
 
 
@@ -530,15 +614,18 @@ def cmd_analyze(a):
         batches.append(b)
     used = [(B, b) for B, b in zip(bdirs, batches) if b['excluded'] is None]
     overall = formal_overall([B for B, _ in used], [b for _, b in used], R)
-    slg = analyze_slg(D + '/slg') if os.path.exists(D + '/slg/runs.json') else None
+    slg = analyze_slg(D, slg_rules(D, fr)) if slg_groups(D) else None
+    amend = json.load(open(D + '/RULES_AMEND.json')) if os.path.exists(D + '/RULES_AMEND.json') else None
     fv = overall['verdict']
     if fv in ('fail',) or (slg and slg['verdict'] == 'fail'): verdict = 'fail'
     elif fv in ('invalid', 'pending', 'incomplete'): verdict = fv
+    elif slg and slg['verdict'] in ('pending', 'incomplete'): verdict = slg['verdict']
     elif slg is None: verdict = 'incomplete'
     else: verdict = 'pass'
     if any(b['meta'].get('smoke') for b in batches) or (slg and slg.get('smoke')): verdict = 'smoke (not a gate result)'
     res = {'schema': SCHEMA, 'name': fr['name'], 'head': fr['head'], 'anchor': fr['anchor'], 'verdict': verdict,
            'formal_overall': overall, 'formal_batches': batches, 'slg': slg, 'freeze_sha256': h(D + '/FREEZE.json'),
+           'rules_amend': amend, 'rules_amend_sha256': h(D + '/RULES_AMEND.json') if amend else None,
            'quiet': [json.loads(l) for l in open(D + '/quiet.jsonl')] if os.path.exists(D + '/quiet.jsonl') else []}
     json.dump(res, open(D + '/RESULT.json', 'w'), indent=1)
     open(D + '/RESULT.md', 'w').write(render_md(fr, res))
@@ -619,15 +706,27 @@ def render_md(fr, res):
     for b in bs: p(f'| {b["batch_dir"]} | ' + ' | '.join(iv4(b['old']['auxiliary'][f'{c}:reload']) for c in RIVALS) + ' |')
     if res['slg']:
         s = res['slg']
-        p('\n## 3. SLG M（head、anchor 交替进程 ABBA×3，SLG_REUSE=1，四家）\n')
+        p(f'\n## 3. SLG M（head、anchor 交替进程 ABBA×3，SLG_REUSE=1，四家；{s.get("groups", 1)} 组合并）\n')
+        if res.get('rules_amend'):
+            am = res['rules_amend']
+            p(f'- SLG 规则在 {am["utc"]} 补写（RULES_AMEND.json sha256 `{res["rules_amend_sha256"]}`），先于第 2 组计时：{am["reason"]}\n')
         p('### 新口径 head÷anchor\n')
-        p('每个进程的值 = 第 1–40 周期 log(xoffset 场景合计 ÷ 同周期三家几何均值) 的均值；Welch t，双侧 95%，k=4。A、B、C 上界 ≤1.02 通过，D 只报。\n')
-        p('| 场景 | head÷anchor | 判定 |')
+        p('每个进程的值 = 第 1–40 周期 log(xoffset 场景合计 ÷ 同周期三家几何均值) 的均值；Welch t，双侧 95%，k=4，各组进程合并。'
+          'A、B、C 最大上界 ≤1.02 通过；1.02–1.03 待定，加跑一组 ABBA×3、两组合并后 ≤1.02 通过、否则失败；>1.03 失败。D 只报。\n')
+        p(f'**SLG 判定：{s["verdict"]}**（A、B、C 最大上界 {f4(s["max_upper"])}）\n' if 'max_upper' in s else '')
+        p('| 场景 | head÷anchor（合并） | ≤1.02 |')
         p('| --- | --- | --- |')
         for sc in SCEN:
-            p(f'| {sc} | {iv4(s["new"][sc])} | {("通过" if s["gate"][sc] else "**不通过**") if sc in s["gate"] else "只报"} |')
-        p(f'\n进程数 head {s["n"]["head"]}、anchor {s["n"]["anchor"]}。漂移（最后一个进程÷第一个）：'
-          + '；'.join(f'{lab} ' + ' '.join(f'{sc} {f3(v)}' for sc, v in d.items()) for lab, d in s['drift_last_over_first'].items()) + '\n')
+            p(f'| {sc} | {iv4(s["new"][sc])} | {("是" if s["gate"][sc] else "**否**") if sc in s["gate"] else "只报"} |')
+        p('\n按组（只报）；趋势调整 = 每组内对进程序号做线性回归后的 head÷anchor，双侧 k=4，只用于诊断会话内漂移，不参与判定：\n')
+        p('| 组 | ' + ' | '.join(f'{sc} Welch / 趋势调整' for sc in SCEN) + ' | 漂移（最后÷第一个进程）|')
+        p('| --- |' + ' --- |' * (len(SCEN) + 1))
+        for g in s.get('per_group', []):
+            if 'new' not in g: continue
+            ta = g['trend_adjusted']
+            p(f'| {g["dir"]} | ' + ' | '.join(f'{iv4(g["new"][sc])} / ' + (iv4(ta[sc]) if ta[sc] else '—') for sc in SCEN) + ' | '
+              + '；'.join(f'{lab} ' + ' '.join(f'{sc} {f3(v)}' for sc, v in d.items()) for lab, d in g['drift_last_over_first'].items()) + ' |')
+        p(f'\n进程数 head {s["n"]["head"]}、anchor {s["n"]["anchor"]}。\n')
         p('### 旧口径 G1–G3（head 进程合并）\n')
         p('每个 head 进程一个几何均值比值，进程间 t，单侧 95%，k=12；括号里是第一个 head 进程按 analyze.py 逐周期的上界。A、B、C ≤0.50 为达标。\n')
         p('| 场景 | ' + ' | '.join(SLG_BASELINES) + ' |')
@@ -827,7 +926,12 @@ def cmd_selftest(a):
               'host': platform.platform(), 'frozen_utc': 'n/a'}
         json.dump(fr, open(D + '/FREEZE.json', 'w'))
         for b in range(1, nb + 1): synth_formal(f'{D}/formal-{b}', R, rng, effect, aa_effect)
-        S = D + '/slg'; os.makedirs(S); runs = []
+        synth_slg(D + '/slg', rng, slg_effect)
+        cmd_analyze(argparse.Namespace(dir=D, exclude=None))
+        return D, json.load(open(D + '/RESULT.json'))
+
+    def synth_slg(S, rng, slg_effect, scen='B'):
+        os.makedirs(S); runs = []
         sched = xc_ab.abba(blocks=3, a='head', b='anch')
         slg_base = {'xoffset': {'A': 2.0e6, 'B': 3.4e6, 'C': 0.33e6, 'D': 0.27e6}, 'cereal': {'A': 5e6, 'B': 9e6, 'C': 1e6, 'D': 0.5e6},
                     'protobuf': {'A': 4.5e6, 'B': 9.5e6, 'C': 1.2e6, 'D': 0.55e6}, 'flatbuffers': {'A': 3.8e6, 'B': 8e6, 'C': 0.9e6, 'D': 0.4e6}}
@@ -838,12 +942,10 @@ def cmd_selftest(a):
                 for c in range(41):
                     for fmt, sc in slg_base.items():
                         for s, v in sc.items():
-                            e = slg_effect if (fmt == 'xoffset' and lab == 'head' and s == 'B') else 1.0
+                            e = slg_effect if (fmt == 'xoffset' and lab == 'head' and s == scen) else 1.0
                             f.write(json.dumps({'cycle': c, 'format': fmt, 'metric': f'{s}.x', 'ns': int(v * e * proc * math.exp(rng.gauss(0, 0.03)))}) + '\n')
             runs.append({'label': lab, 'index': i, 'raw': os.path.relpath(path, S)})
         json.dump({'schedule': sched, 'runs': runs, 'smoke': False, 'aborted': None}, open(S + '/runs.json', 'w'))
-        cmd_analyze(argparse.Namespace(dir=D, exclude=None))
-        return D, json.load(open(D + '/RESULT.json'))
 
     D, res = setup({'mutate': 1.03}, slg_effect=1.03)
     ov = res['formal_overall']
@@ -884,6 +986,26 @@ def cmd_selftest(a):
     chk('3% gap between batches -> pending, not pooled', res['formal_overall']['verdict'] == 'pending' and res['formal_overall']['inconsistent'])
     cmd_analyze(argparse.Namespace(dir=D2, exclude=['2:diagnosed'])); res = json.load(open(D2 + '/RESULT.json'))
     chk('excluding a batch leaves one -> incomplete', res['formal_overall']['verdict'] == 'incomplete')
+    # SLG pending band: find a seed whose first group lands in (1.02, 1.03], then the extra group decides
+    for sd in range(40):
+        Dp, res = setup({}, slg_effect=1.016, seed=100 + sd)
+        if res['slg']['verdict'] == 'pending': break
+    chk(f'SLG +1.6% -> pending after one group (max UB {res["slg"]["max_upper"]:.4f}), overall pending', res['slg']['verdict'] == 'pending' and res['verdict'] == 'pending')
+    synth_slg(Dp + '/slg-2', random.Random(7), 1.016)
+    cmd_analyze(argparse.Namespace(dir=Dp, exclude=None)); res = json.load(open(Dp + '/RESULT.json'))
+    chk(f'two groups pooled, +1.6% -> fail (max UB {res["slg"]["max_upper"]:.4f})', res['slg']['groups'] == 2 and res['slg']['verdict'] == 'fail')
+    r3 = analyze_slg(Dp, RULES['slg'])
+    chk('no third group: the rule allows 2', r3['verdict'] in ('pass', 'fail') and RULES['slg']['max_groups'] == 2)
+    for sd in range(40):
+        Dq, res = setup({}, slg_effect=1.0, seed=300 + sd)
+        if res['slg']['verdict'] == 'pass': break
+    try:
+        cmd_slg(argparse.Namespace(dir=Dq, group=2, quiet_timeout=1, quiet_s=0.0, cycles=4)); refused = False
+    except SystemExit as e:
+        refused = 'not pending' in str(e)
+    chk('extra group refused when the first group passed', refused)
+    ta = res['slg']['per_group'][0]['trend_adjusted']['A']
+    chk(f'trend-adjusted fit reported (A {ta["geo"]:.4f})', abs(ta['geo'] - 1) < 0.02 and ta['low'] < ta['high'])
     d = res['formal_batches'][0]['aa_detail']['mutate']
     chk(f'A/A detail: round sd near 0.07 ({d["round_sd"]:.3f}), {COPIES} copies', abs(d['round_sd'] - 0.0707) < 0.01 and len(d['by_copy']) == COPIES)
     chk('screen limits', screen_problems({'WindowServer': 36.3, 'UURemoteServer': 16.0, 'screensharingd': 0.4}) == ['UURemoteServer 16%', 'WindowServer 36%']
@@ -912,9 +1034,12 @@ def main():
     for name in ['formal', 'slg']:
         s = sp.add_parser(name); s.add_argument('dir')
         if name == 'formal': s.add_argument('--batch', type=int, required=True)
+        if name == 'slg': s.add_argument('--group', type=int, default=1, help='2 = the extra group after a pending SLG verdict')
         s.add_argument('--quiet-timeout', type=int, default=1800)
         s.add_argument('--quiet-s', type=float, default=180.0, help='no-compile window; only lowered for a smoke test')
         s.add_argument('--cycles', type=int, help='smoke test only; marks the result as not a gate result')
+    s = sp.add_parser('amend-slg', help='write the SLG pending-band rule into a run frozen before it (before group 2)'); s.add_argument('dir')
+    s.add_argument('--reason', required=True)
     s = sp.add_parser('analyze'); s.add_argument('dir')
     s.add_argument('--exclude', action='append', help='N:reason, leave formal-N out of the pooled gate (diagnosed invalid batch)')
     s = sp.add_parser('trend'); s.add_argument('dir'); s.add_argument('--trend', required=True); s.add_argument('--link')
@@ -929,7 +1054,7 @@ def main():
     s = sp.add_parser('diag-analyze'); s.add_argument('dir')
     sp.add_parser('selftest')
     a = ap.parse_args()
-    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'selftest': cmd_selftest,
+    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
      'diag-freeze': cmd_diag_freeze, 'diag-formal': cmd_diag_formal, 'diag-analyze': cmd_diag_analyze}[a.cmd](a)
 
 
