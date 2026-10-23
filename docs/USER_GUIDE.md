@@ -149,6 +149,8 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | 可搬槽位上显式 `grow()` 超出槽位（第 3.4 节） | 改变：搬到新存储 | 全部失效 | 加一 |
 | `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
 | `reload_verified`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效 | 加一 |
+| `src.clone_into(dst)` | dst 不变（复用映射）；dst 是可搬槽位且放不下时换存储（第 3.4 节） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
+| `clone()` | 结果是新 buffer，存储种类与源相同（可搬槽位或地址稳定） | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
 | `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
 | `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
 | `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
@@ -258,6 +260,28 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 
 只读战报用池后仍慢于 cereal（约 2.6 倍），剩余开销在建立 owner 和"先拷贝再校验"。
 
+### 4.2 同进程整块复制：`clone()` / `clone_into()`
+
+同一进程里需要一份独立副本时（状态分叉、回滚、快照后继续改），不必经过 wire：
+
+```cpp
+XBuffer snapshot = buf.clone();     // 新 owner：大小、maximum_capacity、增长策略、池、存储种类都同 buf
+buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 reload_verified
+```
+
+- 只拷贝一次已用区，空闲表、类型化根访问和 schema 绑定一起带过去，不生成 wire、
+  不校验（源是本进程正在用的 buffer）。副本与源完全独立，之后同样的修改得到同样的字节，
+  `save_verified` 输出也相同。
+- 未校验的源（`load_unverified`）复制后仍未校验：`root<T>()` 照样拒绝。
+- `clone_into(dst)` 之后，dst 原有内容的根引用、元素指针、`string_view`、span 全部失效，
+  `dst.epoch()` 加一，`XHandle` 按新内容重新解析；dst 的地址、`maximum_capacity` 和增长
+  策略不变，大小变成源的大小（不超过 dst 的上限）。
+- 失败：`clone_into(dst)` 的源就是 dst 时抛 `XException`，什么都不改；源的已用区超过 dst
+  的 `maximum_capacity` 时抛 `XBadAlloc`；除自拷贝外的任何失败都让 dst 成为没有根的空
+  arena，与 `reload_verified` 失败相同，之后可以再 `clone_into` 或 `reset<T>()`。
+  `clone()` 失败不会改动源。
+- 详细语义见 [BUFFER_REUSE.md](BUFFER_REUSE.md)。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
@@ -292,11 +316,12 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 
 ## 8. 核心承诺与 API 稳定性
 
-alpha 之间不承诺源码 API 或 ABI 稳定。下面 K1–K7 是核心承诺，后续版本不得回退；
+alpha 之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺，后续版本不得回退；
 相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
 | # | 承诺 | 接口 / 机制 |
 | --- | --- | --- |
+| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（typelayout：布局签名里带指针记号的类型一律拒绝，含裸指针、成员指针和虚表）；容器头只存相对偏移，根用基址偏移 |
 | K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
@@ -304,6 +329,11 @@ alpha 之间不承诺源码 API 或 ABI 稳定。下面 K1–K7 是核心承诺�
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
 | K6 | schema 指纹精确匹配，不同就拒绝 | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | `tools/sigs/` 签名基线与跨目标比对 |
+
+K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
+buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
+压缩；`XHandle` 用 epoch 在搬动后重新定位。同 ABI、已信任的数据可以用 `load_unverified`
+省掉校验，不可信输入走 K4。
 
 K7 的现状与目标：
 

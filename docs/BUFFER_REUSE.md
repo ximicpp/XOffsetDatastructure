@@ -86,6 +86,38 @@ handle(in.root<Msg>());
 再次 `reload_verified` 或 `reset<T>()`。旧内容不保留；需要"失败时保留旧内容"时继续用
 `load_verified` 构造新 buffer。
 
+## 同进程复制：`clone()` 与 `clone_into()`
+
+```cpp
+XBuffer copy = buf.clone();   // 新 owner
+buf.clone_into(scratch);      // 复用 scratch
+```
+
+`TypedXBuffer<T>` 有同名的 `clone()` 和 `clone_into(TypedXBuffer<T>&)`。
+
+- `clone()` 新建一个 owner，大小、`maximum_capacity`、增长策略和池都与源相同，把源的
+  已用区拷贝过去；`clone_into(dst)` 把同样的内容拷进 dst，复用 dst 的映射、地址和 owner
+  登记，dst 的 `maximum_capacity` 和增长策略不变，大小变成源的大小（不超过 dst 的上限）。
+- 空闲表原样带过去（不完整的空闲表仍不完整），所以副本和源之后做同样的修改，分配位置
+  和字节完全相同；`save_verified` 输出与源相同。类型化根访问和 schema 绑定也带过去：
+  未校验的源复制后仍然只能 `unsafe_root<T>()`。
+- 不经过 wire，也不做校验：源是本进程里正在使用的 buffer，字节本身就是可信的。
+- 副本与源互相独立，任何一方修改或销毁都不影响另一方。dst 原有内容留下的字节不会
+  出现在副本里：已用区之外的尾部和之后增长出来的字节都读为零。
+
+失效规则：`clone_into(dst)` 之后，dst 原有内容的根引用、元素指针或引用、`view()`
+得到的 `string_view`、借用的 span 全部失效；`dst.epoch()` 加一，`XHandle` 按新的内容
+重新解析；dst 的 `get_address()` 不变。`clone()` 不改动源，源上的引用照常有效。
+
+失败：
+
+- `clone_into(dst)` 的源就是 dst：抛 `XException`，buffer 不变。
+- 源的已用区超过 dst 的 `maximum_capacity`，或系统分配失败：抛 `XBadAlloc`。
+- 源没有 arena：抛 `XException`。
+- 除自拷贝外，`clone_into` 失败后 dst 是没有根的空 arena（与 `reload_verified` 失败相同），
+  之后可以再 `clone_into`、`reload_verified` 或 `reset<T>()`。
+- `clone()` 失败只抛异常，源不变。
+
 ## 内存
 
 复用不会自动归还已提交的页：先收一条大消息、再收小消息时，大消息用过的页仍然提交着。
