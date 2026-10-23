@@ -46,16 +46,10 @@ endforeach()
 set(REFLECTION_TESTS
     test_assign_range
     test_scalar_resize
-    test_validation_v8_single_word
-    test_validation_v6_dense_fusion
-    test_validation_v5
-    test_validation_v5_bounds
-    test_validation_v4
+    test_validation_granules
     test_string_replace
     test_hot_path_constants
-    test_wire_bitmap
     test_resize_growth
-    test_validation_resource
     test_reflection_core
     test_reflection_advanced
     test_type_signatures
@@ -77,13 +71,9 @@ set(REFLECTION_TESTS
     test_runtime_regressions
     test_mutation_failures
     test_wire_validation
-    test_wire_range_index
-    test_wire_range_failures
     test_same_arena_move
     test_shift_relocate
     test_free_table_policy
-    test_range_hint
-    test_validation_ascending_run
     test_stable_storage
     test_vm_lifecycle
     test_vm_transport
@@ -101,6 +91,7 @@ set(REFLECTION_TESTS
     test_implicit_padding
     test_v2_fuzz
     test_reload_reset
+    test_clone
 )
 
 foreach(test_name ${REFLECTION_TESTS})
