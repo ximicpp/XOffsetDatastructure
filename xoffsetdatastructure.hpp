@@ -1628,6 +1628,19 @@ namespace XOffsetDatastructure {
             field = static_cast<std::int32_t>(delta);
         }
 
+        // W1: zeroes exactly [p, p + n). 8..64 bytes (a few small elements)
+        // use two overlapping fixed-size stores instead of a memset call.
+        XOFFSET_DETAIL_MOVE_INLINE void zero_bytes(void* p, std::size_t n) noexcept {
+            auto* bytes = static_cast<unsigned char*>(p);
+            if (n >= 8u && n <= 64u) {
+                if (n <= 16u) { std::memset(bytes, 0, 8); std::memset(bytes + n - 8u, 0, 8); }
+                else if (n <= 32u) { std::memset(bytes, 0, 16); std::memset(bytes + n - 16u, 0, 16); }
+                else { std::memset(bytes, 0, 32); std::memset(bytes + n - 32u, 0, 32); }
+                return;
+            }
+            std::memset(bytes, 0, n);
+        }
+
         inline std::uint32_t round_up_to_alignment(std::uint32_t value,
                                                    std::uint32_t alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
@@ -2846,10 +2859,10 @@ namespace XOffsetDatastructure {
     private:
         // M4 (threat model T5/P2): storage of destroyed elements is zeroed, so
         // a later save never emits the old values as spare capacity.
-        void scrub(size_type from, size_type to) noexcept {
+        XOFFSET_DETAIL_MOVE_INLINE void scrub(size_type from, size_type to) noexcept {
             if (to <= from) return;
             if (auto* items = data())
-                std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+                fixed_detail::zero_bytes(static_cast<void*>(items + from), std::size_t(to - from) * sizeof(T));
         }
 
         void copy_from(const XFixedVector& other) {
