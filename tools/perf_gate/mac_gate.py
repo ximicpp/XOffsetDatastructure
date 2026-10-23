@@ -22,6 +22,8 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
   formal   DIR --batch N   one formal batch (waits for the quiet gate first)
   slg      DIR  the SLG alternating processes (waits for the quiet gate first); --group 2 only after pending
   amend-slg DIR  write the SLG pending-band rule into a run frozen before it existed
+  formal DIR --batch K --replaces N / slg DIR --group G --replace
+           the one replacement of a batch or group the environment rule invalidated
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
   selftest      synthetic data through the whole analysis
@@ -29,7 +31,7 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
                 A/A copies (same harness, copies and start conditions; report only, no verdict)
 """
 import argparse, datetime, hashlib, json, math, os, platform, random, shutil, statistics as st
-import subprocess, sys, tempfile, time
+import subprocess, sys, tempfile, threading, time
 from statistics import NormalDist
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -65,6 +67,10 @@ REMOTE_PROCS = ('UURemoteServer', 'screensharingd', 'ScreensharingAgent', 'AnyDe
                 'SunloginClient', 'RustDesk', 'parsecd')
 REMOTE_MAX = 5.0
 SCREEN_HOLD_S = 60.0
+# T4 formal-1: WindowServer rose to >=30% in 114 of 241 samples after a clean start check (1.2%),
+# and only that batch moved. The start check cannot see this, so the screen is sampled during timing.
+ENV_INTERVAL_S = 4.0
+ENV_MAX_FRAC = 0.05
 
 # Pre-registered rules (copied into FREEZE.json; analysis reads them back from there).
 RULES = {
@@ -136,6 +142,17 @@ RULES = {
              'load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20% and every remote-desktop '
              'process < 5%; on timeout (30 min) nothing is timed',
     'screen': {'max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS, 'remote_max': REMOTE_MAX, 'hold_s': SCREEN_HOLD_S},
+    'env_invalid': {
+        'rule': 'frozen by 性能优化 2026-10-23 14:51Z, not retroactive: during timing WindowServer and remote-desktop '
+                'pcpu are sampled every 4 s; a sample is busy when one of them is at or above its start limit. A formal '
+                'batch or SLG group with more than 5% busy samples (or none at all) is invalid by environment. The '
+                'script decides it from the samples alone, before computing any result; the batch stays in RESULT, '
+                'marked invalid with its sample counts. Each one may be replaced once in the same directory (formal '
+                '--replaces N, slg --group G --replace); an invalid replacement stops the run for a report. Nothing '
+                'is ever closed; load is only recorded',
+        'interval_s': ENV_INTERVAL_S, 'max_busy_frac': ENV_MAX_FRAC, 'screen_max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS,
+        'remote_max': REMOTE_MAX, 'max_replacements': 1,
+    },
 }
 
 h = lambda p: hashlib.sha256(open(p, 'rb').read()).hexdigest()
@@ -240,6 +257,42 @@ def screen_problems(load):
     return [f'{n} {v:.0f}%' for n, v in sorted(load.items()) if v >= SCREEN_MAX.get(n, REMOTE_MAX)]
 
 
+class ScreenSampler(threading.Thread):
+    """During timing: screen_load() every interval_s into cpu/<label>.screen.jsonl (environment rule)."""
+    def __init__(self, path, interval_s):
+        super().__init__(daemon=True); self.path, self.interval_s, self.halt = path, interval_s, threading.Event()
+
+    def run(self):
+        with open(self.path, 'a') as f:
+            while True:  # a last sample at stop, so even a short run has two
+                load = screen_load()
+                f.write(json.dumps({'t': time.time(), 'load': load, 'busy': screen_problems(load)}) + '\n'); f.flush()
+                if self.halt.is_set(): break
+                self.halt.wait(self.interval_s)
+
+    def stop(self): self.halt.set(); self.join(timeout=30)
+
+
+def env_summary(path, t0, t1, E):
+    """The environment rule over [t0, t1] of a ScreenSampler log, decided from the samples alone."""
+    recs = [json.loads(l) for l in open(path)] if os.path.exists(path) else []
+    recs = [r for r in recs if t0 <= r['t'] <= t1]
+    busy = [r for r in recs if r['busy']]; by, mx = {}, {}
+    for r in busy:
+        for b in r['busy']: by[b.rsplit(' ', 1)[0]] = by.get(b.rsplit(' ', 1)[0], 0) + 1
+    for r in recs:
+        for n, v in r['load'].items(): mx[n] = max(mx.get(n, 0.0), v)
+    frac = len(busy) / len(recs) if recs else 1.0
+    return {'samples': len(recs), 'busy_samples': len(busy), 'busy_frac': round(frac, 4), 'busy_by_process': by, 'max_pcpu': mx,
+            'max_busy_frac': E['max_busy_frac'], 'invalid': frac > E['max_busy_frac'],
+            'decided_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')}
+
+
+def env_text(e):
+    return (f'{e["busy_samples"]}/{e["samples"]} 次采样超限（{e["busy_frac"]:.1%}，上限 {e["max_busy_frac"]:.0%}），'
+            f'按进程 {e["busy_by_process"] or "无"}，最高 pcpu {e["max_pcpu"] or "无"}')
+
+
 def quiet_or_exit(D, label, sampler, timeout_s, quiet_s=180.0):
     """Block until the start conditions hold (xc_ab.quiet_gate: the sampler has seen no compiler for
     180 s and the 1-minute load is < 3; then WindowServer and remote-desktop processes below their
@@ -295,13 +348,17 @@ def cmd_formal(a):
     C = R['copies']
     for k in LIBS:
         if any(h(f'{D}/bin/{FN[k]}{i}') != fr['binaries'][k] for i in range(C)): sys.exit(f'{k}: binary changed since FREEZE')
+    E = fr['rules'].get('env_invalid')
+    if a.replaces is not None: check_formal_replacement(D, a.replaces, E)
     cycles = a.cycles or R['cycles']; smoke = cycles != R['cycles'] or a.quiet_s != 180.0
     sampler = start_sampler(D, f'formal-{a.batch}')
     quiet_or_exit(D, f'formal-{a.batch}', sampler, a.quiet_timeout, a.quiet_s)
     os.makedirs(B)
-    t0 = time.time()
+    t0 = time.time(); spath = f'{D}/cpu/formal-{a.batch}.screen.jsonl'
+    scr = ScreenSampler(spath, E['interval_s']) if E else None
+    if scr: scr.start()
     meta = {'batch': a.batch, 'cycles': cycles, 'smoke': smoke, 'start_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
-            'load_start': os.getloadavg()}
+            'load_start': os.getloadavg(), 'replaces': a.replaces}
     try:
         with open(B + '/raw.jsonl', 'w') as f:
             for rnd in range(cycles * R['rounds_per_cycle']):
@@ -311,12 +368,34 @@ def cmd_formal(a):
                                         'phase_ns': run_formal_child(D, B, FN[k], rnd % C, fr['trace'], R['child_timeout_s'])}) + '\n')
     finally:
         sampler.stop()
+        if scr: scr.stop()
+    t1 = time.time()
     meta['end_utc'] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'); meta['load_end'] = os.getloadavg()
-    meta['cpu'] = cpu_summary(f'{D}/cpu/formal-{a.batch}.jsonl', t0, time.time())
+    meta['cpu'] = cpu_summary(f'{D}/cpu/formal-{a.batch}.jsonl', t0, t1)
+    if E: meta['env'] = env_summary(spath, t0, t1, E)  # decided before any timing result is looked at
     json.dump(meta, open(B + '/meta.json', 'w'), indent=1)
+    if E and meta['env']['invalid']:
+        print(f'formal-{a.batch}: INVALID by environment: {env_text(meta["env"])}; '
+              + ('it was the replacement of formal-' + str(a.replaces) + ': stop and report' if a.replaces is not None
+                 else f'replace it once: formal {D} --batch <next free> --replaces {a.batch}'))
     b = analyze_formal_batch(B, R)
     print(f'formal-{a.batch}: this batch alone: max UB head/anchor {b["gate"]["max_upper"]:.4f}, A/A ok {b["aa"]["ok"]}, '
           f'old {b["old"]["passed"]}/12, cpu {meta["cpu"]}  (the gate verdict needs the pooled batches: run analyze)')
+
+
+def formal_metas(D):
+    return {int(x.rsplit('-', 1)[1]): json.load(open(f'{D}/{x}/meta.json')) if os.path.exists(f'{D}/{x}/meta.json') else {}
+            for x in os.listdir(D) if x.startswith('formal-')}
+
+
+def check_formal_replacement(D, n, E):
+    """formal-n may be replaced once, only when the environment rule invalidated it and it is no replacement itself."""
+    if not E: sys.exit('this run was frozen without the environment rule: no --replaces')
+    ms = formal_metas(D)
+    if n not in ms: sys.exit(f'formal-{n} does not exist')
+    if not (ms[n].get('env') or {}).get('invalid'): sys.exit(f'formal-{n} is not invalid by environment: no replacement')
+    if ms[n].get('replaces') is not None: sys.exit(f'formal-{n} is itself a replacement: stop and report')
+    if any(m.get('replaces') == n for m in ms.values()): sys.exit(f'formal-{n} was already replaced once')
 
 
 def run_formal_child(D, B, stem, copy, trace, timeout):
@@ -464,6 +543,23 @@ def slg_groups(D):
     return [S for S in [D + '/slg'] + [f'{D}/slg-{g}' for g in range(2, 10)] if os.path.exists(S + '/runs.json')]
 
 
+def slg_env(S): return json.load(open(S + '/runs.json')).get('env') or {}
+
+
+def slg_used(D):
+    """The groups that count: each group (slg, slg-2), or its one replacement <group>-r when the environment rule
+    invalidated it; plus the environment problems that make the SLG part invalid."""
+    used, prob = [], []
+    for S in slg_groups(D):
+        g, r = os.path.basename(S), S + '-r'
+        if not slg_env(S).get('invalid'): used.append(S)
+        elif not os.path.exists(r + '/runs.json'):
+            prob.append(f'{g} 环境失效，尚未补跑：slg --group {1 if g == "slg" else g.split("-")[1]} --replace')
+        elif slg_env(r).get('invalid'): prob.append(f'{g}-r（替换 {g}）环境仍失效：停下报告')
+        else: used.append(r)
+    return used, prob
+
+
 def cmd_amend_slg(a):
     """Write the current SLG rule (with the pending band) into a directory frozen before it existed."""
     D = a.dir; fr = json.load(open(D + '/FREEZE.json'))
@@ -478,10 +574,14 @@ def cmd_amend_slg(a):
 
 
 def cmd_slg(a):
-    D = a.dir; fr = json.load(open(D + '/FREEZE.json'))
+    D = a.dir; fr = json.load(open(D + '/FREEZE.json')); E = fr['rules'].get('env_invalid')
     S = D + '/slg' if a.group == 1 else f'{D}/slg-{a.group}'
+    if a.replace:  # the one replacement of a group the environment rule invalidated
+        if not E: sys.exit('this run was frozen without the environment rule: no --replace')
+        if not os.path.exists(S + '/runs.json') or not slg_env(S).get('invalid'): sys.exit(f'{S} is not invalid by environment: no replacement')
+        S += '-r'
     if os.path.exists(S): sys.exit(f'{S} exists (no reruns into the same directory)')
-    if a.group > 1:  # only the pre-registered extra group after a pending first group
+    if a.group > 1 and not a.replace:  # only the pre-registered extra group after a pending first group
         Rs = slg_rules(D, fr)
         if a.group > Rs.get('max_groups', 1): sys.exit(f'group {a.group}: the rule allows {Rs.get("max_groups", 1)} group(s)')
         if len(slg_groups(D)) != a.group - 1: sys.exit(f'group {a.group} needs groups 1..{a.group - 1} first')
@@ -497,16 +597,25 @@ def cmd_slg(a):
     argv = {lab: [f'{D}/bin/slg_{lab}', '--mode', 'bench', '--scale', 'M', '--cycles', str(cycles), '--formats', SLG_FORMATS]
             for lab in SLG_LABELS}
     gate = xc_ab.quiet_gate(sampler, load_max=3.0, quiet_s=a.quiet_s, timeout_s=a.quiet_timeout)
+    spath = f'{D}/cpu/{lab}.screen.jsonl'; scr = ScreenSampler(spath, E['interval_s']) if E else None
+    t0 = time.time()
+    if scr: scr.start()
     try:
         xc_ab.run_schedule(sched, argv, {'SLG_REUSE': '1'}, S, gate=gate,
                            binaries={lab: f'{D}/bin/slg_{lab}' for lab in SLG_LABELS})
     finally:
         sampler.stop()
+        if scr: scr.stop()
     doc = json.load(open(S + '/runs.json')); doc['smoke'] = cycles != 41 or a.quiet_s != 180.0
     doc['cpu'] = cpu_summary(f'{D}/cpu/{lab}.jsonl', doc['started'], doc.get('finished', time.time()))
+    if E: doc['env'] = env_summary(spath, t0, time.time(), E)  # decided before any timing result is looked at
     json.dump(doc, open(S + '/runs.json', 'w'), indent=1)
+    if E and doc['env']['invalid']:
+        print(f'{lab}: INVALID by environment: {env_text(doc["env"])}; '
+              + ('it was the replacement: stop and report' if a.replace else f'replace it once: slg {D} --group {a.group} --replace'))
     res = analyze_slg(D, slg_rules(D, fr))
     if res.get('aborted'): sys.exit(f'slg aborted: {res["aborted"]}')
+    if 'new' not in res: sys.exit(f'slg: verdict {res["verdict"]}: ' + '; '.join(res.get('env_invalid') or []))
     print('slg: ' + '  '.join(f'{s} {res["new"][s]["geo"]:.4f} [{res["new"][s]["low"]:.4f}, {res["new"][s]["high"]:.4f}]' for s in SCEN)
           + f'  verdict {res["verdict"]} ({res["groups"]} group(s) pooled)')
 
@@ -541,7 +650,7 @@ def trend_adjusted(order, is_head, y, k=4):
 def slg_group(S):
     """Per-process values of one SLG group (one ABBA x3 run directory)."""
     doc = json.load(open(S + '/runs.json'))
-    g = {'dir': os.path.basename(S), 'aborted': doc.get('aborted'), 'smoke': doc.get('smoke', False), 'cpu': doc.get('cpu'),
+    g = {'dir': os.path.basename(S), 'aborted': doc.get('aborted'), 'smoke': doc.get('smoke', False), 'cpu': doc.get('cpu'), 'env': doc.get('env'),
          'vals': {'head': [], 'anchor': []}, 'order': {'head': [], 'anchor': []}, 'med': {'head': [], 'anchor': []}, 'rival': [], 'first_head': None}
     for i, r in enumerate(doc['runs']):
         lab = SLG_LABELS.get(r['label'], r['label'])
@@ -556,18 +665,40 @@ def slg_group(S):
     return g
 
 
+def abba_blocks(g, sc):
+    """Per ABBA block (4 consecutive processes): mean head value - mean anchor value; linear drift cancels."""
+    lab = {i: ('head', v[sc]) for i, v in zip(g['order']['head'], g['vals']['head'])}
+    lab.update({i: ('anchor', v[sc]) for i, v in zip(g['order']['anchor'], g['vals']['anchor'])})
+    ds = []
+    for b in range(max(lab) // 4 + 1 if lab else 0):
+        blk = [lab[i] for i in range(4 * b, 4 * b + 4) if i in lab]
+        hs = [v for l, v in blk if l == 'head']; an = [v for l, v in blk if l == 'anchor']
+        if len(blk) == 4 and hs and an: ds.append(st.mean(hs) - st.mean(an))
+    return ds
+
+
+def abba_paired(ds, k=4):
+    """Report only (性能优化 2026-10-23 14:51Z): t across blocks, two-sided 95% k=4, never part of the verdict."""
+    if len(ds) < 2: return None
+    m = st.mean(ds); se = st.stdev(ds) / math.sqrt(len(ds)); q = xc_ab.t_ppf(1 - 0.05 / (2 * k), len(ds) - 1)
+    return {'geo': math.exp(m), 'low': math.exp(m - q * se), 'high': math.exp(m + q * se), 'blocks': len(ds)}
+
+
 def analyze_slg(D, Rs=None):
     """SLG part: every group under D (slg, slg-2) pooled for the verdict; per-group numbers and the
     trend-adjusted fit are reported only."""
     Rs = Rs or RULES['slg']
-    gs = [slg_group(S) for S in slg_groups(D)]
+    used, prob = slg_used(D)
+    gs = [slg_group(S) for S in used]
     vals = {lab: [v for g in gs for v in g['vals'][lab]] for lab in ('head', 'anchor')}
+    envs = {os.path.basename(S): slg_env(S) for G in slg_groups(D) for S in (G, G + '-r') if os.path.exists(S + '/runs.json') and slg_env(S)}
     res = {'groups': len(gs), 'group_dirs': [g['dir'] for g in gs], 'rules': {k: Rs.get(k) for k in ('pass_le', 'fail_gt', 'max_groups')},
+           'env_invalid': prob, 'env_by_group': envs,
            'aborted': next((g['aborted'] for g in gs if g['aborted']), None), 'smoke': any(g['smoke'] for g in gs),
            'cpu': [g['cpu'] for g in gs], 'n': {k: len(v) for k, v in vals.items()}, 'process_values': vals,
            'xoffset_median_ms': {lab: [m for g in gs for m in g['med'][lab]] for lab in ('head', 'anchor')}}
     if min(res['n'].values()) < 2:
-        res.update(verdict='incomplete'); return res
+        res.update(verdict='invalid' if prob else 'incomplete'); return res
     new = {sc: welch([v[sc] for v in vals['head']], [v[sc] for v in vals['anchor']], k=4) for sc in SCEN}
     gate = {sc: new[sc]['high'] <= Rs['pass_le'] for sc in 'ABC'}
     mx = max(new[sc]['high'] for sc in 'ABC')
@@ -582,6 +713,7 @@ def analyze_slg(D, Rs=None):
             order = g['order']['head'] + g['order']['anchor']; ish = [1] * len(g['order']['head']) + [0] * len(g['order']['anchor'])
             pg['trend_adjusted'] = {sc: trend_adjusted(order, ish, [v[sc] for v in g['vals']['head'] + g['vals']['anchor']]) for sc in SCEN}
             pg['drift_last_over_first'] = {lab: {sc: math.exp(v[-1][sc] - v[0][sc]) for sc in SCEN} for lab, v in g['vals'].items()}
+            pg['abba'] = {sc: abba_paired(abba_blocks(g, sc)) for sc in SCEN}
         per_group.append(pg)
     rival = [x for g in gs for x in g['rival']]
     old = {}
@@ -595,7 +727,9 @@ def analyze_slg(D, Rs=None):
             r = xc_ab.per_cycle_ratio(gs[0]['first_head'], 'xoffset', b, sc + '.total', alpha=0.05, k=12, sided='upper')
             per_cycle[f'{sc}/{b}'] = {'geo': r['ratio'], 'upper': r['hi']}
     res.update(new=new, gate=gate, max_upper=mx, verdict=verdict, per_group=per_group, old_pooled=old,
-               old_first_head_per_cycle=per_cycle, drift_last_over_first=per_group[0].get('drift_last_over_first', {}))
+               old_first_head_per_cycle=per_cycle, drift_last_over_first=per_group[0].get('drift_last_over_first', {}),
+               abba={sc: abba_paired([d for g in gs for d in abba_blocks(g, sc)]) for sc in SCEN})
+    if prob: res['verdict'] = 'invalid'
     if res['aborted']: res['verdict'] = 'incomplete'
     return res
 
@@ -611,15 +745,24 @@ def cmd_analyze(a):
         b = analyze_formal_batch(B, R)
         b['meta'] = json.load(open(B + '/meta.json')) if os.path.exists(B + '/meta.json') else {}
         n = int(B.rsplit('-', 1)[1]); b['excluded'] = excl.get(n) if n in excl else None
+        b['n'] = n; b['env'] = b['meta'].get('env'); b['replaces'] = b['meta'].get('replaces')
+        b['env_invalid'] = bool(b['env'] and b['env']['invalid'])
         batches.append(b)
-    used = [(B, b) for B, b in zip(bdirs, batches) if b['excluded'] is None]
+    used = [(B, b) for B, b in zip(bdirs, batches) if b['excluded'] is None and not b['env_invalid']]
     overall = formal_overall([B for B, _ in used], [b for _, b in used], R)
+    env_prob = []  # environment rule: an invalid batch needs its one replacement; an invalid replacement stops the run
+    for b in batches:
+        if not b['env_invalid']: continue
+        if b['replaces'] is not None: env_prob.append(f'formal-{b["n"]}（替换 formal-{b["replaces"]}）环境仍失效：停下报告')
+        elif not any(x['replaces'] == b['n'] for x in batches): env_prob.append(f'formal-{b["n"]} 环境失效，尚未补跑：formal --batch <下一个> --replaces {b["n"]}')
+    overall['env_invalid'] = env_prob
+    if env_prob: overall['verdict'] = 'invalid'
     slg = analyze_slg(D, slg_rules(D, fr)) if slg_groups(D) else None
-    amend = json.load(open(D + '/RULES_AMEND.json')) if os.path.exists(D + '/RULES_AMEND.json') else None
     fv = overall['verdict']
+    amend = json.load(open(D + '/RULES_AMEND.json')) if os.path.exists(D + '/RULES_AMEND.json') else None
     if fv in ('fail',) or (slg and slg['verdict'] == 'fail'): verdict = 'fail'
     elif fv in ('invalid', 'pending', 'incomplete'): verdict = fv
-    elif slg and slg['verdict'] in ('pending', 'incomplete'): verdict = slg['verdict']
+    elif slg and slg['verdict'] in ('invalid', 'pending', 'incomplete'): verdict = slg['verdict']
     elif slg is None: verdict = 'incomplete'
     else: verdict = 'pass'
     if any(b['meta'].get('smoke') for b in batches) or (slg and slg.get('smoke')): verdict = 'smoke (not a gate result)'
@@ -645,7 +788,15 @@ def render_md(fr, res):
     if fr.get('lib_identity_note'): p(f'- {fr["lib_identity_note"]}')
     p(f'- **结论：{res["verdict"]}**。正式部分 {ov["verdict"]}（合并 {ov["batches"]} 批），SLG {res["slg"]["verdict"] if res["slg"] else "未跑"}。')
     for b in bs:
-        if b['excluded'] is not None: p(f'- {b["batch_dir"]} 未计入合并：{b["excluded"]}')
+        if b['excluded'] is not None: p(f'- {b["batch_dir"]} 未计入合并（逐例诊断后排除）：{b["excluded"]}')
+        if b.get('env_invalid'): p(f'- {b["batch_dir"]} **环境失效**，未计入合并：' + env_text(b['env'])
+                                   + (f'；它是 formal-{b["replaces"]} 的补跑' if b.get('replaces') is not None else ''))
+        elif b.get('replaces') is not None: p(f'- {b["batch_dir"]} 是 formal-{b["replaces"]} 的补跑（环境失效后补跑一次）')
+    for x in ov.get('env_invalid', []): p(f'- **正式部分 invalid：{x}**')
+    for x in (res['slg'] or {}).get('env_invalid', []): p(f'- **SLG invalid：{x}**')
+    if 'env_invalid' in fr['rules']:
+        p(f'- 环境失效规则（{fr["rules"]["env_invalid"]["rule"][:40]}…）：计时期间每 {fr["rules"]["env_invalid"]["interval_s"]:.0f} s 采一次屏幕负载，'
+          f'超限采样占比 >{fr["rules"]["env_invalid"]["max_busy_frac"]:.0%} 即失效，同目录最多补跑一次。')
     C = R.get('copies', 1)
     p(f'- 8 个二进制在磁盘上用等长文件名（{", ".join(f"{k}→{v}" for k, v in R["file_names"].items())}）；raw 里的标签不变。'
       + (f'每个二进制和 wire 各存 {C} 份独立文件，第 r 轮用第 r % {C} 份（W0b 等长文件名后 A/A mutate 仍偏 1.2%，'
@@ -661,7 +812,7 @@ def render_md(fr, res):
         return (f'| {name} | ' + ' | '.join(iv4(g['phases'][m]) for m in GATE_PHASES) + f' | {f4(g["max_upper"])} | {verdict or g["verdict"]} | '
                 + ' / '.join(f4(aa['phases'][m]['geo']) for m in GATE_PHASES) + f' | {"有效" if aa["ok"] else "**无效**"} |')
     if 'gate' in ov: p(row(f'**合并 {ov["batches"]} 批（判定）**', ov['gate'], ov['gate']['aa'], ov['verdict']))
-    for b in bs: p(row(b['batch_dir'] + '（单批，只报）', b['gate'], b['aa']))
+    for b in bs: p(row(b['batch_dir'] + ('（环境失效，未计入）' if b.get('env_invalid') else '（单批，只报）'), b['gate'], b['aa']))
     p('\n区间列为 几何均值 [双侧下界, 单侧上界]。\n')
     if ov.get('inconsistent'): p('**两批不一致，未合并判定（待定，先诊断再加跑一批）：** ' + '；'.join(ov['inconsistent']) + '\n')
     p('逐周期 head÷anchor 比值的分位数（只报，看重尾是否由少数周期造成）：\n')
@@ -704,7 +855,9 @@ def render_md(fr, res):
     p('| 批 | ' + ' | '.join(RIVALS) + ' |')
     p('| --- |' + ' --- |' * len(RIVALS))
     for b in bs: p(f'| {b["batch_dir"]} | ' + ' | '.join(iv4(b['old']['auxiliary'][f'{c}:reload']) for c in RIVALS) + ' |')
-    if res['slg']:
+    if res['slg'] and 'new' not in res['slg']:
+        p(f'\n## 3. SLG M\n\n**SLG 判定：{res["slg"]["verdict"]}**，没有可计入的组（' + '；'.join(res['slg'].get('env_invalid') or ['进程不足']) + '）。\n')
+    if res['slg'] and 'new' in res['slg']:
         s = res['slg']
         p(f'\n## 3. SLG M（head、anchor 交替进程 ABBA×3，SLG_REUSE=1，四家；{s.get("groups", 1)} 组合并）\n')
         if res.get('rules_amend'):
@@ -726,6 +879,13 @@ def render_md(fr, res):
             ta = g['trend_adjusted']
             p(f'| {g["dir"]} | ' + ' | '.join(f'{iv4(g["new"][sc])} / ' + (iv4(ta[sc]) if ta[sc] else '—') for sc in SCEN) + ' | '
               + '；'.join(f'{lab} ' + ' '.join(f'{sc} {f3(v)}' for sc, v in d.items()) for lab, d in g['drift_last_over_first'].items()) + ' |')
+        if s.get('abba'):
+            p('\nABBA 配对（只报，不参与判定）：每 4 个连续进程一块，块内 head 均值减 anchor 均值，块间 t，双侧 95% k=4。点估计与 Welch 相同；每组只有 3 块，自由度 2，区间通常更宽：\n')
+            p('| 组 | ' + ' | '.join(SCEN) + ' |')
+            p('| --- |' + ' --- |' * len(SCEN))
+            for g in s.get('per_group', []):
+                if g.get('abba'): p(f'| {g["dir"]} | ' + ' | '.join(iv4(g['abba'][sc]) if g['abba'][sc] else '—' for sc in SCEN) + ' |')
+            p('| 合并 | ' + ' | '.join(iv4(s['abba'][sc]) if s['abba'][sc] else '—' for sc in SCEN) + ' |')
         p(f'\n进程数 head {s["n"]["head"]}、anchor {s["n"]["anchor"]}。\n')
         p('### 旧口径 G1–G3（head 进程合并）\n')
         p('每个 head 进程一个几何均值比值，进程间 t，单侧 95%，k=12；括号里是第一个 head 进程按 analyze.py 逐周期的上界。A、B、C ≤0.50 为达标。\n')
@@ -740,6 +900,9 @@ def render_md(fr, res):
     for b in bs:
         m = b.get('meta', {})
         if m: p(f'- {b["batch_dir"]}：{m.get("start_utc")} → {m.get("end_utc")}，load {m.get("load_start")} → {m.get("load_end")}，CPU 采样 {m.get("cpu")}')
+        if b.get('env'): p(f'  - 计时期间屏幕采样：{env_text(b["env"])}，{"**失效**" if b["env"]["invalid"] else "有效"}')
+    for g, e in ((res['slg'] or {}).get('env_by_group') or {}).items():
+        p(f'- {g} 计时期间屏幕采样：{env_text(e)}，{"**失效**" if e["invalid"] else "有效"}')
     for b in bs:
         d = b.get('aa_detail')
         if d: p(f'- {b["batch_dir"]} A/A 逐轮 log 比值 sd（噪声；历史安静批次 mutate 约 0.06–0.08）：'
@@ -1000,7 +1163,7 @@ def cmd_selftest(a):
         Dq, res = setup({}, slg_effect=1.0, seed=300 + sd)
         if res['slg']['verdict'] == 'pass': break
     try:
-        cmd_slg(argparse.Namespace(dir=Dq, group=2, quiet_timeout=1, quiet_s=0.0, cycles=4)); refused = False
+        cmd_slg(argparse.Namespace(dir=Dq, group=2, replace=False, quiet_timeout=1, quiet_s=0.0, cycles=4)); refused = False
     except SystemExit as e:
         refused = 'not pending' in str(e)
     chk('extra group refused when the first group passed', refused)
@@ -1011,6 +1174,57 @@ def cmd_selftest(a):
     chk('screen limits', screen_problems({'WindowServer': 36.3, 'UURemoteServer': 16.0, 'screensharingd': 0.4}) == ['UURemoteServer 16%', 'WindowServer 36%']
         and screen_problems({'WindowServer': 8.0}) == [])
     chk('screen_load parses ps', isinstance(screen_load(), dict))
+    # environment rule (frozen 2026-10-23 14:51Z): busy fraction > 5% invalidates; one replacement; never retroactive
+    E = RULES['env_invalid']; ep = tempfile.mkdtemp(prefix='mac_gate_selftest_') + '/s.jsonl'
+    with open(ep, 'w') as f:
+        for i in range(41): f.write(json.dumps({'t': 100.0 + i, 'load': {'WindowServer': 31.0 if i < 3 else 2.0},
+                                                 'busy': ['WindowServer 31%'] if i < 3 else []}) + '\n')
+    e1 = env_summary(ep, 100.0, 139.0, E); e2 = env_summary(ep, 101.0, 140.0, E); e0 = env_summary(ep, 500.0, 600.0, E)
+    chk(f'env: 3/40 busy -> invalid, 2/40 (exactly 5%) -> valid, no samples -> invalid',
+        e1['invalid'] and e1['busy_by_process'] == {'WindowServer': 3} and not e2['invalid'] and e0['invalid'] and e0['samples'] == 0)
+    ss = ScreenSampler(ep + '.live', 0.05); ss.start(); time.sleep(0.3); ss.stop()
+    chk('screen sampler writes samples', sum(1 for _ in open(ep + '.live')) >= 2)
+    De, res = setup({})
+    inv = {'samples': 100, 'busy_samples': 40, 'busy_frac': 0.4, 'busy_by_process': {'WindowServer': 40}, 'max_pcpu': {'WindowServer': 45.0},
+           'max_busy_frac': 0.05, 'invalid': True, 'decided_utc': 'n/a'}
+    ok_env = {**inv, 'busy_samples': 0, 'busy_frac': 0.0, 'busy_by_process': {}, 'invalid': False}
+    json.dump({'batch': 1, 'env': inv, 'replaces': None}, open(De + '/formal-1/meta.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=De, exclude=None)); res = json.load(open(De + '/RESULT.json'))
+    chk('env-invalid batch, not yet replaced -> invalid, still reported', res['verdict'] == 'invalid' and res['formal_overall']['env_invalid']
+        and res['formal_batches'][0]['env_invalid'] and '环境失效' in open(De + '/RESULT.md').read())
+    def refused(fn):
+        try: fn(); return None
+        except SystemExit as e: return str(e)
+    chk('replacement allowed for an env-invalid batch', refused(lambda: check_formal_replacement(De, 1, E)) is None)
+    chk('no replacement when frozen without the rule', 'without the environment rule' in (refused(lambda: check_formal_replacement(De, 1, None)) or ''))
+    chk('no replacement for a valid batch', 'not invalid' in (refused(lambda: check_formal_replacement(De, 2, E)) or ''))
+    synth_formal(De + '/formal-3', R, random.Random(11), {})
+    json.dump({'batch': 3, 'env': ok_env, 'replaces': 1}, open(De + '/formal-3/meta.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=De, exclude=None)); res = json.load(open(De + '/RESULT.json'))
+    chk(f'replaced -> batches 2+3 pooled as two ({res["verdict"]})', res['verdict'] == 'pass' and res['formal_overall']['batches'] == 2)
+    chk('second replacement refused', 'already replaced' in (refused(lambda: check_formal_replacement(De, 1, E)) or ''))
+    json.dump({'batch': 3, 'env': inv, 'replaces': 1}, open(De + '/formal-3/meta.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=De, exclude=None)); res = json.load(open(De + '/RESULT.json'))
+    chk('invalid replacement -> invalid, stop', res['verdict'] == 'invalid' and any('停下' in x for x in res['formal_overall']['env_invalid'])
+        and 'itself a replacement' in (refused(lambda: check_formal_replacement(De, 3, E)) or ''))
+    Ds, res = setup({})
+    doc = json.load(open(Ds + '/slg/runs.json')); doc['env'] = inv; json.dump(doc, open(Ds + '/slg/runs.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=Ds, exclude=None)); res = json.load(open(Ds + '/RESULT.json'))
+    chk('env-invalid SLG group -> invalid', res['slg']['verdict'] == 'invalid' and res['verdict'] == 'invalid')
+    synth_slg(Ds + '/slg-r', random.Random(12), 1.0)
+    cmd_analyze(argparse.Namespace(dir=Ds, exclude=None)); res = json.load(open(Ds + '/RESULT.json'))
+    chk(f'SLG replacement counts as group 1 ({res["slg"]["verdict"]}, groups {res["slg"]["group_dirs"]})',
+        res['slg']['group_dirs'] == ['slg-r'] and res['slg']['verdict'] in ('pass', 'pending') and 'slg' in res['slg']['env_by_group'])
+    chk('second SLG replacement refused', 'exists' in (refused(lambda: cmd_slg(argparse.Namespace(dir=Ds, group=1, replace=True, quiet_timeout=1, quiet_s=0.0, cycles=4))) or ''))
+    doc = json.load(open(Ds + '/slg-r/runs.json')); doc['env'] = inv; json.dump(doc, open(Ds + '/slg-r/runs.json', 'w'))
+    res = analyze_slg(Ds, RULES['slg'])
+    chk('invalid SLG replacement -> invalid, stop', res['verdict'] == 'invalid' and any('停下' in x for x in res['env_invalid']))
+    old = {**RULES}; old.pop('env_invalid')
+    fr = json.load(open(Dq + '/FREEZE.json')); fr['rules'] = old; json.dump(fr, open(Dq + '/FREEZE.json', 'w'))
+    chk('not retroactive: --replace refused on a run frozen before the rule',
+        'without the environment rule' in (refused(lambda: cmd_slg(argparse.Namespace(dir=Dq, group=1, replace=True, quiet_timeout=1, quiet_s=0.0, cycles=4))) or ''))
+    ab = res_q = json.load(open(Dq + '/RESULT.json'))['slg']['abba']
+    chk(f'ABBA paired reported, 3 blocks per group (A {ab["A"]["geo"]:.4f})', ab['A']['blocks'] == 3 and ab['A']['low'] < ab['A']['geo'] < ab['A']['high'])
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
 
@@ -1033,8 +1247,12 @@ def main():
     f.add_argument('--prep', action='append', help='NAME=LOGFILE:EXITCODE of a prep check (repeatable)')
     for name in ['formal', 'slg']:
         s = sp.add_parser(name); s.add_argument('dir')
-        if name == 'formal': s.add_argument('--batch', type=int, required=True)
-        if name == 'slg': s.add_argument('--group', type=int, default=1, help='2 = the extra group after a pending SLG verdict')
+        if name == 'formal':
+            s.add_argument('--batch', type=int, required=True)
+            s.add_argument('--replaces', type=int, help='N: the one replacement of formal-N, invalid by environment')
+        if name == 'slg':
+            s.add_argument('--group', type=int, default=1, help='2 = the extra group after a pending SLG verdict')
+            s.add_argument('--replace', action='store_true', help='the one replacement of this group, invalid by environment')
         s.add_argument('--quiet-timeout', type=int, default=1800)
         s.add_argument('--quiet-s', type=float, default=180.0, help='no-compile window; only lowered for a smoke test')
         s.add_argument('--cycles', type=int, help='smoke test only; marks the result as not a gate result')
