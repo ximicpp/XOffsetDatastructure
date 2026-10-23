@@ -570,10 +570,10 @@ def render_md(fr, res):
       'A/A（head_aa÷head，同一统计量）每项双侧区间含 1 且偏差 ≤1%，否则无效。\n')
     p('| 范围 | read_sum | mutate | emit_after | 最大上界 | 判定 | A/A read_sum / mutate / emit_after | A/A |')
     p('| --- | --- | --- | --- | --- | --- | --- | --- |')
-    def row(name, g, aa):
-        return (f'| {name} | ' + ' | '.join(iv4(g['phases'][m]) for m in GATE_PHASES) + f' | {f4(g["max_upper"])} | {g["verdict"]} | '
+    def row(name, g, aa, verdict=None):  # the pooled row shows the overall verdict (batch count, consistency, A/A)
+        return (f'| {name} | ' + ' | '.join(iv4(g['phases'][m]) for m in GATE_PHASES) + f' | {f4(g["max_upper"])} | {verdict or g["verdict"]} | '
                 + ' / '.join(f4(aa['phases'][m]['geo']) for m in GATE_PHASES) + f' | {"有效" if aa["ok"] else "**无效**"} |')
-    if 'gate' in ov: p(row(f'**合并 {ov["batches"]} 批（判定）**', ov['gate'], ov['gate']['aa']))
+    if 'gate' in ov: p(row(f'**合并 {ov["batches"]} 批（判定）**', ov['gate'], ov['gate']['aa'], ov['verdict']))
     for b in bs: p(row(b['batch_dir'] + '（单批，只报）', b['gate'], b['aa']))
     p('\n区间列为 几何均值 [双侧下界, 单侧上界]。\n')
     if ov.get('inconsistent'): p('**两批不一致，未合并判定（待定，先诊断再加跑一批）：** ' + '；'.join(ov['inconsistent']) + '\n')
@@ -871,6 +871,10 @@ def cmd_selftest(a):
     _, res = setup({'emit_after': 1.018})
     g = res['formal_overall']['gate']['phases']['emit_after']
     chk(f'+1.8% emit_after -> pending (geo {g["geo"]:.4f} ub {g["high"]:.4f})', res['formal_overall']['verdict'] == 'pending')
+    _, res = setup({'mutate': 1.022}, nb=3, seed=3)
+    md = open(_ + '/RESULT.md').read()
+    chk(f'3 batches, +2.2% mutate -> fail, and the pooled row says fail (verdict {res["formal_overall"]["verdict"]})',
+        res['formal_overall']['verdict'] == 'fail' and res['formal_overall']['gate']['verdict'] == 'pending' and '**合并 3 批（判定）**' in md and md.split('**合并 3 批（判定）**')[1].split('\n')[0].count('| fail |') == 1)
     _, res = setup({}, nb=1)
     chk('one batch -> incomplete', res['verdict'] == 'incomplete')
     D2 = tempfile.mkdtemp(prefix='mac_gate_selftest_')  # two batches that disagree by 3% are not pooled
