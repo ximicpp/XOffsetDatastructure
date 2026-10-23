@@ -76,7 +76,8 @@ handle(in.root<Msg>());
 - 之前取得的根引用、元素指针或引用、`view()` 得到的 `string_view`、借用的 span 全部失效，
   不能再使用；
 - `XHandle` 会按新的内容重新解析（与 move 赋值后的规则相同）；
-- buffer 的地址（`get_address()`）不变。
+- buffer 的地址（`get_address()`）不变；例外是可搬槽位上的 buffer 收到放不下的内容时会先换存储
+  （见 USER_GUIDE 第 3.4 节），这时地址改变，`epoch()` 照样加一。
 
 ## 失败
 
