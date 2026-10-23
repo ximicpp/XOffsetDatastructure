@@ -2388,7 +2388,15 @@ namespace XOffsetDatastructure {
             scrub(0, old_size);
         }
 
-        void reserve(std::size_t requested) {
+        // W1: the no-op case (bound, already large enough) is decided inline;
+        // it is the same outcome as ensure_bound() + checked_count() below.
+        XOFFSET_DETAIL_MOVE_INLINE void reserve(std::size_t requested) {
+            if (is_bound() && requested <= capacity_) [[likely]] return;
+            reserve_grow(requested);
+        }
+
+    private:
+        void reserve_grow(std::size_t requested) {
             ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
@@ -2420,6 +2428,7 @@ namespace XOffsetDatastructure {
             }
         }
 
+    public:
         // Replaces all elements from stable live T objects. Self/subrange and
         // other live containers (including another arena) may overlap. Private
         // allocator control bytes that allocation itself mutates are not a
@@ -2494,7 +2503,7 @@ namespace XOffsetDatastructure {
         }
 
         void push_back(const T& value) {
-            insert_construct(size_, [&](T* dst) {
+            append_construct([&](T* dst) {
                 fixed_detail::transfer_construct(dst, value, binding());
             });
         }
@@ -2573,7 +2582,7 @@ namespace XOffsetDatastructure {
         }
 
         T& emplace_back() {
-            return *insert_construct(size_, [&](T* dst) {
+            return append_construct([&](T* dst) {
                 fixed_detail::default_construct(dst, binding());
             });
         }
@@ -2581,12 +2590,26 @@ namespace XOffsetDatastructure {
         template <typename... Args>
             requires (sizeof...(Args) > 0)
         T& emplace_back(Args&&... args) {
-            return *insert_construct(size_, [&](T* dst) {
+            return append_construct([&](T* dst) {
                 fixed_detail::construct_bound(dst, binding(), std::forward<Args>(args)...);
             });
         }
 
     protected:
+        // W1: appending into spare capacity of a bound vector is decided
+        // inline; it is insert_construct(size_)'s first branch (size_ <
+        // capacity_ <= max_size()). Growth and the unbound error stay there.
+        template <typename Construct>
+        XOFFSET_DETAIL_MOVE_INLINE T& append_construct(Construct&& construct) {
+            if (is_bound() && size_ < capacity_) [[likely]] {
+                T* slot = data() + size_;
+                construct(slot);
+                ++size_;
+                return *slot;
+            }
+            return *insert_construct(size_, construct);
+        }
+
         static size_type checked_count(std::size_t count) {
             if (count > max_size()) throw XBadAlloc();
             return static_cast<size_type>(count);
