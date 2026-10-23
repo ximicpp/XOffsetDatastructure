@@ -261,11 +261,12 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 
 ## 8. 核心承诺与 API 稳定性
 
-alpha 之间不承诺源码 API 或 ABI 稳定。下面 K1–K7 是核心承诺，后续版本不得回退；
+alpha 之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺，后续版本不得回退；
 相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
 | # | 承诺 | 接口 / 机制 |
 | --- | --- | --- |
+| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（typelayout：布局签名里带指针记号的类型一律拒绝，含裸指针、成员指针和虚表）；容器头只存相对偏移，根用基址偏移 |
 | K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
@@ -273,6 +274,11 @@ alpha 之间不承诺源码 API 或 ABI 稳定。下面 K1–K7 是核心承诺�
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
 | K6 | schema 指纹精确匹配，不同就拒绝 | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | `tools/sigs/` 签名基线与跨目标比对 |
+
+K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
+buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
+压缩；`XHandle` 用 epoch 在搬动后重新定位。同 ABI、已信任的数据可以用 `load_unverified`
+省掉校验，不可信输入走 K4。
 
 K7 的现状与目标：
 
