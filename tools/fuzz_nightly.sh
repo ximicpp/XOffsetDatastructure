@@ -107,7 +107,11 @@ if ! docker pull --platform linux/amd64 "$IMAGE" > "$OUT/pull.log" 2>&1; then
   docker pull --platform linux/amd64 "$RUN_IMAGE" >> "$OUT/pull.log" 2>&1 || { echo "docker pull failed, see pull.log"; exit 0; }
 fi
 write_wrapper "$RUN_IMAGE"
-python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool > /dev/null || { echo "cmake preparation failed"; exit 0; }
+if [ ! -x build/cmake-tool/root/bin/cmake ]; then
+  rm -rf build/cmake-tool
+  python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool > "$OUT/cmake.log" 2>&1 ||
+    { echo "cmake preparation failed, see cmake.log"; exit 0; }
+fi
 
 # One build for both jobs; the cache line keeps a drill build from leaking
 # into the next nightly.
