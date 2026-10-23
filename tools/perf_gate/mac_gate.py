@@ -24,6 +24,8 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
   selftest      synthetic data through the whole analysis
+  diag-freeze / diag-formal / diag-analyze   a diagnostic batch with any set of equal-length labels and
+                A/A copies (same harness, copies and start conditions; report only, no verdict)
 """
 import argparse, datetime, hashlib, json, math, os, platform, random, shutil, statistics as st
 import subprocess, sys, tempfile, time
@@ -259,7 +261,7 @@ def quiet_or_exit(D, label, sampler, timeout_s, quiet_s=180.0):
     return rec
 
 
-def cpu_summary(path, t0=None, t1=None):
+def cpu_summary(path, t0=None, t1=None, own=()):
     """Summary of a CpuSampler log over [t0, t1]: samples, Chrome CPU, other busy processes, compilers."""
     recs = [json.loads(l) for l in open(path)] if os.path.exists(path) else []
     recs = [r for r in recs if (t0 is None or r['t'] >= t0) and (t1 is None or r['t'] <= t1)]
@@ -267,7 +269,7 @@ def cpu_summary(path, t0=None, t1=None):
     for r in recs:
         chrome.append(sum(b['pcpu'] for b in r['busy'] if 'chrome' in b['comm'].lower()))
         ob = [b for b in r['busy'] if 'chrome' not in b['comm'].lower() and 'python' not in os.path.basename(b['comm']).lower()
-              and not os.path.basename(b['comm']).startswith(tuple(FN.values()) + ('slg_',))]
+              and not os.path.basename(b['comm']).startswith(tuple(FN.values()) + tuple(own) + ('slg_',))]
         other += bool(ob); comp += bool(r['compilers'])
         for b in ob: names[os.path.basename(b['comm'])] = names.get(os.path.basename(b['comm']), 0) + 1
     out = {'samples': len(recs), 'other_busy_samples': other, 'compile_samples': comp,
@@ -299,7 +301,7 @@ def cmd_formal(a):
                 order = list(LIBS); random.Random(20261022 + 1000 * (a.batch - 1) + rnd).shuffle(order)
                 for k in order:
                     f.write(json.dumps({'round': rnd, 'cycle': rnd // R['rounds_per_cycle'], 'lib': k, 'copy': rnd % C,
-                                        'phase_ns': run_formal_child(D, B, k, rnd % C, fr['trace'], R['child_timeout_s'])}) + '\n')
+                                        'phase_ns': run_formal_child(D, B, FN[k], rnd % C, fr['trace'], R['child_timeout_s'])}) + '\n')
     finally:
         sampler.stop()
     meta['end_utc'] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'); meta['load_end'] = os.getloadavg()
@@ -310,20 +312,20 @@ def cmd_formal(a):
           f'old {b["old"]["passed"]}/12, cpu {meta["cpu"]}  (the gate verdict needs the pooled batches: run analyze)')
 
 
-def run_formal_child(D, B, k, copy, trace, timeout):
-    f = f'{FN[k]}{copy}'
+def run_formal_child(D, B, stem, copy, trace, timeout):
+    f = f'{stem}{copy}'
     with tempfile.TemporaryDirectory(dir=B) as d:
         p = subprocess.run([f'{D}/bin/{f}', 'run', '--wire', f'{D}/wire/{f}.input.wire', '--trace', trace, '--wire-out', d + '/w',
                             '--canonical-out', d + '/c', '--queries-out', d + '/q', '--result', d + '/r.json'],
                            capture_output=True, timeout=timeout, cwd=B, env=CHILD_ENV)
-        if p.returncode: raise SystemExit(f'child failed {k}: {p.stderr[-300:]}')
+        if p.returncode: raise SystemExit(f'child failed {f}: {p.stderr[-300:]}')
         return {kk: int(v) for kk, v in json.load(open(d + '/r.json'))['phase_ns'].items()}
 
 
 CHILD_ENV = dict(os.environ)
 
 
-def load_formal(B, R):
+def load_formal(B, R, nlibs=len(LIBS)):
     by = {}
     for line in open(B + '/raw.jsonl'):
         r = json.loads(line); p = r['phase_ns']
@@ -331,7 +333,7 @@ def load_formal(B, R):
         p['total'] = sum(v for kk, v in r['phase_ns'].items() if kk != 'read_sum')
         by.setdefault(r['round'], {})[r['lib']] = p
     rpc = R['rounds_per_cycle']; ncyc = len(by) // rpc
-    if ncyc * rpc != len(by) or any(len(v) != len(LIBS) for v in by.values()):
+    if ncyc * rpc != len(by) or any(len(v) != nlibs for v in by.values()):
         raise SystemExit(f'{B}/raw.jsonl is incomplete ({len(by)} rounds)')
     return by, ncyc
 
@@ -651,6 +653,124 @@ def render_md(fr, res):
     return '\n'.join(out) + '\n'
 
 
+# ---------------------------------------------------------------- diagnostic batches (no gate verdict)
+
+DIAG_RULES = {
+    'cycles': 65, 'rounds_per_cycle': 3, 'warmup_cycles': 1, 'copies': COPIES, 'child_timeout_s': 30,
+    'seed': 'random.Random(20261023 + 1000 * (batch - 1) + round).shuffle(labels)',
+    'phases': GATE_PHASES + ['load', 'reload', 'total'],
+    'interval': 'per-cycle mean log ratio (formal_r3.py), batches pooled and per batch; two-sided 95%, Bonferroni '
+                'k = (compared labels) x 3 gate phases, the same q for the other phases and for every A/A pair; '
+                'plus the median of the per-round ratios (robust to outlier rounds); report only, no verdict',
+    'copy_rule': 'every binary and wire is stored as `copies` separate files <label><i>; round r runs copy r % copies',
+    'quiet': 'same start conditions as the gate batches',
+}
+
+
+def cmd_diag_freeze(a):
+    D = a.dir
+    if os.path.exists(D): sys.exit(f'{D} exists')
+    bins = {}
+    for item in a.bin:  # LABEL=BIN:WIRE
+        lab, rest = item.split('=', 1); b, w = rest.rsplit(':', 1); bins[lab] = (b, w)
+    aa = dict(x.split(':', 1) for x in a.aa or [])  # AA_LABEL:LABEL, a second copy of LABEL
+    for x, y in aa.items():
+        if y not in bins or x in bins: sys.exit(f'--aa {x}:{y}: {y} must be a --bin label and {x} a new one')
+        bins[x] = bins[y]
+    if len({len(l) for l in bins}) != 1: sys.exit('all labels must have the same length (equal path sizes)')
+    if a.reference not in bins: sys.exit(f'reference {a.reference} is not a --bin label')
+    if a.expect_wire:
+        bad = [l for l, (b, w) in bins.items() if h(w) != a.expect_wire]
+        if bad: sys.exit(f'input wire differs from {a.expect_wire}: {bad}')
+    os.makedirs(D + '/bin'); os.makedirs(D + '/wire')
+    for lab, (b, w) in bins.items():
+        for i in range(COPIES): shutil.copy2(b, f'{D}/bin/{lab}{i}'); shutil.copy2(w, f'{D}/wire/{lab}{i}.input.wire')
+    shutil.copy2(os.path.abspath(__file__), D + '/mac_gate.py'); shutil.copy2(xc_ab.__file__, D + '/xc_ab.py')
+    fr = {'schema': SCHEMA + '-diag', 'name': os.path.basename(os.path.normpath(D)), 'note': a.note,
+          'labels': sorted(bins), 'reference': a.reference, 'aa': aa,
+          'desc': dict(x.split('=', 1) for x in a.desc or []),
+          'binaries': {l: h(f'{D}/bin/{l}0') for l in bins}, 'input_wires': {l: h(f'{D}/wire/{l}0.input.wire') for l in bins},
+          'trace': a.trace, 'trace_sha256': h(a.trace), 'rules': DIAG_RULES,
+          'mac_gate_py_sha256': h(D + '/mac_gate.py'), 'xc_ab_py_sha256': h(D + '/xc_ab.py'),
+          'host': platform.platform(), 'frozen_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')}
+    for l in bins:
+        if any(h(f'{D}/bin/{l}{i}') != fr['binaries'][l] for i in range(COPIES)): sys.exit(f'freeze: copies of {l} differ')
+    json.dump(fr, open(D + '/FREEZE.json', 'w'), indent=1)
+    print(f'FREEZE.json written: {D}')
+    for k, v in fr['binaries'].items(): print(f'  {k:6s} {v}')
+
+
+def cmd_diag_formal(a):
+    D = a.dir; fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']; labels = fr['labels']; C = R['copies']
+    B = f'{D}/formal-{a.batch}'
+    if os.path.exists(B): sys.exit(f'{B} exists (no reruns into the same directory)')
+    for l in labels:
+        if any(h(f'{D}/bin/{l}{i}') != fr['binaries'][l] for i in range(C)): sys.exit(f'{l}: binary changed since FREEZE')
+    cycles = a.cycles or R['cycles']
+    sampler = start_sampler(D, f'formal-{a.batch}')
+    quiet_or_exit(D, f'formal-{a.batch}', sampler, a.quiet_timeout, a.quiet_s)
+    os.makedirs(B); t0 = time.time()
+    meta = {'batch': a.batch, 'cycles': cycles, 'smoke': cycles != R['cycles'] or a.quiet_s != 180.0,
+            'start_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'), 'load_start': os.getloadavg()}
+    try:
+        with open(B + '/raw.jsonl', 'w') as f:
+            for rnd in range(cycles * R['rounds_per_cycle']):
+                order = list(labels); random.Random(20261023 + 1000 * (a.batch - 1) + rnd).shuffle(order)
+                for l in order:
+                    f.write(json.dumps({'round': rnd, 'cycle': rnd // R['rounds_per_cycle'], 'lib': l, 'copy': rnd % C,
+                                        'phase_ns': run_formal_child(D, B, l, rnd % C, fr['trace'], R['child_timeout_s'])}) + '\n')
+    finally:
+        sampler.stop()
+    meta['end_utc'] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'); meta['load_end'] = os.getloadavg()
+    meta['cpu'] = cpu_summary(f'{D}/cpu/formal-{a.batch}.jsonl', t0, time.time(), own=labels)
+    json.dump(meta, open(B + '/meta.json', 'w'), indent=1)
+    print(f'formal-{a.batch} done, cpu {meta["cpu"]}  (run diag-analyze)')
+
+
+def diag_block(data, R, fr):
+    ref, aa = fr['reference'], fr['aa']; rpc = R['rounds_per_cycle']
+    comp = [l for l in fr['labels'] if l != ref and l not in aa]
+    df = len(cycle_logs(data, R, comp[0], ref, 'mutate')) - 1
+    q = tq(1 - 0.05 / (2 * len(comp) * len(GATE_PHASES)), df)
+    def one(num, den):
+        out = {}
+        for m in R['phases']:
+            v = interval(cycle_logs(data, R, num, den, m), q, q)
+            v['round_median'] = math.exp(st.median(math.log(by[r][num][m] / by[r][den][m])
+                                                   for by, ncyc in data for r in range(R['warmup_cycles'] * rpc, ncyc * rpc)))
+            out[m] = v
+        return out
+    return {'df': df, 'k': len(comp) * len(GATE_PHASES), 'compare': {f'{l}/{ref}': one(l, ref) for l in comp},
+            'aa': {f'{x}/{y}': one(x, y) for x, y in aa.items()}}
+
+
+def cmd_diag_analyze(a):
+    D = a.dir; fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']; n = len(fr['labels'])
+    bdirs = sorted((os.path.join(D, x) for x in os.listdir(D) if x.startswith('formal-')), key=lambda p: int(p.rsplit('-', 1)[1]))
+    data = [load_formal(B, R, n) for B in bdirs]
+    metas = [json.load(open(B + '/meta.json')) if os.path.exists(B + '/meta.json') else {} for B in bdirs]
+    res = {'schema': fr['schema'], 'name': fr['name'], 'pooled': diag_block(data, R, fr),
+           'batches': {os.path.basename(B): diag_block([d], R, fr) for B, d in zip(bdirs, data)}, 'meta': metas,
+           'smoke': any(m.get('smoke') for m in metas), 'freeze_sha256': h(D + '/FREEZE.json'),
+           'quiet': [json.loads(l) for l in open(D + '/quiet.jsonl')] if os.path.exists(D + '/quiet.jsonl') else []}
+    json.dump(res, open(D + '/DIAG_RESULT.json', 'w'), indent=1)
+    out = [f'# 诊断批次 {fr["name"]}' + ('（冒烟，不是结果）' if res['smoke'] else '') + '\n',
+           f'- {fr["note"]}', '- ' + '；'.join(f'{l} = {fr["desc"].get(l, "")} `{fr["binaries"][l][:16]}…`' for l in fr['labels'] if l not in fr['aa']),
+           f'- A/A：' + '，'.join(f'{x} 是 {y} 的另一份' for x, y in fr['aa'].items()) + f'；每个二进制 {R["copies"]} 份文件轮换',
+           f'- 只报，不判定。区间：逐周期 log 比值，双侧 95%，Bonferroni k={res["pooled"]["k"]}；"轮中位数"是逐轮比值的中位数（不受离群轮影响）',
+           f'- FREEZE.json sha256 `{res["freeze_sha256"]}`；mac_gate.py `{fr["mac_gate_py_sha256"]}`\n']
+    for scope, blk in [('合并 ' + str(len(bdirs)) + ' 批', res['pooled'])] + list(res['batches'].items()):
+        out += [f'## {scope}\n', '| 比值 | ' + ' | '.join(R['phases']) + ' |', '| --- |' + ' --- |' * len(R['phases'])]
+        for name, v in list(blk['compare'].items()) + [(k + '（A/A）', v) for k, v in blk['aa'].items()]:
+            out.append(f'| {name} | ' + ' | '.join(f'{iv4(v[m])} 轮中位数 {f4(v[m]["round_median"])}' for m in R['phases']) + ' |')
+        out.append('')
+    out.append('## 环境\n')
+    for q in res['quiet']: out.append(f'- 开跑条件 {q["label"]}：' + ', '.join(f'{k}={v}' for k, v in q.items() if k != 'label'))
+    for B, m in zip(bdirs, metas): out.append(f'- {os.path.basename(B)}：{m.get("start_utc")} → {m.get("end_utc")}，CPU 采样 {m.get("cpu")}')
+    open(D + '/DIAG_RESULT.md', 'w').write('\n'.join(out) + '\n')
+    print(f'DIAG_RESULT.json / DIAG_RESULT.md written: {D}')
+
+
 # ---------------------------------------------------------------- trend
 
 TREND_HEADER = ('| 批次 | head | anchor | 结论 | 合并批数 | 旧口径通过数（逐批） | head÷anchor 合并上界 read_sum / mutate / emit_after | A/A '
@@ -794,9 +914,19 @@ def main():
     s = sp.add_parser('analyze'); s.add_argument('dir')
     s.add_argument('--exclude', action='append', help='N:reason, leave formal-N out of the pooled gate (diagnosed invalid batch)')
     s = sp.add_parser('trend'); s.add_argument('dir'); s.add_argument('--trend', required=True); s.add_argument('--link')
+    s = sp.add_parser('diag-freeze', help='diagnostic batch: any equal-length labels, A/A copies, no verdict'); s.add_argument('dir')
+    s.add_argument('--bin', action='append', required=True, help='LABEL=BIN:WIRE (repeatable)')
+    s.add_argument('--aa', action='append', help='AA_LABEL:LABEL, a second copy of LABEL (repeatable)')
+    s.add_argument('--desc', action='append', help='LABEL=description (repeatable)')
+    s.add_argument('--reference', required=True); s.add_argument('--trace', required=True)
+    s.add_argument('--expect-wire'); s.add_argument('--note', default='')
+    s = sp.add_parser('diag-formal'); s.add_argument('dir'); s.add_argument('--batch', type=int, required=True)
+    s.add_argument('--quiet-timeout', type=int, default=1800); s.add_argument('--quiet-s', type=float, default=180.0); s.add_argument('--cycles', type=int)
+    s = sp.add_parser('diag-analyze'); s.add_argument('dir')
     sp.add_parser('selftest')
     a = ap.parse_args()
-    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'selftest': cmd_selftest}[a.cmd](a)
+    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'selftest': cmd_selftest,
+     'diag-freeze': cmd_diag_freeze, 'diag-formal': cmd_diag_formal, 'diag-analyze': cmd_diag_analyze}[a.cmd](a)
 
 
 if __name__ == '__main__':
