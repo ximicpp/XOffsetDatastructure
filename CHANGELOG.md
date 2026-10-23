@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
+  without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
+  (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
+  `tests/fuzz/regressions/<target>/` and each harness's seed corpus in every
+  CI job. `test_v2_fuzz` draws each case from its own stream of
+  (seed, case), reruns one case with `--replay <seed> <case>`, and with
+  `XOFFSET_FUZZ_DUMP_DIR` set writes a failing input wire before aborting.
+  `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
+  with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
+  given seed now generates different cases than in 0.3.0-beta.1.
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
+- Performance: canonical wires (no holes, blocks laid out back to back in
+  visiting order, as `XCompactor::compact` writes them) are validated with a
+  single cursor instead of the bitmaps, and take no scratch memory at any
+  size. At the first block elsewhere or the first hole the live bitmap is set
+  to the cursor's prefix and validation continues there, so accept/reject sets
+  and first errors are unchanged (`test_v2_fuzz` compares every case with the
+  cursor off). Map/set key order is checked without an early exit, and
+  validation errors are raised from one out-of-line function.
+- Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
+  root type, canonical / ascending-with-holes / out-of-order wires that pass
+  verified validation and prints them to stderr at exit (not thread-safe;
+  diagnostic builds only).
+
 ## 0.3.0-beta.1: production-readiness beta
 
 Release gates G1–G8 (`PRODUCTION_READINESS_GOAL`): K1–K7 mapped to tests, two

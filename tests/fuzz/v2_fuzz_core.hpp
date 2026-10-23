@@ -12,8 +12,6 @@
 //      accepted reload must hold byte-identical payload (in particular gap and
 //      tail bytes left by every earlier reload read as zero) and re-save
 //      byte-identically; after a reject typed root access must throw.
-//   6. the typed validator with the ascending live-range run switched off:
-//      same accept/reject, same error message, same payload and re-save.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
@@ -25,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <memory_resource>
 #include <optional>
@@ -32,6 +31,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace xo = XOffsetDatastructure;
@@ -70,10 +70,63 @@ constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 // more is a header-stage rejection (threat model R1: a short sparse wire may
 // declare a huge payload).
 constexpr std::size_t kLimit = std::size_t(1) << 22;
+// Payloads up to this size keep the validator's granule bitmaps inline.
+constexpr std::uint64_t kInlineBitmapExtent = 32 * 1024;
+
+// What fail() reports besides its message. test_v2_fuzz sets these per case:
+// the input wire under test, a file-name tag and the command that replays the
+// case. The libFuzzer targets leave them empty (libFuzzer saves the input).
+struct FailContext {
+    const std::string* wire = nullptr;
+    std::string tag;
+    std::string replay;
+};
+FailContext g_fail;
 
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "v2 fuzz FAILED: " << message << "\n";
+    if (!g_fail.replay.empty()) std::cerr << "v2 fuzz replay: " << g_fail.replay << "\n";
+    // XOFFSET_FUZZ_DUMP_DIR: keep the failing input (<tag>.wire) and the report
+    // (<tag>.txt) for the nightly report job, which has no other copy of it.
+    const char* dir = std::getenv("XOFFSET_FUZZ_DUMP_DIR");
+    if (dir && *dir && g_fail.wire) {
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        const std::string base = std::string(dir) + "/" + (g_fail.tag.empty() ? "v2fuzz" : g_fail.tag);
+        const std::string report = "v2 fuzz FAILED: " + message + "\nreplay: " + g_fail.replay + "\n";
+        bool ok = true;
+        for (const auto& [path, bytes] : {std::pair{base + ".wire", g_fail.wire}, std::pair{base + ".txt", &report}}) {
+            std::FILE* f = std::fopen(path.c_str(), "wb");
+            ok = f && std::fwrite(bytes->data(), 1, bytes->size(), f) == bytes->size() && std::fclose(f) == 0 && ok;
+        }
+        std::cerr << "v2 fuzz dump: " << base << ".wire" << (ok ? "" : " (write FAILED)") << "\n";
+    }
     std::abort(); // libFuzzer records abort as a crash and saves the input
+}
+
+// Drill builds only (CMake -DXOFFSET_FUZZ_INJECT_CRASH=ON): an input starting
+// with XOFFSET-INJECT crashes the harness, so the nightly crash pipeline can be
+// exercised end to end without a real bug.
+inline void inject_crash_drill([[maybe_unused]] const std::uint8_t* data, [[maybe_unused]] std::size_t size) {
+#ifdef XOFFSET_FUZZ_INJECT_CRASH
+    constexpr char marker[] = "XOFFSET-INJECT";
+    if (size >= sizeof(marker) - 1 && std::memcmp(data, marker, sizeof(marker) - 1) == 0) {
+        std::cerr << "XOFFSET_FUZZ_INJECT_CRASH: injected crash (drill input)\n";
+        std::abort();
+    }
+#endif
+}
+
+// Per-case random stream of test_v2_fuzz: case `id` of a run with `seed`
+// depends on nothing else, so `test_v2_fuzz --replay <seed> <id>` reruns it
+// alone (splitmix64 finalizer over both values).
+std::mt19937_64 case_rng(std::uint64_t seed, std::uint64_t id) {
+    auto mix = [](std::uint64_t z) {
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+        return z ^ (z >> 31);
+    };
+    return std::mt19937_64(mix(seed ^ mix(id + 0x9e3779b97f4a7c15ull)));
 }
 
 // ---------------------------------------------------------------------------
@@ -308,34 +361,6 @@ std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::s
         if (error) *error = e.what();
         return std::nullopt;
     }
-}
-
-// Acceptor 6: the typed validator with the ascending live run switched off
-// (every live range inserted into the byte index directly). It must agree
-// with acceptor 2 on accept/reject and on the error message.
-std::optional<Buffer> typed_load_direct(const std::string& wire, std::string* error) {
-    xo::detail::wire_validation_defer_ascending_owned = false;
-    auto result = typed_load(wire, error);
-    xo::detail::wire_validation_defer_ascending_owned = true;
-    return result;
-}
-
-void compare_direct(const std::string& wire, std::optional<Buffer>& typed,
-                    const std::string& terr, const std::string& where) {
-    std::string derr;
-    auto direct = typed_load_direct(wire, &derr);
-    if (bool(direct) != bool(typed))
-        fail(where + ": direct=" + (direct ? "accept" : "reject(" + derr + ")") +
-             " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
-    if (!typed) {
-        if (derr != terr) fail(where + ": direct error '" + derr + "' != typed error '" + terr + "'");
-        return;
-    }
-    const auto a = typed->get_buffer(), b = direct->get_buffer();
-    if (a.size() != b.size() || std::memcmp(a.data(), b.data(), a.size()) != 0)
-        fail(where + ": direct payload differs");
-    if (typed->save_verified() != direct->save_verified())
-        fail(where + ": direct re-save differs");
 }
 
 // Acceptor 5: one buffer reused for every case (same maximum as typed_load).
@@ -685,27 +710,26 @@ enum class Outcome { Accepted, HeaderReject, PayloadReject };
 
 // One input through the oracle and all library acceptors. They must agree;
 // an accepted input is then read, mutated and re-saved (see exercise()).
-Outcome check_case(const std::string& w, std::mt19937_64& rng, std::size_t id) {
+Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string& id) {
     const auto o = oracle(w);
     std::string terr, rerr, verr;
     auto typed = typed_load(w, &terr);
     if (bool(typed) != o.ok)
-        fail("case " + std::to_string(id) + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
+        fail("case " + id + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
              " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     std::string lerr;
     if (reload_accepts(w, &lerr) != bool(typed))
-        fail("case " + std::to_string(id) + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
+        fail("case " + id + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
-    compare_direct(w, typed, terr, "case " + std::to_string(id));
     if (o.ok || o.stage == Oracle::Stage::Payload) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
         if (raw != o.ok)
-            fail("case " + std::to_string(id) + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
+            fail("case " + id + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
         if (recv != o.ok)
-            fail("case " + std::to_string(id) + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
+            fail("case " + id + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     }
     if (o.ok) { exercise(*typed, rng); return Outcome::Accepted; }
@@ -720,16 +744,28 @@ void check_golden(const std::string& w, const std::string& where) {
     auto loaded = typed_load(w);
     if (!loaded) fail(where + ": typed load rejects a library-generated wire");
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
-    compare_direct(w, loaded, "", where);
     compare_reload(*loaded);
     if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
 }
 
+// The same content compacted: blocks in visiting preorder, no holes.
+std::string canonical_wire(const std::string& w) {
+    auto loaded = xo::XBuffer::load_verified<fz::Root>(w);
+    auto compact = xo::XCompactor::compact<fz::Root>(loaded);
+    return compact.save_verified<fz::Root>();
+}
+
+// count built wires, and the compacted form of every second one.
 std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
     std::vector<std::string> pool;
     for (std::size_t i = 0; i < count; ++i) {
         auto w = build_wire(rng);
         check_golden(w, "golden " + std::to_string(i));
+        if (i % 2 == 0) {
+            auto c = canonical_wire(w);
+            check_golden(c, "canonical " + std::to_string(i));
+            pool.push_back(std::move(c));
+        }
         pool.push_back(std::move(w));
     }
     return pool;
@@ -751,17 +787,21 @@ std::string sized_wire(std::mt19937_64 rng, std::size_t vals) {
     return buf.save_verified();
 }
 
-// Wires around the size gate of the ascending live run (used <= max_extent
-// takes the run, larger payloads insert directly). [0, 3): valid wires with
-// used = page - 8, page, page + 8. Library wires keep used a multiple of 8, so
-// [3, 5) patch the page-sized wire to used = page - 1 (last payload byte
-// dropped) and page + 1 (one zero byte appended); they are mutated inputs.
+// Wires around the validator's inline bitmap limit (payloads up to
+// inline_extent keep both granule bitmaps inside the context, larger ones take
+// host words). [0, 3): valid wires with used = page - 8, page, page + 8.
+// Library wires keep used a multiple of 8, so [3, 5) patch the page-sized wire
+// to used = page - 1 (last payload byte dropped) and page + 1 (one zero byte
+// appended); they are mutated inputs.
 std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
-    constexpr std::uint64_t page = xo::detail::WireValidationContext::DeferredOwned::max_extent;
+    // WireGranuleIndex::inline_extent (test_v2_fuzz checks it); spelled out so
+    // the core also builds against libraries without it (validation_outcomes).
+    constexpr std::uint64_t page = kInlineBitmapExtent;
     const auto content = rng;
     rng.discard(1);
     std::vector<std::string> out;
-    for (std::size_t vals = 0; out.size() < 3; ++vals) {
+    // Two bytes per value; the rest of the root is well under 1200 bytes.
+    for (std::size_t vals = page / 2 - 600; out.size() < 3; ++vals) {
         auto w = sized_wire(content, vals);
         xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
         const auto target = page - 8 + 8 * out.size();
@@ -786,5 +826,21 @@ std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
     out.push_back(std::move(shorter));
     out.push_back(std::move(longer));
     return out;
+}
+
+// Seed corpus for fuzz_v2_wire: the golden pool plus the page boundary wires,
+// one file per wire. Returns the number written.
+std::size_t write_v2_seed_corpus(const std::string& dir) {
+    std::mt19937_64 rng(20261021);
+    std::filesystem::create_directories(dir);
+    auto pool = seed_pool(rng, 64);
+    for (auto& w : page_boundary_wires(rng)) pool.push_back(std::move(w));
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        const auto path = dir + "/seed-" + std::to_string(i) + ".wire";
+        std::FILE* f = std::fopen(path.c_str(), "wb");
+        if (!f || std::fwrite(pool[i].data(), 1, pool[i].size(), f) != pool[i].size() || std::fclose(f) != 0)
+            fail("cannot write " + path);
+    }
+    return pool.size();
 }
 } // namespace
