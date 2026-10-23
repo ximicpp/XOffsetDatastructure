@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-"""Nightly fuzz reporting and watch (H4, .github/workflows/fuzz.yml).
+"""Nightly fuzz reporting (H4).
 
-`report` runs after the fuzz jobs of a nightly or manual run. It reads every
-findings.json the jobs uploaded, files one issue per crash signature (comment
-on an open one, reopen a closed one as a regression, otherwise create one),
-pushes the reproducer to a `fuzz-crash/<signature>` branch under
-tests/fuzz/regressions/, and records job failures without findings on the
-single rolling `fuzz-infra` issue. A nightly with every job green closes that
-issue. Crash issues are never closed here; the fix PR closes them.
+`report` runs after a nightly or manual fuzz run, on GitHub Actions
+(.github/workflows/fuzz.yml) or on any Docker host (tools/fuzz_nightly.sh).
+It reads every findings.json under --findings-dir, files one issue per crash
+signature (comment on an open one, reopen a closed one as a regression,
+otherwise create one), pushes the reproducer to a `fuzz-crash/<signature>`
+branch under tests/fuzz/regressions/, and records job failures without
+findings on the single rolling `fuzz-infra` issue. A nightly with every job
+green closes that issue. Crash issues are never closed here; the fix PR
+closes them.
 
-`watch` runs on pushes to next_cpp26 (and manual runs given `watch_hours`). It
-re-enables the main-branch dispatcher, which GitHub disables after 60 days
-without repository activity, then comments on `fuzz-infra` when the newest
-nightly run is older than the threshold.
-
-findings.json is the file tools/fuzz_findings.py writes for each libFuzzer
-job (fuzz-<target>/fuzz-report/<target>/findings.json). The fields read here:
+findings.json is what tools/fuzz_findings.py (libFuzzer jobs) and
+tools/fuzz_gcc16.py (GCC 16 jobs) write. The fields read here:
 
     {"target": "v2_wire", "artifact": "fuzz-v2_wire",
      "job": "libfuzzer-v2_wire",   # optional; default libfuzzer-<target>
@@ -51,8 +48,6 @@ LABELS = {
 INFRA_TITLE = '[fuzz-infra] nightly fuzz infrastructure'
 REGRESSION_DIR = 'tests/fuzz/regressions'
 BRANCH_PREFIX = 'fuzz-crash/'
-STALE_MARKER = '<!-- fuzz-watch:stale -->'
-STALE_REPEAT_HOURS = 12
 MAX_LOG_CHARS = 6000
 MAX_INPUT_BYTES = 1 << 20
 
@@ -67,7 +62,7 @@ class GhError(RuntimeError):
 
 
 class Gh:
-    """The few REST calls the report and the watch need, through `gh api`."""
+    """The few REST calls the report needs, through `gh api`."""
 
     def __init__(self, repo):
         self.repo = repo
@@ -109,9 +104,6 @@ class Gh:
     def comment(self, number, body):
         self.api('POST', f'issues/{number}/comments', {'body': body})
 
-    def comments(self, number):
-        return self.api('GET', f'issues/{number}/comments?per_page=100', paginate=True)
-
     def set_state(self, number, state, reason=None):
         body = {'state': state}
         if reason:
@@ -138,16 +130,6 @@ class Gh:
             'message': message, 'tree': tree['sha'], 'parents': [base_sha]})
         self.api('POST', 'git/refs', {'ref': f'refs/heads/{branch}', 'sha': commit['sha']})
 
-    def enable_workflow(self, workflow):
-        self.api('PUT', f'actions/workflows/{workflow}/enable')
-
-    def workflow(self, workflow):
-        return self.api('GET', f'actions/workflows/{workflow}')
-
-    def runs(self, workflow, branch, event):
-        data = self.api('GET', f'actions/workflows/{workflow}/runs?branch={branch}&event={event}&per_page=100')
-        return data.get('workflow_runs', [])
-
 
 def fence(text):
     longest = max((len(run) for run in re.findall(r'`+', text)), default=0)
@@ -158,10 +140,6 @@ def fence(text):
 def one_line(text, limit=80):
     text = ' '.join(str(text).split())
     return text if len(text) <= limit else text[:limit - 3] + '...'
-
-
-def parse_time(stamp):
-    return dt.datetime.fromisoformat(stamp.replace('Z', '+00:00'))
 
 
 def load_findings(root):
@@ -233,7 +211,8 @@ class Context:
         self.mode = args.mode
         self.ref = getattr(args, 'ref', None) or 'next_cpp26'
         server = args.server_url.rstrip('/')
-        self.run_url = f'{server}/{self.repo}/actions/runs/{self.run_id}'
+        self.run_url = getattr(args, 'run_url', None) or f'{server}/{self.repo}/actions/runs/{self.run_id}'
+        self.push_branches = not getattr(args, 'no_branches', False)
         self.commit_url = f'{server}/{self.repo}/commit/{self.sha}'
         self.today = dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d')
 
@@ -282,6 +261,8 @@ def finding_details(ctx, finding, count, branch_note):
 def regression_branch(gh, ctx, finding, actions):
     branch = BRANCH_PREFIX + finding['signature']
     path = f'{REGRESSION_DIR}/{finding["target"]}/{finding["signature"]}'
+    if not ctx.push_branches:
+        return 'Regression branch: not pushed (drill run)'
     if finding['input_path'] is None:
         return 'Regression branch: not pushed, the finding has no input file'
     if finding['input_path'].stat().st_size > MAX_INPUT_BYTES:
@@ -289,7 +270,7 @@ def regression_branch(gh, ctx, finding, actions):
     if gh.branch_exists(branch):
         return f'Regression branch: `{branch}` already exists (not changed)'
     message = (f'fuzz: regression input {finding["target"]}/{finding["signature"]}\n\n'
-               f'Found by fuzz.yml {ctx.mode} run {ctx.run_url}\n'
+               f'Found by the {ctx.mode} fuzz run {ctx.run_url}\n'
                f'Fix on this branch and keep {path} so CTest replays it.\n')
     gh.create_branch_with_file(branch, ctx.sha, path, finding['input_path'].read_bytes(), message)
     actions.append(f'pushed `{branch}` with `{path}`')
@@ -368,53 +349,6 @@ def run_report(gh, args):
             'infra_failures': failures, 'actions': actions}
 
 
-def run_watch(gh, args):
-    actions = []
-    now = parse_time(args.now) if args.now else dt.datetime.now(dt.timezone.utc)
-    try:
-        gh.enable_workflow(args.dispatcher)
-        dispatcher = gh.workflow(args.dispatcher)
-        actions.append(f'{args.dispatcher}: {dispatcher.get("state")}')
-    except GhError as error:
-        if error.status != 404:
-            raise
-        dispatcher = None
-        actions.append(f'{args.dispatcher}: not on the default branch')
-    title = re.compile(args.title_regex)
-    nightly = [run for run in gh.runs(args.workflow, args.branch, 'workflow_dispatch')
-               if title.search(run.get('display_title') or '')]
-    if nightly:
-        newest = max(nightly, key=lambda run: run['created_at'])
-        since = parse_time(newest['created_at'])
-        last = f'the newest nightly run [{newest["id"]}]({newest["html_url"]}) started {newest["created_at"]}'
-    elif dispatcher:
-        since = parse_time(dispatcher['created_at'])
-        last = f'no nightly run yet; {args.dispatcher} was added {dispatcher["created_at"]}'
-    else:
-        since, last = None, f'no nightly run and no {args.dispatcher} on the default branch'
-    age = (now - since).total_seconds() / 3600 if since else None
-    stale = (age is None and args.manual) or (age is not None and age > args.hours)
-    result = {'age_hours': None if age is None else round(age, 1), 'threshold_hours': args.hours,
-              'stale': stale, 'actions': actions}
-    if not stale:
-        return result
-    issue = open_infra_issue(gh)
-    if issue and not args.manual:
-        cutoff = now - dt.timedelta(hours=STALE_REPEAT_HOURS)
-        recent = [c for c in gh.comments(issue['number'])
-                  if STALE_MARKER in (c.get('body') or '') and parse_time(c['created_at']) > cutoff]
-        if recent:
-            actions.append(f'#{issue["number"]} already has a stale-nightly comment from the last {STALE_REPEAT_HOURS} h')
-            return result
-    for name, (color, description) in LABELS.items():
-        gh.ensure_label(name, color, description)
-    age_text = 'unknown' if age is None else f'{age:.1f} h'
-    infra_comment(gh, f'{STALE_MARKER}\nNo nightly fuzz run within {args.hours:g} h at '
-                  f'{now.strftime("%Y-%m-%dT%H:%MZ")}: {last} (age {age_text}). Checked by run '
-                  f'{args.run_url or "(local)"}.', actions)
-    return result
-
-
 def write_summary(title, result):
     path = os.environ.get('GITHUB_STEP_SUMMARY')
     lines = [f'### {title}', '', '```json', json.dumps(result, indent=2, default=str), '```', '']
@@ -437,27 +371,15 @@ def main(argv=None):
     report.add_argument('--ref', default=env.get('GITHUB_REF_NAME'))
     report.add_argument('--run-id', default=env.get('GITHUB_RUN_ID'))
     report.add_argument('--server-url', default=env.get('GITHUB_SERVER_URL', 'https://github.com'))
-    watch = sub.add_parser('watch', help='re-enable the dispatcher and flag a stale nightly')
-    watch.add_argument('--hours', type=float, default=36)
-    watch.add_argument('--manual', action='store_true', help='always comment when stale (drills)')
-    watch.add_argument('--workflow', default='fuzz.yml')
-    watch.add_argument('--branch', default='next_cpp26')
-    watch.add_argument('--dispatcher', default='nightly-fuzz-dispatch.yml')
-    watch.add_argument('--title-regex', default=r'\bnightly\b')
-    watch.add_argument('--run-url')
-    watch.add_argument('--now', help=argparse.SUPPRESS)
+    report.add_argument('--run-url', help='link for the run (default: the Actions run of --run-id)')
+    report.add_argument('--no-branches', action='store_true', help='drill: do not push fuzz-crash branches')
     args = parser.parse_args(argv)
     if not args.repo:
         parser.error('--repo or GITHUB_REPOSITORY is required')
-    gh = Gh(args.repo)
-    if args.command == 'report':
-        if not args.sha or not args.run_id:
-            parser.error('--sha and --run-id are required outside Actions')
-        result = run_report(gh, args)
-        write_summary('Fuzz report', result)
-    else:
-        result = run_watch(gh, args)
-        write_summary('Nightly watch', result)
+    if not args.sha or not args.run_id:
+        parser.error('--sha and --run-id are required outside Actions')
+    result = run_report(Gh(args.repo), args)
+    write_summary('Fuzz report', result)
     json.dump(result, sys.stdout, indent=2, default=str)
     print()
     return 0
