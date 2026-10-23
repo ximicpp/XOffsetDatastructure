@@ -762,8 +762,13 @@ namespace XOffsetDatastructure {
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
         // releasing one per load dominated small-message loads, so released
         // tables are emptied (bin and map storage returned to the host
-        // allocator) and kept in a small per-thread cache. A cached table is
-        // indistinguishable from a freshly constructed one.
+        // allocator) and kept in a small per-thread cache. D2: a table
+        // released by an in-place reload/reset keeps the storage of its small
+        // bins (at most keep_bin_entries entries each, keep_bytes per table),
+        // so the first retires after the reload, which usually take the same
+        // table back, do not allocate it again. A cached table differs from a
+        // freshly constructed one only in bin capacity, which no allocation
+        // decision, hole table or wire byte depends on.
         static bool& free_table_cache_available() noexcept {
             static thread_local bool available = true; // trivial: outlives the cache
             return available;
@@ -785,6 +790,11 @@ namespace XOffsetDatastructure {
         }
 
         struct FreeTableRecycler {
+            // Small-bin storage a table released by reload/reset keeps: at
+            // most 64 entries (256 B) per bin and 16 KiB per table, so at most
+            // 64 KiB per thread.
+            static constexpr std::size_t keep_bin_entries = 64;
+            static constexpr std::size_t keep_bytes = 16u * 1024u;
             // Kept out of line: every FreeTablePtr destructor on the mutate
             // path (insert_free_block's spare) inlines only the null check.
             void operator()(FreeTable* table) const noexcept {
@@ -793,16 +803,26 @@ namespace XOffsetDatastructure {
 #if defined(__clang__) || defined(__GNUC__)
             [[gnu::noinline, gnu::cold]]
 #endif
-            static void recycle(FreeTable* table) noexcept {
+            static void recycle(FreeTable* table, bool keep_bins = false) noexcept {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
+                std::size_t kept = 0;
                 for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u)
-                        std::vector<std::uint32_t>().swap(
-                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))]);
+                    std::uint64_t still_touched = 0;
+                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
+                        auto& bin = table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
+                        const auto bytes = bin.capacity() * sizeof(std::uint32_t);
+                        if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
+                            bin.clear(); // storage stays, so the bin stays touched
+                            kept += bytes;
+                            still_touched |= bits & (~bits + 1u);
+                        } else {
+                            std::vector<std::uint32_t>().swap(bin);
+                        }
+                    }
                     table->nonempty[word] = 0;
-                    table->touched[word] = 0;
+                    table->touched[word] = still_touched;
                 }
                 table->large.clear();
                 table->bytes = 0;
@@ -822,6 +842,25 @@ namespace XOffsetDatastructure {
                 if (cache.count) return FreeTablePtr(cache.tables[--cache.count]);
             }
             return FreeTablePtr(new FreeTable());
+        }
+
+        // A copy of an exact table for clone(). Entries are payload offsets,
+        // so they stay valid at the destination address. Bin order and the
+        // large map are kept, so both buffers allocate identically afterwards.
+        static FreeTablePtr copy_free_table(const FreeTable& src) {
+            auto table = make_free_table();
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = src.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    table->bins[bin] = src.bins[bin];
+                }
+                table->nonempty[word] = src.nonempty[word];
+                table->touched[word] |= src.nonempty[word];
+            }
+            table->large = src.large;
+            table->bytes = src.bytes;
+            table->count = src.count;
+            return table;
         }
 
         // The general allocation and retirement paths (see allocate_block
@@ -1408,7 +1447,7 @@ namespace XOffsetDatastructure {
         // caller finishes verification.
         void begin_reinit() noexcept {
             ++m_epoch;
-            free_table_.reset();
+            if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
@@ -1476,6 +1515,56 @@ namespace XOffsetDatastructure {
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
             }
+        }
+
+        // clone()/clone_into(): the host state that travels with a payload
+        // copied from a live buffer of this process. The logical size grows
+        // to src's (at most this owner's maximum; the tail reads as zero),
+        // the exact free table is copied (an incomplete one stays incomplete),
+        // and so are typed root access and the root/schema binding, because
+        // the bytes are exactly src's: nothing needs verifying. Throws
+        // XBadAlloc; on a throw this owner keeps the state the payload copy
+        // left it in.
+        void copy_clone_state(const XBufferCore& src) {
+            const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
+            if (logical > buffer_.size() && !buffer_.grow_to(logical)) throw XBadAlloc();
+            if (!src.free_table_lost_) {
+                try {
+                    free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
+                } catch (const std::bad_alloc&) {
+                    throw XBadAlloc();
+                } catch (const std::length_error&) {
+                    throw XBadAlloc();
+                }
+                free_table_lost_ = false;
+            }
+            typed_root_access_allowed_ = src.typed_root_access_allowed_;
+            schema_bound_ = src.schema_bound_;
+            bound_root_type_id_ = src.bound_root_type_id_;
+            bound_schema_hash_ = src.bound_schema_hash_;
+            root_type_identity_ = src.root_type_identity_;
+        }
+
+        // clone_into(): src's used payload replaces this owner's content in
+        // place, like reload_verified (same mapping, address and registration;
+        // epoch advances). On any failure this owner is left an empty arena.
+        void clone_state_from(const XBufferCore& src) {
+            if (this == &src) throw XException("clone_into(): source and destination are the same buffer");
+            try {
+                const auto* sm = src.arena();
+                if (!sm) throw XException("clone_into(): source buffer has no arena");
+                reinit_from_bytes(reinterpret_cast<const char*>(sm), static_cast<size_type>(sm->used_end));
+                copy_clone_state(src);
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+        }
+
+        // clone(): a new owner with src's maximum capacity, growth policy and
+        // pool.
+        MaximumCapacity clone_capacity() const noexcept {
+            return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool()};
         }
 
         // Empty arena: header only, no root, empty exact free table. Bytes
@@ -6117,6 +6206,37 @@ namespace XOffsetDatastructure {
             if (!this->arena()) throw XException("reset<T>(): buffer has no arena");
             return *this->template make<T>();
         }
+
+        /// An independent copy of this buffer in the same process: one copy of
+        /// the used payload into a new owner with this buffer's size, maximum
+        /// capacity, growth policy and pool. The exact free table, typed root
+        /// access and the root/schema binding come along, so the copy behaves
+        /// like this buffer would (same allocations, same save_verified bytes);
+        /// nothing goes through a wire and nothing is verified. Throws
+        /// XException when this buffer has no arena and XBadAlloc when the new
+        /// owner cannot be created; this buffer is never modified.
+        XBuffer clone() const {
+            const auto* sm = this->arena();
+            if (!sm) throw XException("clone(): buffer has no arena");
+            XBuffer out(reinterpret_cast<const char*>(sm), static_cast<std::size_t>(sm->used_end),
+                        this->clone_capacity());
+            out.copy_clone_state(*this);
+            return out;
+        }
+
+        /// The same copy into an existing buffer, reusing its mapping, address,
+        /// owner registration, maximum capacity and growth policy (like
+        /// reload_verified); dst's size becomes this buffer's size, at most
+        /// dst's maximum capacity. Every reference into dst's previous content is
+        /// invalidated and dst.epoch() advances. Throws XException when dst is
+        /// this buffer (nothing is changed) and XBadAlloc when this buffer's
+        /// used bytes exceed dst's maximum capacity; on any failure other than
+        /// the self copy dst is left an empty arena without a root, as after a
+        /// failed reload_verified.
+        void clone_into(XBuffer& dst) const {
+            dst.clone_state_from(*this);
+        }
+
         template <typename T>
         static XBuffer load_verified(const std::string& data,
                                      std::optional<MaximumCapacity> cap = std::nullopt) {
@@ -6381,6 +6501,9 @@ namespace XOffsetDatastructure {
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
         T& reset() { return XBuffer::reset<T>(); }
+
+        TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
+        void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }
 
         void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
 
