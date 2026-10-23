@@ -269,7 +269,7 @@ def cpu_summary(path, t0=None, t1=None, own=()):
     for r in recs:
         chrome.append(sum(b['pcpu'] for b in r['busy'] if 'chrome' in b['comm'].lower()))
         ob = [b for b in r['busy'] if 'chrome' not in b['comm'].lower() and 'python' not in os.path.basename(b['comm']).lower()
-              and not os.path.basename(b['comm']).startswith(tuple(FN.values()) + tuple(own) + ('slg_',))]
+              and not os.path.basename(b['comm']).strip('()').startswith(tuple(FN.values()) + tuple(own) + ('slg_',))]  # ps shows exiting children as (name)
         other += bool(ob); comp += bool(r['compilers'])
         for b in ob: names[os.path.basename(b['comm'])] = names.get(os.path.basename(b['comm']), 0) + 1
     out = {'samples': len(recs), 'other_busy_samples': other, 'compile_samples': comp,
