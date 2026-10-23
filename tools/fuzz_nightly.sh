@@ -75,7 +75,7 @@ needs = json.loads((Path(out) / 'needs.json').read_text())
 meta = {'start': start, 'end': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'sha': sha, 'seconds': int(secs), 'seeds': seeds.split(), 'cases_per_process': int(cases),
         'inject': inject == 'ON', 'image': image, 'jobs': {k: v['result'] for k, v in needs.items()}}
-lines = ['# Nightly fuzz %s' % start[:10], '', '- next_cpp26 `%s`, %s to %s' % (sha[:10], start, meta['end']),
+lines = ['# Nightly fuzz %s' % start[:10], '', '- commit `%s`, %s to %s' % (sha[:10], start, meta['end']),
          '- GCC 16 ASan+UBSan, %s s, seeds %s, %s cases per process%s' % (secs, seeds, cases, ', **inject drill**' if meta['inject'] else '')]
 for job in ('gcc16-diff', 'gcc16-replay'):
     path = Path(out) / job / 'findings.json'
