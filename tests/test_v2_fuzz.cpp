@@ -20,6 +20,8 @@
 
 #include <charconv>
 
+static_assert(kInlineBitmapExtent == xo::detail::WireGranuleIndex::inline_extent);
+
 namespace {
 constexpr int kBoundaryMutants = 301; // per page boundary wire, the first unmutated
 constexpr std::uint64_t kBoundaryStream = std::uint64_t(1) << 63;
@@ -111,7 +113,7 @@ int main(int argc, char** argv) {
     }
     Counts c;
     for (std::size_t i = 0; i < cases; ++i) count(c, run_case(in, seed, std::to_string(i)));
-    // Both sides of the ascending live run's size gate, each also mutated.
+    // Both sides of the inline bitmap limit, each also mutated.
     const std::size_t boundary_cases = in.boundary.size() * kBoundaryMutants;
     for (std::size_t k = 0; k < boundary_cases; ++k) count(c, run_case(in, seed, "b" + std::to_string(k)));
     if (sparse == 0) fail("no sparse wire in the pool");

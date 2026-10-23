@@ -12,8 +12,6 @@
 //      accepted reload must hold byte-identical payload (in particular gap and
 //      tail bytes left by every earlier reload read as zero) and re-save
 //      byte-identically; after a reject typed root access must throw.
-//   6. the typed validator with the ascending live-range run switched off:
-//      same accept/reject, same error message, same payload and re-save.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
@@ -72,6 +70,8 @@ constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 // more is a header-stage rejection (threat model R1: a short sparse wire may
 // declare a huge payload).
 constexpr std::size_t kLimit = std::size_t(1) << 22;
+// Payloads up to this size keep the validator's granule bitmaps inline.
+constexpr std::uint64_t kInlineBitmapExtent = 32 * 1024;
 
 // What fail() reports besides its message. test_v2_fuzz sets these per case:
 // the input wire under test, a file-name tag and the command that replays the
@@ -361,34 +361,6 @@ std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::s
         if (error) *error = e.what();
         return std::nullopt;
     }
-}
-
-// Acceptor 6: the typed validator with the ascending live run switched off
-// (every live range inserted into the byte index directly). It must agree
-// with acceptor 2 on accept/reject and on the error message.
-std::optional<Buffer> typed_load_direct(const std::string& wire, std::string* error) {
-    xo::detail::wire_validation_defer_ascending_owned = false;
-    auto result = typed_load(wire, error);
-    xo::detail::wire_validation_defer_ascending_owned = true;
-    return result;
-}
-
-void compare_direct(const std::string& wire, std::optional<Buffer>& typed,
-                    const std::string& terr, const std::string& where) {
-    std::string derr;
-    auto direct = typed_load_direct(wire, &derr);
-    if (bool(direct) != bool(typed))
-        fail(where + ": direct=" + (direct ? "accept" : "reject(" + derr + ")") +
-             " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
-    if (!typed) {
-        if (derr != terr) fail(where + ": direct error '" + derr + "' != typed error '" + terr + "'");
-        return;
-    }
-    const auto a = typed->get_buffer(), b = direct->get_buffer();
-    if (a.size() != b.size() || std::memcmp(a.data(), b.data(), a.size()) != 0)
-        fail(where + ": direct payload differs");
-    if (typed->save_verified() != direct->save_verified())
-        fail(where + ": direct re-save differs");
 }
 
 // Acceptor 5: one buffer reused for every case (same maximum as typed_load).
@@ -750,7 +722,6 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
         fail("case " + id + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
-    compare_direct(w, typed, terr, "case " + id);
     if (o.ok || o.stage == Oracle::Stage::Payload) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
@@ -773,7 +744,6 @@ void check_golden(const std::string& w, const std::string& where) {
     auto loaded = typed_load(w);
     if (!loaded) fail(where + ": typed load rejects a library-generated wire");
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
-    compare_direct(w, loaded, "", where);
     compare_reload(*loaded);
     if (loaded->save_verified() != w) fail(where + ": golden write-read-write not byte stable");
 }
@@ -804,17 +774,21 @@ std::string sized_wire(std::mt19937_64 rng, std::size_t vals) {
     return buf.save_verified();
 }
 
-// Wires around the size gate of the ascending live run (used <= max_extent
-// takes the run, larger payloads insert directly). [0, 3): valid wires with
-// used = page - 8, page, page + 8. Library wires keep used a multiple of 8, so
-// [3, 5) patch the page-sized wire to used = page - 1 (last payload byte
-// dropped) and page + 1 (one zero byte appended); they are mutated inputs.
+// Wires around the validator's inline bitmap limit (payloads up to
+// inline_extent keep both granule bitmaps inside the context, larger ones take
+// host words). [0, 3): valid wires with used = page - 8, page, page + 8.
+// Library wires keep used a multiple of 8, so [3, 5) patch the page-sized wire
+// to used = page - 1 (last payload byte dropped) and page + 1 (one zero byte
+// appended); they are mutated inputs.
 std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
-    constexpr std::uint64_t page = xo::detail::WireValidationContext::DeferredOwned::max_extent;
+    // WireGranuleIndex::inline_extent (test_v2_fuzz checks it); spelled out so
+    // the core also builds against libraries without it (validation_outcomes).
+    constexpr std::uint64_t page = kInlineBitmapExtent;
     const auto content = rng;
     rng.discard(1);
     std::vector<std::string> out;
-    for (std::size_t vals = 0; out.size() < 3; ++vals) {
+    // Two bytes per value; the rest of the root is well under 1200 bytes.
+    for (std::size_t vals = page / 2 - 600; out.size() < 3; ++vals) {
         auto w = sized_wire(content, vals);
         xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
         const auto target = page - 8 + 8 * out.size();

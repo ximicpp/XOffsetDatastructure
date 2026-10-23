@@ -12,6 +12,13 @@
   `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
   with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
   given seed now generates different cases than in 0.3.0-beta.1.
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
 
 ## 0.3.0-beta.1: production-readiness beta
 
