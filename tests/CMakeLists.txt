@@ -46,15 +46,9 @@ endforeach()
 set(REFLECTION_TESTS
     test_assign_range
     test_scalar_resize
-    test_validation_v8_single_word
-    test_validation_v6_dense_fusion
-    test_validation_v5
-    test_validation_v5_bounds
-    test_validation_v4
+    test_validation_granules
     test_string_replace
-    test_wire_bitmap
     test_resize_growth
-    test_validation_resource
     test_reflection_core
     test_reflection_advanced
     test_type_signatures
@@ -76,13 +70,9 @@ set(REFLECTION_TESTS
     test_runtime_regressions
     test_mutation_failures
     test_wire_validation
-    test_wire_range_index
-    test_wire_range_failures
     test_same_arena_move
     test_shift_relocate
     test_free_table_policy
-    test_range_hint
-    test_validation_ascending_run
     test_stable_storage
     test_vm_lifecycle
     test_vm_transport
@@ -108,6 +98,36 @@ endforeach()
 
 find_package(Threads REQUIRED)
 target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
+
+# G5/F4: the two libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
+# libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
+#   fuzz_<target>_replay          replays fuzz/regressions/<target>/: crash
+#                                 inputs kept by fix PRs (see its README.md)
+#   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
+#                                 by fuzz_<target>_replay_seeds
+# Names start with the target name so tools/validate_vm.py --targets selects all three.
+foreach(fuzz_target v2_wire wire_schemas)
+    set(replay fuzz_${fuzz_target}_replay)
+    add_executable(${replay} fuzz/fuzz_${fuzz_target}.cpp fuzz/replay_main.cpp)
+    configure_xoffset_target(${replay})
+    xoffset_enable_test_assertions(${replay})
+    if(XOFFSET_FUZZ_INJECT_CRASH)
+        target_compile_definitions(${replay} PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
+    endif()
+    add_test(NAME ${replay}
+        COMMAND $<TARGET_FILE:${replay}> "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/${fuzz_target}")
+    set(replay_seeds "${CMAKE_CURRENT_BINARY_DIR}/replay-seeds/${fuzz_target}")
+    add_test(NAME ${replay}_seeds COMMAND $<TARGET_FILE:${replay}> --write-seeds "${replay_seeds}")
+    add_test(NAME ${replay}_corpus COMMAND $<TARGET_FILE:${replay}> "${replay_seeds}")
+    set_tests_properties(${replay} ${replay}_seeds ${replay}_corpus PROPERTIES LABELS "reflection;replay")
+    set_tests_properties(${replay}_seeds PROPERTIES FIXTURES_SETUP ${replay}_seeds)
+    set_tests_properties(${replay}_corpus PROPERTIES FIXTURES_REQUIRED ${replay}_seeds)
+endforeach()
+
+# test_v2_fuzz --replay reruns one case alone; it must match the full run.
+add_test(NAME test_v2_fuzz_replay COMMAND $<TARGET_FILE:test_v2_fuzz> --replay 20261021 17)
+add_test(NAME test_v2_fuzz_replay_boundary COMMAND $<TARGET_FILE:test_v2_fuzz> --replay 20261021 b302)
+set_tests_properties(test_v2_fuzz_replay test_v2_fuzz_replay_boundary PROPERTIES LABELS "reflection")
 
 # Observe process exit after main() returns: these exercise global/static
 # destructor order, which an ordinary in-process assertion cannot cover.
