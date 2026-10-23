@@ -21,6 +21,8 @@
 #include <charconv>
 
 static_assert(kInlineBitmapExtent == xo::detail::WireGranuleIndex::inline_extent);
+// check_clone() in exercise() is compiled only when the library has clone().
+static_assert(requires(Buffer& b) { b.clone(); b.clone_into(b); });
 
 namespace {
 constexpr int kBoundaryMutants = 301; // per page boundary wire, the first unmutated

@@ -9,6 +9,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | K0 | 可重定位：payload 无绝对地址，任何修改后仍可整块搬到任意地址接着读写 | `test_type_safety`、`test_inheritance` | 带裸指针、成员指针、函数指针、虚表或 `std::string`/`std::vector` 的类型被编译期准入（`is_byte_copy_safe_v`）拒绝 |
 | | | 配置期检查 `polymorphic_rejection`（`cmake/XOffsetBuildChecks.cmake`） | 多态类型调用 `XBuffer::make<T>` 必须编译失败，且报错是 `Type is not byte-copy safe`；先跑正向对照，排除工具链本身坏掉 |
 | | | `test_stability_contract`（K3、K5 部分）、`test_v2_golden` | 输出后在新地址的 buffer 里加载，接着读、改、再发；写-读-写逐字节一致 |
+| | | `test_clone`、`test_v2_fuzz`（复制检查） | 修改过、带空洞的 buffer 用 `clone()` / `clone_into()` 整块拷到另一个地址，不经 wire：字节、空闲表、重存相同，之后同样的修改得到同样的字节 |
 | K1 | 普通 C++ 聚合体定义 schema，反射得出布局和指纹，不用 IDL | `test_zero_boilerplate`、`test_reflection_core`、`test_reflection_advanced`、`test_type_signatures` | 聚合体不写样板代码就能建、读、存；反射遍历成员；签名文本 |
 | | | `test_v2_golden` | 固定模型的 wire 字节固定（大小 + FNV-1a），写-读-写逐字节一致 |
 | K2 | 对象建在 arena 里，原地读写（含变长修改），空闲块复用 | `test_modify`、`test_vector`、`test_map_set`、`test_main_containers`、`test_string_replace`、`test_assign_range`、`test_stable_erase_if`、`test_resize_growth` | 各容器的原地修改语义 |
