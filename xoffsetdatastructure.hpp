@@ -804,8 +804,13 @@ namespace XOffsetDatastructure {
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
         // releasing one per load dominated small-message loads, so released
         // tables are emptied (bin and map storage returned to the host
-        // allocator) and kept in a small per-thread cache. A cached table is
-        // indistinguishable from a freshly constructed one.
+        // allocator) and kept in a small per-thread cache. D2: a table
+        // released by an in-place reload/reset keeps the storage of its small
+        // bins (at most keep_bin_entries entries each, keep_bytes per table),
+        // so the first retires after the reload, which usually take the same
+        // table back, do not allocate it again. A cached table differs from a
+        // freshly constructed one only in bin capacity, which no allocation
+        // decision, hole table or wire byte depends on.
         static bool& free_table_cache_available() noexcept {
             static thread_local bool available = true; // trivial: outlives the cache
             return available;
@@ -827,6 +832,11 @@ namespace XOffsetDatastructure {
         }
 
         struct FreeTableRecycler {
+            // Small-bin storage a table released by reload/reset keeps: at
+            // most 64 entries (256 B) per bin and 16 KiB per table, so at most
+            // 64 KiB per thread.
+            static constexpr std::size_t keep_bin_entries = 64;
+            static constexpr std::size_t keep_bytes = 16u * 1024u;
             // Kept out of line: every FreeTablePtr destructor on the mutate
             // path (insert_free_block's spare) inlines only the null check.
             void operator()(FreeTable* table) const noexcept {
@@ -835,16 +845,26 @@ namespace XOffsetDatastructure {
 #if defined(__clang__) || defined(__GNUC__)
             [[gnu::noinline, gnu::cold]]
 #endif
-            static void recycle(FreeTable* table) noexcept {
+            static void recycle(FreeTable* table, bool keep_bins = false) noexcept {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
+                std::size_t kept = 0;
                 for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u)
-                        std::vector<std::uint32_t>().swap(
-                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))]);
+                    std::uint64_t still_touched = 0;
+                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
+                        auto& bin = table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
+                        const auto bytes = bin.capacity() * sizeof(std::uint32_t);
+                        if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
+                            bin.clear(); // storage stays, so the bin stays touched
+                            kept += bytes;
+                            still_touched |= bits & (~bits + 1u);
+                        } else {
+                            std::vector<std::uint32_t>().swap(bin);
+                        }
+                    }
                     table->nonempty[word] = 0;
-                    table->touched[word] = 0;
+                    table->touched[word] = still_touched;
                 }
                 table->large.clear();
                 table->bytes = 0;
@@ -1576,7 +1596,7 @@ namespace XOffsetDatastructure {
         // caller finishes verification.
         void begin_reinit() noexcept {
             ++m_epoch;
-            free_table_.reset();
+            if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;

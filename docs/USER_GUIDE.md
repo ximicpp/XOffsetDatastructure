@@ -7,7 +7,7 @@
 ## 1. 基本模型
 
 - 一个 `XBuffer` 拥有一块连续的 arena。根对象和它引用的所有字符串、数组、集合都放在
-  这块 arena 里，彼此之间用相对偏移相连，所以 arena 放在哪里都一样（存储见 3.2 节）。
+  这块 arena 里，彼此之间用相对偏移相连，所以 arena 放在哪里都一样（存储见 3.4 节）。
 - arena 的字节就是序列化结果，读写字段不需要编码或解码。
 - `save_verified` 把 arena 复制成一份调用方独占的 wire（`std::string`），发送方之后
   可以继续修改原 buffer。
@@ -58,37 +58,17 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
   显式选择 `XGrowPolicy::Automatic`。`maximum_capacity` 始终是硬上限。
 - 容器头必须位于所属 arena 内。给插入接口传 `std::string_view`、`std::string` 等
   原生值，不要在栈上构造绑定 arena 的 `XString` 临时对象。
-- 容器扩容、插入、删除会移动元素，不能长期保存元素指针。Automatic 增长和容器操作
-  不会移动 arena；显式 `grow()` 在可搬槽位上可能移动它（3.2 节）。
+- 容器扩容、插入、删除会移动元素，规则和 `std::vector` 相同；`XSet`、`XMap` 是有序
+  平铺数组，规则和 `std::flat_set`、`std::flat_map` 相同，**和 `std::set`、`std::map`
+  不同**。逐个操作的规则见第 3.2 节。Automatic 增长和容器操作不移动 arena；显式 `grow()`
+  在可搬槽位上可能移动它（第 3.4 节）。
+- **元素是含 `XString`、`XVector`、`XMap` 等成员的记录类型时，先把这些记录声明为
+  普通记录（第 3.1 节）。** 不声明也完全正确，只是中间插入删除、扩容要逐个元素搬移：
+  云端 GCC 16 微基准里（只看比例，不是正式测量），元素带字符串和向量成员的
+  `XVector` 中间删除，不声明约是 `std::vector` 的 1.6 倍，声明后约 0.73 倍。
+- 能改什么、不能改什么（schema、写者、所有权）见第 3.3 节。
 - 也可以用带类型的包装 `TypedXBuffer<T>`：`create`、`root()`、`save_verified()`、
   `load()`（走校验路径）。它属于便利接口（第 8 节 E2）。
-
-### 3.2 存储：VM、钉住槽位、可搬槽位
-
-创建 buffer（`create`、构造函数、`load*`）时按参数选存储，`storage_kind()` 可以查：
-
-| 存储 | 什么时候选 | 地址 |
-| --- | --- | --- |
-| VM（`XStorageKind::Vm`） | 带 `XBufferPool`；`with_storage(XStorage::Pinned)`；Automatic 且上限大于 `XBuffer::SLOT_MAX`；初始大小大于 `SLOT_MAX` | 整个生命周期不变 |
-| 钉住槽位（`PinnedSlot`） | 上限不超过 `SLOT_MAX`（任何增长策略） | 整个生命周期不变 |
-| 可搬槽位（`MovableSlot`） | 其余情况：Explicit 增长（默认）、上限更大、初始大小放得进槽位 | 只在下面几个显式点改变 |
-
-- `SLOT_MAX` 默认是 256 KiB − 64 B，编译期可以用 `XOFFSET_SLOT_MAX_BYTES`（2 的幂，0 表示
-  不用槽位）调整。槽位来自库内的 slab，按 2 的幂分级，小消息不再每个 buffer 预留一段
-  虚拟地址；建立和销毁一个槽位不走系统调用。
-- 可搬槽位的搬家点：`grow()` 超出当前槽位时搬到更大的槽位（超过 `SLOT_MAX` 时搬到 VM，
-  之后钉住）；`reload_verified`、`begin_verified_reload` 收到放不下的内容时先换存储（不复制
-  旧内容）；`set_growth_policy(XGrowPolicy::Automatic)` 会先搬到 VM，因为自动增长发生在
-  容器操作内部，那里不能搬。
-- 搬家后，之前拿到的根引用、元素指针、`allocator<T>()`、`arena()` 和借用的 span 全部失效，
-  `epoch()` 改变。用 `XHandle`（自动重新定位）或重新调用 `root<T>()`。`address_stable()` 为
-  真时不会搬；需要地址永远不变就写 `with_storage(XStorage::Pinned)`。
-- Automatic 增长、容器操作、`save*`、`shrink_to_fit`、`reset<T>()` 都不搬。
-- 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
-- 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
-  `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
-- 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
-  `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
 
 ### 3.1 删除与插入的性能
 
@@ -124,6 +104,108 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 - 不写这些声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
   `stable_erase_if` 不可用（编译期报错）。两条路径输出的 wire 字节相同。
 
+### 3.2 引用和迭代器什么时候失效
+
+库不替你跟踪指向元素的引用，和 std 容器一样要按操作判断。地址分三层：
+
+| 层 | 指什么 | 例子 |
+| --- | --- | --- |
+| 元素 | 容器里的元素对象，包括元素里嵌套的容器头 | `p.scores[0]`、`marches[3]`、`marches[3].troops` 这个头本身 |
+| 子数据 | 元素拥有的块 | `p.bio.view()` 指向的字符、`marches[3].troops` 的元素数组 |
+| 区域 | 整个 payload：根对象和它能到达的一切 | `buf.root<Profile>()` |
+
+**容器操作只影响这个容器自己。** 分配只从空闲块或区域尾部取新块，释放只把块记进
+空闲表，不会挪动别的容器的元素或子数据。
+
+| 操作 | 本容器元素的引用、指针、迭代器 | 对照 |
+| --- | --- | --- |
+| `push_back`、`emplace_back` | 没扩容时都有效；扩容时全部失效 | 同 `std::vector` |
+| `insert(pos, …)` | `pos` 及之后失效；扩容时全部失效 | 同 `std::vector` |
+| `erase(pos)`、`pop_back()` | 被删的及之后失效 | 同 `std::vector` |
+| `stable_erase_if(pred)` | 第一个被删的位置及之后失效 | 同 `std::erase_if` |
+| `reserve(n)`、`resize(n)` 超过容量 | 全部失效 | 同 `std::vector` |
+| `resize(n)` 不超过容量 | 缩小时第 n 个及之后失效，增大时都有效 | 同 `std::vector` |
+| `clear()`、`assign(…)` | 全部失效 | 同 `std::vector`；`clear()` 保留容量，并把旧元素的字节清零 |
+| `XString` 的赋值、`clear()`、`reserve()` | 之前取到的 `view()`、`data()`、`c_str()` 失效 | 同 `std::string` |
+| `XSet` 的 `insert`、`emplace`；`XMap` 的 `try_emplace`、`emplace`，以及 `insert_or_assign`、`operator[]` 插入新键 | 插入位置及之后失效；扩容时全部失效 | 同 `std::flat_set`、`std::flat_map`；**不同于 `std::set`、`std::map`**（它们插入不影响别的元素） |
+| `XMap` 的 `insert_or_assign` 给已有键赋值 | 其他元素不受影响 | 同 std |
+| `XSet`、`XMap` 的 `erase(key)` | 被删的及之后失效 | 同 `std::flat_map`；不同于 `std::map` |
+| 读、改已有元素的值（不改变容器长度） | 都有效 | 同 std |
+| 同一个 buffer 里的移动赋值 `a = std::move(b)` | `b` 的元素不挪动，改归 `a`，`b` 变空；`a` 原来的元素失效。跨 buffer 时是复制，`b` 不变 | 同 `std::vector` 的移动赋值 |
+
+- 扩容有时能原地完成（容器的块正好在区域尾部时），这时地址不变。这不在承诺里，
+  请按"扩容即全部失效"写代码。
+- 元素搬家时，它拥有的子数据通常不动：容器头在新位置重建，仍指向原来的块。这也
+  只是实现细节，和 `std::vector<std::string>` 的短字符串优化一样，不要依赖。
+- `XSet`、`XMap` 查找是 O(log n)，插入、删除是 O(n)，要和 `std::flat_set`、
+  `std::flat_map` 比，而不是和基于节点的 `std::set`、`std::map` 比。
+
+**buffer 操作影响整块区域。** epoch 是 buffer 对象上的计数，`XHandle` 看到它变了就
+重新解析根。
+
+| 操作 | 根对象和区域的地址 | 指进 payload 的引用、span、迭代器 | epoch |
+| --- | --- | --- | --- |
+| 容器操作触发的 Automatic 增长；显式 `grow()` 没有超出当前存储 | 不变（在预留或槽位里扩展） | 只按上表失效 | 不变 |
+| 可搬槽位上显式 `grow()` 超出槽位（第 3.4 节） | 改变：搬到新存储 | 全部失效 | 加一 |
+| `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
+| `reload_verified`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效 | 加一 |
+| `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
+| `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
+| `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
+| `XBuffer` 的移动构造、移动赋值、`swap` | 不变，存储随对象转移 | 仍然有效，但现在属于另一个对象 | 两边都加一 |
+| 析构 | 释放 | 全部失效 | 不涉及 |
+
+- `XHandle` 绑在 buffer 对象上，不跟着 payload 走：移动之后原对象为空，绑在它上面的
+  `XHandle` 解析为空指针；`swap` 之后解析到这个对象现在的内容。要跟着数据走，在新
+  对象上重新建 `XHandle`。
+- payload 里没有绝对地址，任何两次操作之间都可以把区域的字节整块复制到别处继续
+  用（保存、加载就是这样做的）；但复制得到的是新 buffer，旧地址上的引用不会指过去。
+
+### 3.3 能改什么、不能改什么
+
+能改的：任意字段写入；变长修改，也就是字符串、数组、集合、映射的增删改；空闲块
+复用；收到（`load_verified`）之后接着改、再发出。
+
+不能做的有三条，是这种数据结构本身的限制：
+
+1. **不能改 schema。** 增加、删除、重排或改变任何字段，旧 wire 都会被拒绝（第 7 节）。
+   类型定义要在收发两端同时更新。
+2. **一个 buffer 同一时刻只能有一个写者。** 库不加锁，写操作要和这个 buffer 上的其他
+   读写互斥，由调用方同步（第 5 节）。多个进程通过共享内存同时读写一个 buffer 不在
+   支持范围内。
+3. **所有权是一棵树。** 每个块只属于一个容器头：两个容器不能共享同一块子数据，对象
+   之间不能互相引用，也不能成环。原生指针和引用在编译期就被拒绝（第 2 节）；要表达
+   图，存元素下标或 ID（例如 `std::uint32_t` 下标，或 `XMap` 的键）。拷贝赋值是深拷贝，
+   同一个 buffer 里的移动赋值是转移所有权。**不要把一个容器移动赋值给它自己子树里的
+   容器，或者反过来**：Release 构建不检查这种情况，结果是未定义行为。
+
+### 3.4 存储：VM、钉住槽位、可搬槽位
+
+创建 buffer（`create`、构造函数、`load*`）时按参数选存储，`storage_kind()` 可以查：
+
+| 存储 | 什么时候选 | 地址 |
+| --- | --- | --- |
+| VM（`XStorageKind::Vm`） | 带 `XBufferPool`；`with_storage(XStorage::Pinned)`；Automatic 且上限大于 `XBuffer::SLOT_MAX`；初始大小大于 `SLOT_MAX` | 整个生命周期不变 |
+| 钉住槽位（`PinnedSlot`） | 上限不超过 `SLOT_MAX`（任何增长策略） | 整个生命周期不变 |
+| 可搬槽位（`MovableSlot`） | 其余情况：Explicit 增长（默认）、上限更大、初始大小放得进槽位 | 只在下面几个显式点改变 |
+
+- `SLOT_MAX` 默认是 256 KiB − 64 B，编译期可以用 `XOFFSET_SLOT_MAX_BYTES`（2 的幂，0 表示
+  不用槽位）调整。槽位来自库内的 slab，按 2 的幂分级，小消息不再每个 buffer 预留一段
+  虚拟地址；建立和销毁一个槽位不走系统调用。
+- 可搬槽位的搬家点：`grow()` 超出当前槽位时搬到更大的槽位（超过 `SLOT_MAX` 时搬到 VM，
+  之后钉住）；`reload_verified`、`begin_verified_reload` 收到放不下的内容时先换存储（不复制
+  旧内容）；`set_growth_policy(XGrowPolicy::Automatic)` 会先搬到 VM，因为自动增长发生在
+  容器操作内部，那里不能搬。
+- 搬家后，之前拿到的根引用、元素指针、`allocator<T>()`、`arena()` 和借用的 span 全部失效，
+  `epoch()` 改变。用 `XHandle`（自动重新定位）或重新调用 `root<T>()`。`address_stable()` 为
+  真时不会搬；需要地址永远不变就写 `with_storage(XStorage::Pinned)`。
+- Automatic 增长、容器操作、`save*`、`shrink_to_fit`、`reset<T>()` 都不搬。
+- 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
+- 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
+  `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
+- 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
+  `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
+
 ## 4. 保存与加载
 
 ```cpp
@@ -149,7 +231,7 @@ VM 存储的 `XBuffer` 都有自己的虚拟内存预留：建立时预留 `maxi
 与预留大小关系不大。消息只有几 KB、而且每条都新建、销毁一个 buffer 时（战斗服往返、
 只读战报、客户端收包），这部分开销会远大于校验本身。
 
-不带池、Explicit 增长（默认）的小消息落在槽位上（3.2 节），不走这套系统调用。
+不带池、Explicit 增长（默认）的小消息落在槽位上（3.4 节），不走这套系统调用。
 Automatic 增长且上限较大的用法仍是 VM，这类接收方和发送方应当共用一个池，让销毁后的
 映射留给下一条消息复用：
 
@@ -182,6 +264,7 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 | --- | --- |
 | 手动分配（如 `XBuffer::allocator<T>()`、`arena()->allocate_aligned`）且不能从根到达的内存，必须在 `save_verified` 前释放 | 保存出的 wire 无法通过加载校验（铺满检查失败） |
 | 同一个 buffer 的写操作由调用方同步 | 数据竞争，行为未定义 |
+| 不把容器移动赋值给它自己子树里的容器（或反过来，第 3.3 节） | Release 构建下行为未定义 |
 | buffer 对象要比它的 `XHandle`、借用的 span 活得久 | 悬垂访问 |
 | 同一可执行文件内所有翻译单元使用相同的头文件版本、编译选项和工具链 | 布局或 schema 身份不一致 |
 | 接收不可信输入前限制 wire 长度、`maximum_capacity` 和并发 buffer 数 | 单个合法 wire 也可能占用大量内存 |
@@ -257,4 +340,5 @@ Windows、Android、iOS，能接收、读写、校验、再发。三个客户端
 唯一的正式测量来自一台 Apple M4、一个 demo 负载，对比 cista、FlatBuffers、
 Cap'n Proto、cereal，见 [docs/perf/round3-20261021/REPORT.md](perf/round3-20261021/REPORT.md)。
 引用时请同时说明机器、负载和竞品用法（例如 FlatBuffers 走 Object API）；
-没有 Linux 或 Windows 的性能数据。
+没有 Linux 或 Windows 的性能数据。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
+说明声明普通记录的量级，不是正式测量。
