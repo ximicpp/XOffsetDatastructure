@@ -699,7 +699,8 @@ Buffer& clone_target() {
     return buffer;
 }
 
-void same_as_source(const Buffer& src, const Buffer& copy, const char* what) {
+template <class B>
+void same_as_source(const B& src, const B& copy, const char* what) {
     const auto used = std::size_t(src.arena()->used_end);
     if (copy.arena()->used_end != src.arena()->used_end || std::memcmp(copy.data(), src.data(), used) != 0)
         fail(std::string(what) + " payload differs from its source");
@@ -709,20 +710,25 @@ void same_as_source(const Buffer& src, const Buffer& copy, const char* what) {
 }
 
 // The mutation streams are copies, so the case's own stream is not advanced.
-void check_clone(Buffer& buf, const std::string& saved, const std::mt19937_64& rng) {
-    auto copy = buf.clone();
-    buf.clone_into(clone_target());
-    same_as_source(buf, copy, "clone()");
-    same_as_source(buf, clone_target(), "clone_into()");
-    if (copy.save_verified() != saved) fail("clone() re-save differs");
-    if (clone_target().save_verified() != saved) fail("clone_into() re-save differs");
-    auto r1 = rng, r2 = rng, r3 = rng;
-    mutate_valid(buf.root(), r1);
-    mutate_valid(copy.root(), r2);
-    mutate_valid(clone_target().root(), r3);
-    const auto next = buf.save_verified();
-    if (copy.save_verified() != next || clone_target().save_verified() != next)
-        fail("clone diverged from its source under the same mutation");
+// A template so the core still builds against libraries without clone()
+// (validation_outcomes); test_v2_fuzz asserts that the check is active.
+template <class B>
+void check_clone(B& buf, const std::string& saved, const std::mt19937_64& rng) {
+    if constexpr (requires { buf.clone(); buf.clone_into(buf); }) {
+        auto copy = buf.clone();
+        buf.clone_into(clone_target());
+        same_as_source(buf, copy, "clone()");
+        same_as_source(buf, clone_target(), "clone_into()");
+        if (copy.save_verified() != saved) fail("clone() re-save differs");
+        if (clone_target().save_verified() != saved) fail("clone_into() re-save differs");
+        auto r1 = rng, r2 = rng, r3 = rng;
+        mutate_valid(buf.root(), r1);
+        mutate_valid(copy.root(), r2);
+        mutate_valid(clone_target().root(), r3);
+        const auto next = buf.save_verified();
+        if (copy.save_verified() != next || clone_target().save_verified() != next)
+            fail("clone diverged from its source under the same mutation");
+    }
 }
 
 void exercise(Buffer& buf, std::mt19937_64& rng) {
