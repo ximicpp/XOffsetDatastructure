@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
+  source's size, maximum capacity, growth policy and pool) and
+  `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;
+  dst's epoch advances; on failure dst is left an empty arena, a self copy is
+  refused unchanged). One copy of the used payload; the exact free table,
+  typed root access and schema binding come along, so no wire and no
+  verification. `TypedXBuffer<T>` has both. See `docs/BUFFER_REUSE.md`.
 - Nightly fuzz without GitHub Actions (threat model F4): `tools/fuzz_nightly.sh`
   runs the GCC 16 ASan+UBSan differential fuzz (`test_v2_fuzz`, 4 processes,
   date-based seeds, about 45 minutes) and the replay of
