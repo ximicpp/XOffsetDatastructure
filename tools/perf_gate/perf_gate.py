@@ -3,9 +3,10 @@
 
 Builds three copies of the benchmarks in one job -- anchor (bench/perf/ANCHOR),
 base and head -- all from the head's benchmark sources, counts the instructions
-of every timed phase of the SLG benchmark (S scale) and the formal acceptance
-harness (M fixture) under callgrind, and judges head/base and head/anchor
-against the thresholds in docs/PERF_GATE.md.
+of every timed phase of the SLG benchmark (S scale), the formal acceptance
+harness (M fixture) and every case of the relocation tax benchmark under
+callgrind, and judges head/base and head/anchor against the thresholds in
+docs/PERF_GATE.md.
 
 Instruction counts only block regressions. They are never evidence that code
 got faster; timing conclusions come from the Mac formal batch (L2).
@@ -35,6 +36,7 @@ from pathlib import Path
 
 SLG_DIR = "bench/slg"
 FORMAL_DIR = "bench/formal"
+RELOC_DIR = "bench/reloc"
 ANCHOR_FILE = "bench/perf/ANCHOR"
 LEDGER_FILE = "bench/perf/ledger.json"
 ROLES = ("anchor", "base", "head")
@@ -44,6 +46,7 @@ SLG_SCALE = "S"
 SLG_CYCLES = "8"
 SLG_SKIP_CYCLES = "4"
 FORMAL_PHASES = ("load", "query_before", "mutate", "emit_after", "retire", "reload", "query_after", "cleanup")
+RELOC_ROUNDS, RELOC_WARMUP, RELOC_SKIP_ROUNDS = "5", "1", "2"   # collect rounds 2-4 of each case
 
 # Thresholds (docs/PERF_GATE.md, design H3 section 5.3).
 TOTAL_WARN, TOTAL_FAIL = 1.003, 1.010          # head/base, scenario totals and formal judged phases
@@ -139,7 +142,7 @@ def cmd_prepare(a):
         log(f"exported {short(sha)} ({', '.join(r for r, s in roles.items() if s == sha)})")
     bench_root = Path(a.bench_root).resolve() if a.bench_root else Path(trees[head]["path"])
     plan = {"roles": roles, "trees": trees, "bench_root": str(bench_root),
-            "slg_dir": a.slg_dir, "formal_dir": a.formal_dir,
+            "slg_dir": a.slg_dir, "formal_dir": a.formal_dir, "reloc_dir": a.reloc_dir,
             "refs": {"anchor": anchor_ref, "base": a.base, "head": a.head}}
     # Ledgers travel with the trees: head's applies, base's tells which entries are new.
     for role in ("base", "head"):
@@ -201,6 +204,17 @@ def build_one(prof, lib: Path, bench: Path, slg_dir, formal_dir, cereal, outdir:
     return ok, "\n".join(out)
 
 
+def build_reloc(prof, lib: Path, reloc: Path, outdir: Path, extra):
+    """Build reloc_bench of `reloc` against library tree `lib`. Returns (status, log)."""
+    if not (reloc / "reloc_bench.cpp").is_file():
+        return "absent", ""
+    cmd = shlex.split(prof["cxx"]) + prof["std"] + ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem",
+                                                    f"{lib}/external/typelayout/include"] + extra + [
+        "-DRELOC_IR_COUNT=1", f"{reloc}/reloc_bench.cpp", "-o", str(outdir / "reloc_bench")] + prof["link"]
+    r = subprocess.run(cmd, text=True, capture_output=True)
+    return ("ok" if r.returncode == 0 else "failed"), f"$ {shlex.join(cmd)}\n{r.stdout}{r.stderr}"
+
+
 def cmd_build(a):
     work = Path(a.work).resolve()
     plan = load_json(work / "plan.json")
@@ -227,17 +241,26 @@ def cmd_build(a):
                 status, bench = "bench_differs", "own"
         if status is None:
             status = "incomparable"
+        # The relocation benchmark is optional per tree: it is built from the same benchmark
+        # sources as the rest, and an older tree that cannot build it only loses reloc.*.
+        reloc_dir = plan.get("reloc_dir", RELOC_DIR)
+        reloc_status = "absent"
+        if status != "incomparable":
+            reloc_src = (head_bench if bench == "head" else tree) / reloc_dir
+            reloc_status, rtext = build_reloc(prof, tree, reloc_src, outdir, extra)
+            text += "\n--- reloc_bench ---\n" + rtext
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"build-{a.compiler}-{short(sha)}.log").write_text(text, encoding="utf-8")
-        log(f"build {a.compiler} {short(sha)}: {status}")
-        return sha, {"status": status, "bench": bench, "dir": str(outdir)}
+        log(f"build {a.compiler} {short(sha)}: {status}, reloc {reloc_status}")
+        return sha, {"status": status, "bench": bench, "dir": str(outdir), "reloc": reloc_status}
 
     with concurrent.futures.ThreadPoolExecutor(max(1, min(3, a.jobs // 2))) as ex:
         for sha, res in ex.map(one, list(plan["trees"])):
             builds["trees"][sha] = res
     dump_json(work / f"build-{a.compiler}.json", builds)
     head = plan["roles"]["head"]
-    if builds["trees"][head]["status"] != "ok":
+    head_reloc = builds["trees"][head].get("reloc")
+    if builds["trees"][head]["status"] != "ok" or head_reloc == "failed":
         log("head does not build; see logs/")
         tail = (work / "logs" / f"build-{a.compiler}-{short(head)}.log").read_text(encoding="utf-8")[-4000:]
         print(tail, file=sys.stderr)
@@ -365,6 +388,27 @@ def checks_for(binary_dir: Path, fx: Path, tmp: Path):
     return res
 
 
+def reloc_cmd(binary, case):
+    return [str(binary), "--rounds", RELOC_ROUNDS, "--warmup", RELOC_WARMUP, "--cases", case]
+
+
+def reloc_env(case):
+    return dict(os.environ, RELOC_IR_KEYS=case, RELOC_IR_SKIP_ROUNDS=RELOC_SKIP_ROUNDS)
+
+
+def reloc_check(binary: Path, tmp: Path):
+    """reloc_bench --mode verify (digests of all sides agree) and the case names it ran."""
+    out = tmp / "reloc-verify.jsonl"
+    r = subprocess.run([str(binary), "--mode", "verify", "--out", str(out)], text=True, capture_output=True)
+    cases = set()
+    if out.exists():
+        for line in out.read_text().splitlines():
+            row = json.loads(line)
+            if "case" in row and "round" in row:
+                cases.add(row["case"])
+    return {"ok": r.returncode == 0 and bool(cases), "tail": (r.stdout + r.stderr)[-1500:] if r.returncode else ""}, sorted(cases)
+
+
 def cmd_measure(a):
     work = Path(a.work).resolve()
     plan = load_json(work / "plan.json")
@@ -394,8 +438,16 @@ def cmd_measure(a):
         t2 = scratch / f"keys-{short(sha)}"
         t2.mkdir()
         keys = discover_slg_keys(Path(b["dir"]) / "slg_bench", t2) if chk["ok"] else []
-        result["trees"][sha] = {"checks": chk, "slg_keys": keys, "slg": {}, "formal": {}, "functions": {}}
-        log(f"checks {short(sha)}: {'ok' if chk['ok'] else 'FAILED'}; {len(keys)} SLG keys")
+        tr = {"checks": chk, "slg_keys": keys, "slg": {}, "formal": {}, "functions": {},
+              "reloc_status": b.get("reloc", "absent"), "reloc_keys": [], "reloc": {}}
+        if chk["ok"] and tr["reloc_status"] == "ok":
+            tr["reloc_check"], tr["reloc_keys"] = reloc_check(Path(b["dir"]) / "reloc_bench", t2)
+            if not tr["reloc_check"]["ok"]:
+                tr["reloc_status"] = "verify_failed"
+                tr["reloc_keys"] = []
+        result["trees"][sha] = tr
+        log(f"checks {short(sha)}: {'ok' if chk['ok'] else 'FAILED'}; {len(keys)} SLG keys; "
+            f"reloc {tr['reloc_status']}, {len(tr['reloc_keys'])} cases")
 
     tasks = []
     for sha, tr in result["trees"].items():
@@ -406,6 +458,8 @@ def cmd_measure(a):
             tasks.append((sha, "slg", k, 0))
         for ph in FORMAL_PHASES:
             tasks.append((sha, "formal", ph, 0))
+        for k in tr["reloc_keys"]:
+            tasks.append((sha, "reloc", k, 0))
     # Determinism: the same binary twice must give bit-identical counts.
     if head in result["trees"] and result["trees"][head]["checks"]["ok"]:
         keys = result["trees"][head]["slg_keys"]
@@ -413,6 +467,8 @@ def cmd_measure(a):
         if probe:
             tasks.append((head, "slg", probe, 1))
         tasks.append((head, "formal", "mutate", 1))
+        if result["trees"][head]["reloc_keys"]:
+            tasks.append((head, "reloc", result["trees"][head]["reloc_keys"][0], 1))
 
     def run(task):
         sha, kind, key, rep = task
@@ -422,6 +478,8 @@ def cmd_measure(a):
             if kind == "slg":
                 ir, prof = callgrind(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
                                slg_env(SLG_IR_KEYS=key, SLG_IR_SKIP_CYCLES=SLG_SKIP_CYCLES), tmp)
+            elif kind == "reloc":
+                ir, prof = callgrind(a.valgrind, reloc_cmd(bdir / "reloc_bench", key), reloc_env(key), tmp)
             else:
                 env = dict(os.environ, SC_IR_PHASE=key)
                 ir, prof = callgrind(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
@@ -480,12 +538,16 @@ def metrics_of(tree):
         m["formal.read_sum"] = f["query_before"] + f["query_after"]
     if f:
         m["formal.total"] = sum(f.values())
+    for k, v in tree.get("reloc", {}).items():
+        m[f"reloc.{k}"] = v
     return m
 
 
 def classify(metric, base_m, head_m):
     """total | phase | report, plus the phase's share of its scenario."""
     kind, _, rest = metric.partition(".")
+    if kind == "reloc":
+        return "phase", 1.0  # every case is its own scenario
     if kind == "slg":
         if rest in SLG_TOTALS:
             return "total", 1.0
@@ -546,6 +608,8 @@ def validate_ledger(entries):
 def metric_keys(metric, tree):
     """The callgrind runs (keys of a tree's "functions") that a gate metric adds up."""
     kind, _, rest = metric.partition(".")
+    if kind == "reloc":
+        return [metric]
     if kind == "slg":
         if rest in SLG_TOTALS:
             return sorted(f"slg.{k}" for k in tree.get("slg", {}) if k.startswith(rest + "."))
@@ -665,6 +729,8 @@ def cmd_compare(a):
         fail("head 的正确性检查失败，不出数字" if head_tree else "head 构建失败")
     for e in ir.get("errors", []):
         fail(f"callgrind 运行失败：{e.splitlines()[0]}")
+    if head_tree and head_tree.get("reloc_status") == "verify_failed":
+        fail("head 的 reloc_bench --mode verify 失败（各方结果摘要不一致），不出 reloc.* 的数字")
     for k, d in ir.get("determinism", {}).items():
         if not d["identical"]:
             fail(f"同一二进制两次 Ir 不同（{k}: {d['first']} vs {d['second']}），门禁结果不可信")
@@ -684,6 +750,9 @@ def cmd_compare(a):
             status[role] = b
             if b == "bench_differs":
                 warn(f"{role} {short(sha)} 用它自己那一版基准构建（基准不同），比值仅供参考")
+            rs = t.get("reloc_status", "absent")
+            if rs in ("failed", "verify_failed") and (head_tree or {}).get("reloc_status") == "ok":
+                warn(f"{role} {short(sha)} 的 reloc_bench {'编不过' if rs == 'failed' else '校验失败'}：reloc.* 不和它比")
 
     metrics = {}
     for role in ROLES:
@@ -767,7 +836,8 @@ def cmd_compare(a):
     for row in rows:
         if row["class"] == "total" or row["head_base"] is None or row["metric"] == "formal.total":
             continue
-        scen = ".".join(row["metric"].split(".")[:2]) if row["metric"].startswith("slg.") else "formal"
+        scen = (".".join(row["metric"].split(".")[:2]) if row["metric"].startswith("slg.")
+                else row["metric"].split(".")[0])
         cur = biggest.get(scen)
         if cur is None or abs(row["head_base"] - 1) > abs(cur["head_base"] - 1):
             biggest[scen] = row
@@ -777,6 +847,8 @@ def cmd_compare(a):
            "slg": {"scale": SLG_SCALE, "cycles": int(SLG_CYCLES), "skip_cycles": int(SLG_SKIP_CYCLES),
                    "seed": int(SLG_SEED), "protocol": "reuse"},
            "formal": {"fixture": "M", "input_digest": ir["fixture_input_digest"]},
+           "reloc": {"rounds": int(RELOC_ROUNDS), "warmup": int(RELOC_WARMUP), "skip_rounds": int(RELOC_SKIP_ROUNDS),
+                     "status": {sha: t.get("reloc_status", "absent") for sha, t in ir["trees"].items()}},
            "checks": {sha: t["checks"] for sha, t in ir["trees"].items()},
            "determinism": ir.get("determinism", {}), "failures": failures, "warnings": warnings, "notes": notes,
            "ledger_applied": sorted({i for r in rows for i in r["ledger"]}), "rows": rows,
@@ -803,7 +875,8 @@ def render_summary(out, plan, biggest):
     L.append(f"anchor `{short(r['anchor'])}` · base `{short(r['base'])}` · head `{short(r['head'])}` · "
              f"{out['compiler_version']} · {out['valgrind']}")
     L.append(f"SLG {out['slg']['scale']} 规模、{out['slg']['cycles']} 周期（跳过前 {out['slg']['skip_cycles']} 个）、"
-             f"seed {out['slg']['seed']}、复用协议；正式 harness M fixture")
+             f"seed {out['slg']['seed']}、复用协议；正式 harness M fixture；"
+             f"reloc 每项 {out['reloc']['rounds']} 轮（热身 {out['reloc']['warmup']}，收第 {out['reloc']['skip_rounds']} 轮起）")
     L.append("")
     for title, items in (("失败", out["failures"]), ("警告", out["warnings"]), ("说明", out["notes"])):
         if items:
@@ -867,6 +940,7 @@ def main():
                     help="benchmark sources and default ANCHOR (default: the head tree); replays pass the checkout")
     sp.add_argument("--slg-dir", default=SLG_DIR)
     sp.add_argument("--formal-dir", default=FORMAL_DIR)
+    sp.add_argument("--reloc-dir", default=RELOC_DIR)
     sp.add_argument("--ledger", default="", help="override the head's ledger file")
 
     for name in ("build", "measure", "run"):

@@ -47,6 +47,10 @@
 #include <atomic>
 #include <map>
 #include <unordered_map>
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+#include <cstdio>
+#include <typeinfo>
+#endif
 #include "xoffset_virtual_memory.hpp"
 
 // TypeLayout library — the authoritative byte-copy-safety engine.
@@ -788,8 +792,13 @@ namespace XOffsetDatastructure {
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
         // releasing one per load dominated small-message loads, so released
         // tables are emptied (bin and map storage returned to the host
-        // allocator) and kept in a small per-thread cache. A cached table is
-        // indistinguishable from a freshly constructed one.
+        // allocator) and kept in a small per-thread cache. D2: a table
+        // released by an in-place reload/reset keeps the storage of its small
+        // bins (at most keep_bin_entries entries each, keep_bytes per table),
+        // so the first retires after the reload, which usually take the same
+        // table back, do not allocate it again. A cached table differs from a
+        // freshly constructed one only in bin capacity, which no allocation
+        // decision, hole table or wire byte depends on.
         static bool& free_table_cache_available() noexcept {
             static thread_local bool available = true; // trivial: outlives the cache
             return available;
@@ -811,6 +820,11 @@ namespace XOffsetDatastructure {
         }
 
         struct FreeTableRecycler {
+            // Small-bin storage a table released by reload/reset keeps: at
+            // most 64 entries (256 B) per bin and 16 KiB per table, so at most
+            // 64 KiB per thread.
+            static constexpr std::size_t keep_bin_entries = 64;
+            static constexpr std::size_t keep_bytes = 16u * 1024u;
             // Kept out of line: every FreeTablePtr destructor on the mutate
             // path (insert_free_block's spare) inlines only the null check.
             void operator()(FreeTable* table) const noexcept {
@@ -819,16 +833,26 @@ namespace XOffsetDatastructure {
 #if defined(__clang__) || defined(__GNUC__)
             [[gnu::noinline, gnu::cold]]
 #endif
-            static void recycle(FreeTable* table) noexcept {
+            static void recycle(FreeTable* table, bool keep_bins = false) noexcept {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
+                std::size_t kept = 0;
                 for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u)
-                        std::vector<std::uint32_t>().swap(
-                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))]);
+                    std::uint64_t still_touched = 0;
+                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
+                        auto& bin = table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
+                        const auto bytes = bin.capacity() * sizeof(std::uint32_t);
+                        if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
+                            bin.clear(); // storage stays, so the bin stays touched
+                            kept += bytes;
+                            still_touched |= bits & (~bits + 1u);
+                        } else {
+                            std::vector<std::uint32_t>().swap(bin);
+                        }
+                    }
                     table->nonempty[word] = 0;
-                    table->touched[word] = 0;
+                    table->touched[word] = still_touched;
                 }
                 table->large.clear();
                 table->bytes = 0;
@@ -1434,7 +1458,7 @@ namespace XOffsetDatastructure {
         // caller finishes verification.
         void begin_reinit() noexcept {
             ++m_epoch;
-            free_table_.reset();
+            if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
@@ -3700,596 +3724,209 @@ namespace XOffsetDatastructure {
             return is_v1_wire_admitted_impl<std::remove_cvref_t<T>>::value;
         }
 
-        using WireValidationRangeIndex = std::pmr::map<std::size_t, std::size_t>;
-
-        // Entries are nonempty, pairwise disjoint half-open arena-offset ranges.
-        // A validated candidate can overlap only its successor or predecessor.
-        // A successful check also retains the unique lower_bound insertion
-        // position. Neither range set changes before the eventual insertion.
-        inline bool wire_range_overlaps_with_hint(
-                                        const WireValidationRangeIndex& ranges,
-                                        std::size_t begin_offset,
-                                        std::size_t end_offset,
-                                        WireValidationRangeIndex::const_iterator& insertion_hint) {
-            if (begin_offset == end_offset) {
-                insertion_hint = ranges.end();
-                return false;
-            }
-            insertion_hint = ranges.lower_bound(begin_offset);
-            const auto next = insertion_hint;
-            if (next != ranges.end() && next->first < end_offset) return true;
-            if (next != ranges.begin()) {
-                auto previous = next;
-                --previous;
-                if (previous->second > begin_offset) return true;
-            }
-            return false;
+        // Validation errors leave the hot path through one out-of-line call.
+        [[noreturn, gnu::cold, gnu::noinline]] inline void wire_reject(const char* what) {
+            throw XException(what);
         }
 
-        // Preserve the original three-argument helper and its function type.
-        inline bool wire_range_overlaps(const WireValidationRangeIndex& ranges,
-                                        std::size_t begin_offset,
-                                        std::size_t end_offset) {
-            auto insertion_hint = ranges.cend();
-            return wire_range_overlaps_with_hint(
-                ranges, begin_offset, end_offset, insertion_hint);
-        }
-
-        // XV5: byte-exact ownership with per-page word-any/word-full summaries.
-        // Data words are read only when their any bit is set and full bit is not.
-        class WireValidationByteIndex {
-            static constexpr std::size_t page_bytes = 4096;
-            static constexpr std::size_t word_bits = 64;
-            static constexpr std::size_t words_per_page = 64;
-            static constexpr std::size_t dense_words_per_page = 66;
-            static constexpr std::uint64_t all_bits = (std::numeric_limits<std::uint64_t>::max)();
-            struct alignas(8) Page {
-                std::uint64_t words[64];
-                std::uint64_t any, full;
-                // Scalar data objects have lifetime, but intentionally no value
-                // until written. The initialized metadata guards every read.
-                Page() noexcept : any{}, full{} {}
-            };
-            static_assert(alignof(Page) >= 2);
-            static_assert(sizeof(Page) == 528);
-            static_assert(sizeof(std::uintptr_t) >= sizeof(Page*));
-            static_assert(std::is_nothrow_default_constructible_v<Page>);
-            std::pmr::memory_resource* resource_;
-            bool allow_dense_;
-            std::uint64_t* dense_{};
-            std::size_t dense_pages_{};
-            std::uintptr_t* directory_{};
-            std::size_t directory_size_{}, extent_{}, registrations_{};
-            std::size_t coverage_begin_{}, coverage_end_{};
-
-            bool disjoint_coverage_bounds(std::size_t begin, std::size_t end) const noexcept {
-                return registrations_ == 0 || end <= coverage_begin_ || begin >= coverage_end_;
-            }
-
-            static constexpr std::size_t page_count(std::size_t extent) noexcept {
-                return extent / page_bytes + (extent % page_bytes != 0);
-            }
-            static std::uint64_t low_mask(unsigned bits) noexcept {
-                return bits == 64 ? all_bits : (std::uint64_t{1} << bits) - 1;
-            }
-            static Page* page_pointer(std::uintptr_t value) noexcept {
-                return reinterpret_cast<Page*>(value); // tags0/1 never reach here
-            }
-            std::uintptr_t tail_entry(std::size_t page) const noexcept {
-                if (page < dense_pages_ || page - dense_pages_ >= directory_size_) return 0;
-                return directory_[page - dense_pages_];
-            }
-            struct View {
-                const std::uint64_t* words;
-                std::uint64_t any, full;
-            };
-            View page_view(std::size_t page) const noexcept {
-                if (page < dense_pages_) {
-                    const auto* control = dense_ + dense_pages_ * words_per_page + page * 2;
-                    return {dense_ + page * words_per_page, control[0], control[1]};
-                }
-                const auto entry = tail_entry(page);
-                if (entry == 0) return {nullptr, 0, 0};
-                if (entry == 1) return {nullptr, all_bits, all_bits};
-                const auto* p = page_pointer(entry);
-                return {p->words, p->any, p->full};
-            }
-            static std::uint64_t read_word(const View& view, std::size_t word) noexcept {
-                const auto bit = std::uint64_t{1} << word;
-                if (!(view.any & bit)) {
-                    /* XV5: empty-word-synthesized */
-                    return 0;
-                }
-                if (view.full & bit) {
-                    /* XV5: full-word-synthesized */
-                    return all_bits;
-                }
-                /* XV5: initialized-data-word-read */
-                return view.words[word];
-            }
-            struct Span {
-                std::size_t first, last;
-                std::uint64_t first_mask, last_mask, whole;
-            };
-            static Span page_span(std::size_t lo, std::size_t hi) noexcept {
-                const auto first = lo / word_bits, last = (hi - 1) / word_bits;
-                const auto left = unsigned(lo % word_bits);
-                const auto right = unsigned((hi - 1) % word_bits + 1);
-                const auto a = first == last ? low_mask(right) & ~low_mask(left) : ~low_mask(left);
-                const auto z = first == last ? 0 : low_mask(right);
-                auto whole = low_mask(unsigned(last + 1)) & ~low_mask(unsigned(first));
-                if (a != all_bits) whole &= ~(std::uint64_t{1} << first);
-                if (first != last && z != all_bits) whole &= ~(std::uint64_t{1} << last);
-                return {first, last, a, z, whole};
-            }
-            static bool page_overlaps(const View& view, const Span& span) noexcept {
-                /* XV5: page-summary-query */
-                if (view.any & span.whole) return true;
-                if (span.first_mask != all_bits &&
-                    (read_word(view, span.first) & span.first_mask)) return true;
-                if (span.first != span.last && span.last_mask != all_bits &&
-                    (read_word(view, span.last) & span.last_mask)) return true;
-                return false;
-            }
-            static void mark_boundary(std::uint64_t* words, std::uint64_t& any,
-                                      std::uint64_t& full, std::size_t word,
-                                      std::uint64_t mask,
-                                      const std::uint64_t* cached_word = nullptr) noexcept {
-                const auto bit = std::uint64_t{1} << word;
-                const auto value = (cached_word ? *cached_word : read_word({words, any, full}, word)) | mask;
-                if (value == all_bits) {
-                    full |= bit;
-                    /* XV5: boundary-promoted-full */
-                } else {
-                    words[word] = value;
-                    /* XV5: partial-data-word-written */
-                }
-                any |= bit;
-            }
-            static void mark_page(std::uint64_t* words, std::uint64_t& any,
-                                  std::uint64_t& full, const Span& span,
-                                  const std::uint64_t* cached_first = nullptr,
-                                  const std::uint64_t* cached_last = nullptr) noexcept {
-                // All whole words, including a full page, need only summaries.
-                any |= span.whole;
-                full |= span.whole;
-                /* XV5: whole-word-mask-marked */
-                if (span.first_mask != all_bits)
-                    mark_boundary(words, any, full, span.first, span.first_mask, cached_first);
-                if (span.first != span.last && span.last_mask != all_bits)
-                    mark_boundary(words, any, full, span.last, span.last_mask, cached_last);
-            }
-            Page* allocate_page() {
-                std::pmr::polymorphic_allocator<Page> allocator(resource_);
-                auto* p = allocator.allocate(1);
-                std::construct_at(p);
-                /* XV5: page-prepared */
-                return p;
-            }
-            void release_page(Page* p) noexcept {
-                if (!p) return;
-                std::destroy_at(p);
-                std::pmr::polymorphic_allocator<Page>(resource_).deallocate(p, 1);
-                /* XV5: page-released */
-            }
-            void release_directory(std::uintptr_t* p, std::size_t n) noexcept {
-                if (!p) return;
-                std::destroy_n(p, n);
-                std::pmr::polymorphic_allocator<std::uintptr_t>(resource_).deallocate(p, n);
-                /* XV5: directory-released */
-            }
-            void release_dense(std::uint64_t* p, std::size_t pages) noexcept {
-                if (!p) return;
-                const auto n = pages * dense_words_per_page;
-                std::destroy_n(p, n);
-                std::pmr::polymorphic_allocator<std::uint64_t>(resource_).deallocate(p, n);
-                /* XV5: dense-released */
-            }
+        // Retained validation words of one long-lived reload buffer: the
+        // bitmaps of payloads above WireGranuleIndex::inline_extent reuse
+        // them message after message instead of a fresh host block. They grow
+        // to the largest payload validated and are released with the buffer
+        // that owns them (or by XBuffer::release_reload_scratch()). The
+        // validator clears every word it reads, exactly as on fresh memory,
+        // and the words never reach the payload or the wire.
+        class WireValidationScratch {
         public:
-            // Preserve the old per-index hard logical dense-byte budget rather
-            // than silently increasing it for the additional word summaries.
-            static constexpr std::size_t dense_byte_budget = 8u * 1024u * 1024u + 2048u;
-            static constexpr std::size_t dense_extent_limit =
-                (dense_byte_budget / (dense_words_per_page * sizeof(std::uint64_t))) * page_bytes;
-            explicit WireValidationByteIndex(std::pmr::memory_resource* resource =
-                    std::pmr::new_delete_resource(), bool allow_dense = true) noexcept
-                : resource_(resource), allow_dense_(allow_dense) {}
-            WireValidationByteIndex(const WireValidationByteIndex&) = delete;
-            WireValidationByteIndex& operator=(const WireValidationByteIndex&) = delete;
-            WireValidationByteIndex(WireValidationByteIndex&&) = delete;
-            WireValidationByteIndex& operator=(WireValidationByteIndex&&) = delete;
-            ~WireValidationByteIndex() {
-                for (std::size_t i = 0; i < directory_size_; ++i)
-                    if (directory_[i] > 1) release_page(page_pointer(directory_[i]));
-                release_directory(directory_, directory_size_);
-                release_dense(dense_, dense_pages_);
+            WireValidationScratch() = default;
+            WireValidationScratch(const WireValidationScratch&) = delete;
+            WireValidationScratch& operator=(const WireValidationScratch&) = delete;
+            ~WireValidationScratch() { release(); }
+            std::size_t capacity() const noexcept { return capacity_; }
+            std::uint64_t* words(std::size_t count) {
+                if (count > capacity_) {
+                    auto* fresh = new std::uint64_t[count];
+                    release();
+                    words_ = fresh;
+                    capacity_ = count;
+                }
+                return words_;
             }
-            std::size_t size() const noexcept { return registrations_; }
-            bool empty() const noexcept { return registrations_ == 0; }
-            std::size_t extent() const noexcept { return extent_; }
-            std::pair<std::size_t, std::size_t> coverage_bounds() const noexcept {
-                return {coverage_begin_, coverage_end_};
-            }
-            std::size_t directory_entries() const noexcept { return directory_size_; }
-            std::size_t dense_prefix_bytes() const noexcept { return dense_pages_ * page_bytes; }
-            std::size_t dense_requested_bytes() const noexcept { return dense_pages_ * dense_words_per_page * 8; }
-            std::pmr::memory_resource* resource() const noexcept { return resource_; }
-            std::size_t allocated_pages() const noexcept {
-                std::size_t result = 0;
-                for (std::size_t i = 0; i < directory_size_; ++i) result += directory_[i] > 1;
-                return result;
-            }
-            std::uint64_t word_at(std::size_t word) const noexcept {
-                if (word >= extent_ / word_bits + (extent_ % word_bits != 0)) return 0;
-                return read_word(page_view(word / words_per_page), word % words_per_page);
-            }
-            // Calls fn(gap_begin, gap_end) for each maximal run of unmarked
-            // bytes within [begin, end), in ascending order.
-            template <typename Fn>
-            void for_each_gap(std::size_t begin, std::size_t end, Fn&& fn) const {
-                std::size_t gap_begin = 0;
-                bool in_gap = false;
-                for (std::size_t pos = begin; pos < end;) {
-                    const auto bit = unsigned(pos % word_bits);
-                    const auto avail = std::min<std::size_t>(word_bits - bit, end - pos);
-                    auto bits = word_at(pos / word_bits) >> bit;
-                    if (avail < word_bits) bits &= low_mask(unsigned(avail));
-                    if (!in_gap) {
-                        const auto ones = static_cast<std::size_t>(std::countr_one(bits));
-                        if (ones >= avail) { pos += avail; continue; }
-                        pos += ones;
-                        in_gap = true;
-                        gap_begin = pos;
-                    } else {
-                        const auto zeros = static_cast<std::size_t>(std::countr_zero(bits));
-                        if (zeros >= avail) { pos += avail; continue; }
-                        pos += zeros;
-                        fn(gap_begin, pos);
-                        in_gap = false;
-                    }
-                }
-                if (in_gap) fn(gap_begin, end);
-            }
-            bool overlaps(std::size_t begin, std::size_t end) const noexcept {
-                /* XV5: standalone-query */
-                if (begin >= end || begin >= extent_) return false;
-                end = std::min(end, extent_);
-                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
-                for (auto page = first;; ++page) {
-                    /* XV5: standalone-page-tested */
-                    const auto view = page_view(page);
-                    if (view.any) {
-                        const auto lo = page == first ? begin % page_bytes : 0;
-                        const auto hi = page == last ? end - page * page_bytes : page_bytes;
-                        if (page_overlaps(view, page_span(lo, hi))) return true;
-                    }
-                    if (page == last) break;
-                }
-                return false;
-            }
-            //0 none,1 owned,2 free. A free hit never prevents a later owned hit.
-            static unsigned overlap_priority(const WireValidationByteIndex& owned,
-                                             const WireValidationByteIndex& free,
-                                             std::size_t begin, std::size_t end) noexcept {
-                /* XV5: paired-query */
-                const auto limit = std::max(owned.extent_, free.extent_);
-                if (begin >= end || begin >= limit) return 0;
-                end = std::min(end, limit);
-                /* XV5: coverage-bounds-query */
-                if (owned.disjoint_coverage_bounds(begin, end) &&
-                    free.disjoint_coverage_bounds(begin, end)) {
-                    /* XV5: coverage-bounds-fast-return */
-                    return 0;
-                }
-                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
-                bool free_hit = false;
-                for (auto page = first;; ++page) {
-                    /* XV5: paired-page-tested */
-                    const auto live = owned.page_view(page);
-                    const auto dead = free_hit ? View{nullptr, 0, 0} : free.page_view(page);
-                    if (live.any || dead.any) {
-                        const auto lo = page == first ? begin % page_bytes : 0;
-                        const auto hi = page == last ? end - page * page_bytes : page_bytes;
-                        const auto span = page_span(lo, hi);
-                        if (live.any && page_overlaps(live, span)) return 1;
-                        if (dead.any && page_overlaps(dead, span)) free_hit = true;
-                    }
-                    if (page == last) break;
-                }
-                return free_hit ? 2 : 0;
-            }
-            // XV6 draft: prepared dense, one-page registrations need no host
-            // allocation. Check both sets before any mark and retain the target
-            // boundary values, avoiding the second page walk and data reread.
-            // false means the caller must use the unchanged general path.
-            static bool try_insert_dense_single_page(
-                    WireValidationByteIndex& owned,
-                    WireValidationByteIndex& free,
-                    bool incoming_free, std::size_t begin, std::size_t end,
-                    std::size_t validated_extent, unsigned& overlap) noexcept {
-                auto& target = incoming_free ? free : owned;
-                if (begin >= end || end > validated_extent ||
-                    validated_extent > target.extent_ || !target.dense_)
-                    return false;
-                const auto page = begin / page_bytes;
-                if (page != (end - 1) / page_bytes || page >= target.dense_pages_)
-                    return false;
-                // XV8: the existing prepared/dense/page/extent guards above
-                // already hold. One arena byte is one occupancy bit.
-                if (begin / word_bits == (end - 1) / word_bits) {
-                    /* XV8: single-word-probe */
-                    overlap = 0;
-                    const auto word = (begin / word_bits) % words_per_page;
-                    const auto bit = std::uint64_t{1} << word;
-                    const auto mask = low_mask(unsigned((end - 1) % word_bits + 1)) &
-                                      ~low_mask(unsigned(begin % word_bits));
-                    const bool bounds_disjoint = owned.disjoint_coverage_bounds(begin, end) &&
-                                                 free.disjoint_coverage_bounds(begin, end);
-                    std::uint64_t old_target = 0;
-                    if (mask == all_bits) {
-                        // There are no neighboring bits to preserve. A whole
-                        // word uses only initialized summary bits, just as the
-                        // existing general path: never read its data storage.
-                        /* XV8: single-whole-word */
-                        if (!bounds_disjoint) {
-                            if (owned.page_view(page).any & bit) {
-                                overlap = 1;
-                                return true;
-                            }
-                            if (free.page_view(page).any & bit) {
-                                overlap = 2;
-                                return true;
-                            }
-                        }
-                    } else {
-                        /* XV8: single-partial-word */
-                        if (bounds_disjoint) {
-                            // Bounds exclude requested bytes, not other bytes
-                            // in this word. Preserve those exact neighbors.
-                            old_target = read_word(target.page_view(page), word);
-                        } else {
-                            const auto live = read_word(owned.page_view(page), word);
-                            if (live & mask) {
-                                overlap = 1;
-                                return true;
-                            }
-                            const auto dead = read_word(free.page_view(page), word);
-                            if (dead & mask) {
-                                overlap = 2;
-                                return true;
-                            }
-                            old_target = incoming_free ? dead : live;
-                        }
-                    }
-                    // Both complete conflict checks precede this no-throw,
-                    // allocation-free commit. read_word guarded every data read.
-                    const auto value = old_target | mask;
-                    auto* control = target.dense_ + target.dense_pages_ * words_per_page + page * 2;
-                    if (value == all_bits) control[1] |= bit;
-                    else target.dense_[page * words_per_page + word] = value;
-                    control[0] |= bit;
-                    target.coverage_begin_ = target.registrations_ ?
-                        std::min(target.coverage_begin_, begin) : begin;
-                    target.coverage_end_ = std::max(target.coverage_end_, end);
-                    ++target.registrations_;
-                    /* XV8: single-word-committed */
-                    return true;
-                }
-                /* XV6: dense-single-page-probe */
-                overlap = 0;
-                const auto span = page_span(begin % page_bytes,
-                                            end - page * page_bytes);
-                const auto target_view = target.page_view(page);
-                std::uint64_t first_value{}, last_value{};
-                bool first_loaded = false, last_loaded = false;
-                auto first_word = [&]() noexcept {
-                    if (!first_loaded) {
-                        first_value = read_word(target_view, span.first);
-                        first_loaded = true;
-                    }
-                    return first_value;
-                };
-                auto last_word = [&]() noexcept {
-                    if (!last_loaded) {
-                        last_value = read_word(target_view, span.last);
-                        last_loaded = true;
-                    }
-                    return last_value;
-                };
-                auto target_overlaps = [&]() noexcept {
-                    /* XV6: cached-page-summary-query */
-                    if (target_view.any & span.whole) return true;
-                    if (span.first_mask != all_bits &&
-                        (first_word() & span.first_mask)) return true;
-                    return span.first != span.last && span.last_mask != all_bits &&
-                           (last_word() & span.last_mask);
-                };
-                /* XV6: dense-coverage-bounds-query */
-                if (owned.disjoint_coverage_bounds(begin, end) &&
-                    free.disjoint_coverage_bounds(begin, end)) {
-                    /* XV6: dense-coverage-bounds-fast-return */
-                } else {
-                    /* XV6: dense-paired-page-tested */
-                    // The complete range is on this one page: checking owned
-                    // before free preserves the global first-error priority.
-                    const auto live = incoming_free ? owned.page_view(page) : target_view;
-                    if (live.any && (incoming_free ? page_overlaps(live, span) : target_overlaps())) {
-                        overlap = 1;
-                        /* XV6: dense-single-page-rejected */
-                        return true;
-                    }
-                    const auto dead = incoming_free ? target_view : free.page_view(page);
-                    if (dead.any && (incoming_free ? target_overlaps() : page_overlaps(dead, span))) {
-                        overlap = 2;
-                        /* XV6: dense-single-page-free-rejected */
-                        return true;
-                    }
-                }
-                // Preserve bits outside the requested masks even when the
-                // coverage envelope proved the requested bytes disjoint.
-                if (span.first_mask != all_bits) first_word();
-                if (span.first != span.last && span.last_mask != all_bits) last_word();
-                auto* control = target.dense_ + target.dense_pages_ * words_per_page + page * 2;
-                mark_page(target.dense_ + page * words_per_page,
-                          control[0], control[1], span,
-                          first_loaded ? &first_value : nullptr,
-                          last_loaded ? &last_value : nullptr);
-                target.coverage_begin_ = target.registrations_ ?
-                    std::min(target.coverage_begin_, begin) : begin;
-                target.coverage_end_ = std::max(target.coverage_end_, end);
-                ++target.registrations_;
-                /* XV6: dense-single-page-committed */
-                return true;
-            }
-
-            // Checks precede all preparation. No mark, count or extent update
-            // occurs until every needed allocation and object lifetime exists.
-            void insert_disjoint(std::size_t begin, std::size_t end,
-                                 std::size_t validated_extent) {
-                if (begin >= end || end > validated_extent)
-                    throw XException("wire validation bitmap received invalid checked range");
-                const auto requested_extent = std::max(extent_, validated_extent);
-                const bool make_dense = !dense_ && extent_ == 0 && allow_dense_ &&
-                                        requested_extent <= dense_extent_limit;
-                const auto prefix_pages = make_dense ? page_count(requested_extent) : dense_pages_;
-                const auto total_pages = page_count(requested_extent);
-                const auto needed = total_pages - prefix_pages;
-                if (needed > (std::numeric_limits<std::size_t>::max)() / sizeof(std::uintptr_t))
-                    throw std::bad_alloc();
-                const auto first = begin / page_bytes, last = (end - 1) / page_bytes;
-                const auto first_lo = begin % page_bytes, last_hi = end - last * page_bytes;
-                const auto tail_first = std::max(first, prefix_pages);
-                const auto tail_lo = tail_first == first ? first_lo : 0;
-                const bool has_tail = last >= prefix_pages;
-                const bool first_partial = has_tail && (tail_first == last ?
-                    (tail_lo != 0 || last_hi != page_bytes) : tail_lo != 0);
-                const bool last_partial = has_tail && tail_first != last && last_hi != page_bytes;
-                std::uint64_t* fresh_dense = nullptr;
-                std::uintptr_t* fresh_directory = nullptr;
-                auto* slots = directory_;
-                Page* fresh_first = nullptr;
-                Page* fresh_last = nullptr;
-                try {
-                    if (make_dense) {
-                        const auto count = prefix_pages * dense_words_per_page;
-                        fresh_dense = std::pmr::polymorphic_allocator<std::uint64_t>(resource_).allocate(count);
-                        // Starts every scalar lifetime, without value-initializing
-                        // data. Only initialized summary bits authorize a read.
-                        std::uninitialized_default_construct_n(fresh_dense, count);
-                        std::fill_n(fresh_dense + prefix_pages * words_per_page, prefix_pages * 2, std::uint64_t{0});
-                        /* XV5: dense-prepared */
-                    }
-                    if (needed > directory_size_) {
-                        fresh_directory = std::pmr::polymorphic_allocator<std::uintptr_t>(resource_).allocate(needed);
-                        std::uninitialized_value_construct_n(fresh_directory, needed);
-                        for (std::size_t i = 0; i < directory_size_; ++i) fresh_directory[i] = directory_[i];
-                        slots = fresh_directory;
-                        /* XV5: directory-prepared */
-                    }
-                    if (first_partial && slots[tail_first - prefix_pages] == 0) fresh_first = allocate_page();
-                    if (last_partial && slots[last - prefix_pages] == 0) fresh_last = allocate_page();
-                } catch (...) {
-                    release_page(fresh_last);
-                    release_page(fresh_first);
-                    release_directory(fresh_directory, needed);
-                    release_dense(fresh_dense, prefix_pages);
-                    throw;
-                }
-                auto* dense_words = fresh_dense ? fresh_dense : dense_;
-                if (fresh_first) slots[tail_first - prefix_pages] = reinterpret_cast<std::uintptr_t>(fresh_first);
-                if (fresh_last) slots[last - prefix_pages] = reinterpret_cast<std::uintptr_t>(fresh_last);
-                for (auto page = first;; ++page) {
-                    const auto lo = page == first ? first_lo : 0;
-                    const auto hi = page == last ? last_hi : page_bytes;
-                    if (page < prefix_pages) {
-                        auto* control = dense_words + prefix_pages * words_per_page + page * 2;
-                        mark_page(dense_words + page * words_per_page, control[0], control[1], page_span(lo, hi));
-                    } else if (lo == 0 && hi == page_bytes) {
-                        auto& entry = slots[page - prefix_pages];
-                        if (entry > 1) {
-                            // Retain a previously allocated Page until destruction.
-                            // Normal disjoint registrations never need this case.
-                            auto* p = page_pointer(entry);p->any = p->full = all_bits;
-                        } else entry = 1;
-                        /* XV5: full-page-tagged */
-                    } else {
-                        auto* p = page_pointer(slots[page - prefix_pages]);
-                        mark_page(p->words, p->any, p->full, page_span(lo, hi));
-                    }
-                    if (page == last) break;
-                }
-                if (fresh_dense) { dense_ = fresh_dense; dense_pages_ = prefix_pages; }
-                if (fresh_directory) {
-                    release_directory(directory_, directory_size_);
-                    directory_ = fresh_directory;
-                    directory_size_ = needed;
-                }
-                extent_ = requested_extent;
-                // Only successful commit publishes covered bounds; scratch
-                // preparation failure must not expand this observed envelope.
-                coverage_begin_ = registrations_ ? std::min(coverage_begin_, begin) : begin;
-                coverage_end_ = std::max(coverage_end_, end);
-                ++registrations_;
-            }
-        };
-
-        inline bool wire_range_overlaps(const WireValidationByteIndex& ranges,
-                                        std::size_t begin_offset,
-                                        std::size_t end_offset) noexcept {
-            return ranges.overlaps(begin_offset, end_offset);
-        }
-
-        // Validation scratch owned by one long-lived reload buffer. Every
-        // verified load builds two monotonic resources whose upstream blocks
-        // have the same few sizes message after message; this resource keeps
-        // up to `capacity` released blocks of at most `max_block` bytes and
-        // hands them out again by exact size and alignment. Larger or surplus
-        // blocks go straight back to new/delete. The validator constructs
-        // everything it reads, exactly as on fresh memory, and the scratch
-        // never reaches the payload or the wire. Its blocks are released with
-        // the buffer that owns it.
-        class ValidationScratchCache final : public std::pmr::memory_resource {
-        public:
-            static constexpr std::size_t max_block = 64u * 1024u;
-            static constexpr std::size_t capacity = 8;
-            ValidationScratchCache() = default;
-            ValidationScratchCache(const ValidationScratchCache&) = delete;
-            ValidationScratchCache& operator=(const ValidationScratchCache&) = delete;
-            ~ValidationScratchCache() override { release_all(); }
-            std::size_t cached_blocks() const noexcept { return count_; }
-            void release_all() noexcept {
-                while (count_) {
-                    const auto b = blocks_[--count_];
-                    std::pmr::new_delete_resource()->deallocate(b.p, b.bytes, b.align);
-                }
+            void release() noexcept {
+                delete[] words_;
+                words_ = nullptr;
+                capacity_ = 0;
             }
         private:
-            struct Block { void* p; std::size_t bytes, align; };
-            Block blocks_[capacity] = {};
-            std::size_t count_ = 0;
-            void* do_allocate(std::size_t bytes, std::size_t align) override {
-                for (std::size_t i = count_; i-- > 0;) {
-                    if (blocks_[i].bytes == bytes && blocks_[i].align == align) {
-                        void* p = blocks_[i].p;
-                        blocks_[i] = blocks_[--count_];
-                        return p;
-                    }
-                }
-                return std::pmr::new_delete_resource()->allocate(bytes, align);
-            }
-            void do_deallocate(void* p, std::size_t bytes, std::size_t align) override {
-                if (bytes <= max_block && count_ < capacity) {
-                    blocks_[count_++] = {p, bytes, align};
-                    return;
-                }
-                std::pmr::new_delete_resource()->deallocate(p, bytes, align);
-            }
-            bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override {
-                return this == &other;
-            }
+            std::uint64_t* words_ = nullptr;
+            std::size_t capacity_ = 0;
         };
 
+        // V2 validation index: one bit per 8-byte granule of the payload, one
+        // bitmap for live blocks and one for holes. Every range the validator
+        // registers is granule aligned: a block is 8-byte aligned with its
+        // length rounded up to 8 (register_allocation), and the arena header
+        // and every hole are multiples of 8 at multiples of 8. A granule bit
+        // therefore records exactly the byte membership that a byte index
+        // would, and every overlap, coverage and gap answer is the same.
+        //
+        // Payloads up to inline_extent use words inside the index (no host
+        // memory). Larger ones use a reload buffer's retained words or one
+        // block from the upstream resource, returned when the index dies.
+        // The size follows the payload extent, which the caller has already
+        // bounded by its maximum capacity, never a wire count. Both bitmaps
+        // are cleared once, on the first registration.
+        class WireGranuleIndex {
+        public:
+            static constexpr std::size_t inline_words = 64;              // per bitmap
+            static constexpr std::size_t inline_extent = inline_words * 64 * 8; // 32 KiB
+            WireGranuleIndex() noexcept {} // inline words stay uninitialized until prepare()
+            WireGranuleIndex(const WireGranuleIndex&) = delete;
+            WireGranuleIndex& operator=(const WireGranuleIndex&) = delete;
+            WireGranuleIndex(WireGranuleIndex&&) = delete;
+            WireGranuleIndex& operator=(WireGranuleIndex&&) = delete;
+            ~WireGranuleIndex() {
+                if (block_) block_upstream_->deallocate(block_, block_words_ * sizeof(std::uint64_t),
+                                                        alignof(std::uint64_t));
+            }
+
+            bool prepared() const noexcept { return owned_ != nullptr; }
+            // Granules of the payload; a trailing partial granule (extent not
+            // a multiple of 8) is never registered and never free.
+            std::size_t granules() const noexcept { return granules_; }
+            // Host words this index took from outside itself (0: inline or retained).
+            std::size_t upstream_words() const noexcept { return block_words_; }
+
+            void prepare(std::size_t extent, std::pmr::memory_resource* upstream,
+                         WireValidationScratch* retained) {
+                const auto granules = extent / 8u;
+                const auto words = (granules + 63u) / 64u;
+                std::uint64_t* storage;
+                if (words <= inline_words) {
+                    storage = inline_;
+                } else if (retained) {
+                    storage = retained->words(2 * words);
+                } else {
+                    if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+                    storage = static_cast<std::uint64_t*>(
+                        upstream->allocate(2 * words * sizeof(std::uint64_t), alignof(std::uint64_t)));
+                    block_ = storage;
+                    block_words_ = 2 * words;
+                    block_upstream_ = upstream;
+                }
+                if (words) std::memset(storage, 0, 2 * words * sizeof(std::uint64_t));
+                owned_ = storage;
+                free_ = storage + words;
+                granules_ = granules;
+            }
+
+            // [g0, g1) nonempty, g1 <= granules(). 0 none, 1 live, 2 free. A
+            // live hit anywhere in the range wins over a free hit.
+            unsigned overlap(std::size_t g0, std::size_t g1) const noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                const auto first = ~std::uint64_t(0) << (g0 % 64u);
+                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
+                if (w0 == w1) {
+                    const auto m = first & last;
+                    if (owned_[w0] & m) return 1;
+                    return (free_[w0] & m) ? 2 : 0;
+                }
+                if (owned_[w0] & first) return 1;
+                std::uint64_t dead = free_[w0] & first;
+                for (auto w = w0 + 1u; w < w1; ++w) {
+                    if (owned_[w]) return 1;
+                    dead |= free_[w];
+                }
+                if (owned_[w1] & last) return 1;
+                dead |= free_[w1] & last;
+                return dead ? 2 : 0;
+            }
+
+            void mark(bool free, std::size_t g0, std::size_t g1) noexcept {
+                auto* bits = free ? free_ : owned_;
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                const auto first = ~std::uint64_t(0) << (g0 % 64u);
+                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
+                if (w0 == w1) {
+                    bits[w0] |= first & last;
+                    return;
+                }
+                bits[w0] |= first;
+                for (auto w = w0 + 1u; w < w1; ++w) bits[w] = ~std::uint64_t(0);
+                bits[w1] |= last;
+            }
+
+            bool member(bool free, std::size_t granule) const noexcept {
+                return ((free ? free_ : owned_)[granule / 64u] >> (granule % 64u)) & 1u;
+            }
+
+            // True when every granule of [g0, g1) is free.
+            bool all_free(std::size_t g0, std::size_t g1) const noexcept {
+                if (g0 >= g1) return true;
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                const auto first = ~std::uint64_t(0) << (g0 % 64u);
+                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
+                if (w0 == w1) return (free_[w0] & first & last) == (first & last);
+                if ((free_[w0] & first) != first) return false;
+                for (auto w = w0 + 1u; w < w1; ++w)
+                    if (free_[w] != ~std::uint64_t(0)) return false;
+                return (free_[w1] & last) == last;
+            }
+
+        private:
+            std::uint64_t* owned_ = nullptr;
+            std::uint64_t* free_ = nullptr;
+            std::size_t granules_ = 0;
+            std::uint64_t* block_ = nullptr;
+            std::size_t block_words_ = 0;
+            std::pmr::memory_resource* block_upstream_ = nullptr;
+            std::uint64_t inline_[2 * inline_words];
+        };
+
+        // Test switch for the cursor path below (differential on/off runs).
+        inline constinit bool wire_validation_cursor = true;
+
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+        // Diagnostic build only: layout classes, per root type, of the wires
+        // that pass verified validation, printed to stderr at exit.
+        // canonical: the cursor path validated the whole graph. ascending:
+        // live blocks in visiting order at rising offsets, with holes between
+        // them. out_of_order: some block starts below the end of the previous
+        // one (first_offset_sum adds the payload offset of the first such
+        // block, out_of_order_blocks counts them all).
+        struct WireLayoutStats {
+            const char* type = nullptr;
+            WireLayoutStats* next = nullptr;
+            std::uint64_t canonical = 0, ascending = 0, out_of_order = 0;
+            std::uint64_t out_of_order_blocks = 0, first_offset_sum = 0;
+        };
+        inline WireLayoutStats* wire_layout_stats_list = nullptr;
+        struct WireLayoutStatsReport {
+            ~WireLayoutStatsReport() {
+                for (auto* s = wire_layout_stats_list; s; s = s->next)
+                    std::fprintf(stderr,
+                        "xoffset layout stats %s: canonical %llu ascending %llu out_of_order %llu"
+                        " out_of_order_blocks %llu first_offset_sum %llu\n", s->type,
+                        (unsigned long long)s->canonical, (unsigned long long)s->ascending,
+                        (unsigned long long)s->out_of_order, (unsigned long long)s->out_of_order_blocks,
+                        (unsigned long long)s->first_offset_sum);
+            }
+        };
+        inline WireLayoutStatsReport wire_layout_stats_report;
+        template <typename T> inline WireLayoutStats wire_layout_stats_of{};
+        template <typename T> WireLayoutStats& wire_layout_stats() {
+            auto& s = wire_layout_stats_of<T>;
+            if (!s.type) {
+                s.type = typeid(T).name();
+                s.next = wire_layout_stats_list;
+                wire_layout_stats_list = &s;
+            }
+            return s;
+        }
+#endif
+
         struct WireValidationContext {
+            static constexpr std::size_t no_cursor = ~std::size_t(0);
             const char* base{};
             const char* end{};
             XArena* segment{};
@@ -4298,34 +3935,41 @@ namespace XOffsetDatastructure {
             // proves the payload is tiled exactly.
             std::uint64_t owned_bytes = 0;
             std::uint64_t free_bytes = 0;
-            // Host-only, lazy storage; never sized from untrusted wire counts.
-            // Declaration order keeps the resource alive until both indexes die.
-            std::pmr::monotonic_buffer_resource range_resource{
-                std::size_t{4096}, std::pmr::new_delete_resource()};
-            std::pmr::monotonic_buffer_resource free_range_resource{
-                std::size_t{4096}, std::pmr::new_delete_resource()};
-            WireValidationByteIndex owned_ranges{&range_resource};
-            WireValidationByteIndex free_ranges{&free_range_resource};
-            // Ascending live run (verify_structural_wire_graph only). While
-            // every live range starts at or after the end of all earlier live
-            // ranges, it cannot overlap any of them, so it is only recorded
-            // here; it is checked against the free set as usual. A live range
-            // that starts lower is checked against the run and then takes the
-            // general path into owned_ranges, so the run keeps going. A full
-            // run, a free range or the recomputed gap walk writes the recorded
-            // ranges into owned_ranges (flush_deferred_owned), exactly as if
-            // they had been inserted one by one.
-            struct DeferredOwned {
-                static constexpr std::size_t capacity = 128;
-                // Payloads above this (one byte-index page) skip the run.
-                static constexpr std::size_t max_extent = 4096;
-                bool enabled = false;
-                std::uint32_t count = 0;
-                std::size_t run_end = 0; // every live range so far ends at or below this
-                std::uint32_t begin[capacity];
-                std::uint32_t end[capacity];
-                DeferredOwned() noexcept {} // ranges stay uninitialized until written
-            } deferred_owned;
+            // Host-only scratch for bitmaps above the inline size: a reload
+            // buffer's retained words when set, else one upstream block.
+            std::pmr::memory_resource* upstream = std::pmr::new_delete_resource();
+            WireValidationScratch* retained = nullptr;
+            // Cursor path: while no hole is registered and every live block
+            // starts where the previous one ended (canonical preorder), the
+            // live set is exactly [0, cursor) and no bitmap is touched. At the
+            // first block elsewhere, or the first hole, the live bitmap is set
+            // to [0, cursor) (the state the bitmaps would have reached) and
+            // validation continues on the bitmaps, so accept/reject and the
+            // first error are unchanged. no_cursor: bitmaps only.
+            std::size_t cursor = wire_validation_cursor ? 0 : no_cursor;
+            WireGranuleIndex granules;
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            std::size_t stats_end = 0, stats_first = no_cursor;
+            std::uint64_t stats_out_of_order = 0;
+#endif
+
+            std::size_t extent() const noexcept {
+                return static_cast<std::size_t>(reinterpret_cast<std::uintptr_t>(end) -
+                                                reinterpret_cast<std::uintptr_t>(base));
+            }
+            WireGranuleIndex& index() {
+                if (!granules.prepared()) granules.prepare(extent(), upstream, retained);
+                return granules;
+            }
+            // The bitmaps with the cursor's live range folded in.
+            WireGranuleIndex& general() {
+                auto& bits = index();
+                if (cursor != no_cursor) {
+                    if (cursor) bits.mark(false, 0, cursor / 8u);
+                    cursor = no_cursor;
+                }
+                return bits;
+            }
         };
 
 #if defined(_MSC_VER)
@@ -4341,59 +3985,70 @@ namespace XOffsetDatastructure {
                                            const char* what) {
             if (bytes == 0) return;
             if (!ptr) {
-                throw XException(what);
+                wire_reject(what);
             }
             auto begin = reinterpret_cast<std::uintptr_t>(ptr);
             auto base = reinterpret_cast<std::uintptr_t>(ctx.base);
             auto end = reinterpret_cast<std::uintptr_t>(ctx.end);
             if (begin < base || begin > end || bytes > end - begin) {
-                throw XException(what);
+                wire_reject(what);
             }
             if ((reinterpret_cast<std::uintptr_t>(ptr) % alignment) != 0) {
-                throw XException(what);
+                wire_reject(what);
             }
         }
 
-        // Differential-test switch: false makes verify_structural_wire_graph
-        // insert every live range directly, as before the ascending run
-        // existed (test_v2_fuzz compares both). Not for production use.
-        inline constinit bool wire_validation_defer_ascending_owned = true;
+        void register_owned_bitmap(std::size_t begin, std::size_t bytes, WireValidationContext& ctx);
 
-        // Writes the deferred ascending live ranges into owned_ranges. They
-        // are pairwise disjoint and were each checked against the free set
-        // when recorded, so every insert takes the disjoint path.
-        inline void flush_deferred_owned(WireValidationContext& ctx) {
-            auto& d = ctx.deferred_owned;
-            const auto extent = static_cast<std::size_t>(
-                reinterpret_cast<std::uintptr_t>(ctx.end) -
+        // Registers granules [begin, begin + bytes) of a range that is already
+        // known to lie in the payload on 8-byte granules.
+        XOFFSET_DETAIL_V4_INLINE void register_owned_granules(std::size_t begin, std::size_t bytes,
+                                                              WireValidationContext& ctx) {
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            if (begin < ctx.stats_end) {
+                if (ctx.stats_first == WireValidationContext::no_cursor) ctx.stats_first = begin;
+                ++ctx.stats_out_of_order;
+            }
+            ctx.stats_end = begin + bytes;
+#endif
+            if (begin == ctx.cursor) [[likely]] {
+                ctx.cursor += bytes;
+                ctx.owned_bytes += bytes;
+                return;
+            }
+            register_owned_bitmap(begin, bytes, ctx);
+        }
+
+        // Bitmap registration, kept out of line so that the validators the
+        // cursor path inlines into stay small.
+        [[gnu::noinline]] inline void register_owned_bitmap(std::size_t begin, std::size_t bytes,
+                                                            WireValidationContext& ctx) {
+            auto& index = ctx.general();
+            const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
+            const auto overlap = index.overlap(g0, g1);
+            if (overlap == 1) {
+                wire_reject(
+                    "wire validation detected overlapping dynamic ranges");
+            }
+            if (overlap == 2) {
+                wire_reject("wire validation detected live/free overlap");
+            }
+            index.mark(false, g0, g1);
+            ctx.owned_bytes += bytes;
+            /* XBV3: owned-registered */
+        }
+
+        // Offset of a range that passed validate_storage_range; a range that
+        // is not on 8-byte granules is rejected with `what` (the validator
+        // never registers one: see WireGranuleIndex).
+        inline std::size_t granule_range_offset(const void* ptr, std::size_t bytes,
+                                                const WireValidationContext& ctx,
+                                                const char* what) {
+            const auto begin = static_cast<std::size_t>(
+                reinterpret_cast<std::uintptr_t>(ptr) -
                 reinterpret_cast<std::uintptr_t>(ctx.base));
-            for (std::uint32_t i = 0; i < d.count; ++i) {
-                unsigned overlap = 0;
-                if (!WireValidationByteIndex::try_insert_dense_single_page(
-                        ctx.owned_ranges, ctx.free_ranges, false, d.begin[i], d.end[i], extent, overlap))
-                    ctx.owned_ranges.insert_disjoint(d.begin[i], d.end[i], extent);
-                else if (overlap != 0)
-                    throw XException("wire validation: deferred live range overlap");
-            }
-            d.count = 0;
-        }
-
-        // True when [begin, end) intersects a recorded range of the run.
-        inline bool deferred_owned_overlaps(const WireValidationContext::DeferredOwned& d,
-                                            std::size_t begin, std::size_t end) {
-            // First recorded range that ends after begin; ends ascend with begins.
-            std::uint32_t lo = 0, hi = d.count;
-            while (lo < hi) {
-                const std::uint32_t mid = lo + (hi - lo) / 2;
-                if (d.end[mid] <= begin) lo = mid + 1;
-                else hi = mid;
-            }
-            return lo < d.count && d.begin[lo] < end;
-        }
-
-        inline void stop_deferring_owned(WireValidationContext& ctx) {
-            flush_deferred_owned(ctx);
-            ctx.deferred_owned.enabled = false;
+            if (((begin | bytes) & 7u) != 0) wire_reject(what);
+            return begin;
         }
 
         inline void register_owned_range(const void* ptr, std::size_t bytes,
@@ -4401,86 +4056,27 @@ namespace XOffsetDatastructure {
                                          const char* what) {
             if (bytes == 0 || !ptr) return;
             validate_storage_range(ptr, bytes, 1, ctx, what);
-            const auto begin_offset = static_cast<std::size_t>(
-                reinterpret_cast<std::uintptr_t>(ptr) -
-                reinterpret_cast<std::uintptr_t>(ctx.base));
-            // Validated bounds imply this sum is within the arena extent.
-            const auto end_offset = begin_offset + bytes;
-            const auto extent = static_cast<std::size_t>(
-                reinterpret_cast<std::uintptr_t>(ctx.end) -
-                reinterpret_cast<std::uintptr_t>(ctx.base));
-            if (auto& d = ctx.deferred_owned; d.enabled) {
-                if (begin_offset >= d.run_end) {
-                    // Disjoint from every live range; the free set decides.
-                    const auto [free_begin, free_end] = ctx.free_ranges.coverage_bounds();
-                    if (!ctx.free_ranges.empty() && end_offset > free_begin && begin_offset < free_end &&
-                        ctx.free_ranges.overlaps(begin_offset, end_offset)) {
-                        throw XException("wire validation detected live/free overlap");
-                    }
-                    if (d.count == WireValidationContext::DeferredOwned::capacity) flush_deferred_owned(ctx);
-                    d.begin[d.count] = static_cast<std::uint32_t>(begin_offset);
-                    d.end[d.count] = static_cast<std::uint32_t>(end_offset);
-                    ++d.count;
-                    d.run_end = end_offset;
-                    ctx.owned_bytes += bytes;
-                    /* XBV3: owned-registered */
-                    return;
-                }
-                // A lower range (a block that grew and moved, for example)
-                // takes the general path below; it must also miss the
-                // recorded run, which is sorted and pairwise disjoint.
-                if (deferred_owned_overlaps(d, begin_offset, end_offset)) {
-                    throw XException(
-                        "wire validation detected overlapping dynamic ranges");
-                }
-            }
-            unsigned overlap = 0;
-            const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
-                ctx.owned_ranges, ctx.free_ranges, false,
-                begin_offset, end_offset, extent, overlap);
-            if (!handled) overlap = WireValidationByteIndex::overlap_priority(
-                ctx.owned_ranges, ctx.free_ranges, begin_offset, end_offset);
-            if (overlap == 1) {
-                throw XException(
-                    "wire validation detected overlapping dynamic ranges");
-            }
-            if (overlap == 2) {
-                throw XException("wire validation detected live/free overlap");
-            }
-            if (!handled) ctx.owned_ranges.insert_disjoint(begin_offset, end_offset, extent);
-            ctx.owned_bytes += bytes;
-            /* XBV3: owned-registered */
+            register_owned_granules(granule_range_offset(ptr, bytes, ctx, what), bytes, ctx);
         }
 
         inline void register_free_range(const void* ptr, std::size_t bytes,
                                         WireValidationContext& ctx,
                                         const char* what) {
             if (bytes == 0 || !ptr) return;
-            // A free range must see every live range in owned_ranges.
-            if (ctx.deferred_owned.enabled) stop_deferring_owned(ctx);
             validate_storage_range(ptr, bytes, 1, ctx, what);
-            const auto begin_offset = static_cast<std::size_t>(
-                reinterpret_cast<std::uintptr_t>(ptr) -
-                reinterpret_cast<std::uintptr_t>(ctx.base));
-            const auto end_offset = begin_offset + bytes;
-            const auto extent = static_cast<std::size_t>(
-                reinterpret_cast<std::uintptr_t>(ctx.end) -
-                reinterpret_cast<std::uintptr_t>(ctx.base));
-            unsigned overlap = 0;
-            const bool handled = WireValidationByteIndex::try_insert_dense_single_page(
-                ctx.owned_ranges, ctx.free_ranges, true,
-                begin_offset, end_offset, extent, overlap);
-            if (!handled) overlap = WireValidationByteIndex::overlap_priority(
-                ctx.owned_ranges, ctx.free_ranges, begin_offset, end_offset);
+            const auto begin = granule_range_offset(ptr, bytes, ctx, what);
+            auto& index = ctx.general();
+            const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
+            const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
-                throw XException(
+                wire_reject(
                     "wire validation detected free-list overlap with live ranges");
             }
             if (overlap == 2) {
-                throw XException(
+                wire_reject(
                     "wire validation detected overlapping free-list ranges");
             }
-            if (!handled) ctx.free_ranges.insert_disjoint(begin_offset, end_offset, extent);
+            index.mark(true, g0, g1);
             ctx.free_bytes += bytes;
             /* XBV3: free-registered */
         }
@@ -4495,8 +4091,37 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_V4_INLINE void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
             if (delta == 0 || checked_relative(delta, ctx) != ctx.base) {
-                throw XException("wire validation: invalid allocator binding");
+                wire_reject("wire validation: invalid allocator binding");
             }
+        }
+
+        // One check for a head's arena binding: it resolves to the payload
+        // base. When it does not, validate_binding throws its own error.
+        XOFFSET_DETAIL_V4_INLINE void check_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
+            const auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
+            if (delta == 0 || static_cast<std::uintptr_t>(address) != reinterpret_cast<std::uintptr_t>(ctx.base) ||
+                ctx.end == ctx.base) [[unlikely]]
+                validate_binding(delta, ctx);
+        }
+
+        // One check for a head's out-of-line block: data_delta resolves to an
+        // 8-byte aligned address with [data, data + block) inside the payload
+        // (block >= 1 is the head's 8-rounded extent). When it holds, every
+        // check of the full sequence (checked_relative, the payload range,
+        // register_allocation's block range) passes, so the block is
+        // registered directly; `full` returns nullptr and the caller runs that
+        // sequence, which throws its own first error.
+        XOFFSET_DETAIL_V4_INLINE const char* checked_block(const std::int32_t& delta, std::size_t block,
+                                                           WireValidationContext& ctx) {
+            const auto address = static_cast<std::uintptr_t>(
+                static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta);
+            const auto base = reinterpret_cast<std::uintptr_t>(ctx.base);
+            const auto end = reinterpret_cast<std::uintptr_t>(ctx.end);
+            if (address < base || address > end || block > end - address || (address & 7u) != 0 ||
+                ((address - base) & 7u) != 0) [[unlikely]]
+                return nullptr;
+            register_owned_granules(static_cast<std::size_t>(address - base), block, ctx);
+            return reinterpret_cast<const char*>(address);
         }
 
 #undef XOFFSET_DETAIL_V4_INLINE
@@ -4523,7 +4148,7 @@ namespace XOffsetDatastructure {
                 if (hole.bytes == 0 || (hole.bytes & 7u) != 0 || (hole.offset & 7u) != 0 ||
                     hole.offset < sizeof(XArena) || hole.offset > used ||
                     hole.bytes > used - hole.offset) {
-                    throw XException("wire validation failed: invalid hole table entry");
+                    wire_reject("wire validation failed: invalid hole table entry");
                 }
                 register_free_range(ctx.base + hole.offset, hole.bytes, ctx,
                                     "wire validation failed: invalid hole table entry");
@@ -4531,22 +4156,45 @@ namespace XOffsetDatastructure {
         }
 
         // N10: every byte skipped by a sparse wire must lie inside a hole.
+        // Holes are whole granules, so a byte is free exactly when its
+        // granule is; a trailing partial granule never is.
         inline void require_gaps_free(const XBufferCore::WireHole* gaps, std::size_t count,
-                                      const WireValidationContext& ctx) {
+                                      WireValidationContext& ctx) {
             for (std::size_t i = 0; i < count; ++i) {
                 const auto gap = gaps[i];
-                ctx.free_ranges.for_each_gap(gap.offset, std::size_t(gap.offset) + gap.bytes,
-                    [](std::size_t, std::size_t) {
-                        throw XException("wire validation failed: sparse gap is not free");
-                    });
+                if (gap.bytes == 0) continue;
+                const auto& index = ctx.general();
+                const auto g0 = std::size_t(gap.offset) / 8u;
+                const auto g1 = (std::size_t(gap.offset) + gap.bytes + 7u) / 8u;
+                if (g1 > index.granules() || !index.all_free(g0, g1))
+                    wire_reject("wire validation failed: sparse gap is not free");
             }
         }
 
         inline void require_exact_coverage(const WireValidationContext& ctx) {
             if (ctx.owned_bytes + ctx.free_bytes != static_cast<std::uint64_t>(ctx.end - ctx.base)) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: payload is not exactly covered by live blocks and holes");
             }
+        }
+
+        // Calls fn(begin, end) for each maximal run of payload bytes in no
+        // live block, in ascending order (the bytes of a trailing partial
+        // granule are in no block).
+        template <typename Fn>
+        void for_each_unowned_run(WireValidationContext& ctx, Fn&& fn) {
+            const auto used = ctx.extent();
+            const auto& index = ctx.general();
+            std::size_t g = 0;
+            const auto count = index.granules();
+            while (g < count) {
+                if (index.member(false, g)) { ++g; continue; }
+                const auto start = g;
+                while (g < count && !index.member(false, g)) ++g;
+                if (g == count) { fn(start * 8u, used); return; }
+                fn(start * 8u, g * 8u);
+            }
+            if (count * 8u < used) fn(count * 8u, used);
         }
 
         template <typename T>
@@ -4603,39 +4251,43 @@ namespace XOffsetDatastructure {
             std::memcpy(bytes, head + 4, sizeof(bytes));
             const unsigned length = bytes[11] & 0x7fu;
             if (length > XFixedString::inline_max)
-                throw XException("wire validation failed: inline XFixedString length exceeds 10");
+                wire_reject("wire validation failed: inline XFixedString length exceeds 10");
             for (unsigned i = length; i < 11; ++i) {
                 if (bytes[i] != 0)
-                    throw XException("wire validation failed: inline XFixedString has nonzero padding");
+                    wire_reject("wire validation failed: inline XFixedString has nonzero padding");
             }
         }
 
         inline void validate_wire_value(const XFixedString& value,
                                         WireValidationContext& ctx) {
-            validate_binding(value.arena_delta, ctx);
+            check_binding(value.arena_delta, ctx);
             if (value.is_inline()) {
                 validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
                 return;
             }
             if (value.size_ > value.capacity_ || value.capacity_ >= XBufferCore::MAX_PAYLOAD) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedString size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    throw XException(
+                    wire_reject(
                         "wire validation failed: empty XFixedString has invalid payload");
                 }
                 return;
             }
 
-            auto* data = checked_relative(value.data_delta, ctx);
-            validate_storage_range(data, static_cast<std::size_t>(value.capacity_) + 1,
-                                   alignof(char), ctx,
-                                   "wire validation failed: XFixedString payload out of bounds");
-            register_allocation(data, fixed_detail::round_up_to_alignment(value.capacity_ + 1, 8), 8, ctx);
+            const auto block = fixed_detail::round_up_to_alignment(value.capacity_ + 1, 8);
+            auto* data = checked_block(value.data_delta, block, ctx);
+            if (!data) [[unlikely]] {
+                data = checked_relative(value.data_delta, ctx);
+                validate_storage_range(data, static_cast<std::size_t>(value.capacity_) + 1,
+                                       alignof(char), ctx,
+                                       "wire validation failed: XFixedString payload out of bounds");
+                register_allocation(data, block, 8, ctx);
+            }
             if (data[value.size_] != '\0') {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedString missing terminator");
             }
         }
@@ -4643,25 +4295,30 @@ namespace XOffsetDatastructure {
         template <typename T>
         void validate_wire_value(const XFixedVector<T>& value,
                                  WireValidationContext& ctx) {
-            validate_binding(value.arena_delta, ctx);
+            check_binding(value.arena_delta, ctx);
             if (value.size_ > value.capacity_ ||
                 value.capacity_ > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(T)) {
-                throw XException(
+                wire_reject(
                     "wire validation failed: XFixedVector size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    throw XException(
+                    wire_reject(
                         "wire validation failed: empty XFixedVector has invalid payload");
                 }
                 return;
             }
 
-            auto* data = reinterpret_cast<const T*>(checked_relative(value.data_delta, ctx));
-            auto bytes = static_cast<std::size_t>(value.capacity_) * sizeof(T);
-            validate_storage_range(data, bytes, alignof(T), ctx,
-                                   "wire validation failed: XFixedVector payload out of bounds");
-            register_allocation(data, (bytes + 7u) & ~std::size_t(7u), std::max<std::size_t>(alignof(T), 8), ctx);
+            const auto bytes = static_cast<std::size_t>(value.capacity_) * sizeof(T);
+            const auto block = (bytes + 7u) & ~std::size_t(7u);
+            auto* data = alignof(T) <= 8
+                ? reinterpret_cast<const T*>(checked_block(value.data_delta, block, ctx)) : nullptr;
+            if (!data) [[unlikely]] {
+                data = reinterpret_cast<const T*>(checked_relative(value.data_delta, ctx));
+                validate_storage_range(data, bytes, alignof(T), ctx,
+                                       "wire validation failed: XFixedVector payload out of bounds");
+                register_allocation(data, block, std::max<std::size_t>(alignof(T), 8), ctx);
+            }
             if constexpr (wire_value_needs_validation_v<T>) {
                 for (std::uint32_t i = 0; i < value.size_; ++i) {
                     /* XV4: checked-element-visited */
@@ -4696,7 +4353,7 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_same_v<CleanT, bool>) {
                 unsigned char bits;
                 std::memcpy(&bits, &value, 1);
-                if (bits > 1) throw XException("wire validation: invalid bool representation");
+                if (bits > 1) wire_reject("wire validation: invalid bool representation");
             } else if constexpr (std::is_array_v<CleanT>) {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
                     for (const auto& elem : value) validate_wire_value(elem, ctx);
@@ -4705,17 +4362,19 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
-                for (std::uint32_t i = 1; i < value.size(); ++i) {
-                    if (!fixed_detail::ordered_less(value.data()[i - 1], value.data()[i]))
-                        throw XException("wire validation: set keys not strictly ordered");
-                }
+                // No early exit: one error, and the loop vectorizes.
+                bool unordered = false;
+                for (std::uint32_t i = 1; i < value.size(); ++i)
+                    unordered |= !fixed_detail::ordered_less(value.data()[i - 1], value.data()[i]);
+                if (unordered) wire_reject("wire validation: set keys not strictly ordered");
             } else if constexpr (is_fixed_flat_map_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
-                for (std::uint32_t i = 1; i < value.size(); ++i) {
-                    if (!fixed_detail::ordered_less(value.data()[i - 1].first, value.data()[i].first))
-                        throw XException("wire validation: map keys not strictly ordered");
-                }
+                // No early exit: one error, and the loop vectorizes.
+                bool unordered = false;
+                for (std::uint32_t i = 1; i < value.size(); ++i)
+                    unordered |= !fixed_detail::ordered_less(value.data()[i - 1].first, value.data()[i].first);
+                if (unordered) wire_reject("wire validation: map keys not strictly ordered");
             } else if constexpr (is_fixed_vector_v<CleanT>) {
                 validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
@@ -4739,7 +4398,8 @@ namespace XOffsetDatastructure {
                                           std::size_t hole_count,
                                           bool check_coverage = true,
                                           std::vector<XBufferCore::WireHole>* recomputed = nullptr,
-                                          const std::vector<XBufferCore::WireHole>* gaps = nullptr) {
+                                          const std::vector<XBufferCore::WireHole>* gaps = nullptr,
+                                          WireValidationScratch* retained = nullptr) {
             if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
             // W9: flat end for every storage kind. The extent check that R1+M2
@@ -4748,37 +4408,40 @@ namespace XOffsetDatastructure {
             // allocator/load invariant), so it only turns a corrupted extent
             // into this error instead of an out-of-bounds validation context.
             if (used > xbuf.segment_size())
-                throw XException("wire validation: payload extent out of bounds");
+                wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             WireValidationContext ctx{
                 .base = static_cast<const char*>(xbuf.get_address()),
                 .end = validated_end,
                 .segment = xbuf.arena(),
-                .range_resource{std::size_t{4096}, upstream},
-                .free_range_resource{std::size_t{4096}, upstream}
+                .upstream = upstream,
+                .retained = retained
             };
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
-                throw XException("wire validation: unsupported arena header flags");
+                wire_reject("wire validation: unsupported arena header flags");
             }
             register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header");
             if (holes) register_wire_holes(holes, hole_count, ctx);
-            // Every free range is registered; live ranges from here on may be
-            // deferred while they ascend (see WireValidationContext).
-            // Measured on payloads of at most one byte-index page (SLG battle
-            // and report messages); on larger payloads (player state, shard
-            // snapshots) the run cost more than it saved.
-            ctx.deferred_owned.enabled = wire_validation_defer_ascending_owned &&
-                used <= WireValidationContext::DeferredOwned::max_extent;
-            ctx.deferred_owned.run_end = ctx.owned_ranges.coverage_bounds().second;
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
             if (check_coverage) require_exact_coverage(ctx);
             if (gaps) require_gaps_free(gaps->data(), gaps->size(), ctx);
+#if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
+            auto& stats = wire_layout_stats<T>();
+            if (ctx.cursor != WireValidationContext::no_cursor) {
+                ++stats.canonical;
+            } else if (ctx.stats_out_of_order == 0) {
+                ++stats.ascending;
+            } else {
+                ++stats.out_of_order;
+                stats.out_of_order_blocks += ctx.stats_out_of_order;
+                stats.first_offset_sum += ctx.stats_first;
+            }
+#endif
             if (recomputed) {
-                stop_deferring_owned(ctx);
                 // Every byte not covered by a live block is free.
                 recomputed->clear();
-                ctx.owned_ranges.for_each_gap(0, static_cast<std::size_t>(used),
+                for_each_unowned_run(ctx,
                     [&](std::size_t begin, std::size_t end) {
                         while (begin < end) {
                             const auto chunk = std::min<std::size_t>(end - begin, 0x40000000u);
@@ -6358,9 +6021,10 @@ namespace XOffsetDatastructure {
             return load_verified_with_resource<T>(data, cap, std::pmr::new_delete_resource());
         }
 
-        // Explicit host-only upstream. A fresh context and two fresh membership
-        // indexes are constructed for every invocation, including cached blocks.
-        // The upstream must outlive this synchronous call and be non-null.
+        // Explicit host-only upstream. A fresh context and fresh membership
+        // bitmaps are prepared for every invocation; payloads above 32 KiB take
+        // one block from the upstream for them. The upstream must outlive this
+        // synchronous call and be non-null.
         template <typename T>
         static XBuffer load_verified_with_resource(std::span<const std::byte> data,
                                                   std::optional<MaximumCapacity> cap,
@@ -6393,9 +6057,10 @@ namespace XOffsetDatastructure {
         /// without typed root access (root<T>() throws) until a later
         /// successful reload_verified or reset<T>(). Committed pages are kept
         /// (see reclaim_tail_pages()).
-        /// Validation scratch comes from a small block cache owned by this
+        /// Validation scratch for payloads above 32 KiB is retained by this
         /// buffer (released with it or by release_reload_scratch()), so a
-        /// reload loop does not allocate host memory per message.
+        /// reload loop does not allocate host memory per message; smaller
+        /// payloads need none.
         template <typename T>
         void reload_verified(std::span<const std::byte> data) {
             reload_into<T>(data, nullptr);
@@ -6414,9 +6079,9 @@ namespace XOffsetDatastructure {
             reload_into<T>(data, upstream);
         }
 
-        /// Returns the reload scratch blocks to the host allocator.
+        /// Returns the retained reload scratch words to the host allocator.
         void release_reload_scratch() noexcept {
-            if (reload_scratch_) reload_scratch_->release_all();
+            if (reload_scratch_) reload_scratch_->release();
         }
 
     private:
@@ -6425,23 +6090,25 @@ namespace XOffsetDatastructure {
         void reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             try {
+                detail::WireValidationScratch* retained = nullptr;
                 if (!upstream) {
-                    if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::ValidationScratchCache>();
-                    upstream = reload_scratch_.get();
+                    if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::WireValidationScratch>();
+                    retained = reload_scratch_.get();
+                    upstream = std::pmr::new_delete_resource();
                 }
                 XWireHeaderV2 header{};
                 const auto layout = admit_wire_header<T>(data, header, who);
                 const auto used = static_cast<std::size_t>(header.used_bytes);
                 if (layout.extent_count == 0) reinit_from_bytes(layout.stored, used);
                 else reinit_from_extents(layout.stored, layout.extents, layout.extent_count, used);
-                finish_verified_load<T>(header, layout, upstream, who);
+                finish_verified_load<T>(header, layout, upstream, who, retained);
             } catch (...) {
                 reset_arena(0);
                 throw;
             }
         }
 
-        std::unique_ptr<detail::ValidationScratchCache> reload_scratch_;
+        std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
 
     public:
         /// Empties this buffer and constructs a fresh root of type T in it,
@@ -6494,7 +6161,8 @@ namespace XOffsetDatastructure {
         // Post-copy verification shared by load_verified and reload_verified.
         template <typename T>
         void finish_verified_load(const XWireHeaderV2& header, const detail::WireLayout& layout,
-                                  std::pmr::memory_resource* upstream, const char* who) {
+                                  std::pmr::memory_resource* upstream, const char* who,
+                                  detail::WireValidationScratch* retained = nullptr) {
             if (this->arena()->used_end != header.used_bytes) {
                 throw XException(std::string(who) + ": non-normalized payload extent");
             }
@@ -6509,7 +6177,7 @@ namespace XOffsetDatastructure {
                 throw XException(std::string(who) + ": root offset mismatch");
             }
             detail::verify_structural_wire_graph(*root_ptr, *this, upstream, layout.holes, layout.hole_count,
-                                                 true, nullptr, &layout.gaps);
+                                                 true, nullptr, &layout.gaps, retained);
             this->load_free_blocks(layout.holes, layout.hole_count);
             typed_root_access_allowed_ = true;
             bind_schema<T>();
