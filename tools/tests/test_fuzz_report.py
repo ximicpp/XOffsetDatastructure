@@ -25,9 +25,6 @@ class FakeGh:
         self.labels = set()
         self.branches = {}
         self.created_branches = []
-        self.enabled = []
-        self.dispatcher = {'state': 'active', 'created_at': '2026-10-22T00:00:00Z'}
-        self.run_list = []
 
     def ensure_label(self, name, color, description):
         self.labels.add(name)
@@ -62,24 +59,14 @@ class FakeGh:
         self.branches[branch] = (base_sha, path, content)
         self.created_branches.append(branch)
 
-    def enable_workflow(self, workflow):
-        if self.dispatcher is None:
-            raise fuzz_report.GhError(404, 'not found')
-        self.enabled.append(workflow)
-
-    def workflow(self, workflow):
-        return self.dispatcher
-
-    def runs(self, workflow, branch, event):
-        return list(self.run_list)
 
 
-def report_args(root, mode='nightly', needs=None, expect='libfuzzer-v2_wire,libfuzzer-wire_schemas'):
+def report_args(root, mode='nightly', needs=None, expect='libfuzzer-v2_wire,libfuzzer-wire_schemas', **extra):
     needs_path = Path(root) / 'needs.json'
     needs_path.write_text(json.dumps(needs or {'libfuzzer': {'result': 'success'}}))
     return types.SimpleNamespace(repo='o/r', sha=SHA, run_id='42', mode=mode,
                                  server_url='https://github.com', findings_dir=str(Path(root) / 'art'),
-                                 needs_json=str(needs_path), expect=expect)
+                                 needs_json=str(needs_path), expect=expect, **extra)
 
 
 def write_job(root, target, findings=(), fuzzer_exit='0', input_bytes=b'XOFFSET-INJECT'):
@@ -231,55 +218,29 @@ class Report(unittest.TestCase):
         self.assertEqual(path, 'tests/fuzz/regressions/v2_wire/' + branch.split('/')[1])
         self.assertIn('build/xo-docker build/fuzz/bin/Debug/fuzz_v2_wire -timeout=30 fuzz-repro/v2_wire-', issue['body'])
 
-
-def watch_args(**kwargs):
-    base = dict(hours=36, manual=False, workflow='fuzz.yml', branch='next_cpp26',
-                dispatcher='nightly-fuzz-dispatch.yml', title_regex=r'\bnightly\b',
-                run_url='https://github.com/o/r/actions/runs/9', now='2026-10-24T12:00:00Z')
-    base.update(kwargs)
-    return types.SimpleNamespace(**base)
-
-
-def run(created, title='Fuzz nightly · next_cpp26', number=1):
-    return {'id': number, 'created_at': created, 'display_title': title,
-            'html_url': f'https://github.com/o/r/actions/runs/{number}'}
-
-
-class Watch(unittest.TestCase):
-    def test_recent_nightly_is_quiet_and_dispatcher_is_enabled(self):
-        gh = FakeGh()
-        gh.run_list = [run('2026-10-23T18:30:00Z')]
-        result = fuzz_report.run_watch(gh, watch_args())
-        self.assertFalse(result['stale'])
-        self.assertEqual(gh.enabled, ['nightly-fuzz-dispatch.yml'])
-        self.assertEqual(gh.issues_list, [])
-
-    def test_stale_nightly_comments_once_per_window(self):
-        gh = FakeGh()
-        gh.run_list = [run('2026-10-22T18:30:00Z'), run('2026-10-24T11:00:00Z', 'Fuzz manual 120s · x', 2)]
-        gh.now = '2026-10-24T11:00:00Z'
-        result = fuzz_report.run_watch(gh, watch_args())
-        self.assertTrue(result['stale'])
-        self.assertEqual(result['age_hours'], 41.5)
-        [issue] = gh.issues_list
-        self.assertEqual(issue['labels'], ['fuzz-infra'])
-        self.assertIn(fuzz_report.STALE_MARKER, issue['body'])
-        gh.comment(issue['number'], fuzz_report.STALE_MARKER + ' earlier')
-        fuzz_report.run_watch(gh, watch_args())
-        self.assertEqual(len(gh.issue_comments[issue['number']]), 1)  # suppressed
-        fuzz_report.run_watch(gh, watch_args(manual=True, hours=0))
-        self.assertEqual(len(gh.issue_comments[issue['number']]), 2)  # drills always comment
-
-    def test_no_dispatcher_and_no_runs(self):
-        gh = FakeGh()
-        gh.dispatcher = None
-        self.assertFalse(fuzz_report.run_watch(gh, watch_args())['stale'])
-        self.assertTrue(fuzz_report.run_watch(gh, watch_args(manual=True, hours=0))['stale'])
-
-    def test_no_nightly_yet_counts_from_dispatcher_creation(self):
-        gh = FakeGh()
-        self.assertTrue(fuzz_report.run_watch(gh, watch_args())['stale'])  # 60 h after creation
-        self.assertFalse(fuzz_report.run_watch(gh, watch_args(now='2026-10-22T20:00:00Z'))['stale'])
+    def test_gcc16_job_from_a_docker_host_drill(self):
+        """tools/fuzz_nightly.sh: GCC 16 findings.json at the job root, own run link, no branch in a drill."""
+        job = Path(self.root) / 'art' / 'gcc16-replay'
+        job.mkdir(parents=True)
+        (job / f'v2_wire-{SIG}').write_bytes(b'XOFFSET-INJECT')
+        (job / 'findings.json').write_text(json.dumps({'job': 'gcc16-replay', 'needs': 'gcc16-replay', 'findings': [
+            {'target': 'v2_wire', 'signature': SIG, 'kind': 'crash', 'error_type': 'inject: injected crash',
+             'top_function': '', 'log_head': 'XOFFSET_FUZZ_INJECT_CRASH', 'input': f'v2_wire-{SIG}',
+             'reproduce': ['docker run ... fuzz_v2_wire_replay tests/fuzz/regressions/v2_wire/' + SIG]}]}))
+        diff = Path(self.root) / 'art' / 'gcc16-diff'
+        diff.mkdir()
+        (diff / 'findings.json').write_text(json.dumps({'job': 'gcc16-diff', 'needs': 'gcc16-diff', 'findings': []}))
+        result = fuzz_report.run_report(self.gh, report_args(
+            self.root, mode='manual', expect='gcc16-diff,gcc16-replay',
+            needs={'gcc16-diff': {'result': 'success'}, 'gcc16-replay': {'result': 'failure'}},
+            run_url='https://example.invalid/fuzz-nightly/drill', no_branches=True, ref='next_cpp26'))
+        self.assertEqual(result['infra_failures'], [])
+        [issue] = self.gh.issues_list
+        self.assertEqual(issue['title'], f'[fuzz] v2_wire: inject: injected crash in unknown frame ({SIG})')
+        self.assertIn('[42](https://example.invalid/fuzz-nightly/drill)', issue['body'])
+        self.assertIn('not pushed (drill run)', issue['body'])
+        self.assertIn('fuzz_v2_wire_replay tests/fuzz/regressions/v2_wire/', issue['body'])
+        self.assertEqual(self.gh.branches, {})
 
 
 class GhWrapper(unittest.TestCase):

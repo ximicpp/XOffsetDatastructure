@@ -2,18 +2,17 @@
 
 ## Unreleased
 
-- Nightly fuzz reporting (threat model F4): nightly and manual `Fuzz` runs end
-  with a `report` job (`tools/fuzz_report.py`). Each crash signature gets one
-  issue labelled `fuzz-crash`: a new signature opens it, a repeat comments on
-  it, a signature whose issue was closed reopens it as a regression. The
-  minimized input is pushed to a `fuzz-crash/<signature>` branch as
-  `tests/fuzz/regressions/<target>/<signature>`, ready for the fix PR. Jobs
-  that fail without a finding go to one rolling `fuzz-infra` issue, which the
-  next all-green nightly closes. Crash issues are only closed by their fix.
-  Pushes to next_cpp26 run `nightly-watch`: it re-enables the main-branch
-  dispatcher (`nightly-fuzz-dispatch.yml`, 18:23 UTC) against GitHub's 60-day
-  inactivity disable and comments on `fuzz-infra` when the newest nightly run
-  is more than 36 hours old.
+- Nightly fuzz without GitHub Actions (threat model F4): `tools/fuzz_nightly.sh`
+  runs the GCC 16 ASan+UBSan differential fuzz (`test_v2_fuzz`, 4 processes,
+  date-based seeds, about 45 minutes) and the replay of
+  `tests/fuzz/regressions/` and the seed corpora on any Linux host with
+  Docker, writing findings.json per job. `tools/fuzz_report.py` turns those
+  (or the Actions artifacts) into one issue per crash signature (`fuzz-crash`:
+  a new signature opens it, a repeat comments, a closed one is reopened as a
+  regression) and pushes the input to `fuzz-crash/<signature>` as
+  `tests/fuzz/regressions/<target>/<signature>`; failures without a finding go
+  to one rolling `fuzz-infra` issue, closed by the next green nightly. The
+  libFuzzer jobs need P2996 Clang and are not part of this nightly.
 - Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
   without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
   (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
