@@ -15,6 +15,9 @@
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
+// The mutated buffer is then copied with clone() and with clone_into() into
+// ONE long-lived buffer: both copies must hold its bytes and free table,
+// re-save identically and stay identical to it under the same next mutation.
 #pragma once
 #include "xoffsetdatastructure.hpp"
 
@@ -798,6 +801,45 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
     }
 }
 
+// clone_into() target reused for every case (same maximum as typed_load).
+Buffer& clone_target() {
+    static Buffer buffer = Buffer::create(
+        4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
+    return buffer;
+}
+
+template <class B>
+void same_as_source(const B& src, const B& copy, const char* what) {
+    const auto used = std::size_t(src.arena()->used_end);
+    if (copy.arena()->used_end != src.arena()->used_end || std::memcmp(copy.data(), src.data(), used) != 0)
+        fail(std::string(what) + " payload differs from its source");
+    if (copy.free_table_complete() != src.free_table_complete() ||
+        copy.free_block_count() != src.free_block_count() || copy.free_block_bytes() != src.free_block_bytes())
+        fail(std::string(what) + " free table differs from its source");
+}
+
+// The mutation streams are copies, so the case's own stream is not advanced.
+// A template so the core still builds against libraries without clone()
+// (validation_outcomes); test_v2_fuzz asserts that the check is active.
+template <class B>
+void check_clone(B& buf, const std::string& saved, const std::mt19937_64& rng) {
+    if constexpr (requires { buf.clone(); buf.clone_into(buf); }) {
+        auto copy = buf.clone();
+        buf.clone_into(clone_target());
+        same_as_source(buf, copy, "clone()");
+        same_as_source(buf, clone_target(), "clone_into()");
+        if (copy.save_verified() != saved) fail("clone() re-save differs");
+        if (clone_target().save_verified() != saved) fail("clone_into() re-save differs");
+        auto r1 = rng, r2 = rng, r3 = rng;
+        mutate_valid(buf.root(), r1);
+        mutate_valid(copy.root(), r2);
+        mutate_valid(clone_target().root(), r3);
+        const auto next = buf.save_verified();
+        if (copy.save_verified() != next || clone_target().save_verified() != next)
+            fail("clone diverged from its source under the same mutation");
+    }
+}
+
 void exercise(Buffer& buf, std::mt19937_64& rng) {
     auto& r = buf.root();
     std::uint64_t sink = r.epoch + r.title.size();
@@ -813,6 +855,7 @@ void exercise(Buffer& buf, std::mt19937_64& rng) {
     if (!again) fail("re-saved wire after mutating an accepted input was rejected");
     if (dump(again->root()) != before) fail("re-saved wire changed semantics");
     if (again->save_verified() != saved) fail("write-read-write not byte stable after mutation");
+    check_clone(buf, saved, rng);
 }
 
 enum class Outcome { Accepted, HeaderReject, PayloadReject };

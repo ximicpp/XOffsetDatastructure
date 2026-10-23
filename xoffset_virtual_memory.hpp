@@ -392,6 +392,8 @@ public:
     std::size_t logical_bytes() const noexcept { return logical_bytes_; }
     std::size_t capacity() const noexcept { return maximum_capacity_; }
     std::size_t maximum_capacity() const noexcept { return maximum_capacity_; }
+    // The pool this storage was acquired through (empty when none).
+    const VmStoragePool& pool() const noexcept { return pool_; }
     std::size_t reserved_bytes() const noexcept { return reserved_bytes_; }
     std::size_t accessible_bytes() const noexcept { return accessible_bytes_; }
     std::size_t page_size() const noexcept { return page_size_; }

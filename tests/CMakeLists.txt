@@ -90,6 +90,7 @@ set(REFLECTION_TESTS
     test_implicit_padding
     test_v2_fuzz
     test_reload_reset
+    test_clone
 )
 
 foreach(test_name ${REFLECTION_TESTS})
