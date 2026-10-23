@@ -147,6 +147,8 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | 容器操作触发的 Automatic 增长、显式 `grow()` | 不变（在虚拟内存预留里扩展） | 只按上表失效 | 不变 |
 | `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
 | `reload_verified`、`reset<T>()` | 不变（复用映射） | 全部失效 | 加一 |
+| `src.clone_into(dst)` | dst 不变（复用映射） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
+| `clone()` | 结果是新 buffer | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
 | `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
 | `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
 | `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
