@@ -1,11 +1,14 @@
-# 稳定承诺与自动化测试对照（K1–K7）
+# 稳定承诺与自动化测试对照（K0–K7）
 
-K1–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
+K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
 对应到会在 CI 里失败的测试。测试名就是 CTest 名称；"CI 作业"指
 `.github/workflows/ci.yml` 里的作业。改动任何一条承诺的行为时，对应测试必须先失败。
 
 | 承诺 | 内容 | 测试 | 测的是什么 |
 |---|---|---|---|
+| K0 | 可重定位：payload 无绝对地址，任何修改后仍可整块搬到任意地址接着读写 | `test_type_safety`、`test_inheritance` | 带裸指针、成员指针、函数指针、虚表或 `std::string`/`std::vector` 的类型被编译期准入（`is_byte_copy_safe_v`）拒绝 |
+| | | 配置期检查 `polymorphic_rejection`（`cmake/XOffsetBuildChecks.cmake`） | 多态类型调用 `XBuffer::make<T>` 必须编译失败，且报错是 `Type is not byte-copy safe`；先跑正向对照，排除工具链本身坏掉 |
+| | | `test_stability_contract`（K3、K5 部分）、`test_v2_golden` | 输出后在新地址的 buffer 里加载，接着读、改、再发；写-读-写逐字节一致 |
 | K1 | 普通 C++ 聚合体定义 schema，反射得出布局和指纹，不用 IDL | `test_zero_boilerplate`、`test_reflection_core`、`test_reflection_advanced`、`test_type_signatures` | 聚合体不写样板代码就能建、读、存；反射遍历成员；签名文本 |
 | | | `test_v2_golden` | 固定模型的 wire 字节固定（大小 + FNV-1a），写-读-写逐字节一致 |
 | K2 | 对象建在 arena 里，原地读写（含变长修改），空闲块复用 | `test_modify`、`test_vector`、`test_map_set`、`test_main_containers`、`test_string_replace`、`test_assign_range`、`test_stable_erase_if`、`test_resize_growth` | 各容器的原地修改语义 |
@@ -13,7 +16,7 @@ K1–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | `test_mutation_failures`、`test_allocator_failures` | 分配失败时单次修改是原子的 |
 | K3 | 独立输出：`save_verified` 发出调用方独占的副本，发完可以继续改 | `test_stability_contract`（K3 部分） | 保存后修改、扩容、清空、销毁源 buffer，已发出的 wire 不变且仍能加载出原内容 |
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
-| K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_wire_range_failures`、`test_validation_v4`、`test_validation_v5`、`test_validation_v5_bounds`、`test_validation_v6_dense_fusion`、`test_validation_v8_single_word` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
+| K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
 | | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive 三条路径对变异 wire 的接受/拒绝一致 |
 | | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，每个 CI 作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料 |
 | | | `test_receive_raw`、`test_verified_receive` | 原始接收与分段接收路径 |
