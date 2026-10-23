@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Nightly fuzz without GitHub Actions (threat model F4): `tools/fuzz_nightly.sh`
+  runs the GCC 16 ASan+UBSan differential fuzz (`test_v2_fuzz`, 4 processes,
+  date-based seeds, about 45 minutes) and the replay of
+  `tests/fuzz/regressions/` and the seed corpora on any Linux host with
+  Docker, writing findings.json per job. `tools/fuzz_report.py` turns those
+  (or the Actions artifacts) into one issue per crash signature (`fuzz-crash`:
+  a new signature opens it, a repeat comments, a closed one is reopened as a
+  regression) and pushes the input to `fuzz-crash/<signature>` as
+  `tests/fuzz/regressions/<target>/<signature>`; failures without a finding go
+  to one rolling `fuzz-infra` issue, closed by the next green nightly. The
+  libFuzzer jobs need P2996 Clang and are not part of this nightly.
 - Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
   without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
   (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
