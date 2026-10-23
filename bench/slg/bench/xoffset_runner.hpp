@@ -246,8 +246,18 @@ public:
         if (keep && !wires.empty()) keep->report = wires.back();
         for (int q = 0; q < sc.report_reads && !wires.empty(); ++q) {
             const std::string& w = wires[std::size_t(q) % wires.size()];
-            recv<Report>(st, "D.read", w, d_);
-            timed(st, "D.read", [&] { st.report_sum += query_report(d_->root<Report>()); });
+            // One timer around receive + query, like the std formats (a second timer
+            // per read costs about 10% of D). Direct needs the untimed transport write
+            // in between, so it times the two parts separately.
+            if constexpr (!Direct) {
+                timed(st, "D.read", [&] {
+                    d_->reload_verified<Report>(w);
+                    st.report_sum += query_report(d_->root<Report>());
+                });
+            } else {
+                recv<Report>(st, "D.read", w, d_);
+                timed(st, "D.read", [&] { st.report_sum += query_report(d_->root<Report>()); });
+            }
         }
     }
 

@@ -24,6 +24,25 @@
   `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
   with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
   given seed now generates different cases than in 0.3.0-beta.1.
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
+- Performance: canonical wires (no holes, blocks laid out back to back in
+  visiting order, as `XCompactor::compact` writes them) are validated with a
+  single cursor instead of the bitmaps, and take no scratch memory at any
+  size. At the first block elsewhere or the first hole the live bitmap is set
+  to the cursor's prefix and validation continues there, so accept/reject sets
+  and first errors are unchanged (`test_v2_fuzz` compares every case with the
+  cursor off). Map/set key order is checked without an early exit, and
+  validation errors are raised from one out-of-line function.
+- Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
+  root type, canonical / ascending-with-holes / out-of-order wires that pass
+  verified validation and prints them to stderr at exit (not thread-safe;
+  diagnostic builds only).
 
 ## 0.3.0-beta.1: production-readiness beta
 
