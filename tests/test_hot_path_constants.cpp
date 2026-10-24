@@ -105,6 +105,27 @@ int main() {
         }
     }
 
+    // push_back of one of the vector's own elements, in spare capacity and
+    // when it must grow (the element may move: the general path copies it
+    // first).
+    for (int round = 0; round < 2; ++round) {
+        root.wides.clear();
+        root.wides.push_back(7);
+        root.strings.clear();
+        root.strings.push_back(XString());
+        root.strings[0] = std::string_view(pattern(30, 5));
+        const std::string first = pattern(30, 5);
+        for (std::uint32_t i = 1; i < 300; ++i) {
+            root.wides.push_back(root.wides[i - 1]);
+            root.wides.back() += 1;
+            root.strings.push_back(root.strings[i - 1]);
+        }
+        for (std::uint32_t i = 0; i < 300; ++i) {
+            assert(root.wides[i] == 7u + i);
+            assert(root.strings[i].view() == first);
+        }
+    }
+
     // The wire round trip keeps every value.
     auto copy = XBuffer::load_verified<HotRoot>(buf.save_verified<HotRoot>());
     const auto& back = copy.root<HotRoot>();
