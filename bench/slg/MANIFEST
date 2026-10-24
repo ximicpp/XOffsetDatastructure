@@ -27,10 +27,17 @@
 #                        (every format). Origins 2228cb0a930b6c4f271fd06d5981b18dc5bc01cecc306593e204ddfde6a142b8,
 #                        51b279c3bad8ffc616c8f5cce343bd62162f99d419721f12d01ec3add24b93d2,
 #                        81103b56f9c6c0e89e42c16ba2ded491b2d0eb14b379fae373947aa8bc65328c
+#   bench/xoffset_runner.hpp  2026-10-24: XOffset A.req adapter v3, the request is
+#                        composed straight into the wire with the public
+#                        save_compact_into(out, {.slack_div = 0}, xassign(...)...)
+#                        when the library defines XOFFSET_SAVE_COMPOSED_API (older
+#                        libraries keep the T4 adapter v2 + save_verified); A.req wire
+#                        back to the G6 baseline at M (-304 B/cycle) (origin dd40d47b01f5672a7ea3c6c1f8e0a5d1f6638bf0bc9885ea14af8d2853073abd)
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
-# copies through the public API).
+# copies through the public API),
+# XOffset A.req adapter v3 (composed write).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
 fffeb26223e5b10a3f0d11e19766d15f2fcc8cce09152cba08bcee1978eb1d77  README.md
 0f306ee47ffe88ae9094f1b4babf9c8dd63776a65edaf7bfc440d31d1215d6fb  adapters/cereal_format.hpp
@@ -43,7 +50,7 @@ ca78dc903b3c6665bc3c56515456cc917a3447117aba40483742b7a1cc44f3bc  bench/runner.h
 63505e708ed84a8ffa1d6136fef17af72f6d807b00f009b206f145e7c9497a74  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 371cd935d934ed2fb94781381ab86332d05fee833bd19857f20fb11e77faeb07  bench/std_runner.hpp
-dd40d47b01f5672a7ea3c6c1f8e0a5d1f6638bf0bc9885ea14af8d2853073abd  bench/xoffset_runner.hpp
+1331a091dad6203f7ed4b89069b4e8724040799878013d1af1458dbd830f3d94  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
