@@ -400,13 +400,11 @@ jobs:
     timeout-minutes: 45
     env:
       XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
-      # GCC's null / nonnull-attribute / returns-nonnull-attribute checks make
-      # the library's consteval reflection code non-constant (all three must be
-      # off, any one left on fails constant evaluation). Every other UBSan
-      # check stays on and aborts the test.
+      # Every UBSan check is on and aborts the test (TypeLayout fe29592 made
+      # the consteval signature code constant under null / nonnull-attribute /
+      # returns-nonnull-attribute, which earlier needed to be excluded).
       XOFFSET_GCC_SANITIZE: >-
         -fsanitize=address,undefined
-        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
         -fno-sanitize-recover=undefined -fno-omit-frame-pointer
 
     steps:
@@ -452,10 +450,9 @@ jobs:
     timeout-minutes: 45
     env:
       XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
-      # Same exclusions as gcc16-sanitizer (consteval reflection code).
+      # Same flags as gcc16-sanitizer.
       XOFFSET_GCC_SANITIZE: >-
         -fsanitize=address,undefined
-        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
         -fno-sanitize-recover=undefined -fno-omit-frame-pointer
       MAPDEMO_CONFIGURE: >-
         -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_BUILD_DEMOS=ON -DXOFFSET_BUILD_TESTS=OFF

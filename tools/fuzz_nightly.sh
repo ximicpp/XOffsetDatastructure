@@ -26,7 +26,7 @@ set -uo pipefail
 
 # Same image and sanitizer flags as the gcc16 jobs in ci.yml and fuzz.yml.
 IMAGE=gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
-export XOFFSET_GCC_SANITIZE='-fsanitize=address,undefined -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
+export XOFFSET_GCC_SANITIZE='-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
 
 OUT='' SECS=2700 INJECT=OFF
 while [ $# -gt 0 ]; do
