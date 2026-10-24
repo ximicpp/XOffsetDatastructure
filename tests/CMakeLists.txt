@@ -74,6 +74,7 @@ set(REFLECTION_TESTS
     test_same_arena_move
     test_shift_relocate
     test_free_table_policy
+    test_lower_bound_index
     test_stable_storage
     test_vm_lifecycle
     test_vm_transport
