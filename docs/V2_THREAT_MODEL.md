@@ -131,6 +131,21 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 已写好，但 GitHub 定时任务只在默认分支触发，目前没有运行，发布前以一次 480 万例的
 GCC 16 ASan+UBSan 差分 fuzz 代替。
 
+现状（beta.2，2026-10-23 起）：项目不再使用 GitHub Actions，`fuzz.yml` 和 `ci.yml` 保留但不运行。
+每日长跑改在云端 Docker 主机上执行 `tools/fuzz_nightly.sh`（北京时间每天 02:23）：
+
+- GCC 16 ASan+UBSan 差分 fuzz：`test_v2_fuzz` 4 个进程，seed 按日期轮换
+  （`YYYYMMDD×10+i`），用例数按约 45 分钟标定；失败时写出 wire 和 `--replay` 命令。
+- GCC 16 ASan+UBSan 回放：`fuzz_<target>_replay` 回放 `tests/fuzz/regressions/` 和两个
+  harness 的种子语料。
+- 发现崩溃时，`tools/fuzz_report.py` 按签名开 GitHub issue（标签 `fuzz-crash`，同一签名只
+  追加评论，已关闭的重新打开并标注回归），并把输入推到 `fuzz-crash/<签名>` 分支，作为
+  `tests/fuzz/regressions/<target>/<签名>`。修复 PR 带上这个输入，issue 由修复关闭。没有发现
+  却失败的运行记在唯一的 `fuzz-infra` issue 上。结果同时写进项目文件。
+- **缺口**：libFuzzer 覆盖率引导 fuzz（F1、F2）要用 P2996 Clang，云端主机编译不了，
+  所以目前没有定期运行。每日长跑只覆盖差分 fuzz 和回放；`fuzz.yml` 的 libFuzzer 作业
+  只能在 Actions 恢复后手动触发。
+
 - **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为
   `load_verified`、`finish_verified`、`receive_raw::validate`，用 P2996 Clang 和 CI 里已经
   固定的 compiler-rt 构建；种子用跨编译器 wire 语料。
