@@ -77,6 +77,9 @@ constexpr std::size_t kLimit = std::size_t(1) << 22;
 constexpr std::uint64_t kInlineBitmapExtent = 32 * 1024;
 
 inline std::size_t inflated_comparisons = 0; // sparse vs dense-payload checks run
+// Set by validation_outcomes: every built wire is dense, so a library that
+// still requires gap bytes to be holes accepts the pool.
+inline bool g_dense_pool = false;
 
 // What fail() reports besides its message. test_v2_fuzz sets these per case:
 // the input wire under test, a file-name tag and the command that replays the
@@ -521,6 +524,9 @@ void mutate_valid(fz::Root& r, std::mt19937_64& rng) {
     }
 }
 
+std::string dense_of(const std::string& w);
+std::string elide_zero_runs(const std::string& dense);
+
 std::string build_wire(std::mt19937_64& rng) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
     auto& r = buf.root();
@@ -548,10 +554,15 @@ std::string build_wire(std::mt19937_64& rng) {
         after.name = random_text(rng, 40);
         r.items.erase(r.items.begin() + std::ptrdiff_t(r.items.size() - 2));
     }
-    // Every emission form: free runs (default), dense, zero-run elision.
-    constexpr xo::XWireEmission forms[] = {xo::XWireEmission::free_runs, xo::XWireEmission::dense,
-                                           xo::XWireEmission::zero_runs};
-    return buf.save_verified(xo::XSaveOptions{.emission = forms[rng() % 3]});
+    // Three wire forms of the same payload: the library's default emission,
+    // dense, and zero-run elision. The last two are byte operations, so the
+    // core also builds against libraries without XSaveOptions
+    // (validation_outcomes); test_v2_fuzz checks them against the library's
+    // own dense and zero_runs emissions.
+    const auto w = buf.save_verified();
+    const auto form = rng() % 3;
+    if (g_dense_pool || form == 1) return dense_of(w);
+    return form == 2 ? elide_zero_runs(dense_of(w)) : w;
 }
 
 // ---------------------------------------------------------------------------
@@ -641,6 +652,8 @@ std::optional<std::string> inflate(const std::string& w) {
     return out + payload + w.substr(at);
 }
 
+std::string dense_of(const std::string& w) { return inflate(w).value_or(w); }
+
 // Re-emits a dense wire with `gaps` (sorted, disjoint, nonadjacent, inside
 // [8, used)) skipped through an extent table.
 std::string sparsify(const std::string& dense, const std::vector<Range>& gaps) {
@@ -658,6 +671,39 @@ std::string sparsify(const std::string& dense, const std::vector<Range>& gaps) {
     h.extent_count = table.size() / 8;
     std::string out(reinterpret_cast<const char*>(&h), kHeader);
     return out + table + data + dense.substr(kHeader + std::size_t(used));
+}
+
+// The library's zero_runs rule on a dense wire: payloads of at least 4 KiB;
+// a run grows from a 64-byte aligned zero block word by word on both sides,
+// never covers the first 8 bytes, and is skipped when at least 64 bytes; the
+// sparse form is kept only if it saves at least max(256, used / 16) bytes.
+std::string elide_zero_runs(const std::string& dense) {
+    xo::XWireHeaderV2 h; std::memcpy(&h, dense.data(), kHeader);
+    const std::size_t used = h.used_bytes;
+    if (h.extent_count != 0 || used < 4096 || used % 8) return dense;
+    const char* p = dense.data() + kHeader;
+    auto word = [&](std::size_t at) { std::uint64_t v; std::memcpy(&v, p + at, 8); return v; };
+    auto block_zero = [&](std::size_t b) {
+        for (std::size_t i = 0; i < 8; ++i) if (word(b * 64 + i * 8)) return false;
+        return true;
+    };
+    std::vector<Range> gaps;
+    std::size_t cursor = 0, skipped = 0;
+    for (std::size_t b = 0, blocks = used / 64; b < blocks;) {
+        if (!block_zero(b)) { ++b; continue; }
+        std::size_t start = b * 64, e = b + 1;
+        while (start > cursor && word(start - 8) == 0) start -= 8;
+        while (e < blocks && block_zero(e)) ++e;
+        std::size_t stop = e * 64;
+        while (stop < used && word(stop) == 0) stop += 8;
+        start = std::max<std::size_t>(start, 8);
+        if (stop - start >= 64) { gaps.push_back({start, stop}); skipped += stop - start; cursor = stop; }
+        b = stop / 64 + 1;
+    }
+    if (gaps.empty()) return dense;
+    const std::size_t extents = gaps.size() + (cursor < used ? 1 : 0);
+    if (skipped - extents * 8 < std::max<std::size_t>(256, used / 16)) return dense;
+    return sparsify(dense, gaps);
 }
 
 // Adds one gap of 8..512 bytes at a random aligned payload offset >= 8 to a
@@ -885,10 +931,12 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!loaded) fail(where + ": typed load rejects a library-generated wire");
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
     compare_reload(*loaded);
+    // w may be any of the three forms; the default re-save carries the same
+    // payload and holes and is itself byte stable.
     const auto again = loaded->save_verified();
-    if (again != w && loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense}) != w &&
-        loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != w)
-        fail(where + ": golden write-read-write not byte stable");
+    if (dense_of(again) != dense_of(w)) fail(where + ": golden write-read-write changed the payload");
+    auto reloaded = typed_load(again);
+    if (!reloaded || reloaded->save_verified() != again) fail(where + ": golden write-read-write not byte stable");
     // The default emission skips only runs of at least 4 KiB made of holes.
     const auto ext = extents_of(again);
     if (!ext) fail(where + ": default emission has a malformed extent table");
@@ -912,8 +960,6 @@ void check_golden(const std::string& w, const std::string& where) {
         prev = e;
     }
     if (prev < h.used_bytes) check_gap(prev, h.used_bytes);
-    if (inflate(again).value_or(again) != loaded->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense}))
-        fail(where + ": default emission does not load the dense payload");
 }
 
 // The same content compacted: blocks in visiting preorder, no holes.
