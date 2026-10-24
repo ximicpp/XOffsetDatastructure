@@ -1,7 +1,7 @@
 # 0.3.0-beta.1 兼容与输入边界
 
 （文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
-但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K1–K7，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
+但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K7，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
 演进与布局组合之间的长期 wire 兼容。本版本使用 V2 存储与 wire 格式（`docs/V2_FORMAT.md`），
 不读取 V1 wire。
 
