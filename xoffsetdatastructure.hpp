@@ -2629,10 +2629,7 @@ namespace XOffsetDatastructure {
                     alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 auto* old = data();
                 auto old_cap = capacity_;
-                for (size_type i = 0; i < size_; ++i) {
-                    fixed_detail::relocate_construct(fresh + i, old[i]);
-                }
-                fixed_detail::destroy_n(old, size_);
+                relocate_live_run(fresh, old);
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
@@ -2976,6 +2973,27 @@ namespace XOffsetDatastructure {
                     else fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
             }
+        }
+
+        // Moves the size_ live elements from `old` into the separate fresh
+        // block and ends their lifetimes in `old` (left emptied, bindings
+        // kept). SHIFT types: one memcpy plus an inline-head rebase by the
+        // block distance; same bytes and deltas as the per-element loop.
+        void relocate_live_run(T* fresh, T* old) noexcept
+            requires (fixed_detail::can_relocate_without_allocation<T>()) {
+            if (size_ == 0) return;
+            if constexpr (detail::shift_relocate_supported<T>()) {
+                std::memcpy(static_cast<void*>(fresh), static_cast<const void*>(old),
+                            std::size_t(size_) * sizeof(T));
+                detail::shift_rebase_moved(fresh, size_, static_cast<std::int32_t>(
+                    reinterpret_cast<const char*>(old) - reinterpret_cast<const char*>(fresh)));
+                for (size_type i = 0; i < size_; ++i) detail::empty_vacated_slot(old + i);
+            } else {
+                for (size_type i = 0; i < size_; ++i) {
+                    fixed_detail::relocate_construct(fresh + i, old[i]);
+                }
+            }
+            fixed_detail::destroy_n(old, size_);
         }
 
         template <typename Construct, typename Commit>
