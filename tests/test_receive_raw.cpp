@@ -284,7 +284,7 @@ auto admit(xo::XBufferCore& owner, const Wire& wire,
     return rr::validate<T>(owner.data(), owner.get_size(),
         header.root_offset, wire.holes(), wire.hole_count(), resource);
 }
-Wire demo() {
+Wire demo(bool large = false) {
     auto source = xo::XBuffer::create<model::Snapshot>(65536, capacity());
     auto& snapshot = source.root<model::Snapshot>();
     snapshot.epoch = 123;
@@ -302,6 +302,8 @@ Wire demo() {
     }
     // Ensure a real hole (V2 hole table entry) and a second scratch index exist.
     snapshot.records[0].name = "a substantially longer replacement name";
+    // Above 32 KiB the validator takes its bitmaps from the scratch resource.
+    if (large) snapshot.records[1].payload.reserve(40000);
     auto wire = wire_of<model::Snapshot>(source);
     need(wire.hole_count() != 0 && wire.header().hole_bytes != 0, "demo wire has no hole table entry");
     return wire;
@@ -362,7 +364,11 @@ void demo_activation_and_oom() {
     need(snapshot->records[1].id == 11 && snapshot->records[1].score == -99 &&
          snapshot->records[1].attrs[0].key == "attrs" &&
          snapshot->records[1].samples[1] == 21, "active nested values differ");
-    for (long point = 0; point < 2; ++point) {
+    need(resource.allocations == 0, "payload below 32 KiB used the raw scratch resource");
+    const auto large = demo(true);
+    need(large.header().used_bytes > 32768, "large raw fixture is not above the inline scratch limit");
+    for (long point = 0; point < 1; ++point) {
+        const auto& wire = large;
         auto failed_owner = wire.owner();
         const auto failed_before = failed_owner.copy_bytes();
         CountingResource fail; fail.fail_at = point;
@@ -672,7 +678,9 @@ void paired_owned_priority_and_rejection_state() {
     catch (const xo::XException& e) {
         free = std::string_view(e.what()) == "wire validation detected free-list overlap with live ranges";
     }
-    need(owned && free && ctx.owned_ranges.size() == 1 && ctx.free_ranges.size() == 1,
+    need(owned && free && ctx.owned_bytes == 16 && ctx.free_bytes == 16 &&
+         ctx.granules.member(false, 25) && !ctx.granules.member(false, 11) &&
+         ctx.granules.member(true, 10) && !ctx.granules.member(true, 12),
          "early free hit obscured later owned hit or rejection committed index");
 }
 void fixed_arrays() {
