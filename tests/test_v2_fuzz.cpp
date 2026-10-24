@@ -44,6 +44,23 @@ Inputs make_inputs(std::uint64_t seed) {
     return in;
 }
 
+// The core builds its dense and zero-run forms by byte operations; they must
+// be the library's own dense and zero_runs emissions of the loaded buffer.
+// Returns how many pool wires the library sends with skipped zero runs.
+std::size_t check_library_emissions(const std::vector<std::string>& pool) {
+    std::size_t elided = 0;
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        auto b = typed_load(pool[i]);
+        if (!b) fail("pool wire " + std::to_string(i) + " rejected");
+        const auto dense = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense});
+        if (dense != dense_of(b->save_verified())) fail("pool wire " + std::to_string(i) + ": dense emission differs");
+        const auto zero = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
+        if (zero != elide_zero_runs(dense)) fail("pool wire " + std::to_string(i) + ": zero_runs emission differs");
+        elided += zero != dense;
+    }
+    return elided;
+}
+
 struct Counts { std::size_t accepted = 0, header_rejects = 0, payload_rejects = 0; };
 
 // Every acceptor's outcome ("ok" or the exact error) for one input.
@@ -145,6 +162,7 @@ int main(int argc, char** argv) {
     const std::size_t boundary_cases = in.boundary.size() * kBoundaryMutants;
     for (std::size_t k = 0; k < boundary_cases; ++k) count(c, run_case(in, seed, "b" + std::to_string(k)));
     if (sparse == 0) fail("no sparse wire in the pool");
+    if (check_library_emissions(in.pool) == 0) fail("no pool wire is sent with zero runs skipped");
     if (inflated_comparisons == 0) fail("no sparse wire was compared with its dense payload");
     std::cout << "test_v2_fuzz: seed=" << seed << " golden=" << in.pool.size() << " sparse=" << sparse << " cases=" << cases
               << " boundary_cases=" << boundary_cases << " accepted=" << c.accepted
