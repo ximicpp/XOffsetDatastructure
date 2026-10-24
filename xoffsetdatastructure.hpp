@@ -2610,13 +2610,20 @@ namespace XOffsetDatastructure {
                 return;
             }
             auto alloc = binding();
+            // D8a: a container that already has capacity regrows to
+            // max(count, 2 * capacity), like libc++ assign; the first block
+            // stays exact. Fresh blocks are zero, so the spare tail is too (M4).
+            const size_type new_cap = capacity_ == 0 ? count
+                : std::max(count, static_cast<size_type>(
+                      std::min<std::uint64_t>(max_size(), std::uint64_t(capacity_) * 2u)));
+            const auto cap_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
             auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
-                alloc, bytes, alignof(T)), count);
+                alloc, cap_bytes, alignof(T)), new_cap);
             std::int32_t delta = 0;
             try {
                 fixed_detail::set_rel32(delta, &data_delta, fresh);
             } catch (...) {
-                fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
+                fixed_detail::retire_dynamic_bytes(alloc, fresh, cap_bytes);
                 throw;
             }
             // Read the complete source before publishing/retiring old storage.
@@ -2627,7 +2634,7 @@ namespace XOffsetDatastructure {
             const auto old_cap = capacity_;
             data_delta = delta;
             size_ = count;
-            capacity_ = count;
+            capacity_ = new_cap;
             fixed_detail::retire_dynamic_bytes(
                 alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
         }
