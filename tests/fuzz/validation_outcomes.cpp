@@ -3,7 +3,9 @@
 // v2_fuzz_core.hpp are used) and compare the outputs. Each case is one
 // mutated wire; its outcome is the result of typed load, in-place reload, raw
 // validation and verified receive, each "ok" or the exact error message (raw
-// and receive only for wires whose framing the oracle accepts).
+// and receive only for wires whose framing the oracle accepts). A library with
+// the direct reload also checks it against typed load (marked only on
+// disagreement, so the lines stay comparable with older libraries).
 //
 // usage: validation_outcomes <cases> <seed>             digest per 10000 cases
 //        validation_outcomes <cases> <seed> <from> <to> one line per case in [from, to)
@@ -51,6 +53,14 @@ int main(int argc, char** argv) {
         const auto o = oracle(w);
         std::string line = std::to_string(c) + " " + std::to_string(fnv(w)) + " T:" + outcome(typed, terr) +
                            " L:" + outcome(reload, lerr);
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
+        // Direct reload must agree with load_verified and reject every
+        // interrupted delivery; the line only changes (and so differs from a
+        // library without it) when it does not.
+        for (auto mode : {DirectMode::Abort, DirectMode::Mismatch, DirectMode::Short})
+            if (direct_accepts(w, nullptr, mode)) line += " D:interrupted-accepted";
+        if (direct_accepts(w, nullptr) != typed) line += " D:disagrees";
+#endif
         if (o.ok || o.stage == Oracle::Stage::Payload) {
             const bool raw = raw_accepts(w, &rerr);
             const bool recv = receive_accepts(w, &verr);
