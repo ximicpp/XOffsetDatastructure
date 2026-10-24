@@ -205,6 +205,21 @@ std::string_view who = r.name.view();
   只读或归档的接收方传 `XCompactOptions{.slack_div = 0}`：容量等于长度、wire 最小，
   与 `XCompactor::compact<Profile>(b).save_verified<Profile>()` 逐字节相同，
   但接收方第一次增长任何容器都要搬家。
+- 把几段现有状态拼成一条消息时，用 `save_compact_into` 的组合写出重载，不必先赋值：
+
+  ```cpp
+  auto& msg = req.root<BattleMsg>();          // 草稿，标量照常直接改
+  msg.battle_id = id;
+  req.save_compact_into<BattleMsg>(out, {}, xassign(msg.attacker, att), xassign(msg.defender, def));
+  ```
+
+  写出的 wire 等于先做 `msg.attacker = att; msg.defender = def;` 再 `save_compact_into`
+  的结果（tight 和默认余量都一样），但草稿和 `att`、`def` 都不变，也不在草稿里分配。
+  规则：每个 target 是根对象里的成员子对象或数组元素（任意层级，标量也可以），不能是
+  容器里的元素；多个 target 不能重叠；source 与 target 同类型，可以在任何 buffer 里，
+  也可以是草稿自己的另一部分（所有 source 都按调用前的值读取）；含容器的 source 必须
+  是某个 XOffset buffer 里的有效对象，发送端不校验它。target 的隐式填充字节写成 0。
+  违反规则或超过 wire 上限时抛 `XException`，`out` 为空串。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。
