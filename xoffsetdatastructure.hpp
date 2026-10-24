@@ -751,7 +751,9 @@ namespace XOffsetDatastructure {
                     std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
                     if (hole.bytes <= FreeTable::small_max) {
                         const auto bin = hole.bytes / 8u - 1u;
-                        table->bins[bin].push_back(hole.offset);
+                        auto& slot = table->bins[bin];
+                        if (slot.size() == slot.capacity()) [[unlikely]] table->grown = true;
+                        slot.push_back(hole.offset);
                         table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     } else {
@@ -787,6 +789,11 @@ namespace XOffsetDatastructure {
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
+            // RL: false means no bin storage has grown since the last full
+            // recycle (or construction), so what is kept is still within the
+            // keep limits and a keep-recycle only empties the nonempty bins.
+            // Every bin growth (load_free_blocks, insert_free_block) sets it.
+            bool grown = false;
         };
 
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
@@ -838,6 +845,18 @@ namespace XOffsetDatastructure {
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
                 std::size_t kept = 0;
+                if (keep_bins && !table->grown) {
+                    for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                        for (auto bits = table->nonempty[word]; bits != 0; bits &= bits - 1u)
+                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
+                        table->nonempty[word] = 0;
+                    }
+                    table->large.clear();
+                    table->bytes = 0;
+                    table->count = 0;
+                    cache.tables[cache.count++] = table;
+                    return;
+                }
                 for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
                     std::uint64_t still_touched = 0;
                     for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
@@ -857,6 +876,7 @@ namespace XOffsetDatastructure {
                 table->large.clear();
                 table->bytes = 0;
                 table->count = 0;
+                table->grown = false;
                 cache.tables[cache.count++] = table;
             }
         };
@@ -981,6 +1001,7 @@ namespace XOffsetDatastructure {
                                 continue; // re-resolve after the allocation
                             }
                             spare_bin.assign(slot.begin(), slot.end()); // fits: no allocation
+                            table.grown = true;
                             slot.swap(spare_bin); // old storage released at scope exit
                             // Storage only arrives here, so only growth marks the bin.
                             table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
@@ -2709,13 +2730,20 @@ namespace XOffsetDatastructure {
                 return;
             }
             auto alloc = binding();
+            // D8a: a container that already has capacity regrows to
+            // max(count, 2 * capacity), like libc++ assign; the first block
+            // stays exact. Fresh blocks are zero, so the spare tail is too (M4).
+            const size_type new_cap = capacity_ == 0 ? count
+                : std::max(count, static_cast<size_type>(
+                      std::min<std::uint64_t>(max_size(), std::uint64_t(capacity_) * 2u)));
+            const auto cap_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
             auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
-                alloc, bytes, alignof(T)), count);
+                alloc, cap_bytes, alignof(T)), new_cap);
             std::int32_t delta = 0;
             try {
                 fixed_detail::set_rel32(delta, &data_delta, fresh);
             } catch (...) {
-                fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
+                fixed_detail::retire_dynamic_bytes(alloc, fresh, cap_bytes);
                 throw;
             }
             // Read the complete source before publishing/retiring old storage.
@@ -2726,7 +2754,7 @@ namespace XOffsetDatastructure {
             const auto old_cap = capacity_;
             data_delta = delta;
             size_ = count;
-            capacity_ = count;
+            capacity_ = new_cap;
             fixed_detail::retire_dynamic_bytes(
                 alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
         }
