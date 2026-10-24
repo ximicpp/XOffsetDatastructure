@@ -63,10 +63,9 @@ docker run --rm -v "$PWD:/w" -w /w -e PATH=/w/build/cmake-tool/root/bin:/usr/loc
 
 Binaries need the image's libstdc++, so run them inside the container. For
 ASan+UBSan use a Debug build with
-`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute -fno-sanitize-recover=undefined -fno-omit-frame-pointer"`,
+`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"`,
 `-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined`, run with
-`UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1` (GCC needs the three
-`-fno-sanitize` exclusions). The project does not use GitHub CI; the
+`UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1` (every UBSan check on). The project does not use GitHub CI; the
 `mapdemo-gcc16` job left in `.github/workflows/ci.yml` is not run.
 
 **macOS, clang-p2996 (window client)**
