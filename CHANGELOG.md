@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
+  source's size, maximum capacity, growth policy and pool) and
+  `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;
+  dst's epoch advances; on failure dst is left an empty arena, a self copy is
+  refused unchanged). One copy of the used payload; the exact free table,
+  typed root access and schema binding come along, so no wire and no
+  verification. `TypedXBuffer<T>` has both. See `docs/BUFFER_REUSE.md`.
+- Nightly fuzz without GitHub Actions (threat model F4): `tools/fuzz_nightly.sh`
+  runs the GCC 16 ASan+UBSan differential fuzz (`test_v2_fuzz`, 4 processes,
+  date-based seeds, about 45 minutes) and the replay of
+  `tests/fuzz/regressions/` and the seed corpora on any Linux host with
+  Docker, writing findings.json per job. `tools/fuzz_report.py` turns those
+  (or the Actions artifacts) into one issue per crash signature (`fuzz-crash`:
+  a new signature opens it, a repeat comments, a closed one is reopened as a
+  regression) and pushes the input to `fuzz-crash/<signature>` as
+  `tests/fuzz/regressions/<target>/<signature>`; failures without a finding go
+  to one rolling `fuzz-infra` issue, closed by the next green nightly. The
+  libFuzzer jobs need P2996 Clang and are not part of this nightly.
 - Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
   without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
   (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
@@ -12,6 +30,25 @@
   `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
   with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
   given seed now generates different cases than in 0.3.0-beta.1.
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
+- Performance: canonical wires (no holes, blocks laid out back to back in
+  visiting order, as `XCompactor::compact` writes them) are validated with a
+  single cursor instead of the bitmaps, and take no scratch memory at any
+  size. At the first block elsewhere or the first hole the live bitmap is set
+  to the cursor's prefix and validation continues there, so accept/reject sets
+  and first errors are unchanged (`test_v2_fuzz` compares every case with the
+  cursor off). Map/set key order is checked without an early exit, and
+  validation errors are raised from one out-of-line function.
+- Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
+  root type, canonical / ascending-with-holes / out-of-order wires that pass
+  verified validation and prints them to stderr at exit (not thread-safe;
+  diagnostic builds only).
 
 ## 0.3.0-beta.1: production-readiness beta
 
