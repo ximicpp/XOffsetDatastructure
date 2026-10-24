@@ -48,6 +48,7 @@ set(REFLECTION_TESTS
     test_scalar_resize
     test_validation_granules
     test_string_replace
+    test_hot_path_constants
     test_resize_growth
     test_reflection_core
     test_reflection_advanced
@@ -91,6 +92,7 @@ set(REFLECTION_TESTS
     test_implicit_padding
     test_v2_fuzz
     test_reload_reset
+    test_clone
 )
 
 foreach(test_name ${REFLECTION_TESTS})

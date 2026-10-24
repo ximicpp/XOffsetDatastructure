@@ -9,6 +9,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | K0 | 可重定位：payload 无绝对地址，任何修改后仍可整块搬到任意地址接着读写 | `test_type_safety`、`test_inheritance` | 带裸指针、成员指针、函数指针、虚表或 `std::string`/`std::vector` 的类型被编译期准入（`is_byte_copy_safe_v`）拒绝 |
 | | | 配置期检查 `polymorphic_rejection`（`cmake/XOffsetBuildChecks.cmake`） | 多态类型调用 `XBuffer::make<T>` 必须编译失败，且报错是 `Type is not byte-copy safe`；先跑正向对照，排除工具链本身坏掉 |
 | | | `test_stability_contract`（K3、K5 部分）、`test_v2_golden` | 输出后在新地址的 buffer 里加载，接着读、改、再发；写-读-写逐字节一致 |
+| | | `test_clone`、`test_v2_fuzz`（复制检查） | 修改过、带空洞的 buffer 用 `clone()` / `clone_into()` 整块拷到另一个地址，不经 wire：字节、空闲表、重存相同，之后同样的修改得到同样的字节 |
 | K1 | 普通 C++ 聚合体定义 schema，反射得出布局和指纹，不用 IDL | `test_zero_boilerplate`、`test_reflection_core`、`test_reflection_advanced`、`test_type_signatures` | 聚合体不写样板代码就能建、读、存；反射遍历成员；签名文本 |
 | | | `test_v2_golden` | 固定模型的 wire 字节固定（大小 + FNV-1a），写-读-写逐字节一致 |
 | K2 | 对象建在 arena 里，原地读写（含变长修改），空闲块复用 | `test_modify`、`test_vector`、`test_map_set`、`test_main_containers`、`test_string_replace`、`test_assign_range`、`test_stable_erase_if`、`test_resize_growth` | 各容器的原地修改语义 |
@@ -18,7 +19,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
 | K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
 | | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive 三条路径对变异 wire 的接受/拒绝一致 |
-| | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，每个 CI 作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料 |
+| | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料；ci.yml 的每个作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）都包含它们，Actions 停用期间由全量 CTest 和每日长跑（GCC 16 ASan+UBSan）执行 |
 | | | `test_receive_raw`、`test_verified_receive` | 原始接收与分段接收路径 |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | `test_stability_contract`（K5 部分） | 重新加载后释放再分配复用空洞、尾部不增长；接收方的分配决定与发送方逐字节一致；第二跳同样成立 |
 | | | `test_free_table_policy`（`lifecycle_move_swap_reload`） | 空洞表写-读-写字节一致，重新加载后的分配决定与原 buffer 相同 |
@@ -33,3 +34,8 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 - K2、K3 的性能（读、改 ≤ 1.05，独立输出 ≤ 0.20）由正式测量协议在固定机器上判定，
   不在 CI 里。结果见仓库外的性能报告。
 - 内容完整性不在承诺内：只改一个字段值的 wire 会被接受。不要把 K4 说成防篡改。
+- K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
+  ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
+  `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
+  不在 CTest 里，记录在项目文件 `fuzz-nightly/`。libFuzzer 覆盖率引导 fuzz 需要 P2996 Clang，
+  目前不在每日长跑里。
