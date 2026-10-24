@@ -84,9 +84,16 @@ public:
                 XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, cap());
                 auto& msg = b.root<BattleMsg>();
                 msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+#if defined(XOFFSET_SAVE_COMPOSED_API)
+                // Adapter v3: the request is composed from the two armies straight
+                // into the wire (tight save_compact layout); the draft holds only the root.
+                b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
+                                               xassign(msg.attacker, att), xassign(msg.defender, def));
+#else
                 copy_army(msg.attacker, att);
                 copy_army(msg.defender, def);
                 req = b.save_verified<BattleMsg>();
+#endif
             });
             timed(st, "A.req_decode", [&] { m.emplace(XBuffer::load_verified<BattleMsg>(req, cap())); });
             timed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
@@ -179,11 +186,19 @@ public:
             auto& att = player(pr.ap).armies[std::size_t(pr.aa)];
             auto& def = player(pr.dp).armies[std::size_t(pr.da)];
             timed(st, "A.req_encode", [&] {
+#if defined(XOFFSET_SAVE_COMPOSED_API)
+                // Adapter v3 (see above): a_req_'s armies stay empty, nothing is reset.
+                auto& msg = a_req_->root<BattleMsg>();
+                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                a_req_->save_compact_into<BattleMsg>(req_, XCompactOptions{.slack_div = 0},
+                                                     xassign(msg.attacker, att), xassign(msg.defender, def));
+#else
                 auto& msg = a_req_->reset<BattleMsg>();
                 msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
                 copy_army(msg.attacker, att);
                 copy_army(msg.defender, def);
                 a_req_->save_verified_into<BattleMsg>(req_);
+#endif
             });
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
             timed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });

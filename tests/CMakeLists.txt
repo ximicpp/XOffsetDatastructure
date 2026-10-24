@@ -91,6 +91,7 @@ set(REFLECTION_TESTS
     test_implicit_padding
     test_v2_fuzz
     test_save_compact
+    test_save_composed
     test_free_run_emission
     test_reload_reset
     test_clone
