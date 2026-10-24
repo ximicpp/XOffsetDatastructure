@@ -231,6 +231,27 @@ std::uint64_t snapshot_digest(const ViewSnapshot& snapshot) {
     return d.h;
 }
 
+std::uint64_t wire_digest(std::string_view bytes) noexcept {
+    // Little endian is enforced by the library, so word reads mean the same
+    // bytes on every supported target.
+    constexpr std::uint64_t kMul = 0x9E3779B97F4A7C15ull;
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    const char* p = bytes.data();
+    std::size_t n = bytes.size();
+    for (; n >= 8; p += 8, n -= 8) {
+        std::uint64_t w;
+        std::memcpy(&w, p, sizeof w);
+        h = (h ^ w) * kMul;
+        h ^= h >> 29;
+    }
+    for (; n != 0; ++p, --n) {
+        h = (h ^ std::uint8_t(*p)) * kMul;
+        h ^= h >> 29;
+    }
+    h = (h ^ std::uint64_t(bytes.size())) * kMul;
+    return h ^ (h >> 32);
+}
+
 bool in_buffer(const XBuffer& buffer, const void* p, std::size_t bytes) noexcept {
     const auto base = reinterpret_cast<std::uintptr_t>(buffer.get_address());
     const auto size = static_cast<std::uintptr_t>(buffer.get_size());
