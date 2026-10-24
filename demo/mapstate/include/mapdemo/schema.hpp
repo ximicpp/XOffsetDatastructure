@@ -114,6 +114,11 @@ inline XBuffer::MaximumCapacity cap_view_request() {
 
 } // namespace mapdemo
 
+// Element records of the XVectors above: ordinary members only, so growth,
+// insert and erase move them with one memcpy/memmove (same wire bytes).
+XOFFSET_ORDINARY_RECORDS(mapdemo::Point, mapdemo::Rect, mapdemo::SceneData,
+                         mapdemo::SiteData, mapdemo::UnitState, mapdemo::VisibleUnit)
+
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitStateBatch, "mapdemo.UnitStateBatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::ViewRequest, "mapdemo.ViewRequest.v1")
@@ -130,3 +135,4 @@ XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewSnapshot);
 static_assert(sizeof(mapdemo::UnitState) == 64);
 static_assert(sizeof(mapdemo::VisibleUnit) == 40);
 static_assert(sizeof(mapdemo::ViewRequest) == 32);
+static_assert(XOffsetDatastructure::detail::shift_relocate_supported<mapdemo::UnitState>());

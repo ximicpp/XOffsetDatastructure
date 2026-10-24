@@ -2615,10 +2615,7 @@ namespace XOffsetDatastructure {
                     alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 auto* old = data();
                 auto old_cap = capacity_;
-                for (size_type i = 0; i < size_; ++i) {
-                    fixed_detail::relocate_construct(fresh + i, old[i]);
-                }
-                fixed_detail::destroy_n(old, size_);
+                relocate_live_run(fresh, old);
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
@@ -2848,6 +2845,8 @@ namespace XOffsetDatastructure {
             if (index == size_ && size_ < capacity_) {
                 construct(data() + size_);
                 ++size_;
+            } else if (index == size_ && append_grow(construct)) {
+                // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 // A native temporary is safe only for types without arena bindings.
                 alignas(T) std::byte storage[sizeof(T)];
@@ -2939,6 +2938,73 @@ namespace XOffsetDatastructure {
                     else fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
             }
+        }
+
+        // Append to a full vector without a staged element: grow the block
+        // (in place at the arena tail, else a fresh block), build the new
+        // element directly at its final slot, then relocate the old run.
+        // The new element is built while the old run is still intact, so
+        // arguments that alias old elements stay valid. If construct
+        // throws, a fresh block is retired and the old run is untouched; a
+        // tail expansion stays, as after a successful reserve. Returns false
+        // for types that keep the general paths in insert_construct.
+        template <typename Construct>
+        bool append_grow(Construct& construct) {
+            if constexpr (std::is_trivially_copyable_v<T> ||
+                          !fixed_detail::can_relocate_without_allocation<T>()) {
+                return false;
+            } else {
+                const auto new_cap = grown_capacity();
+                auto alloc = binding();
+                const auto new_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
+                if (fixed_detail::try_expand_dynamic_bytes(
+                        alloc, data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)), new_bytes, alignof(T))) {
+                    (void)detail::rebuild_dynamic_array<T>(data(), new_cap, size_);
+                    capacity_ = new_cap;
+                    construct(data() + size_);
+                    ++size_;
+                    return true;
+                }
+                auto* fresh = detail::begin_dynamic_array<T>(
+                    fixed_detail::allocate_dynamic_bytes(alloc, new_bytes, alignof(T)), new_cap);
+                std::int32_t delta = 0;
+                try {
+                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    construct(fresh + size_);
+                } catch (...) {
+                    fixed_detail::retire_dynamic_bytes(alloc, fresh, new_bytes);
+                    throw;
+                }
+                auto* old = data();
+                const auto old_cap = capacity_;
+                relocate_live_run(fresh, old);
+                data_delta = delta;
+                capacity_ = new_cap;
+                ++size_;
+                fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+                return true;
+            }
+        }
+
+        // Moves the size_ live elements from `old` into the separate fresh
+        // block and ends their lifetimes in `old` (left emptied, bindings
+        // kept). SHIFT types: one memcpy plus an inline-head rebase by the
+        // block distance; same bytes and deltas as the per-element loop.
+        void relocate_live_run(T* fresh, T* old) noexcept
+            requires (fixed_detail::can_relocate_without_allocation<T>()) {
+            if (size_ == 0) return;
+            if constexpr (detail::shift_relocate_supported<T>()) {
+                std::memcpy(static_cast<void*>(fresh), static_cast<const void*>(old),
+                            std::size_t(size_) * sizeof(T));
+                detail::shift_rebase_moved(fresh, size_, static_cast<std::int32_t>(
+                    reinterpret_cast<const char*>(old) - reinterpret_cast<const char*>(fresh)));
+                for (size_type i = 0; i < size_; ++i) detail::empty_vacated_slot(old + i);
+            } else {
+                for (size_type i = 0; i < size_; ++i) {
+                    fixed_detail::relocate_construct(fresh + i, old[i]);
+                }
+            }
+            fixed_detail::destroy_n(old, size_);
         }
 
         template <typename Construct, typename Commit>
@@ -4655,6 +4721,37 @@ namespace XOffsetDatastructure {
     // bases/bit-fields and recursive support. Do not specialize for a type
     // whose source layout has not been audited against these obligations.
     template<class T> struct StableEraseOrdinaryMembers : std::false_type {};
+
+    // Mechanical part of XOFFSET_ORDINARY_RECORDS. Physical disjointness
+    // catches a [[no_unique_address]] member that shares storage, but not one
+    // that merely could; the declaration stays a source contract.
+    namespace detail {
+        template <typename T>
+        consteval bool ordinary_record_has_no_bases() {
+            return std::meta::bases_of(^^T, std::meta::access_context::unchecked()).empty();
+        }
+        template <typename T>
+        consteval bool ordinary_record_has_no_bit_fields() {
+            for (auto member : std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()))
+                if (std::meta::is_bit_field(member)) return false;
+            return true;
+        }
+        // Every pair of [offset, offset + sizeof) member ranges is disjoint.
+        template <typename T>
+        consteval bool ordinary_record_members_disjoint() {
+            const auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked());
+            for (std::size_t i = 0; i < members.size(); ++i) {
+                const auto a = std::meta::offset_of(members[i]).bytes;
+                const auto a_end = a + std::meta::size_of(std::meta::type_of(members[i]));
+                for (std::size_t j = i + 1; j < members.size(); ++j) {
+                    const auto b = std::meta::offset_of(members[j]).bytes;
+                    const auto b_end = b + std::meta::size_of(std::meta::type_of(members[j]));
+                    if (a < b_end && b < a_end) return false;
+                }
+            }
+            return true;
+        }
+    } // namespace detail
 
     namespace fixed_detail {
         // [class.prop]: an aggregate whose destructor is not user-provided is
@@ -6626,6 +6723,53 @@ struct _XOffset_NS_Sentinel {};
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
+
+// XOFFSET_ORDINARY_RECORDS(A, B, ...): declares that each record type has
+// only ordinary non-static data members: no bases, unions, bit-fields or
+// [[no_unique_address]], members never overlap. It specializes
+// wire_record_layout<T>::ordinary_members and StableEraseOrdinaryMembers<T>,
+// which turns on the SHIFT path (XVector insert/erase/growth move records with
+// one memmove/memcpy plus an inline-head rebase), stable_erase_if and raw
+// receive for these types. The wire bytes are the same with or without it.
+// Each type is checked at compile time: a class (not a union) without bases
+// or bit-fields whose members are physically disjoint. A [[no_unique_address]]
+// member that happens not to overlap passes the check, so declaring such a type
+// is still undefined behavior; the library never infers the declaration.
+// Use at global scope after the type definitions and before any use of the
+// types in containers. Use an alias for a type name containing commas.
+#define XOFFSET_ORDINARY_RECORDS(...)                                          \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_ORDINARY_RECORDS")                \
+    XOFFSET_DETAIL_FOR_EACH(XOFFSET_DETAIL_ORDINARY_RECORD, __VA_ARGS__)
+
+#define XOFFSET_DETAIL_ORDINARY_RECORD(Type)                                   \
+    static_assert(::std::is_class_v<Type> && !::std::is_union_v<Type>,       \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must be a class type, not a union"); \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bases<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have base classes");   \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bit_fields<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have bit-fields");     \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_members_disjoint<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " has overlapping members "       \
+        "([[no_unique_address]]?); it is not an ordinary record");           \
+    template<> struct XOffsetDatastructure::wire_record_layout<Type> {        \
+        static constexpr bool ordinary_members = true;                         \
+    };                                                                         \
+    template<> struct XOffsetDatastructure::StableEraseOrdinaryMembers<Type>  \
+        : ::std::true_type {};
+
+// Applies macro(x) to each argument (up to 256).
+#define XOFFSET_DETAIL_PARENS ()
+#define XOFFSET_DETAIL_EXPAND(...) XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND4(...) XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND3(...) XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND2(...) XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND1(...) __VA_ARGS__
+#define XOFFSET_DETAIL_FOR_EACH(macro, ...)                                    \
+    __VA_OPT__(XOFFSET_DETAIL_EXPAND(XOFFSET_DETAIL_FOR_EACH_HELPER(macro, __VA_ARGS__)))
+#define XOFFSET_DETAIL_FOR_EACH_HELPER(macro, a1, ...)                         \
+    macro(a1)                                                                  \
+    __VA_OPT__(XOFFSET_DETAIL_FOR_EACH_AGAIN XOFFSET_DETAIL_PARENS (macro, __VA_ARGS__))
+#define XOFFSET_DETAIL_FOR_EACH_AGAIN() XOFFSET_DETAIL_FOR_EACH_HELPER
 
 // Compatibility wrappers. `name` is ignored now that XOffset no longer registers
 // its own containers through TypeLayout's opaque mechanism.
