@@ -48,6 +48,7 @@ set(REFLECTION_TESTS
     test_scalar_resize
     test_validation_granules
     test_string_replace
+    test_hot_path_constants
     test_resize_growth
     test_reflection_core
     test_reflection_advanced
