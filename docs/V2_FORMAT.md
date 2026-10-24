@@ -78,10 +78,37 @@ hole table: hole_count x {u32 offset, u32 bytes}
 | `reserved0` | 0 |
 | `extent_count` | |
 
-**Sparse wire.** When the free table contains a run of free bytes of at least
-4 KiB, emission skips that run. The extents and their gaps tile `[0, used_bytes)`,
-and the first extent starts at 0. Every gap byte must lie inside a hole, and gaps
-load as zero bytes. `freeze_verified` always emits dense wires.
+**Sparse wire.** The extents and their gaps tile `[0, used_bytes)`, and the
+first extent starts at 0. Gaps load as zero bytes wherever they lie; the loaded
+payload is then validated exactly like a dense one, so a sparse wire is
+accepted exactly when the dense wire of the same payload is, with the same
+error. (Before 2026-10-22 every gap byte also had to lie inside a hole; that
+encoding rule is dropped, the payload-level accept/reject set is unchanged.)
+
+**Emission.** `XSaveOptions{.emission}` selects the form; `save_verified` and
+`save_verified_into` emit the same bytes for the same state.
+
+- `free_runs` (default): free blocks of at least 256 B are sorted by offset,
+  adjacent ones merge, and every merged run of at least 4 KiB is skipped.
+  Skipped bytes are all holes. (Earlier releases, N10, merged free blocks of
+  every size; on runs without small neighbours the two agree.)
+- `dense`: one copy of the payload.
+- `zero_runs`: zero runs of at least 64 bytes (capacity slack, holes, zero
+  fields) are skipped; a run is found from a 64-byte aligned all-zero block and
+  extended word by word on both sides. Payloads below 4 KiB, and emissions that
+  would save less than max(256 B, used_bytes / 16), stay dense.
+
+The loaded payload is byte-identical in every form, so spare capacity survives
+the transfer. `freeze_verified` always emits dense wires.
+
+`save_compact` emits a compact wire directly: the root at offset 48, then
+every block in validation (preorder) order, strings of at most 10 bytes
+inline, empty containers without storage, no holes and no extents. With
+`XCompactOptions{.slack_div = 0}` every container has capacity equal to size
+and the bytes equal `XCompactor::compact` followed by `save_verified`. The
+default (`slack_div = 8`) gives vectors of at least 8 elements (not strings)
+size / 8 + 1 zeroed spare elements. Either is an ordinary dense wire and loads
+with no special handling.
 
 **Output.** On Darwin, outputs of at least 1 MiB are copied in 256 KiB chunks.
 Each chunk is preceded by `madvise(MADV_WILLNEED)` on its destination pages.
@@ -135,7 +162,8 @@ The typed validator, the raw validator and the receive path apply the same check
   length of at most 10 and zero padding.
 - **Other values:** `bool` must be 0 or 1; sets and maps must be strictly ordered.
 - **Coverage:** live bytes plus hole bytes must equal `used_end`.
-- **Sparse wires:** every gap byte must be free.
+- **Sparse wires:** gap bytes are zero in the loaded payload; there is no
+  separate gap check.
 
 These checks are not weaker than V1's. V1 detected a corrupted block pointer
 through the per-block header self-check. In V2, a redirected pointer leaves its
