@@ -400,13 +400,11 @@ jobs:
     timeout-minutes: 45
     env:
       XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
-      # GCC's null / nonnull-attribute / returns-nonnull-attribute checks make
-      # the library's consteval reflection code non-constant (all three must be
-      # off, any one left on fails constant evaluation). Every other UBSan
-      # check stays on and aborts the test.
+      # Every UBSan check is on and aborts the test (TypeLayout fe29592 made
+      # the consteval signature code constant under null / nonnull-attribute /
+      # returns-nonnull-attribute, which earlier needed to be excluded).
       XOFFSET_GCC_SANITIZE: >-
         -fsanitize=address,undefined
-        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
         -fno-sanitize-recover=undefined -fno-omit-frame-pointer
 
     steps:
@@ -452,10 +450,9 @@ jobs:
     timeout-minutes: 45
     env:
       XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
-      # Same exclusions as gcc16-sanitizer (consteval reflection code).
+      # Same flags as gcc16-sanitizer.
       XOFFSET_GCC_SANITIZE: >-
         -fsanitize=address,undefined
-        -fno-sanitize=null,nonnull-attribute,returns-nonnull-attribute
         -fno-sanitize-recover=undefined -fno-omit-frame-pointer
       MAPDEMO_CONFIGURE: >-
         -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_BUILD_DEMOS=ON -DXOFFSET_BUILD_TESTS=OFF
@@ -607,7 +604,7 @@ jobs:
             --compiler /opt/p2996-toolchain/bin/clang++ --platform linux/amd64 \
             --cmake-root build/cmake-tool/root \
             --sanitizer address-undefined --runtime-dir build/asan-resource \
-            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,fuzz_v2_wire_replay,fuzz_wire_schemas_replay,test_free_table_policy,test_subtree_copy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
+            --targets test_nested,test_compaction,test_xbuffer_api,test_xhandle,test_error_paths,test_complex_nesting,test_adaptive_reservation,test_main_containers,test_runtime_regressions,test_mutation_failures,test_wire_validation,test_stable_storage,test_virtual_memory_storage,test_vm_pool,test_storage_policies,test_vm_lifecycle,test_vm_transport,test_owner_registry,test_tail_expansion,test_hot_path_constants,test_allocator_model,test_allocator_failures,test_v2_golden,test_v2_fuzz,fuzz_v2_wire_replay,fuzz_wire_schemas_replay,test_free_table_policy,test_subtree_copy,test_owner_identity,test_assign_range,test_verified_receive,test_scalar_resize \
             --jobs 2 --out build/sanitizer-result
 
       - name: Upload sanitizer results

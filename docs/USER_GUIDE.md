@@ -147,6 +147,8 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | 容器操作触发的 Automatic 增长、显式 `grow()` | 不变（在虚拟内存预留里扩展） | 只按上表失效 | 不变 |
 | `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
 | `reload_verified`、`reset<T>()` | 不变（复用映射） | 全部失效 | 加一 |
+| `src.clone_into(dst)` | dst 不变（复用映射） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
+| `clone()` | 结果是新 buffer | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
 | `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
 | `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
 | `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
@@ -226,6 +228,28 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 | 只读战报，每次读取 | 4.9 µs | 0.44 µs |
 
 只读战报用池后仍慢于 cereal（约 2.6 倍），剩余开销在建立 owner 和"先拷贝再校验"。
+
+### 4.2 同进程整块复制：`clone()` / `clone_into()`
+
+同一进程里需要一份独立副本时（状态分叉、回滚、快照后继续改），不必经过 wire：
+
+```cpp
+XBuffer snapshot = buf.clone();     // 新 owner：大小、maximum_capacity、增长策略、池都同 buf
+buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 reload_verified
+```
+
+- 只拷贝一次已用区，空闲表、类型化根访问和 schema 绑定一起带过去，不生成 wire、
+  不校验（源是本进程正在用的 buffer）。副本与源完全独立，之后同样的修改得到同样的字节，
+  `save_verified` 输出也相同。
+- 未校验的源（`load_unverified`）复制后仍未校验：`root<T>()` 照样拒绝。
+- `clone_into(dst)` 之后，dst 原有内容的根引用、元素指针、`string_view`、span 全部失效，
+  `dst.epoch()` 加一，`XHandle` 按新内容重新解析；dst 的地址、`maximum_capacity` 和增长
+  策略不变，大小变成源的大小（不超过 dst 的上限）。
+- 失败：`clone_into(dst)` 的源就是 dst 时抛 `XException`，什么都不改；源的已用区超过 dst
+  的 `maximum_capacity` 时抛 `XBadAlloc`；除自拷贝外的任何失败都让 dst 成为没有根的空
+  arena，与 `reload_verified` 失败相同，之后可以再 `clone_into` 或 `reset<T>()`。
+  `clone()` 失败不会改动源。
+- 详细语义见 [BUFFER_REUSE.md](BUFFER_REUSE.md)。
 
 ## 5. 必须遵守的约束
 

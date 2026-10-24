@@ -114,6 +114,23 @@ inline XBuffer::MaximumCapacity cap_view_request() {
 
 } // namespace mapdemo
 
+// Ordinary records (docs/USER_GUIDE.md section 3.1): every type above has
+// plain non-static members only (no bases, unions, bit-fields or
+// [[no_unique_address]]), so the library may move record elements with one
+// memmove and rebuild only their inline heads. Wire bytes are unchanged.
+namespace XOffsetDatastructure {
+template<> struct wire_record_layout<mapdemo::Point> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::Rect> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::SceneData> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::SiteData> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::MapCatalog> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::UnitState> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::UnitStateBatch> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::ViewRequest> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::VisibleUnit> { static constexpr bool ordinary_members = true; };
+template<> struct wire_record_layout<mapdemo::ViewSnapshot> { static constexpr bool ordinary_members = true; };
+} // namespace XOffsetDatastructure
+
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitStateBatch, "mapdemo.UnitStateBatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::ViewRequest, "mapdemo.ViewRequest.v1")
