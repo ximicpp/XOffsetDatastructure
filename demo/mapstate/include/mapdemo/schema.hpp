@@ -114,10 +114,13 @@ inline XBuffer::MaximumCapacity cap_view_request() {
 
 } // namespace mapdemo
 
-// Element records of the XVectors above: ordinary members only, so growth,
-// insert and erase move them with one memcpy/memmove (same wire bytes).
-XOFFSET_ORDINARY_RECORDS(mapdemo::Point, mapdemo::Rect, mapdemo::SceneData,
-                         mapdemo::SiteData, mapdemo::UnitState, mapdemo::VisibleUnit)
+// Ordinary records (docs/USER_GUIDE.md section 3.1): every type above has
+// plain non-static members only (no bases, unions, bit-fields or
+// [[no_unique_address]]), so the library may move record elements with one
+// memmove and rebuild only their inline heads. Wire bytes are unchanged.
+XOFFSET_ORDINARY_RECORDS(mapdemo::Point, mapdemo::Rect, mapdemo::SceneData, mapdemo::SiteData,
+                         mapdemo::MapCatalog, mapdemo::UnitState, mapdemo::UnitStateBatch,
+                         mapdemo::ViewRequest, mapdemo::VisibleUnit, mapdemo::ViewSnapshot)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitStateBatch, "mapdemo.UnitStateBatch.v1")
