@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "mapdemo/buffer_mode.hpp"
 #include "mapdemo/checks.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
@@ -33,6 +34,7 @@ struct Options {
     bool auto_drag = false;
     std::vector<int> screenshot_at; // frame numbers (window client)
     bool evil = false;
+    BufferMode buffers = kDefaultBufferMode;
 
     bool check_on() const { return check.value_or(headless); }
 };
@@ -49,9 +51,15 @@ public:
     bool empty() const noexcept { return root_ == nullptr; }
     const ViewSnapshot& view() const noexcept { return *root_; }
     const XBuffer& buffer() const noexcept { return *buf_; }
-    // Destroys the previous buffer (returns that destroy time in microseconds,
-    // 0 when there was none), then takes ownership of `next`.
+    // --buffers fresh: destroys the previous buffer (returns that destroy
+    // time in microseconds, 0 when there was none), then takes ownership of
+    // `next`.
     double replace(XBuffer&& next);
+    // --buffers reuse: verifies `wire` into the held buffer in place
+    // (reload_verified; load_verified the first time). Everything read from
+    // the old content dies here. On a rejected wire the holder is empty and
+    // the next reload starts from that empty buffer.
+    void reload(const std::string& wire);
     double clear();
 
 private:
@@ -166,6 +174,7 @@ private:
     std::optional<XBuffer> catalog_;
     const MapCatalog* catalog_root_ = nullptr;
     Rect scene_ = scene_bounds();
+    std::optional<XBuffer> req_buf_;   // reuse: reset<ViewRequest>() for every request
 
     bool inflight_ = false;
     bool bye_ = false;
