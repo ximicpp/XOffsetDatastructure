@@ -48,8 +48,10 @@ int main(int argc, char** argv) {
         std::ifstream in(path, std::ios::binary);
         const std::string data{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
         if (!in.good() && !in.eof()) { std::cerr << "replay: cannot read " << path.string() << "\n"; return 2; }
-        // Flushed before the call: if the harness aborts, the log names the input.
-        std::cout << "replay: " << path.string() << " (" << data.size() << " bytes)" << std::endl;
+        // On stderr (unbuffered), the stream of sanitizer and harness reports, so
+        // a log that merges stdout and stderr still names the input right before
+        // its failure report.
+        std::cerr << "replay: " << path.string() << " (" << data.size() << " bytes)\n";
         LLVMFuzzerTestOneInput(reinterpret_cast<const std::uint8_t*>(data.data()), data.size());
         bytes += data.size();
     }

@@ -1,0 +1,171 @@
+name: Perf gate (instruction counts)
+
+# H3 L0: callgrind instruction counts of the SLG benchmark (S scale) and the
+# formal acceptance harness (M fixture), anchor/base/head built in the same job.
+# Instruction counts only block regressions; timing conclusions come from the
+# Mac formal batch. Thresholds and the ledger: docs/PERF_GATE.md.
+
+on:
+  pull_request:
+    branches: [ next_cpp26 ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  push:
+    branches: [ next_cpp26 ]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Base commit (default: first parent of head)'
+        required: false
+        default: ''
+      head:
+        description: 'Head commit (default: the dispatched ref)'
+        required: false
+        default: ''
+      anchor:
+        description: 'Anchor commit (default: bench/perf/ANCHOR of head)'
+        required: false
+        default: ''
+      compilers:
+        description: 'gcc16, p2996 or both'
+        required: false
+        default: 'both'
+
+concurrency:
+  group: perf-gate-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name }}-${{ inputs.base }}-${{ inputs.head }}-${{ inputs.anchor }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Perf gate Ir (${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc16, p2996]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # Same pinned images as ci.yml.
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      CEREAL_COMMIT: ebef1e929807629befafbb2918ea1a08c7194554  # v1.3.2, as in the formal harness
+      WORK: ${{ github.workspace }}/build/perf-gate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve anchor, base and head
+        id: refs
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          IN_BASE: ${{ inputs.base }}
+          IN_HEAD: ${{ inputs.head }}
+          IN_ANCHOR: ${{ inputs.anchor }}
+          IN_COMPILERS: ${{ inputs.compilers }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ] && [ "${IN_COMPILERS:-both}" != both ] && [ "$IN_COMPILERS" != "${{ matrix.compiler }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"; echo "not selected"; exit 0
+          fi
+          head=$(git rev-parse HEAD)
+          [ "$EVENT" = workflow_dispatch ] && [ -n "$IN_HEAD" ] && head=$(git rev-parse "$IN_HEAD^{commit}")
+          case "$EVENT" in
+            pull_request) base=$(git merge-base "$PR_BASE" "$head") ;;
+            workflow_dispatch) base=${IN_BASE:-$head^1}; base=$(git rev-parse "$base^{commit}") ;;
+            *) base=$(git rev-parse "$head^1") ;;
+          esac
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "anchor=${IN_ANCHOR:-}" >> "$GITHUB_OUTPUT"
+          # Benchmarks (and the default ANCHOR) come from the checkout: the head itself for PRs and
+          # pushes, the dispatched ref for replays of older commits that predate bench/.
+          if [ -f bench/slg/bench/slg_bench.cpp ] && [ -f bench/formal/driver.cpp ] && [ -f bench/perf/ANCHOR ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::bench/slg, bench/formal or bench/perf/ANCHOR is missing in the checkout; perf gate skipped."
+            echo "指令数门禁跳过：检出的树里还没有 bench/slg、bench/formal 或 bench/perf/ANCHOR。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "anchor=${IN_ANCHOR:-(bench/perf/ANCHOR)} base=$base head=$head"
+
+      - name: Self-test of the comparison logic
+        if: steps.refs.outputs.ready == 'true'
+        run: python3 tools/perf_gate/test_perf_gate.py
+
+      - name: Export library trees
+        if: steps.refs.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --depth 1 external/typelayout
+          anchor_arg=()
+          [ -n "${{ steps.refs.outputs.anchor }}" ] && anchor_arg=(--anchor "${{ steps.refs.outputs.anchor }}")
+          python3 tools/perf_gate/perf_gate.py prepare --work "$WORK" "${anchor_arg[@]}" \
+            --base "${{ steps.refs.outputs.base }}" --head "${{ steps.refs.outputs.head }}" \
+            --bench-root "$GITHUB_WORKSPACE"
+          git clone --quiet https://github.com/USCiLab/cereal.git "$WORK/cereal"
+          git -C "$WORK/cereal" checkout --quiet "$CEREAL_COMMIT"
+
+      - name: Pull image
+        if: steps.refs.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.compiler }}" = gcc16 ]; then
+            IMAGE=$XOFFSET_GCC_IMAGE
+          else
+            IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+          fi
+          docker pull --platform linux/amd64 "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Build, check and count (in the compiler image)
+        if: steps.refs.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$WORK"
+          # Valgrind runs in the same container as the compiler; its version goes into the result.
+          docker run --rm --platform linux/amd64 \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            "$IMAGE" bash -c '
+              (apt-get update -qq && apt-get install -y -qq --no-install-recommends valgrind python3) > /dev/null || exit 3
+              python3 tools/perf_gate/perf_gate.py build --work "'"$WORK"'" --compiler ${{ matrix.compiler }} \
+                --cereal "'"$WORK"'/cereal/include" --jobs $(nproc) &&
+              python3 tools/perf_gate/perf_gate.py measure --work "'"$WORK"'" --compiler ${{ matrix.compiler }} \
+                --jobs $(nproc)
+              rc=$?
+              chown -R '"$(id -u):$(id -g)"' "'"$WORK"'"
+              exit $rc' 2>&1 | tee "$WORK/container-${{ matrix.compiler }}.log"
+
+      - name: Compare and judge
+        if: steps.refs.outputs.ready == 'true'
+        run: >-
+          python3 tools/perf_gate/perf_gate.py compare --work "$WORK" --compiler ${{ matrix.compiler }}
+          --json "$WORK/perf-gate-${{ matrix.compiler }}-${{ steps.refs.outputs.head }}.json"
+          --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload result
+        if: always() && steps.refs.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-gate-${{ matrix.compiler }}-${{ steps.refs.outputs.head }}
+          path: |
+            build/perf-gate/perf-gate-*.json
+            build/perf-gate/plan.json
+            build/perf-gate/build-*.json
+            build/perf-gate/ir-*.json
+            build/perf-gate/logs/
+            build/perf-gate/container-*.log
+          retention-days: 90
+          if-no-files-found: warn
