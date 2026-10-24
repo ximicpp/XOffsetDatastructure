@@ -1,7 +1,8 @@
 // Map state demo: raylib window front end. OWNER: client thread.
 //
 // One frame: pump the socket; at frame start install a pending snapshot
-// (SnapshotHolder::replace destroys the old buffer); request the current
+// (--buffers reuse: reload_verified into the held buffer; fresh:
+// SnapshotHolder::replace destroys the old buffer); request the current
 // camera rect when nothing is outstanding and 100 ms have passed; read the
 // live snapshot into presentation data (DrawItem: screen position + colour);
 // draw scene grid, sites (read from the catalog buffer), units, labels and
@@ -206,7 +207,8 @@ int run_gui(const Options& opt) {
         } else {
             DrawText("waiting for the first snapshot...", 16, 14, 16, RAYWHITE);
         }
-        DrawText(TextFormat("view rtt %.2f ms (frame-paced)   load_verified %.1f us   %d fps", s.last_rtt_us() / 1000.0,
+        DrawText(TextFormat("view rtt %.2f ms (frame-paced)   %s %.1f us   %d fps", s.last_rtt_us() / 1000.0,
+                            opt.buffers == BufferMode::Reuse ? "reload_verified" : "load_verified",
                             s.last_load_us(), GetFPS()),
                  16, 36, 16, RAYWHITE);
         DrawText(TextFormat("camera (%d, %d)   drag with the left mouse button", int(cam.min.x), int(cam.min.y)), 16, 58,

@@ -7,13 +7,19 @@
 //
 //   mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
 //             [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
-//             [--check | --no-check] [--csv-dir DIR]
+//             [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
 //
-// Each step: save_verified(cur) -> StepReq to B -> StepRes -> load_verified ->
-// (checks) -> the loaded buffer becomes cur, the old one is destroyed. At most
-// one step is in flight; steps are paced at 20 Hz and never bunched up when
-// A falls behind. View requests are answered from cur (the last completed
-// tick) also while a step is in flight.
+// Each step: save(cur) -> StepReq to B -> StepRes -> verify into spare ->
+// (checks) -> spare becomes cur. At most one step is in flight; steps are
+// paced at 20 Hz and never bunched up when A falls behind. View requests are
+// answered from cur (the last completed tick) also while a step is in flight.
+//   --buffers fresh: save_verified, load_verified into a new XBuffer, the old
+//                    state, every request and every snapshot are destroyed.
+//   --buffers reuse: save_verified_into a recycled string, reload_verified
+//                    into the buffer that held the state before last
+//                    (cur/spare ping-pong), one request buffer per client,
+//                    one snapshot buffer refilled with reset<ViewSnapshot>().
+//                    Same validation and byte-identical wires.
 #include <poll.h>
 #include <csignal>
 #include <cerrno>
@@ -29,6 +35,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include "mapdemo/buffer_mode.hpp"
 #include "mapdemo/checks.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
@@ -57,6 +64,7 @@ struct Options {
     std::string b_host = "127.0.0.1";
     std::uint16_t b_port = net::kDefaultPortB;
     bool check = true;
+    BufferMode buffers = kDefaultBufferMode;
     std::string csv_dir;
 };
 
@@ -65,7 +73,7 @@ struct Options {
         "error: %s\n"
         "usage: mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]\n"
         "                 [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]\n"
-        "                 [--check | --no-check] [--csv-dir DIR]\n", what.c_str());
+        "                 [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]\n", what.c_str());
     std::exit(2);
 }
 
@@ -101,6 +109,12 @@ Options parse(int argc, char** argv) {
         else if (a == "--b-port") o.b_port = std::uint16_t(parse_u64("--b-port", value(), 65535));
         else if (a == "--check") o.check = true;
         else if (a == "--no-check") o.check = false;
+        else if (a == "--buffers") {
+            const char* t = value();
+            const auto m = parse_buffer_mode(t);
+            if (!m) usage_error(std::string("bad value for --buffers: ") + t);
+            o.buffers = *m;
+        }
         else if (a == "--csv-dir") o.csv_dir = value();
         else usage_error(std::string("unknown argument ") + argv[i]);
     }
@@ -152,6 +166,8 @@ struct Client {
     net::Conn conn;
     bool hello_done = false;
     bool close_after_flush = false;
+    XBuffer req_buf;          // reuse: reloaded for every ViewReq
+    bool req_ready = false;
 };
 
 class ServerA {
@@ -182,12 +198,18 @@ private:
     void fail_check(const std::string& check, const std::string& detail);
 
     UnitStateBatch& cur_root() { return cur_.root<UnitStateBatch>(); }
+    bool reuse() const noexcept { return opt_.buffers == BufferMode::Reuse; }
 
     Options opt_;
     metrics::Recorder rec_;
 
     std::string catalog_wire_;
     XBuffer cur_;                       // last completed tick
+    XBuffer spare_;                     // B's result is verified into this, then swapped with cur_
+    bool spare_ready_ = false;          // reuse: spare_ holds an arena to reload into
+    XBuffer snap_buf_;                  // reuse: refilled for every snapshot
+    bool snap_ready_ = false;
+    std::vector<std::uint32_t> hits_;   // filter output, capacity kept
     std::unique_ptr<stdm::UnitStateBatch> ref_;   // reference model (--check)
     checks::Coverage coverage_;
 
@@ -201,6 +223,7 @@ private:
     std::uint64_t send_start_ns_ = 0;
     double inflight_save_us_ = 0;
     std::size_t inflight_req_bytes_ = 0;
+    std::uint64_t inflight_req_digest_ = 0;
     std::uint64_t steps_sent_ = 0;
     std::uint64_t steps_done_ = 0;
     std::uint64_t next_due_ns_ = 0;
@@ -232,7 +255,8 @@ void ServerA::open_csv() {
     const std::string steps_path = opt_.csv_dir + "/a_steps.csv";
     const std::string snaps_path = opt_.csv_dir + "/a_snapshots.csv";
     if (!steps_csv_.open(steps_path,
-            "tick,req_bytes,res_bytes,ab_rtt_us,save_us,load_us,destroy_us,free_blocks,free_bytes,check_ok"))
+            "tick,req_bytes,res_bytes,ab_rtt_us,save_us,load_us,destroy_us,free_blocks,free_bytes,check_ok,"
+            "req_digest,res_digest"))
         throw Fatal{2, "cannot open " + steps_path};
     if (!snaps_csv_.open(snaps_path,
             "request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,"
@@ -294,11 +318,19 @@ bool ServerA::may_send_step(std::uint64_t now) const {
 
 void ServerA::send_step(std::uint64_t now) {
     metrics::Stopwatch sw;
-    std::string wire = cur_.save_verified<UnitStateBatch>();
+    std::string wire;
+    if (reuse()) {
+        // The previous StepReq was written completely before B answered it.
+        wire = b_.take_tx_buffer();
+        cur_.save_verified_into<UnitStateBatch>(wire);
+    } else {
+        wire = cur_.save_verified<UnitStateBatch>();
+    }
     inflight_save_us_ = sw.us();
     rec_.add("a.save_us", inflight_save_us_);
     inflight_req_bytes_ = wire.size();
     rec_.add("a.step_req_bytes", double(wire.size()));
+    inflight_req_digest_ = opt_.check ? checks::wire_digest(wire) : 0;
 
     inflight_tick_ = cur_root().tick;
     send_start_ns_ = net::now_ns();
@@ -330,19 +362,24 @@ void ServerA::on_step_result(net::Frame frame) {
                        ", expected " + std::to_string(expect)};
 
     metrics::Stopwatch sw;
-    XBuffer next;
     try {
-        next = XBuffer::load_verified<UnitStateBatch>(frame.payload, cap_batch());
+        if (reuse() && spare_ready_) {
+            spare_.reload_verified<UnitStateBatch>(frame.payload);
+        } else {
+            spare_ = XBuffer::load_verified<UnitStateBatch>(frame.payload, cap_batch());
+            spare_ready_ = true;
+        }
     } catch (const std::exception& e) {
         throw Fatal{2, std::string("rejected StepRes from B: ") + e.what()};
     }
     const double load_us = sw.us();
     rec_.add("a.load_us", load_us);
+    const std::uint64_t res_digest = opt_.check ? checks::wire_digest(frame.payload) : 0;
 
     bool check_ok = true;
     if (opt_.check) {
         sw.restart();
-        auto& nb = next.root<UnitStateBatch>();
+        auto& nb = spare_.root<UnitStateBatch>();
         rules::step_batch(*ref_, opt_.seed);
         checks::Result inv = checks::batch_invariants(nb, opt_.units, expect);
         if (!inv.ok) { check_ok = false; fail_check("batch_roundtrip", "tick " + std::to_string(expect) + ": " + inv.detail); }
@@ -351,29 +388,37 @@ void ServerA::on_step_result(net::Frame frame) {
         coverage_.observe(cur_root(), nb);
         ++step_checks_;
         rec_.add("a.check_us", sw.us());
-    } else if (next.root<UnitStateBatch>().tick != expect) {
-        throw Fatal{2, "protocol: StepRes batch tick " + std::to_string(next.root<UnitStateBatch>().tick) +
+    } else if (spare_.root<UnitStateBatch>().tick != expect) {
+        throw Fatal{2, "protocol: StepRes batch tick " + std::to_string(spare_.root<UnitStateBatch>().tick) +
                        ", expected " + std::to_string(expect)};
     }
 
-    // Publish: the loaded buffer becomes the current state; the old one dies.
-    cur_.swap(next);
-    sw.restart();
-    next = XBuffer();
-    std::string().swap(frame.payload);
-    const double destroy_us = sw.us();
-    rec_.add("a.destroy_us", destroy_us);
+    // Publish: the verified buffer becomes the current state.
+    cur_.swap(spare_);
+    double destroy_us = -1;
+    if (reuse()) {
+        // The old state stays in spare_ and is reloaded with the next result.
+        b_.recycle_rx(std::move(frame.payload));
+    } else {
+        sw.restart();
+        spare_ = XBuffer();
+        spare_ready_ = false;
+        std::string().swap(frame.payload);
+        destroy_us = sw.us();
+        rec_.add("a.destroy_us", destroy_us);
+    }
 
     inflight_ = false;
     ++steps_done_;
     last_done_ns_ = done_ns;
 
     if (csv_) {
-        char line[256];
-        std::snprintf(line, sizeof line, "%" PRIu64 ",%zu,%zu,%s,%s,%s,%s,%zu,%" PRIu64 ",%d",
+        char line[320];
+        std::snprintf(line, sizeof line, "%" PRIu64 ",%zu,%zu,%s,%s,%s,%s,%zu,%" PRIu64 ",%d,%s,%s",
             expect, inflight_req_bytes_, res_bytes, fmt_us(rtt_us).c_str(), fmt_us(inflight_save_us_).c_str(),
-            fmt_us(load_us).c_str(), fmt_us(destroy_us).c_str(), cur_.free_block_count(),
-            std::uint64_t(cur_.free_block_bytes()), check_ok ? 1 : 0);
+            fmt_us(load_us).c_str(), destroy_us < 0 ? "" : fmt_us(destroy_us).c_str(), cur_.free_block_count(),
+            std::uint64_t(cur_.free_block_bytes()), check_ok ? 1 : 0,
+            opt_.check ? hex16(inflight_req_digest_).c_str() : "", opt_.check ? hex16(res_digest).c_str() : "");
         steps_csv_.row(line);
     }
     if (!check_ok) throw Fatal{1, "check failed at tick " + std::to_string(expect)};
@@ -411,16 +456,15 @@ void ServerA::on_client_readable(Client& c) {
         std::optional<net::Frame> f;
         try {
             f = c.conn.try_recv({MsgType::Hello, MsgType::ViewReq});
+        } catch (const net::PeerClosed&) {
+            std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
+            c.conn.close();
+            return;
         } catch (const net::ProtocolError& e) {
-            // Bad header, unexpected type, oversize declared length, or EOF:
-            // the payload buffer was never allocated; drop this connection.
-            const std::string what = e.what();
-            if (what == "connection closed by peer" || what.find("reset by peer") != std::string::npos) {
-                std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
-                c.conn.close();
-            } else {
-                reject(c, what, true);
-            }
+            // Bad header, unexpected type, oversize declared length, or a
+            // close mid-frame: the payload buffer was never allocated; drop
+            // this connection.
+            reject(c, e.what(), true);
             return;
         }
         if (!f) return;
@@ -455,15 +499,20 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     }
 
     metrics::Stopwatch sw;
-    XBuffer req_buf;
     try {
-        req_buf = XBuffer::load_verified<ViewRequest>(frame.payload, cap_view_request());
+        if (reuse() && c.req_ready) {
+            // A rejected wire leaves the buffer empty; the next one reloads it.
+            c.req_buf.reload_verified<ViewRequest>(frame.payload);
+        } else {
+            c.req_buf = XBuffer::load_verified<ViewRequest>(frame.payload, cap_view_request());
+            c.req_ready = true;
+        }
     } catch (const std::exception& e) {
         reject(c, std::string("ViewReq: bad wire: ") + e.what(), false);
         return;
     }
     const double req_load_us = sw.us();
-    const ViewRequest& req = req_buf.root<ViewRequest>();
+    const ViewRequest& req = c.req_buf.root<ViewRequest>();
     if (req.request_id != frame.correlation) {
         reject(c, "ViewReq: request_id " + std::to_string(req.request_id) + " does not match correlation " +
                   std::to_string(frame.correlation), false);
@@ -478,7 +527,8 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     // Filter: plain scan of the current batch (no spatial index, design 4.3).
     sw.restart();
     const auto& units = cur_root().units;
-    std::vector<std::uint32_t> hits;
+    std::vector<std::uint32_t>& hits = hits_;
+    hits.clear();
     const std::uint32_t n = std::uint32_t(units.size());
     for (std::uint32_t i = 0; i < n; ++i) {
         const auto& u = units[i];
@@ -489,9 +539,14 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
 
     // Build the snapshot in its own arena from the public fields only.
     sw.restart();
-    XBuffer snap_buf;
+    XBuffer& snap_buf = snap_buf_;
     try {
-        snap_buf = XBuffer::create<ViewSnapshot>(4096 + hits.size() * 64, cap_snapshot());
+        if (reuse() && snap_ready_) {
+            snap_buf.reset<ViewSnapshot>();
+        } else {
+            snap_buf = XBuffer::create<ViewSnapshot>(4096 + hits.size() * 64, cap_snapshot());
+            snap_ready_ = true;
+        }
         auto& s = snap_buf.root<ViewSnapshot>();
         s.request_id = req.request_id;
         s.tick = cur_root().tick;
@@ -518,7 +573,13 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     rec_.add("a.snap_build_us", build_us);
 
     sw.restart();
-    std::string wire = snap_buf.save_verified<ViewSnapshot>();
+    std::string wire;
+    if (reuse()) {
+        wire = c.conn.take_tx_buffer();
+        snap_buf.save_verified_into<ViewSnapshot>(wire);
+    } else {
+        wire = snap_buf.save_verified<ViewSnapshot>();
+    }
     const double save_us = sw.us();
     rec_.add("a.snap_save_us", save_us);
     const std::size_t wire_bytes = wire.size();
@@ -561,11 +622,18 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     const Rect rect = req.rect;
     const std::size_t visible = hits.size();
 
-    sw.restart();
-    snap_buf = XBuffer();
-    req_buf = XBuffer();
-    const double destroy_us = sw.us();
-    rec_.add("a.snap_destroy_us", destroy_us);
+    double destroy_us = -1;
+    if (reuse()) {
+        c.conn.recycle_rx(std::move(frame.payload));
+    } else {
+        sw.restart();
+        snap_buf = XBuffer();
+        snap_ready_ = false;
+        c.req_buf = XBuffer();
+        c.req_ready = false;
+        destroy_us = sw.us();
+        rec_.add("a.snap_destroy_us", destroy_us);
+    }
 
     if (csv_) {
         std::string row;
@@ -584,7 +652,8 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         row += fmt_us(filter_us); row += ',';
         row += fmt_us(build_us); row += ',';
         row += fmt_us(save_us); row += ',';
-        row += fmt_us(destroy_us); row += ',';
+        if (destroy_us >= 0) row += fmt_us(destroy_us);
+        row += ',';
         row += check_ok ? '1' : '0';
         snaps_csv_.row(row);
     }
@@ -701,8 +770,9 @@ int ServerA::run() {
     if (!failures_.empty()) throw Fatal{1, "initial batch failed its checks"};
 
     listener_ = net::Listener::bind("127.0.0.1", opt_.port);
-    std::fprintf(stderr, "a: listening on 127.0.0.1:%u, units=%u seed=%" PRIu64 " check=%s\n",
-                 unsigned(opt_.port), opt_.units, opt_.seed, opt_.check ? "on" : "off");
+    std::fprintf(stderr, "a: listening on 127.0.0.1:%u, units=%u seed=%" PRIu64 " check=%s buffers=%s\n",
+                 unsigned(opt_.port), opt_.units, opt_.seed, opt_.check ? "on" : "off",
+                 buffer_mode_name(opt_.buffers));
     connect_b();
     std::fprintf(stderr, "a: connected to B at %s:%u\n", opt_.b_host.c_str(), unsigned(opt_.b_port));
 
