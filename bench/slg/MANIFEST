@@ -19,9 +19,16 @@
 #   include/slg/model_xoffset.hpp  2026-10-22: every xm record type declared an
 #                        ordinary record (was March only), as a user following the
 #                        guide would (origin 0c056aba4e88b0cfb579f383f2f7fdcfdf7631f9681073a2a77e468b85847e65)
+#   bench/xoffset_runner.hpp  2026-10-24: XOffset A.req adapter v3, the request is
+#                        composed straight into the wire with the public
+#                        save_compact_into(out, {.slack_div = 0}, xassign(...)...)
+#                        when the library defines XOFFSET_SAVE_COMPOSED_API (older
+#                        libraries keep copy_army + save_verified); wire bytes
+#                        unchanged (origin 2228cb0a930b6c4f271fd06d5981b18dc5bc01cecc306593e204ddfde6a142b8)
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
-# record type in include/slg/model_xoffset.hpp. No T4 adapter.
+# record type in include/slg/model_xoffset.hpp, XOffset A.req adapter v3
+# (composed write). No T4 adapter.
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
 fffeb26223e5b10a3f0d11e19766d15f2fcc8cce09152cba08bcee1978eb1d77  README.md
 0f306ee47ffe88ae9094f1b4babf9c8dd63776a65edaf7bfc440d31d1215d6fb  adapters/cereal_format.hpp
@@ -34,7 +41,7 @@ ca78dc903b3c6665bc3c56515456cc917a3447117aba40483742b7a1cc44f3bc  bench/runner.h
 63505e708ed84a8ffa1d6136fef17af72f6d807b00f009b206f145e7c9497a74  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 371cd935d934ed2fb94781381ab86332d05fee833bd19857f20fb11e77faeb07  bench/std_runner.hpp
-2228cb0a930b6c4f271fd06d5981b18dc5bc01cecc306593e204ddfde6a142b8  bench/xoffset_runner.hpp
+10c33e339c485c5acbc02c29d71d2431e7d28297e7949f45564d119682531ccf  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 81103b56f9c6c0e89e42c16ba2ded491b2d0eb14b379fae373947aa8bc65328c  include/slg/generic.hpp
 320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
