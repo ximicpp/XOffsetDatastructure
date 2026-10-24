@@ -1,0 +1,31 @@
+# bench/formal: XOffset part of the R3 formal acceptance harness. Check: python3 bench/check_manifest.py
+# Origin: formal_harness_src_r3.tar.gz (sha256 49c318a89f5d45de71e057099900ebb33ac088f7e02e72fe9a323ca1e3f35eda),
+#   meta-r3/experiments/serialization_comparison (Mac R3 candidate tree, build-r3d).
+#   Imported verbatim in commit "bench/formal: import the R3 formal harness, xoffset part, verbatim".
+#   fixtures/prepared-v1-M/fixture.json = Mac prepared-v1/M/fixture.json (the formal M fixture).
+#   model/reference.py 2ce49fc6... is identical to the Mac prepared-v1 copy.
+# Changed since origin:
+#   driver.cpp           SC_IR_COUNT / SC_IR_PHASE callgrind toggles (origin 11aa76107eedb0fcdc1ffcf79893d2cdaf2a844f95f9a49d8682bbc434b80380)
+#   CMakeLists.txt       new: sc_xoffset and the xoffset contracts only
+#   README.md, scripts/  new
+# Formal M input wire (sc_xoffset encode of M/input.canonical.bin), R3 FREEZE.json:
+#   2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+acf775534fefd8ef172ffc8b234ba203da28c389b34e8fdddbf3341d97c2c391  CMakeLists.txt
+31a8df3430cec0b1f75af9b7b97c9d4ed1361f7abd4240ce517c110c5a50c1b9  README.md
+b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7  adapters/xoffset/README.md
+bf246d895b16f542027022ee1b10291328f0c5c4a47d2992ad013e895f84b1d5  adapters/xoffset/adapter.hpp
+95aaf4c38920e99f46e14c5fb9fc005ae687a78eb161219a08efbf3a9fbeb52b  driver.cpp
+186da64c3e58c845b4eab52de803895b442ff8442692fb8c2f55b72a383a2f05  fixtures/golden-S/fixture.json
+d6db0ad22bbe4f69cae69dda27093f2f7952daeb1bb0d8a52c3c787670b2ba47  fixtures/prepared-v1-M/fixture.json
+65cc39900c999f7c43fcf907ead4175ec895ad1bf35a8e7a18e0a8961d32b2f0  include/adapter.hpp
+96bce64d0a3366c39052162f05e0a3ce3d1c28b0689fbc0dc3879e0ffeb1b124  include/model.hpp
+b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727  include/sha256.hpp
+106fd01b02efd831cb0d1812a4e75e1b6f18d0d9387fdb4581528c2206e7ef35  include/views.hpp
+6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef  model/SPEC.md
+2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f  model/reference.py
+ef5f7a89747eb1ba979095209b8a31e50bd11f287dd56671809083b43a174bb4  scripts/make_fixtures.py
+9dd667920981019ba38ee58afbc8902def44db75d0ee6a023d36e14915e3a046  scripts/smoke.py
+5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a  tests/contracts/adapter_contract.cpp
+ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9  tests/contracts/model_contract.cpp
+e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908  tests/contracts/resource_failure.cpp
+e0b97022dfe9ab2495f45981596d8bad5828471f72b90a37bf7d00c08596493f  tests/view_contract.cpp

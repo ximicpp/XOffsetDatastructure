@@ -1,0 +1,31 @@
+// SLG prototype: protobuf schema mirroring include/slg/model_std.hpp.
+syntax = "proto3";
+package slg.pb;
+
+message Buff  { int32 id = 1; int32 stacks = 2; int64 expire_ms = 3; }
+message Skill { int32 id = 1; int32 level = 2; }
+message Troop { int32 type = 1; int32 count = 2; int32 wounded = 3; }
+message Hero {
+  int32 id = 1; int32 level = 2; int32 star = 3; string name = 4;
+  repeated Skill skills = 5; repeated Buff buffs = 6;
+}
+message Army {
+  int64 army_id = 1; int64 owner_id = 2; int32 x = 3; int32 y = 4;
+  repeated Hero heroes = 5; repeated Troop troops = 6; repeated Buff buffs = 7;
+}
+message City { int64 city_id = 1; int32 level = 2; map<int32, int32> buildings = 3; map<int32, int64> resources = 4; }
+message PlayerState {
+  int64 player_id = 1; string name = 2; City city = 3;
+  repeated Army armies = 4; repeated Hero heroes = 5;
+  map<int32, int32> research = 6; map<int32, int64> items = 7;
+}
+message Event { int32 round = 1; int32 hero_id = 2; int32 skill_id = 3; int32 target = 4; int32 damage = 5; }
+message Report { int64 battle_id = 1; string summary = 2; repeated Event events = 3; }
+message BattleMsg { int64 battle_id = 1; int64 seed = 2; int32 winner = 3; Army attacker = 4; Army defender = 5; Report report = 6; }
+message Tile { int32 x = 1; int32 y = 2; int32 terrain = 3; int32 level = 4; int64 owner = 5; }
+message March {
+  int64 march_id = 1; int64 owner = 2;
+  int32 from_x = 3; int32 from_y = 4; int32 to_x = 5; int32 to_y = 6; int32 eta = 7;
+  repeated Troop troops = 8;
+}
+message ShardState { int32 shard_id = 1; int64 tick = 2; int32 width = 3; repeated Tile tiles = 4; repeated City cities = 5; repeated March marches = 6; }

@@ -172,10 +172,10 @@ void freeze_transaction_and_lease() {
     {Arm arm;try{(void)xo::freeze_verified(std::move(source));}catch(const std::bad_alloc&){oom=true;}}
     need(oom && source.get_address()==base && source.copy_bytes()==raw && source.get_size()==logical,
          "shared control OOM consumed/normalized source");
-    // Force both independent monotonic upstream allocations by retaining a
-    // retired allocation, alongside owned graph ranges.
-    for(unsigned point=0;point<2;++point) {
-        auto candidate=make();candidate.root().blob.reserve(400);
+    // A payload above 32 KiB takes one scratch block from the upstream (both
+    // granule bitmaps); its failure must leave the source untouched.
+    for(unsigned point=0;point<1;++point) {
+        auto candidate=make();candidate.root().blob.reserve(40000);
         const auto before=candidate.copy_bytes();const auto extent=candidate.get_size();const auto* address=candidate.get_address();
         FailingResource resource(point);bool failed=false;
         try{(void)xo::freeze_verified(std::move(candidate),&resource);}catch(const std::bad_alloc&){failed=true;}
