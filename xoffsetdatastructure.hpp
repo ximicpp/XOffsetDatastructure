@@ -1793,6 +1793,13 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
 
+        // delta != 0 is known (a head with capacity names a live block).
+        template <typename T>
+        T* resolve_rel32_live(const std::int32_t* origin, std::int32_t delta) noexcept {
+            auto* base = reinterpret_cast<const char*>(origin);
+            return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
+        }
+
         template <typename T>
         const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
@@ -2398,12 +2405,35 @@ namespace XOffsetDatastructure {
             capacity_ = 0;
         }
 
-        // src may alias these inline bytes.
+        // src may alias these inline bytes: every source byte is loaded before
+        // the head is written. The 12 bytes are assembled in two registers
+        // (little-endian) and written with two stores; a byte-filled stack
+        // buffer reloaded as words stalled store forwarding.
         void store_inline(const char* src, std::uint32_t count) noexcept {
-            char bytes[12] = {};
-            if (count != 0) std::memcpy(bytes, src, count);
-            bytes[11] = static_cast<char>(0x80u | count);
-            std::memcpy(inline_bytes(), bytes, sizeof(bytes));
+            std::uint64_t lo = 0;
+            std::uint32_t hi = 0;
+            if (count >= 8) {
+                std::memcpy(&lo, src, 8);
+                if (count == 10) {
+                    std::uint16_t tail;
+                    std::memcpy(&tail, src + 8, 2);
+                    hi = tail;
+                } else if (count == 9) {
+                    hi = static_cast<unsigned char>(src[8]);
+                }
+            } else if (count >= 4) {
+                std::uint32_t head, tail;
+                std::memcpy(&head, src, 4);
+                std::memcpy(&tail, src + count - 4, 4);
+                lo = head | (std::uint64_t(tail) << ((count - 4) * 8));
+            } else if (count != 0) {
+                lo = std::uint64_t(static_cast<unsigned char>(src[0])) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count >> 1])) << ((count >> 1) * 8)) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count - 1])) << ((count - 1) * 8));
+            }
+            hi |= (0x80u | count) << 24;
+            std::memcpy(inline_bytes(), &lo, 8);
+            std::memcpy(inline_bytes() + 8, &hi, 4);
         }
 
         // The head has no out-of-line storage (inline or null). src may alias
@@ -2684,9 +2714,17 @@ namespace XOffsetDatastructure {
         }
 
         void push_back(const T& value) {
-            insert_construct(size_, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, value, binding());
-            });
+            const size_type n = size_;
+            if (n < capacity_) [[likely]] {
+                // As insert_construct's append fast path, kept here so the
+                // caller's loop builds no closure for the general call.
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                fixed_detail::transfer_construct(slot, value, binding());
+                size_ = n + 1u;
+                return;
+            }
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
+            else push_back_general<const T&>(value);
         }
 
         void push_back(T&& value) {
@@ -2777,6 +2815,15 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // push_back beyond capacity or on an unbound head. A small trivially
+        // copyable value arrives by value (registers), not by reference.
+        template <typename V>
+        XOFFSET_DETAIL_NOINLINE void push_back_general(V value) {
+            insert_construct(size_, [&](T* dst) {
+                fixed_detail::transfer_construct(dst, static_cast<const T&>(value), binding());
+            });
+        }
+
         static size_type checked_count(std::size_t count) {
             if (count > max_size()) throw XBadAlloc();
             return static_cast<size_type>(count);
@@ -2824,12 +2871,18 @@ namespace XOffsetDatastructure {
 
         template <typename Construct>
         iterator insert_construct(size_type index, Construct&& construct) {
+            if (index == size_ && size_ < capacity_) [[likely]] {
+                // Append into spare capacity. capacity_ != 0 implies a bound
+                // head with a live block (data_delta != 0), and size_ <
+                // capacity_ <= max_size(): the checks below are implied.
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + size_;
+                construct(slot);
+                ++size_;
+                return slot;
+            }
             ensure_bound();
             if (index > size_ || size_ == max_size()) throw XBadAlloc();
-            if (index == size_ && size_ < capacity_) {
-                construct(data() + size_);
-                ++size_;
-            } else if constexpr (std::is_trivially_copyable_v<T>) {
+            if constexpr (std::is_trivially_copyable_v<T>) {
                 // A native temporary is safe only for types without arena bindings.
                 alignas(T) std::byte storage[sizeof(T)];
                 auto* staged = reinterpret_cast<T*>(storage);

@@ -49,7 +49,7 @@ git -c core.autocrlf=false -c core.eol=lf -C external/boost submodule update --i
 ```
 
 Boost 固定于 `da041154c6bac1a4aa98254a7d6819059e8ac0b0`，TypeLayout 固定于
-`9a6de1d73617631a9612ba9f572d6c0844a90b19`。完整配置按
+`fe295929d0a5bfa7809fb737a6eb3db279599346`。完整配置按
 `cmake/XOffsetDependencyLock.cmake` 核对 11 个 include tree 与 3 个许可证的内容，
 不依赖 Git 元数据。不要使用 `--remote` 升级依赖，也不要改锁来接受 CRLF 或其他差异。
 已有检出的字节不匹配时，先保护修改并诊断，重复 update 不代表已修复。
