@@ -5,7 +5,8 @@
 #   run_tier.sh BIN_DIR UNITS OUT_DIR [STEPS]
 #
 # Environment: MAPDEMO_PORT_A / MAPDEMO_PORT_B (default 47701 / 47702),
-# MAPDEMO_SEED (default 1), MAPDEMO_CLIENT_ARGS (extra client arguments),
+# MAPDEMO_SEED (default 1), MAPDEMO_BUFFERS (reuse | fresh, default reuse;
+# passed to all three processes), MAPDEMO_CLIENT_ARGS (extra client arguments),
 # MAPDEMO_NO_CLIENT=1 (servers only), MAPDEMO_A_LIMIT_S (A's wall-clock
 # limit; default STEPS/5 + 60 s, i.e. 4x slower than 20 Hz plus start-up).
 #
@@ -25,6 +26,7 @@ STEPS=${4:-500}
 PORT_A=${MAPDEMO_PORT_A:-47701}
 PORT_B=${MAPDEMO_PORT_B:-47702}
 SEED=${MAPDEMO_SEED:-1}
+BUFFERS=${MAPDEMO_BUFFERS:-reuse}
 CLIENT_ARGS=${MAPDEMO_CLIENT_ARGS:-}
 
 for exe in mapdemo_a mapdemo_b mapdemo_client; do
@@ -65,6 +67,7 @@ wait_for() {
     echo "units=$UNITS"
     echo "steps=$STEPS"
     echo "seed=$SEED"
+    echo "buffers=$BUFFERS"
     echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "host=$(uname -srm)"
     echo "load_before=$(uptime | sed 's/.*load average[s]*: //')"
@@ -73,15 +76,15 @@ wait_for() {
     fi
 } > "$OUT/meta.txt"
 
-"$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &
+"$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --buffers "$BUFFERS" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &
 B_PID=$!
-"$BIN/mapdemo_a" --units "$UNITS" --seed "$SEED" --steps "$STEPS" --check \
+"$BIN/mapdemo_a" --units "$UNITS" --seed "$SEED" --steps "$STEPS" --check --buffers "$BUFFERS" \
     --port "$PORT_A" --b-port "$PORT_B" --csv-dir "$OUT" > "$OUT/a.log" 2>&1 &
 A_PID=$!
 C_PID=
 if [ "${MAPDEMO_NO_CLIENT:-0}" != 1 ]; then
     # shellcheck disable=SC2086 # CLIENT_ARGS is a word list on purpose
-    "$BIN/mapdemo_client" --headless --check --port "$PORT_A" --csv-dir "$OUT" \
+    "$BIN/mapdemo_client" --headless --check --buffers "$BUFFERS" --port "$PORT_A" --csv-dir "$OUT" \
         $CLIENT_ARGS > "$OUT/client.log" 2>&1 &
     C_PID=$!
 fi
@@ -103,7 +106,7 @@ B_RC=$RC
 } > "$OUT/exit_codes.txt"
 echo "load_after=$(uptime | sed 's/.*load average[s]*: //')" >> "$OUT/meta.txt"
 
-echo "tier units=$UNITS steps=$STEPS: a=$A_RC b=$B_RC client=$C_RC (logs in $OUT)"
+echo "tier units=$UNITS steps=$STEPS buffers=$BUFFERS: a=$A_RC b=$B_RC client=$C_RC (logs in $OUT)"
 for f in a b client; do
     if [ -f "$OUT/$f.log" ] && grep -q '^error:' "$OUT/$f.log"; then
         grep '^error:' "$OUT/$f.log" | sed "s/^/  $f: /" | head -n 5
