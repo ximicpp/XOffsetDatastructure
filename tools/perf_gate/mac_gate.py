@@ -142,6 +142,11 @@ RULES = {
              'load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20% and every remote-desktop '
              'process < 5%; on timeout (30 min) nothing is timed',
     'screen': {'max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS, 'remote_max': REMOTE_MAX, 'hold_s': SCREEN_HOLD_S},
+    'identical_binaries': 'frozen by 性能优化 2026-10-25 10:35Z, not retroactive: at freeze the head and anchor binaries '
+                          'are compared, the formal pair (sc_xoffset) and the SLG pair (slg_bench) separately. A part whose '
+                          'two binaries are byte-identical is not applicable: it is not timed and takes no part in the '
+                          'verdict, and the report states the sha256 (T4-r2: slg_head = slg_anch = 3b37bd3f..., so its SLG '
+                          'C bound 1.0201 was an A/A of one binary)',
     'env_invalid': {
         'rule': 'frozen by 性能优化 2026-10-23 14:51Z, not retroactive: during timing WindowServer and remote-desktop '
                 'pcpu are sampled every 4 s; a sample is busy when one of them is at or above its start limit. A formal '
@@ -228,6 +233,8 @@ def cmd_freeze(a):
     json.dump(fr, open(D + '/FREEZE.json', 'w'), indent=1)
     print(f'FREEZE.json written: {D}')
     for k, v in fr['binaries'].items(): print(f'  {k:12s} {v}')
+    for part in ('formal', 'slg'):
+        if not_applicable(fr, part): print(f'  {part}: NOT APPLICABLE, head and anchor binaries are identical ({not_applicable(fr, part)}); skip its timing')
 
 
 # ---------------------------------------------------------------- quiet gate and sampling
@@ -344,6 +351,7 @@ def cpu_summary(path, t0=None, t1=None, own=()):
 def cmd_formal(a):
     D = a.dir; fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']['formal']
     B = f'{D}/formal-{a.batch}'
+    if not_applicable(fr, 'formal'): sys.exit(f'formal not applicable: head and anchor are the same binary ({not_applicable(fr, "formal")}); nothing to time')
     if os.path.exists(B): sys.exit(f'{B} exists (no reruns into the same directory)')
     C = R['copies']
     for k in LIBS:
@@ -551,6 +559,13 @@ def slg_rules(D, fr):
     return json.load(open(p))['slg'] if os.path.exists(p) else fr['rules']['slg']
 
 
+def not_applicable(fr, part):
+    """identical_binaries rule: the sha256 when the head and anchor binaries of this part are the same file, else None."""
+    if 'identical_binaries' not in fr['rules']: return None
+    a, b = (fr['binaries']['head'], fr['binaries']['anchor']) if part == 'formal' else (fr['slg']['head'], fr['slg']['anchor'])
+    return a if a == b else None
+
+
 def slg_groups(D):
     return [S for S in [D + '/slg'] + [f'{D}/slg-{g}' for g in range(2, 10)] if os.path.exists(S + '/runs.json')]
 
@@ -587,6 +602,7 @@ def cmd_amend_slg(a):
 
 def cmd_slg(a):
     D = a.dir; fr = json.load(open(D + '/FREEZE.json')); E = fr['rules'].get('env_invalid')
+    if not_applicable(fr, 'slg'): sys.exit(f'SLG not applicable: slg_head and slg_anch are the same binary ({not_applicable(fr, "slg")}); nothing to time')
     S = D + '/slg' if a.group == 1 else f'{D}/slg-{a.group}'
     if a.replace:  # the one replacement of a group the environment rule invalidated
         if not E: sys.exit('this run was frozen without the environment rule: no --replace')
@@ -774,14 +790,18 @@ def cmd_analyze(a):
     if len(aborted) > 1: env_prob.append(f'{len(aborted)} 批中断（{", ".join(x["batch_dir"] for x in aborted)}）：只允许一批中断后换批号补跑，停下报告')
     overall['env_invalid'] = env_prob; overall['aborted'] = aborted
     if env_prob: overall['verdict'] = 'invalid'
-    slg = analyze_slg(D, slg_rules(D, fr)) if slg_groups(D) else None
+    na_f, na_s = not_applicable(fr, 'formal'), not_applicable(fr, 'slg')
+    if na_f: overall, batches = {'verdict': 'n/a', 'batches': 0, 'identical_sha256': na_f}, []
+    slg = ({'verdict': 'n/a', 'identical_sha256': na_s} if na_s else
+           analyze_slg(D, slg_rules(D, fr)) if slg_groups(D) else None)
     fv = overall['verdict']
     amend = json.load(open(D + '/RULES_AMEND.json')) if os.path.exists(D + '/RULES_AMEND.json') else None
     if fv in ('fail',) or (slg and slg['verdict'] == 'fail'): verdict = 'fail'
     elif fv in ('invalid', 'pending', 'incomplete'): verdict = fv
     elif slg and slg['verdict'] in ('invalid', 'pending', 'incomplete'): verdict = slg['verdict']
     elif slg is None: verdict = 'incomplete'
-    else: verdict = 'pass'
+    elif fv == 'n/a' and slg['verdict'] == 'n/a': verdict = 'n/a (identical binaries)'
+    else: verdict = 'pass'  # a part that is n/a (identical binaries) neither passes nor fails the gate
     if any(b['meta'].get('smoke') for b in batches) or (slg and slg.get('smoke')): verdict = 'smoke (not a gate result)'
     res = {'schema': SCHEMA, 'name': fr['name'], 'head': fr['head'], 'anchor': fr['anchor'], 'verdict': verdict,
            'formal_overall': overall, 'formal_batches': batches, 'slg': slg, 'freeze_sha256': h(D + '/FREEZE.json'),
@@ -873,7 +893,11 @@ def render_md(fr, res):
     p('| 批 | ' + ' | '.join(RIVALS) + ' |')
     p('| --- |' + ' --- |' * len(RIVALS))
     for b in bs: p(f'| {b["batch_dir"]} | ' + ' | '.join(iv4(b['old']['auxiliary'][f'{c}:reload']) for c in RIVALS) + ' |')
-    if res['slg'] and 'new' not in res['slg']:
+    if ov.get('identical_sha256'):
+        p(f'\n**正式部分不适用**：head 与 anchor 的 sc_xoffset 是同一个二进制（sha256 `{ov["identical_sha256"]}`），不计时，不参与判定。\n')
+    if res['slg'] and res['slg'].get('identical_sha256'):
+        p(f'\n## 3. SLG M\n\n**SLG 不适用**：slg_head 与 slg_anch 是同一个二进制（sha256 `{res["slg"]["identical_sha256"]}`），不计时，不参与判定。\n')
+    elif res['slg'] and 'new' not in res['slg']:
         p(f'\n## 3. SLG M\n\n**SLG 判定：{res["slg"]["verdict"]}**，没有可计入的组（' + '；'.join(res['slg'].get('env_invalid') or ['进程不足']) + '）。\n')
     if res['slg'] and 'new' in res['slg']:
         s = res['slg']
@@ -1063,8 +1087,10 @@ def cmd_trend(a):
     ov, bs, slg = res['formal_overall'], res['formal_batches'], res['slg']
     ub = ' / '.join(f3(ov['gate']['phases'][m]['high']) for m in GATE_PHASES) if 'gate' in ov else ''
     aa = ('有效' if ov['gate']['aa']['ok'] else '无效') if 'gate' in ov else ''
-    sl = ' / '.join(f'{f3(slg["new"][s]["geo"])}≤{f3(slg["new"][s]["high"])}' for s in SCEN) if slg else ''
-    g = ' / '.join(f3(max(slg['old_pooled'][f'{s}/{b}']['upper'] for b in SLG_BASELINES)) for s in 'ABC') if slg else ''
+    sl = (' / '.join(f'{f3(slg["new"][s]["geo"])}≤{f3(slg["new"][s]["high"])}' for s in SCEN) if slg and 'new' in slg
+          else '不适用（二进制相同）' if slg and slg.get('identical_sha256') else '')
+    g = ' / '.join(f3(max(slg['old_pooled'][f'{s}/{b}']['upper'] for b in SLG_BASELINES)) for s in 'ABC') if slg and 'new' in slg else ''
+    if 'identical_sha256' in ov: ub = '不适用（二进制相同）'
     row = (f'| {res["name"]} | {res["head"]["commit"][:7]} | {res["anchor"]["commit"][:7]} | {res["verdict"]} | {ov["batches"]} '
            f'| {" ".join(str(b["old"]["passed"]) for b in bs)} | {ub} | {aa} | {sl} | {g} | {a.link or ""} |\n')
     new = not os.path.exists(a.trend)
@@ -1101,8 +1127,8 @@ def cmd_selftest(a):
         rng = random.Random(seed)  # fixed per case, so the selftest is deterministic
         D = tempfile.mkdtemp(prefix='mac_gate_selftest_')
         fr = {'schema': SCHEMA, 'name': '2026-10-22-selftest', 'head': {'commit': 'h' * 40, 'desc': 'synthetic'},
-              'anchor': {'commit': 'a' * 40, 'desc': 'synthetic'}, 'lib_identity_note': '', 'binaries': {k: '0' * 64 for k in LIBS},
-              'slg': {'head': '0' * 64, 'anchor': '0' * 64, 'tree': 'synthetic', 'tree_sha256': '0' * 64},
+              'anchor': {'commit': 'a' * 40, 'desc': 'synthetic'}, 'lib_identity_note': '', 'binaries': {k: ('1' if k.startswith('head') else '0') * 64 for k in LIBS},
+              'slg': {'head': '1' * 64, 'anchor': '0' * 64, 'tree': 'synthetic', 'tree_sha256': '0' * 64},
               'mac_gate_py_sha256': h(os.path.abspath(__file__)), 'xc_ab_py_sha256': h(xc_ab.__file__), 'prep': {}, 'rules': RULES,
               'host': platform.platform(), 'frozen_utc': 'n/a'}
         json.dump(fr, open(D + '/FREEZE.json', 'w'))
@@ -1252,6 +1278,23 @@ def cmd_selftest(a):
         'without the environment rule' in (refused(lambda: cmd_slg(argparse.Namespace(dir=Dq, group=1, replace=True, quiet_timeout=1, quiet_s=0.0, cycles=4))) or ''))
     ab = res_q = json.load(open(Dq + '/RESULT.json'))['slg']['abba']
     chk(f'ABBA paired reported, 3 blocks per group (A {ab["A"]["geo"]:.4f})', ab['A']['blocks'] == 3 and ab['A']['low'] < ab['A']['geo'] < ab['A']['high'])
+    Di, res = setup({})  # identical_binaries rule: SLG pair identical -> SLG n/a, verdict from the formal part alone
+    fr = json.load(open(Di + '/FREEZE.json')); fr['slg']['anchor'] = fr['slg']['head']; json.dump(fr, open(Di + '/FREEZE.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=Di, exclude=None)); res = json.load(open(Di + '/RESULT.json'))
+    chk(f'identical SLG binaries -> SLG n/a, formal decides ({res["verdict"]})', res['slg']['verdict'] == 'n/a' and res['verdict'] == 'pass'
+        and 'SLG 不适用' in open(Di + '/RESULT.md').read())
+    chk('slg refused when the SLG binaries are identical',
+        'not applicable' in (refused(lambda: cmd_slg(argparse.Namespace(dir=Di, group=2, replace=False, quiet_timeout=1, quiet_s=0.0, cycles=4))) or ''))
+    cmd_trend(argparse.Namespace(dir=Di, trend=Di + '/T.md', link=''))
+    chk('trend row for an n/a SLG part', '不适用' in open(Di + '/T.md').read())
+    fr['binaries']['anchor'] = fr['binaries']['head']; json.dump(fr, open(Di + '/FREEZE.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=Di, exclude=None)); res = json.load(open(Di + '/RESULT.json'))
+    chk('both pairs identical -> n/a overall', res['verdict'].startswith('n/a') and res['formal_overall']['verdict'] == 'n/a')
+    chk('formal refused when the formal binaries are identical',
+        'not applicable' in (refused(lambda: cmd_formal(argparse.Namespace(dir=Di, batch=3, replaces=None, quiet_timeout=1, quiet_s=0.0, cycles=4))) or ''))
+    fr['rules'] = {k: v for k, v in fr['rules'].items() if k != 'identical_binaries'}; json.dump(fr, open(Di + '/FREEZE.json', 'w'))
+    cmd_analyze(argparse.Namespace(dir=Di, exclude=None)); res = json.load(open(Di + '/RESULT.json'))
+    chk('identical-binary rule not retroactive', res['slg']['verdict'] != 'n/a' and res['formal_overall']['verdict'] != 'n/a')
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
 
