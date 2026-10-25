@@ -76,6 +76,7 @@ set(REFLECTION_TESTS
     test_append_grow
     test_subtree_copy
     test_free_table_policy
+    test_lower_bound_index
     test_stable_storage
     test_vm_lifecycle
     test_vm_transport
