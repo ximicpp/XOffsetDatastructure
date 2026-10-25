@@ -388,6 +388,18 @@ def formal_metas(D):
             for x in os.listdir(D) if x.startswith('formal-')}
 
 
+def formal_aborted(B, R):
+    """A batch whose process died before meta.json (e.g. the session dropped): a short or torn raw.jsonl.
+    It has no result, so it is reported and skipped; the next batch number takes its place."""
+    if os.path.exists(B + '/meta.json'): return None
+    good, torn = 0, 0
+    for l in open(B + '/raw.jsonl') if os.path.exists(B + '/raw.jsonl') else []:
+        try: json.loads(l); good += 1
+        except ValueError: torn += 1
+    want = R['cycles'] * R['rounds_per_cycle'] * len(LIBS)
+    return None if good == want and not torn else {'records': good, 'torn_lines': torn, 'expected': want}
+
+
 def check_formal_replacement(D, n, E):
     """formal-n may be replaced once, only when the environment rule invalidated it and it is no replacement itself."""
     if not E: sys.exit('this run was frozen without the environment rule: no --replaces')
@@ -740,14 +752,18 @@ def cmd_analyze(a):
     D = a.dir; fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']['formal']
     excl = {int(x.split(':', 1)[0]): x.split(':', 1)[1] if ':' in x else '' for x in (a.exclude or [])}
     bdirs = sorted((os.path.join(D, x) for x in os.listdir(D) if x.startswith('formal-')), key=lambda p: int(p.rsplit('-', 1)[1]))
-    batches = []
+    batches, aborted = [], []
     for B in bdirs:
+        ab = formal_aborted(B, R)
+        if ab:
+            aborted.append({'batch_dir': os.path.basename(B), **ab}); continue
         b = analyze_formal_batch(B, R)
         b['meta'] = json.load(open(B + '/meta.json')) if os.path.exists(B + '/meta.json') else {}
         n = int(B.rsplit('-', 1)[1]); b['excluded'] = excl.get(n) if n in excl else None
         b['n'] = n; b['env'] = b['meta'].get('env'); b['replaces'] = b['meta'].get('replaces')
         b['env_invalid'] = bool(b['env'] and b['env']['invalid'])
         batches.append(b)
+    bdirs = [B for B in bdirs if os.path.basename(B) not in {x['batch_dir'] for x in aborted}]
     used = [(B, b) for B, b in zip(bdirs, batches) if b['excluded'] is None and not b['env_invalid']]
     overall = formal_overall([B for B, _ in used], [b for _, b in used], R)
     env_prob = []  # environment rule: an invalid batch needs its one replacement; an invalid replacement stops the run
@@ -755,7 +771,8 @@ def cmd_analyze(a):
         if not b['env_invalid']: continue
         if b['replaces'] is not None: env_prob.append(f'formal-{b["n"]}（替换 formal-{b["replaces"]}）环境仍失效：停下报告')
         elif not any(x['replaces'] == b['n'] for x in batches): env_prob.append(f'formal-{b["n"]} 环境失效，尚未补跑：formal --batch <下一个> --replaces {b["n"]}')
-    overall['env_invalid'] = env_prob
+    if len(aborted) > 1: env_prob.append(f'{len(aborted)} 批中断（{", ".join(x["batch_dir"] for x in aborted)}）：只允许一批中断后换批号补跑，停下报告')
+    overall['env_invalid'] = env_prob; overall['aborted'] = aborted
     if env_prob: overall['verdict'] = 'invalid'
     slg = analyze_slg(D, slg_rules(D, fr)) if slg_groups(D) else None
     fv = overall['verdict']
@@ -792,6 +809,7 @@ def render_md(fr, res):
         if b.get('env_invalid'): p(f'- {b["batch_dir"]} **环境失效**，未计入合并：' + env_text(b['env'])
                                    + (f'；它是 formal-{b["replaces"]} 的补跑' if b.get('replaces') is not None else ''))
         elif b.get('replaces') is not None: p(f'- {b["batch_dir"]} 是 formal-{b["replaces"]} 的补跑（环境失效后补跑一次）')
+    for x in ov.get('aborted', []): p(f'- {x["batch_dir"]} **中断**（进程在写 meta.json 之前退出，raw 只有 {x["records"]}/{x["expected"]} 条记录、{x["torn_lines"]} 行残缺），没有结果，不计入；下一个批号补上')
     for x in ov.get('env_invalid', []): p(f'- **正式部分 invalid：{x}**')
     for x in (res['slg'] or {}).get('env_invalid', []): p(f'- **SLG invalid：{x}**')
     if 'env_invalid' in fr['rules']:
@@ -1184,6 +1202,15 @@ def cmd_selftest(a):
         e1['invalid'] and e1['busy_by_process'] == {'WindowServer': 3} and not e2['invalid'] and e0['invalid'] and e0['samples'] == 0)
     ss = ScreenSampler(ep + '.live', 0.05); ss.start(); time.sleep(0.3); ss.stop()
     chk('screen sampler writes samples', sum(1 for _ in open(ep + '.live')) >= 2)
+    Da, res = setup({}, nb=3)  # formal-2 torn by a dropped session: skipped, formal-1 + formal-3 pooled
+    L = open(Da + '/formal-2/raw.jsonl').read().splitlines()
+    open(Da + '/formal-2/raw.jsonl', 'w').write('\n'.join(L[:len(L) // 2]) + '\n{"round": 9')
+    cmd_analyze(argparse.Namespace(dir=Da, exclude=None)); res = json.load(open(Da + '/RESULT.json'))
+    chk(f'aborted batch skipped, two pooled ({res["verdict"]})', res['verdict'] == 'pass' and res['formal_overall']['batches'] == 2
+        and [x['batch_dir'] for x in res['formal_overall']['aborted']] == ['formal-2'] and '中断' in open(Da + '/RESULT.md').read())
+    open(Da + '/formal-3/raw.jsonl', 'w').write('\n'.join(L[:10]) + '\n')
+    cmd_analyze(argparse.Namespace(dir=Da, exclude=None)); res = json.load(open(Da + '/RESULT.json'))
+    chk('a second aborted batch -> invalid, stop', res['verdict'] == 'invalid' and len(res['formal_overall']['aborted']) == 2)
     De, res = setup({})
     inv = {'samples': 100, 'busy_samples': 40, 'busy_frac': 0.4, 'busy_by_process': {'WindowServer': 40}, 'max_pcpu': {'WindowServer': 45.0},
            'max_busy_frac': 0.05, 'invalid': True, 'decided_utc': 'n/a'}
