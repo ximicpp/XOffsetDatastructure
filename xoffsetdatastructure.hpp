@@ -1457,6 +1457,8 @@ namespace XOffsetDatastructure {
         }
 
         // Same admission as init_from_storage, against this owner's maximum.
+        // The two halves are forced inline so that reload_verified compiles
+        // as it did before begin_verified_reload shared them.
         template <typename Assign>
         void reinit_from_storage(const char* data, size_type size, Assign&& assign) {
             admit_reinit(size, data != nullptr);
@@ -1470,7 +1472,7 @@ namespace XOffsetDatastructure {
             check_reinit_payload();
         }
 
-        void admit_reinit(size_type size, bool has_source = true) {
+        XOFFSET_DETAIL_MOVE_INLINE void admit_reinit(size_type size, bool has_source = true) {
             if (buffer_.empty() && buffer_.maximum_capacity() == 0)
                 throw XException("XBufferCore: buffer has no storage");
             begin_reinit();
@@ -1484,7 +1486,7 @@ namespace XOffsetDatastructure {
             free_table_lost_ = true;
         }
 
-        void check_reinit_payload() const {
+        XOFFSET_DETAIL_MOVE_INLINE void check_reinit_payload() const {
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
