@@ -4840,6 +4840,37 @@ namespace XOffsetDatastructure {
     // whose source layout has not been audited against these obligations.
     template<class T> struct StableEraseOrdinaryMembers : std::false_type {};
 
+    // Mechanical part of XOFFSET_ORDINARY_RECORDS. Physical disjointness
+    // catches a [[no_unique_address]] member that shares storage, but not one
+    // that merely could; the declaration stays a source contract.
+    namespace detail {
+        template <typename T>
+        consteval bool ordinary_record_has_no_bases() {
+            return std::meta::bases_of(^^T, std::meta::access_context::unchecked()).empty();
+        }
+        template <typename T>
+        consteval bool ordinary_record_has_no_bit_fields() {
+            for (auto member : std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()))
+                if (std::meta::is_bit_field(member)) return false;
+            return true;
+        }
+        // Every pair of [offset, offset + sizeof) member ranges is disjoint.
+        template <typename T>
+        consteval bool ordinary_record_members_disjoint() {
+            const auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked());
+            for (std::size_t i = 0; i < members.size(); ++i) {
+                const auto a = std::meta::offset_of(members[i]).bytes;
+                const auto a_end = a + std::meta::size_of(std::meta::type_of(members[i]));
+                for (std::size_t j = i + 1; j < members.size(); ++j) {
+                    const auto b = std::meta::offset_of(members[j]).bytes;
+                    const auto b_end = b + std::meta::size_of(std::meta::type_of(members[j]));
+                    if (a < b_end && b < a_end) return false;
+                }
+            }
+            return true;
+        }
+    } // namespace detail
+
     namespace fixed_detail {
         // [class.prop]: an aggregate whose destructor is not user-provided is
         // implicit-lifetime, even when that destructor is nontrivial because a
@@ -6810,6 +6841,53 @@ struct _XOffset_NS_Sentinel {};
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
+
+// XOFFSET_ORDINARY_RECORDS(A, B, ...): declares that each record type has
+// only ordinary non-static data members: no bases, unions, bit-fields or
+// [[no_unique_address]], members never overlap. It specializes
+// wire_record_layout<T>::ordinary_members and StableEraseOrdinaryMembers<T>,
+// which turns on the SHIFT path (XVector insert/erase/growth move records with
+// one memmove/memcpy plus an inline-head rebase), stable_erase_if and raw
+// receive for these types. The wire bytes are the same with or without it.
+// Each type is checked at compile time: a class (not a union) without bases
+// or bit-fields whose members are physically disjoint. A [[no_unique_address]]
+// member that happens not to overlap passes the check, so declaring such a type
+// is still undefined behavior; the library never infers the declaration.
+// Use at global scope after the type definitions and before any use of the
+// types in containers. Use an alias for a type name containing commas.
+#define XOFFSET_ORDINARY_RECORDS(...)                                          \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_ORDINARY_RECORDS")                \
+    XOFFSET_DETAIL_FOR_EACH(XOFFSET_DETAIL_ORDINARY_RECORD, __VA_ARGS__)
+
+#define XOFFSET_DETAIL_ORDINARY_RECORD(Type)                                   \
+    static_assert(::std::is_class_v<Type> && !::std::is_union_v<Type>,       \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must be a class type, not a union"); \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bases<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have base classes");   \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bit_fields<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have bit-fields");     \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_members_disjoint<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " has overlapping members "       \
+        "([[no_unique_address]]?); it is not an ordinary record");           \
+    template<> struct XOffsetDatastructure::wire_record_layout<Type> {        \
+        static constexpr bool ordinary_members = true;                         \
+    };                                                                         \
+    template<> struct XOffsetDatastructure::StableEraseOrdinaryMembers<Type>  \
+        : ::std::true_type {};
+
+// Applies macro(x) to each argument (up to 256).
+#define XOFFSET_DETAIL_PARENS ()
+#define XOFFSET_DETAIL_EXPAND(...) XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND4(...) XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND3(...) XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND2(...) XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND1(...) __VA_ARGS__
+#define XOFFSET_DETAIL_FOR_EACH(macro, ...)                                    \
+    __VA_OPT__(XOFFSET_DETAIL_EXPAND(XOFFSET_DETAIL_FOR_EACH_HELPER(macro, __VA_ARGS__)))
+#define XOFFSET_DETAIL_FOR_EACH_HELPER(macro, a1, ...)                         \
+    macro(a1)                                                                  \
+    __VA_OPT__(XOFFSET_DETAIL_FOR_EACH_AGAIN XOFFSET_DETAIL_PARENS (macro, __VA_ARGS__))
+#define XOFFSET_DETAIL_FOR_EACH_AGAIN() XOFFSET_DETAIL_FOR_EACH_HELPER
 
 // Compatibility wrappers. `name` is ignored now that XOffset no longer registers
 // its own containers through TypeLayout's opaque mechanism.
