@@ -73,6 +73,7 @@ set(REFLECTION_TESTS
     test_wire_validation
     test_same_arena_move
     test_shift_relocate
+    test_append_grow
     test_subtree_copy
     test_free_table_policy
     test_lower_bound_index
