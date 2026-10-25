@@ -5,6 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "mapdemo/schema.hpp"
 #include "mapdemo/std_model.hpp"
@@ -53,6 +54,12 @@ Result snapshot_sanity(const ViewSnapshot& snapshot, std::uint64_t request_id, c
 // id, hp, pos bits, behavior, name, in array order. A and the client log it
 // per request id; tools/summarize.py compares the two logs.
 std::uint64_t snapshot_digest(const ViewSnapshot& snapshot);
+
+// Digest of a whole wire (or any byte string): 64-bit words mixed in order,
+// then the tail bytes and the length. A logs it per step (a_steps.csv) so
+// runs built with other compilers, on other platforms or with the other
+// --buffers mode can be compared tick by tick; equal digests = same bytes.
+std::uint64_t wire_digest(std::string_view bytes) noexcept;
 
 // True when [p, p + bytes) lies inside the live payload of `buffer`
 // (direct-read evidence on the client).

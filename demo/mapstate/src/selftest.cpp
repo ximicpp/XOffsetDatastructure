@@ -142,7 +142,11 @@ XB::MaximumCapacity small_cap(std::size_t bytes) { return XB::maximum_capacity(b
 
 // ---- 1. allocation / free / reuse across save and load ---------------------------
 
-void test_reuse() {
+// via_reload = false: every round loads the wire into a new buffer
+// (--buffers fresh). true: one buffer is saved and then reloaded from its own
+// wire with reload_verified, as B does with --buffers reuse.
+void test_reuse(bool via_reload) {
+    const std::string prefix = via_reload ? "reload_round_" : "reuse_round_";
     Expect ex;
     XB b = XB::create<UnitStateBatch>(4096, cap_batch());
     auto& batch = b.root<UnitStateBatch>();
@@ -171,7 +175,7 @@ void test_reuse() {
         has32 |= h.bytes == 32;
     }
     ex(has24 && has32, "source holes lack the 24 B and 32 B blocks: " + holes_text(src));
-    record("reuse_setup", ex.ok(),
+    if (!via_reload) record("reuse_setup", ex.ok(),
            ex.ok() ? fmt("source used_end=%llu free_count=%zu free_bytes=%llu holes=%s",
                          (unsigned long long)used_end(b), b.free_block_count(),
                          (unsigned long long)b.free_block_bytes(), holes_text(src).c_str())
@@ -183,7 +187,10 @@ void test_reuse() {
         const std::string wire = b.save_verified<UnitStateBatch>();
         const auto wh = wire_holes(wire);
         rx(same_holes(wh, before_save), "wire hole table " + holes_text(wh) + " != in-memory " + holes_text(before_save));
-        XB in = XB::load_verified<UnitStateBatch>(wire, cap_batch());
+        XB fresh;
+        if (via_reload) b.reload_verified<UnitStateBatch>(wire);
+        else fresh = XB::load_verified<UnitStateBatch>(wire, cap_batch());
+        XB& in = via_reload ? b : fresh;
         const auto carried = holes(in);
         rx(same_holes(carried, before_save), "loaded holes " + holes_text(carried) + " != saved " + holes_text(before_save));
         const std::uint64_t end_before = used_end(in);
@@ -239,9 +246,57 @@ void test_reuse() {
                    c.units[1].path[std::size_t(4 + round)].x == float(100 + round),
                "unit 1 last path point");
         }
-        record("reuse_round_" + std::to_string(round), rx.ok(), rx.ok() ? detail : rx.first + " | " + detail);
-        b = std::move(in);
+        record(prefix + std::to_string(round), rx.ok(), rx.ok() ? detail : rx.first + " | " + detail);
+        if (!via_reload) b = std::move(fresh);
     }
+}
+
+// ---- 1b. --buffers fresh and --buffers reuse send the same bytes ----------------
+
+// The whole A <-> B chain in one process, both ways side by side.
+//   fresh: A save_verified -> B load_verified, step, save_verified -> A load_verified (new buffers)
+//   reuse: A save_verified_into -> B reload_verified (kept buffer), step,
+//          save_verified_into -> A reload_verified into spare, swap with cur
+// Every request and result wire must be byte-identical, tick by tick.
+void test_buffer_modes(std::uint32_t units, std::uint64_t ticks) {
+    Expect ex;
+    const std::uint64_t seed = kDefaultSeed;
+    XB f_cur = XB::create<UnitStateBatch>(4096 + std::size_t(units) * 128, cap_batch());
+    rules::init_batch(f_cur.root<UnitStateBatch>(), units, seed);
+    XB r_cur = XB::create<UnitStateBatch>(4096 + std::size_t(units) * 128, cap_batch());
+    rules::init_batch(r_cur.root<UnitStateBatch>(), units, seed);
+    XB r_spare, b_kept;
+    bool r_spare_ready = false, b_kept_ready = false;
+    std::string a_out, b_out;
+    std::uint64_t compared = 0, last_digest = 0;
+    for (std::uint64_t t = 0; t < ticks && ex.ok(); ++t) {
+        // fresh
+        const std::string f_req = f_cur.save_verified<UnitStateBatch>();
+        XB fb = XB::load_verified<UnitStateBatch>(f_req, cap_batch());
+        rules::step_batch(fb.root<UnitStateBatch>(), seed);
+        const std::string f_res = fb.save_verified<UnitStateBatch>();
+        f_cur = XB::load_verified<UnitStateBatch>(f_res, cap_batch());
+        // reuse
+        r_cur.save_verified_into<UnitStateBatch>(a_out);
+        if (b_kept_ready) b_kept.reload_verified<UnitStateBatch>(a_out);
+        else { b_kept = XB::load_verified<UnitStateBatch>(a_out, cap_batch()); b_kept_ready = true; }
+        rules::step_batch(b_kept.root<UnitStateBatch>(), seed);
+        b_kept.save_verified_into<UnitStateBatch>(b_out);
+        if (r_spare_ready) r_spare.reload_verified<UnitStateBatch>(b_out);
+        else { r_spare = XB::load_verified<UnitStateBatch>(b_out, cap_batch()); r_spare_ready = true; }
+        r_cur.swap(r_spare);
+
+        ex(f_req == a_out, fmt("tick %llu: request wires differ (%zu vs %zu bytes)", (unsigned long long)t,
+                               f_req.size(), a_out.size()));
+        ex(f_res == b_out, fmt("tick %llu: result wires differ (%zu vs %zu bytes)", (unsigned long long)(t + 1),
+                               f_res.size(), b_out.size()));
+        ++compared;
+        last_digest = checks::wire_digest(f_res);
+    }
+    record("buffer_modes_same_bytes_" + std::to_string(units), ex.ok(),
+           ex.ok() ? fmt("units=%u ticks=%llu request and result wires byte-identical, last result digest %016llx",
+                         units, (unsigned long long)compared, (unsigned long long)last_digest)
+                   : ex.first);
 }
 
 // ---- 2. independent output ---------------------------------------------------------
@@ -729,7 +784,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    run_guarded("reuse", test_reuse);
+    run_guarded("reuse", [] { test_reuse(false); });
+    run_guarded("reload", [] { test_reuse(true); });
+    run_guarded("buffer_modes_same_bytes_100", [] { test_buffer_modes(100, 300); });
+    run_guarded("buffer_modes_same_bytes_10000", [] { test_buffer_modes(10000, 200); });
     run_guarded("independent_output", test_independent_output);
     run_guarded("failure_inputs", test_failure_inputs);
     run_guarded("frame_limits", test_frame_limits);
