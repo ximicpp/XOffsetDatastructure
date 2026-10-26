@@ -1,6 +1,8 @@
-// In-place reuse of one XBuffer: reload_verified<T>, reset<T> and
-// save_verified_into<T>. (Accept/reject equivalence with load_verified over
-// mutated wires is covered by test_v2_fuzz acceptor 5.)
+// In-place reuse of one XBuffer: reload_verified<T>, begin_verified_reload<T>,
+// reset<T> and save_verified_into<T>. (Accept/reject equivalence with
+// load_verified over mutated wires is covered by test_v2_fuzz acceptors 5, 6.)
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -170,6 +172,179 @@ void reload_scratch_survives_release_and_swap() {
     in.reload_verified<ReloadRoot>(good);
     need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
 }
+// Transport stand-in: header, extent table, each extent at its offset (or the
+// dense payload), hole table; `payload_limit` stops the payload early.
+template <class Token>
+void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MAX) {
+    std::size_t at = 0;
+    auto take = [&](std::byte* to, std::size_t n) { std::memcpy(to, w.data() + at, n); at += n; };
+    take(t.header_bytes().data(), t.header_bytes().size());
+    if (!t.extent_bytes().empty()) take(t.extent_bytes().data(), t.extent_bytes().size());
+    const auto table = t.extent_bytes();
+    if (table.empty()) {
+        take(t.payload_bytes().data(), std::min(payload_limit, t.payload_bytes().size()));
+    } else {
+        for (std::size_t i = 0; i < table.size() / 8; ++i) {
+            std::uint32_t e[2];
+            std::memcpy(e, table.data() + i * 8, 8);
+            take(t.payload_bytes().data() + e[0], e[1]);
+        }
+    }
+    if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
+    if (payload_limit == SIZE_MAX) need(at == w.size(), "test transport framing");
+}
+
+XWireHeaderV2 header_of(const std::string& w) {
+    XWireHeaderV2 h{};
+    std::memcpy(&h, w.data(), sizeof(h));
+    return h;
+}
+
+void direct_reload(XBuffer& in, const std::string& w) {
+    const auto h = header_of(w);
+    auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+    deliver(t, w);
+    t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+    t.finish();
+}
+
+// A wire with one large hole: emitted sparse when the library skips gaps.
+std::string gap_wire(std::uint64_t id) {
+    auto b = XBuffer::create<ReloadRoot>(4096, cap());
+    auto& r = b.root<ReloadRoot>();
+    r.id = id;
+    auto* p = b.arena()->allocate_aligned(1u << 16, 8);
+    std::memset(p, 0xcd, 1u << 16);
+    for (std::uint32_t i = 0; i < 200; ++i) r.values.push_back(i);
+    b.arena()->deallocate(p, 1u << 16);
+    return b.save_verified<ReloadRoot>();
+}
+
+void direct_reload_equals_reload() {
+    const auto big = make_wire(1, 50000, 8), small = make_wire(2, 3, 2), gaps = gap_wire(6);
+    auto in = XBuffer::create<ReloadRoot>(4096, cap());
+    const auto* address = in.get_address();
+    for (const std::string* w : {&small, &big, &small, &big, &gaps, &small, &gaps}) {
+        const auto epoch = in.epoch();
+        direct_reload(in, *w);
+        need(in.epoch() != epoch, "direct reload did not invalidate typed references");
+        need(in.get_address() == address, "direct reload changed the payload address");
+        auto fresh = XBuffer::load_verified<ReloadRoot>(*w, cap());
+        need(payload_equal(in, fresh), "direct reload payload differs from load_verified (stale bytes?)");
+        need(in.free_block_count() == fresh.free_block_count(), "direct reload free table");
+        need(in.save_verified<ReloadRoot>() == *w, "direct reload re-save not byte stable");
+    }
+    // Sparse gaps were dirty from the big content and still read as zero.
+    need(header_of(gaps).extent_count != 0 || header_of(gaps).hole_count != 0, "gap wire has no gap");
+    const auto size = in.get_size();
+    need(in.grow(1u << 20), "grow after direct reload");
+    for (std::size_t i = size; i < in.get_size(); ++i) need(in.data()[i] == 0, "stale byte after growth");
+    in.root<ReloadRoot>().values.push_back(7);
+    auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(), cap());
+    need(out.root<ReloadRoot>().values.back() == 7, "mutate after direct reload");
+    TypedXBuffer<ReloadRoot> typed = TypedXBuffer<ReloadRoot>::create(4096, cap());
+    direct_reload(typed, small);
+    need(typed.root().id == 2, "TypedXBuffer direct reload");
+}
+
+// N2 on the direct path (#70 with #50): after a direct reload every logical
+// byte at or past used_end reads zero, so growth exposes only zero bytes and
+// the reset that follows, which clears just [header, used_end), still equals
+// a fresh buffer. A verified direct reload exposes exactly used_end bytes, so
+// this holds today even without the zeroing in check_reinit_payload; it
+// fails if either path starts to leave bytes past used_end.
+void direct_reload_keeps_n2() {
+    const auto big = make_wire(3, 40000, 6), small = make_wire(4, 5, 3);
+    auto in = XBuffer::create<ReloadRoot>(4096, cap());
+    for (int round = 0; round < 3; ++round) {
+        direct_reload(in, big);
+        direct_reload(in, small);
+        const auto used = static_cast<std::size_t>(in.arena()->used_end);
+        for (std::size_t i = used; i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "direct reload left bytes past used_end");
+        need(in.grow(1u << 18), "grow after direct reload");
+        for (std::size_t i = used; i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "growth after direct reload exposed stale bytes");
+        (void)in.reset<ReloadRoot>();
+        for (std::size_t i = static_cast<std::size_t>(in.arena()->used_end); i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "reset after direct reload left stale bytes");
+        auto fresh = XBuffer::create<ReloadRoot>(4096, cap());
+        need(in.save_verified<ReloadRoot>() == fresh.save_verified<ReloadRoot>(),
+             "reset after direct reload differs from create");
+    }
+}
+
+void direct_reload_rejects_interrupted_input() {
+    const auto good = make_wire(3, 100, 3);
+    const auto h = header_of(good);
+    auto in = XBuffer::create<ReloadRoot>(4096, cap());
+    auto rejects = [&](auto&& attempt, const char* what) {
+        bool threw = false;
+        try { attempt(); } catch (const XException&) { threw = true; }
+        need(threw, what);
+        need(root_refused(in) && !in.has_root<ReloadRoot>(), "root after a rejected direct reload");
+        direct_reload(in, good);
+        need(in.save_verified<ReloadRoot>() == good, "direct reload after a reject");
+    };
+    // Dropped half-way: the token's destructor leaves the buffer rootless.
+    rejects([&] {
+        { auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+          deliver(t, good, h.used_bytes / 2); }
+        (void)in.root<ReloadRoot>();
+    }, "dropped direct reload left a root");
+    // Received counts disagree with the declared sections.
+    for (int k = 0; k < 4; ++k)
+        rejects([&] {
+            auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+            deliver(t, good);
+            std::size_t n[4] = {t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(),
+                                t.extent_bytes().size()};
+            n[k] = n[k] ? n[k] - 1 : 8;
+            t.complete(n[0], n[1], n[2], n[3]);
+            t.finish();
+        }, "short count accepted");
+    rejects([&] {
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+        deliver(t, good);
+        t.finish(); // no complete()
+    }, "finish without complete accepted");
+    // Declared lengths other than the header's.
+    rejects([&] {
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count + 1, h.extent_count);
+        deliver(t, good + std::string(8, '\0'));
+        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        t.finish();
+    }, "hole_count mismatch accepted");
+    rejects([&] {
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes + 8, h.hole_count, h.extent_count);
+        deliver(t, good, h.used_bytes);
+        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        t.finish();
+    }, "used_bytes mismatch accepted");
+    rejects([&] { (void)in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.used_bytes, 0); },
+            "impossible hole count accepted");
+    // One token at a time; a consumed token cannot finish again.
+    {
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+        bool second = false;
+        try { (void)in.begin_verified_reload<ReloadRoot>(h.used_bytes); } catch (const XException&) { second = true; }
+        need(second, "second open direct reload allowed");
+        deliver(t, good);
+        in.release_reload_scratch(); // keeps the open token's tables
+        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        t.finish();
+        need(!t, "token still open after finish");
+        bool again = false;
+        try { t.finish(); } catch (const XException&) { again = true; }
+        need(again && in.save_verified<ReloadRoot>() == good, "finish on a consumed token");
+    }
+    // Over the buffer's maximum: XBadAlloc at begin, like reload_verified.
+    auto tiny = XBuffer::create<ReloadRoot>(
+        4096, XBuffer::maximum_capacity(8192).with_growth(XGrowPolicy::Automatic));
+    bool too_big = false;
+    try { (void)tiny.begin_verified_reload<ReloadRoot>(1u << 16); } catch (const XBadAlloc&) { too_big = true; }
+    need(too_big && root_refused(tiny), "direct reload above maximum_capacity not rejected with XBadAlloc");
+}
 } // namespace
 
 int main() {
@@ -179,6 +354,9 @@ int main() {
         reset_equals_create();
         save_into_is_an_independent_copy();
         reload_scratch_survives_release_and_swap();
+        direct_reload_equals_reload();
+        direct_reload_rejects_interrupted_input();
+        direct_reload_keeps_n2();
         std::cout << "test_reload_reset passed\n";
         return 0;
     } catch (const std::exception& e) {
