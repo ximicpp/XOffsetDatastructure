@@ -363,7 +363,9 @@ detail_of() {
         diff-c++20) grep -E '^seed [0-9]+:' "$f" | sed 's/^/C++26 vs C++20 /' | paste -sd ';' ;;
         wire-matrix) grep -E '^wire matrix:' "$f" | tail -n 1 ;;
         gcc13-*|clang18-*|gcc16-c++*|p2996-c++*)
-            { grep -qE "tests passed|tests failed" "$f" && ctest_line "$f" || grep -m1 -A1 -E '^CMake Error' "$f" | tail -n 1 | sed 's/^ */configure: /'
+            { if grep -qE "tests passed|tests failed" "$f"; then ctest_line "$f"
+              elif grep -q '^CMake Error' "$f"; then grep -m1 -A1 -E '^CMake Error' "$f" | tail -n 1 | sed 's/^ */configure: /'
+              else echo "build failed: $(grep -oE 'CMakeFiles/[A-Za-z0-9_]+\.dir/all' "$f" | sed -E 's|CMakeFiles/||; s|\.dir/all||' | sort -u | paste -sd ' ')"; fi
               [[ -f $WORK/m-$s/test-inventory.json ]] && python3 -c 'import json, sys
 n = len(json.load(open(sys.argv[1])).get("cxx26_only_not_built", []))
 print(f"{n} C++26-only tests/tools not built")' "$WORK/m-$s/test-inventory.json"; } | paste -sd ';' ;;
