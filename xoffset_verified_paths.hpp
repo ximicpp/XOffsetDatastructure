@@ -163,23 +163,21 @@ namespace detail {
 
     template <class U, std::size_t N = 0>
     consteval bool compact_members_have_heads() {
-        if constexpr (N >= reflected_member_count<U>()) {
+        if constexpr (N >= schema::member_count_v<U>) {
             return false;
         } else {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^U, std::meta::access_context::unchecked())[N];
-            using M = [:std::meta::type_of(member):];
+            using member = schema::member_t<U, N>;
+            using M = typename member::type;
             return compact_has_heads<M>() || compact_members_have_heads<U, N + 1>();
         }
     }
     template <class U, std::size_t N = 0>
     consteval bool compact_members_supported() {
-        if constexpr (N >= reflected_member_count<U>()) {
+        if constexpr (N >= schema::member_count_v<U>) {
             return true;
         } else {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^U, std::meta::access_context::unchecked())[N];
-            using M = [:std::meta::type_of(member):];
+            using member = schema::member_t<U, N>;
+            using M = typename member::type;
             return compact_direct_supported<M>() && compact_members_supported<U, N + 1>();
         }
     }
@@ -274,11 +272,10 @@ namespace detail {
 
     template <class U, std::size_t N>
     void compact_member_at(const U& src, CompactMeasure& w) noexcept {
-        constexpr auto member = std::meta::nonstatic_data_members_of(
-            ^^U, std::meta::access_context::unchecked())[N];
-        using M = [:std::meta::type_of(member):];
+        using member = schema::member_t<U, N>;
+        using M = typename member::type;
         if constexpr (compact_has_heads<M>())
-            compact_value(src.[:member:], w);
+            compact_value(member::get(src), w);
     }
 
     template <class U>
@@ -293,7 +290,7 @@ namespace detail {
         } else if constexpr (std::is_array_v<C>) {
             for (std::size_t i = 0; i < std::extent_v<C>; ++i) compact_value(src[i], w);
         } else {
-            static_for<reflected_member_count<C>()>([&](auto index) {
+            static_for<schema::member_count_v<C>>([&](auto index) {
                 compact_member_at<C, decltype(index)::value>(src, w);
             });
         }
@@ -360,11 +357,10 @@ namespace detail {
 
     template <class U, std::size_t N, bool P>
     void direct_member_at(const U& src, std::size_t at, DirectWriter<P>& w) noexcept {
-        constexpr auto member = std::meta::nonstatic_data_members_of(
-            ^^U, std::meta::access_context::unchecked())[N];
-        using M = [:std::meta::type_of(member):];
+        using member = schema::member_t<U, N>;
+        using M = typename member::type;
         if constexpr (compact_has_heads<M>())
-            direct_value(src.[:member:], at + std::meta::offset_of(member).bytes, w);
+            direct_value(member::get(src), at + member::offset, w);
     }
 
     template <bool P>
@@ -427,7 +423,7 @@ namespace detail {
             using Elem = std::remove_extent_t<C>;
             for (std::size_t i = 0; i < std::extent_v<C>; ++i) direct_value(src[i], at + i * sizeof(Elem), w);
         } else {
-            static_for<reflected_member_count<C>()>([&](auto index) {
+            static_for<schema::member_count_v<C>>([&](auto index) {
                 direct_member_at<C, decltype(index)::value>(src, at, w);
             });
         }
@@ -465,12 +461,11 @@ namespace detail {
     template <class C, class... M> consteval bool compose_descend();
     template <class C, std::size_t N, class... M>
     consteval bool compose_members_descend() {
-        if constexpr (N >= reflected_member_count<C>()) {
+        if constexpr (N >= schema::member_count_v<C>) {
             return false;
         } else {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^C, std::meta::access_context::unchecked())[N];
-            using Mem0 = [:std::meta::type_of(member):];
+            using member = schema::member_t<C, N>;
+            using Mem0 = typename member::type;
             using Mem = std::remove_cv_t<Mem0>;
             return compose_targets<Mem, M...>() || compose_descend<Mem, M...>() ||
                    compose_members_descend<C, N + 1, M...>();
@@ -521,9 +516,8 @@ namespace detail {
     std::size_t compose_count(const U& draft, const Set& set) noexcept;
     template <class U, std::size_t N, class Set>
     std::size_t compose_count_member_at(const U& draft, const Set& set) noexcept {
-        constexpr auto member = std::meta::nonstatic_data_members_of(
-            ^^U, std::meta::access_context::unchecked())[N];
-        return compose_count(draft.[:member:], set);
+        using member = schema::member_t<U, N>;
+        return compose_count(member::get(draft), set);
     }
     template <class U, class Set>
     std::size_t compose_count(const U& draft, const Set& set) noexcept {
@@ -536,7 +530,7 @@ namespace detail {
                 if constexpr (std::is_array_v<C>) {
                     for (std::size_t i = 0; i < std::extent_v<C>; ++i) found += compose_count(draft[i], set);
                 } else {
-                    static_for<reflected_member_count<C>()>([&](auto index) {
+                    static_for<schema::member_count_v<C>>([&](auto index) {
                         found += compose_count_member_at<C, decltype(index)::value>(draft, set);
                     });
                 }
@@ -561,9 +555,8 @@ namespace detail {
 
     template <class U, std::size_t N, class W, class Set>
     void compose_member_at(const U& draft, std::size_t at, W& w, const Set& set) noexcept {
-        constexpr auto member = std::meta::nonstatic_data_members_of(
-            ^^U, std::meta::access_context::unchecked())[N];
-        compose_value(draft.[:member:], at + std::meta::offset_of(member).bytes, w, set);
+        using member = schema::member_t<U, N>;
+        compose_value(member::get(draft), at + member::offset, w, set);
     }
 
     template <class U, class W, class Set>
@@ -587,7 +580,7 @@ namespace detail {
                     using E = std::remove_extent_t<C>;
                     for (std::size_t i = 0; i < std::extent_v<C>; ++i) compose_value(draft[i], at + i * sizeof(E), w, set);
                 } else {
-                    static_for<reflected_member_count<C>()>([&](auto index) {
+                    static_for<schema::member_count_v<C>>([&](auto index) {
                         compose_member_at<C, decltype(index)::value>(draft, at, w, set);
                     });
                 }
