@@ -25,6 +25,39 @@ for (...) {
 
 `TypedXBuffer<T>` 有同名的 `reload_verified(wire)`、`reset()`、`save_verified_into(out)`。
 
+## 直接接收进复用槽
+
+`reload_verified(wire)` 要先有一整段连续的 wire，库再把 payload 拷进 buffer。传输层可以
+省掉这次拷贝，直接把收到的字节写进 buffer：
+
+```cpp
+XWireHeaderV2 h = read_header(conn);         // 先收 wire 头，拿到三个长度
+auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.hole_count, h.extent_count);
+std::memcpy(t.header_bytes().data(), &h, sizeof h);
+recv_exact(conn, t.extent_bytes());          // 稀疏 wire 的 extent 表
+recv_exact(conn, t.payload_bytes());         // 稠密：整段；稀疏：每个 extent 写到它的偏移
+recv_exact(conn, t.hole_bytes());            // 空洞表
+t.complete(t.header_bytes().size(), t.payload_bytes().size(),
+           t.hole_bytes().size(), t.extent_bytes().size());
+t.finish();                                  // 与 reload_verified 同一个校验器
+handle(in.root<Msg>());
+```
+
+- 接纳、校验、拒绝集合和结果与对同一条 wire 调用 `reload_verified<T>()` 完全相同。
+- `complete()` 报的是实际写入的字节数；稀疏 wire 的 payload 计数包括 gap，即全部 extent
+  落地后的逻辑长度。消息比头里声明的短或长、没有调用 `complete()`、计数不符、声明的
+  长度与头不符，都拒绝。
+- token 在 `finish()` 之前被销毁（例如连接中途断开）等同于一次失败的 reload：buffer
+  变成空的，没有可用的根。
+- 从 begin 到 `finish()` 成功之前，buffer 没有可用的根；期间不能使用、移动或销毁 buffer，
+  同一个 buffer 同时只能有一个 token。
+- begin 不清零：稠密 payload 由传输层整段覆盖；稀疏 wire 的 gap 只在 finish 时清掉旧内容
+  弄脏的部分（从未暴露过的页本来就是零）。
+- header、extent 表和空洞表放在 buffer 保留的暂存里（与校验位图一起由
+  `release_reload_scratch()` 归还），稠密 wire 每条消息不向宿主申请内存。
+- 传输层按未校验的 extent 表写入时要自己检查每个 extent 落在 `payload_bytes()` 之内；
+  越界的表在 finish 时一定会被拒绝。
+
 ## 语义
 
 - `reload_verified<T>(wire)` 的接纳和校验与 `load_verified<T>(wire, 该 buffer 的 MaximumCapacity)`
@@ -38,12 +71,13 @@ for (...) {
 
 ## 失效规则
 
-调用 `reload_verified` 或 `reset` 之后：
+调用 `reload_verified`、`begin_verified_reload` 或 `reset` 之后：
 
 - 之前取得的根引用、元素指针或引用、`view()` 得到的 `string_view`、借用的 span 全部失效，
   不能再使用；
 - `XHandle` 会按新的内容重新解析（与 move 赋值后的规则相同）；
-- buffer 的地址（`get_address()`）不变。
+- buffer 的地址（`get_address()`）不变；例外是可搬槽位上的 buffer 收到放不下的内容时会先换存储
+  （见 USER_GUIDE 第 3.4 节），这时地址改变，`epoch()` 照样加一。
 
 ## 失败
 

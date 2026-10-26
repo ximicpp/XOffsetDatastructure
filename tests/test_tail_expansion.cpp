@@ -353,9 +353,10 @@ void transport_and_graph_admission() {
     std::string wire = buffer.save_verified<TailExpansionRoot>();
     for (std::uint32_t round = 0; round < 3; ++round) {
         auto loaded = XBuffer::load_verified<TailExpansionRoot>(wire);
-        auto& current = loaded.root<TailExpansionRoot>();
-        assert(current.id == 307);
+        // grow() may move a movable slot: take the root after it.
+        assert(loaded.root<TailExpansionRoot>().id == 307);
         assert(loaded.grow(8192));
+        auto& current = loaded.root<TailExpansionRoot>();
         auto* old_data = current.values.data();
         const auto count = current.values.size();
         current.values.reserve(current.values.capacity() + 128);
