@@ -56,8 +56,11 @@ namespace XOffsetDatastructure::schema {
     template <class T, std::size_t I>
     using base_t = typename reflect_detail::base<T, I>::type;
 
+    template <class T, std::size_t I>
+    inline constexpr bool base_is_virtual_v = std::meta::is_virtual(reflect_detail::bases(^^T)[I]);
+
     template <class T>
-    inline constexpr bool is_described_v = std::is_class_v<T>;
+    inline constexpr bool is_described_v = std::is_class_v<T> || std::is_union_v<T>;
 
     template <class E>
     consteval auto enum_range() {

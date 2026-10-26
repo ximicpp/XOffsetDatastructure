@@ -357,7 +357,7 @@ alpha 之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺�
 
 | # | 承诺 | 接口 / 机制 |
 | --- | --- | --- |
-| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（typelayout：布局签名里带指针记号的类型一律拒绝，含裸指针、成员指针和虚表）；容器头只存相对偏移，根用基址偏移 |
+| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（`is_byte_copy_safe_v`：沿用 TypeLayout 的规则，按字段接口递归，凡含裸指针、成员指针、引用和虚表的类型一律拒绝）；容器头只存相对偏移，根用基址偏移 |
 | K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
