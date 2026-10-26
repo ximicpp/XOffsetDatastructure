@@ -4599,7 +4599,10 @@ namespace XOffsetDatastructure {
             }
 
             bool member(bool free, std::size_t granule) const noexcept {
-                return ((free ? free_ : owned_)[granule / 64u] >> (granule % 64u)) & 1u;
+                // The pointer is chosen first: GCC 13 at -O0 with UBSan
+                // miscompiles the conditional used directly as the array.
+                const std::uint64_t* bits = free ? free_ : owned_;
+                return (bits[granule / 64u] >> (granule % 64u)) & 1u;
             }
 
         private:
