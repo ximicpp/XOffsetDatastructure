@@ -236,6 +236,14 @@ namespace XOffsetDatastructure {
 #define XOFFSET_DETAIL_MOVE_INLINE inline
 #define XOFFSET_DETAIL_MOVE_COLD
 #endif
+// Inlining that GCC 16 does on its own in C++26 mode but not in C++23 (it
+// keeps these out of line in push_back: +7% instructions on reloc.hero
+// push_back_grow). Forced only below C++26, so C++26 machine code is unchanged.
+#if __cplusplus > 202302L
+#define XOFFSET_DETAIL_PRE26_INLINE
+#else
+#define XOFFSET_DETAIL_PRE26_INLINE XOFFSET_DETAIL_MOVE_INLINE
+#endif
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_NOINLINE __declspec(noinline)
 #elif defined(__clang__) || defined(__GNUC__)
@@ -3729,7 +3737,7 @@ namespace XOffsetDatastructure {
             }
         }
 
-        void ensure_bound() const {
+        XOFFSET_DETAIL_PRE26_INLINE void ensure_bound() const {
             if (!is_bound() || !arena()) {
                 throw XException(
                     "XFixedVector is not bound to an allocator");
@@ -6478,7 +6486,7 @@ namespace XOffsetDatastructure {
         inline constexpr auto padding_ranges = padding_range_array<T>();
 
         template <class T>
-        void zero_implicit_padding(T* object) noexcept {
+        XOFFSET_DETAIL_PRE26_INLINE void zero_implicit_padding(T* object) noexcept {
             if constexpr (!std::is_class_v<std::remove_cv_t<T>> && !std::is_array_v<std::remove_cv_t<T>>) {
                 (void)object;
             } else if constexpr (padding_ranges<T>.size() == 0) {
