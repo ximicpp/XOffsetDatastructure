@@ -4905,6 +4905,23 @@ namespace XOffsetDatastructure {
 
 
 
+        // Padding bytes [n, 11) of an inline string of length n, as masks of
+        // bytes 0..7 and 8..10 (little endian). A table keeps the check free
+        // of length-dependent branches.
+        struct InlinePadMasks {
+            std::uint64_t low[XFixedString::inline_max + 1];
+            std::uint32_t high[XFixedString::inline_max + 1];
+        };
+        inline constexpr InlinePadMasks inline_pad_masks = [] {
+            InlinePadMasks masks{};
+            for (unsigned n = 0; n <= XFixedString::inline_max; ++n)
+                for (unsigned i = n; i < 11u; ++i) {
+                    if (i < 8u) masks.low[n] |= std::uint64_t(0xff) << (8u * i);
+                    else masks.high[n] |= std::uint32_t(0xff) << (8u * (i - 8u));
+                }
+            return masks;
+        }();
+
         // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
         inline void validate_inline_string_bytes(const char* head) {
             unsigned char bytes[12];
@@ -4912,10 +4929,13 @@ namespace XOffsetDatastructure {
             const unsigned length = bytes[11] & 0x7fu;
             if (length > XFixedString::inline_max)
                 wire_reject("wire validation failed: inline XFixedString length exceeds 10");
-            for (unsigned i = length; i < 11; ++i) {
-                if (bytes[i] != 0)
-                    wire_reject("wire validation failed: inline XFixedString has nonzero padding");
-            }
+            // bytes[length..10] must be zero.
+            std::uint64_t low;
+            std::uint32_t high;
+            std::memcpy(&low, bytes, sizeof(low));
+            std::memcpy(&high, bytes + 8, sizeof(high));
+            if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
+                wire_reject("wire validation failed: inline XFixedString has nonzero padding");
         }
 
         inline void validate_wire_value(const XFixedString& value,
