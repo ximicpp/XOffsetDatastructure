@@ -54,8 +54,15 @@ if(NOT XOFFSET_STORAGE_ONLY)
 
     # Build-tree convenience only. Installed consumers locate their toolchain
     # explicitly; these directories are never exported.
-    if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version")
+    # Apple clang builds use the system libc++, whose std::pmr symbols exist from
+    # macOS 14; an older target links but fails at load. The C++26 build keeps 10.15
+    # (P2996 Clang ships its own libc++).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        if(XOFFSET_CXX_STANDARD STREQUAL "26")
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version")
+        else()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS deployment version")
+        endif()
     endif()
     include(cmake/XOffsetDependencies.cmake)
     xoffset_validate_dependencies()
