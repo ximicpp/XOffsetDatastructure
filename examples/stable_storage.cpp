@@ -14,8 +14,10 @@ XOFFSET_REGISTER_SCHEMA_NAME(StableExample, "example.StableStorage")
 
 int main() {
     constexpr std::size_t limit = 512 * 1024;
-    auto buffer = TypedXBuffer<StableExample>::create(4096,
-        XBuffer::maximum_capacity(limit));
+    // Pinned: a VM reservation whose address never changes. Without it this
+    // buffer would start on a movable slot, where grow() may move it.
+    const auto pinned = XBuffer::maximum_capacity(limit).with_storage(XStorage::Pinned);
+    auto buffer = TypedXBuffer<StableExample>::create(4096, pinned);
     auto* root = &buffer.root();
     root->sequence = 42;
     root->name = "stable arena";
@@ -26,8 +28,7 @@ int main() {
     auto snapshot = buffer.save_verified();
     assert(buffer.get_address() == base && &buffer.root() == root);
 
-    auto restored = TypedXBuffer<StableExample>::load(snapshot,
-        XBuffer::maximum_capacity(limit));
+    auto restored = TypedXBuffer<StableExample>::load(snapshot, pinned);
     const auto* restored_base = restored.get_address();
     if (!restored.grow(64 * 1024)) return 1;
     assert(restored.get_address() == restored_base);

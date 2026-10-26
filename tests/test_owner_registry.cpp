@@ -132,6 +132,25 @@ void ordinary_registration_allocates_only_its_record() {
         alloc.deallocate(value, 1);
         if (i % 32 == 0) check_registry_identity(owners[i], static_cast<std::int64_t>(i));
     }
+    // A movable slot that outgrows its slot moves (replace_storage) and is
+    // registered again at the new address: still only its new record, not
+    // an index node (#59 with #82's slot storage).
+    auto moving = XBuffer::create<RegistryRoot>(1024);
+    moving.root<RegistryRoot>().value = 512;
+    assert(moving.storage_kind() == XStorageKind::MovableSlot);
+    const auto* before = moving.get_address();
+    { XBuffer warm(moving.accessible_bytes() * 2); } // the larger class's chunk exists
+    fail_host_allocation_after = 1;
+    assert(moving.grow(moving.accessible_bytes()));
+    assert(fail_host_allocation_after == 0);
+    fail_host_allocation_after = -1;
+    assert(moving.get_address() != before && moving.storage_kind() == XStorageKind::MovableSlot);
+    auto moved_alloc = moving.allocator<std::int64_t>();
+    auto* moved_value = moved_alloc.allocate(1);
+    *moved_value = 513;
+    assert(*moved_value == 513);
+    moved_alloc.deallocate(moved_value, 1);
+    check_registry_identity(moving, 512);
 }
 
 void transfer_matrix() {
