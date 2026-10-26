@@ -41,7 +41,8 @@ function(xoffset_write_test_inventory)
         endif()
     endif()
     get_property(configure_checks GLOBAL PROPERTY XOFFSET_CONFIGURE_CHECKS)
-    foreach(category programs scenarios tooling configure_checks)
+    get_property(cxx26_only GLOBAL PROPERTY XOFFSET_CXX26_ONLY_NOT_BUILT)
+    foreach(category programs scenarios tooling configure_checks cxx26_only)
         list(SORT ${category})
         list(LENGTH ${category} ${category}_count)
         xoffset_inventory_array(${category}_json ${${category}})
@@ -49,6 +50,7 @@ function(xoffset_write_test_inventory)
     math(EXPR ctest_count "${programs_count} + ${scenarios_count} + ${tooling_count}")
     file(WRITE "${PROJECT_BINARY_DIR}/test-inventory.json"
         "{\n  \"mode\": \"${mode}\",\n"
+        "  \"cxx_standard\": ${XOFFSET_CXX_STANDARD},\n"
         "  \"runtime_test_program_count\": ${programs_count},\n"
         "  \"subprocess_scenario_count\": ${scenarios_count},\n"
         "  \"tooling_check_count\": ${tooling_count},\n"
@@ -57,7 +59,11 @@ function(xoffset_write_test_inventory)
         "  \"runtime_test_programs\": ${programs_json},\n"
         "  \"subprocess_scenarios\": ${scenarios_json},\n"
         "  \"tooling_checks\": ${tooling_json},\n"
-        "  \"configure_checks\": ${configure_checks_json}\n}\n")
+        "  \"configure_checks\": ${configure_checks_json},\n"
+        "  \"cxx26_only_not_built\": ${cxx26_only_json}\n}\n")
     message(STATUS "CTest inventory: ${programs_count} test programs + ${scenarios_count} subprocess scenarios + ${tooling_count} tooling checks = ${ctest_count}; ${configure_checks_count} configure checks listed separately")
+    if(cxx26_only_count GREATER 0)
+        message(STATUS "C++${XOFFSET_CXX_STANDARD} build: ${cxx26_only_count} C++26-only tests not built (listed in test-inventory.json)")
+    endif()
     message(STATUS "Test inventory: ${PROJECT_BINARY_DIR}/test-inventory.json")
 endfunction()
