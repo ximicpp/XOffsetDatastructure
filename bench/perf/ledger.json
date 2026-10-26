@@ -31,6 +31,16 @@
       "reason": "只作记录，不放行任何指标。#83（E-2，Linux 专用）把 ≥1 MiB 新输出的拷贝分成 256 KiB 一块，每块先 madvise(MADV_POPULATE_WRITE)。门禁关掉 glibc 的 rep movsb 路径之后（perf_gate.py IR_ENV），Linux 上 formal.emit_after 的 Ir head÷base 是 1.058：多出来的是分块拷贝和 mincore/madvise 的指令。换来的是缺页：新输出的陷入缺页从 3083 次降到 36 次，墙钟从约 6.3–7.8 ms 降到约 3.7–4.6 ms（云端，噪声大，只作参考）。Ir 看不到缺页的收益，所以这条说明 Ir 的 +5.8% 不代表变慢。没有 tunable 时 valgrind 把 rep movsb 按字节计数，同一指标是 5.96 倍，那是计数假象。macOS 头文件与 base 逐字节相同（0 类），Mac 门禁不适用。",
       "evidence": "PR #83 描述（缺页和墙钟表，populate_bench.cpp dcbc8c13…）；/mnt/project-files/perf-gate/ir/（pr83_gate_run1.json 无 tunable 5.9614，pr83_gate_tunable_no_rep_movsb.json 有 tunable 1.0579）；本 PR 描述里的对照表",
       "approved_by": "「性能优化」（2026-10-26 07:44Z，只作记录）"
+    },
+    {
+      "id": "slg-areq-composed-v3",
+      "pr": 80,
+      "metric": "slg.A.simulate",
+      "compiler": "*",
+      "max_ratio": 1.02,
+      "reason": "有意的基准变更（适配器 v3，只用公开文档化的 API）：bench/slg/bench/xoffset_runner.hpp 的 A.req 改用 save_compact_into(out, {.slack_div = 0}, xassign(msg.attacker, att), xassign(msg.defender, def))，请求直接从两支军队组合写进 wire，草稿只放根对象；库没有 XOFFSET_SAVE_COMPOSED_API 时（anchor、旧 base）仍走 T4 适配器 v2（msg.attacker = att + save_verified）。T4 v2 → v3（next_cpp26 120145f 上同一个库，GCC 16，S，口径 c，第 4–7 周期，Ir）：slg.A 4,768,623 → 4,415,915（0.926），A.req_encode 986,966 → 602,975（0.611），slg.B 0.999，slg.C 1.000，slg.D 1.000；上升的阶段都低于阶段警告线：A.simulate 1.013（1,306,859 → 1,323,833，收到的请求是紧凑布局），A.req_decode 1.007，A.res_decode 1.007，A.apply 1.000，本条只记 A.simulate。G6（M，41 周期，每周期合计中位数）：xoffset A.req 776,068 → 775,764（−304 B，回到 G6 基线），A.res 904,020 → 904,004，其余各项与对手不变，台账记 0。",
+      "evidence": "云端 GCC 16 M 2×10 轮新旧并列（t4 槽 = T4 v2，dw 槽 = v3）：A.req_encode 0.853，A 合计 0.949，A÷zpp_bits（每轮几何均值中位数）1.134 → 1.078；verify M 四家一致，第 1 周期 acc464551a268253；/mnt/project-files/direct-wire-20261024/impl/I2_CLOUD_RESULT_20261026.md；早先对 copy_army 的数据见 I2_CLOUD_RESULT.md；Mac GATE_COMPOSED 与 INT1 L2 批次",
+      "approved_by": "「性能优化」（2026-10-24，设计 A.req 直接写 wire 的实现拆分 I-2）"
     }
   ]
 }
