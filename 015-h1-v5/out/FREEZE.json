@@ -1,0 +1,83 @@
+{
+ "kind": "H1_FREEZE",
+ "created_utc": "2026-10-26T18:19:12Z",
+ "design": "beta2-20261022/H1_GCC16_PERF_DESIGN_20261022.md sha256 2955d1d7f3a946292cb3df289ece6f0e588c0571224c61df978d6f6e7299d1b9",
+ "library_commit": "b1bcaa09594697bb8bc48354defbdc178eab8fa1",
+ "measurement_branch_head": "034fc3423fb86f7bcdf1836ba717e1aa2b3ad5f9",
+ "diff_lib_to_head_sha256": "6bd29b92ed73f39bfa4e78e99f00bee1109e1eb14b047a95bc33156a1c87f72e",
+ "library_code_diff_bytes": 0,
+ "binaries": {
+  "gcc": {
+   "path": "/Volumes/XOffsetCS/h1/v5/bin/gcc_slg_bench",
+   "sha256": "71a5787037ec3c93427eed7bdcca821ce937c6e61625a573ad9918bfb656780f"
+  },
+  "clang": {
+   "path": "/Volumes/XOffsetCS/h1/v5/bin/clang_slg_bench",
+   "sha256": "a657ade7ac69486a4bebc64ceb5e878500427c3387408d04dbd2681a790d610e"
+  }
+ },
+ "files": {
+  "toolchain": {
+   "path": "/Volumes/XOffsetCS/h1/toolchain/p2996-d77eff1-linux-aarch64.tar.xz",
+   "sha256": "b8a1f39dfb8676ed0e1818cab34671752c7655223ecc22dceb356aa0ca81cad6"
+  },
+  "freqprobe": {
+   "path": "/Volumes/XOffsetCS/h1/v5/freqprobe.c",
+   "sha256": "f82463e02e1c934e51664ee7f669906b355c316d5beb3702ab4362564065516a"
+  },
+  "run_sh": {
+   "path": "/Users/ximi/workspace/xo-queue/queue/015-h1-v5/run.sh",
+   "sha256": "ef7f3eeecb90be25ed6719668829be324cac7a92c107bdfe07cb841932b62096"
+  }
+ },
+ "images": {
+  "gcc16_arm64": "gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a"
+ },
+ "compilers": {
+  "gcc": "g++ (GCC) 16.2.0",
+  "clang": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)",
+  "native": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)"
+ },
+ "extra": {
+  "platform": "M4-colima-vz-linux-arm64",
+  "vcpu": "4",
+  "vm_mem_gb": "6",
+  "bridge": "0"
+ },
+ "protocol": {
+  "bench_args": "--mode bench --scale M --cycles 41",
+  "env_primary": {
+   "SLG_REUSE": "1"
+  },
+  "env_secondary": {},
+  "formats": "xoffset,cereal,protobuf,flatbuffers",
+  "pairs_primary": 10,
+  "pairs_secondary": 5,
+  "aa_pairs": 3,
+  "order": "xcomp: A A* | A B B A x ceil(n/4) | A A* | A B B A x floor(n/4) | A A*",
+  "pin_cpu": 2,
+  "runs_per_platform": 1
+ },
+ "statistics": {
+  "q2_metric": "xoffset A-D scenario totals, per-run median over cycles 1-40, B/A per adjacent pair",
+  "q2_interval": "two-sided 95% t on logs",
+  "q2_k": 4,
+  "q1": "tools/analyze.py per-cycle paired, one-sided 95% UB, k=12; pooled over runs (df = runs-1)",
+  "q1_baselines": [
+   "cereal",
+   "flatbuffers",
+   "protobuf"
+  ],
+  "q1_goal_ub": 0.5,
+  "aa_valid": "|geomean-1| <= 0.015 and the k=4 interval contains 1",
+  "drift_valid": "|last A/A block / first A/A block - 1| <= 0.02"
+ },
+ "decision_q2": {
+  "parity": "interval within [0.95, 1.05]",
+  "gcc_behind": "geomean > 1.05 and lower bound > 1.02 -> open thread 'GCC 16 \u5dee\u8ddd\u5b9a\u4f4d' (stages with ratio > 1.10 and >= 2% of the scenario)",
+  "gcc_ahead": "geomean < 0.95 and upper bound < 0.98 -> hand stages to \u6027\u80fd\u4f18\u5316",
+  "uncertain": "otherwise; a signal only if the M4 VM and at least one GitHub platform agree in direction with > 3%",
+  "github_alone_never_triggers": true,
+  "invalid_batches": "reported and marked invalid; diagnosed; rerun at most once"
+ }
+}

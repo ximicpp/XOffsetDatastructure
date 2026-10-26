@@ -1,0 +1,96 @@
+== 2026-10-26T18:12:28Z 0. inputs
+ProductName:		macOS
+ProductVersion:		26.3
+BuildVersion:		25D125
+Darwin ximideMac-mini.local 25.3.0 Darwin Kernel Version 25.3.0: Wed Jan 28 20:49:24 PST 2026; root:xnu-12377.81.4~5/RELEASE_ARM64_T8132 arm64
+Mac16,10
+17179869184
+4
+6
+colima version 0.10.2
+Docker version 29.5.3, build d1c06ef6b4
+cmake version 4.4.4
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+Target: arm64-apple-darwin25.3.0
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk7s1   120Gi    60Gi    32Gi    66%    638k  336M    0%   /Volumes/XOffsetCS
+/dev/disk3s5   228Gi   173Gi    32Gi    85%    1.3M  336M    0%   /System/Volumes/Data
+perf cores 4, host memory 16 GB -> VM: 4 vCPU, 6 GB
+== 2026-10-26T18:12:28Z 1. export
+== 2026-10-26T18:12:45Z 2. VM
+PROFILE    STATUS     ARCH       CPUS    MEMORY    DISK     RUNTIME    ADDRESS
+h1         Running    aarch64    4       6GiB      40GiB    docker     
+Ubuntu 24.04.4 LTS aarch64 NCPU=4 Mem=6197440512
+Linux colima-h1 6.8.0-117-generic #117-Ubuntu SMP PREEMPT_DYNAMIC Thu May  7 17:26:37 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+PAGESIZE 4096
+nproc 4
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm dit uscat ilrcpc flagm sb paca pacg dcpodp flagm2 frint i8mm bf16 bti afp
+CPU implementer	: 0x61
+CPU part	: 0x000
+toolchain volume h1tc reused
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+Target: aarch64-unknown-linux-gnu
+#define _LIBCPP_HARDENING_MODE_DEFAULT 2
+Selected GCC installation: /usr/lib/gcc/aarch64-linux-gnu/14
+native: #define _LIBCPP_HARDENING_MODE_DEFAULT 2
+== 2026-10-26T18:13:01Z 3. build
+h1_build: gcc deps 59 s
+h1_build: gcc slg 17 s
+h1_build: gcc audit 7 s
+h1_build: gcc tests 58 s
+h1_build: clang deps 45 s
+h1_build: clang slg 24 s
+h1_build: clang audit 16 s
+h1_build: clang tests 46 s
+3fadb6c2e14760eacc1663c401555e3b0a0ddc832ca5b927d8c73514f7b08adb  clang_path_audit
+a657ade7ac69486a4bebc64ceb5e878500427c3387408d04dbd2681a790d610e  clang_slg_bench
+722a04665e49214b96a7064a034ca7464ba644ee3fc0c0845cd9aec73caaf1be  clang_slg_strlen
+575f55f1b36bb87c5c9fc9f7fa05b3f0ab4c213513ddf779634030e162bbd6fe  gcc_path_audit
+71a5787037ec3c93427eed7bdcca821ce937c6e61625a573ad9918bfb656780f  gcc_slg_bench
+ad2c4d64e2560c8dc68456a30d20980b3f61108b2b994e34c99512a43b163706  gcc_slg_strlen
+   text	   data	    bss	    dec	    hex	filename
+2146690	  24200	   2024	2172914	 2127f2	gcc_slg_bench
+2155509	  30128	   1605	2187242	 215fea	clang_slg_bench
+--- gcc
+	linux-vdso.so.1 (0x0000f80f86b24000)
+	libstdc++.so.6 => /usr/local/lib64/libstdc++.so.6 (0x0000f80f86850000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000f80f867a0000)
+	libgcc_s.so.1 => /usr/local/lib64/libgcc_s.so.1 (0x0000f80f86760000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000f80f865a0000)
+	/lib/ld-linux-aarch64.so.1 (0x0000f80f86ae0000)
+--- clang
+	linux-vdso.so.1 (0x0000fac97024c000)
+	libc++.so.1 => /opt/p2996/lib/aarch64-unknown-linux-gnu/libc++.so.1 (0x0000fac96feb0000)
+	libc++abi.so.1 => /opt/p2996/lib/aarch64-unknown-linux-gnu/libc++abi.so.1 (0x0000fac96fe50000)
+	libunwind.so.1 => /opt/p2996/lib/aarch64-unknown-linux-gnu/libunwind.so.1 (0x0000fac96fe30000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000fac96fd80000)
+	libgcc_s.so.1 => /usr/local/lib64/libgcc_s.so.1 (0x0000fac96fd40000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000fac96fb80000)
+	libatomic.so.1 => /usr/local/lib64/libatomic.so.1 (0x0000fac96fb50000)
+	/lib/ld-linux-aarch64.so.1 (0x0000fac970200000)
+== 2026-10-26T18:18:09Z 4. gates
+V0 clang slg_bench runs in h1rt: ok
+V1 ctest gcc: 100% tests passed, 0 tests failed out of 98 (rc 0)
+V1 ctest clang: 100% tests passed, 0 tests failed out of 98 (rc 0)
+V2 test_v2_fuzz (gcc): 62/98 Test #62: test_v2_fuzz ...............................   Passed    0.43 sec
+verify S reuse: agree=[True, True] same_state=True same_wire=True cycle1 xoffset=9ce25b0fdb68f2ab
+verify S per_message: agree=[True, True] same_state=True same_wire=True cycle1 xoffset=9ce25b0fdb68f2ab
+verify M reuse: agree=[True, True] same_state=True same_wire=True cycle1 xoffset=acc464551a268253
+verify M per_message: agree=[True, True] same_state=True same_wire=True cycle1 xoffset=acc464551a268253
+VERIFY OK
+M reuse cycle-1 xoffset state: acc464551a268253
+V6 path_audit: identical apart from '#' headers, 1116 lines
+string lengths: identical
+== 2026-10-26T18:18:24Z 5. native
+native build failed (logs/build_native.log): bridge not done
+bridge: 0
+== 2026-10-26T18:19:12Z 6. freeze
+freeze lib diff bytes 0 diff sha 6bd29b92ed73f39bfa4e78e99f00bee1109e1eb14b047a95bc33156a1c87f72e
+== 2026-10-26T18:19:13Z 7. timing
+== 2026-10-26T18:28:32Z 8. analyze
+main batch: invalid
+== 2026-10-26T18:28:34Z finish rc=7
+/Users/ximi/workspace/xo-queue/queue/015-h1-v5/run.sh: line 50: 72225 Terminated: 15          ( while :; do
+    ts=$(utc); echo "$ts load $(sysctl -n vm.loadavg)"; ps -Ao pcpu=,pid=,comm= -r | awk -v t="$ts" '$1 >= 30 { print t, "hot", $0 }'; sleep 2;
+done ) >> "$W/logs/hostwatch.log" 2>&1
+4.2G	/Volumes/XOffsetCS/h1/colima

@@ -1,0 +1,1 @@
+native build failed (logs/build_native.log): bridge not done
