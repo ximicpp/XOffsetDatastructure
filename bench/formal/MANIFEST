@@ -10,10 +10,13 @@
 #   README.md, scripts/  new
 # Formal M input wire (sc_xoffset encode of M/input.canonical.bin), R3 FREEZE.json:
 #   2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+# Field lists (2026-10-26, remove-C++26 p5): adapters/xoffset/adapter.hpp describes Attr,
+#   Record and Snapshot with XOFFSET_RECORD_DERIVED when the library has it (guarded).
+#   Same machine code under GCC 16 and P2996 (asm_equal).
 acf775534fefd8ef172ffc8b234ba203da28c389b34e8fdddbf3341d97c2c391  CMakeLists.txt
 31a8df3430cec0b1f75af9b7b97c9d4ed1361f7abd4240ce517c110c5a50c1b9  README.md
 b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7  adapters/xoffset/README.md
-bf246d895b16f542027022ee1b10291328f0c5c4a47d2992ad013e895f84b1d5  adapters/xoffset/adapter.hpp
+b30e6ee3c59c0e361d62657777ca84f6b5cdc0270a116d6cfcc83ff623d7a599  adapters/xoffset/adapter.hpp
 95aaf4c38920e99f46e14c5fb9fc005ae687a78eb161219a08efbf3a9fbeb52b  driver.cpp
 186da64c3e58c845b4eab52de803895b442ff8442692fb8c2f55b72a383a2f05  fixtures/golden-S/fixture.json
 d6db0ad22bbe4f69cae69dda27093f2f7952daeb1bb0d8a52c3c787670b2ba47  fixtures/prepared-v1-M/fixture.json
