@@ -50,6 +50,24 @@
   the bytes are identical to `XCompactor::compact<T>(b).save_verified<T>()`
   (tested over 600 random models), 7x (840 KB shard) to 85x (1.6 KB) faster
   than compact-then-save on the cloud box.
+- `save_compact_into<T>(out, options, xassign(target, source)...)` composes a
+  message from parts: it writes the wire `save_compact_into<T>(out, options)`
+  would write after `*target = *source` for every assignment, without doing
+  the assignments (the draft and every source are unchanged; nothing is
+  allocated in the draft). Targets are non-overlapping member subobjects of
+  the root (any depth, scalars and array elements included), not container
+  elements; sources are read as they were before the call, from any buffer
+  or the draft itself. Target padding is written as zero. A bad target or a
+  wire over the limit throws `XException` before any byte is written, and the
+  output is then empty. Same wire format and receivers; byte-identical to
+  assign + `save_compact` (test_save_composed, fuzz core). SLG A.req on the
+  cloud box: A.req_encode x0.76-0.79, instructions per request 2060 -> ~1200.
+  Plain `save_compact` / `save_compact_into` now write through the same
+  `DirectWriter` (one head writer in the library; the old two-mode writer
+  only measures now): same bytes, and a reused output with room is written
+  without measuring first, also with slack. Cloud box, SLG M states, reused
+  output: player x0.74 tight / x0.59 slack, shard x0.79 / x0.74, battle
+  request x0.82 / x0.74; a state that grows before every save x0.81 / x0.62.
 - Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
   source's size, maximum capacity, growth policy and pool) and
   `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;
