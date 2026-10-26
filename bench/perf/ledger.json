@@ -185,6 +185,20 @@
       "reason": "只作记录，不放行任何指标。整批记录，随 INT1 最后一个合并提交（#80）入账，不归属某一个 PR。INT1_r2 的 Mac reloc 中 map.insert 变慢：fresh 33.53 → 35.56 ns（+6.1%），reused 30.92 → 33.2 ns（+7.4%）。云端都看不出差别：P2996 Ir 是 1.0000（GCC 16 是 1.0037），x86 P2996 的 insert_construct 两边逐条指令相同，元素位置也相同（VM、页对齐、+64）。怀疑是 arm64 上的代码对齐，有待 Mac 反汇编确认。依「性能优化」的规则，Ir 1.0000 不当作噪声；G9 判定照 Mac 表。",
       "evidence": "INT1_MERGE_TRIAL.md 第 5 节；/mnt/project-files/alloc-fastpath-20261022/int1-merge/mapinsert/mapins_disasm.sh；INT1_r2 reloc 表",
       "approved_by": "「访问与拷贝」G9 判读（「性能优化」12:07Z 交办），只作记录"
+    },
+    {
+      "id": "s-class-pr91",
+      "pr": 91,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0017,
+      "record_only": true,
+      "class": "S",
+      "head": "e15c5d5923af",
+      "base": "f8eebf46565c",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：P1，XFixedVector 的 POD 元素拷贝赋值在 0 < count ≤ capacity 时走内联原地拷贝（memmove、scrub 收缩的尾部、M6 填充清零，与 assign_range 原地分支加 assign_trivial_copy 相同），扩容、绑定、空源和自赋值走一次 out-of-line 的原通用路径；非 POD 保持内联。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 35 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.A），≥5% 阶段最大 1.0017（slg.A.apply）；P2996 d77eff1 + libc++ 合计最大 1.0007（formal.mutate），阶段最大 1.0001。声称的阶段 slg.A.apply：P2996 0.9538；GCC 16 1.0017，GCC 16 上不宣称收益。",
+      "evidence": "PR #91 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/p1_e15c5d5_REPORT.md 与 p1_e15c5d5_ir-{gcc16,p2996}_gate.json；设计与计时 /mnt/project-files/perf-next-20261022/A_ZPP_LEVERS_20261026.md",
+      "approved_by": "「性能优化」（2026-10-26 12:07Z，判 S 类：INT1 合入后在新主线上两种 Ir 门禁不出警告即合并）"
     }
   ]
 }
