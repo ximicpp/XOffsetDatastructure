@@ -238,11 +238,12 @@ namespace XOffsetDatastructure {
 #endif
 // Inlining that GCC 16 does on its own in C++26 mode but not in C++23 (it
 // keeps these out of line in push_back: +7% instructions on reloc.hero
-// push_back_grow). Forced only below C++26, so C++26 machine code is unchanged.
-#if __cplusplus > 202302L
-#define XOFFSET_DETAIL_PRE26_INLINE
-#else
+// push_back_grow). Forced only for GCC below C++26: C++26 machine code is
+// unchanged, and Clang inlines less around them when they are forced.
+#if __cplusplus <= 202302L && defined(__GNUC__) && !defined(__clang__)
 #define XOFFSET_DETAIL_PRE26_INLINE XOFFSET_DETAIL_MOVE_INLINE
+#else
+#define XOFFSET_DETAIL_PRE26_INLINE
 #endif
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_NOINLINE __declspec(noinline)
