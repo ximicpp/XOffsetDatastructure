@@ -23,6 +23,10 @@
 static_assert(kInlineBitmapExtent == xo::detail::WireGranuleIndex::inline_extent);
 // check_clone() in exercise() is compiled only when the library has clone().
 static_assert(requires(Buffer& b) { b.clone(); b.clone_into(b); });
+// check_composed() likewise only when it has save_compact_into with assignments.
+#if !defined(XOFFSET_SAVE_COMPOSED_API)
+#error "test_v2_fuzz needs save_compact_into with assignments (check_composed)"
+#endif
 
 namespace {
 constexpr int kBoundaryMutants = 301; // per page boundary wire, the first unmutated
@@ -164,10 +168,12 @@ int main(int argc, char** argv) {
     if (sparse == 0) fail("no sparse wire in the pool");
     if (check_library_emissions(in.pool) == 0) fail("no pool wire is sent with zero runs skipped");
     if (inflated_comparisons == 0) fail("no sparse wire was compared with its dense payload");
+    if (composed_comparisons == 0) fail("no composed wire was compared with assign + save_compact");
     std::cout << "test_v2_fuzz: seed=" << seed << " golden=" << in.pool.size() << " sparse=" << sparse << " cases=" << cases
               << " boundary_cases=" << boundary_cases << " accepted=" << c.accepted
               << " header_rejects=" << c.header_rejects << " payload_rejects=" << c.payload_rejects
-              << " sparse_vs_dense=" << inflated_comparisons << " cursor_off_compared=" << cursor_compared
+              << " sparse_vs_dense=" << inflated_comparisons << " composed=" << composed_comparisons
+              << " cursor_off_compared=" << cursor_compared
               << " inconsistencies=0\n";
     return 0;
 }
