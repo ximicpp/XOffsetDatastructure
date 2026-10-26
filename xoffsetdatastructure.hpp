@@ -1498,7 +1498,31 @@ namespace XOffsetDatastructure {
             register_registry();
         }
 
-        void move_from(XBufferCore&& other) noexcept {
+        // Out of line: inlining the short path into every move site changes
+        // register allocation in unrelated callers (GCC 16 reloc map.find).
+        XOFFSET_DETAIL_NOINLINE void move_from(XBufferCore&& other) noexcept {
+            if (holds_nothing()) [[likely]] {
+                // Nothing to retire (a new or moved-from target, as in all
+                // three moves of std::swap). Take other's storage, record,
+                // free list and schema state; other keeps this empty storage
+                // and gets the default state the retired path below leaves
+                // it. Each epoch still advances by one.
+                buffer_.swap(other.buffer_);
+                owner_record_.swap(other.owner_record_);
+                free_table_.swap(other.free_table_);
+                free_table_lost_ = std::exchange(other.free_table_lost_, false);
+                publish_host_owner();
+                growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
+                root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
+                typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
+                schema_bound_ = std::exchange(other.schema_bound_, false);
+                bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
+                bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
+                ++m_epoch;
+                ++other.m_epoch;
+                update_registry_owner();
+                return;
+            }
             const auto target_epoch = m_epoch;
             const auto source_epoch = other.m_epoch;
             XBufferCore retired;
@@ -1513,6 +1537,13 @@ namespace XOffsetDatastructure {
             other.m_epoch = source_epoch + 1u;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
+        }
+
+        // No storage, slot, pool, registry record or free list: retiring
+        // this owner would release nothing.
+        bool holds_nothing() const noexcept {
+            return !buffer_.data() && !buffer_.is_slot() && !buffer_.pool().enabled() &&
+                !owner_record_ && !free_table_;
         }
 
         void update_registry_owner() noexcept {
