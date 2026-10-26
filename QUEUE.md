@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-26T21:17:45Z after 018-ckpt1r2: done 12 2026-10-26T21:17:42Z
+Updated 2026-10-26T21:17:53Z after 019-int3: running 2026-10-26T21:17:50Z
 
 ```
 runner: pid 45762 (version 2)
@@ -23,5 +23,5 @@ free: 27 GB on /Volumes/XOffsetCS, 27 GB on /Users/ximi
 016-native-envprobe                      done 0 2026-10-26T18:29:06Z
 017-h1-v5r2                              done 7 2026-10-26T19:58:27Z
 018-ckpt1r2                              done 12 2026-10-26T21:17:42Z
-019-int3                                 queued
+019-int3                                 running 2026-10-26T21:17:50Z
 ```
