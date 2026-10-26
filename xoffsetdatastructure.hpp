@@ -2974,6 +2974,39 @@ namespace XOffsetDatastructure {
         XFixedVector(const XFixedVector&) = delete;
         XFixedVector(XFixedVector&&) = delete;
         XFixedVector& operator=(const XFixedVector& other) {
+            if constexpr (detail::subtree_copy_supported<T>() && std::is_trivially_copyable_v<T> &&
+                          std::is_trivially_copy_constructible_v<T> &&
+                          std::is_trivially_destructible_v<T> &&
+                          !std::is_const_v<T> && !std::is_volatile_v<T>) {
+                // T4 POD in place: assign_range's in-place case and the M6
+                // padding pass of assign_trivial_copy, inline. Regrowth,
+                // binding and an empty source take the general path.
+                const size_type count = other.size_;
+                if (this != &other && is_bound() && count != 0 && count <= capacity_ &&
+                    detail::subtree_copy_enabled()) [[likely]] {
+                    T* items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                    const size_type old_size = size_;
+                    std::memmove(static_cast<void*>(items), other.data(), std::size_t(count) * sizeof(T));
+                    size_ = count;
+                    if (old_size > count)
+                        std::memset(static_cast<void*>(items + count), 0, std::size_t(old_size - count) * sizeof(T));
+                    for (size_type i = 0; i < count; ++i) detail::zero_implicit_padding(items + i);
+                    XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
+                    return *this;
+                }
+                return assign_general_out_of_line(other);
+            } else {
+                return assign_general(other);
+            }
+        }
+
+    private:
+        // The POD fast path's fallback stays out of line, so that path inlines small.
+        XOFFSET_DETAIL_NOINLINE XFixedVector& assign_general_out_of_line(const XFixedVector& other) {
+            return assign_general(other);
+        }
+
+        XFixedVector& assign_general(const XFixedVector& other) {
             if (this == &other) return *this;
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
@@ -2996,6 +3029,8 @@ namespace XOffsetDatastructure {
             });
             return *this;
         }
+
+    public:
         XFixedVector& operator=(XFixedVector&& other) {
             if (this == &other) return *this;
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
