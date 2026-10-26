@@ -263,6 +263,16 @@ namespace XOffsetDatastructure::schema {
     template <class T>
     inline constexpr bool is_described_v = description<std::remove_cv_t<T>>::described;
 
+    // XOFFSET_RECORD takes aggregate classes only (an aggregate is never
+    // polymorphic). Without reflection nothing is known about the members of
+    // the rest, so the walks answer "not admitted" for them instead of asking
+    // for a field list that cannot be written.
+    template <class T>
+    inline constexpr bool is_undescribable_v =
+        (std::is_union_v<std::remove_cv_t<T>> ||
+         (std::is_class_v<std::remove_cv_t<T>> && !std::is_aggregate_v<std::remove_cv_t<T>>)) &&
+        !is_described_v<T>;
+
     namespace describe_detail {
         template <class T>
         struct of {
@@ -305,19 +315,46 @@ namespace XOffsetDatastructure::schema {
         return enum_bounds<U>{};
     }
 
-    // Without reflection these are promises. The library asks them only for a
-    // record declared ordinary (XOFFSET_RECORD, XOFFSET_ORDINARY_RECORDS or a
-    // wire_record_layout specialization), and that declaration promises a
-    // destructor that is not user-provided and no user-declared special member
-    // function.
+    namespace describe_detail {
+        // Is every base and member of T trivial for Trait? Then T's implicit
+        // special member would be trivial too, and a nontrivial one is
+        // user-provided.
+        template <template <class> class Trait, class T, std::size_t... I>
+        consteval bool bases_trivial(std::index_sequence<I...>) {
+            return (Trait<typename of_t<T>::template base<I>>::value && ...);
+        }
+        template <template <class> class Trait, class T, std::size_t... I>
+        consteval bool members_trivial(std::index_sequence<I...>) {
+            return (Trait<typename of_t<T>::template member<I>::type>::value && ...);
+        }
+        template <template <class> class Trait, class T>
+        consteval bool user_provided() {
+            return bases_trivial<Trait, T>(std::make_index_sequence<of_t<T>::base_count>{}) &&
+                   members_trivial<Trait, T>(std::make_index_sequence<of_t<T>::member_count>{}) &&
+                   !Trait<T>::value;
+        }
+    } // namespace describe_detail
+
+    // Without reflection these are promises, checked where the traits can
+    // tell. The library asks them only for a record declared ordinary
+    // (XOFFSET_RECORD, XOFFSET_ORDINARY_RECORDS or a wire_record_layout
+    // specialization), and that declaration promises a destructor that is not
+    // user-provided and no user-declared special member function. An aggregate
+    // has no user-declared constructor; a user-provided destructor or
+    // assignment is caught when every base and member is trivial for it (T is
+    // then not), and stays a promise when some member (an XString, say)
+    // is not trivial itself.
     template <class T>
     consteval bool implicit_lifetime_aggregate() {
-        return std::is_aggregate_v<T> && is_described_v<T>;
+        if constexpr (!std::is_aggregate_v<T> || !is_described_v<T>) return false;
+        else return !describe_detail::user_provided<std::is_trivially_destructible, T>();
     }
 
     template <class T>
     consteval bool only_implicit_special_members() {
-        return std::is_aggregate_v<T> && is_described_v<T>;
+        if constexpr (!implicit_lifetime_aggregate<T>()) return false;
+        else return !describe_detail::user_provided<std::is_trivially_copy_assignable, T>() &&
+                    !describe_detail::user_provided<std::is_trivially_move_assignable, T>();
     }
 } // namespace XOffsetDatastructure::schema
 

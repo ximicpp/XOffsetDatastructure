@@ -17,6 +17,11 @@
 //   Anything else (an array of non-trivially-copyable elements, a function
 //   type) is not.
 //
+//   Without reflection a union or a non-aggregate class (std::string, a
+//   polymorphic class) has no field list and cannot get one: it is opaque and
+//   counts as holding a pointer, so it is not admitted (specialize
+//   is_byte_copy_safe for direct queries of such a type).
+//
 // is_byte_copy_safe<T> is the customization point: specialize it for a type
 // whose safety the walk cannot see. As with TypeLayout, a specialization
 // answers direct queries for that type (make<T>(), allocator<T>(), ...); the
@@ -56,6 +61,7 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_pointer_v<U> || std::is_member_pointer_v<U> || std::is_reference_v<U>)
                 return true;
             else if constexpr (std::is_array_v<U>) return has_pointer<std::remove_extent_t<U>>();
+            else if constexpr (schema::is_undescribable_v<U>) return true;  // opaque
             else if constexpr (std::is_union_v<U>) return members_have_pointer<U>();
             else if constexpr (std::is_class_v<U>)
                 return std::is_polymorphic_v<U> || bases_have_pointer<U>() || members_have_pointer<U>();

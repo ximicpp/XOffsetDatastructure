@@ -33,17 +33,50 @@ namespace xoffset_describe_dump {
     template <class T> struct is_key_value : std::false_type {};
     template <class K, class V> struct is_key_value<xo::XKeyValue<K, V>> : std::true_type {};
 
-    consteval std::string qualified_name(std::meta::info type) {
-        type = std::meta::dealias(type);
-        if (std::meta::has_template_arguments(type))
-            return std::string(std::meta::display_string_of(type));
-        std::string name(std::meta::identifier_of(type));
-        for (auto scope = std::meta::parent_of(type); scope != ^^::; scope = std::meta::parent_of(scope)) {
+    // XOffset's own heads, by exact type: a user record derived from one (a
+    // struct with an XString base, say) still needs its own line.
+    template <class T> struct is_library_head : std::false_type {};
+    template <> struct is_library_head<xo::XFixedString> : std::true_type {};
+    template <> struct is_library_head<xo::XString> : std::true_type {};
+    template <class E> struct is_library_head<xo::XFixedVector<E>> : std::true_type {};
+    template <class E> struct is_library_head<xo::XVector<E>> : std::true_type {};
+    template <class E> struct is_library_head<xo::XFixedFlatSet<E>> : std::true_type {};
+    template <class E> struct is_library_head<xo::XSet<E>> : std::true_type {};
+    template <class K, class V> struct is_library_head<xo::XFixedFlatMap<K, V>> : std::true_type {};
+    template <class K, class V> struct is_library_head<xo::XMap<K, V>> : std::true_type {};
+
+    consteval std::string qualified_name(std::meta::info type);
+
+    // A class, enum or template name with its enclosing namespaces and classes.
+    consteval std::string scoped_name(std::meta::info entity) {
+        std::string name(std::meta::identifier_of(entity));
+        for (auto scope = std::meta::parent_of(entity); scope != ^^::; scope = std::meta::parent_of(scope)) {
             if (!std::meta::has_identifier(scope) || std::meta::is_function(scope))
                 return std::string("<local or unnamed scope>::") + name;
             name = std::string(std::meta::identifier_of(scope)) + "::" + name;
         }
         return name;
+    }
+
+    // The name as it must be written at global scope, template arguments
+    // included (XOffsetDatastructure::XMap<int, ns::Item>).
+    consteval std::string qualified_name(std::meta::info type) {
+        type = std::meta::dealias(type);
+        if (std::meta::has_template_arguments(type)) {
+            std::string name = scoped_name(std::meta::template_of(type)) + "<";
+            bool first = true;
+            for (auto arg : std::meta::template_arguments_of(type)) {
+                if (!first) name += ", ";
+                first = false;
+                name += std::meta::is_type(arg) ? qualified_name(arg)
+                                                : std::string(std::meta::display_string_of(arg));
+            }
+            return name + ">";
+        }
+        if (!std::meta::is_class_type(type) && !std::meta::is_union_type(type) &&
+            !std::meta::is_enum_type(type))
+            return std::string(std::meta::display_string_of(type));
+        return scoped_name(type);
     }
 
     // Why T cannot get an XOFFSET_RECORD line, or "" if it can.
@@ -58,6 +91,14 @@ namespace xoffset_describe_dump {
             if (std::meta::is_bit_field(member)) return "a bit-field";
             if (std::meta::is_reference_type(std::meta::type_of(member))) return "a reference member";
         }
+        // [[no_unique_address]] can overlap members; a field list needs
+        // ascending, disjoint offsets.
+        std::size_t end = 0;
+        for (auto member : std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())) {
+            const auto offset = static_cast<std::size_t>(std::meta::offset_of(member).bytes);
+            if (offset < end) return "overlapping members ([[no_unique_address]])";
+            end = offset + std::meta::size_of(std::meta::type_of(member));
+        }
         return "";
     }
 
@@ -70,11 +111,11 @@ namespace xoffset_describe_dump {
             using U = std::remove_cv_t<T>;
             if constexpr (std::is_array_v<U>) visit<std::remove_extent_t<U>>();
             else if constexpr (std::is_enum_v<U>) enumeration<U>();
-            else if constexpr (xo::detail::is_fixed_string_v<U>) {}
-            else if constexpr (xo::detail::is_fixed_flat_map_v<U>) {
+            else if constexpr (is_library_head<U>::value && xo::detail::is_fixed_string_v<U>) {}
+            else if constexpr (is_library_head<U>::value && xo::detail::is_fixed_flat_map_v<U>) {
                 visit<typename U::key_type>();
                 visit<typename U::mapped_type>();
-            } else if constexpr (xo::detail::is_fixed_flat_set_v<U> || xo::detail::is_fixed_vector_v<U>)
+            } else if constexpr (is_library_head<U>::value)
                 visit<typename U::value_type>();
             else if constexpr (is_std_array<U>::value) visit<typename U::value_type>();
             else if constexpr (is_key_value<U>::value) {
@@ -98,10 +139,16 @@ namespace xoffset_describe_dump {
             constexpr const char* name = std::define_static_string(qualified_name(^^T));
             if (!done.insert(name).second) return;
             constexpr const char* why = std::define_static_string(obstacle<T>());
-            if (why[0] != '\0') {
+            // if constexpr: the member walk below must not be instantiated for
+            // a type it cannot read (std::string's anonymous members, say).
+            if constexpr (why[0] != '\0')
                 lines.push_back(std::string("// ") + name + " cannot be described: " + why);
-                return;
-            }
+            else
+                describable<T>(name);
+        }
+
+        template <class T>
+        void describable(const char* name) {
             static constexpr auto bases = std::define_static_array(
                 std::meta::bases_of(^^T, std::meta::access_context::unchecked()));
             static constexpr auto members = std::define_static_array(
@@ -125,7 +172,8 @@ namespace xoffset_describe_dump {
 
         template <class T>
         static std::string qualified_name_of() {
-            return std::define_static_string(qualified_name(^^T));
+            static constexpr const char* name = std::define_static_string(qualified_name(^^T));
+            return name;
         }
     };
 
