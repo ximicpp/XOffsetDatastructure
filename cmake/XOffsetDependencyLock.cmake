@@ -1,8 +1,8 @@
 # Content lock for the bundled header surface (SHA-256 of sorted path/hash records).
 # Boost da041154c6bac1a4aa98254a7d6819059e8ac0b0
-# TypeLayout 9a6de1d73617631a9612ba9f572d6c0844a90b19
+# TypeLayout fe295929d0a5bfa7809fb737a6eb3db279599346
 set(XOFFSET_DEPENDENCY_TREES
-    "external/typelayout/include|2f9bf5b8b76d5930dbdb4aef6c18c587f3d4b21d2989146a79fe6febbaa37a2a"
+    "external/typelayout/include|4d53c95226ead0bc4721ab81d9234c3955b62cffcb771ebe8a5c3bfb202d2705"
     "external/boost/libs/container/include|5cbc130ddfe6961862f15ae11bedd1e574961e4f7aec27b593da2a4abb479bf4"
     "external/boost/libs/core/include|87ed5b33887f001920abc50bae318901a91328e3d4313b02b935e684d9d06e61"
     "external/boost/libs/config/include|1840c63a8e130b742d6f8148acaf9706a566ccf1791d2afd6eb9462465c2aaf8"
@@ -15,7 +15,7 @@ set(XOFFSET_DEPENDENCY_TREES
     "external/boost/libs/predef/include|94ec7f40a6deb27aca1b5a0e25e0addf80b91cf782159a2b0deec753bfe0010b"
 )
 set(XOFFSET_BOOST_REVISION da041154c6bac1a4aa98254a7d6819059e8ac0b0)
-set(XOFFSET_TYPELAYOUT_REVISION 9a6de1d73617631a9612ba9f572d6c0844a90b19)
+set(XOFFSET_TYPELAYOUT_REVISION fe295929d0a5bfa7809fb737a6eb3db279599346)
 set(XOFFSET_DEPENDENCY_LICENSES
     "external/boost/LICENSE_1_0.txt|c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
     "external/typelayout/LICENSE|c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"

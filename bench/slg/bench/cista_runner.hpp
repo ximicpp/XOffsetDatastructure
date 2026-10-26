@@ -227,8 +227,8 @@ public:
 private:
     static void build_request(cm::BattleMsg& msg, const Pairing& pr, const cm::Army& att, const cm::Army& def) {
         msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-        copy_army(msg.attacker, att);
-        copy_army(msg.defender, def);
+        msg.attacker = att;  // T4 adapter (c): cista's own copy assignment
+        msg.defender = def;
         msg.report.battle_id = 0;
         msg.report.summary = std::string_view{};
         msg.report.events.clear();
