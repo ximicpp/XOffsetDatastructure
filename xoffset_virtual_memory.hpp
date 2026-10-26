@@ -195,7 +195,6 @@ private:
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
-        set_logical_bytes(0);
         // A throwing constructor does not run this object's destructor.
         if (!grow_to(logical_bytes)) {
             release();
@@ -259,7 +258,7 @@ public:
             throw std::bad_alloc();
         }
         std::memcpy(owner.base_, bytes, length);
-        owner.set_logical_bytes(length);
+        owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
         return owner;
     }
@@ -294,7 +293,7 @@ public:
             cursor = std::size_t(entry[0]) + entry[1];
         }
         clear(cursor, length);
-        owner.set_logical_bytes(length);
+        owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
         return owner;
     }
@@ -322,7 +321,6 @@ public:
         owner.slot_class_ = static_cast<std::uint8_t>(cls);
         owner.movable_ = movable;
         owner.set_host_owner(nullptr);
-        owner.set_logical_bytes(0);
         return owner;
     }
 
@@ -338,12 +336,12 @@ public:
         if (length != 0 && bytes == nullptr) {
             throw std::invalid_argument("VM input is null");
         }
-        if (length == 0) { set_logical_bytes(0); return; }
+        if (length == 0) { logical_bytes_ = 0; return; }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
         std::memcpy(base_, bytes, length);
-        set_logical_bytes(length);
+        logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
     }
 
@@ -354,7 +352,7 @@ public:
         if (length > maximum_capacity_) {
             throw std::invalid_argument("VM input length exceeds maximum capacity");
         }
-        if (length == 0) { set_logical_bytes(0); return; }
+        if (length == 0) { logical_bytes_ = 0; return; }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
@@ -372,7 +370,7 @@ public:
             cursor = std::size_t(entry[0]) + entry[1];
         }
         clear(cursor, length);
-        set_logical_bytes(length);
+        logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
     }
 
@@ -389,7 +387,7 @@ public:
             throw std::bad_alloc();
         }
         const auto clean_from = zero_from_;
-        set_logical_bytes(length);
+        logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
         return clean_from;
     }
@@ -416,12 +414,6 @@ public:
     }
     void set_host_owner(void* owner) noexcept {
         if (base_) *reinterpret_cast<void**>(base_ - sizeof(void*)) = owner;
-    }
-    // Host-only copy of size() in the slot before the owner (base - 16),
-    // written wherever the logical length changes, so a check against the
-    // logical end needs only the payload base.
-    static std::size_t logical_bytes_at(const char* base) noexcept {
-        return *reinterpret_cast<const std::size_t*>(base - 2 * sizeof(void*));
     }
     char* data() noexcept { return base_; }
     const char* data() const noexcept { return base_; }
@@ -459,7 +451,7 @@ public:
             (std::max)(zero_from_, logical_bytes_));
         if (dirty_end > logical_bytes_)
             std::memset(base_ + logical_bytes_, 0, dirty_end - logical_bytes_);
-        set_logical_bytes(new_logical_bytes);
+        logical_bytes_ = new_logical_bytes;
         if (zero_from_ < new_logical_bytes) zero_from_ = new_logical_bytes;
         return true;
     }
@@ -471,7 +463,7 @@ public:
             throw std::length_error("VM length exceeds maximum capacity");
         }
         if (new_logical_bytes <= logical_bytes_) {
-            set_logical_bytes(new_logical_bytes);
+            logical_bytes_ = new_logical_bytes;
         } else if (!grow_to(new_logical_bytes)) {
             throw std::bad_alloc();
         }
@@ -548,11 +540,6 @@ private:
 
     bool acquire_from_pool() noexcept;
     void release() noexcept;
-    // Every logical length change goes through here (see logical_bytes_at).
-    void set_logical_bytes(std::size_t bytes) noexcept {
-        logical_bytes_ = bytes;
-        if (base_) *reinterpret_cast<std::size_t*>(base_ - 2 * sizeof(void*)) = bytes;
-    }
     // Publish permissions separately from logical bytes. Both initialization
     // paths keep an accurate accessible extent if preparation later fails.
     bool enable_prefix(std::size_t new_logical_bytes) noexcept {
@@ -709,7 +696,7 @@ inline void VirtualMemoryStorage::release() noexcept {
             accessible_bytes_ <= limits.max_accessible_bytes - statistics.cached_accessible_bytes) {
             statistics.cached_reserved_bytes += reserved_bytes_;
             statistics.cached_accessible_bytes += accessible_bytes_;
-            set_logical_bytes(0);
+            logical_bytes_ = 0;
             set_host_owner(nullptr);
             state->cached.emplace_back();
             swap_storage(state->cached.back());
