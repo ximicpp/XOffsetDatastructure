@@ -24,6 +24,8 @@ struct ReplaceRoot {
     xo::XVector<xo::XString> words;
     xo::XVector<ReplaceAttr> attrs;
 };
+XOFFSET_RECORD_DERIVED(ReplaceAttr, (), key, value)
+XOFFSET_RECORD_DERIVED(ReplaceRoot, (), first, second, blocker, words, attrs)
 XOFFSET_REGISTER_SCHEMA_NAME(ReplaceRoot, "test.v3.full-string-replacement.v1")
 
 namespace {

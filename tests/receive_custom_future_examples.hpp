@@ -54,6 +54,15 @@ struct MissingInline { std::uint32_t value; ~MissingInline() noexcept {} };
 struct HiddenRawOnly { xo::XVector<RawOnly> later; };
 struct HiddenByPolicy { xo::XVector<RawOnly> later; };
 struct FutureOnlyChild { std::uint32_t value{}; };
+} // namespace receive_custom_v2_examples
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::RawOnly, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::MissingRvalue, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::ThrowingDestructor, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::MissingInline, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenRawOnly, (), later)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenByPolicy, (), later)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::FutureOnlyChild, (), value)
+namespace receive_custom_v2_examples {
 inline thread_local long transfer_failure=-1;
 inline void check_transfer_failure() {
     if(transfer_failure==0){transfer_failure=-1;throw std::bad_alloc();}

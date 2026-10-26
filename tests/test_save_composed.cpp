@@ -30,6 +30,9 @@ struct Root {
     xo::XVector<Named> list;
 };
 } // namespace cmp
+XOFFSET_RECORD_DERIVED(cmp::Pod, (), tag, value)
+XOFFSET_RECORD_DERIVED(cmp::Named, (), id, name, ids)
+XOFFSET_RECORD_DERIVED(cmp::Root, (), version, pod, pods, named, other, list)
 XOFFSET_REGISTER_SCHEMA_NAME(cmp::Root, "test.save_composed.root")
 static_assert(xo::has_implicit_padding_v<cmp::Pod> && xo::has_implicit_padding_v<cmp::Named>);
 

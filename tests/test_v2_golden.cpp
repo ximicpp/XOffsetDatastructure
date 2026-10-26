@@ -32,6 +32,8 @@ struct Model {
     xo::XMap<xo::XString, std::uint64_t> props;
 };
 } // namespace golden
+XOFFSET_RECORD_DERIVED(golden::Entry, (), id, active, label, values)
+XOFFSET_RECORD_DERIVED(golden::Model, (), version, name, entries, ids, props)
 
 XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 

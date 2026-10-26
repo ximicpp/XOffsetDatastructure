@@ -60,6 +60,11 @@ struct StdRec {
     std::int32_t tail{};
 };
 } // namespace shift
+XOFFSET_RECORD_DERIVED(shift::Troop, (), type, count, wounded, pad)
+XOFFSET_RECORD_DERIVED(shift::Rec, (), id, active, name, troops, res, tag0, tag1, tail)
+XOFFSET_RECORD_DERIVED(shift::Root, (), version, recs)
+XOFFSET_RECORD_DERIVED(shift::PlainRec, (), id, active, name, troops, res, tag0, tag1, tail)
+XOFFSET_RECORD_DERIVED(shift::PlainRoot, (), version, recs)
 
 XOFFSET_REGISTER_SCHEMA_NAME(shift::Root, "test.shift.root")
 XOFFSET_REGISTER_SCHEMA_NAME(shift::PlainRoot, "test.shift.plain")

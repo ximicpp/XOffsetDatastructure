@@ -24,6 +24,8 @@ struct EnvelopeDataAlias {
     XString name;
     XVector<int32_t> items;
 };
+XOFFSET_RECORD_DERIVED(EnvelopeData, (), id, name, items)
+XOFFSET_RECORD_DERIVED(EnvelopeDataAlias, (), id, name, items)
 
 XOFFSET_REGISTER_SCHEMA_NAME(EnvelopeData, "test.EnvelopeData")
 XOFFSET_REGISTER_SCHEMA_NAME(EnvelopeDataAlias, "test.EnvelopeDataAlias")

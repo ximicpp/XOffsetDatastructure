@@ -10,10 +10,8 @@
 #include <cassert>
 #include <cstring>
 #include "../xoffsetdatastructure.hpp"
-#include <boost/typelayout.hpp>
 
 using namespace XOffsetDatastructure;
-using namespace boost::typelayout;
 
 // ============================================================================
 // Test Data Structures
@@ -68,6 +66,16 @@ struct FullCharacter : Entity {
     Stats stats;                    // composition
     XVector<XString> abilities;     // container member
 };
+XOFFSET_RECORD_DERIVED(HasLevel, (), level)
+XOFFSET_RECORD_DERIVED(HasName, (), name)
+XOFFSET_RECORD_DERIVED(HasId, (), id)
+XOFFSET_RECORD_DERIVED(Entity, (), id, name)
+XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)
+XOFFSET_RECORD_DERIVED(Character, (Entity), hp, mp)
+XOFFSET_RECORD_DERIVED(Warrior, (Character), strength, skills)
+XOFFSET_RECORD_DERIVED(MixinPlayer, (HasId, HasName, HasLevel), inventory)
+XOFFSET_RECORD_DERIVED(Stats, (), attack, defense)
+XOFFSET_RECORD_DERIVED(FullCharacter, (Entity), stats, abilities)
 
 // ============================================================================
 // Test Functions
@@ -250,15 +258,16 @@ bool test_inheritance_compaction() {
     return true;
 }
 
+// Root struct that holds a vector of inherited types
+struct Team {
+    XString team_name;
+    XVector<Player> members;
+};
+XOFFSET_RECORD_DERIVED(Team, (), team_name, members)
+
 bool test_inheritance_in_vector() {
     std::cout << "\n[TEST] Inherited types inside XVector\n";
     std::cout << std::string(50, '-') << "\n";
-
-    // Root struct that holds a vector of inherited types
-    struct Team {
-        XString team_name;
-        XVector<Player> members;
-    };
 
     XBuffer xbuf(16384);
     auto* team = xbuf.make<Team>();
@@ -324,6 +333,14 @@ bool test_multiple_inheritance_compaction() {
     return true;
 }
 
+// Types the safety checks must reject.
+struct HasVirtual { virtual void foo() {} int x; };
+struct DerivedVirtual : HasVirtual { int y; };
+struct BadBase { std::string name; };
+struct DerivedBad : BadBase { int x; };
+XOFFSET_RECORD_DERIVED(BadBase, (), name)
+XOFFSET_RECORD_DERIVED(DerivedBad, (BadBase), x)
+
 bool test_safety_validation() {
     std::cout << "\n[TEST] Safety Validation (compile-time checks)\n";
     std::cout << std::string(50, '-') << "\n";
@@ -338,18 +355,14 @@ bool test_safety_validation() {
     static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Stats>,        "Stats (plain struct) should be safe");
 
     // Virtual functions should be UNSAFE
-    struct HasVirtual { virtual void foo() {} int x; };
     static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasVirtual>,
                   "HasVirtual should be unsafe");
 
     // Types inheriting from polymorphic should be UNSAFE
-    struct DerivedVirtual : HasVirtual { int y; };
     static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<DerivedVirtual>,
                   "DerivedVirtual should be unsafe");
 
     // Struct with unsafe members in base should be UNSAFE
-    struct BadBase { std::string name; };
-    struct DerivedBad : BadBase { int x; };
     static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<DerivedBad>,
                   "DerivedBad should be unsafe (base has std::string)");
 

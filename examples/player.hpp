@@ -12,5 +12,6 @@ struct Player {
 	XString name;
 	XVector<int32_t> items;
 };
+XOFFSET_RECORD_DERIVED(Player, (), id, level, name, items)
 
 #endif // PLAYER_HPP_

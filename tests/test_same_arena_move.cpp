@@ -114,6 +114,8 @@ struct MoveRoot {
     XVector<std::uint32_t> a, b;
     XVector<MoveRecord> records;
 };
+XOFFSET_RECORD_DERIVED(MoveRecord, (), id, name, values, labels)
+XOFFSET_RECORD_DERIVED(MoveRoot, (), left, right, a, b, records)
 XOFFSET_REGISTER_SCHEMA_NAME(MoveRoot, "test.O3.same-arena-move.v1")
 
 // A finite local tree exercises public-container ancestor/descendant assignment.
@@ -123,6 +125,8 @@ namespace XOffsetDatastructure {
 template <> struct is_byte_copy_safe<LocalNode> : std::true_type {};
 }
 struct LocalTree { XVector<LocalNode> nodes; };
+XOFFSET_RECORD_DERIVED(LocalNode, (), id, children)
+XOFFSET_RECORD_DERIVED(LocalTree, (), nodes)
 
 namespace {
 std::size_t cases = 0, fast_new_attempts = 0, retire_new_attempts = 0, retire_new_hits = 0;
