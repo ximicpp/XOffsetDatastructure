@@ -1969,16 +1969,6 @@ namespace XOffsetDatastructure {
             }
         }
 
-        template <typename T>
-        consteval std::size_t reflected_base_count() {
-            return schema::base_count_v<T>;
-        }
-
-        template <typename T>
-        consteval std::size_t reflected_member_count() {
-            return schema::member_count_v<T>;
-        }
-
         template <typename T, typename BaseFn, typename MemberFn>
         void for_each_reflected_subobject(BaseFn&& on_base, MemberFn&& on_member) {
             static_for<schema::base_count_v<T>>([&](auto index) {
