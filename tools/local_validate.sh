@@ -245,7 +245,8 @@ for s in $ALL_STEPS; do
     rc=$?
     mins=$(( ($(date +%s) - t0 + 30) / 60 ))
     if (( rc == 0 )); then res=pass; else res=FAIL; overall=1; fi
-    detail=$(detail_of "$s" 2>/dev/null | tr '\t\n' '  ')
+    # build.sh colours its last line; keep escape codes out of the table.
+    detail=$(detail_of "$s" 2>/dev/null | sed -E $'s/\x1b\\[[0-9;]*m//g' | tr '\t\n' '  ')
     printf '%s\t%s\t%s\t%s\n' "$s" "$res" "$mins" "$detail" >> "$RESULTS"
     log "$s: $res in ${mins} min${detail:+ ($detail)}"
     if (( rc != 0 && FAIL_FAST )); then break; fi
