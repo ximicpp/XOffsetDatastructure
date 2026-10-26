@@ -27,15 +27,12 @@ namespace snapshot_index_detail {
         } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
             bool stop = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
-                constexpr auto base = std::meta::bases_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                using Base = [:std::meta::type_of(base):];
+                using Base = schema::base_t<U, decltype(index)::value>;
                 if (!stop) stop = inline_heads(static_cast<const Base&>(value), visit);
             }, [&](auto index) {
-                constexpr auto member = std::meta::nonstatic_data_members_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                if constexpr (!std::meta::is_bit_field(member))
-                    if (!stop) stop = inline_heads(value.[:member:], visit);
+                using member = schema::member_t<U, decltype(index)::value>;
+                if constexpr (!member::is_bit_field)
+                    if (!stop) stop = inline_heads(member::get(value), visit);
             });
             return stop;
         }
@@ -60,15 +57,12 @@ namespace snapshot_index_detail {
         } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
             bool found = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
-                constexpr auto base = std::meta::bases_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                using Base = [:std::meta::type_of(base):];
+                using Base = schema::base_t<U, decltype(index)::value>;
                 if (!found) found = find_parent(static_cast<const Base&>(value), parent);
             }, [&](auto index) {
-                constexpr auto member = std::meta::nonstatic_data_members_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                if constexpr (!std::meta::is_bit_field(member))
-                    if (!found) found = find_parent(value.[:member:], parent);
+                using member = schema::member_t<U, decltype(index)::value>;
+                if constexpr (!member::is_bit_field)
+                    if (!found) found = find_parent(member::get(value), parent);
             });
             return found;
         }
