@@ -146,6 +146,27 @@ void free_table_and_allocation_match() {
     need(!rt.free_table_complete(), "clone_into completed an unknown free table");
 }
 
+// The only small hole sits in a later 64-bin word than the request, so the
+// search reaches it only through the copied table's nonempty-word summary.
+void later_word_hole_is_found_after_clone() {
+    auto src = XBuffer::create<CloneRoot>(1u << 16, cap());
+    auto* hole = src.arena()->allocate_aligned(2048, 8);
+    auto* keep = src.arena()->allocate_aligned(64, 8);
+    std::memset(keep, 0x5a, 64);
+    src.arena()->deallocate(hole, 2048);
+    need(src.free_block_count() == 1, "fixture should have exactly one hole");
+    auto c = src.clone();
+    auto target = XBuffer::create<CloneRoot>(4096, cap());
+    src.clone_into(target);
+    auto* a = static_cast<char*>(src.arena()->allocate_aligned(16, 8));
+    auto* b = static_cast<char*>(c.arena()->allocate_aligned(16, 8));
+    auto* t = static_cast<char*>(target.arena()->allocate_aligned(16, 8));
+    need(a == static_cast<char*>(hole), "source did not reuse its later-word hole");
+    need(b - c.data() == a - src.data() && t - target.data() == a - src.data(),
+         "clone missed a hole in a later bin word");
+    need(same_free_table(c, src) && same_free_table(target, src), "free table after split diverged");
+}
+
 void wire_identical_and_round_trip() {
     auto src = make_source(4, 2000);
     const auto wire = src.save_verified<CloneRoot>();
@@ -348,6 +369,7 @@ int main() {
     try {
         clone_is_independent();
         free_table_and_allocation_match();
+        later_word_hole_is_found_after_clone();
         wire_identical_and_round_trip();
         clone_into_reuses_destination();
         explicit_growth_keeps_room();

@@ -56,6 +56,9 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 
 - 默认增长策略是 `XGrowPolicy::Explicit`，空间不够时抛 `XBadAlloc`；需要自动增长时
   显式选择 `XGrowPolicy::Automatic`。`maximum_capacity` 始终是硬上限。
+- 自动增长通常把逻辑长度翻倍；`reload_verified` 之后，在以前用过的范围内
+  每次只增长 4 KiB（重新露出的字节要清零，按需清零更省），越过以前的最高位置后恢复
+  翻倍。逻辑长度只影响 `get_size()`，不影响 wire。
 - 容器头必须位于所属 arena 内。给插入接口传 `std::string_view`、`std::string` 等
   原生值，不要在栈上构造绑定 arena 的 `XString` 临时对象。
 - 容器扩容、插入、删除会移动元素，规则和 `std::vector` 相同；`XSet`、`XMap` 是有序
