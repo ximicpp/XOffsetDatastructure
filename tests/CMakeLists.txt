@@ -99,6 +99,7 @@ set(REFLECTION_TESTS
     test_free_run_emission
     test_wire_populate
     test_reload_reset
+    test_reset_used_range
     test_clone
 )
 
