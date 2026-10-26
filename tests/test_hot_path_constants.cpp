@@ -17,6 +17,7 @@ struct HotRoot {
     XVector<std::int32_t> ints;
     XVector<std::uint64_t> wides;
 };
+XOFFSET_RECORD_DERIVED(HotRoot, (), strings, ints, wides)
 XOFFSET_REGISTER_SCHEMA_NAME(HotRoot, "test.HotPathConstants")
 
 namespace {

@@ -61,6 +61,8 @@ struct Root {
     xo::XMap<xo::XString, std::uint64_t> attrs;
 };
 } // namespace fz
+XOFFSET_RECORD_DERIVED(fz::Item, (), id, flag, name, vals)
+XOFFSET_RECORD_DERIVED(fz::Root, (), epoch, title, items, tags, keys, attrs)
 
 XOFFSET_REGISTER_SCHEMA_NAME(fz::Root, "fuzz.v2.root")
 

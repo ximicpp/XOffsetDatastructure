@@ -21,6 +21,7 @@ struct CheckedRoot {
     XMap<int32_t, int32_t> map;
     XVector<XString> labels;
 };
+XOFFSET_RECORD_DERIVED(CheckedRoot, (), id, enabled, bits, name, values, map, labels)
 XOFFSET_REGISTER_SCHEMA_NAME(CheckedRoot, "test.CheckedRoot")
 
 namespace {

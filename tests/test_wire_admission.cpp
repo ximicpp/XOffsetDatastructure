@@ -11,14 +11,16 @@
 #include <cstring>
 #include <iostream>
 
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct WireRoot {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Alloc>
     WireRoot(Alloc alloc)
         : title(alloc), blob(alloc), values(alloc), ids(alloc), names(alloc) {}
+#endif
 
     int32_t id{0};
     XString title;
@@ -29,8 +31,10 @@ struct WireRoot {
 };
 
 struct WireOther {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Alloc>
     WireOther(Alloc alloc) : label(alloc) {}
+#endif
 
     XString label;
 };
@@ -43,6 +47,20 @@ struct BaseRecord { int32_t base; };
 struct DerivedRecord : BaseRecord { int32_t extra; };
 struct ExtendedString : XString { int32_t extra; };
 struct ExtendedMap : XMap<int32_t, int32_t> { int32_t extra; };
+XOFFSET_RECORD_DERIVED(ExtendedString, (XOffsetDatastructure::XString), extra)
+XOFFSET_RECORD_DERIVED(ExtendedMap, (XOffsetDatastructure::XMap<int, int>), extra)
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(WireRoot, (), id, title, blob, values, ids, names)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(WireOther, (), label)
+#endif
+XOFFSET_RECORD_DERIVED(BaseRecord, (), base)
+XOFFSET_RECORD_DERIVED(HasLong, (), value)
+XOFFSET_RECORD_DERIVED(HasWchar, (), value)
+XOFFSET_RECORD_DERIVED(HasLongDouble, (), value)
+XOFFSET_RECORD_DERIVED(HasPointer, (), ptr)
+XOFFSET_RECORD_DERIVED(DerivedRecord, (BaseRecord), extra)
 
 XOFFSET_REGISTER_SCHEMA_NAME(WireRoot, "test.WireRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(WireOther, "test.WireOther")

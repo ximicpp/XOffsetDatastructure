@@ -48,6 +48,7 @@ struct PathsRoot {
     xo::XVector<std::uint8_t> blob;
     xo::XVector<xo::XString> labels;
 };
+XOFFSET_RECORD_DERIVED(PathsRoot, (), value, enabled, name, blob, labels)
 XOFFSET_REGISTER_SCHEMA_NAME(PathsRoot, "test.VerifiedPathsRoot")
 
 namespace {

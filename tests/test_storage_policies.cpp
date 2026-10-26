@@ -14,6 +14,7 @@ struct PolicyRoot {
     XVector<std::uint32_t> values;
     XString text;
 };
+XOFFSET_RECORD_DERIVED(PolicyRoot, (), marker, values, text)
 XOFFSET_REGISTER_SCHEMA_NAME(PolicyRoot, "test.storage.policies.v1")
 
 struct NestedPolicyValue { XString first, second; };
@@ -21,6 +22,8 @@ struct NestedPolicyRoot {
     NestedPolicyValue source;
     XVector<NestedPolicyValue> rows;
 };
+XOFFSET_RECORD_DERIVED(NestedPolicyValue, (), first, second)
+XOFFSET_RECORD_DERIVED(NestedPolicyRoot, (), source, rows)
 XOFFSET_REGISTER_SCHEMA_NAME(NestedPolicyRoot, "test.storage.policies.nested.v1")
 
 namespace {

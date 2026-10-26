@@ -18,6 +18,7 @@ using namespace XOffsetDatastructure;
 struct AppendRoot {
     XVector<XString> strings;
 };
+XOFFSET_RECORD_DERIVED(AppendRoot, (), strings)
 XOFFSET_REGISTER_SCHEMA_NAME(AppendRoot, "test.StringAppend")
 
 namespace {

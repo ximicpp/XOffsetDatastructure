@@ -37,6 +37,19 @@ struct ArrayOfPadded { Tail items[2]; };
 struct BigArray { std::uint32_t n{}; Interior items[4096]; };         // one element reflected, not 4096
 struct Grid { ArrayOfPadded rows[64][3]; };                            // array of records holding arrays
 } // namespace pad
+XOFFSET_RECORD_DERIVED(pad::Dense, (), a, b)
+XOFFSET_RECORD_DERIVED(pad::Interior, (), tag, value)
+XOFFSET_RECORD_DERIVED(pad::Tail, (), value, tag)
+XOFFSET_RECORD_DERIVED(pad::Explicit, (), tag, reserved, value)
+XOFFSET_RECORD_DERIVED(pad::HoldsInterior, (), id, inner)
+XOFFSET_RECORD_DERIVED(pad::Strings, (), name, ids)
+XOFFSET_RECORD_DERIVED(pad::EnumPair, (), kind, other, n)
+XOFFSET_RECORD_DERIVED(pad::DenseRoot, (), d, e, s, k, arr, by_id, set)
+XOFFSET_RECORD_DERIVED(pad::VectorOfPadded, (), items)
+XOFFSET_RECORD_DERIVED(pad::MapWithPaddedPair, (), m)
+XOFFSET_RECORD_DERIVED(pad::ArrayOfPadded, (), items)
+XOFFSET_RECORD_DERIVED(pad::BigArray, (), n, items)
+XOFFSET_RECORD_DERIVED(pad::Grid, (), rows)
 
 // A large array costs one element's ranges, repeated (compile-time bound).
 static_assert(xo::detail::padding_ranges<pad::Interior[4096]>.size() == 1);
@@ -70,6 +83,9 @@ struct Root {
     xo::XVector<std::uint64_t> scratch;
 };
 } // namespace padrt
+XOFFSET_RECORD_DERIVED(padrt::Entry, (), tag, value)
+XOFFSET_RECORD_DERIVED(padrt::WithString, (), id, name)
+XOFFSET_RECORD_DERIVED(padrt::Root, (), entries, resources, named, scratch)
 
 XOFFSET_REGISTER_SCHEMA_NAME(padrt::Root, "test.implicit_padding.root")
 

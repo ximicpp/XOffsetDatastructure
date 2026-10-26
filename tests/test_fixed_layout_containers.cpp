@@ -34,6 +34,10 @@ struct FixedAssocRoot {
     XFixedFlatMap<int32_t, XFixedString> by_id;
     XFixedFlatMap<XFixedString, int32_t> by_name;
 };
+XOFFSET_RECORD_DERIVED(FixedRoot, (), id, name, values)
+XOFFSET_RECORD_DERIVED(FixedItem, (), code, label)
+XOFFSET_RECORD_DERIVED(FixedNestedRoot, (), owner, items)
+XOFFSET_RECORD_DERIVED(FixedAssocRoot, (), ids, names, by_id, by_name)
 
 XOFFSET_REGISTER_SCHEMA_NAME(FixedRoot, "test.FixedRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(FixedNestedRoot, "test.FixedNestedRoot")
