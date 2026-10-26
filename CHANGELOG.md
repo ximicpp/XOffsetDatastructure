@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Linux output prefetch: in a `save_verified` / `save_verified_into` output of
+  at least 1 MiB, each copy of at least 256 KiB into pages that are not yet
+  resident is preceded, per 256 KiB chunk, by `madvise(MADV_POPULATE_WRITE)`,
+  so the kernel faults the pages in one call instead of one trap per page.
+  Reused (resident) outputs and smaller ones are unchanged. Kernels before
+  5.14 answer `EINVAL` once, after which outputs are copied plainly. Same wire
+  bytes; Darwin and Windows code unchanged. On the formal M final state (12.6
+  MB) a new output takes 36 page-fault traps instead of 3083 (cloud, GCC 16).
 - Send path: `XSaveOptions{.emission}` picks the wire form of
   `save_verified` / `save_verified_into`; both APIs emit the same bytes for
   the same state.

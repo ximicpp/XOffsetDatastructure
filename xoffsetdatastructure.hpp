@@ -47,6 +47,9 @@
 #include <atomic>
 #include <map>
 #include <unordered_map>
+#if defined(__linux__)
+#include <cerrno>
+#endif
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
 #include <cstdio>
 #include <typeinfo>
@@ -5146,6 +5149,22 @@ namespace XOffsetDatastructure {
 
         // E1 (N8): on Darwin, outputs of at least 1 MiB are copied in 256 KiB
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
+#if defined(__linux__)
+        // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
+        // 256 KiB whose last page is not resident (a fresh mapping, not a
+        // reused string) goes in 256 KiB chunks, each preceded by
+        // madvise(MADV_POPULATE_WRITE), so the kernel faults the chunk's pages
+        // in one call instead of one trap per page.
+        // A kernel without it (before 5.14) answers EINVAL once; the output
+        // is then copied as before for the rest of the process.
+#ifndef MADV_POPULATE_WRITE
+#define MADV_POPULATE_WRITE 23
+#endif
+#ifndef XOFFSET_WIRE_MADVISE
+#define XOFFSET_WIRE_MADVISE ::madvise
+#endif
+        inline std::atomic<bool> wire_populate_unsupported{false};
+#endif
         struct WireCopier {
             bool prefault = false;
             std::size_t page = 0;
@@ -5162,6 +5181,28 @@ namespace XOffsetDatastructure {
                     }
                     return;
                 }
+#elif defined(__linux__)
+                constexpr std::size_t chunk = std::size_t(256) << 10;
+                unsigned char last_page = 1;
+                if (prefault && n >= chunk && !wire_populate_unsupported.load(std::memory_order_relaxed) &&
+                    ::mincore(reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)),
+                              page, &last_page) == 0 && (last_page & 1u) == 0) {
+                    bool populate = true;
+                    for (std::size_t off = 0; off < n; off += chunk) {
+                        const auto len = std::min(chunk, n - off);
+                        if (populate) {
+                            const auto lo = reinterpret_cast<std::uintptr_t>(dst + off) & ~(page - 1u);
+                            const auto hi = (reinterpret_cast<std::uintptr_t>(dst + off) + len + page - 1u) & ~(page - 1u);
+                            if (XOFFSET_WIRE_MADVISE(reinterpret_cast<void*>(lo), hi - lo, MADV_POPULATE_WRITE) != 0 &&
+                                errno == EINVAL) {
+                                wire_populate_unsupported.store(true, std::memory_order_relaxed);
+                                populate = false;
+                            }
+                        }
+                        std::memcpy(dst + off, src + off, len);
+                    }
+                    return;
+                }
 #endif
                 std::memcpy(dst, src, n);
             }
@@ -5173,6 +5214,11 @@ namespace XOffsetDatastructure {
                 copier.prefault = true;
                 copier.page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
                 if (copier.page == 0 || (copier.page & (copier.page - 1u)) != 0) copier.prefault = false;
+            }
+#elif defined(__linux__)
+            if (output_bytes >= (std::size_t(1) << 20) && !wire_populate_unsupported.load(std::memory_order_relaxed)) {
+                copier.page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+                copier.prefault = copier.page != 0 && (copier.page & (copier.page - 1u)) == 0;
             }
 #else
             (void)output_bytes;
