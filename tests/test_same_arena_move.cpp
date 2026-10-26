@@ -119,7 +119,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(MoveRoot, "test.O3.same-arena-move.v1")
 // A finite local tree exercises public-container ancestor/descendant assignment.
 // It is deliberately NOT registered/loaded as a V1 recursive wire schema.
 struct LocalNode { std::uint32_t id; XVector<LocalNode> children; };
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template <> struct is_byte_copy_safe<LocalNode> : std::true_type {};
 }
 struct LocalTree { XVector<LocalNode> nodes; };

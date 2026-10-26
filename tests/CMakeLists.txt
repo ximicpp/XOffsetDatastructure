@@ -55,6 +55,7 @@ set(REFLECTION_TESTS
     test_type_signatures
     test_field_limit_fix
     test_type_safety
+    test_admission_typelayout
     test_wire_admission
     test_enum_support
     test_xstring_direct_assign
