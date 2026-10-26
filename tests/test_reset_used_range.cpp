@@ -140,6 +140,34 @@ int main() {
         ++resets;
     }
 
+    // The same for a reload: reload_verified releases the table to the
+    // keep-recycle, whose fast path (RL, taken when no bin grew since the
+    // last full recycle) must clear the word summary too. The first reload
+    // takes the full path and keeps bin 127's storage; the second hole in
+    // word 1 reuses that storage, so the second reload takes the fast path.
+    {
+        auto b = XBuffer::create<ResetRoot>(1u << 16, cap());
+        const auto wire = XBuffer::create<ResetRoot>(b.get_size(), cap()).save_verified<ResetRoot>();
+        for (int round = 0; round < 2; ++round) {
+            auto* before = b.arena()->allocate_aligned(1024, 8);   // bin 127, word 1
+            b.arena()->allocate_aligned(64, 8);
+            b.arena()->deallocate(before, 1024);
+            assert(b.free_block_count() == 1);
+            b.reload_verified<ResetRoot>(wire);
+        }
+        auto fresh = XBuffer::create<ResetRoot>(b.get_size(), cap());
+        fresh.reload_verified<ResetRoot>(wire);
+        for (auto* x : {&b, &fresh}) {
+            auto* hole = x->arena()->allocate_aligned(2048, 8); // bin 255, word 3
+            x->arena()->allocate_aligned(64, 8);
+            x->arena()->deallocate(hole, 2048);
+            assert(x->free_block_count() == 1);
+            auto* small = x->arena()->allocate_aligned(16, 8);
+            assert(small == hole && "a later word's hole was missed after reload");
+        }
+        assert(b.save_verified<ResetRoot>() == fresh.save_verified<ResetRoot>());
+    }
+
     std::cout << "test_reset_used_range: " << resets << " resets byte-identical to fresh buffers\n";
     return 0;
 }
