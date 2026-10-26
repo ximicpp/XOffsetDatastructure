@@ -215,6 +215,37 @@ def main():
     rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb2))
     expect("a signature change is not inlining", not row(out, "slg.D")["functions"]["inline_suspect"])
 
+    # B.in_decode: calls to malloc/free replaced by recycling the free table in place (D2, #33).
+    rec = "XOffsetDatastructure::XBufferCore::FreeTableRecycler::recycle(XOffsetDatastructure::XBufferCore::FreeTable&)"
+    lfb = "XOffsetDatastructure::XBufferCore::load_free_blocks(void const*, unsigned long)"
+    fb3 = dict(keys, **{"slg.B.in_decode": prof({"free": 128_000, "malloc": 63_000, "operator new(unsigned long)": 21_000,
+                                                 lfb: 188_000, "other": 4_600_000})})
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 904_000, "malloc": 300, lfb: 107_000, "other": 4_600_000})})
+    s3 = dict(BASE_SLG, **{"B.in_decode": 5_000_000 + 531_000})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("allocator calls replaced by recycling are flagged, verdict unchanged",
+           rc == 1 and row(out, "slg.B.in_decode")["verdict"] == "fail" and d["alloc_recycle"]
+           and d["alloc_recycle"]["kind"] == "alloc_calls_removed" and d["alloc_recycle"]["alloc"] == -211_700
+           and any("分配器回收型" in x and "D2 型" in x for x in out["notes"]))
+    summary = pg.render_summary(out, {}, {})
+    expect("the function table header carries the recycle flag", "分配器回收型（只是诊断，不放行）" in summary)
+
+    # The same recycle growth without fewer allocator calls: more bins to recycle (COPS).
+    fb3 = dict(keys, **{"slg.B.in_decode": prof({rec: 400_000, "malloc": 63_000, "other": 4_537_000})})
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 900_000, "malloc": 63_000, "other": 4_568_000})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("more recycle work with the same allocator calls is flagged as the COPS kind",
+           d["alloc_recycle"] and d["alloc_recycle"]["kind"] == "more_recycle_work"
+           and any("COPS 型" in x for x in out["notes"]))
+
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 500_000, "malloc": 63_000, "other": 5_068_000})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    expect("recycle growth below half of the increase is not flagged",
+           row(out, "slg.B.in_decode")["functions"]["alloc_recycle"] is None
+           and not any("分配器回收型" in x for x in out["notes"]))
+
     r = dict(BASE_RELOC, **{"map.insert.fresh": int(900_000 * 1.06)})
     rc, out = run_case(tree(reloc=r))
     expect("reloc case +6% fails as a phase", rc == 1 and row(out, "reloc.map.insert.fresh")["verdict"] == "fail"
