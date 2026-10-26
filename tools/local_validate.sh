@@ -16,6 +16,10 @@
 #   p2996     P2996 Clang + libc++ Release via ./build.sh: build, CTest, signature
 #             export/matrix/compat; tools/sigs must not change (the old P2996 CI job)
 #   p2996-ir  tools/perf_gate with P2996 Clang + libc++ (the Mac's compiler and library)
+#   asm       tools/perf_gate/asm_equal.py, GCC 16 and P2996: do base and head of the three
+#             benchmark programs have the same instructions per function and the same .text
+#             layout (MERGE_RULES_V2 class-0 evidence)? Reuses the Ir builds; a difference is
+#             reported in REPORT.md and fails the step only with --asm-strict
 #
 # The GCC steps run in the pinned gcc:16 image (the digest the CI used). The P2996 steps
 # run on the host with the toolchain at $P2996_ROOT (default /opt/p2996-toolchain): if it
@@ -38,7 +42,8 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-ALL_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir"
+ALL_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir asm"
+ASM_STRICT=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -47,7 +52,8 @@ while [[ $# -gt 0 ]]; do
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
-        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+        --asm-strict) ASM_STRICT=1; shift ;;
+        -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -84,7 +90,7 @@ docker_up() {
 need_gcc=0; need_p2996=0
 for s in $STEPS; do
     case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step: $s" >&2; exit 2 ;; esac
-    case $s in p2996*) need_p2996=1 ;; *) need_gcc=1 ;; esac
+    case $s in p2996*) need_p2996=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
 done
 
 log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, work $WORK"
@@ -174,8 +180,8 @@ step_smoke() {
     in_gcc "JOBS=$JOBS bench/ci_smoke.sh g++ '$CACHE/cereal/include' '$CACHE/vginc' '$WORK/smoke'"
 }
 
-# perf_gate for one compiler: prepare (git), build, measure (valgrind on the host), compare.
-perf_gate() {
+# perf_gate build for one compiler: prepare (git) and build base and head into $WORK/ir-<compiler>.
+perf_gate_build() {
     local compiler=$1 w="$WORK/ir-$1" P="$REPO/tools/perf_gate/perf_gate.py" cxx extra
     rm -rf "$w"
     python3 "$P" prepare --work "$w" --repo "$REPO" --base "$BASE_SHA" --head "$HEAD_SHA" || return 1
@@ -192,7 +198,13 @@ EOF
         extra="-isystem $CACHE/vginc"
     fi
     (cd "$w" && P2996_ROOT="$P2996_ROOT" python3 "$P" build --work "$w" --compiler "$compiler" --cxx "$cxx" \
-        --cereal "$CACHE/cereal/include" --extra-flags "$extra" --jobs "$JOBS") || return 1
+        --cereal "$CACHE/cereal/include" --extra-flags "$extra" --jobs "$JOBS")
+}
+
+# perf_gate for one compiler: build, measure (valgrind on the host), compare.
+perf_gate() {
+    local compiler=$1 w="$WORK/ir-$1" P="$REPO/tools/perf_gate/perf_gate.py"
+    perf_gate_build "$compiler" || return 1
     python3 "$P" measure --work "$w" --compiler "$compiler" --jobs "$JOBS" || return 1
     python3 "$P" compare --work "$w" --compiler "$compiler" --summary "$w/summary.md" --json "$w/gate.json"
     local rc=$?
@@ -215,6 +227,20 @@ step_p2996() {
 
 step_p2996_ir() { perf_gate p2996; }
 
+# Class-0 evidence per compiler, on the Ir builds when those steps ran (else builds them).
+step_asm() {
+    local c rc=0 r
+    for c in gcc16 p2996; do
+        [[ $c == p2996 ]] && (( ! P2996_OK )) && { echo "asm $c: not run (no P2996 toolchain)"; rc=1; continue; }
+        [[ -f $WORK/ir-$c/build-$c.json ]] || perf_gate_build "$c" || { echo "asm $c: build failed"; rc=1; continue; }
+        python3 "$REPO/tools/perf_gate/asm_equal.py" gate --work "$WORK/ir-$c" --compiler "$c" \
+            --summary "$WORK/asm-$c.md" --json "$WORK/asm-$c.json"
+        r=$?
+        (( r == 2 || (r == 1 && ASM_STRICT) )) && rc=1
+    done
+    return $rc
+}
+
 detail_of() {
     local s=$1 f="$WORK/logs/$1.log" w
     case $s in
@@ -223,6 +249,8 @@ detail_of() {
         fuzz) grep -E '^test_v2_fuzz: seed=' "$f" | sed -E 's/.*seed=([0-9]+).* cases=([0-9]+).*inconsistencies=([0-9]+).*/seed \1: \2 cases, \3 inconsistencies/' | paste -sd ';' ;;
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
         smoke) grep -E 'bench smoke passed|input wire' "$f" | tail -n 1 ;;
+        asm) for c in gcc16 p2996; do [[ -f $WORK/asm-$c.json ]] && python3 -c 'import json, sys
+print(sys.argv[2] + ": " + json.load(open(sys.argv[1]))["verdict"])' "$WORK/asm-$c.json" "$c"; done | paste -sd ';' ;;
         ir|p2996-ir)
             w="$WORK/ir-${s%-ir}"; [[ $s == ir ]] && w="$WORK/ir-gcc16"
             [[ -f $w/gate.json ]] && python3 -c 'import json, sys
@@ -261,6 +289,15 @@ done
     echo "| Step | Result | Minutes | Detail |"
     echo "| --- | --- | --- | --- |"
     while IFS=$'\t' read -r s r m d; do echo "| $s | $r | $m | $d |"; done < "$RESULTS"
+    for c in gcc16 p2996; do
+        [[ -f $WORK/asm-$c.md ]] || continue
+        echo
+        echo "<details><summary>Machine code, $c</summary>"
+        echo
+        cat "$WORK/asm-$c.md"
+        echo
+        echo "</details>"
+    done
     for c in gcc16 p2996; do
         [[ -f $WORK/ir-$c/summary.md ]] || continue
         echo
