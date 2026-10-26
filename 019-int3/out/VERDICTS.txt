@@ -1,0 +1,4 @@
+G-P4m 0
+G-FR 0
+reloc done
+ctest  p4m:0 fr:0
