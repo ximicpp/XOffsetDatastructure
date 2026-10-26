@@ -112,6 +112,11 @@ with no special handling.
 
 **Output.** On Darwin, outputs of at least 1 MiB are copied in 256 KiB chunks.
 Each chunk is preceded by `madvise(MADV_WILLNEED)` on its destination pages.
+On Linux, in an output of at least 1 MiB, a copy of at least 256 KiB into
+pages that are not yet resident (a new output, not a reused string) goes in
+256 KiB chunks, each preceded by `madvise(MADV_POPULATE_WRITE)`. A kernel
+without it (before 5.14) answers `EINVAL` once, and outputs are then copied
+plainly. The wire bytes are the same either way.
 
 ## 4. Allocator
 
