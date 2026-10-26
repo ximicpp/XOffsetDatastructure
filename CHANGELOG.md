@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- Send path: `XSaveOptions{.emission}` picks the wire form of
+  `save_verified` / `save_verified_into`; both APIs emit the same bytes for
+  the same state.
+  - `XWireEmission::free_runs` (default) skips each run of at least 4 KiB of
+    adjacent free blocks of at least 256 B. It replaces N10 (which built a
+    1 bit / 8 B free bitmap on every save of a buffer with 4 KiB of holes):
+    only the bins of at least 256 B and the large blocks are visited, sorted
+    by offset with a radix sort and merged. On the formal M final state it
+    skips the same run as N10 (about 6x cheaper to find, cloud box), and on the
+    golden model its bytes equal the earlier N10 pin. Skipped bytes are all
+    holes, so 0.3.0-beta.1 receivers accept it.
+  - `XWireEmission::dense`: one copy of the payload.
+  - `XWireEmission::zero_runs` skips every zero run of at least 64 bytes
+    (capacity slack, holes, zero fields), for cross-machine sends; the
+    receiver loads a byte-identical payload, so spare capacity is kept (K5
+    unchanged).
+  Receivers no longer require gap bytes to lie in holes: gaps load as zero and
+  the payload is validated as before, so the payload-level accept/reject set is
+  unchanged (fuzzed: every sparse wire has the outcome and error of its dense
+  equivalent); the wire-level accept set grows by sparse wires whose gaps
+  cover live zero bytes.
+- `save_verified_into` into an output whose capacity already holds the dense
+  wire examines and normalizes the source once instead of twice.
+- New `save_compact<T>(XCompactOptions)` / `save_compact_into<T>(out, ...)`
+  write a compact wire (preorder layout, no holes) by direct traversal of the
+  source graph, with no temporary buffer; the source is not modified. By
+  default vectors of at least 8 elements (not strings) keep size / 8 + 1
+  zeroed spare elements (`slack_div = 8`), so a receiver that edits them does
+  not relocate on the first insert. With `slack_div = 0` capacity == size and
+  the bytes are identical to `XCompactor::compact<T>(b).save_verified<T>()`
+  (tested over 600 random models), 7x (840 KB shard) to 85x (1.6 KB) faster
+  than compact-then-save on the cloud box.
 - Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
   source's size, maximum capacity, growth policy and pool) and
   `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;
