@@ -150,18 +150,17 @@ consteval bool shift_rebase_domain() {
     else if constexpr (std::is_array_v<T>) return shift_rebase_domain<std::remove_extent_t<T>>();
     else if constexpr (std::is_scalar_v<T>) return true;
     else if constexpr (std::is_class_v<T>) {
-        if constexpr (reflected_base_count<T>() != 0) return false;
+        if constexpr (schema::base_count_v<T> != 0) return false;
         else return []<std::size_t... I>(std::index_sequence<I...>) {
             return ([] {
-                constexpr auto member = std::meta::nonstatic_data_members_of(
-                    ^^T, std::meta::access_context::unchecked())[I];
-                if constexpr (std::meta::is_bit_field(member)) return false;
+                using member = schema::member_t<T, I>;
+                if constexpr (member::is_bit_field) return false;
                 else {
-                    using M = [:std::meta::type_of(member):];
+                    using M = typename member::type;
                     return shift_rebase_domain<M>();
                 }
             }() && ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
 
@@ -209,12 +208,11 @@ void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 shift_rebase_inline_value<E>(address + i * sizeof(E), shift);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
-                shift_rebase_inline_value<M>(address + std::meta::offset_of(member).bytes, shift);
+                shift_rebase_inline_value<M>(address + member::offset, shift);
         });
     }
 }
@@ -239,12 +237,11 @@ void empty_vacated_slot(T* slot) noexcept {
     } else if constexpr (std::is_array_v<T>) {
         for (auto& element : *slot) empty_vacated_slot(&element);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
-                empty_vacated_slot(&(slot->[:member:]));
+                empty_vacated_slot(&member::get(*slot));
         });
     }
 }
@@ -267,20 +264,19 @@ consteval bool subtree_copy_domain() {
     } else if constexpr (std::is_array_v<T>) return subtree_copy_domain<std::remove_extent_t<T>>();
     else if constexpr (std::is_scalar_v<T>) return true;
     else if constexpr (std::is_class_v<T>) {
-        if constexpr (reflected_base_count<T>() != 0) return false;
+        if constexpr (schema::base_count_v<T> != 0) return false;
         else if constexpr (!std::is_trivially_copyable_v<T> &&
                            !ordinary_outer_lifetime_supported<T>()) return false;
         else return []<std::size_t... I>(std::index_sequence<I...>) {
             return ([] {
-                constexpr auto member = std::meta::nonstatic_data_members_of(
-                    ^^T, std::meta::access_context::unchecked())[I];
-                if constexpr (std::meta::is_bit_field(member)) return false;
+                using member = schema::member_t<T, I>;
+                if constexpr (member::is_bit_field) return false;
                 else {
-                    using M = [:std::meta::type_of(member):];
+                    using M = typename member::type;
                     return subtree_copy_domain<M>();
                 }
             }() && ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
 
@@ -344,11 +340,10 @@ void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept {
     } else if constexpr (std::is_array_v<T>) {
         for (const auto& element : value) subtree_measure_value(element, extent);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
-            if constexpr (raw_needs_activation<M>()) subtree_measure_value<M>(value.[:member:], extent);
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
+            if constexpr (raw_needs_activation<M>()) subtree_measure_value<M>(member::get(value), extent);
         });
     }
 }
@@ -405,12 +400,11 @@ void subtree_fix_value(char* address, XArena* arena) noexcept {
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 subtree_fix_value<E>(address + i * sizeof(E), arena);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
-                subtree_fix_value<M>(address + std::meta::offset_of(member).bytes, arena);
+                subtree_fix_value<M>(address + member::offset, arena);
         });
     }
 }
@@ -495,13 +489,12 @@ void subtree_compact_value(char* address, const T& source, XArena* arena, char*&
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 subtree_compact_value<E>(address + i * sizeof(E), source[i], arena, cursor);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
-                subtree_compact_value<M>(address + std::meta::offset_of(member).bytes,
-                                         source.[:member:], arena, cursor);
+                subtree_compact_value<M>(address + member::offset,
+                                         member::get(source), arena, cursor);
         });
     }
 }

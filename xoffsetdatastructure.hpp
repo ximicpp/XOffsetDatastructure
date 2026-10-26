@@ -20,6 +20,7 @@
 #else
 #include <experimental/meta>
 #endif
+#include "xoffset_schema.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <compare>
