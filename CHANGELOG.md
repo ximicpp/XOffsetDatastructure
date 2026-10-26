@@ -93,6 +93,16 @@
   and first errors are unchanged (`test_v2_fuzz` compares every case with the
   cursor off). Map/set key order is checked without an early exit, and
   validation errors are raised from one out-of-line function.
+- API: `XBuffer::begin_verified_reload<T>(used, holes, extents)` receives a
+  wire directly into an existing buffer (no library copy, no new owner): the
+  transport writes the header, extent table, payload (dense, or each extent at
+  its offset) and hole table into the token's spans, calls `complete()` with
+  the counts written, then `finish()`. Verification is `reload_verified`'s
+  (same validator, same accept/reject set, `test_v2_fuzz` acceptor 6); an
+  incomplete, aborted or mis-declared delivery rejects and leaves the buffer
+  rootless. Nothing is cleared at begin: a dense payload is overwritten whole,
+  and only the parts of sparse gaps that earlier content made dirty are
+  zeroed at finish. `VerifiedReloadToken<T>`; `XOFFSET_VERIFIED_RELOAD_API`.
 - Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
   root type, canonical / ascending-with-holes / out-of-order wires that pass
   verified validation and prints them to stderr at exit (not thread-safe;
