@@ -27,9 +27,13 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
   bisect   DIR  checkpoint run that failed (frozen with --bisect): next bisection step, or the culprit
+  bisect-supply DIR COMMIT SC WIRE SLG  the binaries of a deferred bisection point (--bisect COMMIT|LABEL),
+                built only when the bisection reaches it
+  bisect-auto DIR  the unattended bisection of a failed checkpoint after a supply (auto does it after the gate)
   auto     DIR  unattended: formal 1-2, SLG, the pre-registered follow-ups (one replacement per invalid
                 batch/group, third batch or SLG group 2 in the pending band), analyze, and the bisection of
-                a failing checkpoint; exit 0 pass / 10 fail / 11 pending / 12 invalid / 13 incomplete / 14 n/a
+                a failing checkpoint; exit 0 pass / 10 fail / 11 pending / 12 invalid / 13 incomplete / 14 n/a /
+                15 fail, the bisection needs a deferred point built (BISECT.json names it)
   selftest      synthetic data through the whole analysis
   diag-freeze / diag-formal / diag-analyze   a diagnostic batch with any set of equal-length labels and
                 A/A copies (same harness, copies and start conditions; report only, no verdict)
@@ -172,6 +176,10 @@ RULES = {
                     'pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; '
                     'f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]',
         'spread': 'a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges',
+        'deferred': '性能优化 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the '
+                    'bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred '
+                    'point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head '
+                    'still give its value without timing, so a build costs no timed step',
         'max_steps': 3,
         'result': 'hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported',
     },
@@ -231,9 +239,10 @@ def cmd_freeze(a):
         prep[name] = {'log': os.path.basename(path), 'log_sha256': h(path), 'exit': int(code)}
         if int(code) != 0: problems.append(f'prep {name} exit {code} (see {path})')
     bis = []
-    for item in a.bisect or []:  # COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN, oldest first
+    for item in a.bisect or []:  # COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN, oldest first; COMMIT|LABEL = deferred
         f = item.split('|')
-        if len(f) != 5: problems.append(f'--bisect {item!r}: want COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN'); continue
+        if len(f) == 2: bis.append(f + [None] * 3); continue
+        if len(f) != 5: problems.append(f'--bisect {item!r}: want COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN or COMMIT|LABEL'); continue
         if any(not os.path.isfile(x) for x in f[2:]): problems.append(f'--bisect {f[0]}: missing file'); continue
         bis.append(f)
     if len({f[0] for f in bis}) != len(bis): problems.append('--bisect: a commit is listed twice')
@@ -267,6 +276,8 @@ def cmd_freeze(a):
         fr['bisect'] = []
         for i, (c, lab, b, w, sl) in enumerate(bis):
             P = f'bisect/{i:02d}-{c[:7]}'; os.makedirs(f'{D}/{P}')
+            if b is None:
+                fr['bisect'].append({'commit': c, 'label': lab, 'dir': P, 'formal': None, 'wire': None, 'slg': None, 'deferred': True}); continue
             for x, y in ((b, 'sc'), (w, 'sc.input.wire'), (sl, 'slg')): shutil.copy2(x, f'{D}/{P}/{y}')
             fr['bisect'].append({'commit': c, 'label': lab, 'dir': P, 'formal': h(f'{D}/{P}/sc'), 'wire': h(f'{D}/{P}/sc.input.wire'),
                                  'slg': h(f'{D}/{P}/slg')})
@@ -282,6 +293,7 @@ def cmd_freeze(a):
     print(f'FREEZE.json written: {D}')
     for k, v in fr['binaries'].items(): print(f'  {k:12s} {v}')
     for x in fr.get('bisect', []):
+        if x.get('deferred'): print(f'  bisect {x["commit"][:12]} {x["label"]}: deferred (built when the bisection reaches it)'); continue
         print(f'  bisect {x["commit"][:12]} {x["label"]}: formal {x["formal"][:12]} slg {x["slg"][:12]} wire {x["wire"][:12]}')
     for part in ('formal', 'slg'):
         if not_applicable(fr, part): print(f'  {part}: NOT APPLICABLE, head and anchor binaries are identical ({not_applicable(fr, part)}); skip its timing')
@@ -1186,15 +1198,22 @@ def failed_metrics(res):
     return out
 
 
-def bisect_points(fr, parts):
-    """anchor, the --bisect commits, head; consecutive identical binaries (for the failed parts) collapse to the earliest."""
+def supplied(D):
+    try: return json.load(open(D + '/BISECT_SUPPLIED.json'))
+    except FileNotFoundError: return {}
+
+
+def bisect_points(fr, parts, sup=None):
+    """anchor, the --bisect commits, head; consecutive identical binaries (for the failed parts) collapse to the earliest.
+    Deferred points take their supplied hashes (None until built) and never collapse."""
     key = lambda f, s: tuple(x for p, x in (('formal', f), ('slg', s)) if p in parts)
+    sup = sup or {}
     raw = ([{'commit': fr['anchor']['commit'], 'label': 'anchor', 'formal': fr['binaries']['anchor'], 'slg': fr['slg']['anchor'], 'role': 'anchor'}]
-           + [{**x, 'role': 'commit'} for x in fr['bisect']]
+           + [{**x, **{k: v for k, v in sup.get(x['commit'], {}).items() if k in ('formal', 'slg', 'wire')}, 'role': 'commit'} for x in fr['bisect']]
            + [{'commit': fr['head']['commit'], 'label': 'head', 'formal': fr['binaries']['head'], 'slg': fr['slg']['head'], 'role': 'head'}])
     pts = []
     for x in raw:
-        if pts and key(pts[-1]['formal'], pts[-1]['slg']) == key(x['formal'], x['slg']):
+        if pts and not x.get('deferred') and not pts[-1].get('deferred') and key(pts[-1]['formal'], pts[-1]['slg']) == key(x['formal'], x['slg']):
             pts[-1].setdefault('same', []).append(x['commit']); continue
         pts.append(dict(x))
     return pts
@@ -1236,7 +1255,7 @@ def cmd_bisect(a):
     metrics = failed_metrics(res)
     if not metrics: sys.exit('the checkpoint failed but no failed metric has a geometric mean above 1: no direction to bisect, report')
     parts = {p for p, _ in metrics}
-    pts = bisect_points(fr, parts)
+    pts = bisect_points(fr, parts, supplied(D))
     lo, hi, steps, log = 0, len(pts) - 1, [], []
     rr = sum(r * r for r in metrics.values())
     def value(i, S=None, frs=None):
@@ -1256,6 +1275,10 @@ def cmd_bisect(a):
         mid = (lo + hi) // 2
         vals, need, detail = value(mid)
         S = None
+        if vals is None and pts[mid].get('deferred') and pts[mid]['formal'] is None:
+            log.append({'step': None, 'dir': None, 'point': pts[mid]['commit'], 'label': pts[mid]['label'], 'build': pts[mid]['commit'],
+                        'waiting': [f'build {pts[mid]["commit"]}, then bisect-supply {D} {pts[mid]["commit"]} SC WIRE SLG']})
+            break
         if vals is None:
             k += 1
             S = f'{D}/bisect-{k}'
@@ -1293,15 +1316,36 @@ def cmd_bisect(a):
     out = {'checkpoint': fr['name'], 'failed_metrics': {f'{p}:{m}': math.exp(r) for (p, m), r in metrics.items()},
            'points': [{k2: v for k2, v in x.items() if k2 in ('commit', 'label', 'role', 'same')} for x in pts], 'steps': log,
            'range': {'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'lo_label': pts[lo]['label'], 'hi_label': pts[hi]['label']},
-           'status': 'culprit' if done else 'waiting' if waiting else 'max_steps', 'rules': C}
+           'status': 'culprit' if done else ('build' if 'build' in log[-1] else 'waiting') if waiting else 'max_steps', 'rules': C}
     if done: out['culprit'] = {'commit': pts[hi]['commit'], 'label': pts[hi]['label'], 'same_binaries': pts[hi].get('same', [])}
     json.dump(out, open(D + '/BISECT.json', 'w'), indent=1)
     open(D + '/BISECT.md', 'w').write(render_bisect(out))
     if done: print(f'DONE culprit {pts[hi]["commit"]} {pts[hi]["label"]}')
+    elif out['status'] == 'build': print(f'BUILD {log[-1]["build"]} {log[-1]["label"]}; then: bisect-supply {D} {log[-1]["build"]} SC WIRE SLG; then: bisect {D}')
     elif waiting:
         print(f'NEXT bisection step {log[-1]["step"]} ({log[-1]["label"]} {log[-1]["point"][:12]}): ' + '; '.join(log[-1]['waiting'])
               + f'; then: bisect {D}')
     else: print(f'STOP after {C["max_steps"]} steps: culprit in ({pts[lo]["commit"][:12]} {pts[lo]["label"]}, {pts[hi]["commit"][:12]} {pts[hi]["label"]}]')
+
+
+def cmd_bisect_supply(a):
+    """Store the binaries of a deferred bisection point; FREEZE.json stays as frozen, the hashes go to BISECT_SUPPLIED.json."""
+    D = os.path.normpath(a.dir); fr = json.load(open(D + '/FREEZE.json'))
+    x = next((x for x in fr.get('bisect', []) if x['commit'] == a.commit), None)
+    if x is None or not x.get('deferred'): sys.exit(f'{a.commit}: not a deferred bisection point of {D}')
+    for f in (a.sc, a.wire, a.slg):
+        if not os.path.isfile(f): sys.exit(f'bisect-supply: missing file {f}')
+    new = {'formal': h(a.sc), 'wire': h(a.wire), 'slg': h(a.slg)}
+    sup = supplied(D); old = sup.get(a.commit)
+    if old and {k: old[k] for k in new} != new: sys.exit(f'{a.commit} already supplied with other binaries: {old}')
+    for f, y in ((a.sc, 'sc'), (a.wire, 'sc.input.wire'), (a.slg, 'slg')): shutil.copy2(f, f'{D}/{x["dir"]}/{y}')
+    if {k: h(f'{D}/{x["dir"]}/{y}') for k, y in (('formal', 'sc'), ('wire', 'sc.input.wire'), ('slg', 'slg'))} != new: sys.exit('bisect-supply: copy differs')
+    sup[a.commit] = {**new, 'supplied_utc': (old or {}).get('supplied_utc') or datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')}
+    json.dump(sup, open(D + '/BISECT_SUPPLIED.json', 'w'), indent=1)
+    same = [r for r, v in (('anchor', (fr['binaries']['anchor'], fr['slg']['anchor'])), ('head', (fr['binaries']['head'], fr['slg']['head'])))
+            if (new['formal'], new['slg']) == v]
+    print(f'supplied {a.commit[:12]} {x["label"]}: formal {new["formal"][:12]} slg {new["slg"][:12]} wire {new["wire"][:12]}'
+          + (f' (identical to {same[0]})' if same else ''))
 
 
 def render_bisect(o):
@@ -1312,6 +1356,7 @@ def render_bisect(o):
     L += [f'| {i} | {x["commit"][:12]} | {x["label"]} | {" ".join(c[:7] for c in x.get("same", []))} |' for i, x in enumerate(o['points'])]
     L += ['', '| 步 | 点 | 范围 (lo, hi] | f | 各指标 m/r | 方向 | 计时 |', '| --- | --- | --- | --- | --- | --- | --- |']
     for s in o['steps']:
+        if 'build' in s: L.append(f'| — | {s["point"][:7]} {s["label"]} | | | | 等待编译这个点（延后编译） | |'); continue
         if 'waiting' in s: L.append(f'| {s["step"]} | {s["point"][:7]} {s["label"]} | | | | 等待计时：{"；".join(s["waiting"])} | |'); continue
         own = '，'.join(f'{k} {v:.2f}' for k, v in s['own'].items())
         tm = (s['dir'] + ('（' + s['_formal']['batch'] + '）' if '_formal' in s else '')) if s['timed'] else '不计时（二进制与 anchor 或 head 相同）'
@@ -1323,6 +1368,7 @@ def render_bisect(o):
     if o['status'] == 'culprit':
         c = o['culprit']
         L.append(f'**结论：回退来自 {c["commit"][:12]}（{c["label"]}）**' + (f'，与它二进制相同的后续提交 {" ".join(x[:7] for x in c["same_binaries"])} 一并列出' if c['same_binaries'] else '') + '。')
+    elif o['status'] == 'build': L.append(f'**进行中**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，等编译 {o["steps"][-1]["point"][:12]}。')
     elif o['status'] == 'waiting': L.append(f'**进行中**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，等下一步计时。')
     else: L.append(f'**已用完 {o["rules"]["max_steps"]} 步**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，交「性能优化」决定。')
     return '\n'.join(L) + '\n'
@@ -1369,11 +1415,9 @@ def auto_gate(D, a):
     return an()
 
 
-def cmd_auto(a):
-    D = os.path.normpath(a.dir); res = auto_gate(D, a)
-    v = res['verdict']; print(f'AUTO {D}: verdict {v}')
-    fr = json.load(open(D + '/FREEZE.json'))
-    if v == 'fail' and 'bisect' in fr:
+def auto_bisect(D, a):
+    """Bisection steps of a failed checkpoint until culprit, max_steps, or a deferred point to build. Returns BISECT.json."""
+    if True:
         for _ in range(10):
             cmd_bisect(argparse.Namespace(dir=D)); o = json.load(open(D + '/BISECT.json'))
             if o['status'] != 'waiting': break
@@ -1386,8 +1430,23 @@ def cmd_auto(a):
                 if slg_groups(S): sys.exit(f'AUTO {S}: SLG group already there but not usable: stop and report')
                 auto_slg(S, 1, a)
                 if slg_used(S)[1]: sys.exit(f'AUTO {S}: SLG replacement invalid by environment: stop and report')
-        print(f'AUTO bisect: {o["status"]}' + (f' -> {o["culprit"]["commit"]} {o["culprit"]["label"]}' if o['status'] == 'culprit' else ''))
+        print(f'AUTO bisect: {o["status"]}' + (f' -> {o["culprit"]["commit"]} {o["culprit"]["label"]}' if o['status'] == 'culprit'
+                                               else f' -> build {o["steps"][-1]["build"]}' if o['status'] == 'build' else ''))
+    return o
+
+
+def cmd_auto(a):
+    D = os.path.normpath(a.dir); res = auto_gate(D, a)
+    v = res['verdict']; print(f'AUTO {D}: verdict {v}')
+    fr = json.load(open(D + '/FREEZE.json'))
+    if v == 'fail' and 'bisect' in fr and auto_bisect(D, a)['status'] == 'build': sys.exit(15)
     sys.exit(AUTO_RC.get(v, 14 if v.startswith('n/a') else 13))
+
+
+def cmd_bisect_auto(a):
+    D = os.path.normpath(a.dir); res = json.load(open(D + '/RESULT.json'))
+    if res['verdict'] != 'fail': sys.exit(f'checkpoint verdict is {res["verdict"]}, not fail: nothing to bisect')
+    sys.exit(15 if auto_bisect(D, a)['status'] == 'build' else 10)
 
 
 # ---------------------------------------------------------------- selftest
@@ -1589,7 +1648,7 @@ def cmd_selftest(a):
     chk('identical-binary rule not retroactive', res['slg']['verdict'] != 'n/a' and res['formal_overall']['verdict'] != 'n/a')
     # checkpoint bisection (merge rules v2): 5 commits between anchor and head, commit c3 regresses mutate by 4%;
     # c1 and c2 share a binary (collapse), the SLG binaries never change (SLG not part of the bisection)
-    def ckpt(culprit, eff, effect_of=None):
+    def ckpt(culprit, eff, effect_of=None, deferred=False, builds=None):
         T = tempfile.mkdtemp(prefix='mac_gate_selftest_')
         def put(path, data):
             os.makedirs(os.path.dirname(path), exist_ok=True); open(path, 'wb').write(data); return path
@@ -1605,14 +1664,18 @@ def cmd_selftest(a):
                    head_src=None, anchor_bin=put(T + '/sc-anch', b'ANCH'), anchor_wire=wire, anchor_commit='a' * 40, anchor_desc='',
                    anchor_src=None, r3_dir=T + '/r3', trace=trace, slg_head=slg, slg_anchor=put(T + '/slg-a', b'slga'), slg_tree='t',
                    slg_tree_sha='0', expect_wire=None, lib_note='', prep=None,
-                   bisect=[f'{n * 20}|#{80 + i} {n}|{bins[n]}|{wire}|{slg}' for i, n in enumerate(names)]))
+                   bisect=[f'{n * 20}|#{80 + i} {n}' + ('' if deferred else f'|{bins[n]}|{wire}|{slg}') for i, n in enumerate(names)]))
         rng = random.Random(41)
         for b in (1, 2): synth_formal(f'{Dc}/formal-{b}', R, rng, eff)
         synth_slg(Dc + '/slg', rng, 1.0)
         cmd_analyze(argparse.Namespace(dir=Dc, exclude=None))
         order = names + ['head']
-        for _ in range(6):
+        for _ in range(12):
             cmd_bisect(argparse.Namespace(dir=Dc)); o = json.load(open(Dc + '/BISECT.json'))
+            if o['status'] == 'build':
+                c = o['steps'][-1]['build']; n = c[:2]
+                if builds is not None: builds.append(n)
+                cmd_bisect_supply(argparse.Namespace(dir=Dc, commit=c, sc=bins[n], wire=wire, slg=slg)); continue
             if o['status'] != 'waiting': return Dc, o
             st_ = o['steps'][-1]; S = f'{Dc}/{st_["dir"]}'
             pt = st_['label'].split()[-1]
@@ -1642,6 +1705,20 @@ def cmd_selftest(a):
     fi = json.load(open(T2 + '/int/FREEZE.json'))
     chk('reference build in the r3 slot, max steps 2', fi['binaries']['r3'] == h(rb) and fi['reference']['commit'] == '4' * 40
         and fi['rules']['checkpoint']['max_steps'] == 2 and RULES['checkpoint']['max_steps'] == 3)
+    built = []
+    Dd, o = ckpt('c3', {'mutate': 1.04}, deferred=True, builds=built)
+    frd = json.load(open(Dd + '/FREEZE.json'))
+    chk(f'deferred points: nothing built at freeze, bisection builds {built} and finds c3 in {sum(1 for s in o["steps"] if s.get("timed"))} timed steps',
+        all(x['deferred'] and x['formal'] is None for x in frd['bisect']) and o['status'] == 'culprit' and o['culprit']['label'].endswith('c3')
+        and len(built) <= 3 and sum(1 for s in o['steps'] if s.get('timed')) <= 3 and len(set(built)) == len(built))
+    chk('deferred points never collapse', [x['label'] for x in o['points']] == ['anchor'] + [f'#{80 + i} c{i + 1}' for i in range(5)] + ['head'])
+    sup = json.load(open(Dd + '/BISECT_SUPPLIED.json'))
+    chk('supplied hashes recorded, FREEZE.json unchanged', set(sup) == {f'{n * 20}' for n in built} and json.load(open(Dd + '/FREEZE.json')) == frd)
+    c0 = next(iter(sup)); other = Dd + '/other.bin'; open(other, 'wb').write(b'OTHER')
+    chk('a second supply with other binaries is refused',
+        'already supplied' in (refused(lambda: cmd_bisect_supply(argparse.Namespace(dir=Dd, commit=c0, sc=other, wire=other, slg=other))) or ''))
+    chk('supply refused for a frozen (not deferred) point',
+        'not a deferred' in (refused(lambda: cmd_bisect_supply(argparse.Namespace(dir=Dc, commit='c1' * 20, sc=other, wire=other, slg=other))) or ''))
     chk('bisect refused on a checkpoint that passed', 'not fail' in (refused(lambda: cmd_bisect(argparse.Namespace(dir=ckpt('c3', {})[0]))) or ''))
     # unattended run: fake timing parts write synthetic data; the first formal batch is invalid by environment
     g = globals(); real = (g['cmd_formal'], g['cmd_slg']); calls = []
@@ -1665,6 +1742,21 @@ def cmd_selftest(a):
         chk(f'auto: env-invalid formal-1 replaced by formal-2, formal-3 pooled, fail -> bisected to c3 (rc {rc})',
             rc == 10 and calls[1][2:] == (2, 1) and res['formal_overall']['batches'] == 2 and o['status'] == 'culprit' and o['culprit']['label'].endswith('c3'))
         chk('auto: steps time formal only (SLG identical)', all(c[0] == 'formal' for c in calls if '/bisect-' in c[1]))
+        Dd, _ = ckpt('c3', {'mutate': 1.04}, deferred=True)
+        for x in os.listdir(Dd):
+            if x.startswith(('formal-', 'slg', 'bisect-', 'RESULT', 'BISECT')): shutil.rmtree(f'{Dd}/{x}') if os.path.isdir(f'{Dd}/{x}') else os.remove(f'{Dd}/{x}')
+        del calls[:]; rcs = []; T3 = os.path.dirname(Dd)
+        try: cmd_auto(argparse.Namespace(dir=Dd, quiet_timeout=1, quiet_s=180.0, cycles=None))
+        except SystemExit as e: rcs.append(e.code)
+        for _ in range(8):
+            if rcs[-1] != 15: break
+            c = json.load(open(Dd + '/BISECT.json'))['steps'][-1]['build']
+            cmd_bisect_supply(argparse.Namespace(dir=Dd, commit=c, sc=f'{T3}/sc-{c[:2]}', wire=T3 + '/w.wire', slg=T3 + '/slg'))
+            try: cmd_bisect_auto(argparse.Namespace(dir=Dd, quiet_timeout=1, quiet_s=180.0, cycles=None))
+            except SystemExit as e: rcs.append(e.code)
+        o = json.load(open(Dd + '/BISECT.json'))
+        chk(f'auto, deferred points: exit 15 per build, then 10 with the culprit (rcs {rcs})',
+            rcs[0] == 15 and rcs[-1] == 10 and set(rcs[:-1]) == {15} and o['status'] == 'culprit' and o['culprit']['label'].endswith('c3'))
     finally:
         g['cmd_formal'], g['cmd_slg'] = real
     print(f'selftest dir {D}')
@@ -1691,7 +1783,7 @@ def main():
     f.add_argument('--ref-wire'); f.add_argument('--ref-commit'); f.add_argument('--ref-desc')
     f.add_argument('--bisect-max-steps', type=int, help='checkpoint: timed bisection steps allowed (default 3)')
     f.add_argument('--bisect', action='append', help='checkpoint: COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN of each first-parent '
-                   'commit between anchor and head, oldest first (repeatable)')
+                   'commit between anchor and head, oldest first (repeatable); COMMIT|LABEL = deferred, built only when reached')
     for name in ['formal', 'slg']:
         s = sp.add_parser(name); s.add_argument('dir')
         if name == 'formal':
@@ -1708,6 +1800,10 @@ def main():
     s = sp.add_parser('analyze'); s.add_argument('dir')
     s.add_argument('--exclude', action='append', help='N:reason, leave formal-N out of the pooled gate (diagnosed invalid batch)')
     s = sp.add_parser('bisect', help='checkpoint that failed: freeze the next step or name the culprit'); s.add_argument('dir')
+    s = sp.add_parser('bisect-supply', help='the binaries of a deferred bisection point'); s.add_argument('dir'); s.add_argument('commit')
+    s.add_argument('sc'); s.add_argument('wire'); s.add_argument('slg')
+    s = sp.add_parser('bisect-auto', help='unattended bisection of a failed checkpoint (after bisect-supply)'); s.add_argument('dir')
+    s.add_argument('--quiet-timeout', type=int, default=43200); s.add_argument('--quiet-s', type=float, default=180.0); s.add_argument('--cycles', type=int)
     s = sp.add_parser('auto', help='unattended: the whole gate with its pre-registered follow-ups (and the bisection)'); s.add_argument('dir')
     s.add_argument('--quiet-timeout', type=int, default=43200, help='per timed part; on timeout nothing is timed and auto stops')
     s.add_argument('--quiet-s', type=float, default=180.0, help='smoke test only'); s.add_argument('--cycles', type=int, help='smoke test only')
@@ -1723,7 +1819,7 @@ def main():
     s = sp.add_parser('diag-analyze'); s.add_argument('dir')
     sp.add_parser('selftest')
     a = ap.parse_args()
-    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'bisect': cmd_bisect, 'auto': cmd_auto, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
+    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'bisect': cmd_bisect, 'bisect-supply': cmd_bisect_supply, 'bisect-auto': cmd_bisect_auto, 'auto': cmd_auto, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
      'diag-freeze': cmd_diag_freeze, 'diag-formal': cmd_diag_formal, 'diag-analyze': cmd_diag_analyze}[a.cmd](a)
 
 
