@@ -71,7 +71,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(ResizeRoot, "test.P2.resize-growth.v1")
 // Explicit non-relocatable fallback: destructor may throw by type, but the
 // enumerated test destructor does not. The same reflected string is copied.
 struct Fallback { xo::XString text; ~Fallback() noexcept(false) {} };
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<Fallback> : std::true_type {};
 }
 static_assert(fd::can_relocate_without_allocation<ResizeAttr>());

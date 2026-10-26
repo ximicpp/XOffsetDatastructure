@@ -65,7 +65,7 @@ inline void check_transfer_failure() {
 
 // Existing explicit TypeLayout user extension, local to these policy examples.
 // It does not bypass the separate production V1 recursive member/layout gate.
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Word> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Owned> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::RawOnly> : std::true_type {};

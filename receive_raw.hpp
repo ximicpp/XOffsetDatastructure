@@ -1,6 +1,6 @@
 #pragma once
 // Source-only implementation. Include after the COMPLETE main header, including
-// its TypeLayout specializations. Never include from inside an existing namespace.
+// its admission specializations. Never include from inside an existing namespace.
 #include "receive_raw_fwd.hpp"
 #include "xoffsetdatastructure.hpp"
 #include <array>

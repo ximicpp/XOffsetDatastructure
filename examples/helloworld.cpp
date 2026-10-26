@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 #include "player.hpp"
 
 using namespace XOffsetDatastructure;

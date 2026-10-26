@@ -99,7 +99,7 @@ struct EraseRecord {
         }
     }
 };
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<EraseRecord> : std::true_type {};
 }
 // User-provided destructor makes this outer class nonimplicit-lifetime. The
@@ -147,7 +147,7 @@ struct OptedUserDestructor { xo::XString name; ~OptedUserDestructor() noexcept {
 namespace XOffsetDatastructure {
 template<> struct StableEraseOrdinaryMembers<OptedUserDestructor> : std::true_type {};
 }
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<UncustomizedRecord> : std::true_type {};
 template<> struct is_byte_copy_safe<OptedUserDestructor> : std::true_type {};
 }
@@ -173,7 +173,7 @@ static_assert(!std::is_implicit_lifetime_v<EraseRecord>);
 static_assert(std::is_aggregate_v<ImplicitRecord>);
 static_assert(fd::stable_erase_implicit_lifetime<ImplicitRecord>());
 static_assert(!fd::stable_erase_implicit_lifetime<OptedUserDestructor>());
-static_assert(boost::typelayout::is_byte_copy_safe_v<ImplicitRecord>);
+static_assert(XOffsetDatastructure::is_byte_copy_safe_v<ImplicitRecord>);
 static_assert(xo::is_v1_wire_admitted_v<EraseRoot>);
 static_assert(Erasable<xo::XVector<ImplicitRecord>>);
 

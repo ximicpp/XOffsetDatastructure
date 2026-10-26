@@ -24,7 +24,7 @@ namespace snapshot_index_detail {
             for (const auto& child : value) if (inline_heads(child, visit)) return true;
         } else if constexpr (fixed_detail::is_owning_head<U>::value) {
             return visit(value);
-        } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
+        } else if constexpr (std::is_class_v<U> && is_byte_copy_safe_v<U>) {
             bool stop = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
                 using Base = schema::base_t<U, decltype(index)::value>;
@@ -54,7 +54,7 @@ namespace snapshot_index_detail {
                 if constexpr (!std::is_trivially_copyable_v<typename U::value_type>)
                     for (const auto& child : value) if (find_parent(child, parent)) return true;
             }
-        } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
+        } else if constexpr (std::is_class_v<U> && is_byte_copy_safe_v<U>) {
             bool found = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
                 using Base = schema::base_t<U, decltype(index)::value>;

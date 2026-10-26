@@ -8,7 +8,7 @@
 namespace xo=XOffsetDatastructure;
 namespace fd=xo::fixed_detail;
 struct Node { std::uint32_t id{};xo::XVector<Node> children; };
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<>struct is_byte_copy_safe<Node>:std::true_type{};
 }
 struct Forest {xo::XVector<Node> left,right;xo::XVector<std::byte> opaque;};

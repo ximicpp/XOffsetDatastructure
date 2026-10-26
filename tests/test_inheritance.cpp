@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstring>
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 
 using namespace XOffsetDatastructure;
 using namespace boost::typelayout;
@@ -328,28 +329,28 @@ bool test_safety_validation() {
     std::cout << std::string(50, '-') << "\n";
 
     // These should all be SAFE
-    static_assert(is_byte_copy_safe_v<Entity>,      "Entity should be safe");
-    static_assert(is_byte_copy_safe_v<Player>,       "Player (single inherit) should be safe");
-    static_assert(is_byte_copy_safe_v<Character>,    "Character should be safe");
-    static_assert(is_byte_copy_safe_v<Warrior>,      "Warrior (multi-level) should be safe");
-    static_assert(is_byte_copy_safe_v<MixinPlayer>,  "MixinPlayer (multiple inherit) should be safe");
-    static_assert(is_byte_copy_safe_v<FullCharacter>, "FullCharacter (mixed) should be safe");
-    static_assert(is_byte_copy_safe_v<Stats>,        "Stats (plain struct) should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Entity>,      "Entity should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Player>,       "Player (single inherit) should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Character>,    "Character should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Warrior>,      "Warrior (multi-level) should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<MixinPlayer>,  "MixinPlayer (multiple inherit) should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<FullCharacter>, "FullCharacter (mixed) should be safe");
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Stats>,        "Stats (plain struct) should be safe");
 
     // Virtual functions should be UNSAFE
     struct HasVirtual { virtual void foo() {} int x; };
-    static_assert(!is_byte_copy_safe_v<HasVirtual>,
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasVirtual>,
                   "HasVirtual should be unsafe");
 
     // Types inheriting from polymorphic should be UNSAFE
     struct DerivedVirtual : HasVirtual { int y; };
-    static_assert(!is_byte_copy_safe_v<DerivedVirtual>,
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<DerivedVirtual>,
                   "DerivedVirtual should be unsafe");
 
     // Struct with unsafe members in base should be UNSAFE
     struct BadBase { std::string name; };
     struct DerivedBad : BadBase { int x; };
-    static_assert(!is_byte_copy_safe_v<DerivedBad>,
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<DerivedBad>,
                   "DerivedBad should be unsafe (base has std::string)");
 
     std::cout << "  static_assert: Entity safe... [OK]\n";

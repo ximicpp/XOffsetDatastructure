@@ -9,11 +9,12 @@
 //
 // Interface (namespace XOffsetDatastructure::schema):
 //   base_count_v<T>, base_t<T, I>          direct bases, declaration order
+//   base_is_virtual_v<T, I>                base I is a virtual base
 //   member_count_v<T>                      non-static data members, declaration order
 //   member_t<T, I>                         ::type, ::offset (bytes), ::is_bit_field,
 //                                          ::get(obj) -> obj's member I (any access)
 //   member_type_t<T, I>                    member_t<T, I>::type
-//   is_described_v<T>                      the backend can describe T
+//   is_described_v<T>                      the backend can describe T (class or union)
 //   enum_range<E>()                        {min, max}: the smallest range holding 0 and
 //                                          every enumerator of E
 //   implicit_lifetime_aggregate<T>()       aggregate without a user-provided destructor
