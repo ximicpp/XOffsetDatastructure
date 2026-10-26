@@ -2259,6 +2259,41 @@ namespace XOffsetDatastructure {
                 std::destroy_n(ptr, count);
             }
         }
+#if defined(__linux__)
+
+        // A SHIFT erase from the middle moves the tail of records down by one
+        // element: an overlapping memmove with the destination just below the
+        // source. On x86-64 glibc, one call over a tail of tens of KiB is
+        // about a third slower than the same copy in 4 KiB chunks (SLG
+        // S.ticks_middle on a cloud Xeon); tails up to 16 KiB stay one call.
+        // Chunks go from low to high addresses, so none overwrites source
+        // bytes still to be read. The loop is out of line so that the erase
+        // body keeps its inlining.
+#if defined(__GLIBC__) && defined(__x86_64__)
+        XOFFSET_DETAIL_NOINLINE inline void overlap_move_down_chunked(
+                unsigned char* d, const unsigned char* s, std::size_t bytes) noexcept {
+            constexpr std::size_t chunk = 4096;
+            do {
+                std::memmove(d, s, chunk);
+                d += chunk;
+                s += chunk;
+                bytes -= chunk;
+            } while (bytes > chunk);
+            std::memmove(d, s, bytes);
+        }
+#endif
+
+        inline void overlap_move_down(void* dst, const void* src, std::size_t bytes) noexcept {
+#if defined(__GLIBC__) && defined(__x86_64__)
+            if (bytes > 16384) [[unlikely]] {
+                overlap_move_down_chunked(static_cast<unsigned char*>(dst),
+                                          static_cast<const unsigned char*>(src), bytes);
+                return;
+            }
+#endif
+            std::memmove(dst, src, bytes);
+        }
+#endif
 
         inline allocator_ref allocator_ref_of(XArena* sm) noexcept {
             return {sm};
@@ -3477,7 +3512,11 @@ namespace XOffsetDatastructure {
                 auto* items = data();
                 const auto moved = size_ - index - 1;
                 std::destroy_at(items + index);
+#if defined(__linux__)
+                fixed_detail::overlap_move_down(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+#else
                 std::memmove(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+#endif
                 detail::shift_rebase_moved(items + index, moved, static_cast<std::int32_t>(sizeof(T)));
                 detail::empty_vacated_slot(items + size_ - 1);
                 std::destroy_at(items + size_ - 1);
