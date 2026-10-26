@@ -325,6 +325,44 @@ void pooled_source_clones_through_its_pool() {
     need(after.hits == before.hits + 1, "clone did not reuse the pooled mapping");
     need(c.root<CloneRoot>().id == 12, "pooled clone content");
 }
+
+// R1 slot storage: clone() keeps the source's kind of storage (a movable slot
+// clones onto a movable slot, an address-stable owner onto a pinned one), and
+// clone_into() relocates a movable destination slot that is too small.
+void clone_keeps_storage_kind() {
+    auto movable = make_source(13, 200, XGrowPolicy::Explicit);
+    need(movable.storage_kind() == XStorageKind::MovableSlot, "fixture is not a movable slot");
+    auto mc = movable.clone();
+    need(mc.storage_kind() == XStorageKind::MovableSlot && !mc.address_stable(), "movable slot clone kind");
+    need(mc.get_size() == movable.get_size() && used_bytes_equal(mc, movable) && same_free_table(mc, movable),
+         "movable slot clone content");
+
+    auto vm = XBuffer::create<CloneRoot>(4096, cap(XGrowPolicy::Explicit).with_storage(XStorage::Pinned));
+    vm.root<CloneRoot>().id = 14;
+    auto vc = vm.clone();
+    need(vc.storage_kind() == XStorageKind::Vm && vc.address_stable(), "pinned VM clone kind");
+
+    auto pinned = XBuffer::create<CloneRoot>(4096, XBuffer::maximum_capacity(1u << 15));
+    pinned.root<CloneRoot>().id = 15;
+    need(pinned.storage_kind() == XStorageKind::PinnedSlot, "fixture is not a pinned slot");
+    auto pc = pinned.clone();
+    need(pc.storage_kind() == XStorageKind::PinnedSlot && pc.root<CloneRoot>().id == 15, "pinned slot clone");
+
+    // A small movable destination receives a larger source: it changes
+    // storage (epoch advances) and then holds an exact copy.
+    auto src = make_source(16, 3000);
+    auto dst = XBuffer::create<CloneRoot>(1024, cap(XGrowPolicy::Explicit));
+    need(dst.storage_kind() == XStorageKind::MovableSlot && dst.accessible_bytes() < used(src),
+         "destination fixture does not force a relocation");
+    const auto epoch = dst.epoch();
+    src.clone_into(dst);
+    need(dst.epoch() != epoch, "clone_into relocation did not advance the epoch");
+    need(used_bytes_equal(dst, src) && same_free_table(dst, src), "relocated clone_into content");
+    need(dst.save_verified<CloneRoot>() == src.save_verified<CloneRoot>(), "relocated clone_into wire");
+    edit(src, 3);
+    edit(dst, 3);
+    need(used_bytes_equal(dst, src), "relocated clone_into diverged under the same edit");
+}
 } // namespace
 
 int main() {
@@ -338,6 +376,7 @@ int main() {
         self_copy_is_refused();
         failure_leaves_empty_arena();
         pooled_source_clones_through_its_pool();
+        clone_keeps_storage_kind();
         std::cout << "test_clone passed\n";
         return 0;
     } catch (const std::exception& e) {

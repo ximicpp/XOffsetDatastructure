@@ -124,7 +124,10 @@ void demo_memory_management() {
     print_section("2. Memory Management - Buffer Operations");
     
     print_subsection("Initial Buffer");
-    XBuffer xbuf(1024);
+    // Pinned (VM) storage: grow() keeps the root address. A default small
+    // buffer starts on a movable slot, where grow() may move it.
+    XBuffer xbuf(1024, XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY)
+        .with_storage(XStorage::Pinned));
     auto stats = xbuf.stats();
     print_info("Total Size", std::to_string(stats.total_size) + " bytes");
     print_info("Free Size", std::to_string(stats.free_size) + " bytes");
@@ -179,10 +182,10 @@ void demo_memory_management() {
     h->level = 77;
     print_check("XHandle created, player_name = " + std::string(h->player_name.c_str()));
     
-    // Growth preserves the cached root and its epoch.
+    // hbuf is on a movable slot: grow() may move it, and the handle re-resolves.
     if (!hbuf.grow(4096)) throw XBadAlloc();
     print_info("After grow()", std::string("level = ") + std::to_string(h->level));
-    print_check("XHandle retained the same root through grow()");
+    print_check("XHandle followed the root through grow()");
     
     // Logical shrink also preserves the cached root.
     hbuf.shrink_to_fit();
