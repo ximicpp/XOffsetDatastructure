@@ -1526,6 +1526,8 @@ namespace XOffsetDatastructure {
             return obj;
         }
 
+        static constexpr std::size_t regrow_step = 4096;
+
         bool ensure_allocation_extent(size_type required, bool allow_growth = true) {
             if (required <= buffer_.size()) return true;
             if (!allow_growth || growth_policy_ != XGrowPolicy::Automatic ||
@@ -1533,9 +1535,18 @@ namespace XOffsetDatastructure {
             const auto maximum = buffer_.maximum_capacity();
             const auto current = buffer_.size();
             const auto geometric = current > maximum / 2 ? maximum : current * 2;
+            auto target = std::max<std::size_t>(required, geometric);
+            // D6: below zero_from() (bytes exposed before an in-place reload
+            // shrank the logical length) grow_to must memset every newly exposed byte, so a
+            // doubling there clears far more than the tail will use. Grow in
+            // 4 KiB steps inside that range; past it fresh OS pages are
+            // already zero and growth is geometric again. used_end, and
+            // therefore the wire, does not depend on the logical length.
+            if (required < buffer_.zero_from())
+                target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + regrow_step));
             // Throw on an OS/preparation failure. In particular, a container's
             // failed tail expansion must not silently retry via a new allocation.
-            if (!buffer_.grow_to(std::max(required, geometric))) throw XBadAlloc();
+            if (!buffer_.grow_to(target)) throw XBadAlloc();
             return true;
         }
 
