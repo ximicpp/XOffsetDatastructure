@@ -251,14 +251,14 @@ void hole_table_paths() {
     // A lost retirement (host OOM in the free table) is recomputed before emission.
     auto lost=make();
     // A size class with no bin yet: retiring it needs a host allocation.
-    lost.root().name=std::string(300,'q');
+    lost.root().name=std::string(500,'q'); // above the VM front's 384 B bins
     lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
     {Arm arm;lost.root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
     need(!lost.free_table_complete(),"lost retirement not recorded");
     std::string recomputed;lost.save_verified_into(recomputed);
     need(lost.free_table_complete()&&header_of(recomputed).hole_count!=0,"save_verified_into did not recompute holes");
     auto reloaded=xo::XBuffer::load_verified<PathsRoot>(recomputed);
-    need(reloaded.root<PathsRoot>().name.view()==std::string(300,'q'),"recomputed wire lost content");
+    need(reloaded.root<PathsRoot>().name.view()==std::string(500,'q'),"recomputed wire lost content");
 }
 
 void freeze_complete_header_and_graph() {
