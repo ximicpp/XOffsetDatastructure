@@ -70,6 +70,13 @@ void check_common(Buffer& b, const std::string& wire, xo::XCompactOptions option
     tiny.reserve(1);
     b.save_compact_into(tiny, options);
     need(tiny == wire, where + ": save_compact_into (growing) differs");
+    // Room for all but the last bytes: a write into the existing capacity
+    // runs out at the end and the save starts over.
+    std::string near(std::size_t(64), char(0x5A));
+    near.reserve(wire.size() - 1);
+    near.assign(near.capacity(), char(0x5A));
+    b.save_compact_into(near, options);
+    need(near == wire, where + ": save_compact_into (near miss) differs");
 }
 
 void check(Buffer& b, const std::string& where) {
