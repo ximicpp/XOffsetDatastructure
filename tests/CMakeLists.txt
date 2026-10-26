@@ -80,6 +80,7 @@ set(REFLECTION_TESTS
     test_lower_bound_index
     test_stable_storage
     test_slot_storage
+    test_front_ring
     test_ordinary_records
     test_vm_lifecycle
     test_vm_transport
