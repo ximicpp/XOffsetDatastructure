@@ -2884,6 +2884,14 @@ namespace XOffsetDatastructure {
             ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
+            if (capacity_ == 0) {
+                // First storage: nothing to expand, move or retire.
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                    binding(), static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
+                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                capacity_ = new_cap;
+                return;
+            }
             if (fixed_detail::try_expand_dynamic_bytes(
                     binding(), data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                     static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T))) {
