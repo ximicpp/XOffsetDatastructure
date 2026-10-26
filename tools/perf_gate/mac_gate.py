@@ -66,6 +66,10 @@ SCREEN_MAX = {'WindowServer': 20.0}
 REMOTE_PROCS = ('UURemoteServer', 'screensharingd', 'ScreensharingAgent', 'AnyDesk', 'TeamViewer', 'ToDesk',
                 'SunloginClient', 'RustDesk', 'parsecd')
 REMOTE_MAX = 5.0
+# susu 2026-10-26 04:23Z: a connected remote desktop counts as not affecting the timing. Remote-desktop
+# processes are still sampled and reported (so a run can be checked afterwards) but no longer gate a
+# start or invalidate a batch; WindowServer still does (W0b, T4 formal-1). Runs frozen earlier keep gating.
+REMOTE_GATED = False
 SCREEN_HOLD_S = 60.0
 # T4 formal-1: WindowServer rose to >=30% in 114 of 241 samples after a clean start check (1.2%),
 # and only that batch moved. The start check cannot see this, so the screen is sampled during timing.
@@ -139,9 +143,11 @@ RULES = {
                         'per-cycle bound of the first head process',
     },
     'quiet': 'before each batch and before the SLG part: no compiler process for 3 minutes and 1-minute '
-             'load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20% and every remote-desktop '
-             'process < 5%; on timeout (30 min) nothing is timed',
-    'screen': {'max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS, 'remote_max': REMOTE_MAX, 'hold_s': SCREEN_HOLD_S},
+             'load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20%; remote-desktop processes are '
+             'recorded only (susu 2026-10-26 04:23Z: a connected remote does not affect the timing); on timeout '
+             '(30 min) nothing is timed',
+    'screen': {'max': SCREEN_MAX, 'remote_procs': REMOTE_PROCS, 'remote_max': REMOTE_MAX, 'hold_s': SCREEN_HOLD_S,
+               'remote_gated': REMOTE_GATED},
     'identical_binaries': 'frozen by 性能优化 2026-10-25 10:35Z, not retroactive: at freeze the head and anchor binaries '
                           'are compared, the formal pair (sc_xoffset) and the SLG pair (slg_bench) separately. A part whose '
                           'two binaries are byte-identical is not applicable: it is not timed and takes no part in the '
@@ -260,20 +266,34 @@ def screen_load():
     return out
 
 
-def screen_problems(load):
-    return [f'{n} {v:.0f}%' for n, v in sorted(load.items()) if v >= SCREEN_MAX.get(n, REMOTE_MAX)]
+def screen_problems(load, remote_gated=REMOTE_GATED):
+    """Processes over their start limit; remote-desktop processes only where the frozen rule gates them."""
+    return [f'{n} {v:.0f}%' for n, v in sorted(load.items())
+            if (n in SCREEN_MAX or remote_gated) and v >= SCREEN_MAX.get(n, REMOTE_MAX)]
+
+
+def remote_gated(D):
+    """Runs frozen before 2026-10-26 (no screen.remote_gated in FREEZE.json) keep gating on remote desktops."""
+    p = D + '/FREEZE.json'
+    return json.load(open(p))['rules'].get('screen', {}).get('remote_gated', True) if os.path.exists(p) else REMOTE_GATED
+
+
+def remote_active(load):
+    return sorted(n for n, v in load.items() if n not in SCREEN_MAX and v >= REMOTE_MAX)
 
 
 class ScreenSampler(threading.Thread):
     """During timing: screen_load() every interval_s into cpu/<label>.screen.jsonl (environment rule)."""
-    def __init__(self, path, interval_s):
+    def __init__(self, path, interval_s, gated=REMOTE_GATED):
         super().__init__(daemon=True); self.path, self.interval_s, self.halt = path, interval_s, threading.Event()
+        self.gated = gated
 
     def run(self):
         with open(self.path, 'a') as f:
             while True:  # a last sample at stop, so even a short run has two
                 load = screen_load()
-                f.write(json.dumps({'t': time.time(), 'load': load, 'busy': screen_problems(load)}) + '\n'); f.flush()
+                f.write(json.dumps({'t': time.time(), 'load': load, 'busy': screen_problems(load, self.gated),
+                                    'remote': remote_active(load)}) + '\n'); f.flush()
                 if self.halt.is_set(): break
                 self.halt.wait(self.interval_s)
 
@@ -290,32 +310,35 @@ def env_summary(path, t0, t1, E):
     for r in recs:
         for n, v in r['load'].items(): mx[n] = max(mx.get(n, 0.0), v)
     frac = len(busy) / len(recs) if recs else 1.0
+    rem = sum(1 for r in recs if r.get('remote', remote_active(r['load'])))  # recorded only (susu 2026-10-26)
     return {'samples': len(recs), 'busy_samples': len(busy), 'busy_frac': round(frac, 4), 'busy_by_process': by, 'max_pcpu': mx,
+            'remote_active_samples': rem,
             'max_busy_frac': E['max_busy_frac'], 'invalid': frac > E['max_busy_frac'],
             'decided_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')}
 
 
 def env_text(e):
     return (f'{e["busy_samples"]}/{e["samples"]} 次采样超限（{e["busy_frac"]:.1%}，上限 {e["max_busy_frac"]:.0%}），'
-            f'按进程 {e["busy_by_process"] or "无"}，最高 pcpu {e["max_pcpu"] or "无"}')
+            f'按进程 {e["busy_by_process"] or "无"}，最高 pcpu {e["max_pcpu"] or "无"}'
+            + (f'；远程桌面活动（≥{REMOTE_MAX:.0f}%）{e["remote_active_samples"]}/{e["samples"]} 次采样，只记录' if 'remote_active_samples' in e else ''))
 
 
 def quiet_or_exit(D, label, sampler, timeout_s, quiet_s=180.0):
     """Block until the start conditions hold (xc_ab.quiet_gate: the sampler has seen no compiler for
-    180 s and the 1-minute load is < 3; then WindowServer and remote-desktop processes below their
-    limits for 60 s); on timeout record it and exit without timing anything."""
+    180 s and the 1-minute load is < 3; then WindowServer (and, in runs frozen before 2026-10-26,
+    remote-desktop processes) below the limits for 60 s); on timeout record it and exit without timing anything."""
     utc = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
-    t0 = time.time(); hold = min(SCREEN_HOLD_S, quiet_s); ok_since = None; bad = []
+    t0 = time.time(); hold = min(SCREEN_HOLD_S, quiet_s); ok_since = None; bad = []; rg = remote_gated(D)
     try:
         while True:
             info = xc_ab.quiet_gate(sampler, load_max=3.0, quiet_s=quiet_s, timeout_s=max(0.0, timeout_s - (time.time() - t0)))()
-            screen = screen_load(); bad = screen_problems(screen); now = time.time()
+            screen = screen_load(); bad = screen_problems(screen, rg); now = time.time()
             ok_since = None if bad else (ok_since or now)
             if ok_since is not None and now - ok_since >= hold: break
             if now - t0 > timeout_s:
                 raise xc_ab.GateTimeout(f'screen or remote desktop busy after {timeout_s:.0f} s: {", ".join(bad) or "not held " + str(hold) + " s"}')
             time.sleep(5)
-        info = {**info, 'waited_s': round(time.time() - t0, 1), 'screen': screen}
+        info = {**info, 'waited_s': round(time.time() - t0, 1), 'screen': screen, 'remote_active': remote_active(screen)}
         ok = True
     except xc_ab.GateTimeout as e:
         info, ok = {'reason': str(e)}, False
@@ -363,7 +386,7 @@ def cmd_formal(a):
     quiet_or_exit(D, f'formal-{a.batch}', sampler, a.quiet_timeout, a.quiet_s)
     os.makedirs(B)
     t0 = time.time(); spath = f'{D}/cpu/formal-{a.batch}.screen.jsonl'
-    scr = ScreenSampler(spath, E['interval_s']) if E else None
+    scr = ScreenSampler(spath, E['interval_s'], remote_gated(D)) if E else None
     if scr: scr.start()
     meta = {'batch': a.batch, 'cycles': cycles, 'smoke': smoke, 'start_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
             'load_start': os.getloadavg(), 'replaces': a.replaces}
@@ -625,7 +648,7 @@ def cmd_slg(a):
     argv = {lab: [f'{D}/bin/slg_{lab}', '--mode', 'bench', '--scale', 'M', '--cycles', str(cycles), '--formats', SLG_FORMATS]
             for lab in SLG_LABELS}
     gate = xc_ab.quiet_gate(sampler, load_max=3.0, quiet_s=a.quiet_s, timeout_s=a.quiet_timeout)
-    spath = f'{D}/cpu/{lab}.screen.jsonl'; scr = ScreenSampler(spath, E['interval_s']) if E else None
+    spath = f'{D}/cpu/{lab}.screen.jsonl'; scr = ScreenSampler(spath, E['interval_s'], remote_gated(D)) if E else None
     t0 = time.time()
     if scr: scr.start()
     try:
@@ -1215,8 +1238,10 @@ def cmd_selftest(a):
     chk(f'trend-adjusted fit reported (A {ta["geo"]:.4f})', abs(ta['geo'] - 1) < 0.02 and ta['low'] < ta['high'])
     d = res['formal_batches'][0]['aa_detail']['mutate']
     chk(f'A/A detail: round sd near 0.07 ({d["round_sd"]:.3f}), {COPIES} copies', abs(d['round_sd'] - 0.0707) < 0.01 and len(d['by_copy']) == COPIES)
-    chk('screen limits', screen_problems({'WindowServer': 36.3, 'UURemoteServer': 16.0, 'screensharingd': 0.4}) == ['UURemoteServer 16%', 'WindowServer 36%']
-        and screen_problems({'WindowServer': 8.0}) == [])
+    chk('screen limits: remote recorded only, WindowServer gates', screen_problems({'WindowServer': 36.3, 'UURemoteServer': 16.0, 'screensharingd': 0.4}) == ['WindowServer 36%']
+        and screen_problems({'WindowServer': 8.0, 'UURemoteServer': 16.0}) == [] and remote_active({'WindowServer': 36.3, 'UURemoteServer': 16.0}) == ['UURemoteServer'])
+    chk('runs frozen before 2026-10-26 keep the remote gate', screen_problems({'WindowServer': 8.0, 'UURemoteServer': 16.0}, True) == ['UURemoteServer 16%']
+        and RULES['screen']['remote_gated'] is False)
     chk('screen_load parses ps', isinstance(screen_load(), dict))
     # environment rule (frozen 2026-10-23 14:51Z): busy fraction > 5% invalidates; one replacement; never retroactive
     E = RULES['env_invalid']; ep = tempfile.mkdtemp(prefix='mac_gate_selftest_') + '/s.jsonl'
