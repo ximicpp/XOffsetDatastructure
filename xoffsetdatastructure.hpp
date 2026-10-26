@@ -2232,6 +2232,10 @@ namespace XOffsetDatastructure {
         }
 
         // V2 block size of a logical byte count (a nonzero multiple of 8).
+        // Invariant relied on by save_compact_into with assignments: a heap
+        // string of capacity c owns block_bytes_of(c + 1) bytes, so its
+        // characters and terminator can be read in whole 8-byte words
+        // (test_save_composed checks it).
         inline std::uint32_t block_bytes_of(std::uint32_t bytes) noexcept {
             return XArena::block_size(bytes);
         }
@@ -5470,6 +5474,22 @@ namespace XOffsetDatastructure {
         std::uint32_t slack_div = 8;
     };
 
+    // One assignment of save_compact_into(out, options, xassign(target,
+    // source)...): the wire is written as if `*target = *source` had been
+    // done first, without doing it. target: a member subobject (any depth,
+    // scalars and array elements included) of the saved buffer's root, not
+    // inside a container; source: a valid value of the same type (one with
+    // container heads lives in an XOffset buffer).
+    template <class M>
+    struct XAssign {
+        using value_type = M;
+        M* target;
+        const M* source;
+    };
+    template <class M>
+    XAssign<M> xassign(M& target, const M& source) noexcept { return {&target, &source}; }
+#define XOFFSET_SAVE_COMPOSED_API 1
+
     inline constexpr char XWIRE_MAGIC_V1[8] = {'X', 'O', 'F', 'F', 'V', '1', '\0', '\0'};
     inline constexpr char XWIRE_MAGIC_V2[8] = {'X', 'O', 'F', 'F', 'V', '2', '\0', '\0'};
     inline constexpr std::uint16_t XWIRE_FORMAT_MAJOR_V2 = 2;
@@ -6535,6 +6555,8 @@ namespace XOffsetDatastructure {
             template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
+            template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
+                                                                         const XAssign<M>&...);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
             static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
@@ -6743,6 +6765,28 @@ namespace XOffsetDatastructure {
             if (!detail::find_root<T>(*this))
                 throw XException("save_compact<T>(): no root object of requested type");
             detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+        }
+
+        // Composes a wire from parts: writes the wire save_compact_into would
+        // write after `*a.target = *a.source` for every assignment (all
+        // sources read as they were), without changing this buffer or any
+        // source. Targets are distinct, non-overlapping member subobjects of
+        // this buffer's root (not inside a container); their implicit
+        // padding is written as zero. Throws XException on a bad target or
+        // past the wire limit; out is then empty.
+        template <typename T, typename A0, typename... A>
+        void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                               const XAssign<A>&... rest) {
+            try {
+                require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
+                require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+                if (!detail::find_root<T>(*this))
+                    throw XException("save_compact<T>(): no root object of requested type");
+            } catch (...) {
+                out.clear();
+                throw;
+            }
+            detail::VerifiedPathsAccess::save_composed_into<T>(*this, out, options, first, rest...);
         }
 
         template <typename T>
@@ -7170,6 +7214,11 @@ namespace XOffsetDatastructure {
         }
         std::string save_compact(XCompactOptions options = {}) { return XBuffer::save_compact<T>(options); }
         void save_compact_into(std::string& out, XCompactOptions options = {}) { XBuffer::save_compact_into<T>(out, options); }
+        template <typename A0, typename... A>
+        void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                               const XAssign<A>&... rest) {
+            XBuffer::save_compact_into<T>(out, options, first, rest...);
+        }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
