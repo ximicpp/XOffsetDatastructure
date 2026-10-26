@@ -3,6 +3,7 @@
 # records): C++26 builds only. The C++20/C++23 builds list them in
 # test-inventory.json as cxx26_only_not_built.
 set(XOFFSET_CXX26_ONLY_TESTS
+    test_admission_typelayout
     test_canonical_cold_no_callback
     test_canonical_zero_target
     test_enum_support
