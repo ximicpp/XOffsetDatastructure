@@ -1,10 +1,9 @@
 # Mac queue
 
-Updated 2026-10-26T15:57:45Z after 004-mapins-disasm: done 0 2026-10-26T12:19:54Z
+Updated 2026-10-26T16:43:06Z after 010-d5full: running 2026-10-26T16:43:03Z
 
 ```
-runner: pid 70154 (version 1)
-runner: stopping after the current batch
+runner: pid 45762 (version 2)
 free: 32 GB on /Volumes/XOffsetCS, 32 GB on /Users/ximi
 001-GATE_COMPOSED                        done 0 2026-10-26T09:59:24Z
 002-int1-r2                              done 0 2026-10-26T11:33:59Z
@@ -13,8 +12,8 @@ free: 32 GB on /Volumes/XOffsetCS, 32 GB on /Users/ximi
 005-h1-v5                                done 2 2026-10-26T12:35:23Z
 006-h1-v5b                               done 2 2026-10-26T12:38:23Z
 007-h1-v5c                               done 3 2026-10-26T12:45:16Z
-008-int2                                 running 2026-10-26T12:53:16Z
+008-int2                                 done 70 2026-10-26T16:43:01Z
 009-h1-v5d                               cancelled
-010-d5full                               queued
+010-d5full                               running 2026-10-26T16:43:03Z
 011-h1-v5e                               queued
 ```
