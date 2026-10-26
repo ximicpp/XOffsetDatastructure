@@ -39,19 +39,23 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // format change (and say so in the change description). 2026-10-21: hole
 // bytes and spare container capacity are emitted as zero (threat model M3/M4);
 // retired blocks are cleared, so bytes a reused block does not overwrite are
-// zero too.
+// zero too. 2026-10-22 (G1): appending to a full vector of records builds the
+// new element in the grown block instead of a staged slot, so allocation
+// placement changes (dense 1800 -> 1792, 7 -> 5 holes; sparse 1856 -> 1800,
+// 8 -> 5 holes, 2 -> 1 extents). The format itself is unchanged.
 // 2026-10-22: the default emission skips runs of at least 4 KiB of adjacent
 // free blocks of at least 256 B (free_runs, which replaced N10); on this
-// model its bytes equal the earlier N10 pin of build(true). XWireEmission::
-// dense and ::zero_runs have their own pins.
-#define GOLDEN_DENSE_SIZE 1800u
-#define GOLDEN_DENSE_FNV 0x6457288a053030adull
-#define GOLDEN_LARGE_DENSE_SIZE 10032u
-#define GOLDEN_LARGE_DENSE_FNV 0xfbe17178398d9717ull
-#define GOLDEN_ELIDED_SIZE 1688u
-#define GOLDEN_ELIDED_FNV 0x5202003544116936ull
-#define GOLDEN_N10_SIZE 1856u
-#define GOLDEN_N10_FNV 0x03194efaf8964445ull
+// model its bytes equal the N10 pin of build(true). XWireEmission::dense and
+// ::zero_runs have their own pins (after G1: large dense 10032 -> 9984,
+// zero-run elided 1688 -> 1632).
+#define GOLDEN_DENSE_SIZE 1792u
+#define GOLDEN_DENSE_FNV 0xf9823cefa179f71aull
+#define GOLDEN_LARGE_DENSE_SIZE 9984u
+#define GOLDEN_LARGE_DENSE_FNV 0xa9da533ef207708full
+#define GOLDEN_ELIDED_SIZE 1632u
+#define GOLDEN_ELIDED_FNV 0xb08a663f2c0d7ae1ull
+#define GOLDEN_N10_SIZE 1800u
+#define GOLDEN_N10_FNV 0xbe289a9e7e47e1fcull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;
