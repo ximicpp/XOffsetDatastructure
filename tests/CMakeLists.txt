@@ -95,6 +95,9 @@ set(REFLECTION_TESTS
     test_wire_hole_zeroing
     test_implicit_padding
     test_v2_fuzz
+    test_save_compact
+    test_free_run_emission
+    test_wire_populate
     test_reload_reset
     test_clone
 )
