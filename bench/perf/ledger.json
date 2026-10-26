@@ -256,10 +256,10 @@
       "max_ratio": 1.0001,
       "record_only": true,
       "class": "S",
-      "head": "ac4ca462a842",
-      "base": "d924f2426910",
-      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：SR，SHIFT 搬动后重启内联容器头的两处改动，只动 xoffset_core_lifetime.hpp（+47/−15）。shift_rel32 改用 __builtin_add_overflow 加无分支的空值步长，溢出仍 std::terminate，结果与原 int64 检查逐位相同（MSVC 保留原写法）；逐成员重启改为 index_sequence 折叠并用文件内的 XOFFSET_DETAIL_SHIFT_INLINE 强制内联。不改 wire、布局签名、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 与 P2996 d77eff1 + libc++ 全部 65 个指标 head÷base 最大都是 1.0000（max_ratio 字段要求 > 1，取 1.0001）。声称的阶段：slg.B.season_edits GCC 16 0.9632、P2996 0.8413；slg.S.ticks_middle GCC 16 0.8374、P2996 0.8937；slg.B 合计 0.9857 / 0.9326。当前 bench/reloc 的 hero.*.ord 不走 SHIFT（#102 补声明），所以 reloc 指标不变。",
-      "evidence": "PR #104 描述（两种 Ir 表与本地验证）；/mnt/project-files/pareto-rivals-20261024/round2/sr_validate/（sr_ac4ca46_REPORT.md、sr_ac4ca46_p2996_ctest_REPORT.md、sr_ac4ca46_gate_{gcc16,p2996}.json）；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「SR」节",
+      "head": "374a0b7dfdee",
+      "base": "7c8c6a183613",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：SR，SHIFT 搬动后重启内联容器头的两处改动，只动 xoffset_core_lifetime.hpp（+47/−15）。shift_rel32 改用 __builtin_add_overflow 加无分支的空值步长，溢出仍 std::terminate，结果与原 int64 检查逐位相同（MSVC 保留原写法）；逐成员重启改为 index_sequence 折叠并用文件内的 XOFFSET_DETAIL_SHIFT_INLINE 强制内联。不改 wire、布局签名、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 与 P2996 d77eff1 + libc++ 全部 65 个指标 head÷base 最大都是 1.0000（max_ratio 字段要求 > 1，取 1.0001）。声称的阶段：slg.B.season_edits GCC 16 0.9632、P2996 0.8413；slg.S.ticks_middle GCC 16 0.8374、P2996 0.8937；slg.B 合计 0.9857 / 0.9326。首轮门禁（base d924f24，head ac4ca46）时 bench/reloc 的 hero.*.ord 还不走 SHIFT，reloc 全为 1.0000；合入 #102 后在 base 7c8c6a1、head 374a0b7 上两种 Ir 门禁重跑，仍 pass 无警告，SLG 与 formal 各值不变，reloc 下降：hero.mid_erase.ord GCC 16 0.8997 / P2996 0.6139，hero.mid_insert.ord 0.9062 / 0.6295，hero.push_back_grow.ord 0.9934 / 0.9658，nested.build.ord 0.9966 / 0.9833；最大值 GCC 16 reloc.vec.push_back_grow 1.00002，P2996 1.0000。",
+      "evidence": "PR #104 描述（两种 Ir 表与本地验证）；/mnt/project-files/pareto-rivals-20261024/round2/sr_validate/（sr_ac4ca46_REPORT.md、sr_ac4ca46_p2996_ctest_REPORT.md、sr_ac4ca46_gate_{gcc16,p2996}.json，新 base 重跑 on_7c8c6a1/）；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「SR」节",
       "approved_by": "「性能优化」19:58Z 10-26 判 S 类（susu 16:54Z 授权），414dea4 以来第 4 个 S 类（#59、#91、#95、#104）；逐成员强制内联在 Mac 上可能有摆放效应，列为下一次阶段复核的二分点"
     }
   ]
