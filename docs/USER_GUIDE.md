@@ -154,7 +154,7 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | 容器操作触发的 Automatic 增长；显式 `grow()` 没有超出当前存储 | 不变（在预留或槽位里扩展） | 只按上表失效 | 不变 |
 | 可搬槽位上显式 `grow()` 超出槽位（第 3.4 节） | 改变：搬到新存储 | 全部失效 | 加一 |
 | `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
-| `reload_verified`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效 | 加一 |
+| `reload_verified`、`begin_verified_reload`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效（`begin_verified_reload` 在开始时就失效，不等 `finish()`） | 加一 |
 | `src.clone_into(dst)` | dst 不变（复用映射）；dst 是可搬槽位且放不下时换存储（第 3.4 节） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
 | `clone()` | 结果是新 buffer，存储种类与源相同（可搬槽位或地址稳定） | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
 | `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
