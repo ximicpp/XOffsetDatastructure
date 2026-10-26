@@ -8,6 +8,7 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_core_lifetime.hpp
     xoffset_fixed_string.hpp
     xoffset_schema.hpp
+    xoffset_schema_describe.hpp
     xoffset_schema_reflect.hpp
     xoffset_snapshot_index.hpp
     xoffset_snapshot_index_budget.hpp

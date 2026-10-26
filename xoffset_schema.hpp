@@ -6,6 +6,12 @@
 // direct receive) goes through these names, and a backend answers them:
 //
 //   xoffset_schema_reflect.hpp   C++26 reflection (P2996), no user code needed
+//   xoffset_schema_describe.hpp  field lists written with XOFFSET_RECORD (C++20)
+//
+// Reflection answers whenever the compiler has it,
+// unless XOFFSET_SCHEMA_BACKEND_DESCRIBE=1 forces the field lists (the CMake
+// option XOFFSET_SCHEMA_BACKEND=describe sets it). XOFFSET_RECORD is available
+// under both; with reflection it is checked against reflection.
 //
 // Interface (namespace XOffsetDatastructure::schema):
 //   base_count_v<T>, base_t<T, I>          direct bases, declaration order
@@ -35,6 +41,26 @@ namespace XOffsetDatastructure::schema {
     template <class U> struct enum_bounds { U min, max; };
 } // namespace XOffsetDatastructure::schema
 
+// GCC 16 defines __cpp_impl_reflection; the P2996 Clang fork answers
+// __has_feature(reflection). (GCC before 14 has no __has_feature.)
+#if defined(__cpp_impl_reflection)
+#define XOFFSET_SCHEMA_COMPILER_REFLECTION 1
+#elif defined(__has_feature)
+#if __has_feature(reflection)
+#define XOFFSET_SCHEMA_COMPILER_REFLECTION 1
+#endif
+#endif
+
+#if defined(XOFFSET_SCHEMA_COMPILER_REFLECTION) && \
+    !(defined(XOFFSET_SCHEMA_BACKEND_DESCRIBE) && XOFFSET_SCHEMA_BACKEND_DESCRIBE)
+#define XOFFSET_SCHEMA_REFLECTION 1
+#else
+#define XOFFSET_SCHEMA_REFLECTION 0
+#endif
+
+#include "xoffset_schema_describe.hpp"
+#if XOFFSET_SCHEMA_REFLECTION
 #include "xoffset_schema_reflect.hpp"
+#endif
 
 #endif // X_OFFSET_SCHEMA_HPP

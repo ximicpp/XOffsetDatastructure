@@ -98,6 +98,25 @@ template<> struct wire_record_layout<slg::xmr::ShardState> { static constexpr bo
 template<> struct StableEraseOrdinaryMembers<slg::xmr::March> : std::true_type {};
 }
 
+// Field lists for builds without reflection. XOFFSET_RECORD_DERIVED with no
+// bases adds no declaration of its own: this model's declarations stay the
+// specializations above. A C++26 build checks the lists against reflection.
+#if defined(XOFFSET_RECORD_DERIVED)
+XOFFSET_RECORD_DERIVED(slg::xmr::City, (), city_id, level, buildings, resources)
+XOFFSET_RECORD_DERIVED(slg::xmr::Skill, (), id, level)
+XOFFSET_RECORD_DERIVED(slg::xmr::Buff, (), id, stacks, expire_ms)
+XOFFSET_RECORD_DERIVED(slg::xmr::Hero, (), id, level, star, name, skills, buffs)
+XOFFSET_RECORD_DERIVED(slg::xmr::Troop, (), type, count, wounded)
+XOFFSET_RECORD_DERIVED(slg::xmr::Army, (), army_id, owner_id, x, y, heroes, troops, buffs)
+XOFFSET_RECORD_DERIVED(slg::xmr::PlayerState, (), player_id, name, city, armies, heroes, research, items)
+XOFFSET_RECORD_DERIVED(slg::xmr::Event, (), round, hero_id, skill_id, target, damage)
+XOFFSET_RECORD_DERIVED(slg::xmr::Report, (), battle_id, summary, events)
+XOFFSET_RECORD_DERIVED(slg::xmr::BattleMsg, (), battle_id, seed, winner, attacker, defender, report)
+XOFFSET_RECORD_DERIVED(slg::xmr::Tile, (), x, y, terrain, level, owner)
+XOFFSET_RECORD_DERIVED(slg::xmr::March, (), march_id, owner, from_x, from_y, to_x, to_y, eta, troops)
+XOFFSET_RECORD_DERIVED(slg::xmr::ShardState, (), shard_id, tick, width, tiles, cities, marches)
+#endif
+
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xmr::PlayerState, "slg.PlayerState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xmr::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xmr::ShardState, "slg.ShardState.v1")

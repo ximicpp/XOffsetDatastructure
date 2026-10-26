@@ -82,6 +82,7 @@ set(REFLECTION_TESTS
     test_stable_storage
     test_slot_storage
     test_ordinary_records
+    test_schema_describe
     test_vm_lifecycle
     test_vm_transport
     test_owner_identity
@@ -207,6 +208,33 @@ set_tests_properties(ordinary_records_base_fail PROPERTIES
     LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
 set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
     LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
+
+# XOFFSET_RECORD lists that are wrong, and uses the field-list backend cannot
+# serve, must fail the build with these diagnostics. promise_fail needs
+# reflection to see the destructor, so a forced field-list build skips it.
+set(XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
+    "omitted|the list does not name every non-static data member"
+    "order|list every member once, in declaration order"
+    "duplicate|list every member once, in declaration order"
+    "array|the list does not name every non-static data member"
+    "padding|the list does not name every non-static data member"
+    "enum|the enumerators of an enum without a fixed underlying type are unknown"
+    "undescribed|this record has no field list")
+if(NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe" AND
+   (NOT DEFINED XOFFSET_CXX_STANDARD OR XOFFSET_CXX_STANDARD STREQUAL "26"))
+    list(APPEND XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
+        "promise|declares a destructor, copy/move constructor or assignment")
+endif()
+foreach(entry IN LISTS XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS)
+    string(REGEX REPLACE "\\|.*$" "" variant "${entry}")
+    string(REGEX REPLACE "^[^|]*\\|" "" diagnostic "${entry}")
+    add_executable(schema_describe_${variant}_fail EXCLUDE_FROM_ALL schema_describe/${variant}_fail.cpp)
+    configure_xoffset_target(schema_describe_${variant}_fail)
+    add_test(NAME schema_describe_${variant}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_describe_${variant}_fail --config $<CONFIG>)
+    set_tests_properties(schema_describe_${variant}_fail PROPERTIES
+        LABELS "schema" PASS_REGULAR_EXPRESSION "${diagnostic}")
+endforeach()
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")

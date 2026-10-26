@@ -93,8 +93,24 @@ struct alignas(8) IntSet { XSet<int32_t> s; };
 } // namespace rb
 
 // Only the ".ord" records are declared ordinary (all their members are
-// ordinary: no bases, bit-fields, unions or [[no_unique_address]]).
-#ifdef XOFFSET_ORDINARY_RECORDS
+// ordinary: no bases, bit-fields, unions or [[no_unique_address]]). The other
+// records get field lists only (XOFFSET_RECORD_DERIVED without bases), for
+// builds without reflection.
+#if defined(XOFFSET_RECORD)
+XOFFSET_RECORD_DERIVED(rb::Skill, (), id, level)
+XOFFSET_RECORD_DERIVED(rb::Buff, (), id, stacks, expire_ms)
+XOFFSET_RECORD_DERIVED(rb::Troop, (), type, count)
+XOFFSET_RECORD(rb::xm::HeroOrd, id, level, star, name, skills, buffs)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroPlain, (), id, level, star, name, skills, buffs)
+XOFFSET_RECORD(rb::xm::ArmyOrd, id, name, heroes, troops)
+XOFFSET_RECORD_DERIVED(rb::xm::ArmyPlain, (), id, name, heroes, troops)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroVecOrd, (), v, proto)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroVecPlain, (), v, proto)
+XOFFSET_RECORD_DERIVED(rb::xm::IntVec, (), v)
+XOFFSET_RECORD_DERIVED(rb::xm::StrVec, (), s)
+XOFFSET_RECORD_DERIVED(rb::xm::IntMap, (), m)
+XOFFSET_RECORD_DERIVED(rb::xm::IntSet, (), s)
+#elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(rb::xm::HeroOrd, rb::xm::ArmyOrd)
 #else
 // Libraries without the macro: its two specializations, written out.
