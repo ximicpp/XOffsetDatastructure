@@ -5180,8 +5180,8 @@ namespace XOffsetDatastructure {
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
 #if defined(__linux__)
         // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
-        // 256 KiB whose last page is not resident (a fresh mapping, not a
-        // reused string) goes in 256 KiB chunks, each preceded by
+        // 256 KiB whose next-to-last page is not resident (a fresh mapping, not
+        // a reused string) goes in 256 KiB chunks, each preceded by
         // madvise(MADV_POPULATE_WRITE), so the kernel faults the chunk's pages
         // in one call instead of one trap per page.
         // A kernel without it (before 5.14) answers EINVAL once; the output
@@ -5212,10 +5212,14 @@ namespace XOffsetDatastructure {
                 }
 #elif defined(__linux__)
                 constexpr std::size_t chunk = std::size_t(256) << 10;
-                unsigned char last_page = 1;
+                unsigned char probe_page = 1;
+                // Not the last page: libc++'s resize_and_overwrite writes the
+                // terminator before the output is filled, which makes that page
+                // resident in a fresh mapping too. n >= 256 KiB, so the page
+                // before it is still inside the copy.
                 if (prefault && n >= chunk && !wire_populate_unsupported.load(std::memory_order_relaxed) &&
-                    ::mincore(reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)),
-                              page, &last_page) == 0 && (last_page & 1u) == 0) {
+                    ::mincore(reinterpret_cast<void*>((reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)) - page),
+                              page, &probe_page) == 0 && (probe_page & 1u) == 0) {
                     bool populate = true;
                     for (std::size_t off = 0; off < n; off += chunk) {
                         const auto len = std::min(chunk, n - off);
