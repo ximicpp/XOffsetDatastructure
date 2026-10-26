@@ -251,6 +251,17 @@ namespace XOffsetDatastructure {
 #else
 #define XOFFSET_DETAIL_NOINLINE
 #endif
+// [[indeterminate]] (C++26) where the compiler has it: an automatic variable
+// whose bytes are written before they are read does not get the erroneous-
+// behaviour fill (GCC 16 zeroes it; Clang without the attribute does not).
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(indeterminate)
+#define XOFFSET_INDETERMINATE [[indeterminate]]
+#endif
+#endif
+#ifndef XOFFSET_INDETERMINATE
+#define XOFFSET_INDETERMINATE
+#endif
 
     namespace fixed_detail {
         struct StableEraseOwnerWitness;
@@ -5069,13 +5080,17 @@ namespace XOffsetDatastructure {
             if (used > xbuf.segment_size())
                 wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
-            WireValidationContext ctx{
-                .base = static_cast<const char*>(xbuf.get_address()),
-                .end = validated_end,
-                .segment = xbuf.arena(),
-                .upstream = upstream,
-                .retained = retained
-            };
+            // Default-initialized, then assigned: the granule index's inline
+            // words are written by prepare() before any read. GCC 16 zeroes
+            // the whole 1 KiB context for an aggregate initializer, with or
+            // without [[indeterminate]], and for a default-initialized one
+            // without the attribute.
+            XOFFSET_INDETERMINATE WireValidationContext ctx;
+            ctx.base = static_cast<const char*>(xbuf.get_address());
+            ctx.end = validated_end;
+            ctx.segment = xbuf.arena();
+            ctx.upstream = upstream;
+            ctx.retained = retained;
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
                 wire_reject("wire validation: unsupported arena header flags");
             }
