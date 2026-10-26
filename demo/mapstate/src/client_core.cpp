@@ -22,7 +22,8 @@ namespace mapdemo::client {
 
 const char* usage_text() {
     return "usage: mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check | --no-check]\n"
-           "                      [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]\n";
+           "                      [--buffers reuse|fresh] [--csv-dir DIR] [--auto-drag]\n"
+           "                      [--screenshot-at F1,F2,...] [--evil]\n";
 }
 
 static long parse_long(std::string_view flag, const char* text, long lo, long hi) {
@@ -50,6 +51,12 @@ Options parse_options(int argc, char** argv) {
         else if (a == "--csv-dir") o.csv_dir = value();
         else if (a == "--auto-drag") o.auto_drag = true;
         else if (a == "--evil") o.evil = true;
+        else if (a == "--buffers") {
+            const char* t = value();
+            const auto m = parse_buffer_mode(t);
+            if (!m) throw UsageError(std::string(a) + ": bad value '" + t + "'");
+            o.buffers = *m;
+        }
         else if (a == "--screenshot-at") {
             std::string list = value();
             std::size_t start = 0;
@@ -77,6 +84,13 @@ double SnapshotHolder::replace(XBuffer&& next) {
     buf_.emplace(std::move(next));
     root_ = &buf_->root<ViewSnapshot>();
     return destroy_us;
+}
+
+void SnapshotHolder::reload(const std::string& wire) {
+    root_ = nullptr;
+    if (buf_) buf_->reload_verified<ViewSnapshot>(wire);
+    else buf_.emplace(XBuffer::load_verified<ViewSnapshot>(wire, cap_snapshot()));
+    root_ = &buf_->root<ViewSnapshot>();
 }
 
 double SnapshotHolder::clear() {
@@ -238,12 +252,22 @@ void Session::connect() {
 }
 
 void Session::send_view(const Rect& rect, net::ViewCategory category) {
-    XBuffer req = XBuffer::create<ViewRequest>(256, cap_view_request());
-    ViewRequest& r = req.root<ViewRequest>();
+    const bool reuse = opt_.buffers == BufferMode::Reuse;
+    std::optional<XBuffer> fresh;
+    std::optional<XBuffer>& req = reuse ? req_buf_ : fresh;
+    if (req) req->reset<ViewRequest>();
+    else req.emplace(XBuffer::create<ViewRequest>(256, cap_view_request()));
+    ViewRequest& r = req->root<ViewRequest>();
     r.request_id = next_request_id_++;
     r.scene_id = kSceneId;
     r.rect = rect;
-    std::string wire = req.save_verified<ViewRequest>();
+    std::string wire;
+    if (reuse) {
+        wire = conn_.take_tx_buffer();
+        req->save_verified_into<ViewRequest>(wire);
+    } else {
+        wire = req->save_verified<ViewRequest>();
+    }
     sent_request_id_ = r.request_id;
     sent_category_ = category;
     sent_rect_ = rect;
@@ -291,10 +315,18 @@ bool Session::install_pending() {
     Pending p = std::move(*pending_);
     pending_.reset();
 
+    const bool reuse = opt_.buffers == BufferMode::Reuse;
     metrics::Stopwatch sw;
-    XBuffer next = XBuffer::load_verified<ViewSnapshot>(p.frame.payload, cap_snapshot());
-    double load_us = sw.us();
-    double destroy_us = holder_.replace(std::move(next));
+    double load_us = 0;
+    double destroy_us = -1;   // reuse: nothing is destroyed per snapshot
+    if (reuse) {
+        holder_.reload(p.frame.payload);
+        load_us = sw.us();
+    } else {
+        XBuffer next = XBuffer::load_verified<ViewSnapshot>(p.frame.payload, cap_snapshot());
+        load_us = sw.us();
+        destroy_us = holder_.replace(std::move(next));
+    }
     if (cur_.live) retire_current(destroy_us);
 
     rec_.add("c.load_us", load_us);
@@ -316,6 +348,7 @@ bool Session::install_pending() {
     // Outside the timed region: digest (compared with A's log) and checks.
     cur_.digest = checks::snapshot_digest(s);
     if (opt_.check_on()) check_snapshot(p.frame);
+    if (reuse) conn_.recycle_rx(std::move(p.frame.payload));
     return true;
 }
 
@@ -389,20 +422,25 @@ void Session::verify_direct_read() {
 }
 
 void Session::retire_current(double destroy_us) {
-    rec_.add("c.destroy_us", destroy_us);
+    if (destroy_us >= 0) rec_.add("c.destroy_us", destroy_us);
     double rp = cur_.read_present_n ? cur_.read_present_sum / double(cur_.read_present_n) : 0.0;
     if (snap_csv_open_) {
+        char destroy[32] = "";
+        if (destroy_us >= 0) std::snprintf(destroy, sizeof destroy, "%.3f", destroy_us);
         char line[512];
-        std::snprintf(line, sizeof line, "%" PRIu64 ",%" PRIu64 ",%s,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,%.3f,%.3f,%d",
+        std::snprintf(line, sizeof line, "%" PRIu64 ",%" PRIu64 ",%s,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,%.3f,%s,%d",
                       cur_.request_id, cur_.tick, category_name(cur_.category), cur_.visible, cur_.wire_bytes,
-                      cur_.digest, cur_.rtt_us, cur_.load_us, rp, destroy_us, cur_.check_ok ? 1 : 0);
+                      cur_.digest, cur_.rtt_us, cur_.load_us, rp, destroy, cur_.check_ok ? 1 : 0);
         snap_csv_.row(line);
     }
     cur_.live = false;
 }
 
 bool Session::finish() {
-    if (cur_.live) retire_current(holder_.clear());
+    if (cur_.live) {
+        const double destroy_us = holder_.clear();
+        retire_current(opt_.buffers == BufferMode::Reuse ? -1.0 : destroy_us);
+    }
     if (opt_.check_on()) {
         if (snapshots_ == 0) checks_.fail("snapshots_received", "no snapshot received");
         else {
@@ -642,6 +680,42 @@ int run_evil(const Options& opt) {
             left -= std::size_t(n);
         }
         expect_rejected(log, "evil_oversize_header", "header declaring a 1 GiB ViewReq", c);
+    }
+    {   // (4) one connection: valid request, truncated wire, valid request.
+        // With --buffers reuse, A's per-client request buffer is left empty
+        // by the rejected reload and must be refilled by the next one.
+        net::Conn c = net::Conn::connect(opt.host, opt.port);
+        handshake(c);
+        auto served = [&](std::uint64_t id) -> std::string {
+            c.send(net::MsgType::ViewReq, id, view_request_wire(id, normal), static_cast<std::uint16_t>(net::ViewCategory::Normal));
+            Awaited a = await_frame(c, 5000);
+            if (a.outcome != Outcome::Frame) return a.outcome == Outcome::Closed ? "closed: " + a.detail : "no answer within 5 s";
+            if (a.frame.type != net::MsgType::ViewSnapshot) return std::string("got ") + net::type_name(a.frame.type) + " " + a.frame.payload;
+            if (a.frame.correlation != id) return "correlation " + std::to_string(a.frame.correlation);
+            try {
+                XBuffer b = XBuffer::load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
+                checks::Result r = checks::snapshot_sanity(b.root<ViewSnapshot>(), id, normal);
+                return r.ok ? std::string() : r.detail;
+            } catch (const std::exception& e) {
+                return std::string("load_verified: ") + e.what();
+            }
+        };
+        std::string why = served(5);
+        if (why.empty()) {
+            std::string bad = view_request_wire(6, normal);
+            bad.pop_back();
+            c.send(net::MsgType::ViewReq, 6, bad, static_cast<std::uint16_t>(net::ViewCategory::Normal));
+            if (!expect_rejected(log, "evil_same_conn_rejected", "same connection: truncated wire", c)) why = "not rejected";
+        }
+        if (why.empty()) why = served(7);
+        std::fprintf(stdout, "evil: %-40s -> %s\n", "same connection: valid request after it",
+                     why.empty() ? "answered" : why.c_str());
+        if (why.empty()) {
+            log.pass("evil_same_conn_recovers");
+            log.note("evil_same_conn_recovers", "requests 5 and 7 answered around rejected 6");
+        } else {
+            log.fail("evil_same_conn_recovers", why);
+        }
     }
     {   // A still serves a normal client. Its snapshot is logged like any other
         // (client_snapshots.csv) so it can be matched with A's a_snapshots.csv.

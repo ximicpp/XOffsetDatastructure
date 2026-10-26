@@ -80,6 +80,8 @@ namespace XOffsetDatastructure {
         explicit XBadAlloc(const std::string& what) : XException(what) {}
     };
 
+    template <typename T> struct XFixedVector;
+
     namespace detail {
         template<class T> T* begin_dynamic_array(void*, std::size_t) noexcept;
         template<class T> T* rebuild_dynamic_array(void*, std::size_t, std::uint32_t) noexcept;
@@ -93,6 +95,32 @@ namespace XOffsetDatastructure {
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
         template<class T> void zero_implicit_padding(T*) noexcept;
+        template<class T> consteval bool subtree_copy_supported();
+        template<class T> bool subtree_copy_assign(XFixedVector<T>&, const XFixedVector<T>&);
+#if defined(XOFFSET_TEST_HOOKS)
+        // T4 test hooks: a per-thread switch that sends container copy
+        // assignment down the element-wise reference path, and counters.
+        struct SubtreeCopyStats {
+            std::uint64_t whole_hits = 0;        // contiguous source: one memcpy
+            std::uint64_t compact_hits = 0;      // any other source: compacted
+            std::uint64_t pod_hits = 0;          // trivially copyable element copies
+            std::uint64_t whole_skipped_layout = 0; // source not one contiguous range
+            std::uint64_t whole_skipped_slack = 0;  // contiguous, spare bytes over the bound
+            std::uint64_t fallback_type = 0;     // element type not admitted: element-wise
+            std::uint64_t fallback_alloc = 0;    // segment did not fit (XBadAlloc): element-wise
+            std::uint64_t whole_retires = 0;     // old content retired as one range
+            std::uint64_t piecewise_retires = 0; // old content retired block by block
+            std::uint64_t bytes = 0;             // segment bytes of whole and compact copies
+        };
+        inline thread_local bool subtree_copy_hook_enabled = true;
+        inline thread_local SubtreeCopyStats subtree_copy_stats{};
+        inline bool subtree_copy_enabled() noexcept { return subtree_copy_hook_enabled; }
+#define XOFFSET_DETAIL_SUBTREE_COUNT(field, n) \
+        (::XOffsetDatastructure::detail::subtree_copy_stats.field += (n))
+#else
+        constexpr bool subtree_copy_enabled() noexcept { return true; }
+#define XOFFSET_DETAIL_SUBTREE_COUNT(field, n) ((void)0)
+#endif
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -640,7 +668,9 @@ namespace XOffsetDatastructure {
             return true;
         }
 
-        // ptr/bytes must name exactly one live block of this arena.
+        // ptr/bytes must name exactly one live block of this arena, or a run
+        // of adjacent live blocks released together (T4 subtree retirement):
+        // blocks have no headers and the table records only holes.
         // D3: a small block entering a bin that already has spare capacity
         // needs no host allocation and runs no host callback; it is published
         // inline. Everything else takes retire_block_general unchanged.
@@ -855,6 +885,25 @@ namespace XOffsetDatastructure {
                 if (cache.count) return FreeTablePtr(cache.tables[--cache.count]);
             }
             return FreeTablePtr(new FreeTable());
+        }
+
+        // A copy of an exact table for clone(). Entries are payload offsets,
+        // so they stay valid at the destination address. Bin order and the
+        // large map are kept, so both buffers allocate identically afterwards.
+        static FreeTablePtr copy_free_table(const FreeTable& src) {
+            auto table = make_free_table();
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = src.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    table->bins[bin] = src.bins[bin];
+                }
+                table->nonempty[word] = src.nonempty[word];
+                table->touched[word] |= src.nonempty[word];
+            }
+            table->large = src.large;
+            table->bytes = src.bytes;
+            table->count = src.count;
+            return table;
         }
 
         // The general allocation and retirement paths (see allocate_block
@@ -1502,6 +1551,56 @@ namespace XOffsetDatastructure {
             reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
         }
 
+        // clone()/clone_into(): the host state that travels with a payload
+        // copied from a live buffer of this process. The logical size grows
+        // to src's (at most this owner's maximum; the tail reads as zero),
+        // the exact free table is copied (an incomplete one stays incomplete),
+        // and so are typed root access and the root/schema binding, because
+        // the bytes are exactly src's: nothing needs verifying. Throws
+        // XBadAlloc; on a throw this owner keeps the state the payload copy
+        // left it in.
+        void copy_clone_state(const XBufferCore& src) {
+            const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
+            if (logical > buffer_.size() && !buffer_.grow_to(logical)) throw XBadAlloc();
+            if (!src.free_table_lost_) {
+                try {
+                    free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
+                } catch (const std::bad_alloc&) {
+                    throw XBadAlloc();
+                } catch (const std::length_error&) {
+                    throw XBadAlloc();
+                }
+                free_table_lost_ = false;
+            }
+            typed_root_access_allowed_ = src.typed_root_access_allowed_;
+            schema_bound_ = src.schema_bound_;
+            bound_root_type_id_ = src.bound_root_type_id_;
+            bound_schema_hash_ = src.bound_schema_hash_;
+            root_type_identity_ = src.root_type_identity_;
+        }
+
+        // clone_into(): src's used payload replaces this owner's content in
+        // place, like reload_verified (same mapping, address and registration;
+        // epoch advances). On any failure this owner is left an empty arena.
+        void clone_state_from(const XBufferCore& src) {
+            if (this == &src) throw XException("clone_into(): source and destination are the same buffer");
+            try {
+                const auto* sm = src.arena();
+                if (!sm) throw XException("clone_into(): source buffer has no arena");
+                reinit_from_bytes(reinterpret_cast<const char*>(sm), static_cast<size_type>(sm->used_end));
+                copy_clone_state(src);
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+        }
+
+        // clone(): a new owner with src's maximum capacity, growth policy and
+        // pool.
+        MaximumCapacity clone_capacity() const noexcept {
+            return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool()};
+        }
+
         // Empty arena: header only, no root, empty exact free table.
         // N2: every logical byte at or past used_end is zero (growth zeroes
         // what it exposes, used_end only rises until a reset, and loads zero
@@ -1767,6 +1866,13 @@ namespace XOffsetDatastructure {
         template <typename T>
         T* resolve_rel32(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
+            auto* base = reinterpret_cast<const char*>(origin);
+            return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
+        }
+
+        // delta != 0 is known (a head with capacity names a live block).
+        template <typename T>
+        T* resolve_rel32_live(const std::int32_t* origin, std::int32_t delta) noexcept {
             auto* base = reinterpret_cast<const char*>(origin);
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
@@ -2037,6 +2143,22 @@ namespace XOffsetDatastructure {
         template <typename Elem, typename KeyLike, typename KeyFn>
         std::uint32_t lower_bound_index(const Elem* data, std::uint32_t size,
                                         const KeyLike& key, KeyFn&& key_fn) {
+            if constexpr (std::is_scalar_v<std::remove_cvref_t<decltype(key_fn(*data))>> &&
+                          std::is_scalar_v<KeyLike>) {
+                // Scalar keys: branch-free halving (conditional move), same
+                // index as the loop below. Random keys made the loop's
+                // data-dependent branch mispredict about half the time.
+                if (size == 0) return 0;
+                const Elem* base = data;
+                std::uint32_t n = size;
+                while (n > 1) {
+                    const std::uint32_t half = n / 2;
+                    base = ordered_less(key_fn(base[half - 1]), key) ? base + half : base;
+                    n -= half;
+                }
+                return static_cast<std::uint32_t>(base - data) +
+                       static_cast<std::uint32_t>(ordered_less(key_fn(*base), key));
+            }
             std::uint32_t first = 0;
             std::uint32_t count = size;
             while (count > 0) {
@@ -2376,12 +2498,35 @@ namespace XOffsetDatastructure {
             capacity_ = 0;
         }
 
-        // src may alias these inline bytes.
+        // src may alias these inline bytes: every source byte is loaded before
+        // the head is written. The 12 bytes are assembled in two registers
+        // (little-endian) and written with two stores; a byte-filled stack
+        // buffer reloaded as words stalled store forwarding.
         void store_inline(const char* src, std::uint32_t count) noexcept {
-            char bytes[12] = {};
-            if (count != 0) std::memcpy(bytes, src, count);
-            bytes[11] = static_cast<char>(0x80u | count);
-            std::memcpy(inline_bytes(), bytes, sizeof(bytes));
+            std::uint64_t lo = 0;
+            std::uint32_t hi = 0;
+            if (count >= 8) {
+                std::memcpy(&lo, src, 8);
+                if (count == 10) {
+                    std::uint16_t tail;
+                    std::memcpy(&tail, src + 8, 2);
+                    hi = tail;
+                } else if (count == 9) {
+                    hi = static_cast<unsigned char>(src[8]);
+                }
+            } else if (count >= 4) {
+                std::uint32_t head, tail;
+                std::memcpy(&head, src, 4);
+                std::memcpy(&tail, src + count - 4, 4);
+                lo = head | (std::uint64_t(tail) << ((count - 4) * 8));
+            } else if (count != 0) {
+                lo = std::uint64_t(static_cast<unsigned char>(src[0])) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count >> 1])) << ((count >> 1) * 8)) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count - 1])) << ((count - 1) * 8));
+            }
+            hi |= (0x80u | count) << 24;
+            std::memcpy(inline_bytes(), &lo, 8);
+            std::memcpy(inline_bytes() + 8, &hi, 4);
         }
 
         // The head has no out-of-line storage (inline or null). src may alias
@@ -2459,6 +2604,20 @@ namespace XOffsetDatastructure {
             if (this == &other) return *this;
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
+            // T4: a trivially copyable element is one range copy; any other
+            // admitted subtree is copied into one fresh segment.
+            if constexpr (detail::subtree_copy_supported<T>()) {
+                if (detail::subtree_copy_enabled()) {
+                    if constexpr (std::is_trivially_copyable_v<T>) {
+                        assign_trivial_copy(other);
+                        return *this;
+                    } else if (other.size_ != 0 && detail::subtree_copy_assign(*this, other)) {
+                        return *this;
+                    }
+                }
+            } else {
+                XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
+            }
             rebuild(other.size_, std::max(capacity_, other.size_), [&](T* dst, size_type i) {
                 fixed_detail::transfer_construct(dst, other.data()[i], binding());
             });
@@ -2577,10 +2736,7 @@ namespace XOffsetDatastructure {
                     alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 auto* old = data();
                 auto old_cap = capacity_;
-                for (size_type i = 0; i < size_; ++i) {
-                    fixed_detail::relocate_construct(fresh + i, old[i]);
-                }
-                fixed_detail::destroy_n(old, size_);
+                relocate_live_run(fresh, old);
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
@@ -2665,9 +2821,17 @@ namespace XOffsetDatastructure {
         }
 
         void push_back(const T& value) {
-            insert_construct(size_, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, value, binding());
-            });
+            const size_type n = size_;
+            if (n < capacity_) [[likely]] {
+                // As insert_construct's append fast path, kept here so the
+                // caller's loop builds no closure for the general call.
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                fixed_detail::transfer_construct(slot, value, binding());
+                size_ = n + 1u;
+                return;
+            }
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
+            else push_back_general<const T&>(value);
         }
 
         void push_back(T&& value) {
@@ -2758,6 +2922,15 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // push_back beyond capacity or on an unbound head. A small trivially
+        // copyable value arrives by value (registers), not by reference.
+        template <typename V>
+        XOFFSET_DETAIL_NOINLINE void push_back_general(V value) {
+            insert_construct(size_, [&](T* dst) {
+                fixed_detail::transfer_construct(dst, static_cast<const T&>(value), binding());
+            });
+        }
+
         static size_type checked_count(std::size_t count) {
             if (count > max_size()) throw XBadAlloc();
             return static_cast<size_type>(count);
@@ -2805,11 +2978,19 @@ namespace XOffsetDatastructure {
 
         template <typename Construct>
         iterator insert_construct(size_type index, Construct&& construct) {
+            if (index == size_ && size_ < capacity_) [[likely]] {
+                // Append into spare capacity. capacity_ != 0 implies a bound
+                // head with a live block (data_delta != 0), and size_ <
+                // capacity_ <= max_size(): the checks below are implied.
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + size_;
+                construct(slot);
+                ++size_;
+                return slot;
+            }
             ensure_bound();
             if (index > size_ || size_ == max_size()) throw XBadAlloc();
-            if (index == size_ && size_ < capacity_) {
-                construct(data() + size_);
-                ++size_;
+            if (index == size_ && append_grow(construct)) {
+                // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 // A native temporary is safe only for types without arena bindings.
                 alignas(T) std::byte storage[sizeof(T)];
@@ -2901,6 +3082,73 @@ namespace XOffsetDatastructure {
                     else fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
             }
+        }
+
+        // Append to a full vector without a staged element: grow the block
+        // (in place at the arena tail, else a fresh block), build the new
+        // element directly at its final slot, then relocate the old run.
+        // The new element is built while the old run is still intact, so
+        // arguments that alias old elements stay valid. If construct
+        // throws, a fresh block is retired and the old run is untouched; a
+        // tail expansion stays, as after a successful reserve. Returns false
+        // for types that keep the general paths in insert_construct.
+        template <typename Construct>
+        bool append_grow(Construct& construct) {
+            if constexpr (std::is_trivially_copyable_v<T> ||
+                          !fixed_detail::can_relocate_without_allocation<T>()) {
+                return false;
+            } else {
+                const auto new_cap = grown_capacity();
+                auto alloc = binding();
+                const auto new_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
+                if (fixed_detail::try_expand_dynamic_bytes(
+                        alloc, data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)), new_bytes, alignof(T))) {
+                    (void)detail::rebuild_dynamic_array<T>(data(), new_cap, size_);
+                    capacity_ = new_cap;
+                    construct(data() + size_);
+                    ++size_;
+                    return true;
+                }
+                auto* fresh = detail::begin_dynamic_array<T>(
+                    fixed_detail::allocate_dynamic_bytes(alloc, new_bytes, alignof(T)), new_cap);
+                std::int32_t delta = 0;
+                try {
+                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    construct(fresh + size_);
+                } catch (...) {
+                    fixed_detail::retire_dynamic_bytes(alloc, fresh, new_bytes);
+                    throw;
+                }
+                auto* old = data();
+                const auto old_cap = capacity_;
+                relocate_live_run(fresh, old);
+                data_delta = delta;
+                capacity_ = new_cap;
+                ++size_;
+                fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+                return true;
+            }
+        }
+
+        // Moves the size_ live elements from `old` into the separate fresh
+        // block and ends their lifetimes in `old` (left emptied, bindings
+        // kept). SHIFT types: one memcpy plus an inline-head rebase by the
+        // block distance; same bytes and deltas as the per-element loop.
+        void relocate_live_run(T* fresh, T* old) noexcept
+            requires (fixed_detail::can_relocate_without_allocation<T>()) {
+            if (size_ == 0) return;
+            if constexpr (detail::shift_relocate_supported<T>()) {
+                std::memcpy(static_cast<void*>(fresh), static_cast<const void*>(old),
+                            std::size_t(size_) * sizeof(T));
+                detail::shift_rebase_moved(fresh, size_, static_cast<std::int32_t>(
+                    reinterpret_cast<const char*>(old) - reinterpret_cast<const char*>(fresh)));
+                for (size_type i = 0; i < size_; ++i) detail::empty_vacated_slot(old + i);
+            } else {
+                for (size_type i = 0; i < size_; ++i) {
+                    fixed_detail::relocate_construct(fresh + i, old[i]);
+                }
+            }
+            fixed_detail::destroy_n(old, size_);
         }
 
         template <typename Construct, typename Commit>
@@ -3025,6 +3273,18 @@ namespace XOffsetDatastructure {
 
         void copy_from(const XFixedVector& other) {
             if (other.size_ == 0) return;
+            if constexpr (detail::subtree_copy_supported<T>()) {
+                if (detail::subtree_copy_enabled()) {
+                    if constexpr (std::is_trivially_copyable_v<T>) {
+                        assign_trivial_copy(other);
+                        return;
+                    } else if (detail::subtree_copy_assign(*this, other)) {
+                        return;
+                    }
+                }
+            } else {
+                XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
+            }
             reserve(other.size_);
             size_type constructed = 0;
             try {
@@ -3038,6 +3298,15 @@ namespace XOffsetDatastructure {
                 throw;
             }
             size_ = other.size_;
+        }
+
+        // T4 POD: assign_range (in place when the capacity suffices, else one
+        // exact block), then the M6 padding zeroing transfer_construct does.
+        void assign_trivial_copy(const XFixedVector& other) {
+            assign_range(std::span<const T>(other.data(), other.size_));
+            auto* items = data();
+            for (size_type i = 0; i < size_; ++i) detail::zero_implicit_padding(items + i);
+            XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
         }
 
         void release() noexcept {
@@ -4618,6 +4887,37 @@ namespace XOffsetDatastructure {
     // whose source layout has not been audited against these obligations.
     template<class T> struct StableEraseOrdinaryMembers : std::false_type {};
 
+    // Mechanical part of XOFFSET_ORDINARY_RECORDS. Physical disjointness
+    // catches a [[no_unique_address]] member that shares storage, but not one
+    // that merely could; the declaration stays a source contract.
+    namespace detail {
+        template <typename T>
+        consteval bool ordinary_record_has_no_bases() {
+            return std::meta::bases_of(^^T, std::meta::access_context::unchecked()).empty();
+        }
+        template <typename T>
+        consteval bool ordinary_record_has_no_bit_fields() {
+            for (auto member : std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()))
+                if (std::meta::is_bit_field(member)) return false;
+            return true;
+        }
+        // Every pair of [offset, offset + sizeof) member ranges is disjoint.
+        template <typename T>
+        consteval bool ordinary_record_members_disjoint() {
+            const auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked());
+            for (std::size_t i = 0; i < members.size(); ++i) {
+                const auto a = std::meta::offset_of(members[i]).bytes;
+                const auto a_end = a + std::meta::size_of(std::meta::type_of(members[i]));
+                for (std::size_t j = i + 1; j < members.size(); ++j) {
+                    const auto b = std::meta::offset_of(members[j]).bytes;
+                    const auto b_end = b + std::meta::size_of(std::meta::type_of(members[j]));
+                    if (a < b_end && b < a_end) return false;
+                }
+            }
+            return true;
+        }
+    } // namespace detail
+
     namespace fixed_detail {
         // [class.prop]: an aggregate whose destructor is not user-provided is
         // implicit-lifetime, even when that destructor is nontrivial because a
@@ -6104,6 +6404,37 @@ namespace XOffsetDatastructure {
             if (!this->arena()) throw XException("reset<T>(): buffer has no arena");
             return *this->template make<T>();
         }
+
+        /// An independent copy of this buffer in the same process: one copy of
+        /// the used payload into a new owner with this buffer's size, maximum
+        /// capacity, growth policy and pool. The exact free table, typed root
+        /// access and the root/schema binding come along, so the copy behaves
+        /// like this buffer would (same allocations, same save_verified bytes);
+        /// nothing goes through a wire and nothing is verified. Throws
+        /// XException when this buffer has no arena and XBadAlloc when the new
+        /// owner cannot be created; this buffer is never modified.
+        XBuffer clone() const {
+            const auto* sm = this->arena();
+            if (!sm) throw XException("clone(): buffer has no arena");
+            XBuffer out(reinterpret_cast<const char*>(sm), static_cast<std::size_t>(sm->used_end),
+                        this->clone_capacity());
+            out.copy_clone_state(*this);
+            return out;
+        }
+
+        /// The same copy into an existing buffer, reusing its mapping, address,
+        /// owner registration, maximum capacity and growth policy (like
+        /// reload_verified); dst's size becomes this buffer's size, at most
+        /// dst's maximum capacity. Every reference into dst's previous content is
+        /// invalidated and dst.epoch() advances. Throws XException when dst is
+        /// this buffer (nothing is changed) and XBadAlloc when this buffer's
+        /// used bytes exceed dst's maximum capacity; on any failure other than
+        /// the self copy dst is left an empty arena without a root, as after a
+        /// failed reload_verified.
+        void clone_into(XBuffer& dst) const {
+            dst.clone_state_from(*this);
+        }
+
         template <typename T>
         static XBuffer load_verified(const std::string& data,
                                      std::optional<MaximumCapacity> cap = std::nullopt) {
@@ -6265,6 +6596,9 @@ namespace XOffsetDatastructure {
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
         T& reset() { return XBuffer::reset<T>(); }
+
+        TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
+        void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }
 
         void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
 
@@ -6554,6 +6888,53 @@ struct _XOffset_NS_Sentinel {};
         static constexpr XOffsetDatastructure::XCompactor::MigrateStrategy     \
             value = XOffsetDatastructure::XCompactor::MigrateStrategy::strategy; \
     };
+
+// XOFFSET_ORDINARY_RECORDS(A, B, ...): declares that each record type has
+// only ordinary non-static data members: no bases, unions, bit-fields or
+// [[no_unique_address]], members never overlap. It specializes
+// wire_record_layout<T>::ordinary_members and StableEraseOrdinaryMembers<T>,
+// which turns on the SHIFT path (XVector insert/erase/growth move records with
+// one memmove/memcpy plus an inline-head rebase), stable_erase_if and raw
+// receive for these types. The wire bytes are the same with or without it.
+// Each type is checked at compile time: a class (not a union) without bases
+// or bit-fields whose members are physically disjoint. A [[no_unique_address]]
+// member that happens not to overlap passes the check, so declaring such a type
+// is still undefined behavior; the library never infers the declaration.
+// Use at global scope after the type definitions and before any use of the
+// types in containers. Use an alias for a type name containing commas.
+#define XOFFSET_ORDINARY_RECORDS(...)                                          \
+    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_ORDINARY_RECORDS")                \
+    XOFFSET_DETAIL_FOR_EACH(XOFFSET_DETAIL_ORDINARY_RECORD, __VA_ARGS__)
+
+#define XOFFSET_DETAIL_ORDINARY_RECORD(Type)                                   \
+    static_assert(::std::is_class_v<Type> && !::std::is_union_v<Type>,       \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must be a class type, not a union"); \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bases<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have base classes");   \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_has_no_bit_fields<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " must not have bit-fields");     \
+    static_assert(::XOffsetDatastructure::detail::ordinary_record_members_disjoint<Type>(), \
+        "XOFFSET_ORDINARY_RECORDS: " #Type " has overlapping members "       \
+        "([[no_unique_address]]?); it is not an ordinary record");           \
+    template<> struct XOffsetDatastructure::wire_record_layout<Type> {        \
+        static constexpr bool ordinary_members = true;                         \
+    };                                                                         \
+    template<> struct XOffsetDatastructure::StableEraseOrdinaryMembers<Type>  \
+        : ::std::true_type {};
+
+// Applies macro(x) to each argument (up to 256).
+#define XOFFSET_DETAIL_PARENS ()
+#define XOFFSET_DETAIL_EXPAND(...) XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(XOFFSET_DETAIL_EXPAND4(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND4(...) XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(XOFFSET_DETAIL_EXPAND3(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND3(...) XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(XOFFSET_DETAIL_EXPAND2(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND2(...) XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(XOFFSET_DETAIL_EXPAND1(__VA_ARGS__))))
+#define XOFFSET_DETAIL_EXPAND1(...) __VA_ARGS__
+#define XOFFSET_DETAIL_FOR_EACH(macro, ...)                                    \
+    __VA_OPT__(XOFFSET_DETAIL_EXPAND(XOFFSET_DETAIL_FOR_EACH_HELPER(macro, __VA_ARGS__)))
+#define XOFFSET_DETAIL_FOR_EACH_HELPER(macro, a1, ...)                         \
+    macro(a1)                                                                  \
+    __VA_OPT__(XOFFSET_DETAIL_FOR_EACH_AGAIN XOFFSET_DETAIL_PARENS (macro, __VA_ARGS__))
+#define XOFFSET_DETAIL_FOR_EACH_AGAIN() XOFFSET_DETAIL_FOR_EACH_HELPER
 
 // Compatibility wrappers. `name` is ignored now that XOffset no longer registers
 // its own containers through TypeLayout's opaque mechanism.

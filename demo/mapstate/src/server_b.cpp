@@ -1,11 +1,14 @@
 // Map state demo: server B (MAP_DEMO_DESIGN section 4.2). OWNER: server thread.
 //
 // Blocking single-connection loop. B owns no state across steps: every
-// StepReq is loaded with load_verified, advanced one step in place inside the
-// loaded arena, saved with save_verified and returned; the received buffer is
-// then destroyed. B never advances anything on its own.
+// StepReq is verified into an arena, advanced one step in place inside that
+// arena, saved and returned. B never advances anything on its own.
+//   --buffers fresh: load_verified into a new XBuffer, save_verified, destroy.
+//   --buffers reuse: reload_verified into the one buffer B keeps,
+//                    save_verified_into a kept string; payload strings are
+//                    handed back to the connection. Same bytes either way.
 //
-//   mapdemo_b [--port 47702] [--seed 1] [--csv-dir DIR]
+//   mapdemo_b [--port 47702] [--seed 1] [--buffers reuse|fresh] [--csv-dir DIR]
 //
 // --seed must match A's seed (the rules depend on it); A's reference model
 // reports any mismatch as a failed check.
@@ -17,6 +20,7 @@
 #include <exception>
 #include <string>
 #include <string_view>
+#include "mapdemo/buffer_mode.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
@@ -30,11 +34,12 @@ using net::MsgType;
 struct Options {
     std::uint16_t port = net::kDefaultPortB;
     std::uint64_t seed = kDefaultSeed;
+    BufferMode buffers = kDefaultBufferMode;
     std::string csv_dir;
 };
 
 [[noreturn]] void usage_error(const std::string& what) {
-    std::fprintf(stderr, "error: %s\nusage: mapdemo_b [--port 47702] [--seed 1] [--csv-dir DIR]\n", what.c_str());
+    std::fprintf(stderr, "error: %s\nusage: mapdemo_b [--port 47702] [--seed 1] [--buffers reuse|fresh] [--csv-dir DIR]\n", what.c_str());
     std::exit(2);
 }
 
@@ -57,6 +62,12 @@ Options parse(int argc, char** argv) {
         };
         if (a == "--port") o.port = std::uint16_t(parse_u64("--port", value(), 65535));
         else if (a == "--seed") o.seed = parse_u64("--seed", value(), UINT64_MAX);
+        else if (a == "--buffers") {
+            const char* t = value();
+            const auto m = parse_buffer_mode(t);
+            if (!m) usage_error(std::string("bad value for --buffers: ") + t);
+            o.buffers = *m;
+        }
         else if (a == "--csv-dir") o.csv_dir = value();
         else usage_error(std::string("unknown argument ") + argv[i]);
     }
@@ -87,8 +98,12 @@ int run(const Options& opt) {
         }
         conn.send(MsgType::HelloOk, 0, {});
     }
-    std::fprintf(stderr, "b: A connected\n");
+    std::fprintf(stderr, "b: A connected, buffers=%s\n", buffer_mode_name(opt.buffers));
 
+    const bool reuse = opt.buffers == BufferMode::Reuse;
+    XBuffer kept;          // reuse: the one arena every step is reloaded into
+    bool kept_ready = false;
+    std::string out;       // reuse: the output string, capacity kept
     std::uint64_t steps = 0;
     std::uint64_t last_report = net::now_ns();
     int exit_code = 0;
@@ -103,9 +118,15 @@ int run(const Options& opt) {
         rec.add("b.in_bytes", double(req.payload.size()));
 
         metrics::Stopwatch sw;
-        XBuffer buf;
+        XBuffer fresh;
+        XBuffer& buf = reuse ? kept : fresh;
         try {
-            buf = XBuffer::load_verified<UnitStateBatch>(req.payload, cap_batch());
+            if (reuse && kept_ready) {
+                kept.reload_verified<UnitStateBatch>(req.payload);
+            } else {
+                buf = XBuffer::load_verified<UnitStateBatch>(req.payload, cap_batch());
+                kept_ready = reuse;
+            }
         } catch (const std::exception& e) {
             const std::string text = std::string("rejected StepReq: ") + e.what();
             send_error(conn, text);
@@ -136,7 +157,8 @@ int run(const Options& opt) {
         rec.add("b.modify_us", sw.us());
 
         sw.restart();
-        std::string out = buf.save_verified<UnitStateBatch>();
+        if (reuse) buf.save_verified_into<UnitStateBatch>(out);
+        else out = buf.save_verified<UnitStateBatch>();
         rec.add("b.save_us", sw.us());
         rec.add("b.out_bytes", double(out.size()));
 
@@ -144,11 +166,17 @@ int run(const Options& opt) {
         conn.send(MsgType::StepRes, batch.tick, out);
         rec.add("b.send_us", sw.us());
 
-        sw.restart();
-        buf = XBuffer();
-        std::string().swap(req.payload);
-        std::string().swap(out);
-        rec.add("b.destroy_us", sw.us());
+        if (reuse) {
+            // Nothing is destroyed: the next StepReq is received into this
+            // payload string and reloaded into `kept`.
+            conn.recycle_rx(std::move(req.payload));
+        } else {
+            sw.restart();
+            fresh = XBuffer();
+            std::string().swap(req.payload);
+            std::string().swap(out);
+            rec.add("b.destroy_us", sw.us());
+        }
 
         ++steps;
         const std::uint64_t now = net::now_ns();
