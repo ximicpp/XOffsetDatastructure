@@ -225,7 +225,9 @@ detail_of() {
         smoke) grep -E 'bench smoke passed|input wire' "$f" | tail -n 1 ;;
         ir|p2996-ir)
             w="$WORK/ir-${s%-ir}"; [[ $s == ir ]] && w="$WORK/ir-gcc16"
-            [[ -f $w/gate.json ]] && python3 -c 'import json,sys; g=json.load(open(sys.argv[1])); v=g["verdict"]; print(f"verdict {v}; S-class Ir condition: {\"yes\" if v == \"pass\" else \"no\"}")' "$w/gate.json" ;;
+            [[ -f $w/gate.json ]] && python3 -c 'import json, sys
+v = json.load(open(sys.argv[1]))["verdict"]
+print(f"verdict {v}; S-class Ir condition: " + ("yes" if v == "pass" else "no"))' "$w/gate.json" ;;
     esac
 }
 
