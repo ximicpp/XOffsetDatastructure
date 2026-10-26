@@ -11,10 +11,14 @@
 
 namespace host_fault {
 inline thread_local bool fail_next=false;
+inline thread_local int fail_after=-1; // fail the (fail_after+1)-th request
 inline thread_local unsigned attempts=0;
 }
 void* operator new(std::size_t n){
-    if(std::exchange(host_fault::fail_next,false)){
+    bool fail=std::exchange(host_fault::fail_next,false);
+    if(host_fault::fail_after==0){host_fault::fail_after=-1;fail=true;}
+    else if(host_fault::fail_after>0)--host_fault::fail_after;
+    if(fail){
         ++host_fault::attempts;
         if(auto h=std::get_new_handler())h();else throw std::bad_alloc();
     }
@@ -111,6 +115,30 @@ void many_owners_and_pending_oom(){
     need(normal.root().marker==91&&normal.root().values[3]==71,"normal reads after last C owner differ");
     need(xo::XBufferCore::canonical_bytes_at(&normal.root(),reinterpret_cast<std::uintptr_t>(normal.root().values.data()),sizeof(std::uint32_t))==nullptr,"ordinary VM falsely claimed canonical origin");
 }
+// Direct-receive owners are the only indexed owners, so their record and
+// index node are the only registry allocations left. Fail each host request
+// of finish_verified in turn: every failure leaves the token intact and
+// retryable, and the sweep must pass both registry allocations.
+void every_finish_allocation_failure(){
+    const auto input=wire();
+    for(int k=0;;++k){
+        need(k<64,"finish_verified allocation sweep did not terminate");
+        auto pending=receive(input);const auto* address=pending.payload_address();
+        auto previous=std::set_new_handler(nullptr);host_fault::fail_after=k;
+        bool rejected=false;std::optional<Buffer> out;
+        try{out.emplace(xo::finish_verified(pending));}
+        catch(const std::bad_alloc&){rejected=true;}catch(const xo::XBadAlloc&){rejected=true;}
+        const bool reached=host_fault::fail_after==-1;host_fault::fail_after=-1;std::set_new_handler(previous);
+        if(!reached){
+            need(out&&!rejected,"unfailed finish did not publish");check(*out);
+            need(k>=2,"direct receive registration lost its record or index-node allocation");
+            return;
+        }
+        if(out){check(*out);continue;} // the failed request was absorbed (e.g. free table)
+        need(rejected&&pending&&pending.payload_address()==address,"failed finish changed token/owner");
+        auto recovered=xo::finish_verified(pending);check(recovered);
+    }
 }
-int main(){try{many_owners_and_pending_oom();std::cout<<"canonical-v2: seven domains, retire/move/swap, cold OOM/new_handler and final normal reads passed\n";return 0;}
+}
+int main(){try{many_owners_and_pending_oom();every_finish_allocation_failure();std::cout<<"canonical-v2: seven domains, retire/move/swap, cold OOM/new_handler and final normal reads passed\n";return 0;}
 catch(const std::exception& e){host_fault::fail_next=false;std::set_new_handler(nullptr);std::cerr<<e.what()<<'\n';return 1;}}
