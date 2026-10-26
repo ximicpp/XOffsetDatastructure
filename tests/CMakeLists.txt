@@ -46,15 +46,10 @@ endforeach()
 set(REFLECTION_TESTS
     test_assign_range
     test_scalar_resize
-    test_validation_v8_single_word
-    test_validation_v6_dense_fusion
-    test_validation_v5
-    test_validation_v5_bounds
-    test_validation_v4
+    test_validation_granules
     test_string_replace
-    test_wire_bitmap
+    test_hot_path_constants
     test_resize_growth
-    test_validation_resource
     test_reflection_core
     test_reflection_advanced
     test_type_signatures
@@ -76,14 +71,14 @@ set(REFLECTION_TESTS
     test_runtime_regressions
     test_mutation_failures
     test_wire_validation
-    test_wire_range_index
-    test_wire_range_failures
     test_same_arena_move
     test_shift_relocate
+    test_append_grow
+    test_subtree_copy
     test_free_table_policy
-    test_range_hint
-    test_validation_ascending_run
+    test_lower_bound_index
     test_stable_storage
+    test_ordinary_records
     test_vm_lifecycle
     test_vm_transport
     test_owner_identity
@@ -99,7 +94,11 @@ set(REFLECTION_TESTS
     test_wire_hole_zeroing
     test_implicit_padding
     test_v2_fuzz
+    test_save_compact
+    test_free_run_emission
+    test_wire_populate
     test_reload_reset
+    test_clone
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -188,6 +187,20 @@ add_test(NAME require_no_padding_fail
 set_tests_properties(require_no_padding_fail PROPERTIES
     LABELS "reflection"
     PASS_REGULAR_EXPRESSION "has implicit padding bytes")
+
+# XOFFSET_ORDINARY_RECORDS on a record that is not ordinary must fail the build.
+foreach(variant overlap base bit_field)
+    add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
+    configure_xoffset_target(ordinary_records_${variant}_fail)
+    add_test(NAME ordinary_records_${variant}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ordinary_records_${variant}_fail --config $<CONFIG>)
+endforeach()
+set_tests_properties(ordinary_records_overlap_fail PROPERTIES
+    LABELS "reflection" PASS_REGULAR_EXPRESSION "has overlapping members")
+set_tests_properties(ordinary_records_base_fail PROPERTIES
+    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
+set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
+    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")

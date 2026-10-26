@@ -30,7 +30,8 @@ struct SampleWires { std::string req, res, player, shard, report; };
 // callgrind collects only inside timed regions named by SLG_IR_KEYS
 // (comma-separated; an entry matches a key exactly, or as a prefix when it ends
 // with '*', e.g. "A.*"), and not in cycles below SLG_IR_SKIP_CYCLES (default 0;
-// the gate passes 1, cycle 0 being warm-up). The default build has none of
+// the gate runs 8 cycles and passes 4: at S scale with SLG_REUSE=1 cycles 1-3
+// are still warming up). The default build has none of
 // this: timed() is the timing path unchanged.
 inline int& ir_cycle() { static int c = 0; return c; }  // set by the bench loop
 inline bool ir_selected(const char* key) {
