@@ -110,11 +110,14 @@ void read_exact(int fd, char* dst, std::size_t n, std::uint64_t& counter) {
             got += static_cast<std::size_t>(r);
             counter += static_cast<std::uint64_t>(r);
         } else if (r == 0) {
-            throw ProtocolError(got == 0 ? "connection closed by peer" : "connection closed mid-frame");
+            if (got == 0) throw PeerClosed("connection closed by peer");
+            throw ProtocolError("connection closed mid-frame");
         } else if (errno == EINTR) {
             continue;
         } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
             wait_fd(fd, POLLIN);
+        } else if (errno == ECONNRESET && got == 0) {
+            throw PeerClosed(errno_text("recv"));
         } else {
             throw ProtocolError(errno_text("recv"));
         }
@@ -196,7 +199,9 @@ Conn::Conn(Conn&& other) noexcept
       rx_have_header_(std::exchange(other.rx_have_header_, false)),
       rx_payload_(std::move(other.rx_payload_)),
       rx_payload_got_(std::exchange(other.rx_payload_got_, 0)),
+      rx_spare_(std::move(other.rx_spare_)),
       tx_(std::move(other.tx_)),
+      tx_spare_(std::move(other.tx_spare_)),
       bytes_sent_(std::exchange(other.bytes_sent_, 0)),
       bytes_received_(std::exchange(other.bytes_received_, 0)) {
     other.tx_.clear();
@@ -212,7 +217,9 @@ Conn& Conn::operator=(Conn&& other) noexcept {
         rx_have_header_ = std::exchange(other.rx_have_header_, false);
         rx_payload_ = std::move(other.rx_payload_);
         rx_payload_got_ = std::exchange(other.rx_payload_got_, 0);
+        rx_spare_ = std::move(other.rx_spare_);
         tx_ = std::move(other.tx_);
+        tx_spare_ = std::move(other.tx_spare_);
         bytes_sent_ = std::exchange(other.bytes_sent_, 0);
         bytes_received_ = std::exchange(other.bytes_received_, 0);
         other.tx_.clear();
@@ -294,8 +301,10 @@ Frame Conn::recv(std::initializer_list<MsgType> allowed) {
     FrameHeader h{};
     read_exact(fd_, reinterpret_cast<char*>(&h), sizeof h, bytes_received_);
     validate_header(h, allowed);
+    // A recycled buffer keeps its capacity; its old bytes are overwritten.
     std::string payload;
     if (h.length != 0) {
+        payload = std::exchange(rx_spare_, std::string());
         payload.resize(h.length);
         read_exact(fd_, payload.data(), h.length, bytes_received_);
     }
@@ -327,7 +336,10 @@ bool Conn::flush() {
         if (w == 0) return false;
         p.written += w;
         bytes_sent_ += w;
-        if (p.written == total) tx_.pop_front();
+        if (p.written == total) {
+            if (p.payload.capacity() > tx_spare_.capacity()) tx_spare_ = std::move(p.payload);
+            tx_.pop_front();
+        }
     }
     return true;
 }
@@ -346,13 +358,15 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
         }
         if (want != 0) {
             const ssize_t r = ::recv(fd_, dst, want, 0);
+            const bool mid = rx_header_got_ != 0;
             if (r == 0) {
-                const bool mid = rx_header_got_ != 0;
-                throw ProtocolError(mid ? "connection closed mid-frame" : "connection closed by peer");
+                if (!mid) throw PeerClosed("connection closed by peer");
+                throw ProtocolError("connection closed mid-frame");
             }
             if (r < 0) {
                 if (errno == EINTR) continue;
                 if (errno == EAGAIN || errno == EWOULDBLOCK) return std::nullopt;
+                if (errno == ECONNRESET && !mid) throw PeerClosed(errno_text("recv"));
                 throw ProtocolError(errno_text("recv"));
             }
             bytes_received_ += static_cast<std::uint64_t>(r);
@@ -364,6 +378,7 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
             validate_header(rx_header_, allowed);   // before the payload is sized
             rx_have_header_ = true;
             rx_payload_.clear();
+            if (rx_header_.length != 0) rx_payload_ = std::exchange(rx_spare_, std::string());
             rx_payload_.resize(rx_header_.length);
             rx_payload_got_ = 0;
         }
@@ -377,6 +392,16 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
         rx_payload_got_ = 0;
         return finish_frame(h, std::move(payload), allowed);
     }
+}
+
+void Conn::recycle_rx(std::string&& buffer) noexcept {
+    if (buffer.capacity() > rx_spare_.capacity()) rx_spare_ = std::move(buffer);
+}
+
+std::string Conn::take_tx_buffer() noexcept {
+    std::string s = std::exchange(tx_spare_, std::string());
+    s.clear();
+    return s;
 }
 
 // ---- Listener ----------------------------------------------------------------

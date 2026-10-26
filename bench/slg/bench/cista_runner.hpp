@@ -192,8 +192,17 @@ public:
         for (int q = 0; q < sc.report_reads && !wires.empty(); ++q) {
             const Bytes& w = wires[std::size_t(q) % wires.size()];
             if (reuse) {
-                recv(st, "D.read", d_, w);
-                timed(st, "D.read", [&] { st.report_sum += query_report(*d_); });
+                // One timer around receive + query (see xoffset_runner.hpp); Direct
+                // times the two parts separately around the untimed copy.
+                if constexpr (!Direct) {
+                    timed(st, "D.read", [&] {
+                        d_.receive({w.data(), w.size()});
+                        st.report_sum += query_report(*d_);
+                    });
+                } else {
+                    recv(st, "D.read", d_, w);
+                    timed(st, "D.read", [&] { st.report_sum += query_report(*d_); });
+                }
             } else {
                 timed(st, "D.read", [&] {
                     Held<cm::Report> d;
@@ -218,8 +227,8 @@ public:
 private:
     static void build_request(cm::BattleMsg& msg, const Pairing& pr, const cm::Army& att, const cm::Army& def) {
         msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-        copy_army(msg.attacker, att);
-        copy_army(msg.defender, def);
+        msg.attacker = att;  // T4 adapter (c): cista's own copy assignment
+        msg.defender = def;
         msg.report.battle_id = 0;
         msg.report.summary = std::string_view{};
         msg.report.events.clear();

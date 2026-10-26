@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check (or rewrite) the sha256 manifests of the frozen benchmark trees.
 
-usage: check_manifest.py [--write] [DIR ...]      default DIR: bench/slg bench/formal
+usage: check_manifest.py [--write] [DIR ...]      default DIR: bench/slg bench/formal bench/reloc
 
 Each DIR/MANIFEST holds '#' header lines (origin of the tree) and one
 "<sha256>  <path>" line per file under DIR except MANIFEST itself. The check
@@ -42,7 +42,7 @@ def read(manifest):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--write", action="store_true")
-    p.add_argument("dirs", nargs="*", type=Path, default=[BENCH / "slg", BENCH / "formal"])
+    p.add_argument("dirs", nargs="*", type=Path, default=[BENCH / "slg", BENCH / "formal", BENCH / "reloc"])
     args = p.parse_args()
     bad = 0
     for d in args.dirs:

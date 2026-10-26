@@ -1,45 +1,126 @@
 name: Fuzz
 
 # G5: coverage-guided libFuzzer runs of the V2 validators (fuzz_v2_wire, and
-# fuzz_wire_schemas over three more schemas) under
-# ASan+UBSan. Pull requests and pushes run 5 minutes; the nightly run and
-# manual dispatch run longer. The corpus is carried between runs in the
-# Actions cache. GitHub reads `schedule` only from the default branch, so the
-# nightly run starts once this file is on the default branch.
+# fuzz_wire_schemas over three more schemas) under ASan+UBSan, one job per
+# target.
+#
+# Modes:
+#   pr       pushes to next_cpp26 and pull requests into it: 300 s per target,
+#            one process, stops at the first crash.
+#   nightly  started every night by .github/workflows/nightly-fuzz-dispatch.yml
+#            on main (GitHub reads `schedule` only from the default branch):
+#            3600 s per target, 4 processes, keeps going after a crash.
+#   manual   workflow_dispatch with `seconds`, run like nightly; also the
+#            pre-merge long run for a branch: gh workflow run fuzz.yml
+#            --ref <branch> -f mode=manual -f seconds=3600
+#
+# Each target keeps its own corpus in the Actions cache, merged (-merge=1)
+# before it is saved. Nightly and manual runs also upload the merged corpus;
+# a run that finds no cache starts from the latest such upload on next_cpp26.
+# Crash, leak, timeout and OOM inputs are replayed, minimized and given a
+# signature by tools/fuzz_findings.py, which writes findings.json into the
+# fuzz-<target> artifact. A job fails when it has findings, not on the
+# fuzzer's exit code alone.
+#
+# Nightly and manual runs add two GCC 16 ASan+UBSan jobs (GCC 16 is the
+# production compiler): gcc16-diff runs the seeded differential fuzz
+# test_v2_fuzz, and gcc16-replay replays the merged libFuzzer corpora, the
+# regression inputs and the seeds through fuzz_<target>_replay. Both write
+# findings.json through tools/fuzz_gcc16.py into fuzz-gcc16-diff and
+# fuzz-gcc16-replay.
 
 on:
   push:
     branches: [ next_cpp26 ]
   pull_request:
     branches: [ next_cpp26 ]
-  schedule:
-    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'pr (300 s, 1 process), nightly (3600 s, 4 processes) or manual (seconds below, 4 processes)'
+        type: choice
+        options: [ manual, nightly, pr ]
+        default: manual
       seconds:
-        description: 'Fuzzing time in seconds'
+        description: 'manual: fuzzing seconds per target (at most 16200)'
         default: '3600'
+      inject_crash:
+        description: 'Drill: build with -DXOFFSET_FUZZ_INJECT_CRASH=ON and feed the XOFFSET-INJECT input'
+        type: boolean
+        default: false
+      watch_hours:
+        description: 'Drill for the nightly watch: report when the last nightly run is older than this'
+        default: ''
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format('Fuzz {0}{1}{2} · {3}', inputs.mode,
+                inputs.mode == 'manual' && format(' {0}s', inputs.seconds) || '',
+                inputs.inject_crash && ' inject' || '',
+                github.ref_name)
+      || format('Fuzz pr · {0}', github.event_name == 'pull_request' && github.event.pull_request.title || github.ref_name) }}
+
+permissions:
+  contents: read
+  actions: read   # corpus fallback: list and download artifacts of earlier runs
+
+# One run per mode and ref at a time; a newer push to a pull request replaces
+# its running fuzz, nightly and manual runs queue instead.
+concurrency:
+  group: fuzz-${{ inputs.mode || 'pr' }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  XOFFSET_FUZZ_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'pr' }}
+  XOFFSET_FUZZ_INJECT: ${{ github.event_name == 'workflow_dispatch' && inputs.inject_crash || false }}
 
 jobs:
-  fuzz-v2-wire:
-    name: libFuzzer V2 validators (P2996 Docker, ASan+UBSan)
+  libfuzzer:
+    name: libFuzzer ${{ matrix.target }} (P2996 Docker, ASan+UBSan)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.mode == 'manual' && 330 || 120 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: v2_wire
+            seeds: test_v2_fuzz --write-corpus
+            build: test_v2_fuzz fuzz_v2_wire
+          - target: wire_schemas
+            seeds: fuzz_wire_schemas_seeds
+            build: fuzz_wire_schemas fuzz_wire_schemas_seeds
+    env:
+      T: ${{ matrix.target }}
+      FUZZER: build/fuzz/bin/Debug/fuzz_${{ matrix.target }}
+      # Shared by fuzzing, merging, replay and minimization.
+      FUZZ_FLAGS: -max_len=262144 -rss_limit_mb=2048 -timeout=30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'schedule' && 'next_cpp26' || '' }}
           submodules: recursive
 
-      - name: Fuzzing time
+      - name: Fuzzing budget
+        shell: bash
         run: |
-          case "${{ github.event_name }}" in
-            schedule) echo "XOFFSET_FUZZ_SECONDS=3600" >> "$GITHUB_ENV" ;;
-            workflow_dispatch) echo "XOFFSET_FUZZ_SECONDS=${{ github.event.inputs.seconds }}" >> "$GITHUB_ENV" ;;
-            *) echo "XOFFSET_FUZZ_SECONDS=300" >> "$GITHUB_ENV" ;;
+          set -euo pipefail
+          case "$XOFFSET_FUZZ_MODE" in
+            pr)      SECS=300;  EXTRA="" ;;
+            nightly) SECS=3600; EXTRA="-fork=4 -ignore_crashes=1 -ignore_ooms=1 -ignore_timeouts=1 -use_value_profile=1" ;;
+            manual)  SECS="${{ inputs.seconds }}"
+                     EXTRA="-fork=4 -ignore_crashes=1 -ignore_ooms=1 -ignore_timeouts=1 -use_value_profile=1" ;;
+            *) echo "::error::unknown mode '$XOFFSET_FUZZ_MODE'"; exit 1 ;;
           esac
+          if ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ] || [ "$SECS" -gt 16200 ]; then
+            echo "::error::seconds must be an integer from 10 to 16200, got '$SECS'"; exit 1
+          fi
+          {
+            echo "XOFFSET_FUZZ_SECONDS=$SECS"
+            echo "FUZZ_MODE_FLAGS=$EXTRA"
+          } >> "$GITHUB_ENV"
+          mkdir -p "build/fuzz-report/$T"
+          echo "$XOFFSET_FUZZ_MODE: $SECS s for $T, flags: $FUZZ_FLAGS $EXTRA, inject=$XOFFSET_FUZZ_INJECT"
 
       - name: Pull P2996 Docker image
         run: |
@@ -73,62 +154,438 @@ jobs:
           find build/fuzz-resource -name '*fuzzer*' | tee build/fuzz-runtime-listing.txt
           test -s build/fuzz-runtime-listing.txt
 
+      # Every later command runs in the image through this wrapper, with the
+      # workspace at /workspace, so paths are the same inside and outside.
+      - name: Docker wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          SANITIZER="halt_on_error=1"
+          if docker run --rm --platform linux/amd64 "$XOFFSET_CI_IMAGE" test -x /opt/p2996-toolchain/bin/llvm-symbolizer; then
+            SANITIZER="$SANITIZER:external_symbolizer_path=/opt/p2996-toolchain/bin/llvm-symbolizer"
+          else
+            echo "::warning::no llvm-symbolizer in the image; stacks and signatures will lack function names"
+          fi
+          cat > build/xo-docker <<EOF
+          #!/bin/bash
+          exec docker run --rm --platform linux/amd64 \\
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \\
+            -v "$GITHUB_WORKSPACE/build/fuzz-resource:/runtime:ro" \\
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \\
+            -e ASAN_OPTIONS=detect_leaks=1:$SANITIZER \\
+            -e UBSAN_OPTIONS=print_stacktrace=1:$SANITIZER \\
+            -e T -e FUZZER -e FUZZ_FLAGS -e FUZZ_MODE_FLAGS -e XOFFSET_FUZZ_SECONDS -e XOFFSET_FUZZ_INJECT \\
+            "$XOFFSET_CI_IMAGE" "\$@"
+          EOF
+          chmod +x build/xo-docker
+          cat build/xo-docker
+
       - name: Restore corpus
+        id: cache
         uses: actions/cache/restore@v4
         with:
-          path: build/fuzz-corpus
-          key: fuzz-corpus-${{ github.run_id }}
-          restore-keys: fuzz-corpus-
+          path: build/fuzz-corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
 
-      - name: Build, smoke, fuzz
+      # A cache miss (evicted, or a branch that cannot read next_cpp26's
+      # cache) falls back to the newest corpus uploaded by a nightly or
+      # manual run on next_cpp26.
+      - name: Corpus fallback from the latest next_cpp26 upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATCHED: ${{ steps.cache.outputs.cache-matched-key }}
+        run: |
+          set -euo pipefail
+          DIR="build/fuzz-corpus/$T"
+          mkdir -p "$DIR"
+          SOURCE="cache $MATCHED"
+          if [ -z "$MATCHED" ]; then
+            SOURCE=none
+            ROW=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=fuzz-corpus-$T&per_page=50" \
+              --jq '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "next_cpp26")][0] // empty | "\(.id) \(.workflow_run.id)"' || true)
+            if [ -n "$ROW" ]; then
+              read -r ART RUN <<< "$ROW"
+              if gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ART/zip" > build/corpus-fallback.zip \
+                 && unzip -q -o build/corpus-fallback.zip -d "$DIR"; then
+                SOURCE="artifact of run $RUN"
+              else
+                echo "::warning::could not download corpus artifact $ART of run $RUN; starting from seeds"
+              fi
+            fi
+          fi
+          FILES=$(find "$DIR" -type f | wc -l)
+          BYTES=$(find "$DIR" -type f -printf '%s\n' | awk '{s += $1} END {print s + 0}')
+          echo "$FILES $BYTES $SOURCE" | tee "build/fuzz-report/$T/before.txt"
+
+      # No CTest smoke here: the 20000-run smoke is a short fuzz from the same
+      # seeds, and a crash it found would fail this step instead of reaching
+      # the findings below. The Fuzz step covers it.
+      - name: Build
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p build/fuzz-corpus build/fuzz-artifacts
-          docker run --rm --platform linux/amd64 \
-            -v "${{ github.workspace }}:/workspace" -w /workspace \
-            -v "${{ github.workspace }}/build/fuzz-resource:/runtime:ro" \
-            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
-            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
-            -e UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-            -e XOFFSET_FUZZ_SECONDS \
-            "$XOFFSET_CI_IMAGE" bash -c '
-              set -e
-              cmake -S . -B build/fuzz -DCMAKE_BUILD_TYPE=Debug \
-                -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ \
-                "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime" \
-                -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
-                -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
-                -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6
-              cmake --build build/fuzz --parallel 4 --target \
-                test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds
-              ctest --test-dir build/fuzz -L fuzz --output-on-failure
-              BIN=build/fuzz/bin/Debug
-              mkdir -p build/fuzz-corpus/v2_wire build/fuzz-corpus/wire_schemas
-              $BIN/test_v2_fuzz --write-corpus build/fuzz-corpus/v2_wire
-              $BIN/fuzz_wire_schemas_seeds build/fuzz-corpus/wire_schemas
-              # Split the time: 60% for the oracle-checked target, 40% for the
-              # three extra schemas.
-              T1=$(( XOFFSET_FUZZ_SECONDS * 3 / 5 )); T2=$(( XOFFSET_FUZZ_SECONDS - T1 ))
-              FLAGS="-max_len=262144 -rss_limit_mb=2048 -timeout=30 -print_final_stats=1"
-              $BIN/fuzz_v2_wire -max_total_time=$T1 $FLAGS \
-                -artifact_prefix=build/fuzz-artifacts/v2_wire- build/fuzz-corpus/v2_wire
-              $BIN/fuzz_wire_schemas -max_total_time=$T2 $FLAGS \
-                -artifact_prefix=build/fuzz-artifacts/wire_schemas- build/fuzz-corpus/wire_schemas' \
-            2>&1 | tee build/fuzz.log
+          INJECT=OFF
+          if [ "$XOFFSET_FUZZ_INJECT" = true ]; then INJECT=ON; fi
+          build/xo-docker bash -euo pipefail -c "
+            cmake -S . -B build/fuzz -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_CXX_COMPILER=/opt/p2996-toolchain/bin/clang++ \
+              '-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -resource-dir=/runtime' \
+              -DCMAKE_BUILD_RPATH=/opt/p2996-toolchain/lib/x86_64-unknown-linux-gnu \
+              -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF \
+              -DXOFFSET_FUZZER_LINK_LIBS=-l:libstdc++.so.6 -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT
+            cmake --build build/fuzz --parallel 4 --target ${{ matrix.build }}" \
+            2>&1 | tee "build/build-$T.log"
 
+      # The fuzzer's exit code is recorded, not acted on here: a crash in pr
+      # mode exits non-zero and still needs the merge and findings steps.
+      - name: Fuzz
+        id: fuzz
+        shell: bash
+        run: |
+          set -o pipefail
+          build/xo-docker bash -uo pipefail -c '
+            set -e
+            BIN=build/fuzz/bin/Debug
+            mkdir -p build/fuzz-seeds/$T build/fuzz-work/$T build/fuzz-artifacts
+            $BIN/${{ matrix.seeds }} build/fuzz-seeds/$T
+            if [ "$XOFFSET_FUZZ_INJECT" = true ]; then
+              # Run the drill input on its own: fork mode drops crashing
+              # initial-corpus inputs without saving them as artifacts, and
+              # libFuzzer never saves an input file it is given directly, so
+              # a crash is copied into the artifacts here.
+              mkdir -p build/fuzz-inject
+              IN=build/fuzz-inject/XOFFSET-INJECT
+              printf "XOFFSET-INJECT" > $IN
+              if ! $FUZZER $FUZZ_FLAGS $IN; then
+                cp $IN build/fuzz-artifacts/$T-crash-$(sha1sum < $IN | cut -c1-40)
+              fi
+            fi
+            if [ -n "$FUZZ_MODE_FLAGS" ]; then
+              # Fork mode also skips crashing initial-corpus inputs silently,
+              # so replay the restored corpus once in a single process first.
+              $FUZZER -runs=0 $FUZZ_FLAGS -artifact_prefix=build/fuzz-artifacts/$T- \
+                build/fuzz-corpus/$T build/fuzz-seeds/$T || echo "corpus replay failed (exit $?)"
+            fi
+            set +e
+            # New inputs go to fuzz-work (the first directory); the restored
+            # corpus and the seeds are read only.
+            $FUZZER -max_total_time=$XOFFSET_FUZZ_SECONDS $FUZZ_FLAGS $FUZZ_MODE_FLAGS -print_final_stats=1 \
+              -artifact_prefix=build/fuzz-artifacts/$T- \
+              build/fuzz-work/$T build/fuzz-corpus/$T build/fuzz-seeds/$T
+            echo $? > build/fuzz-exit-$T' \
+            2>&1 | tee "build/fuzz-$T.log"
+          echo "fuzzer exit code: $(cat "build/fuzz-exit-$T" 2>/dev/null || echo missing)"
+
+      # Value profile is on for every merge, so a pr-mode run on next_cpp26
+      # does not drop the inputs a nightly run kept for value-profile features.
+      - name: Merge corpus
+        if: always() && steps.fuzz.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          build/xo-docker bash -euo pipefail -c '
+            rm -rf build/fuzz-merged/$T && mkdir -p build/fuzz-merged/$T
+            $FUZZER -merge=1 -use_value_profile=1 $FUZZ_FLAGS \
+              build/fuzz-merged/$T build/fuzz-corpus/$T build/fuzz-work/$T build/fuzz-seeds/$T
+            rm -rf build/fuzz-corpus/$T && mv build/fuzz-merged/$T build/fuzz-corpus/$T' \
+            2>&1 | tee "build/fuzz-report/$T/merge.log"
+          build/xo-docker bash -c '$FUZZER -runs=0 $FUZZ_FLAGS build/fuzz-corpus/$T' \
+            > "build/fuzz-report/$T/corpus.log" 2>&1 || true
+          grep -m1 INITED "build/fuzz-report/$T/corpus.log" || true
+          echo "XOFFSET_FUZZ_MERGED=1" >> "$GITHUB_ENV"
+
+      - name: Replay, minimize and sign findings
+        if: always() && steps.fuzz.outcome == 'success'
+        run: >-
+          python3 tools/fuzz_findings.py findings --target "$T" --bin "$FUZZER" --flags="$FUZZ_FLAGS"
+          --artifacts build/fuzz-artifacts --out "build/fuzz-report/$T"
+
+      - name: Summary
+        if: always() && steps.fuzz.outcome == 'success'
+        run: >-
+          python3 tools/fuzz_findings.py summary --target "$T" --mode "$XOFFSET_FUZZ_MODE"
+          --seconds "$XOFFSET_FUZZ_SECONDS" --log "build/fuzz-$T.log"
+          --before "build/fuzz-report/$T/before.txt" --corpus "build/fuzz-corpus/$T"
+          --corpus-log "build/fuzz-report/$T/corpus.log" --merge-log "build/fuzz-report/$T/merge.log"
+          --exit-file "build/fuzz-exit-$T" --findings "build/fuzz-report/$T/findings.json"
+          --out "build/fuzz-report/$T"
+
+      # Drill runs carry the XOFFSET-INJECT input and stay out of the cache.
       - name: Save corpus
-        if: always()
+        if: always() && env.XOFFSET_FUZZ_MERGED == '1' && env.XOFFSET_FUZZ_INJECT != 'true'
         uses: actions/cache/save@v4
         with:
-          path: build/fuzz-corpus
-          key: fuzz-corpus-${{ github.run_id }}
+          path: build/fuzz-corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - name: Upload log and crashing inputs
+      - name: Upload corpus
+        if: >-
+          always() && env.XOFFSET_FUZZ_MERGED == '1' && env.XOFFSET_FUZZ_INJECT != 'true'
+          && env.XOFFSET_FUZZ_MODE != 'pr'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ matrix.target }}
+          path: build/fuzz-corpus/${{ matrix.target }}
+          retention-days: 90
+
+      - name: Upload log, findings and crashing inputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-v2-wire
+          name: fuzz-${{ matrix.target }}
           path: |
-            build/fuzz.log
+            build/build-${{ matrix.target }}.log
+            build/fuzz-${{ matrix.target }}.log
             build/fuzz-artifacts/
+            build/fuzz-report/${{ matrix.target }}/
+
+      - name: Verdict
+        if: always() && steps.fuzz.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' "build/fuzz-report/$T/findings.json")
+          CODE=$(cat "build/fuzz-exit-$T" 2>/dev/null || echo missing)
+          if [ "$N" != 0 ]; then
+            echo "::error::$T: $N finding(s), see findings.json in the fuzz-$T artifact"; exit 1
+          fi
+          if [ "$CODE" != 0 ]; then
+            echo "::error::$T: fuzzer exited with '$CODE' and left no crash, leak, timeout or oom input"; exit 1
+          fi
+          echo "$T: no findings"
+
+  # Nightly and manual only. GCC 16 is the production compiler: the seeded
+  # differential fuzz (test_v2_fuzz) runs there for most of the budget, four
+  # processes, seeds YYYYMMDD*10 + i, with the sanitizer flags of ci.yml's
+  # gcc16-sanitizer job (plus -O1 for throughput). A failing process dumps its input wire
+  # (XOFFSET_FUZZ_DUMP_DIR) and names its `test_v2_fuzz --replay` command;
+  # tools/fuzz_gcc16.py turns that into findings.json.
+  gcc16-diff:
+    name: GCC 16 differential fuzz (ASan+UBSan)
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'pr'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.mode == 'manual' && 330 || 90 }}
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Budget, seeds and Docker wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$XOFFSET_FUZZ_MODE" in
+            nightly) SECS=2700 ;;
+            manual)  SECS="${{ inputs.seconds }}" ;;
+            *) echo "::error::gcc16-diff does not run in mode '$XOFFSET_FUZZ_MODE'"; exit 1 ;;
+          esac
+          if ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ] || [ "$SECS" -gt 16200 ]; then
+            echo "::error::seconds must be an integer from 10 to 16200, got '$SECS'"; exit 1
+          fi
+          DAY=$(date -u +%Y%m%d)
+          SEEDS="$((DAY * 10)) $((DAY * 10 + 1)) $((DAY * 10 + 2)) $((DAY * 10 + 3))"
+          { echo "DIFF_SECONDS=$SECS"; echo "DIFF_SEEDS=$SEEDS"; } >> "$GITHUB_ENV"
+          echo "$XOFFSET_FUZZ_MODE: $SECS s, seeds $SEEDS"
+          mkdir -p build/gcc16-diff/logs build/gcc16-diff/report
+          cat > build/gcc-docker <<EOF
+          #!/bin/bash
+          exec docker run --rm --platform linux/amd64 \\
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \\
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \\
+            -e XOFFSET_GCC_SANITIZE -e XOFFSET_FUZZ_DUMP_DIR \\
+            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:handle_abort=1 \\
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \\
+            "$XOFFSET_GCC_IMAGE" "\$@"
+          EOF
+          chmod +x build/gcc-docker
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Build test_v2_fuzz
+        shell: bash
+        run: |
+          set -o pipefail
+          build/gcc-docker bash -euo pipefail -c '
+            g++ --version | head -n 1
+            cmake -S . -B build/gcc16-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+              "-DCMAKE_CXX_FLAGS=-O1 $XOFFSET_GCC_SANITIZE" \
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined \
+              -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
+            cmake --build build/gcc16-asan --parallel 4 --target test_v2_fuzz' \
+            2>&1 | tee build/gcc16-diff/build.log
+
+      # Per-case cost from one process: 2000 cases minus the fixed part (pool
+      # and the 1505 page boundary cases), then 90 % for four processes
+      # sharing four vCPUs.
+      - name: Calibrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          SEED=${DIFF_SEEDS%% *}
+          timed() {
+            local a b
+            a=$(date +%s.%N)
+            build/gcc-docker build/gcc16-asan/bin/Debug/test_v2_fuzz "$1" "$SEED" > "build/gcc16-diff/logs/calibrate-$1.log" 2>&1
+            b=$(date +%s.%N)
+            echo "$a $b" | awk '{printf "%.2f", $2 - $1}' > "build/gcc16-diff/logs/calibrate-$1.time"
+          }
+          timed 0
+          timed 2000
+          T0=$(cat build/gcc16-diff/logs/calibrate-0.time)
+          T1=$(cat build/gcc16-diff/logs/calibrate-2000.time)
+          CASES=$(python3 -c "import sys; t0, t1, s = map(float, sys.argv[1:]); per = max((t1 - t0) / 2000, 1e-6); print(max(1000, int((s - t0) / per * 0.9)))" "$T0" "$T1" "$DIFF_SECONDS")
+          echo "DIFF_CASES=$CASES" >> "$GITHUB_ENV"
+          echo "fixed part ${T0}s, 2000 cases ${T1}s: $CASES cases per process for ${DIFF_SECONDS}s"
+
+      # A process still running at twice the budget (plus 5 minutes) is
+      # killed and reported as a timeout.
+      - name: Differential fuzz
+        id: diff
+        shell: bash
+        run: |
+          set -uo pipefail
+          LIMIT=$((DIFF_SECONDS * 2 + 300))
+          i=0
+          for SEED in $DIFF_SEEDS; do
+            ( XOFFSET_FUZZ_DUMP_DIR=build/gcc16-diff/dump/p$i build/gcc-docker \
+                timeout -s KILL "$LIMIT" build/gcc16-asan/bin/Debug/test_v2_fuzz "$DIFF_CASES" "$SEED" \
+                > "build/gcc16-diff/logs/p$i.log" 2>&1
+              echo $? > "build/gcc16-diff/logs/p$i.exit" ) &
+            i=$((i + 1))
+          done
+          wait
+          for f in build/gcc16-diff/logs/p*.exit; do echo "$f: $(cat "$f")"; tail -n 3 "${f%.exit}.log"; done
+
+      - name: Findings
+        if: always() && steps.diff.outcome == 'success'
+        run: >-
+          python3 tools/fuzz_gcc16.py diff --logs build/gcc16-diff/logs --seeds "$DIFF_SEEDS"
+          --cases "$DIFF_CASES" --image "$XOFFSET_GCC_IMAGE" --out build/gcc16-diff/report
+
+      - name: Upload logs and findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-gcc16-diff
+          path: |
+            build/gcc16-diff/report/
+            build/gcc16-diff/logs/
+            build/gcc16-diff/build.log
+
+      - name: Verdict
+        if: always() && steps.diff.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' build/gcc16-diff/report/findings.json)
+          if [ "$N" != 0 ]; then echo "::error::gcc16-diff: $N finding(s), see the fuzz-gcc16-diff artifact"; exit 1; fi
+          echo "gcc16-diff: no findings"
+
+  # Nightly and manual only, after the libFuzzer jobs: the merged corpus of
+  # each target (fuzz-corpus-<target>, uploaded by the libfuzzer job), the
+  # regression inputs and the seed corpus, replayed through the harnesses
+  # built by GCC 16 with ASan+UBSan (fuzz_<target>_replay, no libFuzzer).
+  # A target whose corpus upload is missing (drill run, failed job) replays
+  # the rest.
+  gcc16-replay:
+    name: GCC 16 replay of the libFuzzer corpus (ASan+UBSan)
+    needs: libfuzzer
+    if: "!cancelled() && github.event_name == 'workflow_dispatch' && inputs.mode != 'pr'"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      XOFFSET_GCC_IMAGE: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+      XOFFSET_GCC_SANITIZE: >-
+        -fsanitize=address,undefined
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download the merged corpora
+        continue-on-error: true   # none in a drill run or when both uploads failed
+        uses: actions/download-artifact@v4
+        with:
+          pattern: fuzz-corpus-*
+          path: build/gcc16-replay/corpus
+
+      - name: Docker wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gcc16-replay/report
+          cat > build/gcc-docker <<EOF
+          #!/bin/bash
+          exec docker run --rm --platform linux/amd64 \\
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \\
+            -e PATH=/workspace/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \\
+            -e XOFFSET_GCC_SANITIZE \\
+            -e ASAN_OPTIONS=detect_leaks=1:halt_on_error=1:handle_abort=1 \\
+            -e UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \\
+            "$XOFFSET_GCC_IMAGE" "\$@"
+          EOF
+          chmod +x build/gcc-docker
+          for T in v2_wire wire_schemas; do
+            echo "$T: $(find "build/gcc16-replay/corpus/fuzz-corpus-$T" -type f 2>/dev/null | wc -l) corpus files"
+          done
+
+      - name: Pull GCC 16 image
+        run: docker pull --platform linux/amd64 "$XOFFSET_GCC_IMAGE"
+
+      - name: Prepare pinned CMake
+        run: python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
+
+      - name: Build the replay targets and write the seeds
+        shell: bash
+        run: |
+          set -o pipefail
+          build/gcc-docker bash -euo pipefail -c '
+            g++ --version | head -n 1
+            cmake -S . -B build/gcc16-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=g++ \
+              "-DCMAKE_CXX_FLAGS=-O1 $XOFFSET_GCC_SANITIZE" \
+              -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined \
+              -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF
+            cmake --build build/gcc16-asan --parallel 4 --target fuzz_v2_wire_replay fuzz_wire_schemas_replay
+            for T in v2_wire wire_schemas; do
+              build/gcc16-asan/bin/Debug/fuzz_${T}_replay --write-seeds build/gcc16-replay/seeds/$T
+            done' \
+            2>&1 | tee build/gcc16-replay/build.log
+
+      - name: Replay
+        id: replay
+        run: >-
+          python3 tools/fuzz_gcc16.py replay --image "$XOFFSET_GCC_IMAGE" --out build/gcc16-replay/report
+          --spec v2_wire:build/gcc16-asan/bin/Debug/fuzz_v2_wire_replay:build/gcc16-replay/corpus/fuzz-corpus-v2_wire:tests/fuzz/regressions/v2_wire:build/gcc16-replay/seeds/v2_wire
+          --spec wire_schemas:build/gcc16-asan/bin/Debug/fuzz_wire_schemas_replay:build/gcc16-replay/corpus/fuzz-corpus-wire_schemas:tests/fuzz/regressions/wire_schemas:build/gcc16-replay/seeds/wire_schemas
+
+      - name: Upload logs and findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-gcc16-replay
+          path: |
+            build/gcc16-replay/report/
+            build/gcc16-replay/build.log
+
+      - name: Verdict
+        if: always() && steps.replay.outcome != 'skipped'
+        shell: bash
+        run: |
+          set -euo pipefail
+          N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' build/gcc16-replay/report/findings.json)
+          if [ "$N" != 0 ]; then echo "::error::gcc16-replay: $N finding(s), see the fuzz-gcc16-replay artifact"; exit 1; fi
+          echo "gcc16-replay: no findings"

@@ -345,6 +345,24 @@ public:
         if (zero_from_ < length) zero_from_ = length;
     }
 
+    // In-place direct receive: makes [0, length) the logical content for a
+    // writer that overwrites it, keeping the reservation and payload address.
+    // Nothing is cleared here. Returns the previous zero_from_: bytes at or
+    // beyond it are still zero, so a writer that skips ranges (sparse gaps)
+    // clears only below it. A failure leaves the old bytes and length.
+    std::size_t expose_for_overwrite(std::size_t length) {
+        if (length > maximum_capacity_) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
+            throw std::bad_alloc();
+        }
+        const auto clean_from = zero_from_;
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+        return clean_from;
+    }
+
     ~VirtualMemoryStorage() { release(); }
 
     VirtualMemoryStorage(const VirtualMemoryStorage&) = delete;
@@ -374,6 +392,8 @@ public:
     std::size_t logical_bytes() const noexcept { return logical_bytes_; }
     std::size_t capacity() const noexcept { return maximum_capacity_; }
     std::size_t maximum_capacity() const noexcept { return maximum_capacity_; }
+    // The pool this storage was acquired through (empty when none).
+    const VmStoragePool& pool() const noexcept { return pool_; }
     std::size_t reserved_bytes() const noexcept { return reserved_bytes_; }
     // Bytes at or beyond this offset have not been exposed since the OS
     // supplied them; growth below it zeroes what it exposes.
