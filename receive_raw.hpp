@@ -162,15 +162,7 @@ inline std::string_view raw_verified_string(const char* address) noexcept {
 
 template<class T> consteval bool raw_implicit_lifetime() {
     if constexpr (std::is_const_v<T> || std::is_volatile_v<T>) return false;
-#if defined(__cpp_lib_is_implicit_lifetime)
-    if constexpr (std::is_implicit_lifetime_v<T>) return true;
-#elif defined(__clang__)
-#if __has_builtin(__builtin_is_implicit_lifetime)
-    if constexpr (__builtin_is_implicit_lifetime(T)) return true;
-#elif __has_builtin(__is_implicit_lifetime)
-    if constexpr (__is_implicit_lifetime(T)) return true;
-#endif
-#endif
+    if constexpr (fixed_detail::std_implicit_lifetime<T>()) return true;
     // Independent [class.prop] branch, needed by the fixed SDK whose trait can
     // return false for an aggregate with an implicit nontrivial destructor.
     // No std specialization or constructor call. The explicit ordinary source
@@ -477,6 +469,14 @@ template<class T> consteval bool receive_raw_future_supported() {
     else return true;
 }
 
+template<class T> consteval bool raw_needs_validation();
+// Per member, as a function template: a lambda nested in the pack expansion
+// crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
+template<class T, std::size_t I>
+consteval bool raw_needs_validation_member() {
+    return raw_needs_validation<typename schema::member_t<T, I>::type>();
+}
+
 template<class T> consteval bool raw_needs_validation() {
     if constexpr (wire_activation<T>::enabled) return true;
     else if constexpr (std::is_enum_v<T>) return !raw_enum_fixed_underlying<T>();
@@ -485,14 +485,18 @@ template<class T> consteval bool raw_needs_validation() {
     else if constexpr (std::is_array_v<T>)
         return raw_needs_validation<std::remove_extent_t<T>>();
     else if constexpr (std::is_class_v<T>) {
-        return []<std::size_t... I>(std::index_sequence<I...>) {
-            return ([] {
-                using member = schema::member_t<T, I>;
-                using M = typename member::type;
-                return raw_needs_validation<M>();
-            }() || ...);
+        return []<std::size_t... I>(std::index_sequence<I...>) consteval {
+            return (raw_needs_validation_member<T, I>() || ...);
         }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
+}
+
+template<class T> consteval bool raw_needs_activation();
+// Per member, as a function template: a lambda nested in the pack expansion
+// crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
+template<class T, std::size_t I>
+consteval bool raw_needs_activation_member() {
+    return raw_needs_activation<typename schema::member_t<T, I>::type>();
 }
 
 template<class T> consteval bool raw_needs_activation() {
@@ -501,12 +505,8 @@ template<class T> consteval bool raw_needs_activation() {
     else if constexpr (std::is_array_v<T>)
         return raw_needs_activation<std::remove_extent_t<T>>();
     else if constexpr (std::is_class_v<T>) {
-        return []<std::size_t... I>(std::index_sequence<I...>) {
-            return ([] {
-                using member = schema::member_t<T, I>;
-                using M = typename member::type;
-                return raw_needs_activation<M>();
-            }() || ...);
+        return []<std::size_t... I>(std::index_sequence<I...>) consteval {
+            return (raw_needs_activation_member<T, I>() || ...);
         }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
