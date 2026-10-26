@@ -299,13 +299,15 @@ void callback_during_allocation_bookkeeping() {
     for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
         auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
         from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
-        auto* larger = fd::allocate_dynamic_bytes(ref, 48, 8); fd::retire_dynamic_bytes(ref, larger, 48);
-        need(from.free_block_count() == 1 && from.free_block_bytes() == 48, "fixture free block missing");
+        // Sizes above 384 B: on VM the smaller bins live in the host prefix
+        // (D5) and never reach the host table.
+        auto* larger = fd::allocate_dynamic_bytes(ref, 848, 8); fd::retire_dynamic_bytes(ref, larger, 848);
+        need(from.free_block_count() == 1 && from.free_block_bytes() == 848, "fixture free block missing");
         source = &from; target = &to; auxiliary = &unrelated; active = ref;
         void* raw = nullptr; bool caught = false;
         {
             HandlerScope handler(which); host::fail_after = 0;
-            try { raw = fd::allocate_dynamic_bytes(ref, 32, 8); }
+            try { raw = fd::allocate_dynamic_bytes(ref, 432, 8); }
             catch (const xo::XException&) { caught = true; }
             need(host::calls == 1, "split-remainder new_handler not exercised");
         }
@@ -313,11 +315,11 @@ void callback_during_allocation_bookkeeping() {
             need(caught && from.data() == nullptr, "released payload identity revived/read");
         } else {
             auto& current = which == Action::move || which == Action::swap ? to : from;
-            need(!caught && raw && in_payload(current, raw, 32) && current.root<OwnerRoot>().numbers[0] == 29,
+            need(!caught && raw && in_payload(current, raw, 432) && current.root<OwnerRoot>().numbers[0] == 29,
                  "allocation after callback owner transfer");
             need(raw == larger, "split did not hand out the front of the larger free block");
-            std::memset(raw, 0x43, 32); fd::retire_dynamic_bytes(ref, raw, 32);
-            const std::uint64_t expected = which == Action::reenter ? 72 : 48;
+            std::memset(raw, 0x43, 432); fd::retire_dynamic_bytes(ref, raw, 432);
+            const std::uint64_t expected = which == Action::reenter ? 872 : 848;
             need(current.free_table_complete() && current.free_block_bytes() == expected,
                  "split remainder lost or committed to a stale owner");
             auto loaded = xo::XBuffer::load_verified<OwnerRoot>(current.save_verified<OwnerRoot>(), policy());
@@ -332,21 +334,22 @@ void callback_during_free_table_retirement() {
     // the host free table. That new_handler may transfer, release or reenter.
     for (Action which : {Action::move, Action::swap, Action::release, Action::reclaim_reenter}) {
         auto from = make_buffer(), to = make_buffer(); auto ref = binding(from);
-        auto* p = ref.segment->allocate_aligned(32, 8);
+        // 432 B: above the VM front's bins (D5), so the retirement reaches the table.
+        auto* p = ref.segment->allocate_aligned(432, 8);
         need(from.free_block_count() == 0, "fixture already has a free table entry");
         source = &from; target = &to; active = ref;
         {
             HandlerScope handler(which); host::fail_after = 0;
-            ref.segment->deallocate(p, 32); // the first retirement creates the host table
+            ref.segment->deallocate(p, 432); // the first retirement creates the host table
             need(host::calls == 1, "free-table retirement new_handler not exercised");
         }
         if (which == Action::release) { need(from.data() == nullptr, "retirement revived released owner"); continue; }
         auto& current = which == Action::move || which == Action::swap ? to : from;
         need(static_cast<void*>(current.data()) == static_cast<void*>(ref.segment), "retirement payload transfer");
-        auto* q = ref.segment->allocate_aligned(32, 8);
+        auto* q = ref.segment->allocate_aligned(432, 8);
         if (which == Action::reclaim_reenter) {
             auto* second = ref.segment->allocate_aligned(32, 8);
-            need((q == p && second == reentrant_freed[1]) || (q == reentrant_freed[1] && second == p),
+            need(q == p && second == reentrant_freed[1],
                  "outer or reentrant retired block lost after reentry");
             auto* third = ref.segment->allocate_aligned(24, 8);
             need(third == reentrant_freed[0], "reentrant 24-byte retirement lost after outer retirement");
@@ -354,7 +357,7 @@ void callback_during_free_table_retirement() {
         } else {
             need(q == p, "retirement committed into stale Core instead of actual payload owner");
         }
-        ref.segment->deallocate(q, 32);
+        ref.segment->deallocate(q, 432);
         need(current.free_table_complete(), "retirement left the actual owner's free table incomplete");
         auto loaded = xo::XBuffer::load_verified<OwnerRoot>(current.save_verified<OwnerRoot>(), policy());
         (void)loaded.root<OwnerRoot>();
@@ -365,17 +368,17 @@ void free_table_host_oom_is_recorded_and_recomputed() {
     // V2 replacement of V1's best-effort Core cache under host OOM: a lost
     // retirement marks the host table incomplete and saving recomputes holes.
     auto b = make_buffer(); auto ref = binding(b);
-    auto* p = fd::allocate_dynamic_bytes(ref, 24, 8);
-    host::fail_after = 0; fd::retire_dynamic_bytes(ref, p, 24); host::fail_after = -1;
+    auto* p = fd::allocate_dynamic_bytes(ref, 424, 8); // above the VM front's bins (D5)
+    host::fail_after = 0; fd::retire_dynamic_bytes(ref, p, 424); host::fail_after = -1;
     need(!b.free_table_complete(), "host OOM during retirement was not recorded");
     const auto wire = b.save_verified<OwnerRoot>();
-    need(b.free_table_complete() && b.free_block_count() == 1 && b.free_block_bytes() == 24,
+    need(b.free_table_complete() && b.free_block_count() == 1 && b.free_block_bytes() == 424,
          "save did not recompute the lost hole");
     auto loaded = xo::XBuffer::load_verified<OwnerRoot>(wire, policy());
-    need(loaded.free_block_count() == 1 && loaded.free_block_bytes() == 24, "recomputed hole not on the wire");
-    auto* again = fd::allocate_dynamic_bytes(ref, 24, 8);
+    need(loaded.free_block_count() == 1 && loaded.free_block_bytes() == 424, "recomputed hole not on the wire");
+    auto* again = fd::allocate_dynamic_bytes(ref, 424, 8);
     need(again == p, "recomputed hole not reusable");
-    fd::retire_dynamic_bytes(ref, again, 24);
+    fd::retire_dynamic_bytes(ref, again, 424);
 }
 
 void registry_new_handler_reentry_is_unlocked() {
@@ -397,8 +400,8 @@ void delete_callbacks_observe_complete_move() {
         auto from = make_buffer();
         auto to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy());
         from.root<OwnerRoot>().numbers.resize(3, 313u);
-        auto* p = to.arena()->allocate_aligned(32, 8);
-        begin_capture(); to.arena()->deallocate(p, 32);
+        auto* p = to.arena()->allocate_aligned(432, 8); // above the VM front's bins (D5)
+        begin_capture(); to.arena()->deallocate(p, 432);
         need(!host::capture_next, "target free-table allocation not captured");
         auto* old_table = host::captured;
         delete_binding = binding(from); delete_expected_owner = &to; delete_expected_word = 313;

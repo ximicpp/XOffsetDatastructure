@@ -197,21 +197,22 @@ void real_free_table_growth_has_no_callback(const std::string& bytes){
     CacheScope scope;auto a=std::make_unique<Buffer>(received(bytes));Buffer b;check(*a);
     auto binding=a->root().values.binding();
     // A new bin reserves 8 slots; fill it so the next retire must grow it.
+    // 392 B: above the VM front's bins (D5), which take no host allocation.
     void* filled[8];
-    for(auto*& p:filled) p=fd::allocate_dynamic_bytes(binding,24,8);
-    auto* second=fd::allocate_dynamic_bytes(binding,24,8);
+    for(auto*& p:filled) p=fd::allocate_dynamic_bytes(binding,392,8);
+    auto* second=fd::allocate_dynamic_bytes(binding,392,8);
     auto* first=filled[7];
     need(first!=second,"two real allocator blocks required");
-    for(auto* p:filled) fd::retire_dynamic_bytes(binding,p,24); // table + a full 8-slot 24-byte bin
-    need(a->free_block_count()==8&&a->free_block_bytes()==192,"real free-table block count differs");
+    for(auto* p:filled) fd::retire_dynamic_bytes(binding,p,392); // table + a full 8-slot 392-byte bin
+    need(a->free_block_count()==8&&a->free_block_bytes()==3136,"real free-table block count differs");
     const auto address=reinterpret_cast<std::uintptr_t>(a->get_address());
     scope.prepare();const auto expected=scope.pending_fingerprint();
     Arm arm(scope,a,b,true);
     // No fixture/user operation is interposed: the bin's growth is the only
     // host request, and the armed failure reaches the real new_handler.
-    fd::retire_dynamic_bytes(binding,second,24);
+    fd::retire_dynamic_bytes(binding,second,392);
     need(host::handler_calls==1&&!host::fail_next,"actual free-table new_handler was not exercised exactly once");
-    need(host::delete_calls==0&&!moved&&bool(a)&&a->free_block_count()==9&&a->free_block_bytes()==216&&
+    need(host::delete_calls==0&&!moved&&bool(a)&&a->free_block_count()==9&&a->free_block_bytes()==3528&&
          a->free_table_complete(),"free-table growth evicted terminal record, used invalidated owner or lost a block");
     need(expected[0]==host::delete_address&&scope.same(expected),"free-table growth rotated terminal TLS cache");
     // The callback remains armed until this deliberate, out-of-allocator control.
@@ -221,9 +222,9 @@ void real_free_table_growth_has_no_callback(const std::string& bytes){
     check(b);
     // Host free-table blocks remain usable on the new Core.
     need(b.free_block_count()==9,"free table did not move with the owner");
-    auto* reused=fd::allocate_dynamic_bytes(binding,24,8);
+    auto* reused=fd::allocate_dynamic_bytes(binding,392,8);
     need(reused==second,"retired host-table block was not reusable (LIFO) after owner move");
-    fd::retire_dynamic_bytes(binding,reused,24);check(b);
+    fd::retire_dynamic_bytes(binding,reused,392);check(b);
     auto again=xo::TypedXBuffer<Root>::load_verified(b.save_verified(),policy());check(again);
 }
 }
