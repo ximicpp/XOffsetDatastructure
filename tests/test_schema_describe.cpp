@@ -7,11 +7,13 @@
 //     and round-trip through save_verified/load_verified.
 
 #include "xoffsetdatastructure.hpp"
+#include "schema_describe/dump_cases.hpp"
 
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <string_view>
 
 namespace xo = XOffsetDatastructure;
@@ -89,6 +91,40 @@ static_assert(!xo::wire_record_layout<sd::Player>::ordinary_members);
 static_assert(!xo::wire_record_layout<sd::Counted>::ordinary_members);
 static_assert(xo::is_byte_copy_safe_v<sd::Bag>);
 static_assert(xo::is_byte_copy_safe_v<sd::Player>);
+
+// Types no field list can describe (a union or a non-aggregate class) are
+// opaque without reflection: not admitted, never walked. Reflection sees the
+// same answer through their members.
+namespace sd {
+    struct Polymorphic { virtual ~Polymorphic() = default; std::int32_t x{}; };
+    union Bits { std::int32_t i; float f; };
+    struct UserDestructor { std::int32_t value{}; ~UserDestructor() {} };
+    struct UserAssignment {
+        std::int32_t value{};
+        UserAssignment& operator=(const UserAssignment& other) { value = other.value; return *this; }
+    };
+} // namespace sd
+XOFFSET_RECORD_DERIVED(sd::UserDestructor, (), value)
+XOFFSET_RECORD_DERIVED(sd::UserAssignment, (), value)
+
+template <class T>
+concept StableErasable = requires(xo::XVector<T>& v) { v.stable_erase_if([](const T&) { return false; }); };
+static_assert(!xo::is_byte_copy_safe_v<std::string>);
+static_assert(!xo::is_byte_copy_safe_v<sd::Polymorphic>);
+static_assert(!xo::is_byte_copy_safe_v<sdc::DerivedNamed>);
+static_assert(!xo::is_byte_copy_safe_v<sdc::CaseRoot>);
+static_assert(!StableErasable<std::string>);
+static_assert(!xo::detail::receive_raw_supported<std::string>());
+static_assert(XOFFSET_SCHEMA_REFLECTION || xo::schema::is_undescribable_v<sd::Bits>);
+static_assert(!xo::schema::is_undescribable_v<xo::XVector<std::int32_t>>);
+
+// Without reflection a user-provided destructor or assignment is caught when
+// every member is trivial for it (with reflection, always).
+static_assert(!schema::implicit_lifetime_aggregate<sd::UserDestructor>());
+static_assert(schema::implicit_lifetime_aggregate<sd::UserAssignment>());
+static_assert(!schema::only_implicit_special_members<sd::UserAssignment>());
+static_assert(!xo::detail::receive_raw_supported<sd::UserDestructor>());
+static_assert(!xo::detail::receive_raw_supported<sd::UserAssignment>());
 
 #if XOFFSET_SCHEMA_REFLECTION
 // The library's own field lists, against reflection.

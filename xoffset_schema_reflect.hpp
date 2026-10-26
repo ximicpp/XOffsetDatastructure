@@ -63,6 +63,9 @@ namespace XOffsetDatastructure::schema {
     template <class T>
     inline constexpr bool is_described_v = std::is_class_v<T> || std::is_union_v<T>;
 
+    template <class T>
+    inline constexpr bool is_undescribable_v = false;
+
     template <class E>
     consteval auto enum_range() {
         static_assert(std::is_enum_v<E>);

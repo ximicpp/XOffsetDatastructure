@@ -21,6 +21,10 @@
 //                                          ::get(obj) -> obj's member I (any access)
 //   member_type_t<T, I>                    member_t<T, I>::type
 //   is_described_v<T>                      the backend can describe T (class or union)
+//   is_undescribable_v<T>                  T is a class or union no field list can describe
+//                                          (a union or a non-aggregate class) and it has
+//                                          none; never true under reflection. Walks treat
+//                                          such a T as opaque: not admitted, no walk.
 //   enum_range<E>()                        {min, max}: the smallest range holding 0 and
 //                                          every enumerator of E
 //   implicit_lifetime_aggregate<T>()       aggregate without a user-provided destructor
