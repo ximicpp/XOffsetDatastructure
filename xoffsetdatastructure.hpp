@@ -751,9 +751,12 @@ namespace XOffsetDatastructure {
                 if (bin < front_bins && front_capable(buffer_.data())) {
                     check_owner_resolves();
                     zero_retired(ptr, bytes);
-                    // D5: a full row moves its oldest entry to the end of V.
+                    // D5: a full row moves to the end of V, at once when the
+                    // bin has room, else its oldest entry alone.
+                    char* const front = buffer_.data();
+                    if (front_row(front, bin).count == front_ring) [[unlikely]] spill_front_row(front, bin);
                     auto offset = static_cast<std::uint32_t>(address - base);
-                    if (!front_push(buffer_.data(), bin, offset)) (void)insert_free_block_table(offset, bytes);
+                    if (!front_push(front, bin, offset)) (void)insert_free_block_table(offset, bytes);
                     return;
                 }
                 if (!table) {
@@ -832,8 +835,22 @@ namespace XOffsetDatastructure {
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
                     std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
-                    if (hole.bytes <= front_max && front && image.push(hole.bytes / 8u - 1u, hole.offset))
-                        continue; // else hole.offset is now the row's evicted oldest entry
+                    if (hole.bytes <= front_max && front) {
+                        // A full row moves to V in one step, as at run time.
+                        const auto bin = hole.bytes / 8u - 1u;
+                        if (image.full(bin)) {
+                            if (!table) table = make_free_table();
+                            auto& slot = table->bins[bin];
+                            if (slot.capacity() - slot.size() < front_ring) table->grown = true;
+                            image.take(bin, slot);
+                            table->mark_nonempty(bin);
+                            table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                            table->bytes += std::uint64_t(front_ring) * hole.bytes;
+                            table->count += front_ring;
+                        }
+                        (void)image.push(bin, hole.offset);
+                        continue;
+                    }
                     if (!table) table = make_free_table();
                     if (hole.bytes <= FreeTable::small_max) {
                         const auto bin = hole.bytes / 8u - 1u;
@@ -971,6 +988,18 @@ namespace XOffsetDatastructure {
                     rows[bin].count = 0;
                 }
                 return row_push(rows[bin], tail, bin, offset);
+            }
+            bool full(std::uint32_t bin) const noexcept {
+                return (tail.bits >> bin & 1u) && rows[bin].count == front_ring;
+            }
+            // Appends a full row to V and empties it. Rows here only fill
+            // and empty, never rotate, so the oldest entry is ring[0].
+            void take(std::uint32_t bin, std::vector<std::uint32_t>& slot) {
+                slot.insert(slot.end(), rows[bin].ring, rows[bin].ring + front_ring);
+                rows[bin].count = 0;
+                tail.bits &= ~(std::uint64_t(1) << bin);
+                tail.count -= front_ring;
+                tail.bytes -= std::uint64_t(front_ring) * (bin + 1u) * 8u;
             }
             void publish(char* base) const noexcept {
                 front_clear(base);
@@ -1241,9 +1270,37 @@ namespace XOffsetDatastructure {
         // `offset` names the entry still to be inserted into the table (the
         // original, or the oldest entry a full front row evicted).
         bool insert_free_block_quiet(std::uint32_t& offset, std::uint32_t bytes) noexcept {
-            if (char* base = buffer_.data(); bytes <= front_max && front_capable(base) &&
-                front_push(base, bytes / 8u - 1u, offset)) return true;
+            if (char* base = buffer_.data(); bytes <= front_max && front_capable(base)) {
+                const auto bin = bytes / 8u - 1u;
+                if (front_row(base, bin).count == front_ring) spill_front_row(base, bin);
+                if (front_push(base, bin, offset)) return true;
+            }
             return insert_free_block_inline(offset, bytes);
+        }
+
+        // D5: moves a full front row to the end of V in one step (S = V ++ F
+        // is unchanged) when the bin has room for it, so no host allocation
+        // and no host callback; otherwise the row stays full and the next push
+        // evicts its oldest entry alone.
+        XOFFSET_DETAIL_MOVE_INLINE void spill_front_row(char* base, std::uint32_t bin) noexcept {
+            FreeTable* table = free_table_.get();
+            if (!table) return;
+            auto& slot = table->bins[bin];
+            if (slot.capacity() - slot.size() < front_ring) return;
+            check_owner_resolves();
+            auto& row = front_row(base, bin);
+            slot.insert(slot.end(), row.ring + row.head, row.ring + front_ring);
+            slot.insert(slot.end(), row.ring, row.ring + row.head);
+            table->mark_nonempty(bin);
+            const auto bytes = std::uint64_t(front_ring) * (bin + 1u) * 8u;
+            table->bytes += bytes;
+            table->count += front_ring;
+            auto& tail = front_tail(base);
+            tail.bits &= ~(std::uint64_t(1) << bin);
+            tail.count -= front_ring;
+            tail.bytes -= bytes;
+            row.head = 0;
+            row.count = 0;
         }
 
         // A small block entering a bin that already has spare capacity needs
