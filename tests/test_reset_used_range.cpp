@@ -117,6 +117,29 @@ int main() {
         ++resets;
     }
 
+    // reset empties the bins' word summary too. A hole in bin word 1 before
+    // the reset must not leave its summary bit set: the lookup would stop at
+    // that empty word and miss a later word's hole, as in a fresh buffer.
+    {
+        auto b = XBuffer::create<ResetRoot>(1u << 16, cap());
+        auto* before = b.arena()->allocate_aligned(1024, 8);   // bin 127, word 1
+        b.arena()->allocate_aligned(64, 8);
+        b.arena()->deallocate(before, 1024);
+        assert(b.free_block_count() == 1);
+        b.reset<ResetRoot>();
+        auto fresh = XBuffer::create<ResetRoot>(b.get_size(), cap());
+        for (auto* x : {&b, &fresh}) {
+            auto* hole = x->arena()->allocate_aligned(2048, 8); // bin 255, word 3
+            x->arena()->allocate_aligned(64, 8);
+            x->arena()->deallocate(hole, 2048);
+            assert(x->free_block_count() == 1);
+            auto* small = x->arena()->allocate_aligned(16, 8);
+            assert(small == hole && "a later word's hole was missed after reset");
+        }
+        assert(std::memcmp(fresh.data(), b.data(), b.get_size()) == 0);
+        ++resets;
+    }
+
     std::cout << "test_reset_used_range: " << resets << " resets byte-identical to fresh buffers\n";
     return 0;
 }
