@@ -27,6 +27,9 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
   bisect   DIR  checkpoint run that failed (frozen with --bisect): next bisection step, or the culprit
+  auto     DIR  unattended: formal 1-2, SLG, the pre-registered follow-ups (one replacement per invalid
+                batch/group, third batch or SLG group 2 in the pending band), analyze, and the bisection of
+                a failing checkpoint; exit 0 pass / 10 fail / 11 pending / 12 invalid / 13 incomplete / 14 n/a
   selftest      synthetic data through the whole analysis
   diag-freeze / diag-formal / diag-analyze   a diagnostic batch with any set of equal-length labels and
                 A/A copies (same harness, copies and start conditions; report only, no verdict)
@@ -1325,6 +1328,68 @@ def render_bisect(o):
     return '\n'.join(L) + '\n'
 
 
+# ---------------------------------------------------------------- unattended run
+
+AUTO_RC = {'pass': 0, 'fail': 10, 'pending': 11, 'invalid': 12, 'incomplete': 13}
+
+
+def auto_formal(D, n, a, replaces=None):
+    """One formal batch; when the environment rule invalidates it, its one replacement (next number). Returns the next free number."""
+    cmd_formal(argparse.Namespace(dir=D, batch=n, replaces=replaces, quiet_timeout=a.quiet_timeout, quiet_s=a.quiet_s, cycles=a.cycles))
+    m = json.load(open(f'{D}/formal-{n}/meta.json'))
+    if (m.get('env') or {}).get('invalid'):
+        if replaces is not None: return None  # an invalid replacement: stop (analyze reports invalid)
+        return auto_formal(D, n + 1, a, replaces=n)
+    return n + 1
+
+
+def auto_slg(D, g, a):
+    cmd_slg(argparse.Namespace(dir=D, group=g, replace=False, quiet_timeout=a.quiet_timeout, quiet_s=a.quiet_s, cycles=a.cycles))
+    S = D + '/slg' if g == 1 else f'{D}/slg-{g}'
+    if slg_env(S).get('invalid'):
+        cmd_slg(argparse.Namespace(dir=D, group=g, replace=True, quiet_timeout=a.quiet_timeout, quiet_s=a.quiet_s, cycles=a.cycles))
+
+
+def auto_gate(D, a):
+    """The ordinary gate of one directory, follow-ups as the frozen rules pre-register them. Returns RESULT.json."""
+    fr = json.load(open(D + '/FREEZE.json')); R = fr['rules']['formal']
+    an = lambda: (cmd_analyze(argparse.Namespace(dir=D, exclude=None)), json.load(open(D + '/RESULT.json')))[1]
+    if not not_applicable(fr, 'formal'):
+        nxt = 1
+        for _ in range(R['batches']):
+            nxt = auto_formal(D, nxt, a)
+            if nxt is None: return an()
+        res = an(); ov = res['formal_overall']
+        if ov['verdict'] == 'pending' and not ov.get('inconsistent'):  # pending band: one more batch, pool all
+            if auto_formal(D, nxt, a) is None: return an()
+    if not not_applicable(fr, 'slg'):
+        auto_slg(D, 1, a)
+        res = an()
+        if (res['slg'] or {}).get('verdict') == 'pending': auto_slg(D, 2, a)
+    return an()
+
+
+def cmd_auto(a):
+    D = os.path.normpath(a.dir); res = auto_gate(D, a)
+    v = res['verdict']; print(f'AUTO {D}: verdict {v}')
+    fr = json.load(open(D + '/FREEZE.json'))
+    if v == 'fail' and 'bisect' in fr:
+        for _ in range(10):
+            cmd_bisect(argparse.Namespace(dir=D)); o = json.load(open(D + '/BISECT.json'))
+            if o['status'] != 'waiting': break
+            S = f'{D}/{o["steps"][-1]["dir"]}'; frs = json.load(open(S + '/FREEZE.json')); parts = frs['bisect_step']['parts']
+            if 'formal' in parts and not not_applicable(frs, 'formal'):
+                done = [x for x in os.listdir(S) if x.startswith('formal-')]
+                if done: sys.exit(f'AUTO {S}: formal batch already there but not usable (invalid replacement or aborted): stop and report')
+                if auto_formal(S, 1, a) is None: sys.exit(f'AUTO {S}: replacement invalid by environment: stop and report')
+            if 'slg' in parts and not not_applicable(frs, 'slg'):
+                if slg_groups(S): sys.exit(f'AUTO {S}: SLG group already there but not usable: stop and report')
+                auto_slg(S, 1, a)
+                if slg_used(S)[1]: sys.exit(f'AUTO {S}: SLG replacement invalid by environment: stop and report')
+        print(f'AUTO bisect: {o["status"]}' + (f' -> {o["culprit"]["commit"]} {o["culprit"]["label"]}' if o['status'] == 'culprit' else ''))
+    sys.exit(AUTO_RC.get(v, 14 if v.startswith('n/a') else 13))
+
+
 # ---------------------------------------------------------------- selftest
 
 def synth_formal(B, R, rng, effect, aa_effect=None, cycles=None):
@@ -1578,6 +1643,30 @@ def cmd_selftest(a):
     chk('reference build in the r3 slot, max steps 2', fi['binaries']['r3'] == h(rb) and fi['reference']['commit'] == '4' * 40
         and fi['rules']['checkpoint']['max_steps'] == 2 and RULES['checkpoint']['max_steps'] == 3)
     chk('bisect refused on a checkpoint that passed', 'not fail' in (refused(lambda: cmd_bisect(argparse.Namespace(dir=ckpt('c3', {})[0]))) or ''))
+    # unattended run: fake timing parts write synthetic data; the first formal batch is invalid by environment
+    g = globals(); real = (g['cmd_formal'], g['cmd_slg']); calls = []
+    def fake_formal(x):
+        fr_ = json.load(open(x.dir + '/FREEZE.json')); pt = (fr_.get('bisect_step') or {}).get('point', 'head')
+        eff = {'mutate': 1.04} if pt in ('head', 'c3' * 20, 'c4' * 20, 'c5' * 20) else {}
+        B = f'{x.dir}/formal-{x.batch}'; synth_formal(B, R, random.Random(len(calls) + 70), eff); calls.append(('formal', x.dir, x.batch, x.replaces))
+        bad = len(calls) == 1
+        json.dump({'batch': x.batch, 'replaces': x.replaces, 'smoke': False, 'env': {**(inv if bad else ok_env)}}, open(B + '/meta.json', 'w'))
+    def fake_slg(x):
+        S = (x.dir + '/slg' if x.group == 1 else f'{x.dir}/slg-{x.group}') + ('-r' if x.replace else '')
+        synth_slg(S, random.Random(len(calls) + 90), 1.0); calls.append(('slg', x.dir, x.group, x.replace))
+    g['cmd_formal'], g['cmd_slg'] = fake_formal, fake_slg
+    try:
+        Dc, _ = ckpt('c3', {'mutate': 1.04})
+        for x in os.listdir(Dc):
+            if x.startswith(('formal-', 'slg', 'bisect-', 'RESULT', 'BISECT')): shutil.rmtree(f'{Dc}/{x}') if os.path.isdir(f'{Dc}/{x}') else os.remove(f'{Dc}/{x}')
+        try: cmd_auto(argparse.Namespace(dir=Dc, quiet_timeout=1, quiet_s=180.0, cycles=None)); rc = None
+        except SystemExit as e: rc = e.code
+        o = json.load(open(Dc + '/BISECT.json')); res = json.load(open(Dc + '/RESULT.json'))
+        chk(f'auto: env-invalid formal-1 replaced by formal-2, formal-3 pooled, fail -> bisected to c3 (rc {rc})',
+            rc == 10 and calls[1][2:] == (2, 1) and res['formal_overall']['batches'] == 2 and o['status'] == 'culprit' and o['culprit']['label'].endswith('c3'))
+        chk('auto: steps time formal only (SLG identical)', all(c[0] == 'formal' for c in calls if '/bisect-' in c[1]))
+    finally:
+        g['cmd_formal'], g['cmd_slg'] = real
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
 
@@ -1619,6 +1708,9 @@ def main():
     s = sp.add_parser('analyze'); s.add_argument('dir')
     s.add_argument('--exclude', action='append', help='N:reason, leave formal-N out of the pooled gate (diagnosed invalid batch)')
     s = sp.add_parser('bisect', help='checkpoint that failed: freeze the next step or name the culprit'); s.add_argument('dir')
+    s = sp.add_parser('auto', help='unattended: the whole gate with its pre-registered follow-ups (and the bisection)'); s.add_argument('dir')
+    s.add_argument('--quiet-timeout', type=int, default=43200, help='per timed part; on timeout nothing is timed and auto stops')
+    s.add_argument('--quiet-s', type=float, default=180.0, help='smoke test only'); s.add_argument('--cycles', type=int, help='smoke test only')
     s = sp.add_parser('trend'); s.add_argument('dir'); s.add_argument('--trend', required=True); s.add_argument('--link')
     s = sp.add_parser('diag-freeze', help='diagnostic batch: any equal-length labels, A/A copies, no verdict'); s.add_argument('dir')
     s.add_argument('--bin', action='append', required=True, help='LABEL=BIN:WIRE (repeatable)')
@@ -1631,7 +1723,7 @@ def main():
     s = sp.add_parser('diag-analyze'); s.add_argument('dir')
     sp.add_parser('selftest')
     a = ap.parse_args()
-    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'bisect': cmd_bisect, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
+    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'bisect': cmd_bisect, 'auto': cmd_auto, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
      'diag-freeze': cmd_diag_freeze, 'diag-formal': cmd_diag_formal, 'diag-analyze': cmd_diag_analyze}[a.cmd](a)
 
 
