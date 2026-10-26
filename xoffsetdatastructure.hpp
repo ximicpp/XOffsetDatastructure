@@ -2228,11 +2228,17 @@ namespace XOffsetDatastructure {
         }
 
         // Live block of old_bytes grows in place to new_bytes (tail only).
+        // Only a block that ends at used_end can (try_expand_block tests the
+        // same sum), so that is tested first: most regrowths after a reload
+        // are of other blocks and skip the checks and the owner lookup.
         inline bool try_expand_dynamic_bytes(const allocator_ref& alloc_ref,
                                              void* ptr, std::uint32_t old_bytes,
                                              std::uint32_t new_bytes,
                                              std::size_t alignment) {
-            if (!alloc_ref.segment || !ptr || old_bytes == 0 || new_bytes == 0 || alignment == 0 ||
+            const auto* arena = alloc_ref.segment;
+            if (!arena || reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(arena) +
+                              block_bytes_of(old_bytes) != arena->used_end) return false;
+            if (!ptr || old_bytes == 0 || new_bytes == 0 || alignment == 0 ||
                 (alignment & (alignment - 1)) != 0 || alignment > XBufferCore::MAX_PAYLOAD ||
                 reinterpret_cast<std::uintptr_t>(ptr) % alignment != 0 ||
                 new_bytes > XBufferCore::MAX_PAYLOAD - 8u) return false;

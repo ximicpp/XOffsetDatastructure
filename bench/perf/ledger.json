@@ -199,6 +199,20 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：P1，XFixedVector 的 POD 元素拷贝赋值在 0 < count ≤ capacity 时走内联原地拷贝（memmove、scrub 收缩的尾部、M6 填充清零，与 assign_range 原地分支加 assign_trivial_copy 相同），扩容、绑定、空源和自赋值走一次 out-of-line 的原通用路径；非 POD 保持内联。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 35 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.A），≥5% 阶段最大 1.0017（slg.A.apply）；P2996 d77eff1 + libc++ 合计最大 1.0007（formal.mutate），阶段最大 1.0001。声称的阶段 slg.A.apply：P2996 0.9538；GCC 16 1.0017，GCC 16 上不宣称收益。",
       "evidence": "PR #91 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/p1_e15c5d5_REPORT.md 与 p1_e15c5d5_ir-{gcc16,p2996}_gate.json；设计与计时 /mnt/project-files/perf-next-20261022/A_ZPP_LEVERS_20261026.md",
       "approved_by": "「性能优化」（2026-10-26 12:07Z，判 S 类：INT1 合入后在新主线上两种 Ir 门禁不出警告即合并）"
+    },
+    {
+      "id": "s-class-pr95",
+      "pr": 95,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0034,
+      "record_only": true,
+      "class": "S",
+      "head": "1a7addb11531",
+      "base": "902ff18492b0",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G2，fixed_detail::try_expand_dynamic_bytes 先判断块尾是否等于 arena->used_end，不是就返回 false，省掉参数检查和 owner 查找（try_expand_block 只在同一个条件下才可能成功）；函数保持原来的内联方式，强制内联到五个调用点的第一版让 GCC 内联翻转（reloc.hero.push_back_grow 1.057），已弃。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 10 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），阶段最大 1.0034（reloc.vec.push_back_grow，块在末尾时多一次比较）；P2996 d77eff1 + libc++ 合计最大 1.0000，阶段最大 1.0013（reloc.vec.push_back_grow）。声称的阶段 slg.A.simulate：GCC 16 0.9828，P2996 0.9837；另有 formal.mutate 0.9843 / 0.9904。",
+      "evidence": "PR #95 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/g2/（g2_1a7addb_local_validate_REPORT.md、g2_1a7addb_gate_{gcc16,p2996}.json、弃掉的第一版 diff）；手段清单 /mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 3 节",
+      "approved_by": "「性能优化」（2026-10-26 15:40Z，G2 按 S 类做）"
     }
   ]
 }
