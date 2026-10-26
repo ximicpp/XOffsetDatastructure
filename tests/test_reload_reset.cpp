@@ -247,6 +247,33 @@ void direct_reload_equals_reload() {
     need(typed.root().id == 2, "TypedXBuffer direct reload");
 }
 
+// N2 on the direct path (#70 with #50): after a direct reload every logical
+// byte at or past used_end reads zero, so growth exposes only zero bytes and
+// the reset that follows, which clears just [header, used_end), still equals
+// a fresh buffer. A verified direct reload exposes exactly used_end bytes, so
+// this holds today even without the zeroing in check_reinit_payload; it
+// fails if either path starts to leave bytes past used_end.
+void direct_reload_keeps_n2() {
+    const auto big = make_wire(3, 40000, 6), small = make_wire(4, 5, 3);
+    auto in = XBuffer::create<ReloadRoot>(4096, cap());
+    for (int round = 0; round < 3; ++round) {
+        direct_reload(in, big);
+        direct_reload(in, small);
+        const auto used = static_cast<std::size_t>(in.arena()->used_end);
+        for (std::size_t i = used; i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "direct reload left bytes past used_end");
+        need(in.grow(1u << 18), "grow after direct reload");
+        for (std::size_t i = used; i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "growth after direct reload exposed stale bytes");
+        (void)in.reset<ReloadRoot>();
+        for (std::size_t i = static_cast<std::size_t>(in.arena()->used_end); i < in.get_size(); ++i)
+            need(in.data()[i] == 0, "reset after direct reload left stale bytes");
+        auto fresh = XBuffer::create<ReloadRoot>(4096, cap());
+        need(in.save_verified<ReloadRoot>() == fresh.save_verified<ReloadRoot>(),
+             "reset after direct reload differs from create");
+    }
+}
+
 void direct_reload_rejects_interrupted_input() {
     const auto good = make_wire(3, 100, 3);
     const auto h = header_of(good);
@@ -329,6 +356,7 @@ int main() {
         reload_scratch_survives_release_and_swap();
         direct_reload_equals_reload();
         direct_reload_rejects_interrupted_input();
+        direct_reload_keeps_n2();
         std::cout << "test_reload_reset passed\n";
         return 0;
     } catch (const std::exception& e) {

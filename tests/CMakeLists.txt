@@ -58,6 +58,7 @@ set(REFLECTION_TESTS
     test_wire_admission
     test_enum_support
     test_xstring_direct_assign
+    test_string_append
     test_xhandle
     test_schema_envelope
     test_fixed_layout_containers
@@ -98,6 +99,7 @@ set(REFLECTION_TESTS
     test_free_run_emission
     test_wire_populate
     test_reload_reset
+    test_reset_used_range
     test_clone
 )
 
