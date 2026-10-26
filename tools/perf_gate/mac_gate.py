@@ -189,6 +189,11 @@ RULES = {
                     'still give its value without timing, so a build costs no timed step',
         'max_steps': 3,
         'result': 'hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported',
+        'non_monotone': '性能优化 2026-10-26 19:31Z (INT2: D5 regressed B, P4 recovered B and added C; f followed C and named P4): '
+                        'a step is non-monotone when a failed metric has its own m/r above 1.5 or below -0.5, or when the failed '
+                        'metrics fall on both sides of 0.5 and their m/r differ by 1 or more. The bisection still follows f, but '
+                        'a bisection with a non-monotone step names no single culprit: status non_monotone, every failed metric '
+                        'with its own side at the first such step, and the point f ends at; 性能优化 decides',
     },
     'env_invalid': {
         'rule': 'frozen by 性能优化 2026-10-23 14:51Z, not retroactive: during timing WindowServer and remote-desktop '
@@ -1326,10 +1331,14 @@ def cmd_bisect(a):
                 break
         f = sum(vals[x] * r for x, r in metrics.items()) / rr
         own = {f'{p}:{m}': (vals[(p, m)] / r) for (p, m), r in metrics.items()}
+        ov = list(own.values())
+        nm = 'non_monotone' in C and (any(v > 1.5 or v < -0.5 for v in ov)
+                                      or (min(ov) < 0.5 <= max(ov) and max(ov) - min(ov) >= 1))
         log.append({'step': k if S else None, 'dir': os.path.basename(S) if S else None, 'point': pts[mid]['commit'], 'label': pts[mid]['label'],
                     'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'f': f, 'own': own,
                     'spread': [x for x, v in own.items() if 0.25 < v < 0.75], 'side': 'lo-mid' if f >= 0.5 else 'mid-hi',
-                    'timed': S is not None, **detail})
+                    'timed': S is not None, **({'non_monotone': {x: 'lo-mid' if v >= 0.5 else 'mid-hi' for x, v in own.items()}} if nm else {}),
+                    **detail})
         if f >= 0.5: hi = mid
         else: lo = mid
     done = hi - lo == 1
@@ -1338,10 +1347,20 @@ def cmd_bisect(a):
            'points': [{k2: v for k2, v in x.items() if k2 in ('commit', 'label', 'role', 'same')} for x in pts], 'steps': log,
            'range': {'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'lo_label': pts[lo]['label'], 'hi_label': pts[hi]['label']},
            'status': 'culprit' if done else ('build' if 'build' in log[-1] else 'waiting') if waiting else 'max_steps', 'rules': C}
-    if done: out['culprit'] = {'commit': pts[hi]['commit'], 'label': pts[hi]['label'], 'same_binaries': pts[hi].get('same', [])}
+    nms = [s for s in log if 'non_monotone' in s]
+    if done and nms:
+        out['status'] = 'non_monotone'
+        out['f_end'] = {'commit': pts[hi]['commit'], 'label': pts[hi]['label']}
+        s0 = nms[0]; mid_c = s0['point']
+        out['per_metric'] = {x: {'own': s0['own'][x], 'lo': s0['lo'] if sd == 'lo-mid' else mid_c, 'hi': mid_c if sd == 'lo-mid' else s0['hi']}
+                             for x, sd in s0['non_monotone'].items()}
+    elif done: out['culprit'] = {'commit': pts[hi]['commit'], 'label': pts[hi]['label'], 'same_binaries': pts[hi].get('same', [])}
     json.dump(out, open(D + '/BISECT.json', 'w'), indent=1)
     open(D + '/BISECT.md', 'w').write(render_bisect(out))
-    if done: print(f'DONE culprit {pts[hi]["commit"]} {pts[hi]["label"]}')
+    if out['status'] == 'non_monotone':
+        print('DONE non-monotone: ' + '; '.join(f'{x} in ({v["lo"][:12]}, {v["hi"][:12]}]' for x, v in out['per_metric'].items())
+              + f'; f ends at {pts[hi]["commit"][:12]} {pts[hi]["label"]}')
+    elif done: print(f'DONE culprit {pts[hi]["commit"]} {pts[hi]["label"]}')
     elif out['status'] == 'build': print(f'BUILD {log[-1]["build"]} {log[-1]["label"]}; then: bisect-supply {D} {log[-1]["build"]} SC WIRE SLG; then: bisect {D}')
     elif waiting:
         print(f'NEXT bisection step {log[-1]["step"]} ({log[-1]["label"]} {log[-1]["point"][:12]}): ' + '; '.join(log[-1]['waiting'])
@@ -1384,9 +1403,18 @@ def render_bisect(o):
         L.append(f'| {s["step"] or "—"} | {s["point"][:7]} {s["label"]} | ({s["lo"][:7]}, {s["hi"][:7]}] | {s["f"]:.2f} | {own} | '
                  f'{"回退在此点及之前" if s["side"] == "lo-mid" else "回退在此点之后"} | {tm} |')
         if s['spread']: L.append(f'|  |  |  |  | 可能分散在多个合并里：{"，".join(s["spread"])} |  |  |')
+        if 'non_monotone' in s:
+            L.append(f'|  |  |  |  | **不单调**：' + '，'.join(f'{x} {"此点及之前" if sd == "lo-mid" else "此点之后"}' for x, sd in s['non_monotone'].items()) + ' |  |  |')
     L.append('')
     r = o['range']
-    if o['status'] == 'culprit':
+    lab = {x['commit']: x['label'] for x in o['points']}
+    if o['status'] == 'non_monotone':
+        L.append('**结论：不单调，不给单一来源。** 各失败指标在第一个不单调的步里各自的方向：')
+        L.append('')
+        L += [f'- {x}：m/r {v["own"]:.2f}，来源在 ({v["lo"][:12]} {lab.get(v["lo"], "")}, {v["hi"][:12]} {lab.get(v["hi"], "")}]' for x, v in o['per_metric'].items()]
+        L.append('')
+        L.append(f'按 f 走到的点是 {o["f_end"]["commit"][:12]}（{o["f_end"]["label"]}），只作参考；交「性能优化」决定。')
+    elif o['status'] == 'culprit':
         c = o['culprit']
         L.append(f'**结论：回退来自 {c["commit"][:12]}（{c["label"]}）**' + (f'，与它二进制相同的后续提交 {" ".join(x[:7] for x in c["same_binaries"])} 一并列出' if c['same_binaries'] else '') + '。')
     elif o['status'] == 'build': L.append(f'**进行中**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，等编译 {o["steps"][-1]["point"][:12]}。')
@@ -1452,6 +1480,7 @@ def auto_bisect(D, a):
                 auto_slg(S, 1, a)
                 if slg_used(S)[1]: sys.exit(f'AUTO {S}: SLG replacement invalid by environment: stop and report')
         print(f'AUTO bisect: {o["status"]}' + (f' -> {o["culprit"]["commit"]} {o["culprit"]["label"]}' if o['status'] == 'culprit'
+                                               else f' -> per metric {sorted(o["per_metric"])}' if o['status'] == 'non_monotone'
                                                else f' -> build {o["steps"][-1]["build"]}' if o['status'] == 'build' else ''))
     return o
 
@@ -1723,6 +1752,15 @@ def cmd_selftest(a):
     chk(f'regression in the head merge itself -> culprit head ({o.get("culprit", {}).get("label")})', o['status'] == 'culprit' and o['culprit']['label'] == 'head')
     Dc, o = ckpt('c3', {'mutate': 1.04}, effect_of=lambda q: {'mutate': 1.02} if q in ('c3', 'c4') else {'mutate': 1.04} if q in ('c5', 'head') else {})
     chk('a half-size step effect is reported as possibly spread', any(s['spread'] for s in o['steps']))
+    # INT2-like: c3 regresses mutate by 12%, c5 takes most of it back (head 1.04): own m/r near 3 at c3 -> non-monotone
+    nmf = lambda q: {'mutate': 1.12} if q in ('c3', 'c4') else {'mutate': 1.04} if q in ('c5', 'head') else {}
+    Dc, o = ckpt('c3', {'mutate': 1.04}, effect_of=nmf)
+    chk(f'over-shooting step -> non-monotone, no single culprit ({o["status"]}, {o.get("per_metric")})',
+        o['status'] == 'non_monotone' and 'culprit' not in o and any('non_monotone' in s for s in o['steps'])
+        and set(o['per_metric']) == {'formal:mutate'} and '不单调' in open(Dc + '/BISECT.md').read())
+    fr = json.load(open(Dc + '/FREEZE.json')); fr['rules']['checkpoint'].pop('non_monotone'); json.dump(fr, open(Dc + '/FREEZE.json', 'w'))
+    cmd_bisect(argparse.Namespace(dir=Dc)); o = json.load(open(Dc + '/BISECT.json'))
+    chk(f'non-monotone rule not retroactive: a freeze without it names a culprit ({o["status"]})', o['status'] == 'culprit')
     T2 = tempfile.mkdtemp(prefix='mac_gate_selftest_'); rb = T2 + '/ref'; open(rb, 'wb').write(b'REF414'); rw = T2 + '/rw'; open(rw, 'wb').write(b'w')
     fr0 = json.load(open(Dc + '/FREEZE.json')); src0 = os.path.dirname(fr0['r3_dir'])
     cmd_freeze(argparse.Namespace(dir=T2 + '/int', head_bin=src0 + '/sc-head', head_wire=src0 + '/w.wire', head_commit='h' * 40, head_desc='',
