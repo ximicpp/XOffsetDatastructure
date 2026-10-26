@@ -1828,6 +1828,29 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
         }
 
+        // memmove of 1..16 bytes without a library call: every source byte is
+        // loaded before any store, so src may overlap dst.
+        inline void move_short_bytes(char* dst, const char* src, std::size_t count) noexcept {
+            if (count >= 8) {
+                std::uint64_t head, tail;
+                std::memcpy(&head, src, 8);
+                std::memcpy(&tail, src + count - 8, 8);
+                std::memcpy(dst, &head, 8);
+                std::memcpy(dst + count - 8, &tail, 8);
+            } else if (count >= 4) {
+                std::uint32_t head, tail;
+                std::memcpy(&head, src, 4);
+                std::memcpy(&tail, src + count - 4, 4);
+                std::memcpy(dst, &head, 4);
+                std::memcpy(dst + count - 4, &tail, 4);
+            } else {
+                const char first = src[0], middle = src[count >> 1], last = src[count - 1];
+                dst[0] = first;
+                dst[count >> 1] = middle;
+                dst[count - 1] = last;
+            }
+        }
+
         template <typename T>
         const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
@@ -2421,6 +2444,28 @@ namespace XOffsetDatastructure {
             return *this;
         }
 
+        // Appends rhs, which may view this string's own characters. Growth at
+        // least doubles the capacity, so a run of appends is amortized O(1)
+        // per character.
+        XFixedString& append(std::string_view rhs) {
+            const auto count = rhs.size();
+            if (!is_inline() && count - 1u < std::size_t(capacity_ - size_)) [[likely]] {
+                // Nonempty and fits the out-of-line block (capacity_ != 0
+                // without the inline flag: bound, live block, below
+                // MAX_PAYLOAD). The spare bytes are zero (M4).
+                auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+                if (count <= 16) fixed_detail::move_short_bytes(chars + size_, rhs.data(), count);
+                else std::memmove(chars + size_, rhs.data(), count);
+                size_ += static_cast<std::uint32_t>(count);
+                chars[size_] = '\0';
+                return *this;
+            }
+            append_general(rhs);
+            return *this;
+        }
+
+        XFixedString& operator+=(std::string_view rhs) { return append(rhs); }
+
         bool operator==(const XFixedString& rhs) const noexcept { return view() == rhs.view(); }
         bool operator==(std::string_view rhs) const noexcept { return view() == rhs; }
         bool operator==(const char* rhs) const noexcept {
@@ -2502,6 +2547,37 @@ namespace XOffsetDatastructure {
             hi |= (0x80u | count) << 24;
             std::memcpy(inline_bytes(), &lo, 8);
             std::memcpy(inline_bytes() + 8, &hi, 4);
+        }
+
+        // append() when the value is inline or null, or does not fit.
+        XOFFSET_DETAIL_NOINLINE void append_general(std::string_view rhs) {
+            ensure_bound();
+            if (rhs.empty()) return;
+            const std::size_t old_size = size();
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) throw XBadAlloc();
+            const auto new_size = static_cast<std::uint32_t>(old_size + rhs.size());
+            if (new_size <= inline_max && (is_inline() || data_delta == 0)) {
+                char bytes[inline_max];
+                if (old_size != 0) std::memcpy(bytes, inline_bytes(), old_size);
+                std::memcpy(bytes + old_size, rhs.data(), rhs.size());
+                store_inline(bytes, new_size);
+                return;
+            }
+            // rhs may view the current characters, which reserve() may move
+            // (and retire, zeroed). The new storage repeats the old extent:
+            // the characters, the terminator, then zero bytes (I1 inline
+            // padding, M4 spare capacity). Read from there after the move.
+            const char* const old_chars = data();
+            const std::size_t extent = is_inline() ? 11u : std::size_t(capacity_) + 1u;
+            const auto offset = reinterpret_cast<std::uintptr_t>(rhs.data()) -
+                reinterpret_cast<std::uintptr_t>(old_chars);
+            const bool aliases = old_chars && offset < extent;
+            const auto grown = std::max<std::uint64_t>(new_size, std::uint64_t(capacity()) * 2u);
+            reserve(static_cast<std::size_t>(std::min<std::uint64_t>(grown, XBufferCore::MAX_PAYLOAD - 1u)));
+            auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+            std::memmove(chars + old_size, aliases ? chars + offset : rhs.data(), rhs.size());
+            size_ = new_size;
+            chars[new_size] = '\0';
         }
 
         // The head has no out-of-line storage (inline or null). src may alias
@@ -3540,6 +3616,8 @@ namespace XOffsetDatastructure {
         using Base::empty;
         using Base::clear;
         using Base::reserve;
+        using Base::append;
+        using Base::operator+=;
         using Base::data;
         using Base::c_str;
 

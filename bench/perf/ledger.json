@@ -68,6 +68,18 @@
       "reason": "G9 str.assign_long：XString 原地重新赋值快路径。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
       "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
       "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr71",
+      "pr": 71,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9 str.append：XString 新增 append() 和 operator+=。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
     }
   ]
 }
