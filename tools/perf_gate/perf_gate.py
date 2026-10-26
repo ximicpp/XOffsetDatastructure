@@ -272,13 +272,20 @@ def cmd_build(a):
 
 COLLECTED = re.compile(r"Collected\s*:\s*(\d+)")
 
+# valgrind counts every iteration of `rep movsb` as one instruction, so a copy that glibc's memcpy sends down
+# its rep-movsb path (sizes between x86_rep_movsb_threshold and the non-temporal threshold) costs about one Ir
+# per byte, while the same bytes in one larger copy take the vector loop. #83 split 12 MiB output copies into
+# 256 KiB chunks and formal.emit_after Ir went x5.96 with no change in the work done. With the rep-movsb path
+# off, memcpy Ir follows the bytes copied (#83: x1.058). Every role and run gets the same setting.
+IR_ENV = {"GLIBC_TUNABLES": "glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff"}
+
 
 def callgrind(valgrind, cmd, env, tmp: Path):
     """Run `cmd` under callgrind with collection off at start; return the collected Ir and the profile."""
     logf = tmp / "vg.log"
     full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no",
                                     f"--callgrind-out-file={tmp / 'cg.out'}", f"--log-file={logf}"] + cmd
-    r = subprocess.run(full, env=env, text=True, capture_output=True, cwd=tmp)
+    r = subprocess.run(full, env={**env, **IR_ENV}, text=True, capture_output=True, cwd=tmp)
     text = logf.read_text(encoding="utf-8", errors="replace") if logf.exists() else ""
     m = COLLECTED.search(text)
     if r.returncode != 0 or not m:
@@ -572,6 +579,8 @@ def classify(metric, base_m, head_m):
 def ledger_matches(entries, metric, compiler):
     out = []
     for e in entries:
+        if e.get("record_only"):      # a note in the ledger; it never allows anything
+            continue
         comp = e.get("compiler", "*")
         if comp not in ("*", compiler):
             continue
@@ -598,7 +607,7 @@ def validate_ledger(entries):
             # Scenario-level allowances above 2% need susu's confirmation (design 5.4).
             kind = e.get("metric", "")
             scen_level = kind in {f"slg.{s}" for s in SLG_TOTALS} or kind.startswith("formal.")
-            if scen_level and r > 1.02 and "susu" not in str(e.get("approved_by", "")):
+            if scen_level and r > 1.02 and not e.get("record_only") and "susu" not in str(e.get("approved_by", "")):
                 problems.append(f"ledger entry {e.get('id')}: scenario-level allowance {r} > 1.02 needs approved_by susu")
         except (TypeError, ValueError):
             problems.append(f"ledger entry {e.get('id')}: max_ratio is not a number")
