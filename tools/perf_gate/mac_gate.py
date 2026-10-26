@@ -26,6 +26,7 @@ Subcommands (run in this order on the Mac; analyze/trend/selftest run anywhere):
            the one replacement of a batch or group the environment rule invalidated
   analyze  DIR  RESULT.json + RESULT.md
   trend    DIR --trend PERF_TREND.md   append one row
+  bisect   DIR  checkpoint run that failed (frozen with --bisect): next bisection step, or the culprit
   selftest      synthetic data through the whole analysis
   diag-freeze / diag-formal / diag-analyze   a diagnostic batch with any set of equal-length labels and
                 A/A copies (same harness, copies and start conditions; report only, no verdict)
@@ -153,6 +154,24 @@ RULES = {
                           'two binaries are byte-identical is not applicable: it is not timed and takes no part in the '
                           'verdict, and the report states the sha256 (T4-r2: slg_head = slg_anch = 3b37bd3f..., so its SLG '
                           'C bound 1.0201 was an A/A of one binary)',
+    'checkpoint': {
+        'rule': 'merge rules v2 (性能优化 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = '
+                'next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze '
+                'the binaries of every first-parent commit between them are built and stored (--bisect), so a failing '
+                'checkpoint is bisected in the same session',
+        'points': 'anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are '
+                  'identical collapse into the earliest one (a point identical to the anchor or the head takes its value '
+                  'without timing)',
+        'step': 'the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> '
+                '(head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch '
+                'and/or one SLG group, under the same start, environment and replacement rules',
+        'decision': 'failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above '
+                    'pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; '
+                    'f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]',
+        'spread': 'a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges',
+        'max_steps': 3,
+        'result': 'hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported',
+    },
     'env_invalid': {
         'rule': 'frozen by 性能优化 2026-10-23 14:51Z, not retroactive: during timing WindowServer and remote-desktop '
                 'pcpu are sampled every 4 s; a sample is busy when one of them is at or above its start limit. A formal '
@@ -206,6 +225,13 @@ def cmd_freeze(a):
         name, rest = item.split('=', 1); path, code = rest.rsplit(':', 1)
         prep[name] = {'log': os.path.basename(path), 'log_sha256': h(path), 'exit': int(code)}
         if int(code) != 0: problems.append(f'prep {name} exit {code} (see {path})')
+    bis = []
+    for item in a.bisect or []:  # COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN, oldest first
+        f = item.split('|')
+        if len(f) != 5: problems.append(f'--bisect {item!r}: want COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN'); continue
+        if any(not os.path.isfile(x) for x in f[2:]): problems.append(f'--bisect {f[0]}: missing file'); continue
+        bis.append(f)
+    if len({f[0] for f in bis}) != len(bis): problems.append('--bisect: a commit is listed twice')
     if problems:
         sys.exit('freeze refused, nothing timed:\n  ' + '\n  '.join(problems))
     os.makedirs(D + '/bin'); os.makedirs(D + '/wire'); os.makedirs(D + '/prep')
@@ -232,6 +258,14 @@ def cmd_freeze(a):
         'host': platform.platform(), 'frozen_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),
         'pmset_therm': therm,
     }
+    if bis:
+        fr['bisect'] = []
+        for i, (c, lab, b, w, sl) in enumerate(bis):
+            P = f'bisect/{i:02d}-{c[:7]}'; os.makedirs(f'{D}/{P}')
+            for x, y in ((b, 'sc'), (w, 'sc.input.wire'), (sl, 'slg')): shutil.copy2(x, f'{D}/{P}/{y}')
+            fr['bisect'].append({'commit': c, 'label': lab, 'dir': P, 'formal': h(f'{D}/{P}/sc'), 'wire': h(f'{D}/{P}/sc.input.wire'),
+                                 'slg': h(f'{D}/{P}/slg')})
+    fr.update(getattr(a, 'extra', None) or {})
     for k in src:
         for i in range(1, COPIES):
             if h(f'{D}/bin/{FN[k]}{i}') != fr['binaries'][k] or h(f'{D}/wire/{FN[k]}{i}.input.wire') != fr['input_wires'][k]:
@@ -239,6 +273,8 @@ def cmd_freeze(a):
     json.dump(fr, open(D + '/FREEZE.json', 'w'), indent=1)
     print(f'FREEZE.json written: {D}')
     for k, v in fr['binaries'].items(): print(f'  {k:12s} {v}')
+    for x in fr.get('bisect', []):
+        print(f'  bisect {x["commit"][:12]} {x["label"]}: formal {x["formal"][:12]} slg {x["slg"][:12]} wire {x["wire"][:12]}')
     for part in ('formal', 'slg'):
         if not_applicable(fr, part): print(f'  {part}: NOT APPLICABLE, head and anchor binaries are identical ({not_applicable(fr, part)}); skip its timing')
 
@@ -1123,6 +1159,162 @@ def cmd_trend(a):
     print(row, end='')
 
 
+# ---------------------------------------------------------------- checkpoint bisection
+
+def failed_metrics(res):
+    """The checkpoint's failed metrics and their log effect r: {('formal', phase) | ('slg', scenario): r}."""
+    out, ov, slg = {}, res['formal_overall'], res['slg']
+    if ov.get('verdict') == 'fail':
+        pl = res.get('rules_formal_pass_le', 1.02)
+        for m, v in ov['gate']['phases'].items():
+            if v['high'] > pl and v['geo'] > 1: out[('formal', m)] = math.log(v['geo'])
+    if slg and slg.get('verdict') == 'fail':
+        for sc in 'ABC':
+            v = slg['new'][sc]
+            if v['high'] > slg['rules']['pass_le'] and v['geo'] > 1: out[('slg', sc)] = math.log(v['geo'])
+    return out
+
+
+def bisect_points(fr, parts):
+    """anchor, the --bisect commits, head; consecutive identical binaries (for the failed parts) collapse to the earliest."""
+    key = lambda f, s: tuple(x for p, x in (('formal', f), ('slg', s)) if p in parts)
+    raw = ([{'commit': fr['anchor']['commit'], 'label': 'anchor', 'formal': fr['binaries']['anchor'], 'slg': fr['slg']['anchor'], 'role': 'anchor'}]
+           + [{**x, 'role': 'commit'} for x in fr['bisect']]
+           + [{'commit': fr['head']['commit'], 'label': 'head', 'formal': fr['binaries']['head'], 'slg': fr['slg']['head'], 'role': 'head'}])
+    pts = []
+    for x in raw:
+        if pts and key(pts[-1]['formal'], pts[-1]['slg']) == key(x['formal'], x['slg']):
+            pts[-1].setdefault('same', []).append(x['commit']); continue
+        pts.append(dict(x))
+    return pts
+
+
+def step_effects(S, fr_step, metrics):
+    """log geo of the step's head over anchor for each failed metric, or (None, reason) while it is not measured."""
+    out, need = {}, []
+    parts = {p for p, _ in metrics}
+    if 'formal' in parts:
+        R = fr_step['rules']['formal']; bs = []
+        for n in sorted(int(x.rsplit('-', 1)[1]) for x in os.listdir(S) if x.startswith('formal-')):
+            B = f'{S}/formal-{n}'
+            if formal_aborted(B, R) or not os.path.exists(B + '/meta.json'): continue
+            m = json.load(open(B + '/meta.json'))
+            if m.get('smoke') or (m.get('env') or {}).get('invalid'): continue
+            bs.append(B)
+        if bs:
+            b = analyze_formal_batch(bs[0], R)
+            out.update({('formal', m): math.log(b['gate']['phases'][m]['geo']) for p, m in metrics if p == 'formal'})
+            out['_formal'] = {'batch': os.path.basename(bs[0]), 'phases': b['gate']['phases'], 'aa_ok': b['aa']['ok']}
+        else: need.append(f'formal {S} --batch <下一个>（环境失效就 --replaces N）')
+    if 'slg' in parts:
+        used, prob = slg_used(S)
+        r = analyze_slg(S, slg_rules(S, fr_step)) if used else {}
+        if prob or 'new' not in r or r.get('smoke'): need.append(f'slg {S}' + ('（' + '；'.join(prob) + '）' if prob else ''))
+        else:
+            out.update({('slg', sc): math.log(r['new'][sc]['geo']) for p, sc in metrics if p == 'slg'})
+            out['_slg'] = {'groups': r['group_dirs'], 'new': r['new']}
+    return out, need
+
+
+def cmd_bisect(a):
+    D = os.path.normpath(a.dir); fr = json.load(open(D + '/FREEZE.json')); C = fr['rules'].get('checkpoint') or RULES['checkpoint']
+    if 'bisect' not in fr: sys.exit('not a checkpoint run: frozen without --bisect')
+    if not os.path.exists(D + '/RESULT.json'): sys.exit('run analyze first')
+    res = json.load(open(D + '/RESULT.json')); res['rules_formal_pass_le'] = fr['rules']['formal']['gate']['pass_le']
+    if res['verdict'] != 'fail': sys.exit(f'checkpoint verdict is {res["verdict"]}, not fail: nothing to bisect')
+    metrics = failed_metrics(res)
+    if not metrics: sys.exit('the checkpoint failed but no failed metric has a geometric mean above 1: no direction to bisect, report')
+    parts = {p for p, _ in metrics}
+    pts = bisect_points(fr, parts)
+    lo, hi, steps, log = 0, len(pts) - 1, [], []
+    rr = sum(r * r for r in metrics.values())
+    def value(i, S=None, frs=None):
+        """Per-metric m for point i: known for anchor/head binaries, else measured in step S."""
+        known = {}
+        for (p, m), r in metrics.items():
+            if pts[i][p] == pts[0][p]: known[(p, m)] = 0.0
+            elif pts[i][p] == pts[-1][p]: known[(p, m)] = r
+        if len(known) == len(metrics): return known, [], {}
+        if S is None: return None, ['freeze'], {}
+        eff, need = step_effects(S, frs, [k for k in metrics if k not in known])
+        if need: return None, need, {}
+        isd = lambda x: isinstance(x, str)  # '_formal' / '_slg' details next to the (part, metric) effects
+        return {**known, **{k: v for k, v in eff.items() if not isd(k)}}, [], {k: v for k, v in eff.items() if isd(k)}
+    k = 0
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        vals, need, detail = value(mid)
+        S = None
+        if vals is None:
+            k += 1
+            S = f'{D}/bisect-{k}'
+            if not os.path.exists(S):
+                if k > C['max_steps']: break
+                p = pts[mid]
+                cmd_freeze(argparse.Namespace(
+                    dir=S, head_bin=f'{D}/{p["dir"]}/sc', head_wire=f'{D}/{p["dir"]}/sc.input.wire', head_commit=p['commit'],
+                    head_desc=f'checkpoint {fr["name"]} bisection step {k}: {p["label"]}', head_src=None,
+                    anchor_bin=f'{D}/bin/anch0', anchor_wire=f'{D}/wire/anch0.input.wire', anchor_commit=fr['anchor']['commit'],
+                    anchor_desc=fr['anchor']['desc'], anchor_src=None, r3_dir=fr['r3_dir'], trace=fr['trace'],
+                    slg_head=f'{D}/{p["dir"]}/slg', slg_anchor=f'{D}/bin/slg_anch', slg_tree=fr['slg']['tree'],
+                    slg_tree_sha=fr['slg']['tree_sha256'], expect_wire=None, prep=None, bisect=None,
+                    lib_note=f'bisection step {k} of checkpoint {fr["name"]} (FREEZE sha256 {h(D + "/FREEZE.json")}): {p["commit"]} {p["label"]}',
+                    extra={'bisect_step': {'k': k, 'parent': fr['name'], 'parent_freeze_sha256': h(D + '/FREEZE.json'), 'point': p['commit'],
+                                           'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'parts': sorted(parts)}}))
+            frs = json.load(open(S + '/FREEZE.json'))
+            if (frs.get('bisect_step') or {}).get('point') != pts[mid]['commit']: sys.exit(f'{S} times {frs.get("bisect_step")}, expected {pts[mid]["commit"]}: stop and report')
+            vals, need, detail = value(mid, S, frs)
+            if vals is None:
+                log.append({'step': k, 'dir': os.path.basename(S), 'point': pts[mid]['commit'], 'label': pts[mid]['label'], 'waiting': need})
+                break
+        f = sum(vals[x] * r for x, r in metrics.items()) / rr
+        own = {f'{p}:{m}': (vals[(p, m)] / r) for (p, m), r in metrics.items()}
+        log.append({'step': k if S else None, 'dir': os.path.basename(S) if S else None, 'point': pts[mid]['commit'], 'label': pts[mid]['label'],
+                    'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'f': f, 'own': own,
+                    'spread': [x for x, v in own.items() if 0.25 < v < 0.75], 'side': 'lo-mid' if f >= 0.5 else 'mid-hi',
+                    'timed': S is not None, **detail})
+        if f >= 0.5: hi = mid
+        else: lo = mid
+    done = hi - lo == 1
+    waiting = bool(log and 'waiting' in log[-1])
+    out = {'checkpoint': fr['name'], 'failed_metrics': {f'{p}:{m}': math.exp(r) for (p, m), r in metrics.items()},
+           'points': [{k2: v for k2, v in x.items() if k2 in ('commit', 'label', 'role', 'same')} for x in pts], 'steps': log,
+           'range': {'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'lo_label': pts[lo]['label'], 'hi_label': pts[hi]['label']},
+           'status': 'culprit' if done else 'waiting' if waiting else 'max_steps', 'rules': C}
+    if done: out['culprit'] = {'commit': pts[hi]['commit'], 'label': pts[hi]['label'], 'same_binaries': pts[hi].get('same', [])}
+    json.dump(out, open(D + '/BISECT.json', 'w'), indent=1)
+    open(D + '/BISECT.md', 'w').write(render_bisect(out))
+    if done: print(f'DONE culprit {pts[hi]["commit"]} {pts[hi]["label"]}')
+    elif waiting:
+        print(f'NEXT bisection step {log[-1]["step"]} ({log[-1]["label"]} {log[-1]["point"][:12]}): ' + '; '.join(log[-1]['waiting'])
+              + f'; then: bisect {D}')
+    else: print(f'STOP after {C["max_steps"]} steps: culprit in ({pts[lo]["commit"][:12]} {pts[lo]["label"]}, {pts[hi]["commit"][:12]} {pts[hi]["label"]}]')
+
+
+def render_bisect(o):
+    L = [f'# 阶段复核 {o["checkpoint"]} 二分', '',
+         '失败指标（复核点 head÷anchor 合并几何均值）：' + '，'.join(f'{k} {f4(v)}' for k, v in o['failed_metrics'].items()), '',
+         '判定：每步的 head÷anchor 按失败指标投影到复核点的回退上，f = Σ(m·r)/Σ(r²)；f ≥ 0.5 说明回退在这一点之前（含这一点），否则在这一点之后。'
+         f'最多 {o["rules"]["max_steps"]} 步计时。', '', '| 点 | 提交 | 说明 | 同一二进制的后续提交 |', '| --- | --- | --- | --- |']
+    L += [f'| {i} | {x["commit"][:12]} | {x["label"]} | {" ".join(c[:7] for c in x.get("same", []))} |' for i, x in enumerate(o['points'])]
+    L += ['', '| 步 | 点 | 范围 (lo, hi] | f | 各指标 m/r | 方向 | 计时 |', '| --- | --- | --- | --- | --- | --- | --- |']
+    for s in o['steps']:
+        if 'waiting' in s: L.append(f'| {s["step"]} | {s["point"][:7]} {s["label"]} | | | | 等待计时：{"；".join(s["waiting"])} | |'); continue
+        own = '，'.join(f'{k} {v:.2f}' for k, v in s['own'].items())
+        tm = (s['dir'] + ('（' + s['_formal']['batch'] + '）' if '_formal' in s else '')) if s['timed'] else '不计时（二进制与 anchor 或 head 相同）'
+        L.append(f'| {s["step"] or "—"} | {s["point"][:7]} {s["label"]} | ({s["lo"][:7]}, {s["hi"][:7]}] | {s["f"]:.2f} | {own} | '
+                 f'{"回退在此点及之前" if s["side"] == "lo-mid" else "回退在此点之后"} | {tm} |')
+        if s['spread']: L.append(f'|  |  |  |  | 可能分散在多个合并里：{"，".join(s["spread"])} |  |  |')
+    L.append('')
+    r = o['range']
+    if o['status'] == 'culprit':
+        c = o['culprit']
+        L.append(f'**结论：回退来自 {c["commit"][:12]}（{c["label"]}）**' + (f'，与它二进制相同的后续提交 {" ".join(x[:7] for x in c["same_binaries"])} 一并列出' if c['same_binaries'] else '') + '。')
+    elif o['status'] == 'waiting': L.append(f'**进行中**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，等下一步计时。')
+    else: L.append(f'**已用完 {o["rules"]["max_steps"]} 步**：回退在 ({r["lo"][:12]} {r["lo_label"]}, {r["hi"][:12]} {r["hi_label"]}] 内，交「性能优化」决定。')
+    return '\n'.join(L) + '\n'
+
+
 # ---------------------------------------------------------------- selftest
 
 def synth_formal(B, R, rng, effect, aa_effect=None, cycles=None):
@@ -1320,6 +1512,52 @@ def cmd_selftest(a):
     fr['rules'] = {k: v for k, v in fr['rules'].items() if k != 'identical_binaries'}; json.dump(fr, open(Di + '/FREEZE.json', 'w'))
     cmd_analyze(argparse.Namespace(dir=Di, exclude=None)); res = json.load(open(Di + '/RESULT.json'))
     chk('identical-binary rule not retroactive', res['slg']['verdict'] != 'n/a' and res['formal_overall']['verdict'] != 'n/a')
+    # checkpoint bisection (merge rules v2): 5 commits between anchor and head, commit c3 regresses mutate by 4%;
+    # c1 and c2 share a binary (collapse), the SLG binaries never change (SLG not part of the bisection)
+    def ckpt(culprit, eff, effect_of=None):
+        T = tempfile.mkdtemp(prefix='mac_gate_selftest_')
+        def put(path, data):
+            os.makedirs(os.path.dirname(path), exist_ok=True); open(path, 'wb').write(data); return path
+        r3 = {'binaries': {}, 'input_wires': {}}
+        for k in ['xoffset_cand'] + RIVALS:
+            r3['binaries'][k] = h(put(f'{T}/r3/bin/{k}', k.encode())); r3['input_wires'][k] = h(put(f'{T}/r3/wire/{k}.input.wire', b'w'))
+        json.dump(r3, open(T + '/r3/FREEZE.json', 'w'))
+        trace = put(T + '/trace.bin', b't'); wire = put(T + '/w.wire', b'w'); slg = put(T + '/slg', b'slg')
+        names = ['c1', 'c2', 'c3', 'c4', 'c5']; binof = {'c1': 'B1', 'c2': 'B1', 'c3': 'B3', 'c4': 'B4', 'c5': 'B5'}
+        bins = {n: put(f'{T}/sc-{n}', binof[n].encode()) for n in names}
+        Dc = T + '/ckpt'
+        cmd_freeze(argparse.Namespace(dir=Dc, head_bin=put(T + '/sc-head', b'HEAD'), head_wire=wire, head_commit='h' * 40, head_desc='',
+                   head_src=None, anchor_bin=put(T + '/sc-anch', b'ANCH'), anchor_wire=wire, anchor_commit='a' * 40, anchor_desc='',
+                   anchor_src=None, r3_dir=T + '/r3', trace=trace, slg_head=slg, slg_anchor=put(T + '/slg-a', b'slga'), slg_tree='t',
+                   slg_tree_sha='0', expect_wire=None, lib_note='', prep=None,
+                   bisect=[f'{n * 20}|#{80 + i} {n}|{bins[n]}|{wire}|{slg}' for i, n in enumerate(names)]))
+        rng = random.Random(41)
+        for b in (1, 2): synth_formal(f'{Dc}/formal-{b}', R, rng, eff)
+        synth_slg(Dc + '/slg', rng, 1.0)
+        cmd_analyze(argparse.Namespace(dir=Dc, exclude=None))
+        order = names + ['head']
+        for _ in range(6):
+            cmd_bisect(argparse.Namespace(dir=Dc)); o = json.load(open(Dc + '/BISECT.json'))
+            if o['status'] != 'waiting': return Dc, o
+            st_ = o['steps'][-1]; S = f'{Dc}/{st_["dir"]}'
+            pt = st_['label'].split()[-1]
+            e = (effect_of or (lambda q: eff if order.index(q) >= order.index(culprit) else {}))(pt)
+            synth_formal(S + '/formal-1', R, random.Random(50 + _), e)
+            json.dump({'batch': 1, 'env': None, 'smoke': False, 'replaces': None}, open(S + '/formal-1/meta.json', 'w'))
+        return Dc, o
+    Dc, o = ckpt('c3', {'mutate': 1.04})
+    chk(f'checkpoint bisection finds c3 in {sum(1 for s in o["steps"] if s["timed"])} timed steps ({o["status"]})',
+        o['status'] == 'culprit' and o['culprit']['label'].endswith('c3') and sum(1 for s in o['steps'] if s['timed']) <= 3
+        and list(o['failed_metrics']) == ['formal:mutate'])
+    chk('commits with identical binaries collapse to the earliest', [x['label'] for x in o['points']] == ['anchor', '#80 c1', '#82 c3', '#83 c4', '#84 c5', 'head']
+        and o['points'][1]['same'] == ['c2' * 20])
+    chk('SLG part never timed in a step (identical SLG binaries)', all(not os.path.exists(f'{Dc}/{s["dir"]}/slg') for s in o['steps'] if s['dir']))
+    chk('BISECT.md names the culprit', '回退来自' in open(Dc + '/BISECT.md').read())
+    Dc, o = ckpt('head', {'mutate': 1.04})
+    chk(f'regression in the head merge itself -> culprit head ({o.get("culprit", {}).get("label")})', o['status'] == 'culprit' and o['culprit']['label'] == 'head')
+    Dc, o = ckpt('c3', {'mutate': 1.04}, effect_of=lambda q: {'mutate': 1.02} if q in ('c3', 'c4') else {'mutate': 1.04} if q in ('c5', 'head') else {})
+    chk('a half-size step effect is reported as possibly spread', any(s['spread'] for s in o['steps']))
+    chk('bisect refused on a checkpoint that passed', 'not fail' in (refused(lambda: cmd_bisect(argparse.Namespace(dir=ckpt('c3', {})[0]))) or ''))
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
 
@@ -1340,6 +1578,8 @@ def main():
     f.add_argument('--expect-wire', help='expected sha256 of both M input wires')
     f.add_argument('--lib-note', default='', help='one line on how head and anchor library code relate')
     f.add_argument('--prep', action='append', help='NAME=LOGFILE:EXITCODE of a prep check (repeatable)')
+    f.add_argument('--bisect', action='append', help='checkpoint: COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN of each first-parent '
+                   'commit between anchor and head, oldest first (repeatable)')
     for name in ['formal', 'slg']:
         s = sp.add_parser(name); s.add_argument('dir')
         if name == 'formal':
@@ -1355,6 +1595,7 @@ def main():
     s.add_argument('--reason', required=True)
     s = sp.add_parser('analyze'); s.add_argument('dir')
     s.add_argument('--exclude', action='append', help='N:reason, leave formal-N out of the pooled gate (diagnosed invalid batch)')
+    s = sp.add_parser('bisect', help='checkpoint that failed: freeze the next step or name the culprit'); s.add_argument('dir')
     s = sp.add_parser('trend'); s.add_argument('dir'); s.add_argument('--trend', required=True); s.add_argument('--link')
     s = sp.add_parser('diag-freeze', help='diagnostic batch: any equal-length labels, A/A copies, no verdict'); s.add_argument('dir')
     s.add_argument('--bin', action='append', required=True, help='LABEL=BIN:WIRE (repeatable)')
@@ -1367,7 +1608,7 @@ def main():
     s = sp.add_parser('diag-analyze'); s.add_argument('dir')
     sp.add_parser('selftest')
     a = ap.parse_args()
-    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
+    {'freeze': cmd_freeze, 'formal': cmd_formal, 'slg': cmd_slg, 'analyze': cmd_analyze, 'trend': cmd_trend, 'bisect': cmd_bisect, 'selftest': cmd_selftest, 'amend-slg': cmd_amend_slg,
      'diag-freeze': cmd_diag_freeze, 'diag-formal': cmd_diag_formal, 'diag-analyze': cmd_diag_analyze}[a.cmd](a)
 
 
