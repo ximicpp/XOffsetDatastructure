@@ -1,0 +1,4 @@
+bridge1 vm/native: A.total=1.050 B.total=1.022 C.total=1.415 D.total=1.140
+bridge1: C.total vm/native 1.415 > 1.30 (efficiency core suspected): batch invalid
+bridge2 vm/native: A.total=1.034 B.total=0.998 C.total=1.327 D.total=1.150
+bridge2: C.total vm/native 1.327 > 1.30 (efficiency core suspected): batch invalid
