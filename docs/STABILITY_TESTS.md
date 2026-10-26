@@ -34,6 +34,10 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 - K2、K3 的性能（读、改 ≤ 1.05，独立输出 ≤ 0.20）由正式测量协议在固定机器上判定，
   不在 CI 里。结果见仓库外的性能报告。
 - 内容完整性不在承诺内：只改一个字段值的 wire 会被接受。不要把 K4 说成防篡改。
+- 版本间的 K4 对比：`tools/validation_differential.sh <旧版目录> <新版目录> <例数> <seed>...` 用同一批变异
+  wire 比较两个库版本的校验结果（含确切错误信息）。比较按 payload 进行：带 extent 表的 wire 先展开成
+  等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
+  同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
 - K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果

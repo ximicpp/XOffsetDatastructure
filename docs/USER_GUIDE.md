@@ -62,7 +62,8 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
   平铺数组，规则和 `std::flat_set`、`std::flat_map` 相同，**和 `std::set`、`std::map`
   不同**。逐个操作的规则见第 3.2 节；arena 基址和根对象地址在增长时保持不变。
 - **元素是含 `XString`、`XVector`、`XMap` 等成员的记录类型时，先把这些记录声明为
-  普通记录（第 3.1 节）。** 不声明也完全正确，只是中间插入删除、扩容要逐个元素搬移：
+  普通记录（第 3.1 节），例如在全局作用域写 `XOFFSET_ORDINARY_RECORDS(Troop, March)`。**
+  不声明也完全正确，只是中间插入删除、扩容要逐个元素搬移：
   云端 GCC 16 微基准里（只看比例，不是正式测量），元素带字符串和向量成员的
   `XVector` 中间删除，不声明约是 `std::vector` 的 1.6 倍，声明后约 0.73 倍。
 - 能改什么、不能改什么（schema、写者、所有权）见第 3.3 节。
@@ -76,10 +77,11 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 （SLG 原型里 2000 条行军每 tick 逐条删除，每周期约 160 万次元素搬移）。
 
 - 批量删除用 `stable_erase_if`：一次遍历，保持原顺序，每个保留的元素最多挪一次。
-- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，下面两个声明会打开更快的
-  路径。它们是对**源码**的承诺：记录只有普通的非静态成员，没有基类、`union`、
-  位域、`[[no_unique_address]]`，成员互不重叠。库不靠反射猜测这些性质，声明错了
-  是未定义行为。
+- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，用 `XOFFSET_ORDINARY_RECORDS`
+  声明这些记录类型（连同它们作为成员用到的记录类型），会打开更快的路径：中间
+  `erase`/`insert`、追加扩容和 `reserve` 都用一次 memmove/memcpy 挪动整段元素，只重建
+  内联容器头；`stable_erase_if` 也随之可用。声明是对**源码**的承诺：记录只有普通的非静态
+  成员，没有基类、`union`、位域、`[[no_unique_address]]`，成员互不重叠。
 
 ```cpp
 struct Troop { std::int32_t type{}; std::int32_t count{}; };
@@ -89,18 +91,19 @@ struct March {
     XVector<Troop> troops;
 };
 
-namespace XOffsetDatastructure {
-// 中间 erase/insert 一次 memmove 挪动，只重建内联容器头（成员类型也要声明）。
-template<> struct wire_record_layout<Troop> { static constexpr bool ordinary_members = true; };
-template<> struct wire_record_layout<March> { static constexpr bool ordinary_members = true; };
-// 允许对 XVector<March> 调用 stable_erase_if。
-template<> struct StableEraseOrdinaryMembers<March> : std::true_type {};
-}
+// 全局作用域，放在类型定义之后、第一次在容器里使用之前。
+XOFFSET_ORDINARY_RECORDS(Troop, March)
 
 marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 ```
 
-- 不写这些声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
+- 宏对每个类型做编译期检查：必须是类（不是 `union`），没有基类和位域，成员的
+  `[偏移, 偏移 + sizeof)` 两两不相交。共享存储的 `[[no_unique_address]]` 成员会被
+  查出来；但「可以重叠、只是这次没重叠」的成员查不出来，所以声明仍然是源码承诺，
+  声明错了是未定义行为。库不会在没有声明时自动认定。
+- 宏展开成 `wire_record_layout<T>::ordinary_members = true` 和
+  `StableEraseOrdinaryMembers<T>` 两个特化；手写这两个特化效果相同，但没有检查。
+- 不写声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
   `stable_erase_if` 不可用（编译期报错）。两条路径输出的 wire 字节相同。
 
 ### 3.2 引用和迭代器什么时候失效
@@ -189,7 +192,22 @@ const Profile& r = in.root<Profile>();
 std::string_view who = r.name.view();
 ```
 
-- wire 由 96 字节头、payload 和空洞表组成；空闲区不小于 4 KiB 时稀疏输出。
+- wire 由 96 字节头、payload 和空洞表组成。默认只跳过「不短于 4 KiB、由不小于 256 B 的
+  空闲块连成」的段（例如一次删掉大量记录留下的空洞），其余 payload 一次拷贝。
+  `XSaveOptions{.emission = XWireEmission::dense}` 强制整段拷贝。
+- 跨机器发送时可以打开零段省略：
+  `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
+  （`save_verified_into` 同样接受这个参数）。它跳过不短于 64 字节的全零段（容器余量、
+  空洞、为 0 的字段），接收方按原偏移填零，装载后的 payload 与稠密 wire 逐字节相同，
+  余量照样保留、接着改不变慢。代价是发送时多扫描一遍 payload；payload 不足 4 KiB
+  或省不到 max(256 B, payload 的 1/16) 时自动退回稠密。同机共享内存或进程内传递保持默认。
+  接收方不需要任何设置，三种 wire 都接受。
+- 想让 wire 更小时可以用 `save_compact<Profile>()`（或 `save_compact_into<Profile>(out)`）：
+  它直接按校验顺序遍历对象图写出紧凑 wire（无空洞），不建临时 buffer，源 buffer 不变。
+  默认给不少于 8 个元素的容器（字符串除外）留 size/8+1 个余量，接收方修改时不必马上搬家。
+  只读或归档的接收方传 `XCompactOptions{.slack_div = 0}`：容量等于长度、wire 最小，
+  与 `XCompactor::compact<Profile>(b).save_verified<Profile>()` 逐字节相同，
+  但接收方第一次增长任何容器都要搬家。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。

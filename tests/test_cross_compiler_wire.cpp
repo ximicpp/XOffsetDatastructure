@@ -1,9 +1,9 @@
 // Cross-compiler wire corpus.
 //
 // Builds a fixed set of V2 wires from deterministic inputs: every container
-// kind, inline and heap strings, holes left by mutation, a sparse wire, enum
-// keys ordered only by operator<=>, nested records, arrays, bool and floating
-// point fields. The same source must produce byte-identical wires with every
+// kind, inline and heap strings, holes left by mutation, a zero-run-elided
+// (sparse) wire, enum keys ordered only by operator<=>, nested records,
+// arrays, bool and floating point fields. The same source must produce byte-identical wires with every
 // supported compiler (P2996 Clang with libc++, GCC 16 with libstdc++), and each
 // compiler must accept the other's wires through load_verified.
 //
@@ -186,8 +186,19 @@ std::vector<Case> cases() {
             fill(r, in, 8);
             r.labels.emplace_back(std::string(64 * 1024, 'x'));
             r.items.emplace_back().name = "after the large block";
-            r.labels.pop_back(); // frees a 64 KiB run: emitted as a sparse gap
+            r.labels.pop_back(); // frees a 64 KiB run: the default emission skips it
             return b.save_verified();
+        }},
+        {"elided", [] {
+            Source in(0x5eed0005);
+            auto b = Buffer::create(1u << 20, cap());
+            auto& r = b.root();
+            fill(r, in, 8);
+            r.labels.emplace_back(std::string(64 * 1024, 'x'));
+            r.items.emplace_back().name = "after the large block";
+            r.labels.pop_back();
+            r.items.reserve(r.items.size() * 4); // zero slack outside holes too
+            return b.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
         }},
     };
 }
@@ -200,8 +211,13 @@ std::string read_file(const std::filesystem::path& path) {
 
 void check_wire(const char* name, const std::string& wire, const std::string& expected) {
     try {
+        xo::XWireHeaderV2 header{};
+        std::memcpy(&header, wire.data(), sizeof(header));
         auto loaded = Buffer::load(wire, cap());
-        if (loaded.save_verified() != wire)
+        // The default emission, or zero-run elision for a wire it cannot be.
+        if (loaded.save_verified() != wire &&
+            (header.extent_count == 0 ||
+             loaded.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != wire))
             fail(std::string(name) + ": load_verified -> save_verified is not byte-identical");
     } catch (const std::exception& e) {
         fail(std::string(name) + ": load_verified rejected the wire: " + e.what());
@@ -239,16 +255,17 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (argc != 1) fail("usage: test_cross_compiler_wire [--write <dir> | --read <dir>]");
-    bool sparse_seen = false;
+    int sparse_seen = 0;
     for (const auto& c : all) {
         const auto wire = c.make();
         if (wire != c.make()) fail(std::string(c.name) + ": generation is not deterministic");
         check_wire(c.name, wire, wire);
         xo::XWireHeaderV2 header{};
         std::memcpy(&header, wire.data(), sizeof(header));
-        sparse_seen |= std::string_view(c.name) == "sparse" && header.extent_count != 0;
+        const std::string_view name(c.name);
+        sparse_seen += (name == "sparse" || name == "elided") && header.extent_count != 0;
     }
-    if (!sparse_seen) fail("the sparse case produced a dense wire");
+    if (sparse_seen != 2) fail("the sparse or elided case produced a dense wire");
     std::cout << "cross-compiler wire corpus: " << all.size() << " cases deterministic and self-consistent\n";
     return 0;
 }

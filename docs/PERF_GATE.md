@@ -12,6 +12,9 @@
 2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败，但这个 PR 合并前要跑一次 Mac L2。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
 3. 计数前先查正确性：SLG `--mode verify --scale S`（xoffset 与 cereal 一致，复用协议和逐条协议各一次）；正式 harness 用各自的 `encode` 生成 S、M 输入 wire，`validate` S 和 M；`reloc_bench --mode verify`（每轮各方结果摘要一致，同时给出项名）。head 任何一项失败，门禁直接失败，不出数字。
 4. 在 valgrind callgrind 下数每个阶段的指令数（Ir），`--collect-atstart=no`，只在被测阶段里打开收集。各阶段一个进程，`nproc` 个并行。
+   - 每个进程都带 `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff`，关掉 glibc memcpy 的 rep movsb 路径。
+   - 原因：valgrind 把 `rep movsb` 的每次迭代算一条指令，落在这条路径上的拷贝约每字节一条 Ir；同样的字节放在一次大拷贝里走的是向量循环。
+   - 例子：#83 把 12 MiB 输出拆成 256 KiB 一块，formal.emit_after 的 Ir 就成了 5.96 倍，实际工作量并没有变。关掉这条路径后 memcpy 的 Ir 跟拷贝字节数走，#83 是 1.058 倍。
 5. head 的一个 SLG 阶段、正式 mutate 和第一个 reloc 项各多跑一次，两次 Ir 必须逐位相同，否则门禁失败（结果不可信）。
 6. 按第 3 节的门槛判定，作业摘要里一张表，JSON 产物 `perf-gate-<编译器>-<head sha>.json`（90 天）。不发 PR 评论。
 7. 每个警告、失败或要 ledger 放行的指标，再从同一次 callgrind 输出列一张函数差异表（见第 5 节）。
@@ -63,6 +66,7 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
 ```
 
 - `metric` 可用通配符（`slg.A.*`），`compiler` 是 `*`、`gcc16` 或 `p2996`，`max_ratio` > 1。所有字段必填，`id` 不能重复。
+- `"record_only": true` 的条目只作记录（例如 Ir 看不到的收益），什么都不放行，也不需要 susu 批准；`max_ratio` 写当时观察到的比值。
 - **head÷base**：只有这个 PR 新加的条目（base 的 ledger 里没有的 `id`）能放行。超过失败门槛但不超过 `max_ratio` 的指标记为"已放行"，摘要里列出条目；超过 `max_ratio` 照样失败。
 - **head÷anchor**：head 的 ledger 里所有匹配条目的 `max_ratio` 连乘，作为已放行的部分扣除后再比门槛。
 - **批准**：场景合计（`slg.A`–`slg.D`、`formal.*`）≤ 2% 的条目由「性能优化」批准并写进 `approved_by`；超过 2% 或涉及安全与性能取舍的，要 susu 确认，`approved_by` 必须写明 susu，否则门禁直接失败。
