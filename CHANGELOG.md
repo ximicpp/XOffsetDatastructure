@@ -85,6 +85,16 @@
   and first errors are unchanged (`test_v2_fuzz` compares every case with the
   cursor off). Map/set key order is checked without an early exit, and
   validation errors are raised from one out-of-line function.
+- API: `XBuffer::begin_verified_reload<T>(used, holes, extents)` receives a
+  wire directly into an existing buffer (no library copy, no new owner): the
+  transport writes the header, extent table, payload (dense, or each extent at
+  its offset) and hole table into the token's spans, calls `complete()` with
+  the counts written, then `finish()`. Verification is `reload_verified`'s
+  (same validator, same accept/reject set, `test_v2_fuzz` acceptor 6); an
+  incomplete, aborted or mis-declared delivery rejects and leaves the buffer
+  rootless. Nothing is cleared at begin: a dense payload is overwritten whole,
+  and only the parts of sparse gaps that earlier content made dirty are
+  zeroed at finish. `VerifiedReloadToken<T>`; `XOFFSET_VERIFIED_RELOAD_API`.
 - Storage (R1, **contract change**): small buffers live on slots of a library
   slab (`xoffset_slot_storage.hpp`: 4 MiB chunks, power-of-two classes from
   1 KiB to `XBuffer::SLOT_MAX` + 64 B, per-thread caches) instead of a VM
@@ -93,17 +103,17 @@
   it; a pinned slot when the maximum is at most `SLOT_MAX`; otherwise a
   movable slot, which is the default for small Explicit buffers and loads.
   **`grow()` on a movable slot may move the payload** (to a larger slot, or to
-  VM above `SLOT_MAX`), and so may `reload_verified` and
-  `set_growth_policy(XGrowPolicy::Automatic)` (which pins on VM); a move
+  VM above `SLOT_MAX`), and so may `reload_verified`, `begin_verified_reload`
+  and `set_growth_policy(XGrowPolicy::Automatic)` (which pins on VM); a move
   bumps `epoch()` and invalidates pointers, `XHandle` re-resolves. Automatic
   growth, container operations and save never move. New: `XStorage`,
   `MaximumCapacity::with_storage`, `storage_kind()`, `address_stable()`,
   `XBuffer::trim_slot_storage()`, `slot_storage_stats()`,
   `XOFFSET_SLOT_MAX_BYTES` (0 disables slots), `XOFFSET_SLOT_STORAGE_API`. A
-  default-constructed or moved-from `XBuffer` accepts `reload_verified`
-  (storage on demand, 64 MiB Explicit). Wire bytes,
+  default-constructed or moved-from `XBuffer` accepts `reload_verified` and
+  `begin_verified_reload` (storage on demand, 64 MiB Explicit). Wire bytes,
   validation and the reject set are unchanged: `test_v2_fuzz` acceptor 7
-  checks slot loads and reloads against the VM load byte for
+  checks slot loads, reloads and direct reloads against the VM load byte for
   byte. Pooled, Automatic-with-large-maximum and formal-protocol buffers stay
   on VM.
 - Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
