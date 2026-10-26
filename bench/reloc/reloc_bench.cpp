@@ -93,9 +93,12 @@ struct alignas(8) IntSet { XSet<int32_t> s; };
 } // namespace rb
 
 // Only the ".ord" records are declared ordinary (all their members are
-// ordinary: no bases, bit-fields, unions or [[no_unique_address]]).
+// ordinary: no bases, bit-fields, unions or [[no_unique_address]]), together
+// with the records they hold as container elements, as the user guide says
+// (section 3.1); without Skill, Buff and Troop the .ord heroes took the
+// per-element path of the .plain ones.
 #ifdef XOFFSET_ORDINARY_RECORDS
-XOFFSET_ORDINARY_RECORDS(rb::xm::HeroOrd, rb::xm::ArmyOrd)
+XOFFSET_ORDINARY_RECORDS(rb::Skill, rb::Buff, rb::Troop, rb::xm::HeroOrd, rb::xm::ArmyOrd)
 #else
 // Libraries without the macro: its two specializations, written out.
 #define RELOC_ORDINARY_RECORD(T)                                                       \
@@ -103,6 +106,9 @@ XOFFSET_ORDINARY_RECORDS(rb::xm::HeroOrd, rb::xm::ArmyOrd)
         static constexpr bool ordinary_members = true;                                 \
     };                                                                                 \
     template<> struct XOffsetDatastructure::StableEraseOrdinaryMembers<T> : std::true_type {};
+RELOC_ORDINARY_RECORD(rb::Skill)
+RELOC_ORDINARY_RECORD(rb::Buff)
+RELOC_ORDINARY_RECORD(rb::Troop)
 RELOC_ORDINARY_RECORD(rb::xm::HeroOrd)
 RELOC_ORDINARY_RECORD(rb::xm::ArmyOrd)
 #undef RELOC_ORDINARY_RECORD
@@ -110,6 +116,12 @@ RELOC_ORDINARY_RECORD(rb::xm::ArmyOrd)
 static_assert(XOffsetDatastructure::StableEraseOrdinaryMembers<rb::xm::HeroOrd>::value &&
               XOffsetDatastructure::wire_record_layout<rb::xm::HeroOrd>::ordinary_members);
 static_assert(!XOffsetDatastructure::StableEraseOrdinaryMembers<rb::xm::HeroPlain>::value);
+#ifdef XOFFSET_ORDINARY_RECORDS
+// The .ord heroes move by SHIFT (one memmove, inline heads restarted); the
+// .plain ones relocate element by element.
+static_assert(XOffsetDatastructure::detail::shift_relocate_supported<rb::xm::HeroOrd>() &&
+              !XOffsetDatastructure::detail::shift_relocate_supported<rb::xm::HeroPlain>());
+#endif
 
 namespace rb {
 using namespace XOffsetDatastructure;
