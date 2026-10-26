@@ -143,6 +143,16 @@ T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
 // self-relative delta rebased by the known displacement. Out-of-line payloads
 // keep their addresses and are neither scanned nor restarted. Custom activation
 // or lifetime policies keep the per-element relocate_construct path.
+template<class T> consteval bool shift_rebase_domain();
+// Per member, as a function template: a lambda nested in the pack expansion
+// crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
+template<class T, std::size_t I>
+consteval bool shift_rebase_domain_member() {
+    using member = schema::member_t<T, I>;
+    if constexpr (member::is_bit_field) return false;
+    else return shift_rebase_domain<typename member::type>();
+}
+
 template<class T>
 consteval bool shift_rebase_domain() {
     if constexpr (wire_activation<T>::enabled || future_custom_lifetime_supported<T>()) return false;
@@ -151,15 +161,8 @@ consteval bool shift_rebase_domain() {
     else if constexpr (std::is_scalar_v<T>) return true;
     else if constexpr (std::is_class_v<T>) {
         if constexpr (schema::base_count_v<T> != 0) return false;
-        else return []<std::size_t... I>(std::index_sequence<I...>) {
-            return ([] {
-                using member = schema::member_t<T, I>;
-                if constexpr (member::is_bit_field) return false;
-                else {
-                    using M = typename member::type;
-                    return shift_rebase_domain<M>();
-                }
-            }() && ...);
+        else return []<std::size_t... I>(std::index_sequence<I...>) consteval {
+            return (shift_rebase_domain_member<T, I>() && ...);
         }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
@@ -253,6 +256,16 @@ void empty_vacated_slot(T* slot) noexcept {
 // range, otherwise a compacting preorder walk. The domain is the SHIFT domain
 // extended into container elements: plain heads, scalars, arrays and ordinary
 // records, every alignment <= 8, no custom activation/lifetime.
+template<class T> consteval bool subtree_copy_domain();
+// Per member, as a function template: a lambda nested in the pack expansion
+// crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
+template<class T, std::size_t I>
+consteval bool subtree_copy_domain_member() {
+    using member = schema::member_t<T, I>;
+    if constexpr (member::is_bit_field) return false;
+    else return subtree_copy_domain<typename member::type>();
+}
+
 template<class T>
 consteval bool subtree_copy_domain() {
     if constexpr (alignof(T) > 8 || wire_activation<T>::enabled ||
@@ -267,15 +280,8 @@ consteval bool subtree_copy_domain() {
         if constexpr (schema::base_count_v<T> != 0) return false;
         else if constexpr (!std::is_trivially_copyable_v<T> &&
                            !ordinary_outer_lifetime_supported<T>()) return false;
-        else return []<std::size_t... I>(std::index_sequence<I...>) {
-            return ([] {
-                using member = schema::member_t<T, I>;
-                if constexpr (member::is_bit_field) return false;
-                else {
-                    using M = typename member::type;
-                    return subtree_copy_domain<M>();
-                }
-            }() && ...);
+        else return []<std::size_t... I>(std::index_sequence<I...>) consteval {
+            return (subtree_copy_domain_member<T, I>() && ...);
         }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
