@@ -51,7 +51,8 @@ xo::XBufferCore::MaximumCapacity cap() {
     return xo::XBuffer::maximum_capacity(16u << 20).with_growth(xo::XGrowPolicy::Automatic);
 }
 
-// Retires blocks that held recognizable contents; `sparse` adds a 64 KiB run.
+// Retires blocks that held recognizable contents; `sparse` adds a 64 KiB run
+// (skipped by the default and the zero-run emission).
 // Every allocation that could reuse the secret's block happens before it is
 // retired, so the secret's block is still a hole when the wire is emitted.
 Buffer make(bool sparse) {
@@ -66,7 +67,7 @@ Buffer make(bool sparse) {
     if (sparse) {
         r.big.emplace_back(std::string(64 * 1024, 'B'));
         r.entries.emplace_back().note = "after";
-        r.big.pop_back();                       // 64 KiB of 'B' becomes a sparse gap
+        r.big.pop_back();                       // 64 KiB of 'B' becomes a zeroed hole
     }
     r.filler.assign(64, 0x4141414141414141ull);
     r.secret = std::string(kSecret);
@@ -138,22 +139,25 @@ void check_emitted(std::string_view wire, const char* arena, const char* what) {
 }
 
 void emitted_holes_are_zero() {
-    for (bool sparse : {false, true}) {
+    for (bool sparse : {false, true})
+    for (auto emission : {xo::XWireEmission::free_runs, xo::XWireEmission::dense, xo::XWireEmission::zero_runs}) {
         auto b = make(sparse);
-        const auto wire = b.save_verified();
-        if ((parse(wire).header.extent_count != 0) != sparse) fail("unexpected dense/sparse emission");
+        const xo::XSaveOptions options{.emission = emission};
+        const auto wire = b.save_verified(options);
+        if ((parse(wire).header.extent_count != 0) != (sparse && emission != xo::XWireEmission::dense))
+            fail("unexpected dense/sparse emission");
         const char* arena = static_cast<const char*>(b.get_address());
         if (std::string_view(arena, b.arena()->used_end).find(kSecret.substr(0, 12)) != std::string_view::npos)
             fail("the retired secret is still in the arena");
         check_emitted(wire, arena, sparse ? "save_verified sparse" : "save_verified dense");
 
         std::string into = "previous contents";
-        b.save_verified_into(into);
+        b.save_verified_into(into, options);
         if (into != wire) fail("save_verified_into differs from save_verified");
 
         // Reload installs the hole table; the re-emitted wire is identical.
         auto again = Buffer::load(wire, cap());
-        if (again.save_verified() != wire) fail("reload changed the emitted bytes");
+        if (again.save_verified(options) != wire) fail("reload changed the emitted bytes");
     }
 }
 
@@ -232,10 +236,13 @@ void declared_size_limits() {
         fail("explicit limit message: " + what);
     what = rejection([&] { (void)xo::begin_verified_receive<hz::Root>(std::size_t(1) << 30); });
     if (what.find("begin_verified_receive") == std::string::npos) fail("receive limit message: " + what);
-    // Within the default limit a claim is still accepted (and stays sparse).
+    // Within the default limit a claim is still accepted, and the default
+    // emission skips the claimed free run again.
     const auto ok = inflate_sparse(base, 32u << 20);
     auto loaded = Buffer::load(ok);
-    if (loaded.save_verified() != ok) fail("a 32 MiB sparse claim did not round-trip");
+    const auto resent = loaded.save_verified();
+    if (resent.size() > ok.size() + 64 || Buffer::load(resent).arena()->used_end != (32u << 20))
+        fail("a 32 MiB sparse claim did not round-trip sparsely");
     // An explicit limit admits larger wires.
     auto large = Buffer::load(inflate_sparse(base, 96u << 20), xo::XBuffer::maximum_capacity(128u << 20));
     if (large.arena()->used_end != (96u << 20)) fail("explicit limit did not admit 96 MiB");

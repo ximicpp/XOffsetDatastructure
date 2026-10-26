@@ -2,8 +2,10 @@
 # K4 differential: builds tests/fuzz/validation_outcomes.cpp (from HEAD_DIR)
 # against two library checkouts and compares, per seed, the outcome digests of
 # typed load, reload, raw validation and verified receive over the same
-# mutated wires (exact error messages included). Same inputs with different
-# outcomes fail. Different inputs (the two libraries save differently) are
+# mutated wires (exact error messages included), per payload: a mutated wire
+# with a well-formed extent table is validated as its dense equivalent, since
+# releases may accept different sparse framings of one payload. Same inputs
+# with different outcomes fail. Different inputs (the two libraries save differently) are
 # reported as not comparable.
 #
 # usage: tools/validation_differential.sh <base dir> <head dir> <cases> <seed>...
