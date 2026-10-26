@@ -64,6 +64,18 @@ FN_TOP = 10                                    # functions listed per flagged me
 FN_NAME_MAX = 110                              # display width of a function name
 FN_SUSPECT_MIN = 0.10                          # inlining suspects move >= 10% of the metric's change
 
+# Allocator recycling: Ir that grows mostly in FreeTableRecycler::recycle. In the 2026-10-26 calibration
+# against Mac L2 batches both cases went the other way on the Mac: D2 (#33, calls to malloc/free replaced
+# by recycling the free table in place; slg.B.in_decode Ir 1.059 GCC / 1.052 P2996, Mac 0.989) and COPS
+# (#52/#54 changed what is released, more bins to recycle; slg.B Ir 1.014, Mac 0.977). Cache simulation
+# did not reverse D2 either. The flag is a diagnosis: it does not change the verdict.
+RECYCLE_FN = "FreeTableRecycler::recycle"
+RECYCLE_MIN_SHARE = 0.5                        # recycle carries at least half of the metric's net increase
+ALLOC_DROP_MIN_SHARE = 0.10                    # D2 kind: allocator self-Ir falls by >= 10% of the recycle growth
+                                               # (D2 0.28-0.55; COPS 0.013-0.025, noise next to the recycle growth)
+ALLOC_FN = re.compile(r"^(?:malloc|free|realloc|calloc|cfree|_int_malloc|_int_free\w*|_int_realloc|malloc_consolidate"
+                      r"|tcache\w*|operator new|operator delete)\b")
+
 
 def log(*a):
     print("[perf_gate]", *a, file=sys.stderr, flush=True)
@@ -272,13 +284,20 @@ def cmd_build(a):
 
 COLLECTED = re.compile(r"Collected\s*:\s*(\d+)")
 
+# valgrind counts every iteration of `rep movsb` as one instruction, so a copy that glibc's memcpy sends down
+# its rep-movsb path (sizes between x86_rep_movsb_threshold and the non-temporal threshold) costs about one Ir
+# per byte, while the same bytes in one larger copy take the vector loop. #83 split 12 MiB output copies into
+# 256 KiB chunks and formal.emit_after Ir went x5.96 with no change in the work done. With the rep-movsb path
+# off, memcpy Ir follows the bytes copied (#83: x1.058). Every role and run gets the same setting.
+IR_ENV = {"GLIBC_TUNABLES": "glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff"}
+
 
 def callgrind(valgrind, cmd, env, tmp: Path):
     """Run `cmd` under callgrind with collection off at start; return the collected Ir and the profile."""
     logf = tmp / "vg.log"
     full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no",
                                     f"--callgrind-out-file={tmp / 'cg.out'}", f"--log-file={logf}"] + cmd
-    r = subprocess.run(full, env=env, text=True, capture_output=True, cwd=tmp)
+    r = subprocess.run(full, env={**env, **IR_ENV}, text=True, capture_output=True, cwd=tmp)
     text = logf.read_text(encoding="utf-8", errors="replace") if logf.exists() else ""
     m = COLLECTED.search(text)
     if r.returncode != 0 or not m:
@@ -572,6 +591,8 @@ def classify(metric, base_m, head_m):
 def ledger_matches(entries, metric, compiler):
     out = []
     for e in entries:
+        if e.get("record_only"):      # a note in the ledger; it never allows anything
+            continue
         comp = e.get("compiler", "*")
         if comp not in ("*", compiler):
             continue
@@ -598,7 +619,7 @@ def validate_ledger(entries):
             # Scenario-level allowances above 2% need susu's confirmation (design 5.4).
             kind = e.get("metric", "")
             scen_level = kind in {f"slg.{s}" for s in SLG_TOTALS} or kind.startswith("formal.")
-            if scen_level and r > 1.02 and "susu" not in str(e.get("approved_by", "")):
+            if scen_level and r > 1.02 and not e.get("record_only") and "susu" not in str(e.get("approved_by", "")):
                 problems.append(f"ledger entry {e.get('id')}: scenario-level allowance {r} > 1.02 needs approved_by susu")
         except (TypeError, ValueError):
             problems.append(f"ledger entry {e.get('id')}: max_ratio is not a number")
@@ -663,6 +684,14 @@ def fn_diff(ref_tree, head_tree, metric, ref_role):
     (r, re_), (h, he) = ref, head
     delta = {f: h.get(f, 0) - r.get(f, 0) for f in set(r) | set(h)}
     floor = max(1, FN_SUSPECT_MIN * abs(sum(delta.values())))
+    net = sum(delta.values())
+    recycle = sum(d for f, d in delta.items() if RECYCLE_FN in f)
+    alloc = sum(d for f, d in delta.items() if ALLOC_FN.match(f))
+    alloc_recycle = None
+    if net > 0 and recycle >= RECYCLE_MIN_SHARE * net:
+        alloc_recycle = {"recycle": recycle, "alloc": alloc, "share": recycle / net,
+                         "kind": "alloc_calls_removed" if -alloc >= ALLOC_DROP_MIN_SHARE * recycle
+                         else "more_recycle_work"}
     top = sorted((f for f, d in delta.items() if d), key=lambda f: (-abs(delta[f]), f))[:FN_TOP]
     edges = re_ | he
     partners = collections.defaultdict(set)
@@ -689,8 +718,8 @@ def fn_diff(ref_tree, head_tree, metric, ref_role):
             dx, dy = delta[x], delta[y]
             if dx * dy < 0 and abs(dx + dy) < (abs(dx) + abs(dy)) / 2 and max(abs(dx), abs(dy)) >= floor:
                 suspects.append(f"`{short_fn(x)}` 调用 `{short_fn(y)}`，自身 Ir 一升一降（{dx:+,} / {dy:+,}）")
-    return {"ref": ref_role, "keys": keys, "delta": sum(delta.values()), "top": rows,
-            "inline_suspect": bool(suspects), "suspects": suspects}
+    return {"ref": ref_role, "keys": keys, "delta": net, "top": rows,
+            "inline_suspect": bool(suspects), "suspects": suspects, "alloc_recycle": alloc_recycle}
 
 
 def fmt_ratio(r):
@@ -830,6 +859,13 @@ def cmd_compare(a):
         row["functions"] = d
         if d["inline_suspect"]:
             notes.append(f"{row['metric']}：疑似内联变化（只是诊断，不放行；见函数差异表）")
+        ar = d.get("alloc_recycle")
+        if ar:
+            what = (f"malloc/free/new/delete 自身 Ir {ar['alloc']:+,}，分配器调用换成了原地回收（D2 型）"
+                    if ar["kind"] == "alloc_calls_removed" else "分配器调用没有减少，要回收的 bin 变多了（COPS 型）")
+            notes.append(f"{row['metric']}：分配器回收型（只是诊断，不放行）：FreeTableRecycler::recycle 自身 Ir "
+                         f"{ar['recycle']:+,}（该指标净增 {d['delta']:+,}）；{what}。校准时这两类在 Mac 上都是变快，"
+                         "Ir 方向相反，判定不变，按 L 类由 Mac L2 下结论")
 
     # Largest-changing phase per scenario (head/base), for the summary.
     biggest = {}
@@ -909,7 +945,8 @@ def render_summary(out, plan, biggest):
             L += [f"{head}：同 `{shown[ident]}`", ""]
             continue
         shown[ident] = row["metric"]
-        L.append(head + ("：⚠️ 疑似内联变化（只是诊断，不放行）" if d["inline_suspect"] else ""))
+        tags = (["疑似内联变化"] if d["inline_suspect"] else []) + (["分配器回收型"] if d.get("alloc_recycle") else [])
+        L.append(head + (f"：⚠️ {'、'.join(tags)}（只是诊断，不放行）" if tags else ""))
         L += [f"- {x}" for x in d["suspects"]]
         L += ["", f"| 函数 | {d['ref']} | head | 变化 |", "| --- | --- | --- | --- |"]
         for t in d["top"]:
