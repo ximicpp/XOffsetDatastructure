@@ -684,13 +684,15 @@ namespace XOffsetDatastructure {
                 const auto bin = bytes / 8u - 1u;
                 // D5: a front entry is the top of its bin; a front entry of a
                 // larger bin rules out the bump below.
+                // A row's bit is set exactly while it holds entries.
                 bool front_larger = false;
                 if (char* base = buffer_.data(); bin < front_bins && front_capable(base)) {
-                    if (front_row(base, bin).count != 0) {
+                    const auto from_bin = front_tail(base).bits >> bin;
+                    if (from_bin & 1u) {
                         check_owner_resolves();
                         return base + front_pop(base, bin);
                     }
-                    front_larger = (front_tail(base).bits >> bin) != 0;
+                    front_larger = from_bin != 0;
                 }
                 FreeTable* table = free_table_.get();
                 if (table && table->count != 0) {
@@ -1420,7 +1422,7 @@ namespace XOffsetDatastructure {
             bool from_front = false;
             if (bytes <= FreeTable::small_max) {
                 auto bin = bytes / 8u - 1u;
-                if (front && bin < front_bins && front_row(base, bin).count != 0)
+                if (front && bin < front_bins && (front_tail(base).bits >> bin & 1u))
                     return payload_byte_address(front_pop(base, bin));
                 if (table && !table->bins[bin].empty()) {
                     auto& exact = table->bins[bin];
@@ -1451,7 +1453,7 @@ namespace XOffsetDatastructure {
                 if (bits != 0) {
                     const auto larger = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     found_bytes = (larger + 1u) * 8u;
-                    if (front && larger < front_bins && front_row(base, larger).count != 0) {
+                    if (front && larger < front_bins && (front_tail(base).bits >> larger & 1u)) {
                         found_offset = front_pop(base, larger);
                         from_front = true;
                     } else {
