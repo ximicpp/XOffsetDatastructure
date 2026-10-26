@@ -2320,7 +2320,16 @@ namespace XOffsetDatastructure {
         }
 
         void assign(std::string_view rhs) {
-            if (!is_inline() && rhs.size() - 1u < capacity_) [[likely]] {
+            if (is_inline()) {
+                // A nonempty short value into a bound inline head stays
+                // inline: the general path below would do the same after
+                // its checks. rhs may alias the inline bytes (store_inline
+                // reads them all first).
+                if (rhs.size() - 1u < inline_max && is_bound()) [[likely]] {
+                    store_inline(rhs.data(), static_cast<std::uint32_t>(rhs.size()));
+                    return;
+                }
+            } else if (rhs.size() - 1u < capacity_) [[likely]] {
                 // Nonempty and fits the out-of-line block. capacity_ != 0
                 // without the inline flag implies a bound head with a live
                 // block, and capacity_ < MAX_PAYLOAD: the checks below are

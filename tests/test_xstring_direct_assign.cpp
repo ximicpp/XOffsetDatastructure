@@ -266,6 +266,64 @@ bool test_heap_reassign_in_place() {
     return true;
 }
 
+// Reassigning an inline string: a short value stays inline and its 12
+// inline head bytes are the characters, zero bytes, then the flag and length
+// byte (I1), for every old and new length and for views of the string's own
+// inline characters. A longer value moves to the heap.
+bool test_inline_reassign() {
+    std::cout << "\n[TEST] Inline XString reassignment\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    constexpr std::size_t inline_max = 10;
+    const std::string chars = "abcdefghijklmnop";
+    auto check = [&](const XString& s, std::string_view want) {
+        assert(s.view() == want);
+        if (want.size() > inline_max) {
+            assert(!s.is_inline());
+            return;
+        }
+        unsigned char expect[12] = {};
+        std::memcpy(expect, want.data(), want.size());
+        expect[11] = static_cast<unsigned char>(0x80u | want.size());
+        assert(s.is_inline());
+        assert(std::memcmp(reinterpret_cast<const char*>(&s) + 4, expect, 12) == 0);
+    };
+
+    std::cout << "Test 17: Every old and new length... ";
+    std::size_t cases = 0;
+    for (std::size_t before = 1; before <= inline_max; ++before) {
+        for (std::size_t length = 0; length <= inline_max + 2; ++length) {
+            XBuffer xbuf(4096);
+            auto& s = xbuf.make<StringTestData>()->name;
+            s = std::string_view(chars).substr(16 - before);
+            check(s, std::string_view(chars).substr(16 - before));
+            const std::string want = chars.substr(0, length);
+            s = std::string_view(want);
+            check(s, want);
+            ++cases;
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+
+    std::cout << "Test 18: Views of the string's own inline characters... ";
+    cases = 0;
+    for (std::size_t length = 1; length <= inline_max; ++length) {
+        for (std::size_t from = 0; from < length; ++from) {
+            for (std::size_t count = 1; from + count <= length; ++count) {
+                XBuffer xbuf(4096);
+                auto& s = xbuf.make<StringTestData>()->name;
+                s = std::string_view(chars).substr(0, length);
+                check(s, std::string_view(chars).substr(0, length));
+                s = std::string_view(s.data() + from, count);
+                check(s, std::string_view(chars).substr(from, count));
+                ++cases;
+            }
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+    return true;
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "  XString Direct Assignment Test\n";
@@ -277,6 +335,7 @@ int main() {
     all_passed &= test_vector_of_strings();
     all_passed &= test_player_direct_assign();
     all_passed &= test_heap_reassign_in_place();
+    all_passed &= test_inline_reassign();
 
     std::cout << "\n========================================\n";
     if (all_passed) {
