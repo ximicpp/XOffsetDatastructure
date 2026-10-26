@@ -27,8 +27,12 @@ bool test_default_reservation() {
     constexpr auto default_limit = XBufferCore::DEFAULT_MAXIMUM_CAPACITY;
     static_assert(default_limit == 64ULL * 1024 * 1024);
 
+    // An initial size above SLOT_MAX (or a Pinned request) reserves the
+    // whole maximum; a smaller one starts on a movable slot (R1).
+    const auto pinned = XBuffer::maximum_capacity(default_limit).with_storage(XStorage::Pinned);
     for (const auto initial_size : {4096u, 1024u * 1024u}) {
-        XBuffer buf(initial_size);
+        XBuffer buf = initial_size > XBufferCore::SLOT_MAX ? XBuffer(initial_size) : XBuffer(initial_size, pinned);
+        assert(buf.storage_kind() == XStorageKind::Vm);
         assert(buf.maximum_capacity() == default_limit);
         assert(buf.reserved_capacity() == default_limit);
         assert(buf.get_size() == initial_size);
@@ -36,6 +40,13 @@ bool test_default_reservation() {
         assert(buf.accessible_bytes() >= initial_size);
         assert(buf.accessible_bytes() < buf.reserved_bytes());
         assert(buf.reserved_bytes() >= buf.maximum_capacity());
+    }
+    if (XBufferCore::SLOT_MAX != 0) {
+        XBuffer slot(4096);
+        assert(slot.storage_kind() == XStorageKind::MovableSlot);
+        assert(slot.maximum_capacity() == default_limit && slot.get_size() == 4096);
+        // 4096 + the 64-byte slot header: the 8 KiB class.
+        assert(slot.reserved_bytes() == 8192 && slot.accessible_bytes() == 8192 - 64);
     }
 
     // An initial arena larger than the default must still fit its reservation.
@@ -52,14 +63,14 @@ bool test_capacity_policies() {
     constexpr auto small_limit = 64ULL * 1024;
     constexpr auto large_hint = 256ULL * 1024 * 1024;
 
+    // A legacy hint is not a maximum: the default maximum applies, so a
+    // small initial size starts on a movable slot and grow() may move it.
     XBuffer legacy_small(4096, XBuffer::max_capacity(small_limit));
     assert(legacy_small.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
-    const void* legacy_base = legacy_small.get_address();
     const auto legacy_epoch = legacy_small.epoch();
     assert(legacy_small.grow(2 * small_limit - legacy_small.get_size()));
     assert(legacy_small.get_size() > small_limit);
-    assert(legacy_small.get_address() == legacy_base);
-    assert(legacy_small.epoch() == legacy_epoch);
+    assert(legacy_small.address_stable() || legacy_small.epoch() != legacy_epoch);
 
     XBuffer legacy_large(4096, XBuffer::max_capacity(large_hint));
     assert(legacy_large.maximum_capacity() == large_hint);
@@ -126,7 +137,9 @@ bool test_many_small_buffers() {
 
 bool test_stable_growth_and_round_trip() {
     std::cout << "\n[TEST] Stable growth, continued mutation, and save/load\n";
-    XBuffer buf(4096, XBuffer::maximum_capacity(256 * 1024));
+    // Pinned: a 256 KiB maximum with Explicit growth would otherwise start
+    // on a movable slot, and this test checks that growth keeps the address.
+    XBuffer buf(4096, XBuffer::maximum_capacity(256 * 1024).with_storage(XStorage::Pinned));
     auto* data = buf.make<SmallData>();
     data->id = 42;
     data->value = 12.5;

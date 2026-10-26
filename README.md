@@ -1,7 +1,7 @@
 # XOffsetDatastructure
 
 **0.3.0-beta.1** is an experimental C++26/P2996 library for reflected objects
-and offset containers stored in an address-stable virtual-memory arena. It is
+and offset containers stored in one contiguous, position-independent arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
 
@@ -173,12 +173,31 @@ workload and adapter set. No Linux or Windows performance figures are claimed.
 - Growth defaults to `XGrowPolicy::Explicit`; exhaustion throws `XBadAlloc`.
   `XGrowPolicy::Automatic` and `XBufferPool` are opt-in. Pool budgets bound idle
   cached reservations, not live owners or total process memory.
-- `reserved_bytes()` counts page-rounded virtual address space;
-  `accessible_bytes()` counts enabled pages, not RSS. Logical shrink retains
-  enabled pages; `reclaim_tail_pages()` explicitly attempts page reclamation.
-- Arena/root addresses remain stable through growth and save. Container mutation
-  can move or destroy elements. Borrowed spans and handles do not own the buffer;
-  the C++ buffer object must outlive its handles. Synchronize writes externally.
+- Storage is chosen when a buffer is created (`storage_kind()` reports it):
+  - **VM** (a reserved virtual-memory range, address fixed for life): with an
+    `XBufferPool`, with `with_storage(XStorage::Pinned)`, with Automatic growth
+    and a maximum above `XBuffer::SLOT_MAX` (256 KiB − 64 B), or when the initial
+    size is above `SLOT_MAX`.
+  - **Pinned slot** (a slot of the library slab, address fixed for life): a
+    maximum of at most `SLOT_MAX`.
+  - **Movable slot**: otherwise, which includes the default (Explicit growth,
+    64 MiB maximum) for small buffers and loads.
+- Addresses stay fixed through Automatic growth, container mutation, save,
+  `shrink_to_fit` and `reclaim_tail_pages`. On a movable slot, `grow()` may move
+  the payload to a larger slot (or to VM above `SLOT_MAX`, pinned from then on),
+  and so may `reload_verified` and
+  `set_growth_policy(XGrowPolicy::Automatic)`. A move invalidates root references,
+  element pointers, `allocator<T>()` results and borrowed spans; `XHandle`
+  re-resolves, and `epoch()` changes. `address_stable()` tells which case applies;
+  use `with_storage(XStorage::Pinned)` for an address that never changes.
+- `reserved_bytes()` counts page-rounded virtual address space (the slot size on
+  a slot); `accessible_bytes()` counts enabled pages (the slot capacity on a
+  slot), not RSS. Logical shrink retains enabled pages; `reclaim_tail_pages()`
+  explicitly attempts page reclamation (a no-op on a slot). Freed slots stay in
+  the process for reuse; `XBuffer::trim_slot_storage()` discards their pages.
+- Container mutation can move or destroy elements. Borrowed spans and handles do
+  not own the buffer; the C++ buffer object must outlive its handles. Synchronize
+  writes externally.
 - Library container mutations preserve logical contents on allocation failure;
   capacities and allocator bookkeeping need not roll back. User operation
   sequences and external constructor effects are not transactions.
