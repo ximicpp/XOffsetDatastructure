@@ -185,7 +185,7 @@ workload and adapter set. No Linux or Windows performance figures are claimed.
 - Addresses stay fixed through Automatic growth, container mutation, save,
   `shrink_to_fit` and `reclaim_tail_pages`. On a movable slot, `grow()` may move
   the payload to a larger slot (or to VM above `SLOT_MAX`, pinned from then on),
-  and so may `reload_verified`, `begin_verified_reload` and
+  and so may `reload_verified` and
   `set_growth_policy(XGrowPolicy::Automatic)`. A move invalidates root references,
   element pointers, `allocator<T>()` results and borrowed spans; `XHandle`
   re-resolves, and `epoch()` changes. `address_stable()` tells which case applies;

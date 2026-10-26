@@ -72,6 +72,7 @@ void fill_explicit(XBuffer& b, std::uint64_t id, std::size_t n) {
     }
 }
 
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
 // The transport side of begin_verified_reload: header, extent table,
 // payload (dense or extent by extent), hole table.
 void direct_reload(XBuffer& b, const std::string& w) {
@@ -97,6 +98,7 @@ void direct_reload(XBuffer& b, const std::string& w) {
     t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), table.size());
     t.finish();
 }
+#endif
 
 void storage_rule() {
     XBuffer by_size(4096);
@@ -267,6 +269,7 @@ void reload_onto_slots() {
     need(p.get_address() == p_address, "pinned slot reload stays");
     check(p, 2, 5000);
 
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
     // Direct reload: begin moves a too-small slot before handing out spans.
     auto d = XBuffer::load_verified<SlotRoot>(small);
     const auto* d_address = d.get_address();
@@ -276,6 +279,7 @@ void reload_onto_slots() {
     }
     need(d.get_address() != d_address, "direct reload moved to a larger slot");
     check(d, 2, 5000);
+#endif
 }
 
 void owners_without_storage() {
@@ -286,9 +290,13 @@ void owners_without_storage() {
     check(empty, 9, 30);
 
     XBuffer direct;
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
     direct_reload(direct, wire);
     check(direct, 9, 30);
     need(direct.save_verified<SlotRoot>() == wire, "direct reload on a new owner re-emits");
+#else
+    direct.reload_verified<SlotRoot>(wire);
+#endif
 
     // A moved-from buffer has no storage either.
     XBuffer moved(std::move(direct));
@@ -296,6 +304,7 @@ void owners_without_storage() {
     check(direct, 9, 30);
     check(moved, 9, 30);
 
+#if defined(XOFFSET_VERIFIED_RELOAD_API)
     // Without a maximum the M1 default limit applies.
     bool refused = false;
     try {
@@ -303,6 +312,7 @@ void owners_without_storage() {
         (void)none.begin_verified_reload<SlotRoot>(kDefault + 8);
     } catch (const XBadAlloc&) { refused = true; }
     need(refused, "on-demand storage keeps the default maximum");
+#endif
 }
 
 void reused_slots_read_zero() {

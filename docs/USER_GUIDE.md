@@ -195,7 +195,7 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
   不用槽位）调整。槽位来自库内的 slab，按 2 的幂分级，小消息不再每个 buffer 预留一段
   虚拟地址；建立和销毁一个槽位不走系统调用。
 - 可搬槽位的搬家点：`grow()` 超出当前槽位时搬到更大的槽位（超过 `SLOT_MAX` 时搬到 VM，
-  之后钉住）；`reload_verified`、`begin_verified_reload` 收到放不下的内容时先换存储（不复制
+  之后钉住）；`reload_verified` 收到放不下的内容时先换存储（不复制
   旧内容）；`set_growth_policy(XGrowPolicy::Automatic)` 会先搬到 VM，因为自动增长发生在
   容器操作内部，那里不能搬。
 - 搬家后，之前拿到的根引用、元素指针、`allocator<T>()`、`arena()` 和借用的 span 全部失效，
@@ -205,7 +205,7 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 - 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
 - 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
   `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
-- 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
+- 默认构造的空 `XBuffer` 可以直接 `reload_verified`，按
   `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
 
 ## 4. 保存与加载
