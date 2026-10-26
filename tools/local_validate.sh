@@ -26,10 +26,15 @@
 #   gcc13-c++20          the host's GCC 13         gcc13-c++20-asan    same, Debug + ASan/UBSan
 #   clang18-c++20        the host's Clang 18       clang18-c++20-asan  same, Debug + ASan/UBSan
 #   gcc16-c++20          GCC 16 image, C++20       gcc16-c++23         GCC 16 image, C++23
+#   gcc16-c++26d         GCC 16 image, C++26 with the field-list schema backend (M26D)
 #   p2996-c++20          P2996 Clang + libc++, C++20 (no reflection)
 #   diff-c++20           GCC 16: tools/validation_differential.sh, the C++26 reflection build
 #                        against the C++20 field-list build of HEAD, 200000 cases, seeds 1 2;
 #                        the wires must be the same bytes and the outcomes identical
+#   wire-matrix          after the columns: tools/wire_matrix.sh over the C++26 GCC 16
+#                        build (the reference, built if missing), the C++26 P2996 build if
+#                        present and every non-ASan column: each writes the cross-compiler
+#                        corpus, each loads every other's, all corpora the same bytes
 # The matrix columns run in parallel after the other steps, at most K at a time (--columns,
 # default min(4, columns)), each with -j max(1, N/K). A column whose compiler, sanitizer
 # runtime or image is missing, or a tree without the C++20 build, is reported as "not run".
@@ -57,7 +62,7 @@ CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
 CLASSIC_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir asm"
 ASM_STRICT=0
-MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 p2996-c++20 diff-c++20"
+MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 gcc16-c++26d p2996-c++20 diff-c++20 wire-matrix"
 ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS"
 COLUMNS=0
 
@@ -70,7 +75,7 @@ while [[ $# -gt 0 ]]; do
         --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
         --asm-strict) ASM_STRICT=1; shift ;;
-        -h|--help) sed -n '2,43p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -111,7 +116,7 @@ need_gcc=0; need_p2996=0; want_gcc=0
 for s in $STEPS; do
     case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step: $s" >&2; exit 2 ;; esac
     # The GCC 16 matrix columns report "not run" without docker; the classic steps need it.
-    case $s in p2996*) need_p2996=1 ;; gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
+    case $s in p2996*) need_p2996=1 ;; gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20|wire-matrix) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
 done
 
 log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, work $WORK"
@@ -301,9 +306,9 @@ host_column() {
 }
 
 gcc16_column() {
-    local dir=$1 std=$2
+    local dir=$1 std=$2 extra=${3:-}
     in_gcc "g++ --version | head -n 1 &&
-        cmake -S . -B '$dir' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_CXX_STANDARD=$std &&
+        cmake -S . -B '$dir' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_CXX_STANDARD=$std $extra &&
         cmake --build '$dir' --parallel $COL_JOBS &&
         ctest --test-dir '$dir' --output-on-failure --parallel $COL_JOBS --timeout 900"
 }
@@ -317,6 +322,7 @@ step_matrix() {
         clang18-c++20-asan) host_column "$dir" clang++-18 20 Debug "$SANITIZE" "-fsanitize=address,undefined" ;;
         gcc16-c++20) gcc16_column "$dir" 20 ;;
         gcc16-c++23) gcc16_column "$dir" 23 ;;
+        gcc16-c++26d) gcc16_column "$dir" 26 -DXOFFSET_SCHEMA_BACKEND=describe ;;
         p2996-c++20) host_column "$dir" "$P2996_ROOT/bin/clang++" 20 Release "-stdlib=libc++" \
                          "-stdlib=libc++ -Wl,-rpath,$lib" ;;
         diff-c++20)
@@ -326,11 +332,36 @@ step_matrix() {
     esac
 }
 
+# The cross-compiler corpus of every build that has one, read by every other.
+step_wire_matrix() {
+    local dirs=() names=() d s bin args=() run
+    if [[ ! -d $WORK/gcc ]] || [[ -z $(find "$WORK/gcc" -name test_cross_compiler_wire -type f -perm -u+x 2>/dev/null) ]]; then
+        in_gcc "cmake -S . -B '$WORK/gcc' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ &&
+            cmake --build '$WORK/gcc' --target test_cross_compiler_wire --parallel $JOBS" || return 1
+    fi
+    names+=(gcc16-c++26); dirs+=("$WORK/gcc")
+    [[ -d $WORK/p2996 ]] && { names+=(p2996-c++26); dirs+=("$WORK/p2996"); }
+    for s in $MATRIX_STEPS; do
+        case $s in *-asan|diff-*|wire-matrix) continue ;; esac
+        [[ -d $WORK/m-$s ]] && { names+=("$s"); dirs+=("$WORK/m-$s"); }
+    done
+    for i in "${!names[@]}"; do
+        bin=$(find "${dirs[i]}" -name test_cross_compiler_wire -type f -perm -u+x 2>/dev/null | head -n 1)
+        [[ -n $bin ]] || { echo "${names[i]}: no test_cross_compiler_wire, left out"; continue; }
+        run=$bin
+        [[ ${names[i]} == gcc16-* ]] && run="docker run --rm -v '$WORK:$WORK' '$IMG' $bin"
+        args+=("${names[i]}=$run")
+    done
+    (( ${#args[@]} >= 2 )) || { echo "fewer than two builds with a cross-compiler corpus"; return 1; }
+    tools/wire_matrix.sh "$WORK/wire-matrix" "${args[@]}"
+}
+
 detail_of() {
     local s=$1 f="$WORK/logs/$1.log" w
     case $s in
         gcc|asan) ctest_line "$f" ;;
         diff-c++20) grep -E '^seed [0-9]+:' "$f" | sed 's/^/C++26 vs C++20 /' | paste -sd ';' ;;
+        wire-matrix) grep -E '^wire matrix:' "$f" | tail -n 1 ;;
         gcc13-*|clang18-*|gcc16-c++*|p2996-c++*)
             { grep -qE "tests passed|tests failed" "$f" && ctest_line "$f" || grep -m1 -A1 -E '^CMake Error' "$f" | tail -n 1 | sed 's/^ */configure: /'
               [[ -f $WORK/m-$s/test-inventory.json ]] && python3 -c 'import json, sys
@@ -380,6 +411,7 @@ cols=()
 for s in $MATRIX_STEPS; do
     case "$STEPS" in *" $s "*) ;; *) continue ;; esac
     (( stopped )) && break
+    [[ $s == wire-matrix ]] && continue
     why=$(matrix_blocker "$s")
     if [[ -n $why ]]; then
         printf '%s\tnot run\t0\t%s\n' "$s" "$why" > "$WORK/col-$s.tsv"
@@ -402,6 +434,19 @@ if (( ${#cols[@]} )); then
     done
     wait
 fi
+case "$STEPS" in
+    *" wire-matrix "*)
+        why=$(matrix_blocker wire-matrix)
+        if (( stopped )); then :
+        elif [[ -n $why ]]; then
+            printf '%s\tnot run\t0\t%s\n' wire-matrix "$why" > "$WORK/col-wire-matrix.tsv"
+            log "wire-matrix: not run ($why)"
+        else
+            log "wire-matrix: start"
+            t0=$(date +%s); step_wire_matrix > "$WORK/logs/wire-matrix.log" 2>&1; rc=$?
+            echo "$rc $(( ($(date +%s) - t0 + 30) / 60 ))" > "$WORK/col-wire-matrix.rc"
+        fi ;;
+esac
 for s in $MATRIX_STEPS; do
     if [[ -f $WORK/col-$s.tsv ]]; then
         cat "$WORK/col-$s.tsv" >> "$RESULTS"; rm -f "$WORK/col-$s.tsv"

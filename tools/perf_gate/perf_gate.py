@@ -169,17 +169,20 @@ def cmd_prepare(a):
 
 # ---------------------------------------------------------------- build
 
-def compiler_profile(name, cxx):
+def compiler_profile(name, cxx, std="26"):
+    """Compiler, flags and link line. std 20 or 23 builds without reflection (XOFFSET_RECORD field lists)."""
+    reflect = std == "26"
     if name == "gcc16":
-        return {"cxx": cxx or "g++", "std": ["-std=c++26", "-freflection"], "formal_std": ["-std=gnu++26", "-freflection"],
+        return {"cxx": cxx or "g++", "std": [f"-std=c++{std}"] + ["-freflection"] * reflect,
+                "formal_std": [f"-std=gnu++{std}"] + ["-freflection"] * reflect,
                 "link": [], "env_note": "GCC 16, libstdc++"}
     if name == "p2996":
         root = os.environ.get("P2996_ROOT", "/opt/p2996-toolchain")
         libdirs = [f"{root}/lib", f"{root}/lib/x86_64-unknown-linux-gnu"]
         link = ["-stdlib=libc++"] + [f"-L{d}" for d in libdirs] + [f"-Wl,-rpath,{d}" for d in libdirs]
+        lang = ["-freflection", "-fexpansion-statements"] * reflect + ["-stdlib=libc++"]
         return {"cxx": cxx or f"{root}/bin/clang++",
-                "std": ["-std=c++26", "-freflection", "-fexpansion-statements", "-stdlib=libc++"],
-                "formal_std": ["-std=gnu++26", "-freflection", "-fexpansion-statements", "-stdlib=libc++"],
+                "std": [f"-std=c++{std}"] + lang, "formal_std": [f"-std=gnu++{std}"] + lang,
                 "link": link, "env_note": "P2996 Clang, libc++"}
     raise SystemExit(f"unknown compiler {name}")
 
@@ -232,22 +235,36 @@ def cmd_build(a):
     plan = load_json(work / "plan.json")
     prof = compiler_profile(a.compiler, a.cxx)
     extra = shlex.split(a.extra_flags or "")
+    # Per-role language standard and flags (the build matrix: one tree built two ways).
+    role_of = {}
+    for role in ("anchor", "base", "head"):
+        role_of.setdefault(plan["roles"][role], role)
+    role_std = {"base": a.base_std, "head": a.head_std}
+    role_extra = {"base": shlex.split(a.base_extra_flags or ""), "head": shlex.split(a.head_extra_flags or "")}
+    if (a.base_std != "26" or a.base_extra_flags) and plan["roles"]["base"] in (plan["roles"]["anchor"], plan["roles"]["head"]):
+        raise SystemExit("--base-std/--base-extra-flags need a base commit distinct from anchor and head")
+    if (a.head_std != "26" or a.head_extra_flags) and plan["roles"]["head"] == plan["roles"]["anchor"]:
+        raise SystemExit("--head-std/--head-extra-flags need a head commit distinct from the anchor")
     head_bench = Path(plan["bench_root"])
     try:
         version = subprocess.run(shlex.split(prof["cxx"]) + ["--version"], text=True, capture_output=True).stdout.splitlines()[0]
     except (OSError, IndexError):
         version = "?"
-    builds = {"compiler": a.compiler, "compiler_version": version, "trees": {}}
+    builds = {"compiler": a.compiler, "compiler_version": version, "trees": {},
+              "role_std": role_std, "role_extra_flags": {r: shlex.join(v) for r, v in role_extra.items()}}
 
     def one(sha):
+        role = role_of[sha]
+        prof = compiler_profile(a.compiler, a.cxx, role_std.get(role, "26"))
+        extra_flags = extra + role_extra.get(role, [])
         tree = Path(plan["trees"][sha]["path"])
         outdir = work / "bin" / a.compiler / short(sha)
         if outdir.exists():
             shutil.rmtree(outdir)
-        ok, text = build_one(prof, tree, head_bench, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra)
+        ok, text = build_one(prof, tree, head_bench, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
         status, bench = ("ok", "head") if ok else (None, None)
         if not ok and (tree / plan["slg_dir"]).is_dir() and (tree / plan["formal_dir"]).is_dir() and tree != head_bench:
-            ok2, text2 = build_one(prof, tree, tree, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra)
+            ok2, text2 = build_one(prof, tree, tree, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
             text += "\n--- retry with the tree's own benchmarks ---\n" + text2
             if ok2:
                 status, bench = "bench_differs", "own"
@@ -259,7 +276,7 @@ def cmd_build(a):
         reloc_status = "absent"
         if status != "incomparable":
             reloc_src = (head_bench if bench == "head" else tree) / reloc_dir
-            reloc_status, rtext = build_reloc(prof, tree, reloc_src, outdir, extra)
+            reloc_status, rtext = build_reloc(prof, tree, reloc_src, outdir, extra_flags)
             text += "\n--- reloc_bench ---\n" + rtext
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"build-{a.compiler}-{short(sha)}.log").write_text(text, encoding="utf-8")
@@ -988,6 +1005,11 @@ def main():
             sp.add_argument("--cxx", default="")
             sp.add_argument("--cereal", required=True, help="cereal include directory")
             sp.add_argument("--extra-flags", default="")
+            for role in ("base", "head"):
+                sp.add_argument(f"--{role}-std", default="26", choices=("20", "23", "26"),
+                                help=f"language standard of the {role} build (20/23: XOFFSET_RECORD field lists)")
+                sp.add_argument(f"--{role}-extra-flags", default="",
+                                help=f"flags for the {role} build only, e.g. -DXOFFSET_SCHEMA_BACKEND_DESCRIBE=1")
         if name in ("measure", "run"):
             sp.add_argument("--valgrind", default="valgrind")
             sp.add_argument("--python", default=sys.executable)
