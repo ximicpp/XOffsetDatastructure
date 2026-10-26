@@ -177,11 +177,7 @@ template<class T> consteval bool raw_implicit_lifetime() {
     // attestation remains necessary; a user-provided destructor is rejected.
     if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> &&
                   wire_record_layout<T>::ordinary_members) {
-        for (const auto member : std::meta::members_of(
-                ^^T, std::meta::access_context::unchecked()))
-            if (std::meta::is_destructor(member))
-                if (std::meta::is_user_provided(member)) return false;
-        return true;
+        return schema::implicit_lifetime_aggregate<T>();
     } else return false;
 }
 
@@ -213,12 +209,8 @@ template<class E> consteval auto raw_enum_bounds() {
         // Empty enumeration is treated as a zero enumerator. CWG2932 leaves
         // its minimum-width corner unresolved; the fixed Clang ABI uses at
         // least one positive bit (also for all-zero enums), accepting 0 and 1.
-        U minimum=0,maximum=0;
-        for(const auto enumerator:std::meta::enumerators_of(^^E)) {
-            const U value=static_cast<U>(std::meta::extract<E>(enumerator));
-            if(value<minimum)minimum=value;
-            if(value>maximum)maximum=value;
-        }
+        constexpr auto range=schema::enum_range<E>();
+        const U minimum=range.min,maximum=range.max;
         constexpr auto digits=std::numeric_limits<V>::digits;
         if(minimum>=0) {
             const auto width=std::max(1u,raw_enum_bit_width(static_cast<V>(maximum)));
@@ -360,20 +352,18 @@ template<class Key> consteval bool raw_key_order_available() {
 
 template<class T, std::size_t I, std::size_t J = I + 1>
 consteval bool raw_member_ranges_disjoint() {
-    constexpr auto count = reflected_member_count<T>();
+    constexpr auto count = schema::member_count_v<T>;
     if constexpr (J >= count) return true;
     else {
-        constexpr auto a = std::meta::nonstatic_data_members_of(
-            ^^T, std::meta::access_context::unchecked())[I];
-        constexpr auto b = std::meta::nonstatic_data_members_of(
-            ^^T, std::meta::access_context::unchecked())[J];
-        if constexpr (std::meta::is_bit_field(a) || std::meta::is_bit_field(b))
+        using a = schema::member_t<T, I>;
+        using b = schema::member_t<T, J>;
+        if constexpr (a::is_bit_field || b::is_bit_field)
             return false;
         else {
-            using A = [:std::meta::type_of(a):];
-            using B = [:std::meta::type_of(b):];
-            constexpr auto x = std::meta::offset_of(a).bytes;
-            constexpr auto y = std::meta::offset_of(b).bytes;
+            using A = typename a::type;
+            using B = typename b::type;
+            constexpr auto x = a::offset;
+            constexpr auto y = b::offset;
             return (x + sizeof(A) <= y || y + sizeof(B) <= x) &&
                 raw_member_ranges_disjoint<T, I, J + 1>();
         }
@@ -381,24 +371,18 @@ consteval bool raw_member_ranges_disjoint() {
 }
 
 template<class T, std::size_t I> consteval bool raw_member_supported() {
-    constexpr auto member = std::meta::nonstatic_data_members_of(
-        ^^T, std::meta::access_context::unchecked())[I];
-    if constexpr (std::meta::is_bit_field(member)) return false;
+    using member = schema::member_t<T, I>;
+    if constexpr (member::is_bit_field) return false;
     else {
-        using M = [:std::meta::type_of(member):];
-        constexpr auto offset = std::meta::offset_of(member).bytes;
+        using M = typename member::type;
+        constexpr auto offset = member::offset;
         return offset <= sizeof(T) && sizeof(M) <= sizeof(T) - offset &&
             receive_raw_supported<M>() && raw_member_ranges_disjoint<T, I>();
     }
 }
 
 template<class T> consteval bool raw_only_implicit_special_members() {
-    for (const auto member : std::meta::members_of(
-            ^^T, std::meta::access_context::unchecked()))
-        if (std::meta::is_special_member_function(member) &&
-            std::meta::is_user_declared(member))
-            return false;
-    return true;
+    return schema::only_implicit_special_members<T>();
 }
 
 template<class T> consteval bool receive_raw_supported() {
@@ -431,22 +415,21 @@ template<class T> consteval bool receive_raw_supported() {
     else if constexpr (std::is_class_v<T>) {
         if constexpr (!std::is_aggregate_v<T> || !raw_implicit_lifetime<T>() ||
                       !std::is_standard_layout_v<T> ||
-                      reflected_base_count<T>() != 0 ||
+                      schema::base_count_v<T> != 0 ||
                       !raw_only_implicit_special_members<T>() ||
                       !wire_record_layout<T>::ordinary_members)
             return false;
         else return []<std::size_t... I>(std::index_sequence<I...>) {
             return (raw_member_supported<T, I>() && ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
 
 template<class T, std::size_t I> consteval bool raw_member_future_supported() {
-    constexpr auto member = std::meta::nonstatic_data_members_of(
-        ^^T, std::meta::access_context::unchecked())[I];
-    if constexpr (std::meta::is_bit_field(member)) return false;
+    using member = schema::member_t<T, I>;
+    if constexpr (member::is_bit_field) return false;
     else {
-        using Member=[:std::meta::type_of(member):];
+        using Member=typename member::type;
         return receive_raw_future_supported<Member>();
     }
 }
@@ -463,7 +446,7 @@ template<class T> consteval bool receive_raw_future_supported() {
                 if constexpr (std::is_class_v<T>)
                     return []<std::size_t... I>(std::index_sequence<I...>) {
                         return (raw_member_future_supported<T,I>() && ...);
-                    }(std::make_index_sequence<reflected_member_count<T>()>{});
+                    }(std::make_index_sequence<schema::member_count_v<T>>{});
                 else if constexpr (std::is_array_v<T>)
                     return receive_raw_future_supported<std::remove_extent_t<T>>();
                 else return true;
@@ -490,7 +473,7 @@ template<class T> consteval bool receive_raw_future_supported() {
     else if constexpr (std::is_class_v<T>)
         return []<std::size_t... I>(std::index_sequence<I...>) {
             return (raw_member_future_supported<T, I>() && ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     else return true;
 }
 
@@ -504,12 +487,11 @@ template<class T> consteval bool raw_needs_validation() {
     else if constexpr (std::is_class_v<T>) {
         return []<std::size_t... I>(std::index_sequence<I...>) {
             return ([] {
-                constexpr auto member = std::meta::nonstatic_data_members_of(
-                    ^^T, std::meta::access_context::unchecked())[I];
-                using M = [:std::meta::type_of(member):];
+                using member = schema::member_t<T, I>;
+                using M = typename member::type;
                 return raw_needs_validation<M>();
             }() || ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
 
@@ -521,12 +503,11 @@ template<class T> consteval bool raw_needs_activation() {
     else if constexpr (std::is_class_v<T>) {
         return []<std::size_t... I>(std::index_sequence<I...>) {
             return ([] {
-                constexpr auto member = std::meta::nonstatic_data_members_of(
-                    ^^T, std::meta::access_context::unchecked())[I];
-                using M = [:std::meta::type_of(member):];
+                using member = schema::member_t<T, I>;
+                using M = typename member::type;
                 return raw_needs_activation<M>();
             }() || ...);
-        }(std::make_index_sequence<reflected_member_count<T>()>{});
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
     } else return false;
 }
 
@@ -661,13 +642,12 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
     } else if constexpr (is_fixed_vector_v<T>)
         (void)validate_vector_raw<typename T::value_type>(address,ctx,bytes);
     else if constexpr (std::is_class_v<T>) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_validation<M>())
                 validate_wire_value_raw<M>(
-                    raw_advance(address,std::meta::offset_of(member).bytes,bytes),ctx,bytes);
+                    raw_advance(address,member::offset,bytes),ctx,bytes);
         });
     }
 }
@@ -763,11 +743,10 @@ void reactivate_inline_value_raw(char* address,const CanonicalRawBytes* bytes=nu
         for(std::size_t i=0;i<std::extent_v<T>;++i)
             reactivate_inline_value_raw<E>(raw_advance(address,i*sizeof(E),bytes),bytes);
     } else if constexpr (std::is_class_v<T>) {
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member=std::meta::nonstatic_data_members_of(
-                ^^T,std::meta::access_context::unchecked())[decltype(index)::value];
-            using M=[:std::meta::type_of(member):];
-            reactivate_inline_value_raw<M>(raw_advance(address,std::meta::offset_of(member).bytes,bytes),bytes);
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M=typename member::type;
+            reactivate_inline_value_raw<M>(raw_advance(address,member::offset,bytes),bytes);
         });
     }
 }
@@ -823,13 +802,12 @@ template<class T> void activate_wire_value_raw(char* address,
         // event here would restart initialized scalars with indeterminate value.
         (void)std::launder(reinterpret_cast<T*>(address));
         ++stats.ordinary_outers;
-        static_for<reflected_member_count<T>()>([&](auto index) {
-            constexpr auto member = std::meta::nonstatic_data_members_of(
-                ^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-            using M = [:std::meta::type_of(member):];
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
                 activate_wire_value_raw<M>(
-                    raw_advance(address,std::meta::offset_of(member).bytes,bytes),stats,bytes);
+                    raw_advance(address,member::offset,bytes),stats,bytes);
         });
     }
 }
