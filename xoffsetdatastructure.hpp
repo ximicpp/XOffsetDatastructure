@@ -221,6 +221,17 @@ namespace XOffsetDatastructure {
 
     enum class XGrowPolicy { Explicit, Automatic };
     using XBufferPool = detail::VmStoragePool;
+    // Storage request of a MaximumCapacity (R1). Auto picks by the rule in
+    // XBufferCore::plan_storage; Pinned is always a VM reservation (address
+    // stable for life); Movable requires a slot and throws where the rule
+    // cannot give one.
+    enum class XStorage { Auto, Pinned, Movable };
+    // Storage an owner is on. Only MovableSlot changes address, and only at
+    // grow(), reload_verified, begin_verified_reload or reset.
+    enum class XStorageKind { Vm, PinnedSlot, MovableSlot };
+    // XStorage, XStorageKind, storage_kind() and slot storage are available.
+#define XOFFSET_SLOT_STORAGE_API 1
+    using XSlotStorageStats = detail::SlotStorageStats;
 
 
 #if defined(_MSC_VER)
@@ -325,6 +336,7 @@ namespace XOffsetDatastructure {
             size_type value;
             XGrowPolicy growth = XGrowPolicy::Explicit;
             XBufferPool pool;
+            XStorage storage = XStorage::Auto;
 
             MaximumCapacity with_growth(XGrowPolicy policy) const noexcept {
                 auto result = *this;
@@ -336,7 +348,14 @@ namespace XOffsetDatastructure {
                 result.pool = shared_pool;
                 return result;
             }
+            MaximumCapacity with_storage(XStorage request) const noexcept {
+                auto result = *this;
+                result.storage = request;
+                return result;
+            }
         };
+        // Largest payload a slot holds (0: slots disabled at build time).
+        static constexpr size_type SLOT_MAX = detail::SlotGeometry::max_payload;
         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
         // Host-only canonical address recovery (public API kept unchanged from
@@ -438,7 +457,24 @@ namespace XOffsetDatastructure {
 
     public:
         XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
-        void set_growth_policy(XGrowPolicy policy) noexcept { growth_policy_ = policy; }
+        // Automatic growth runs inside container operations, where the payload
+        // must not move: a movable slot switched to Automatic first moves to a
+        // VM reservation (pinned from then on). That move invalidates pointers
+        // like grow(); it throws XBadAlloc on failure and changes nothing.
+        void set_growth_policy(XGrowPolicy policy) {
+            if (policy == XGrowPolicy::Automatic && buffer_.movable() &&
+                !replace_storage(buffer_.size(), true, true)) throw XBadAlloc();
+            growth_policy_ = policy;
+        }
+        XStorageKind storage_kind() const noexcept {
+            if (!buffer_.is_slot()) return XStorageKind::Vm;
+            return buffer_.movable() ? XStorageKind::MovableSlot : XStorageKind::PinnedSlot;
+        }
+        // False only on a movable slot, whose payload address can change.
+        bool address_stable() const noexcept { return !buffer_.movable(); }
+        // Discards the pages of free slots (see xoffset_slot_storage.hpp).
+        static void trim_slot_storage() noexcept { detail::SlotSlab::trim(); }
+        static XSlotStorageStats slot_storage_stats() noexcept { return detail::SlotSlab::stats(); }
         detail::VmReclaimResult reclaim_tail_pages() noexcept { return buffer_.reclaim_tail(); }
 
         // Numeric reservation parameters are legacy minimum hints, not hard limits.
@@ -468,7 +504,7 @@ namespace XOffsetDatastructure {
         }
 
         XBufferCore(size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_fresh(size, cap.value, cap.pool);
+            init_fresh(size, cap.value, cap.pool, cap.storage);
         }
 
         XBufferCore(const char* data, size_type size) {
@@ -480,7 +516,7 @@ namespace XOffsetDatastructure {
         }
 
         XBufferCore(const char* data, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_from_bytes(data, size, cap.value, cap.pool);
+            init_from_bytes(data, size, cap.value, cap.pool, cap.storage);
         }
 
         // V2 sparse wire payload (see XWireHeaderV2::extent_count).
@@ -490,7 +526,8 @@ namespace XOffsetDatastructure {
             std::size_t extent_count;
         };
         XBufferCore(SparsePayload sparse, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_from_extents(sparse.stored, sparse.extents, sparse.extent_count, size, cap.value, cap.pool);
+            init_from_extents(sparse.stored, sparse.extents, sparse.extent_count, size, cap.value, cap.pool,
+                              cap.storage);
         }
 
         uint64_t epoch() const noexcept { return m_epoch; }
@@ -500,7 +537,12 @@ namespace XOffsetDatastructure {
             if (buffer_.empty() || extra_bytes > buffer_.maximum_capacity() - buffer_.size()) return false;
             // The allocator reads the storage's logical extent directly. No segment
             // reopen, offset rewrite, or potentially throwing allocator update follows.
-            return buffer_.grow_to(buffer_.size() + extra_bytes);
+            const auto target = buffer_.size() + extra_bytes;
+            if (buffer_.grow_to(target)) return true;
+            // A movable slot that is too small moves to a larger owner: every
+            // pointer into the payload is invalidated (epoch), XHandles re-resolve.
+            return buffer_.movable() && target > buffer_.accessible_bytes() &&
+                replace_storage(target, true);
         }
 
         void shrink_to_fit() {
@@ -1178,8 +1220,9 @@ namespace XOffsetDatastructure {
         void* bump_block(std::uint32_t bytes, std::size_t alignment, bool allow_growth) {
             auto* sm = arena();
             const size_type current_end = used_end_clamped();
-            // Align the ADDRESS (the payload base is only page aligned). For
-            // alignment <= 8 this equals aligning the offset.
+            // Align the ADDRESS (the payload base is page aligned on VM and
+            // 64-byte aligned on a slot). For alignment <= 8 this equals
+            // aligning the offset.
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto limit = (std::numeric_limits<std::uintptr_t>::max)();
             const auto align = std::max<std::size_t>(alignment, 8u);
@@ -1356,14 +1399,51 @@ namespace XOffsetDatastructure {
             return sizeof(arena_header); // 48: a multiple of 8 on every platform
         }
 
-        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
+        // R1 storage rule. VM: a pool, Pinned, Automatic growth with a
+        // maximum above SLOT_MAX, or an initial size above SLOT_MAX. Pinned
+        // slot: maximum <= SLOT_MAX (the slot holds the whole maximum).
+        // Movable slot: otherwise, sized for the initial size.
+        struct StoragePlan {
+            std::size_t slot_class; // SlotGeometry::classes: VM
+            bool movable;
+        };
+        static StoragePlan plan_storage(size_type initial, size_type maximum, XGrowPolicy growth,
+                                        bool pooled, XStorage request) {
+            using Geometry = detail::SlotGeometry;
+            constexpr StoragePlan vm{Geometry::classes, false};
+            if (request == XStorage::Pinned) return vm;
+            auto refuse = [&] {
+                if (request == XStorage::Movable)
+                    throw std::invalid_argument(
+                        "XStorage::Movable needs slot storage: no pool, initial size <= SLOT_MAX, "
+                        "and Explicit growth or maximum <= SLOT_MAX");
+                return vm;
+            };
+            if (!Geometry::enabled || pooled) return refuse();
+            if (maximum <= Geometry::max_payload) return {Geometry::class_for(maximum), false};
+            if (growth == XGrowPolicy::Automatic || initial > Geometry::max_payload) return refuse();
+            return {Geometry::class_for(initial), true};
+        }
+
+        static bool plans_slot(const StoragePlan& plan) noexcept {
+            return plan.slot_class != detail::SlotGeometry::classes;
+        }
+
+        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
+                        XStorage request = XStorage::Auto) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
             size = std::max(size, min_payload_size());
             if (size > max_reserved) throw XBadAlloc();
+            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
             try {
                 free_table_.reset();
                 free_table_lost_ = false;
-                buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
+                if (plans_slot(plan)) {
+                    buffer_ = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
+                    if (!buffer_.grow_to(size)) throw std::bad_alloc();
+                } else {
+                    buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
+                }
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
             } catch (const std::length_error&) {
@@ -1381,18 +1461,30 @@ namespace XOffsetDatastructure {
             register_registry();
         }
 
-        void init_from_bytes(const char* data, size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
+        void init_from_bytes(const char* data, size_type size, size_type max_reserved, const XBufferPool& pool = {},
+                             XStorage request = XStorage::Auto) {
+            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
             init_from_storage(data, size, max_reserved, [&] {
-                return detail::VirtualMemoryStorage::from_bytes(data, size, max_reserved, pool);
+                if (!plans_slot(plan) || size > max_reserved)
+                    return detail::VirtualMemoryStorage::from_bytes(data, size, max_reserved, pool);
+                auto owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
+                owner.assign_bytes(data, size);
+                return owner;
             });
         }
 
         // V2 sparse payload: extents (validated by the caller) of `stored`.
         void init_from_extents(const char* stored, const void* extents, std::size_t count,
-                               size_type size, size_type max_reserved, const XBufferPool& pool = {}) {
+                               size_type size, size_type max_reserved, const XBufferPool& pool = {},
+                               XStorage request = XStorage::Auto) {
+            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
             init_from_storage(stored, size, max_reserved, [&] {
-                return detail::VirtualMemoryStorage::from_extents(stored, extents, count, size,
-                                                                  max_reserved, pool);
+                if (!plans_slot(plan) || size > max_reserved)
+                    return detail::VirtualMemoryStorage::from_extents(stored, extents, count, size,
+                                                                      max_reserved, pool);
+                auto owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
+                owner.assign_extents(stored, extents, count, size);
+                return owner;
             });
         }
 
@@ -1471,34 +1563,115 @@ namespace XOffsetDatastructure {
             // The node/control block destructor and operator delete are unlocked.
         }
 
-        void register_registry() {
+        struct PreparedOwner {
+            OwnerRecordPtr record;
+            RegistryOwners::node_type node;
+        };
+
+        // Both allocations, including any new_handler reentry, precede the
+        // mutex. std::map inserts this same-allocator node without
+        // allocation, comparison callbacks, rehash or record creation.
+        PreparedOwner prepare_owner(const detail::VirtualMemoryStorage& storage) {
             if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
             try {
-                // Both allocations, including any new_handler reentry, precede
-                // the mutex. std::map inserts this same-allocator node without
-                // allocation, comparison callbacks, rehash or record creation.
-                auto record = std::make_shared<OwnerRecord>(buffer_.data(), this,
-                    buffer_.canonical_byte_origin(), buffer_.maximum_capacity());
+                auto record = std::make_shared<OwnerRecord>(storage.data(), this,
+                    storage.canonical_byte_origin(), storage.maximum_capacity());
                 RegistryOwners prepared;
                 prepared.emplace(record->payload, record);
                 auto node = prepared.extract(prepared.begin());
-                bool inserted = false;
-                {
-                    auto& state = registry_state();
-                    std::lock_guard lock(state.mutex);
-                    if (state.owners.find(record->payload) == state.owners.end()) {
-                        state.owners.insert(std::move(node));
-                        owner_record_ = record;
-                        mark_canonical_registration(*record);
-                        inserted = true;
-                    }
-                }
-                if (!inserted) throw XException("duplicate arena owner registration");
-                detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
-                detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
+                return {std::move(record), std::move(node)};
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
             }
+        }
+
+        // Publishes a prepared record as this owner's; false on a duplicate.
+        bool insert_owner(PreparedOwner& prepared) noexcept {
+            bool inserted = false;
+            {
+                auto& state = registry_state();
+                std::lock_guard lock(state.mutex);
+                if (state.owners.find(prepared.record->payload) == state.owners.end()) {
+                    state.owners.insert(std::move(prepared.node));
+                    owner_record_ = prepared.record;
+                    mark_canonical_registration(*prepared.record);
+                    inserted = true;
+                }
+            }
+            if (!inserted) return false;
+            detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
+            detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
+            return true;
+        }
+
+        void register_registry() {
+            auto prepared = prepare_owner(buffer_);
+            if (!insert_owner(prepared)) throw XException("duplicate arena owner registration");
+        }
+
+        // Moves this owner to new storage of at least `logical` bytes: a
+        // larger slot, or a VM reservation (pinned from then on) above
+        // SLOT_MAX or with `pin`. With `copy` the used bytes come along and the rest reads
+        // zero; without it the caller overwrites the content (reload). The
+        // free table, schema and typed state stay: this is the same lineage
+        // at a new address. Prepares everything first; on failure nothing
+        // changed and false is returned.
+        XOFFSET_DETAIL_NOINLINE bool replace_storage(size_type logical, bool copy, bool pin = false) noexcept {
+            const auto maximum = buffer_.maximum_capacity();
+            if (logical > maximum) return false;
+            detail::VirtualMemoryStorage next;
+            PreparedOwner prepared;
+            try {
+                const auto cls = pin ? detail::SlotGeometry::classes : detail::SlotGeometry::class_for(logical);
+                if (cls != detail::SlotGeometry::classes) {
+                    next = detail::VirtualMemoryStorage::for_slot(cls, maximum, true);
+                    if (copy) next.assign_bytes(buffer_.data(), used_end_clamped());
+                } else if (copy) {
+                    next = detail::VirtualMemoryStorage::from_bytes(buffer_.data(), used_end_clamped(), maximum);
+                } else {
+                    next = detail::VirtualMemoryStorage(0, maximum);
+                }
+                if (copy && !next.grow_to(logical)) return false;
+                prepared = prepare_owner(next);
+            } catch (...) {
+                return false;
+            }
+            if (!insert_owner_keeping(prepared)) return false;
+            buffer_.swap(next);
+            publish_host_owner();
+            ++m_epoch;
+            return true;
+            // `next` (the old storage) is released here.
+        }
+
+        // insert_owner for an owner that already has a record: the old one
+        // is retired after the new one is published.
+        bool insert_owner_keeping(PreparedOwner& prepared) noexcept {
+            auto old = std::move(owner_record_);
+            if (!insert_owner(prepared)) {
+                owner_record_ = std::move(old);
+                return false;
+            }
+            auto fresh = std::move(owner_record_);
+            owner_record_ = std::move(old);
+            unregister_registry();
+            owner_record_ = std::move(fresh);
+            return true;
+        }
+
+        // An owner without storage (default-constructed or moved-from) gets
+        // one for a reload of `size` bytes, as load_verified would without a
+        // maximum: DEFAULT_MAXIMUM_CAPACITY, this owner's growth policy.
+        void ensure_storage(size_type size) {
+            if (!buffer_.data()) create_storage(size);
+        }
+
+        // Cold half of ensure_storage, out of line so the inlined reinit
+        // admission stays small.
+        XOFFSET_DETAIL_NOINLINE void create_storage(size_type size) {
+            if (size > DEFAULT_MAXIMUM_CAPACITY) throw XBadAlloc();
+            const auto initial = std::max(size, min_payload_size());
+            init_fresh(initial, DEFAULT_MAXIMUM_CAPACITY);
         }
 
         size_type used_end_clamped() const noexcept {
@@ -1639,6 +1812,7 @@ namespace XOffsetDatastructure {
         }
 
         XOFFSET_DETAIL_MOVE_INLINE void admit_reinit(size_type size, bool has_source = true) {
+            if (has_source && size >= sizeof(arena_header) && size <= MAX_PAYLOAD) ensure_storage(size);
             if (buffer_.empty() && buffer_.maximum_capacity() == 0)
                 throw XException("XBufferCore: buffer has no storage");
             begin_reinit();
@@ -1648,6 +1822,10 @@ namespace XOffsetDatastructure {
                     "XBufferCore: payload too small");
             }
             if (size > buffer_.maximum_capacity()) throw XBadAlloc();
+            // A movable slot too small for the new content moves first; the
+            // old content is discarded anyway, so nothing is copied.
+            if (buffer_.is_slot() && size > buffer_.accessible_bytes() && !replace_storage(size, false))
+                throw XBadAlloc();
             // Holes are unknown until verification supplies the hole table.
             free_table_lost_ = true;
         }
@@ -1696,7 +1874,9 @@ namespace XOffsetDatastructure {
         // left it in.
         void copy_clone_state(const XBufferCore& src) {
             const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
-            if (logical > buffer_.size() && !buffer_.grow_to(logical)) throw XBadAlloc();
+            if (logical > buffer_.size() && !buffer_.grow_to(logical) &&
+                !(buffer_.movable() && replace_storage(logical, true)))
+                throw XBadAlloc();
             if (!src.free_table_lost_) {
                 try {
                     free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
@@ -1730,10 +1910,15 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // clone(): a new owner with src's maximum capacity, growth policy and
-        // pool.
+        // clone(): a new owner with src's maximum capacity, growth policy,
+        // pool and kind of storage: a movable slot onto a movable slot, a VM
+        // owner onto VM, a pinned slot onto a pinned slot (Auto picks one,
+        // since its maximum fits a slot).
         MaximumCapacity clone_capacity() const noexcept {
-            return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool()};
+            const auto storage = buffer_.movable() ? XStorage::Movable
+                                 : buffer_.is_slot() ? XStorage::Auto
+                                                     : XStorage::Pinned;
+            return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool(), storage};
         }
 
         // Empty arena: header only, no root, empty exact free table.

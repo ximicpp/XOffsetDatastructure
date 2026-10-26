@@ -21,7 +21,9 @@ XBuffer global_first;
 XBuffer global_second;
 
 XBuffer make_buffer(std::int64_t value) {
-    auto buffer = XBuffer::create<LifecycleRoot>(4096);
+    // VM storage: these checks rely on grow() keeping the address.
+    auto buffer = XBuffer::create<LifecycleRoot>(4096,
+        XBuffer::maximum_capacity(XBufferCore::DEFAULT_MAXIMUM_CAPACITY).with_storage(XStorage::Pinned));
     buffer.root<LifecycleRoot>().value = value;
     return buffer;
 }

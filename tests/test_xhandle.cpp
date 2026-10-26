@@ -63,7 +63,11 @@ bool test_handle_survives_grow() {
     std::cout << "\n[TEST] XHandle survives grow()\n";
     std::cout << std::string(50, '-') << "\n";
 
-    XBuffer buffer(1024);
+    // Pinned storage: grow() keeps the address (a movable slot does not; see
+    // test_handle_relocates_on_movable_grow).
+    XBuffer buffer(1024, XBuffer::maximum_capacity(XBufferCore::DEFAULT_MAXIMUM_CAPACITY)
+        .with_storage(XStorage::Pinned));
+    assert(buffer.storage_kind() == XStorageKind::Vm && buffer.address_stable());
     auto player = buffer.make_handle<Player>();
     player->id = 99;
     player->name = "BeforeGrow";
@@ -98,6 +102,48 @@ bool test_handle_survives_grow() {
     std::cout << "  After grow: ptr=" << (void*)ptr_after << "\n";
     std::cout << "  Test 2.2: cached handle and raw pointer stayed valid ... [OK]\n";
 
+    return true;
+}
+
+// ============================================================================
+// Test 2b: grow() of a movable slot moves the payload; the handle follows
+// ============================================================================
+bool test_handle_relocates_on_movable_grow() {
+    std::cout << "\n[TEST] XHandle re-resolves after a movable grow()\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    XBuffer buffer(1024);
+    if (XBufferCore::SLOT_MAX == 0) {
+        std::cout << "  slots disabled at build time ... [SKIP]\n";
+        return true;
+    }
+    assert(buffer.storage_kind() == XStorageKind::MovableSlot && !buffer.address_stable());
+    auto player = buffer.make_handle<Player>();
+    player->id = 98;
+    player->name = "BeforeMove";
+    player->items.push_back(41);
+
+    const void* base_before = buffer.get_address();
+    const auto epoch_before = buffer.epoch();
+    const auto capacity_before = buffer.accessible_bytes();
+    assert(buffer.grow(capacity_before));
+    assert(buffer.get_address() != base_before);
+    assert(buffer.epoch() != epoch_before);
+    assert(buffer.accessible_bytes() > capacity_before);
+    assert(buffer.storage_kind() == XStorageKind::MovableSlot);
+
+    assert(player->id == 98);
+    assert(std::string(player->name.c_str()) == "BeforeMove");
+    assert(player->items.size() == 1 && player->items[0] == 41);
+    assert(player.get() == &buffer.root<Player>());
+    player->items.push_back(43);
+    assert(buffer.root<Player>().items[1] == 43);
+
+    // Past SLOT_MAX the owner moves to a VM reservation and is pinned.
+    assert(buffer.grow(XBufferCore::SLOT_MAX));
+    assert(buffer.storage_kind() == XStorageKind::Vm && buffer.address_stable());
+    assert(player->id == 98 && player->items[1] == 43);
+    std::cout << "  Test 2b: handle follows slot -> slot -> VM ... [OK]\n";
     return true;
 }
 
@@ -272,6 +318,7 @@ int main() {
     bool all_passed = true;
     all_passed &= test_basic_handle();
     all_passed &= test_handle_survives_grow();
+    all_passed &= test_handle_relocates_on_movable_grow();
     all_passed &= test_handle_survives_shrink();
     all_passed &= test_handle_survives_compact();
     all_passed &= test_epoch_cache_efficiency();

@@ -493,7 +493,9 @@ void canonical_external_heads_and_many_owners(){
     {auto token=receive(wire,capacity);owners[3].emplace(xo::finish_verified(token));}
     for(auto& owner:owners)check(owner->root());
 
-    auto normal=xo::TypedXBuffer<ReceiveRoot>::create(16384,capacity);
+    // Pinned: a VM mapping like the receive owners, so the external heads
+    // below stay within rel32 reach of them (a slab slot may map elsewhere).
+    auto normal=xo::TypedXBuffer<ReceiveRoot>::create(16384,capacity.with_storage(xo::XStorage::Pinned));
     auto& target=*owners[2];const auto binding=target.root().name.binding();
     auto* text_slot=normal.arena()->allocate_aligned(sizeof(xo::XString),alignof(xo::XString));
     auto* vector_slot=normal.arena()->allocate_aligned(sizeof(xo::XVector<std::uint32_t>),alignof(xo::XVector<std::uint32_t>));
