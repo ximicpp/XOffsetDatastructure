@@ -1,0 +1,1 @@
+{"label": "slg", "utc": "2026-10-26T18:07:15+00:00", "ok": true, "quiet_s_required": 180.0, "waited_s": 241.0, "load1": 1.01, "quiet_s": 241.0, "screen": {"WindowServer": 1.2, "UURemoteServer": 0.0, "parsecd": 0.0}, "remote_active": [], "screen_over": [], "screen_gated": false}

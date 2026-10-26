@@ -1,0 +1,117 @@
+== 2026-10-26T17:36:54Z 0. tools
+selftest: 71 ok, 0 FAIL (cloud: 71 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+== 2026-10-26T17:37:12Z 1. export
+anchor f8eebf46565c746a69ed64dbe9e406546032f892 tree 40d4a6e1a594f1b062108e0bf1e8ec4420d6e68a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+p1 8cb6221304c90c1df7387b560e9c855a7a78861f tree 9d0cacf62ea550cbd838228940e712a7462a28f2 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+p2 737f43c0b830dc0a9edc350b86d28b17db278778 tree bb90c2ca52699acbaa71871c68068b3b69d2e6ae typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+/Volumes/XOffsetCS/perf-gate/src/d5full/anchor-f8eebf4/bench/slg/MANIFEST: 23 files match
+== 2026-10-26T17:37:14Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+/Users/ximi/workspace/xo-queue/queue/013-d5full2/run.sh: line 127: ALIGN_FLAGS[@]: unbound variable
+sc anchor: bincache sc-40d4a6e1a594-metar3-p2996-d77eff1-8ba92475
+slg anchor: bincache slg-40d4a6e1a594-ffd88a1606b3-p2996-d77eff1-5afc2985
+sc p1: bincache sc-9d0cacf62ea5-metar3-p2996-d77eff1-8ba92475
+slg p1: bincache slg-9d0cacf62ea5-ffd88a1606b3-p2996-d77eff1-5afc2985
+sc p2: bincache sc-bb90c2ca5269-metar3-p2996-d77eff1-8ba92475
+slg p2: bincache slg-bb90c2ca5269-ffd88a1606b3-p2996-d77eff1-5afc2985
+== 2026-10-26T17:37:14Z 3. wires
+point	commit	sc_xoffset	slg_bench	wire
+anchor	f8eebf46565c746a69ed64dbe9e406546032f892	13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c	8ee1d0a98cd94164c30f602c5ca143b035c4ec6871c6b3853fe0c96027a662f5	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+p1	8cb6221304c90c1df7387b560e9c855a7a78861f	3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921	afad685321ab6337fbf98de0eefc33d058406bb68424cd903052f13aecaceef8	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+p2	737f43c0b830dc0a9edc350b86d28b17db278778	3ba5652fe506806f892a33323cf2a388d36f81bf84c4c7cc9973267e82470683	564d14b029da187de5da51bb767d58181f5e0347584f2f5161897087d3209aed	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+== 2026-10-26T17:37:17Z 4. prep
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1422 2614 15119 862360 824]
+reuse bytes anch [1422 2614 15119 862360 824]
+reuse bytes p2 [1422 2614 15119 862360 824]
+default bytes head [1422 2614 15119 862360 824]
+default bytes anch [1422 2614 15119 862360 824]
+default bytes p2 [1422 2614 15119 862360 824]
+== 2026-10-26T17:37:51Z 5. D5_FULL L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-d5full-8cb6221-smoke
+  head         3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921
+  head_aa      3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921
+  anchor       13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+== formal-1 start 2026-10-26T17:37:52+00:00 {'waited_s': 10.1, 'load1': 1.98, 'quiet_s': 10.1, 'screen': {'WindowServer': 1.5, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.1171, A/A ok False, old 9/12, cpu {'samples': 24, 'other_busy_samples': 2, 'compile_samples': 0, 'other_busy_top': {'XprotectService': 1, 'Codex (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.07}  (the gate verdict needs the pooled batches: run analyze)
+== slg start 2026-10-26T17:38:50+00:00 {'waited_s': 10.1, 'load1': 1.85, 'quiet_s': 10.1, 'screen': {'WindowServer': 2.8, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 3.6 s rc=0
+run 2/12 anch: 0.6 s rc=0
+run 3/12 anch: 0.5 s rc=0
+run 4/12 head: 0.5 s rc=0
+run 5/12 head: 0.5 s rc=0
+run 6/12 anch: 0.5 s rc=0
+run 7/12 anch: 0.5 s rc=0
+run 8/12 head: 0.5 s rc=0
+run 9/12 head: 0.5 s rc=0
+run 10/12 anch: 0.5 s rc=0
+run 11/12 anch: 0.5 s rc=0
+run 12/12 head: 0.5 s rc=0
+slg: A 0.9466 [0.8931, 1.0032]  B 1.0748 [1.0391, 1.1118]  C 0.9997 [0.8893, 1.1239]  D 1.0200 [0.9971, 1.0434]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-d5full-8cb6221
+  head         3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921
+  head_aa      3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921
+  anchor       13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+== formal-1 start 2026-10-26T17:39:10+00:00 {'waited_s': 241.0, 'load1': 1.1, 'quiet_s': 241.0, 'screen': {'WindowServer': 1.4, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.0166, A/A ok True, old 10/12, cpu {'samples': 225, 'other_busy_samples': 6, 'compile_samples': 0, 'other_busy_top': {'Claude Helper (Renderer)': 2, 'searchpartyd': 2, 'XprotectService': 1, 'Codex (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.33}  (the gate verdict needs the pooled batches: run analyze)
+== formal-2 start 2026-10-26T17:50:50+00:00 {'waited_s': 241.0, 'load1': 1.15, 'quiet_s': 241.0, 'screen': {'WindowServer': 1.2, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-2: this batch alone: max UB head/anchor 1.0169, A/A ok True, old 10/12, cpu {'samples': 219, 'other_busy_samples': 1, 'compile_samples': 0, 'other_busy_top': {'Codex (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 1.91}  (the gate verdict needs the pooled batches: run analyze)
+RESULT.json / RESULT.md written: verdict incomplete
+== slg start 2026-10-26T18:02:17+00:00 {'waited_s': 241.0, 'load1': 1.19, 'quiet_s': 241.0, 'screen': {'WindowServer': 1.3, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 6.2 s rc=0
+run 2/12 anch: 4.9 s rc=0
+run 3/12 anch: 4.4 s rc=0
+run 4/12 head: 4.3 s rc=0
+run 5/12 head: 4.4 s rc=0
+run 6/12 anch: 4.3 s rc=0
+run 7/12 anch: 4.3 s rc=0
+run 8/12 head: 4.3 s rc=0
+run 9/12 head: 4.4 s rc=0
+run 10/12 anch: 4.4 s rc=0
+run 11/12 anch: 4.4 s rc=0
+run 12/12 head: 4.4 s rc=0
+slg: A 0.9938 [0.9823, 1.0054]  B 1.0276 [1.0188, 1.0364]  C 1.0079 [0.9969, 1.0190]  D 1.0239 [1.0045, 1.0437]  verdict fail (1 group(s) pooled)
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+AUTO /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-d5full-8cb6221: verdict fail
+D5_FULL L2 rc=10 (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, other = stopped)
+== 2026-10-26T18:07:14Z 6. DIAG_P4
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-diagp4-737f43c
+  head         3ba5652fe506806f892a33323cf2a388d36f81bf84c4c7cc9973267e82470683
+  head_aa      3ba5652fe506806f892a33323cf2a388d36f81bf84c4c7cc9973267e82470683
+  anchor       3c08cd457c9be5d501510faa3f0ecb9f111054538adca6ce496883d213236921
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+== slg start 2026-10-26T18:07:15+00:00 {'waited_s': 241.0, 'load1': 1.01, 'quiet_s': 241.0, 'screen': {'WindowServer': 1.2, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 6.4 s rc=0
+run 2/12 anch: 4.9 s rc=0
+run 3/12 anch: 4.3 s rc=0
+run 4/12 head: 4.3 s rc=0
+run 5/12 head: 4.3 s rc=0
+run 6/12 anch: 4.3 s rc=0
+run 7/12 anch: 4.3 s rc=0
+run 8/12 head: 4.4 s rc=0
+run 9/12 head: 4.3 s rc=0
+run 10/12 anch: 4.4 s rc=0
+run 11/12 anch: 4.4 s rc=0
+run 12/12 head: 4.4 s rc=0
+slg: A 0.9494 [0.9330, 0.9661]  B 0.9695 [0.9556, 0.9837]  C 1.0098 [0.9876, 1.0326]  D 1.0250 [1.0084, 1.0418]  verdict fail (1 group(s) pooled)
+DIAG_P4: report only (analyze rc 0)
+== 2026-10-26T18:12:11Z finish rc=10

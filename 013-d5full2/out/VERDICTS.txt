@@ -1,0 +1,2 @@
+D5_FULL 10
+DIAG_P4 report only (analyze rc 0)
