@@ -213,6 +213,17 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G2，fixed_detail::try_expand_dynamic_bytes 先判断块尾是否等于 arena->used_end，不是就返回 false，省掉参数检查和 owner 查找（try_expand_block 只在同一个条件下才可能成功）；函数保持原来的内联方式，强制内联到五个调用点的第一版让 GCC 内联翻转（reloc.hero.push_back_grow 1.057），已弃。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 10 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），阶段最大 1.0034（reloc.vec.push_back_grow，块在末尾时多一次比较）；P2996 d77eff1 + libc++ 合计最大 1.0000，阶段最大 1.0013（reloc.vec.push_back_grow）。声称的阶段 slg.A.simulate：GCC 16 0.9828，P2996 0.9837；另有 formal.mutate 0.9843 / 0.9904。",
       "evidence": "PR #95 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/g2/（g2_1a7addb_local_validate_REPORT.md、g2_1a7addb_gate_{gcc16,p2996}.json、弃掉的第一版 diff）；手段清单 /mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 3 节",
       "approved_by": "「性能优化」（2026-10-26 15:40Z，G2 按 S 类做）"
+    },
+    {
+      "id": "ir-env-stosb",
+      "pr": 98,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0231,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#98 让 callgrind 也关掉 glibc memset 的 rep stosb 路径（perf_gate.py IR_ENV 加 x86_rep_stosb_threshold，与 #84 的 movsb 同理）：valgrind 把 rep stosb 每次迭代算一条 Ir，≥ 2 KiB 的 memset 约每字节一条，是向量循环的 15–18 倍。从本 PR 起绝对 Ir 是新口径，不能和之前的门禁 JSON、校准表、ledger 里的绝对值比，head÷base 仍可比。重判 D2、P69、T4、COPS、SEND、COMPOSED、INT1 七对 × GCC 16 / P2996（同一二进制新旧口径各测一次）：14 个门禁判定全部不变，失败项不变；新旧之差全在 memset 函数，非 memset Ir 逐位相同。指标级唯一变化：D2（#33）P2996 reloc.reset 1.0065 → 1.0231（警告），base 和 head 的 memset 相同（3.14M → 0.17M Ir），head 多出的 +26,735 Ir 在 glibc 堆（malloc_consolidate），属于校准里方向不可信的分配器回收型，GCC 16 同一对是 0.9851；D2 本来判失败且已按 Mac L2 合并，不影响任何决定。改了大块清零的两对（SEND、INT1），新口径的幅度大多更接近 Mac，例如 INT1 reloc.reset 0.016/0.019 → 0.061/0.070（Mac 0.075），slg.C 0.862 → 0.987/0.979（Mac 0.962）。",
+      "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/STOSB_REJUDGE.md（汇总表、逐项 memset 归因 data/moved_metrics_memset.txt、两种口径的 gate JSON 与原始 Ir）；/mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 4 节（RH 原型 A.simulate 1.416 → 1.0003）；PR #98 描述",
+      "approved_by": "「性能优化」（2026-10-26 15:40Z，按 0 类提 PR，参照 #85 重判已有门禁对）"
     }
   ]
 }
