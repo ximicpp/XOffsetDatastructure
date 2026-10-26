@@ -78,7 +78,10 @@ if [ "$(uname -s)" = Darwin ]; then
 fi
 if [ -n "${OPT:-}" ]; then COMMON+=(-DCMAKE_CXX_FLAGS_RELEASE="$OPT" -DCMAKE_C_FLAGS_RELEASE="$OPT"); fi
 if [ -n "$STDFLAGS" ]; then
-  COMMON+=(-DCMAKE_CXX_FLAGS="$STDFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$STDFLAGS -Wl,-rpath,$LIBCXX_DIR"
+  # macOS: without -L the driver links the SDK's libc++ (/usr/lib/libc++.1.dylib), which lacks the
+  # toolchain's symbols (flatc aborted on __hash_memory in the 10-26 Mac run); Linux finds it already.
+  LINKDIR=""; if [ "$(uname -s)" = Darwin ]; then LINKDIR="-L$LIBCXX_DIR "; fi
+  COMMON+=(-DCMAKE_CXX_FLAGS="$STDFLAGS" -DCMAKE_EXE_LINKER_FLAGS="$STDFLAGS $LINKDIR-Wl,-rpath,$LIBCXX_DIR"
            -DCMAKE_SHARED_LINKER_FLAGS="$STDFLAGS")
 fi
 PREFIX=${DEPS_PREFIX:-$OUT/deps}
