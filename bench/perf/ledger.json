@@ -22,6 +22,42 @@
       "approved_by": "「性能优化」（2026-10-25，T4 适配器 v2 入库请求）"
     },
     {
+      "id": "pr83-emit-after-linux-populate",
+      "pr": 83,
+      "metric": "formal.emit_after",
+      "compiler": "gcc16",
+      "max_ratio": 1.058,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#83（E-2，Linux 专用）把 ≥1 MiB 新输出的拷贝分成 256 KiB 一块，每块先 madvise(MADV_POPULATE_WRITE)。门禁关掉 glibc 的 rep movsb 路径之后（perf_gate.py IR_ENV），Linux 上 formal.emit_after 的 Ir head÷base 是 1.058：多出来的是分块拷贝和 mincore/madvise 的指令。换来的是缺页：新输出的陷入缺页从 3083 次降到 36 次，墙钟从约 6.3–7.8 ms 降到约 3.7–4.6 ms（云端，噪声大，只作参考）。Ir 看不到缺页的收益，所以这条说明 Ir 的 +5.8% 不代表变慢。没有 tunable 时 valgrind 把 rep movsb 按字节计数，同一指标是 5.96 倍，那是计数假象。macOS 头文件与 base 逐字节相同（0 类），Mac 门禁不适用。",
+      "evidence": "PR #83 描述（缺页和墙钟表，populate_bench.cpp dcbc8c13…）；/mnt/project-files/perf-gate/ir/（pr83_gate_run1.json 无 tunable 5.9614，pr83_gate_tunable_no_rep_movsb.json 有 tunable 1.0579）；本 PR 描述里的对照表",
+      "approved_by": "「性能优化」（2026-10-26 07:44Z，只作记录）"
+    },
+    {
+      "id": "pr85-alloc-recycle-flag",
+      "pr": 85,
+      "metric": "slg.B.in_decode",
+      "compiler": "*",
+      "max_ratio": 1.0593,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#85 给 perf_gate 加了“分配器回收型”诊断标记：警告或失败的指标里，净增 Ir 至少一半来自 FreeTableRecycler::recycle 时在说明和摘要里标出来（malloc/free 自身 Ir 下降为 D2 型，否则为 COPS 型），判定不变。依据是 2026-10-26 的 Ir 校准：D2（#33）两种 Ir 都判失败，slg.B.in_decode GCC 16 1.0593、P2996 1.0517，slg.A.req_decode 1.0465 / 1.0379；同一对在 Mac L2 上是变快，B.in_decode 0.989、A.req_decode 0.956，SLG A 0.970、B 0.965。COPS（#51 #52 #54 #55）GCC 16 slg.B 1.014，Mac B 0.977。回收循环的指令全额计入，省掉的 malloc/free 只按几十条指令算；cache-sim 下 D2 head 的 D1 读缺失反而是 2–3 倍，也翻不过来。所以这类 Ir 上升不代表变慢，按 MERGE_RULES_V2 仍是 L 类，由 Mac L2 下结论。",
+      "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/front4/FRONT4_RESULT.md（data/d2x/gate-*.json、cache-gcc16.json、mac_phases d2x.json）；/mnt/project-files/throughput-20261026/ir-calibration/IR_CALIBRATION_MERGED.md；PR #85 描述",
+      "approved_by": "「性能优化」（2026-10-26 09:31Z，0 类合并并记 ledger）"
+    },
+    {
+      "id": "s-class-pr59",
+      "pr": 59,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0018,
+      "record_only": true,
+      "class": "S",
+      "head": "8a8982522083",
+      "base": "f1724e29da3b",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：I2 owner 登记瘦身，普通 owner 不再进全局 map、不拿全局锁，只有直接接收的 canonical owner 进。不改 wire、校验、分配位置、清零和页面行为、arena 分配器元数据和容量策略，无新公开 API；库头 diff 79 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），≥5% 阶段最大 1.0007（slg.A.req_decode）；P2996 d77eff1 + libc++ 合计最大 1.0001（slg.A），阶段最大 1.0018（slg.A.simulate）。门禁场景走复用协议，不新建 owner，所以 Ir 上不宣称收益；收益只在新建 owner 的路径（云端微基准：池化 create+destroy 约 155→100 ns，4 线程 1.8–2.4→0.70–0.82 µs），留待阶段复核。",
+      "evidence": "PR #59 描述（两种 Ir 表与本地验证）；/mnt/project-files/relocatable-20261022/i2/s-class-20261026/（ir_gcc16_*.json/md、ir_p2996_*.json/md、p2996_local_validate_REPORT.md）；/mnt/project-files/relocatable-20261022/i2/registry_bench.cpp",
+      "approved_by": "「性能优化」（2026-10-26，按合并规则 v2 判 S 类）"
+    },
+    {
       "id": "slg-areq-composed-v3",
       "pr": 80,
       "metric": "slg.A.simulate",
@@ -30,6 +66,125 @@
       "reason": "有意的基准变更（适配器 v3，只用公开文档化的 API）：bench/slg/bench/xoffset_runner.hpp 的 A.req 改用 save_compact_into(out, {.slack_div = 0}, xassign(msg.attacker, att), xassign(msg.defender, def))，请求直接从两支军队组合写进 wire，草稿只放根对象；库没有 XOFFSET_SAVE_COMPOSED_API 时（anchor、旧 base）仍走 T4 适配器 v2（msg.attacker = att + save_verified）。T4 v2 → v3（next_cpp26 120145f 上同一个库，GCC 16，S，口径 c，第 4–7 周期，Ir）：slg.A 4,768,623 → 4,415,915（0.926），A.req_encode 986,966 → 602,975（0.611），slg.B 0.999，slg.C 1.000，slg.D 1.000；上升的阶段都低于阶段警告线：A.simulate 1.013（1,306,859 → 1,323,833，收到的请求是紧凑布局），A.req_decode 1.007，A.res_decode 1.007，A.apply 1.000，本条只记 A.simulate。G6（M，41 周期，每周期合计中位数）：xoffset A.req 776,068 → 775,764（−304 B，回到 G6 基线），A.res 904,020 → 904,004，其余各项与对手不变，台账记 0。",
       "evidence": "云端 GCC 16 M 2×10 轮新旧并列（t4 槽 = T4 v2，dw 槽 = v3）：A.req_encode 0.853，A 合计 0.949，A÷zpp_bits（每轮几何均值中位数）1.134 → 1.078；verify M 四家一致，第 1 周期 acc464551a268253；/mnt/project-files/direct-wire-20261024/impl/I2_CLOUD_RESULT_20261026.md；早先对 copy_army 的数据见 I2_CLOUD_RESULT.md；Mac GATE_COMPOSED 与 INT1 L2 批次",
       "approved_by": "「性能优化」（2026-10-24，设计 A.req 直接写 wire 的实现拆分 I-2）"
+    },
+    {
+      "id": "int1-pr68",
+      "pr": 68,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9 str.assign_long：XString 原地重新赋值快路径。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr71",
+      "pr": 71,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9 str.append：XString 新增 append() 和 operator+=。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr70",
+      "pr": 70,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9 reset：reset<T>() 只清已用范围、保留清空后的空闲表（N2）。合并提交里补了 #70 × #50 的语义修补：check_reinit_payload() 改为非 const，两条 reload 路径都清 N2，锁定测试 test_reload_reset direct_reload_keeps_n2。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr72",
+      "pr": 72,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9：空闲块拆分余块直接发布，空 bin 字跳过（nonempty_words）。合并提交里补了 G9_MERGE_CHECKLIST 第 1 项：clear_entries 清 nonempty_words，锁定测试在 test_reset_used_range。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr73",
+      "pr": 73,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9：空 vector 首次 reserve 直接分配。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr78",
+      "pr": 78,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "D8a 几何扩容赋值 + RL 轻量空闲表回收（帕累托杠杆）。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr39",
+      "pr": 39,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "D6：在先前用过的范围内按 4 KiB 步长重新增长。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr82",
+      "pr": 82,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "R1 I1：小 buffer 用 slab 槽位存储，可搬，显式 grow()。合并提交里按 #59 的语义解决了与 #59 的冲突：可搬槽位的 replace_storage 只建记录、不建索引、不拿锁；锁定测试在 test_owner_registry（可搬槽位 grow 只允许一次宿主分配）。这段适配 #59，S 类判定（「性能优化」2026-10-26 12:12Z）：末点对\"p5 + 主线\"库头差 65 行；两种 Ir 组合检查（新主线上的 INT1 比值对旧锚点上的比值）场景合计最大 1.0003、阶段最大 1.0034（P2996 slg.A.apply），没有新增警告；TSan 103/103。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr80",
+      "pr": 80,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "save_compact_into 组合写出：A.req 直接写进 wire（基准适配器 v3 另有条目 slg-areq-composed-v3）。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-reloc-map-insert",
+      "pr": 80,
+      "metric": "reloc.map.insert.*",
+      "compiler": "*",
+      "max_ratio": 1.074,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。整批记录，随 INT1 最后一个合并提交（#80）入账，不归属某一个 PR。INT1_r2 的 Mac reloc 中 map.insert 变慢：fresh 33.53 → 35.56 ns（+6.1%），reused 30.92 → 33.2 ns（+7.4%）。云端都看不出差别：P2996 Ir 是 1.0000（GCC 16 是 1.0037），x86 P2996 的 insert_construct 两边逐条指令相同，元素位置也相同（VM、页对齐、+64）。怀疑是 arm64 上的代码对齐，有待 Mac 反汇编确认。依「性能优化」的规则，Ir 1.0000 不当作噪声；G9 判定照 Mac 表。",
+      "evidence": "INT1_MERGE_TRIAL.md 第 5 节；/mnt/project-files/alloc-fastpath-20261022/int1-merge/mapinsert/mapins_disasm.sh；INT1_r2 reloc 表",
+      "approved_by": "「访问与拷贝」G9 判读（「性能优化」12:07Z 交办），只作记录"
     }
   ]
 }

@@ -136,11 +136,13 @@ all current type/schema/structure validation. Neither path
 reads nor exports the reservation tail, and neither is advertised as zero-copy.
 No sparse format or new scatter/gather protocol is introduced.
 
-The owner registry uses a synchronized hash index of exact arena base addresses.
-Its mutex and index have process lifetime, including global-buffer shutdown.
-Creating/loading a new owner can fail with `XBadAlloc` if index insertion cannot
-allocate; replacement preserves the old owner on that failure. Move, swap, and
-destruction do not allocate index nodes. Independent buffers can have independent
+Each owner holds one identity record; only direct-receive owners are also kept
+in a synchronized ordered index of arena base addresses (for
+`canonical_bytes_at`). Its mutex and index have process lifetime, including
+global-buffer shutdown. Creating/loading a new owner can fail with `XBadAlloc`
+if the record (or a direct-receive index node) cannot be allocated; replacement
+preserves the old owner on that failure. Move, swap, and destruction do not
+allocate. Independent buffers can have independent
 thread lifetimes; concurrent use or destruction of the same buffer still needs
 synchronization.
 

@@ -146,6 +146,27 @@ void free_table_and_allocation_match() {
     need(!rt.free_table_complete(), "clone_into completed an unknown free table");
 }
 
+// The only small hole sits in a later 64-bin word than the request, so the
+// search reaches it only through the copied table's nonempty-word summary.
+void later_word_hole_is_found_after_clone() {
+    auto src = XBuffer::create<CloneRoot>(1u << 16, cap());
+    auto* hole = src.arena()->allocate_aligned(2048, 8);
+    auto* keep = src.arena()->allocate_aligned(64, 8);
+    std::memset(keep, 0x5a, 64);
+    src.arena()->deallocate(hole, 2048);
+    need(src.free_block_count() == 1, "fixture should have exactly one hole");
+    auto c = src.clone();
+    auto target = XBuffer::create<CloneRoot>(4096, cap());
+    src.clone_into(target);
+    auto* a = static_cast<char*>(src.arena()->allocate_aligned(16, 8));
+    auto* b = static_cast<char*>(c.arena()->allocate_aligned(16, 8));
+    auto* t = static_cast<char*>(target.arena()->allocate_aligned(16, 8));
+    need(a == static_cast<char*>(hole), "source did not reuse its later-word hole");
+    need(b - c.data() == a - src.data() && t - target.data() == a - src.data(),
+         "clone missed a hole in a later bin word");
+    need(same_free_table(c, src) && same_free_table(target, src), "free table after split diverged");
+}
+
 void wire_identical_and_round_trip() {
     auto src = make_source(4, 2000);
     const auto wire = src.save_verified<CloneRoot>();
@@ -304,18 +325,58 @@ void pooled_source_clones_through_its_pool() {
     need(after.hits == before.hits + 1, "clone did not reuse the pooled mapping");
     need(c.root<CloneRoot>().id == 12, "pooled clone content");
 }
+
+// R1 slot storage: clone() keeps the source's kind of storage (a movable slot
+// clones onto a movable slot, an address-stable owner onto a pinned one), and
+// clone_into() relocates a movable destination slot that is too small.
+void clone_keeps_storage_kind() {
+    auto movable = make_source(13, 200, XGrowPolicy::Explicit);
+    need(movable.storage_kind() == XStorageKind::MovableSlot, "fixture is not a movable slot");
+    auto mc = movable.clone();
+    need(mc.storage_kind() == XStorageKind::MovableSlot && !mc.address_stable(), "movable slot clone kind");
+    need(mc.get_size() == movable.get_size() && used_bytes_equal(mc, movable) && same_free_table(mc, movable),
+         "movable slot clone content");
+
+    auto vm = XBuffer::create<CloneRoot>(4096, cap(XGrowPolicy::Explicit).with_storage(XStorage::Pinned));
+    vm.root<CloneRoot>().id = 14;
+    auto vc = vm.clone();
+    need(vc.storage_kind() == XStorageKind::Vm && vc.address_stable(), "pinned VM clone kind");
+
+    auto pinned = XBuffer::create<CloneRoot>(4096, XBuffer::maximum_capacity(1u << 15));
+    pinned.root<CloneRoot>().id = 15;
+    need(pinned.storage_kind() == XStorageKind::PinnedSlot, "fixture is not a pinned slot");
+    auto pc = pinned.clone();
+    need(pc.storage_kind() == XStorageKind::PinnedSlot && pc.root<CloneRoot>().id == 15, "pinned slot clone");
+
+    // A small movable destination receives a larger source: it changes
+    // storage (epoch advances) and then holds an exact copy.
+    auto src = make_source(16, 3000);
+    auto dst = XBuffer::create<CloneRoot>(1024, cap(XGrowPolicy::Explicit));
+    need(dst.storage_kind() == XStorageKind::MovableSlot && dst.accessible_bytes() < used(src),
+         "destination fixture does not force a relocation");
+    const auto epoch = dst.epoch();
+    src.clone_into(dst);
+    need(dst.epoch() != epoch, "clone_into relocation did not advance the epoch");
+    need(used_bytes_equal(dst, src) && same_free_table(dst, src), "relocated clone_into content");
+    need(dst.save_verified<CloneRoot>() == src.save_verified<CloneRoot>(), "relocated clone_into wire");
+    edit(src, 3);
+    edit(dst, 3);
+    need(used_bytes_equal(dst, src), "relocated clone_into diverged under the same edit");
+}
 } // namespace
 
 int main() {
     try {
         clone_is_independent();
         free_table_and_allocation_match();
+        later_word_hole_is_found_after_clone();
         wire_identical_and_round_trip();
         clone_into_reuses_destination();
         explicit_growth_keeps_room();
         self_copy_is_refused();
         failure_leaves_empty_arena();
         pooled_source_clones_through_its_pool();
+        clone_keeps_storage_kind();
         std::cout << "test_clone passed\n";
         return 0;
     } catch (const std::exception& e) {
