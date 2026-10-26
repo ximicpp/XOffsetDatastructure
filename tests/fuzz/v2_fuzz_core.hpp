@@ -82,6 +82,7 @@ constexpr std::size_t kLimit = std::size_t(1) << 22;
 constexpr std::uint64_t kInlineBitmapExtent = 32 * 1024;
 
 inline std::size_t inflated_comparisons = 0; // sparse vs dense-payload checks run
+inline std::size_t composed_comparisons = 0; // save_compact_into(xassign...) vs assign + save_compact
 // Set by validation_outcomes: every built wire is dense, so a library that
 // still requires gap bytes to be holes accepts the pool.
 inline bool g_dense_pool = false;
@@ -1017,6 +1018,53 @@ void check_clone(B& buf, const std::string& saved, const std::mt19937_64& rng) {
     }
 }
 
+// save_compact_into with assignments (members of `buf`'s root taken from
+// another valid buffer, or from `buf` itself) must write exactly the
+// save_compact wire of a clone with those members assigned, leave `buf`
+// unchanged, and load. Works on a copy of the stream, so the case's own
+// stream is not advanced; compiled only when the library has it (the core
+// also builds against older libraries for validation_outcomes).
+void check_composed([[maybe_unused]] Buffer& buf, [[maybe_unused]] const std::string& saved,
+                    [[maybe_unused]] const std::mt19937_64& rng) {
+#if defined(XOFFSET_SAVE_COMPOSED_API)
+    auto r = rng;
+    auto src = typed_load(build_wire(r));
+    if (!src) fail("composed: generated source wire rejected");
+    if (r() % 2) mutate_valid(src->root(), r);
+    auto& d = buf.root();
+    const auto& s = src->root();
+    const auto options = r() % 2 ? xo::XCompactOptions{.slack_div = 0} : xo::XCompactOptions{};
+    const auto form = r() % 6;
+    auto clone = typed_load(saved);
+    if (!clone) fail("composed: clone of the case rejected");
+    auto& c = clone->root();
+    std::string out(std::size_t(r() % 2 ? 0 : r() % 4096), char(0xA5)); // stale bytes must not survive
+    switch (form) {
+    case 0: c.items = s.items;
+            buf.save_compact_into(out, options, xo::xassign(d.items, s.items)); break;
+    case 1: c.title = s.title; c.tags = s.tags;
+            buf.save_compact_into(out, options, xo::xassign(d.title, s.title), xo::xassign(d.tags, s.tags)); break;
+    case 2: c.epoch = s.epoch; c.items = s.items; c.attrs = s.attrs;
+            buf.save_compact_into(out, options, xo::xassign(d.epoch, s.epoch), xo::xassign(d.items, s.items),
+                                  xo::xassign(d.attrs, s.attrs)); break;
+    case 3: c.keys = s.keys; c.attrs = s.attrs; c.title = s.title;
+            buf.save_compact_into(out, options, xo::xassign(d.keys, s.keys), xo::xassign(d.attrs, s.attrs),
+                                  xo::xassign(d.title, s.title)); break;
+    case 4: clone.emplace(*typed_load(src->save_verified()));
+            buf.save_compact_into(out, options, xo::xassign(d, s)); break;
+    default: c.items = s.items; // tags from the draft itself
+            buf.save_compact_into(out, options, xo::xassign(d.tags, d.tags), xo::xassign(d.items, s.items)); break;
+    }
+    if (out != clone->save_compact(options))
+        fail("composed wire (form " + std::to_string(form) + ") differs from assign + save_compact");
+    if (buf.save_verified() != saved) fail("save_compact_into with assignments changed the draft");
+    auto loaded = typed_load(out);
+    if (!loaded) fail("composed wire rejected by load_verified");
+    if (dump(loaded->root()) != dump(clone->root())) fail("composed wire loads different values");
+    ++composed_comparisons;
+#endif
+}
+
 std::string exercise(Buffer& buf, std::mt19937_64& rng) {
     auto& r = buf.root();
     std::uint64_t sink = r.epoch + r.title.size();
@@ -1032,6 +1080,7 @@ std::string exercise(Buffer& buf, std::mt19937_64& rng) {
     if (!again) fail("re-saved wire after mutating an accepted input was rejected");
     if (dump(again->root()) != before) fail("re-saved wire changed semantics");
     if (again->save_verified() != saved) fail("write-read-write not byte stable after mutation");
+    check_composed(buf, saved, rng);
     check_clone(buf, saved, rng);
     return saved;
 }

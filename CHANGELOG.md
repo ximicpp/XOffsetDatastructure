@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Owner registration: an ordinary owner (created, loaded or reloaded) keeps
+  only its identity record and no longer enters the process-wide index or
+  takes its mutex. Only direct-receive owners, the ones
+  `canonical_bytes_at` can answer for, are indexed. Creating and destroying
+  an owner costs one host allocation instead of two plus a global lock.
+  The unused private `owner_from_payload_ptr` is gone. The CTest cases
+  `test_owner_registry_fail_node`/`_fail_rehash` became
+  `test_owner_registry_fail-record`/`_record-only`.
 - Linux output prefetch: in a `save_verified` / `save_verified_into` output of
   at least 1 MiB, each copy of at least 256 KiB into pages that are not yet
   resident is preceded, per 256 KiB chunk, by `madvise(MADV_POPULATE_WRITE)`,
@@ -42,6 +50,24 @@
   the bytes are identical to `XCompactor::compact<T>(b).save_verified<T>()`
   (tested over 600 random models), 7x (840 KB shard) to 85x (1.6 KB) faster
   than compact-then-save on the cloud box.
+- `save_compact_into<T>(out, options, xassign(target, source)...)` composes a
+  message from parts: it writes the wire `save_compact_into<T>(out, options)`
+  would write after `*target = *source` for every assignment, without doing
+  the assignments (the draft and every source are unchanged; nothing is
+  allocated in the draft). Targets are non-overlapping member subobjects of
+  the root (any depth, scalars and array elements included), not container
+  elements; sources are read as they were before the call, from any buffer
+  or the draft itself. Target padding is written as zero. A bad target or a
+  wire over the limit throws `XException` before any byte is written, and the
+  output is then empty. Same wire format and receivers; byte-identical to
+  assign + `save_compact` (test_save_composed, fuzz core). SLG A.req on the
+  cloud box: A.req_encode x0.76-0.79, instructions per request 2060 -> ~1200.
+  Plain `save_compact` / `save_compact_into` now write through the same
+  `DirectWriter` (one head writer in the library; the old two-mode writer
+  only measures now): same bytes, and a reused output with room is written
+  without measuring first, also with slack. Cloud box, SLG M states, reused
+  output: player x0.74 tight / x0.59 slack, shard x0.79 / x0.74, battle
+  request x0.82 / x0.74; a state that grows before every save x0.81 / x0.62.
 - Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
   source's size, maximum capacity, growth policy and pool) and
   `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;

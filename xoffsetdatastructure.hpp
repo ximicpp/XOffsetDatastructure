@@ -1528,6 +1528,9 @@ namespace XOffsetDatastructure {
 
         // Host-only identity. A record follows one payload reservation, never a
         // particular Core object's address, and is never revived after release.
+        // Only direct-receive (canonical) records enter the global index, the
+        // sole consumer of which is canonical_bytes_at; an ordinary record is
+        // just the identity lease that host-callback revalidation reads.
         inline static std::atomic<std::size_t> canonical_active_count_{0};
         struct OwnerRecord {
             const void* const payload;
@@ -1535,6 +1538,8 @@ namespace XOffsetDatastructure {
             std::byte* const canonical_origin;
             const std::size_t canonical_extent;
             std::atomic<bool> canonical_registered{false};
+            // Written before the record is published, then read only by its owner.
+            bool indexed = false;
             OwnerRecord(const void* base, XBufferCore* value,
                     std::byte* origin = nullptr, std::size_t extent = 0) noexcept
                 : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
@@ -1609,47 +1614,6 @@ namespace XOffsetDatastructure {
 
         static size_type align_up(size_type value, size_type alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
-        }
-
-        static XBufferCore& owner_from_payload_ptr(const void* ptr) {
-            detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
-            OwnerCache* cache = nullptr;
-            if (owner_cache_available()) {
-                cache = &owner_cache();
-                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
-                    const auto slot = (cache->last + attempt) % 4u;
-                    auto& record = cache->records[slot];
-                    if (record && record->payload == ptr) {
-                        if (auto* owner = record->owner.load(std::memory_order_acquire)) {
-                            detail::owner_lookup_count(&detail::OwnerLookupStats::cache_hits);
-                            cache->last = slot;
-                            return *owner;
-                        }
-                        detail::owner_lookup_count(&detail::OwnerLookupStats::dead_records);
-                        record.reset();
-                    }
-                }
-            }
-            detail::owner_lookup_count(&detail::OwnerLookupStats::cold_lookups);
-            OwnerRecordPtr record;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                const auto found = state.owners.find(ptr);
-                if (found != state.owners.end()) record = found->second;
-            }
-            // Error construction and all shared-owner releases happen unlocked.
-            if (!record) throw XException("arena owner lookup failed");
-            if (cache) {
-                const auto slot = cache->next;
-                // Keep the local lease across release of an evicted record.
-                cache->records[slot] = record;
-                cache->last = slot;
-                cache->next = (slot + 1u) % 4u;
-            }
-            auto* owner = record->owner.load(std::memory_order_acquire);
-            if (!owner) throw XException("arena owner lookup failed");
-            return *owner;
         }
 
         static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
@@ -1819,6 +1783,8 @@ namespace XOffsetDatastructure {
             auto record = std::move(owner_record_);
             if (!record) return;
             record->owner.store(nullptr, std::memory_order_release);
+            // An ordinary record never entered the index: no mutex, no node.
+            if (!record->indexed) return;
             RegistryOwners::node_type retired_node;
             {
                 auto& state = registry_state();
@@ -1832,50 +1798,37 @@ namespace XOffsetDatastructure {
             // The node/control block destructor and operator delete are unlocked.
         }
 
+        // Ordinary owners (init_fresh / init_from_storage, and replace_storage,
+        // which moves only movable slots) only; direct-receive owners are
+        // indexed by VerifiedReceiveAccess. An ordinary record is not indexed:
+        // canonical_bytes_at returns null for it anyway, and reservations
+        // never overlap (each payload follows its own host page or slot), so
+        // leaving it out cannot change any canonical query result.
         struct PreparedOwner {
             OwnerRecordPtr record;
-            RegistryOwners::node_type node;
         };
 
-        // Both allocations, including any new_handler reentry, precede the
-        // mutex. std::map inserts this same-allocator node without
-        // allocation, comparison callbacks, rehash or record creation.
+        // The only allocation, including any new_handler reentry, precedes
+        // publication of the record.
         PreparedOwner prepare_owner(const detail::VirtualMemoryStorage& storage) {
             if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
             try {
-                auto record = std::make_shared<OwnerRecord>(storage.data(), this,
-                    storage.canonical_byte_origin(), storage.maximum_capacity());
-                RegistryOwners prepared;
-                prepared.emplace(record->payload, record);
-                auto node = prepared.extract(prepared.begin());
-                return {std::move(record), std::move(node)};
+                return {std::make_shared<OwnerRecord>(storage.data(), this)};
             } catch (const std::bad_alloc&) {
                 throw XBadAlloc();
             }
         }
 
-        // Publishes a prepared record as this owner's; false on a duplicate.
-        bool insert_owner(PreparedOwner& prepared) noexcept {
-            bool inserted = false;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                if (state.owners.find(prepared.record->payload) == state.owners.end()) {
-                    state.owners.insert(std::move(prepared.node));
-                    owner_record_ = prepared.record;
-                    mark_canonical_registration(*prepared.record);
-                    inserted = true;
-                }
-            }
-            if (!inserted) return false;
+        // Publishes a prepared record as this owner's.
+        void insert_owner(PreparedOwner& prepared) noexcept {
+            owner_record_ = std::move(prepared.record);
             detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
             detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
-            return true;
         }
 
         void register_registry() {
             auto prepared = prepare_owner(buffer_);
-            if (!insert_owner(prepared)) throw XException("duplicate arena owner registration");
+            insert_owner(prepared);
         }
 
         // Moves this owner to new storage of at least `logical` bytes: a
@@ -1905,7 +1858,7 @@ namespace XOffsetDatastructure {
             } catch (...) {
                 return false;
             }
-            if (!insert_owner_keeping(prepared)) return false;
+            insert_owner_keeping(prepared);
             buffer_.swap(next);
             // The old storage is a slot (only movable owners move), so every
             // hole is in the table and the new front starts empty.
@@ -1918,17 +1871,13 @@ namespace XOffsetDatastructure {
 
         // insert_owner for an owner that already has a record: the old one
         // is retired after the new one is published.
-        bool insert_owner_keeping(PreparedOwner& prepared) noexcept {
+        void insert_owner_keeping(PreparedOwner& prepared) noexcept {
             auto old = std::move(owner_record_);
-            if (!insert_owner(prepared)) {
-                owner_record_ = std::move(old);
-                return false;
-            }
+            insert_owner(prepared);
             auto fresh = std::move(owner_record_);
             owner_record_ = std::move(old);
             unregister_registry();
             owner_record_ = std::move(fresh);
-            return true;
         }
 
         // An owner without storage (default-constructed or moved-from) gets
@@ -2562,6 +2511,10 @@ namespace XOffsetDatastructure {
         }
 
         // V2 block size of a logical byte count (a nonzero multiple of 8).
+        // Invariant relied on by save_compact_into with assignments: a heap
+        // string of capacity c owns block_bytes_of(c + 1) bytes, so its
+        // characters and terminator can be read in whole 8-byte words
+        // (test_save_composed checks it).
         inline std::uint32_t block_bytes_of(std::uint32_t bytes) noexcept {
             return XArena::block_size(bytes);
         }
@@ -5809,6 +5762,22 @@ namespace XOffsetDatastructure {
         std::uint32_t slack_div = 8;
     };
 
+    // One assignment of save_compact_into(out, options, xassign(target,
+    // source)...): the wire is written as if `*target = *source` had been
+    // done first, without doing it. target: a member subobject (any depth,
+    // scalars and array elements included) of the saved buffer's root, not
+    // inside a container; source: a valid value of the same type (one with
+    // container heads lives in an XOffset buffer).
+    template <class M>
+    struct XAssign {
+        using value_type = M;
+        M* target;
+        const M* source;
+    };
+    template <class M>
+    XAssign<M> xassign(M& target, const M& source) noexcept { return {&target, &source}; }
+#define XOFFSET_SAVE_COMPOSED_API 1
+
     inline constexpr char XWIRE_MAGIC_V1[8] = {'X', 'O', 'F', 'F', 'V', '1', '\0', '\0'};
     inline constexpr char XWIRE_MAGIC_V2[8] = {'X', 'O', 'F', 'F', 'V', '2', '\0', '\0'};
     inline constexpr std::uint16_t XWIRE_FORMAT_MAJOR_V2 = 2;
@@ -5930,8 +5899,8 @@ namespace XOffsetDatastructure {
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
 #if defined(__linux__)
         // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
-        // 256 KiB whose last page is not resident (a fresh mapping, not a
-        // reused string) goes in 256 KiB chunks, each preceded by
+        // 256 KiB whose next-to-last page is not resident (a fresh mapping, not
+        // a reused string) goes in 256 KiB chunks, each preceded by
         // madvise(MADV_POPULATE_WRITE), so the kernel faults the chunk's pages
         // in one call instead of one trap per page.
         // A kernel without it (before 5.14) answers EINVAL once; the output
@@ -5962,10 +5931,14 @@ namespace XOffsetDatastructure {
                 }
 #elif defined(__linux__)
                 constexpr std::size_t chunk = std::size_t(256) << 10;
-                unsigned char last_page = 1;
+                unsigned char probe_page = 1;
+                // Not the last page: libc++'s resize_and_overwrite writes the
+                // terminator before the output is filled, which makes that page
+                // resident in a fresh mapping too. n >= 256 KiB, so the page
+                // before it is still inside the copy.
                 if (prefault && n >= chunk && !wire_populate_unsupported.load(std::memory_order_relaxed) &&
-                    ::mincore(reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)),
-                              page, &last_page) == 0 && (last_page & 1u) == 0) {
+                    ::mincore(reinterpret_cast<void*>((reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)) - page),
+                              page, &probe_page) == 0 && (probe_page & 1u) == 0) {
                     bool populate = true;
                     for (std::size_t off = 0; off < n; off += chunk) {
                         const auto len = std::min(chunk, n - off);
@@ -6874,6 +6847,8 @@ namespace XOffsetDatastructure {
             template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
+            template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
+                                                                         const XAssign<M>&...);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
             static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
@@ -7087,6 +7062,28 @@ namespace XOffsetDatastructure {
             if (!detail::find_root<T>(*this))
                 throw XException("save_compact<T>(): no root object of requested type");
             detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+        }
+
+        // Composes a wire from parts: writes the wire save_compact_into would
+        // write after `*a.target = *a.source` for every assignment (all
+        // sources read as they were), without changing this buffer or any
+        // source. Targets are distinct, non-overlapping member subobjects of
+        // this buffer's root (not inside a container); their implicit
+        // padding is written as zero. Throws XException on a bad target or
+        // past the wire limit; out is then empty.
+        template <typename T, typename A0, typename... A>
+        void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                               const XAssign<A>&... rest) {
+            try {
+                require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
+                require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+                if (!detail::find_root<T>(*this))
+                    throw XException("save_compact<T>(): no root object of requested type");
+            } catch (...) {
+                out.clear();
+                throw;
+            }
+            detail::VerifiedPathsAccess::save_composed_into<T>(*this, out, options, first, rest...);
         }
 
         template <typename T>
@@ -7665,6 +7662,11 @@ namespace XOffsetDatastructure {
         }
         std::string save_compact(XCompactOptions options = {}) { return XBuffer::save_compact<T>(options); }
         void save_compact_into(std::string& out, XCompactOptions options = {}) { XBuffer::save_compact_into<T>(out, options); }
+        template <typename A0, typename... A>
+        void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                               const XAssign<A>&... rest) {
+            XBuffer::save_compact_into<T>(out, options, first, rest...);
+        }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
