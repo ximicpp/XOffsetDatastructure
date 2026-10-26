@@ -226,6 +226,18 @@
       "approved_by": "「性能优化」（2026-10-26 15:40Z，按 0 类提 PR，参照 #85 重判已有门禁对）"
     },
     {
+      "id": "d5-shelved-pr87",
+      "pr": 87,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0364,
+      "record_only": true,
+      "class": "L",
+      "reason": "只作记录，不放行任何指标；#87 关闭、不合并。D5（VM owner 小块分配/回收前端环）的 Mac L2 失败：D5_FULL（p1 8cb6221 ÷ f8eebf4）SLG B 1.0276 [1.0188, 1.0364]，上界超过 1.03 直接失败；INT2 bisect-1 独立复现 B 1.0300（上界 1.0430）。formal 通过（合并最大上界 1.0142），SLG A 0.9938，C 1.0079。分阶段 B.in_decode +8%、B.out_encode +6%，每周期约多 55 µs；reloc hero.push_back_grow 慢 6%。原因：分配和回收路径上多出的前端判断，在 B 上的代价超过了 A 的收益。云端 Ir 也一致报警（GCC 16 formal.mutate 1.066、slg.D 1.043；P2996 slg.D 1.048、hero.push_back_grow 1.070）。以后再做，前端判断在 B 路径上的成本必须为零。max_ratio 记的是 SLG B 的 Mac 上界。",
+      "evidence": "/mnt/project-files/perf-gate/mac/2026-10-26-int2-737f43c/VERDICT.md（D5_FULL、INT2、分阶段 stages/）；/mnt/project-files/alloc-fastpath-20261022/d5/（云端 Ir 与本地验证）；PR #87 关闭说明",
+      "approved_by": "「性能优化」（2026-10-26 19:3xZ：D5 搁置，#87 关闭，ledger 记 record_only）"
+    },
+    {
       "id": "reloc-ord-element-records",
       "pr": 102,
       "metric": "reloc.vec.push_back_grow",
