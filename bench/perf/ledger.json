@@ -56,6 +56,18 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：I2 owner 登记瘦身，普通 owner 不再进全局 map、不拿全局锁，只有直接接收的 canonical owner 进。不改 wire、校验、分配位置、清零和页面行为、arena 分配器元数据和容量策略，无新公开 API；库头 diff 79 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），≥5% 阶段最大 1.0007（slg.A.req_decode）；P2996 d77eff1 + libc++ 合计最大 1.0001（slg.A），阶段最大 1.0018（slg.A.simulate）。门禁场景走复用协议，不新建 owner，所以 Ir 上不宣称收益；收益只在新建 owner 的路径（云端微基准：池化 create+destroy 约 155→100 ns，4 线程 1.8–2.4→0.70–0.82 µs），留待阶段复核。",
       "evidence": "PR #59 描述（两种 Ir 表与本地验证）；/mnt/project-files/relocatable-20261022/i2/s-class-20261026/（ir_gcc16_*.json/md、ir_p2996_*.json/md、p2996_local_validate_REPORT.md）；/mnt/project-files/relocatable-20261022/i2/registry_bench.cpp",
       "approved_by": "「性能优化」（2026-10-26，按合并规则 v2 判 S 类）"
+    },
+    {
+      "id": "int1-pr68",
+      "pr": 68,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "G9 str.assign_long：XString 原地重新赋值快路径。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
     }
   ]
 }
