@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Owner registration: an ordinary owner (created, loaded or reloaded) keeps
+  only its identity record and no longer enters the process-wide index or
+  takes its mutex. Only direct-receive owners, the ones
+  `canonical_bytes_at` can answer for, are indexed. Creating and destroying
+  an owner costs one host allocation instead of two plus a global lock.
+  The unused private `owner_from_payload_ptr` is gone. The CTest cases
+  `test_owner_registry_fail_node`/`_fail_rehash` became
+  `test_owner_registry_fail-record`/`_record-only`.
 - Linux output prefetch: in a `save_verified` / `save_verified_into` output of
   at least 1 MiB, each copy of at least 256 KiB into pages that are not yet
   resident is preceded, per 256 KiB chunk, by `madvise(MADV_POPULATE_WRITE)`,
