@@ -20,15 +20,54 @@ BASE_FORMAL = {"load": 52_000_000, "query_before": 29_000_000, "mutate": 43_000_
 CHECKS = {"ok": True, "wire_M_sha256": "2bf0c071" + "0" * 56}
 
 
-def tree(slg=None, formal=None, checks=None):
-    return {"checks": copy.deepcopy(checks or CHECKS), "slg_keys": sorted(slg or BASE_SLG),
-            "slg": dict(slg or BASE_SLG), "formal": dict(formal or BASE_FORMAL)}
+BASE_RELOC = {"vec.push_back": 300_000, "map.insert.fresh": 900_000}
 
 
-def run_case(head_tree, anchor_tree=None, ledger_head=(), ledger_base=(), determinism=None, anchor_status="ok"):
+def tree(slg=None, formal=None, checks=None, functions=None, reloc=None, reloc_status="ok"):
+    t = {"checks": copy.deepcopy(checks or CHECKS), "slg_keys": sorted(slg or BASE_SLG),
+         "slg": dict(slg or BASE_SLG), "formal": dict(formal or BASE_FORMAL),
+         "reloc_status": reloc_status, "reloc": dict(BASE_RELOC if reloc is None else reloc)}
+    if functions is not None:
+        t["functions"] = functions
+    return t
+
+
+def prof(self_ir, edges=()):
+    return {"self": dict(self_ir), "edges": [list(e) for e in edges]}
+
+
+CG_SAMPLE = """# callgrind format
+version: 1
+positions: line
+events: Ir
+summary: 1000
+
+ob=(1) /bin/x
+fl=(1) a.cpp
+fn=(1) outer(int)
+10 100
++1 50
+cfl=(1)
+cfn=(2) helper(int) [clone .constprop.0]
+calls=3 20
+* 600
+fn=(2)
+20 400
+fi=(2) b.hpp
++2 200
+fe=(1)
+fn=(3) helper(int)
+5 0
+fn=(4) leaf()
+0x1f 250
+"""
+
+
+def run_case(head_tree, anchor_tree=None, ledger_head=(), ledger_base=(), determinism=None, anchor_status="ok",
+             base_tree=None):
     with tempfile.TemporaryDirectory() as d:
         w = Path(d)
-        trees = {A: anchor_tree or tree(), B: tree(), H: head_tree}
+        trees = {A: anchor_tree or base_tree or tree(), B: base_tree or tree(), H: head_tree}
         pg.dump_json(w / "plan.json", {"roles": {"anchor": A, "base": B, "head": H}, "trees": {},
                                        "ledger_head": {"entries": list(ledger_head)},
                                        "ledger_base": {"entries": list(ledger_base)}})
@@ -125,6 +164,66 @@ def main():
     f = dict(BASE_FORMAL, load=int(52_000_000 * 0.95))
     rc, out = run_case(tree(formal=f))
     expect("an Ir drop below 0.97 gets the note", rc == 0 and any("指令数下降" in x for x in out["notes"]))
+
+    with tempfile.TemporaryDirectory() as d:
+        cg = Path(d) / "cg.out"
+        cg.write_text(CG_SAMPLE)
+        p = pg.fn_profile(cg)
+    expect("fn_profile: self Ir per function, clones merged, call costs excluded",
+           p["self"] == {"outer(int)": 150, "helper(int)": 600, "leaf()": 250}
+           and p["edges"] == [["outer(int)", "helper(int)"]])
+
+    # D.read: helper gets inlined into caller in base, called out of line in head.
+    keys = {k: prof({"f": 10}) for k in BASE_SLG}
+    keys.update({f"formal.{k}": prof({"g": 10}) for k in BASE_FORMAL})
+    fb = dict(keys, **{"slg.D.read": prof({"caller": 900_000, "other": 100_000})})
+    fh = dict(keys, **{"slg.D.read": prof({"caller": 380_000, "helper": 550_000, "other": 102_000},
+                                          [("caller", "helper")])})
+    s = dict(BASE_SLG, **{"D.read": 1_032_000})
+    rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb))
+    d = row(out, "slg.D").get("functions") or {}
+    expect("inlining change: function only on one side is flagged",
+           rc == 1 and d.get("inline_suspect") and any("helper" in x and "只在 head" in x for x in d["suspects"])
+           and d["top"][0]["function"] == "helper" and any("疑似内联" in x for x in out["notes"]))
+    expect("inlining change: opposite caller/callee pair is flagged",
+           any("caller" in x and "一升一降" in x for x in d["suspects"]))
+
+    fh = dict(keys, **{"slg.D.read": prof({"caller": 932_000, "other": 100_000})})
+    rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb))
+    d = row(out, "slg.D").get("functions") or {}
+    expect("a plain regression in one function is not flagged as inlining",
+           rc == 1 and d.get("top") and d["top"][0]["delta"] == 32_000 and not d["inline_suspect"])
+    expect("passing metrics get no function table", "functions" not in row(out, "slg.A"))
+
+    fh = dict(keys, **{"slg.D.read": prof({"caller": 900_000, "zero_holes": 32_000, "other": 100_000},
+                                          [("caller", "zero_holes")])})
+    rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb))
+    d = row(out, "slg.D")["functions"]
+    expect("new code with no partner moving the other way is not inlining",
+           d["top"][0]["only"] == "head" and not d["inline_suspect"])
+
+    fb2 = dict(keys, **{"slg.D.read": prof({"write(int)": 900_000, "other": 100_000})})
+    fh = dict(keys, **{"slg.D.read": prof({"write(int, bool)": 932_000, "other": 100_000})})
+    rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb2))
+    expect("a signature change is not inlining", not row(out, "slg.D")["functions"]["inline_suspect"])
+
+    r = dict(BASE_RELOC, **{"map.insert.fresh": int(900_000 * 1.06)})
+    rc, out = run_case(tree(reloc=r))
+    expect("reloc case +6% fails as a phase", rc == 1 and row(out, "reloc.map.insert.fresh")["verdict"] == "fail"
+           and row(out, "reloc.map.insert.fresh")["class"] == "phase")
+
+    r = dict(BASE_RELOC, **{"vec.push_back": int(300_000 * 1.03)})
+    rc, out = run_case(tree(reloc=r))
+    expect("reloc case +3% warns", rc == 0 and row(out, "reloc.vec.push_back")["verdict"] == "warn")
+
+    rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="absent"))
+    expect("reloc cases new in head are not judged", rc == 0 and row(out, "reloc.vec.push_back")["verdict"] == "new")
+
+    rc, out = run_case(tree(reloc={}, reloc_status="verify_failed"))
+    expect("head reloc verify failure fails", rc == 1 and any("reloc_bench" in x for x in out["failures"]))
+
+    rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="failed"))
+    expect("base that cannot build reloc_bench warns", rc == 0 and any("reloc_bench" in x for x in out["warnings"]))
 
     print(f"{len(failures)} failures")
     return 1 if failures else 0

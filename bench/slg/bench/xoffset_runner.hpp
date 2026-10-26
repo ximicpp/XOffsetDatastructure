@@ -84,8 +84,8 @@ public:
                 XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, cap());
                 auto& msg = b.root<BattleMsg>();
                 msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                copy_army(msg.attacker, att);
-                copy_army(msg.defender, def);
+                msg.attacker = att;  // T4 adapter (c): public copy assignment
+                msg.defender = def;
                 req = b.save_verified<BattleMsg>();
             });
             timed(st, "A.req_decode", [&] { m.emplace(XBuffer::load_verified<BattleMsg>(req, cap())); });
@@ -181,8 +181,8 @@ public:
             timed(st, "A.req_encode", [&] {
                 auto& msg = a_req_->reset<BattleMsg>();
                 msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                copy_army(msg.attacker, att);
-                copy_army(msg.defender, def);
+                msg.attacker = att;  // T4 adapter (c): public copy assignment
+                msg.defender = def;
                 a_req_->save_verified_into<BattleMsg>(req_);
             });
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
@@ -246,8 +246,18 @@ public:
         if (keep && !wires.empty()) keep->report = wires.back();
         for (int q = 0; q < sc.report_reads && !wires.empty(); ++q) {
             const std::string& w = wires[std::size_t(q) % wires.size()];
-            recv<Report>(st, "D.read", w, d_);
-            timed(st, "D.read", [&] { st.report_sum += query_report(d_->root<Report>()); });
+            // One timer around receive + query, like the std formats (a second timer
+            // per read costs about 10% of D). Direct needs the untimed transport write
+            // in between, so it times the two parts separately.
+            if constexpr (!Direct) {
+                timed(st, "D.read", [&] {
+                    d_->reload_verified<Report>(w);
+                    st.report_sum += query_report(d_->root<Report>());
+                });
+            } else {
+                recv<Report>(st, "D.read", w, d_);
+                timed(st, "D.read", [&] { st.report_sum += query_report(d_->root<Report>()); });
+            }
         }
     }
 

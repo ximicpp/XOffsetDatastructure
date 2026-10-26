@@ -20,6 +20,10 @@
 
 #include <charconv>
 
+static_assert(kInlineBitmapExtent == xo::detail::WireGranuleIndex::inline_extent);
+// check_clone() in exercise() is compiled only when the library has clone().
+static_assert(requires(Buffer& b) { b.clone(); b.clone_into(b); });
+
 namespace {
 constexpr int kBoundaryMutants = 301; // per page boundary wire, the first unmutated
 constexpr std::uint64_t kBoundaryStream = std::uint64_t(1) << 63;
@@ -40,7 +44,49 @@ Inputs make_inputs(std::uint64_t seed) {
     return in;
 }
 
+// The core builds its dense and zero-run forms by byte operations; they must
+// be the library's own dense and zero_runs emissions of the loaded buffer.
+// Returns how many pool wires the library sends with skipped zero runs.
+std::size_t check_library_emissions(const std::vector<std::string>& pool) {
+    std::size_t elided = 0;
+    for (std::size_t i = 0; i < pool.size(); ++i) {
+        auto b = typed_load(pool[i]);
+        if (!b) fail("pool wire " + std::to_string(i) + " rejected");
+        const auto dense = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense});
+        if (dense != dense_of(b->save_verified())) fail("pool wire " + std::to_string(i) + ": dense emission differs");
+        const auto zero = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
+        if (zero != elide_zero_runs(dense)) fail("pool wire " + std::to_string(i) + ": zero_runs emission differs");
+        elided += zero != dense;
+    }
+    return elided;
+}
+
 struct Counts { std::size_t accepted = 0, header_rejects = 0, payload_rejects = 0; };
+
+// Every acceptor's outcome ("ok" or the exact error) for one input.
+std::string outcomes(const std::string& w) {
+    std::string terr, lerr, rerr, verr;
+    std::string line = std::string("T:") + (typed_load(w, &terr) ? "ok" : terr) +
+                       " L:" + (reload_accepts(w, &lerr) ? "ok" : lerr);
+    const auto o = oracle(w);
+    if (o.ok || o.stage == Oracle::Stage::Payload) {
+        line += std::string(" R:") + (raw_accepts(w, &rerr) ? "ok" : rerr);
+        line += std::string(" V:") + (receive_accepts(w, &verr) ? "ok" : verr);
+    }
+    return line;
+}
+
+// The cursor path is a shortcut of the bitmaps: with it off, every outcome
+// and every first error must be the same.
+std::size_t cursor_compared = 0;
+void compare_cursor_off(const std::string& w, const std::string& id) {
+    const auto on = outcomes(w);
+    xo::detail::wire_validation_cursor = false;
+    const auto off = outcomes(w);
+    xo::detail::wire_validation_cursor = true;
+    if (on != off) fail("case " + id + ": cursor on {" + on + "} off {" + off + "}");
+    ++cursor_compared;
+}
 
 // Case `id` (a number, or b<k> for page boundary case k).
 Outcome run_case(const Inputs& in, std::uint64_t seed, const std::string& id) {
@@ -65,6 +111,7 @@ Outcome run_case(const Inputs& in, std::uint64_t seed, const std::string& id) {
     g_fail.wire = &w;
     g_fail.tag = "v2fuzz-s" + std::to_string(seed) + "-c" + id;
     g_fail.replay = "test_v2_fuzz --replay " + std::to_string(seed) + " " + id;
+    compare_cursor_off(w, id);
     const auto outcome = check_case(w, rng, id);
     g_fail.wire = nullptr;
     return outcome;
@@ -111,13 +158,16 @@ int main(int argc, char** argv) {
     }
     Counts c;
     for (std::size_t i = 0; i < cases; ++i) count(c, run_case(in, seed, std::to_string(i)));
-    // Both sides of the ascending live run's size gate, each also mutated.
+    // Both sides of the inline bitmap limit, each also mutated.
     const std::size_t boundary_cases = in.boundary.size() * kBoundaryMutants;
     for (std::size_t k = 0; k < boundary_cases; ++k) count(c, run_case(in, seed, "b" + std::to_string(k)));
     if (sparse == 0) fail("no sparse wire in the pool");
+    if (check_library_emissions(in.pool) == 0) fail("no pool wire is sent with zero runs skipped");
+    if (inflated_comparisons == 0) fail("no sparse wire was compared with its dense payload");
     std::cout << "test_v2_fuzz: seed=" << seed << " golden=" << in.pool.size() << " sparse=" << sparse << " cases=" << cases
               << " boundary_cases=" << boundary_cases << " accepted=" << c.accepted
               << " header_rejects=" << c.header_rejects << " payload_rejects=" << c.payload_rejects
+              << " sparse_vs_dense=" << inflated_comparisons << " cursor_off_compared=" << cursor_compared
               << " inconsistencies=0\n";
     return 0;
 }
