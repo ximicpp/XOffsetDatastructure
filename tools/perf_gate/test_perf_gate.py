@@ -240,6 +240,14 @@ def main():
            d["alloc_recycle"] and d["alloc_recycle"]["kind"] == "more_recycle_work"
            and any("COPS 型" in x for x in out["notes"]))
 
+    # A noise-level allocator drop next to the recycle growth (COPS slg.B: -1,730 against +132,242) is still COPS.
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 900_000, "malloc": 56_500, "other": 4_574_500})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("an allocator drop below a tenth of the recycle growth stays the COPS kind",
+           d["alloc_recycle"] and d["alloc_recycle"]["alloc"] == -6_500
+           and d["alloc_recycle"]["kind"] == "more_recycle_work")
+
     fh = dict(keys, **{"slg.B.in_decode": prof({rec: 500_000, "malloc": 63_000, "other": 5_068_000})})
     rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
     expect("recycle growth below half of the increase is not flagged",
