@@ -105,7 +105,7 @@ Receivers verify every wire with the caps in `schema.hpp`: `load_verified<T>(pay
 cap_*())` in `fresh` mode, `reload_verified<T>(payload)` on a buffer created with
 the same cap in `reuse` mode. There is no `XBufferPool`.
 
-Every schema struct declares `wire_record_layout<T>::ordinary_members = true`
+Every schema struct is declared an ordinary record with `XOFFSET_ORDINARY_RECORDS`
 (`USER_GUIDE.md` section 3.1): the declaration does not change a wire byte (the
 self-test digests equal those of d58781e, which had no declaration).
 

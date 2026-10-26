@@ -122,6 +122,14 @@ def main():
     rc, out = run_case(tree(formal=f), ledger_head=[entry(max_ratio=1.012)])
     expect("regression above the ledger cap fails", rc == 1)
 
+    rc, out = run_case(tree(formal=f), ledger_head=[entry(max_ratio=1.02, record_only=True)])
+    expect("a record-only ledger entry allows nothing", rc == 1 and row(out, "formal.mutate")["verdict"] == "fail")
+
+    rc, out = run_case(tree(), ledger_head=[entry(max_ratio=1.06, record_only=True)])
+    expect("a record-only scenario entry above 2% needs no susu", rc == 0)
+
+    expect("callgrind runs with glibc's rep-movsb path off", "x86_rep_movsb_threshold" in pg.IR_ENV["GLIBC_TUNABLES"])
+
     rc, out = run_case(tree(), ledger_head=[entry(max_ratio=1.03)])
     expect("scenario-level entry above 2% without susu fails", rc == 1 and any("susu" in x for x in out["failures"]))
 
