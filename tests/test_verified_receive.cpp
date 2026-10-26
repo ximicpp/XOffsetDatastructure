@@ -292,7 +292,10 @@ struct Resource final:std::pmr::memory_resource{
     bool do_is_equal(const std::pmr::memory_resource& p)const noexcept override{return this==&p;}
 };
 void rollback_and_rejection(){
-    auto source=make_source();const auto wire=source.save_verified();const auto framing=framing_of(wire);const auto n=framing.payload;
+    // The 512-byte name block retired by the second reserve (no longer the
+    // last block, so it cannot extend in place) is above the VM front's bins
+    // (D5), so loading the hole table needs a host table.
+    auto source=make_source(512);source.root().attrs[0].value.reserve(600);source.root().name.reserve(1024);const auto wire=source.save_verified();const auto framing=framing_of(wire);const auto n=framing.payload;
     for(unsigned point=0;point<2;++point){
         auto token=receive(wire,xo::XBuffer::maximum_capacity(n+4096));const auto before=body_image(token);const auto*base=token.payload_address();
         host::remaining=point;bool failed=false;try{(void)xo::finish_verified(token);}catch(const xo::XBadAlloc&){failed=true;}

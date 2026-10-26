@@ -234,6 +234,17 @@ namespace XOffsetDatastructure {
     using XSlotStorageStats = detail::SlotStorageStats;
 
 
+// C++26 gives an uninitialized automatic object a defined (erroneous) value,
+// which GCC implements by zeroing it; a large scratch object that is filled
+// before it is read opts out.
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(indeterminate)
+#define XOFFSET_INDETERMINATE [[indeterminate]]
+#endif
+#endif
+#ifndef XOFFSET_INDETERMINATE
+#define XOFFSET_INDETERMINATE
+#endif
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_MOVE_INLINE __forceinline
 #define XOFFSET_DETAIL_MOVE_COLD __declspec(noinline)
@@ -593,7 +604,7 @@ namespace XOffsetDatastructure {
             if (buffer_.empty()) return 0;
             size_type used = used_end_clamped();
             size_type tail = buffer_.size() > used ? buffer_.size() - used : 0;
-            return tail + static_cast<size_type>(free_table_ ? free_table_->bytes : 0);
+            return tail + static_cast<size_type>(free_block_bytes());
         }
 
         arena_header* arena() noexcept {
@@ -670,9 +681,21 @@ namespace XOffsetDatastructure {
                                                         bool allow_growth = true) {
             if (bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
                 alignment - 1u < 8u && (alignment & (alignment - 1u)) == 0) [[likely]] {
+                const auto bin = bytes / 8u - 1u;
+                // D5: a front entry is the top of its bin; a front entry of a
+                // larger bin rules out the bump below.
+                // A row's bit is set exactly while it holds entries.
+                bool front_larger = false;
+                if (char* base = buffer_.data(); bin < front_bins && front_capable(base)) {
+                    const auto from_bin = front_tail(base).bits >> bin;
+                    if (from_bin & 1u) {
+                        check_owner_resolves();
+                        return base + front_pop(base, bin);
+                    }
+                    front_larger = from_bin != 0;
+                }
                 FreeTable* table = free_table_.get();
                 if (table && table->count != 0) {
-                    const auto bin = bytes / 8u - 1u;
                     auto& exact = table->bins[bin];
                     if (!exact.empty()) [[likely]] {
                         check_owner_resolves();
@@ -683,7 +706,7 @@ namespace XOffsetDatastructure {
                         --table->count;
                         return payload_byte_address(offset);
                     }
-                } else if (auto* sm = arena()) {
+                } else if (auto* sm = arena(); sm && !front_larger) {
                     // No free block: bump_block, whose start is the current
                     // end when that address is already 8-byte aligned.
                     const size_type start = used_end_clamped();
@@ -723,10 +746,25 @@ namespace XOffsetDatastructure {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
             FreeTable* table = free_table_.get();
-            if (table && ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
+            if (ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
                 address >= base && address - base < buffer_.size() &&
                 bytes <= buffer_.size() - (address - base)) [[likely]] {
                 const auto bin = bytes / 8u - 1u;
+                if (bin < front_bins && front_capable(buffer_.data())) {
+                    check_owner_resolves();
+                    zero_retired(ptr, bytes);
+                    // D5: a full row moves to the end of V, at once when the
+                    // bin has room, else its oldest entry alone.
+                    char* const front = buffer_.data();
+                    if (front_row(front, bin).count == front_ring) [[unlikely]] spill_front_row(front, bin);
+                    auto offset = static_cast<std::uint32_t>(address - base);
+                    if (!front_push(front, bin, offset)) (void)insert_free_block_table(offset, bytes);
+                    return;
+                }
+                if (!table) {
+                    retire_block_general(ptr, bytes);
+                    return;
+                }
                 auto& slot = table->bins[bin];
                 if (slot.size() < slot.capacity()) [[likely]] {
                     check_owner_resolves();
@@ -750,46 +788,27 @@ namespace XOffsetDatastructure {
             auto& cache = free_table_cache();
             while (cache.count) delete cache.tables[--cache.count];
         }
-        std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
-        std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
+        std::size_t free_block_count() const noexcept {
+            const char* base = buffer_.data();
+            return (free_table_ ? free_table_->count : 0) + (front_capable(base) ? front_tail(base).count : 0u);
+        }
+        std::uint64_t free_block_bytes() const noexcept {
+            const char* base = buffer_.data();
+            return (free_table_ ? free_table_->bytes : 0) + (front_capable(base) ? front_tail(base).bytes : 0u);
+        }
 
         // Free blocks in canonical emission order: ascending bin size, LIFO
         // vector order within a bin, then large blocks in (size, insertion)
         // order. load_holes() re-inserts in this order, so write-read-write
         // reproduces identical bytes.
         template <typename Fn>
-        void for_each_free_block(Fn&& fn) const {
-            if (!free_table_) return;
-            const auto& table = *free_table_;
-            // Empty bins emit nothing, so visiting only nonempty bins in
-            // ascending order keeps the canonical order.
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
-                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    const auto bytes = (bin + 1u) * 8u;
-                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
-                }
-            }
-            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
-        }
+        void for_each_free_block(Fn&& fn) const { emit_free_blocks(0, fn); }
 
         // Visits only free blocks of at least min_bytes (bins from min_bytes
         // upward, then large blocks), in no particular offset order.
         template <typename Fn>
         void for_each_free_block_at_least(std::uint32_t min_bytes, Fn&& fn) const {
-            if (!free_table_) return;
-            const auto& table = *free_table_;
-            const std::uint32_t first = min_bytes <= 8u ? 0u : (min_bytes + 7u) / 8u - 1u;
-            for (std::uint32_t word = first / 64u; word < FreeTable::small_bins / 64u; ++word) {
-                auto bits = table.nonempty[word];
-                if (word == first / 64u) bits &= ~std::uint64_t(0) << (first % 64u);
-                for (; bits != 0; bits &= bits - 1u) {
-                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    const auto bytes = (bin + 1u) * 8u;
-                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
-                }
-            }
-            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
+            emit_free_blocks(min_bytes <= 8u ? 0u : (min_bytes + 7u) / 8u - 1u, fn);
         }
 
         // Writes free_block_count() little-endian entries.
@@ -805,14 +824,36 @@ namespace XOffsetDatastructure {
         // table is built off to the side (host allocation may run
         // new_handler); the payload's current owner is re-resolved and the
         // old table is destroyed only after publication.
+        // D5: on a VM owner the front rows are built off to the side too
+        // (pushed as at run time, so each bin is the same stack) and replace
+        // the mapping's front at publication. Holes that all fit the front
+        // need no table.
         void load_free_blocks(const void* holes, std::size_t count) {
             const auto identity = owner_record_;
             FreeTablePtr table; // no holes: an absent table is an exact, empty one
+            const bool front = front_capable(buffer_.data());
+            FrontImage image XOFFSET_INDETERMINATE; // C++26 would zero 3 KiB per load
             try {
-                if (count != 0) table = make_free_table();
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
                     std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
+                    if (hole.bytes <= front_max && front) {
+                        // A full row moves to V in one step, as at run time.
+                        const auto bin = hole.bytes / 8u - 1u;
+                        if (image.full(bin)) {
+                            if (!table) table = make_free_table();
+                            auto& slot = table->bins[bin];
+                            if (slot.capacity() - slot.size() < front_ring) table->grown = true;
+                            image.take(bin, slot);
+                            table->mark_nonempty(bin);
+                            table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                            table->bytes += std::uint64_t(front_ring) * hole.bytes;
+                            table->count += front_ring;
+                        }
+                        (void)image.push(bin, hole.offset);
+                        continue;
+                    }
+                    if (!table) table = make_free_table();
                     if (hole.bytes <= FreeTable::small_max) {
                         const auto bin = hole.bytes / 8u - 1u;
                         auto& slot = table->bins[bin];
@@ -831,6 +872,7 @@ namespace XOffsetDatastructure {
             }
             auto* owner = identity ? record_owner(identity) : this;
             if (!owner) throw XException("arena owner lookup failed");
+            if (front) image.publish(owner->buffer_.data());
             owner->free_table_.swap(table);
             owner->free_table_lost_ = false;
         }
@@ -842,6 +884,164 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // ---- D5: small-bin front in the VM host prefix --------------------
+        // A VM payload base is page aligned and preceded by a host-only page
+        // (VirtualMemoryStorage); a slot payload sits 64 bytes into a slot of
+        // at least 1 KiB, so it never is. On a VM owner the 48 smallest exact
+        // bins (8..384 B) keep their newest entries in that page: row b at
+        // base - 4096 + 64 * b holds up to 14 offsets in a ring (oldest at
+        // head), and the line at base - 64 holds the rows' nonempty bits,
+        // entry count and bytes, next to the logical length copy (base - 16)
+        // and the owner (base - 8). Such a bin is the stack S = V ++ F (V its
+        // free-table vector, F its row from oldest to newest): a push goes to
+        // F and, when F is full, moves F's oldest to the end of V; a pop
+        // takes F's newest, else V's back. Every bin therefore holds the same
+        // entries in the same order as without the front, so placement,
+        // canonical hole order (V then F) and wire bytes are unchanged. The
+        // front is host state of the mapping, never payload; swap and move
+        // keep it with its table because both travel with the storage.
+        struct FrontRow {
+            std::uint32_t ring[14];
+            std::uint8_t head;
+            std::uint8_t count;
+        };
+        struct FrontTail {
+            std::uint64_t bits;
+            std::uint64_t bytes;
+            std::uint64_t count;
+        };
+        static constexpr std::uint32_t front_bins = 48;
+        static constexpr std::uint32_t front_max = front_bins * 8u;
+        static constexpr std::uint32_t front_ring = 14;
+        static constexpr std::uintptr_t front_page = 4096;
+        static constexpr std::uintptr_t front_row_bytes = 64;
+        static_assert(sizeof(FrontRow) <= front_row_bytes && front_bins * front_row_bytes <= front_page - 64u);
+        static_assert(sizeof(FrontTail) <= 64u - 2u * sizeof(void*));
+        static_assert(detail::SlotGeometry::header_bytes % front_page != 0);
+
+        static bool front_capable(const char* base) noexcept {
+            return base && (reinterpret_cast<std::uintptr_t>(base) & (front_page - 1u)) == 0;
+        }
+        static FrontRow& front_row(char* base, std::uint32_t bin) noexcept {
+            return *reinterpret_cast<FrontRow*>(base - front_page + front_row_bytes * bin);
+        }
+        static const FrontRow& front_row(const char* base, std::uint32_t bin) noexcept {
+            return *reinterpret_cast<const FrontRow*>(base - front_page + front_row_bytes * bin);
+        }
+        static FrontTail& front_tail(char* base) noexcept {
+            return *reinterpret_cast<FrontTail*>(base - 64);
+        }
+        static const FrontTail& front_tail(const char* base) noexcept {
+            return *reinterpret_cast<const FrontTail*>(base - 64);
+        }
+        static XOFFSET_DETAIL_MOVE_INLINE std::uint32_t row_pop(FrontRow& row, FrontTail& tail, std::uint32_t bin) noexcept {
+            std::uint32_t at = row.head + row.count - 1u;
+            if (at >= front_ring) at -= front_ring;
+            if (--row.count == 0) tail.bits &= ~(std::uint64_t(1) << bin);
+            --tail.count;
+            tail.bytes -= (bin + 1u) * 8u;
+            return row.ring[at];
+        }
+        // False when the row was full: the entry took the oldest's place and
+        // `offset` now names the evicted oldest, which belongs at V's end.
+        static XOFFSET_DETAIL_MOVE_INLINE bool row_push(FrontRow& row, FrontTail& tail, std::uint32_t bin, std::uint32_t& offset) noexcept {
+            if (row.count < front_ring) {
+                std::uint32_t at = row.head + row.count;
+                if (at >= front_ring) at -= front_ring;
+                row.ring[at] = offset;
+                if (row.count++ == 0) tail.bits |= std::uint64_t(1) << bin;
+                ++tail.count;
+                tail.bytes += (bin + 1u) * 8u;
+                return true;
+            }
+            const auto oldest = row.ring[row.head];
+            row.ring[row.head] = offset;
+            row.head = static_cast<std::uint8_t>(row.head + 1u == front_ring ? 0u : row.head + 1u);
+            offset = oldest;
+            return false;
+        }
+        static XOFFSET_DETAIL_MOVE_INLINE std::uint32_t front_pop(char* base, std::uint32_t bin) noexcept {
+            return row_pop(front_row(base, bin), front_tail(base), bin);
+        }
+        static XOFFSET_DETAIL_MOVE_INLINE bool front_push(char* base, std::uint32_t bin, std::uint32_t& offset) noexcept {
+            return row_push(front_row(base, bin), front_tail(base), bin, offset);
+        }
+        // A row whose bit is clear has count 0, so only set bits need clearing.
+        static void front_clear(char* base) noexcept {
+            auto& tail = front_tail(base);
+            for (auto bits = tail.bits; bits != 0; bits &= bits - 1u)
+                front_row(base, static_cast<std::uint32_t>(std::countr_zero(bits))).count = 0;
+            tail.bits = 0;
+            tail.bytes = 0;
+            tail.count = 0;
+        }
+        void clear_front() noexcept {
+            if (char* base = buffer_.data(); front_capable(base)) front_clear(base);
+        }
+
+        // Front rows built off to the side (load_free_blocks). A row is
+        // meaningful only while its bit is set.
+        struct FrontImage {
+            FrontRow rows[front_bins];
+            FrontTail tail{};
+            bool push(std::uint32_t bin, std::uint32_t& offset) noexcept {
+                if (!(tail.bits >> bin & 1u)) {
+                    rows[bin].head = 0;
+                    rows[bin].count = 0;
+                }
+                return row_push(rows[bin], tail, bin, offset);
+            }
+            bool full(std::uint32_t bin) const noexcept {
+                return (tail.bits >> bin & 1u) && rows[bin].count == front_ring;
+            }
+            // Appends a full row to V and empties it. Rows here only fill
+            // and empty, never rotate, so the oldest entry is ring[0].
+            void take(std::uint32_t bin, std::vector<std::uint32_t>& slot) {
+                slot.insert(slot.end(), rows[bin].ring, rows[bin].ring + front_ring);
+                rows[bin].count = 0;
+                tail.bits &= ~(std::uint64_t(1) << bin);
+                tail.count -= front_ring;
+                tail.bytes -= std::uint64_t(front_ring) * (bin + 1u) * 8u;
+            }
+            void publish(char* base) const noexcept {
+                front_clear(base);
+                for (auto bits = tail.bits; bits != 0; bits &= bits - 1u) {
+                    const auto bin = static_cast<std::uint32_t>(std::countr_zero(bits));
+                    std::memcpy(&front_row(base, bin), &rows[bin], sizeof(FrontRow));
+                }
+                front_tail(base) = tail;
+            }
+        };
+
+        // Canonical emission from bin `first` on: per bin V then F (oldest
+        // first), ascending bins, then large blocks in (size, insertion)
+        // order. Empty bins emit nothing, so visiting only nonempty bins in
+        // ascending order keeps the canonical order.
+        template <typename Fn>
+        void emit_free_blocks(std::uint32_t first, Fn& fn) const {
+            const FreeTable* table = free_table_.get();
+            const char* base = buffer_.data();
+            const std::uint64_t front = front_capable(base) ? front_tail(base).bits : 0;
+            if (!table && front == 0) return;
+            for (std::uint32_t word = first / 64u; word < FreeTable::small_bins / 64u; ++word) {
+                auto bits = (table ? table->nonempty[word] : 0) | (word == 0 ? front : 0);
+                if (word == first / 64u) bits &= ~std::uint64_t(0) << (first % 64u);
+                for (; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    const auto bytes = (bin + 1u) * 8u;
+                    if (table) for (auto offset : table->bins[bin]) fn(WireHole{offset, bytes});
+                    if (bin < front_bins && (front >> bin & 1u)) {
+                        const auto& row = front_row(base, bin);
+                        for (std::uint32_t k = 0, at = row.head; k < row.count; ++k) {
+                            fn(WireHole{row.ring[at], bytes});
+                            if (++at == front_ring) at = 0;
+                        }
+                    }
+                }
+            }
+            if (table) for (const auto& [bytes, offset] : table->large) fn(WireHole{offset, bytes});
+        }
+
         struct FreeTable {
             static constexpr std::uint32_t small_max = 4096;
             static constexpr std::uint32_t small_bins = small_max / 8;
@@ -1007,9 +1207,9 @@ namespace XOffsetDatastructure {
                                                              bool allow_growth) {
             if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
                 (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
-            if (alignment <= 8 && free_table_) {
+            if (alignment <= 8 && (free_table_ || front_capable(buffer_.data()))) {
                 FreeSplit split;
-                if (void* reused = take_free_block(*free_table_, bytes, split)) {
+                if (void* reused = take_free_block(free_table_.get(), bytes, split)) {
                     finish_free_split(split);
                     return reused;
                 }
@@ -1059,7 +1259,50 @@ namespace XOffsetDatastructure {
         // directly. On host OOM the entry is lost and the table is marked
         // incomplete (save_verified recomputes it from the live graph).
         bool insert_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            return insert_free_block_quiet(offset, bytes) || insert_free_block_general(offset, bytes);
+        }
+
+        // The table only (V): for an entry the front already evicted.
+        bool insert_free_block_table(std::uint32_t offset, std::uint32_t bytes) noexcept {
             return insert_free_block_inline(offset, bytes) || insert_free_block_general(offset, bytes);
+        }
+
+        // The publications that need no host allocation and run no host
+        // callback: the front (D5), or a bin with spare capacity. On false,
+        // `offset` names the entry still to be inserted into the table (the
+        // original, or the oldest entry a full front row evicted).
+        bool insert_free_block_quiet(std::uint32_t& offset, std::uint32_t bytes) noexcept {
+            if (char* base = buffer_.data(); bytes <= front_max && front_capable(base)) {
+                const auto bin = bytes / 8u - 1u;
+                if (front_row(base, bin).count == front_ring) spill_front_row(base, bin);
+                if (front_push(base, bin, offset)) return true;
+            }
+            return insert_free_block_inline(offset, bytes);
+        }
+
+        // D5: moves a full front row to the end of V in one step (S = V ++ F
+        // is unchanged) when the bin has room for it, so no host allocation
+        // and no host callback; otherwise the row stays full and the next push
+        // evicts its oldest entry alone.
+        XOFFSET_DETAIL_MOVE_INLINE void spill_front_row(char* base, std::uint32_t bin) noexcept {
+            FreeTable* table = free_table_.get();
+            if (!table) return;
+            auto& slot = table->bins[bin];
+            if (slot.capacity() - slot.size() < front_ring) return;
+            check_owner_resolves();
+            auto& row = front_row(base, bin);
+            slot.insert(slot.end(), row.ring + row.head, row.ring + front_ring);
+            slot.insert(slot.end(), row.ring, row.ring + row.head);
+            table->mark_nonempty(bin);
+            const auto bytes = std::uint64_t(front_ring) * (bin + 1u) * 8u;
+            table->bytes += bytes;
+            table->count += front_ring;
+            auto& tail = front_tail(base);
+            tail.bits &= ~(std::uint64_t(1) << bin);
+            tail.count -= front_ring;
+            tail.bytes -= bytes;
+            row.head = 0;
+            row.count = 0;
         }
 
         // A small block entering a bin that already has spare capacity needs
@@ -1144,6 +1387,7 @@ namespace XOffsetDatastructure {
         //    (a node insert lands after equal keys, as the emplace would);
         //  - a small remainder of a small block enters a bin with room.
         void finish_free_split(FreeSplit& split) {
+            bool table_only = false;
             if (split.node) {
                 if (split.bytes > FreeTable::small_max) {
                     check_owner_resolves();
@@ -1155,60 +1399,83 @@ namespace XOffsetDatastructure {
                     ++table.count;
                     return;
                 }
-            } else if (split.bytes == 0 || insert_free_block_inline(split.offset, split.bytes)) {
+            } else if (split.bytes == 0 || insert_free_block_quiet(split.offset, split.bytes)) {
                 return;
+            } else {
+                table_only = true; // the front (if any) is done: only the table remains
             }
             const auto identity = owner_record_;
             { auto released = std::move(split.node); }
-            if (split.bytes) push_free_block(split.offset, split.bytes);
+            if (split.bytes) {
+                if (table_only) (void)insert_free_block_general(split.offset, split.bytes);
+                else push_free_block(split.offset, split.bytes);
+            }
             if (identity && !record_owner(identity)) throw XException("arena owner lookup failed");
         }
 
-        void* take_free_block(FreeTable& table, std::uint32_t bytes, FreeSplit& split) noexcept {
+        // `table` may be null (a VM owner whose holes are all in the front).
+        // A front entry is the top of its bin (S = V ++ F).
+        void* take_free_block(FreeTable* table, std::uint32_t bytes, FreeSplit& split) noexcept {
+            char* const base = buffer_.data();
+            const bool front = front_capable(base);
             std::uint32_t found_offset = 0, found_bytes = 0;
+            bool from_front = false;
             if (bytes <= FreeTable::small_max) {
                 auto bin = bytes / 8u - 1u;
-                auto& exact = table.bins[bin];
-                if (!exact.empty()) {
+                if (front && bin < front_bins && (front_tail(base).bits >> bin & 1u))
+                    return payload_byte_address(front_pop(base, bin));
+                if (table && !table->bins[bin].empty()) {
+                    auto& exact = table->bins[bin];
                     found_offset = exact.back();
                     exact.pop_back();
-                    if (exact.empty()) table.clear_nonempty(bin);
-                    table.bytes -= bytes;
-                    --table.count;
+                    if (exact.empty()) table->clear_nonempty(bin);
+                    table->bytes -= bytes;
+                    --table->count;
                     return payload_byte_address(found_offset);
                 }
                 // Smallest larger nonempty bin: the rest of bin's own word,
-                // then the first nonempty word after it.
+                // then the first nonempty word after it. The front's bins
+                // all lie in word 0.
                 const auto first = (bin + 1u) / 64u;
                 std::uint64_t bits = 0;
                 std::uint32_t word = first;
-                if (first < FreeTable::small_bins / 64u)
-                    bits = table.nonempty[first] & (~std::uint64_t(0) << ((bin + 1u) % 64u));
-                if (bits == 0) {
-                    const auto later = table.nonempty_words & (~0u << first << 1u);
+                if (first < FreeTable::small_bins / 64u) {
+                    bits = (table ? table->nonempty[first] : 0) | (first == 0 && front ? front_tail(base).bits : 0);
+                    bits &= ~std::uint64_t(0) << ((bin + 1u) % 64u);
+                }
+                if (bits == 0 && table) {
+                    const auto later = table->nonempty_words & (~0u << first << 1u);
                     if (later != 0) {
                         word = static_cast<std::uint32_t>(std::countr_zero(later));
-                        bits = table.nonempty[word];
+                        bits = table->nonempty[word];
                     }
                 }
                 if (bits != 0) {
                     const auto larger = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    auto& source = table.bins[larger];
-                    found_offset = source.back();
                     found_bytes = (larger + 1u) * 8u;
-                    source.pop_back();
-                    if (source.empty()) table.clear_nonempty(larger);
+                    if (front && larger < front_bins && (front_tail(base).bits >> larger & 1u)) {
+                        found_offset = front_pop(base, larger);
+                        from_front = true;
+                    } else {
+                        auto& source = table->bins[larger];
+                        found_offset = source.back();
+                        source.pop_back();
+                        if (source.empty()) table->clear_nonempty(larger);
+                    }
                 }
             }
             if (found_bytes == 0) {
-                auto it = table.large.lower_bound(bytes);
-                if (it == table.large.end()) return nullptr;
+                if (!table) return nullptr;
+                auto it = table->large.lower_bound(bytes);
+                if (it == table->large.end()) return nullptr;
                 found_bytes = it->first;
                 found_offset = it->second;
-                split.node = table.large.extract(it); // released after publication
+                split.node = table->large.extract(it); // released after publication
             }
-            table.bytes -= found_bytes;
-            --table.count;
+            if (!from_front) {
+                table->bytes -= found_bytes;
+                --table->count;
+            }
             // Split: the remainder stays free (a multiple of 8, at least 8).
             if (found_bytes > bytes) {
                 split.offset = found_offset + bytes;
@@ -1421,6 +1688,7 @@ namespace XOffsetDatastructure {
             sm->used_end = min_payload_size();
             sm->reserved0 = 0;
             sm->reserved1 = 0;
+            clear_front(); // a pooled mapping keeps its last owner's front
             publish_host_owner();
             register_registry();
         }
@@ -1483,6 +1751,7 @@ namespace XOffsetDatastructure {
                     "XBufferCore: payload used_end out of range");
             }
             zero_past_used_end();
+            clear_front(); // a pooled mapping keeps its last owner's front
             publish_host_owner();
             register_registry();
         }
@@ -1591,6 +1860,9 @@ namespace XOffsetDatastructure {
             }
             insert_owner_keeping(prepared);
             buffer_.swap(next);
+            // The old storage is a slot (only movable owners move), so every
+            // hole is in the table and the new front starts empty.
+            clear_front();
             publish_host_owner();
             ++m_epoch;
             return true;
@@ -1726,6 +1998,7 @@ namespace XOffsetDatastructure {
         // caller finishes verification.
         void begin_reinit(bool keep_table = false) noexcept {
             ++m_epoch;
+            clear_front();
             if (keep_table && free_table_) {
                 // Emptied detached (releasing map nodes may reenter), then
                 // kept with its bin storage: the next holes need neither a
@@ -1829,6 +2102,7 @@ namespace XOffsetDatastructure {
             if (!src.free_table_lost_) {
                 try {
                     free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
+                    copy_front(src);
                 } catch (const std::bad_alloc&) {
                     throw XBadAlloc();
                 } catch (const std::length_error&) {
@@ -1841,6 +2115,40 @@ namespace XOffsetDatastructure {
             bound_root_type_id_ = src.bound_root_type_id_;
             bound_schema_hash_ = src.bound_schema_hash_;
             root_type_identity_ = src.root_type_identity_;
+        }
+
+        // src's front entries after copy_free_table: row for row onto a VM
+        // owner (this owner's front is empty after the payload copy), else
+        // appended to their bins' V, which keeps each bin's stack S = V ++ F.
+        void copy_front(const XBufferCore& src) {
+            const char* from = src.buffer_.data();
+            if (!front_capable(from) || front_tail(from).bits == 0) return;
+            const auto& tail = front_tail(from);
+            if (char* to = buffer_.data(); front_capable(to)) {
+                front_clear(to);
+                for (auto bits = tail.bits; bits != 0; bits &= bits - 1u) {
+                    const auto bin = static_cast<std::uint32_t>(std::countr_zero(bits));
+                    std::memcpy(&front_row(to, bin), &front_row(from, bin), sizeof(FrontRow));
+                }
+                front_tail(to) = tail;
+                return;
+            }
+            if (!free_table_) free_table_ = make_free_table();
+            auto& table = *free_table_;
+            for (auto bits = tail.bits; bits != 0; bits &= bits - 1u) {
+                const auto bin = static_cast<std::uint32_t>(std::countr_zero(bits));
+                const auto& row = front_row(from, bin);
+                auto& slot = table.bins[bin];
+                for (std::uint32_t k = 0, at = row.head; k < row.count; ++k) {
+                    slot.push_back(row.ring[at]);
+                    if (++at == front_ring) at = 0;
+                }
+                table.mark_nonempty(bin);
+                table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+            }
+            table.bytes += tail.bytes;
+            table.count += tail.count;
+            table.grown = true;
         }
 
         // clone_into(): src's used payload replaces this owner's content in
@@ -2224,7 +2532,8 @@ namespace XOffsetDatastructure {
                 bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u)) {
                 throw XBadAlloc();
             }
-            return XBufferCore::owner_from_arena(arena).allocate_block(block_bytes_of(bytes), alignment);
+            const auto block = block_bytes_of(bytes);
+            return XBufferCore::owner_from_arena(arena).allocate_block(block, alignment);
         }
 
         // Live block of old_bytes grows in place to new_bytes (tail only).
@@ -2243,8 +2552,9 @@ namespace XOffsetDatastructure {
         inline void retire_dynamic_bytes(const allocator_ref& alloc_ref,
                                          void* ptr, std::uint32_t bytes) noexcept {
             if (!ptr || bytes == 0) return;
+            const auto block = block_bytes_of(bytes);
             if (auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment))
-                owner->retire_block(ptr, block_bytes_of(bytes));
+                owner->retire_block(ptr, block);
         }
 
         template <typename T>

@@ -56,6 +56,7 @@ namespace detail {
         // The host owner is published only by publish_received, after full
         // validation: a callback during finish must not reach this Core.
         target.free_table_.reset();
+        target.clear_front(); // a pooled reservation keeps its last owner's front
         target.free_table_lost_ = false;
         target.growth_policy_ = growth;
         target.typed_root_access_allowed_ = false;
@@ -73,6 +74,7 @@ namespace detail {
         // Detach the registry before returning the reservation to its token.
         source.unregister_registry();
         source.free_table_.reset();
+        source.clear_front();
         source.free_table_lost_ = false;
         source.buffer_.set_host_owner(nullptr);
         source.buffer_.swap(storage);
