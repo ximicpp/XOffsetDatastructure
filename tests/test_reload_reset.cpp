@@ -172,8 +172,38 @@ void reload_scratch_survives_release_and_swap() {
 }
 } // namespace
 
+// Growth after an in-place reload over larger old content, and after the
+// shrink of save_verified, exposes only zero bytes: the result equals the
+// same edits on a fresh load of the same wire, byte for byte.
+void growth_after_reload_exposes_zero() {
+    const auto big = make_wire(7, 3000, 3), small = make_wire(8, 40);
+    auto edit = [](XBuffer& b) {
+        auto& r = b.root<ReloadRoot>();
+        for (std::uint32_t i = 0; i < 2500; ++i) r.values.push_back(i);
+        r.name = std::string(300, 'n');
+    };
+    auto fresh = XBuffer::load_verified<ReloadRoot>(small, cap());
+    edit(fresh);
+    const auto expected = fresh.save_verified<ReloadRoot>();
+    auto b = XBuffer::create<ReloadRoot>(4096, cap());
+    b.reload_verified<ReloadRoot>(big);
+    edit(b);                                 // old content past used_end, grown
+    (void)b.save_verified<ReloadRoot>();     // shrink_to_fit
+    b.reload_verified<ReloadRoot>(big);
+    b.reload_verified<ReloadRoot>(small);    // old content past the new length
+    edit(b);
+    need(b.save_verified<ReloadRoot>() == expected, "growth after reload exposed old bytes");
+    b.reload_verified<ReloadRoot>(small);
+    edit(b);
+    (void)b.save_verified<ReloadRoot>();
+    b.reload_verified<ReloadRoot>(small);
+    edit(b);
+    need(b.save_verified<ReloadRoot>() == expected, "growth after shrink and reload exposed old bytes");
+}
+
 int main() {
     try {
+        growth_after_reload_exposes_zero();
         reload_reuses_owner();
         failed_reload_is_rootless_then_recovers();
         reset_equals_create();
