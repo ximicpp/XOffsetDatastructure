@@ -6,7 +6,10 @@
 #   std::flat_map/flat_set primary baselines, nested build and reset cases,
 #   timed regions sized for a 24 MHz timer, RELOC_IR_COUNT callgrind toggles,
 #   tools/analyze.py (geometric mean, Bonferroni one-sided 95% UB).
+# Field lists (2026-10-26, remove-C++26 p5): reloc_bench.cpp describes its records with
+#   XOFFSET_RECORD / XOFFSET_RECORD_DERIVED when the library has them (guarded).
+#   Same machine code under GCC 16 and P2996 (asm_equal).
 74551b16f3b99e39ff191e957a29b7c5d55408258a1bb34cc95c0a71a4be0759  CMakeLists.txt
 b4966f42a89545fbac0377f4d55d49dccf6a133a379f31c5a8c3203088ac2a26  README.md
-a52943747967448fc89a96dcd8e6c64d3f50135743e94bb169ecb4109d6609a0  reloc_bench.cpp
+ff2006928428853da2f845fb9aa734656e1e5ee9a08d73f14fb0b6b113902ab5  reloc_bench.cpp
 a3b0540ba0e85e8a3183fbc4edf1b7314d6ff451de1c86b6c1c85582173bb634  tools/analyze.py

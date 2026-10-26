@@ -102,9 +102,9 @@ namespace xoffset_describe_dump {
                 lines.push_back(std::string("// ") + name + " cannot be described: " + why);
                 return;
             }
-            constexpr auto bases = std::define_static_array(
+            static constexpr auto bases = std::define_static_array(
                 std::meta::bases_of(^^T, std::meta::access_context::unchecked()));
-            constexpr auto members = std::define_static_array(
+            static constexpr auto members = std::define_static_array(
                 std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()));
             std::string base_list;
             template for (constexpr auto base : bases) {
