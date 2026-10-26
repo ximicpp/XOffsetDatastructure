@@ -1,0 +1,17 @@
+{
+  "comment": "library_commit: the measured next_cpp26 commit (FREEZE). arm64: clang-p2996 d77eff1 build from p2996-toolchain.yml used by perf-gcc16.yml; empty = GCC-only arm64 jobs.",
+  "library_commit": "723c0ffdfa98323ba270a32a573aeb62ddde9f2b",
+  "arm64": {
+    "run_id": "39780376623",
+    "artifact": "p2996-d77eff1-linux-aarch64",
+    "tar": "p2996-d77eff1-linux-aarch64.tar.xz",
+    "sha256": "b8a1f39dfb8676ed0e1818cab34671752c7655223ecc22dceb356aa0ca81cad6",
+    "top_dir": "p2996-toolchain",
+    "note": "from p2996-toolchain.yml (T2); smoke test not yet passed in CI (stopped 14:50Z); smoke moves to the Mac VM"
+  },
+  "x86_64_d77eff1": {
+    "run_id": "39780376623",
+    "artifact": "p2996-d77eff1-linux-x86_64",
+    "note": "not used yet; x86-64 jobs use the CI image a5270822"
+  }
+}
