@@ -350,6 +350,7 @@ step_wire_matrix() {
         [[ -n $bin ]] || { echo "${names[i]}: no test_cross_compiler_wire, left out"; continue; }
         run=$bin
         [[ ${names[i]} == gcc16-* ]] && run="docker run --rm -v '$WORK:$WORK' '$IMG' $bin"
+        [[ ${names[i]} == p2996-* ]] && run="env LD_LIBRARY_PATH='$P2996_ROOT/lib/x86_64-unknown-linux-gnu' $bin"
         args+=("${names[i]}=$run")
     done
     (( ${#args[@]} >= 2 )) || { echo "fewer than two builds with a cross-compiler corpus"; return 1; }

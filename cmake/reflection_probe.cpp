@@ -1,8 +1,11 @@
 #include "xoffsetdatastructure.hpp"
+#include <meta>
 
 struct ReflectionProbe {
     int value = 7;
 };
+// Also described, so the probe builds with XOFFSET_SCHEMA_BACKEND=describe.
+XOFFSET_RECORD(ReflectionProbe, value)
 
 static_assert(std::meta::nonstatic_data_members_of(
                   ^^ReflectionProbe, std::meta::access_context::unchecked()).size() == 1);

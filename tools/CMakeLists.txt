@@ -15,8 +15,9 @@ add_test(
 set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
 endif()
 
-# Signature export and its checks use reflection and TypeLayout: C++26 only.
-if(NOT XOFFSET_CXX_STANDARD STREQUAL "26")
+# Signature export and its checks use reflection and TypeLayout: C++26 with the
+# reflection backend only.
+if(NOT XOFFSET_CXX_STANDARD STREQUAL "26" OR XOFFSET_SCHEMA_BACKEND STREQUAL "describe")
     foreach(name export_signatures check_signature_regeneration check_compat)
         set_property(GLOBAL APPEND PROPERTY XOFFSET_CXX26_ONLY_NOT_BUILT ${name})
     endforeach()
