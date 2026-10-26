@@ -98,6 +98,7 @@ set(REFLECTION_TESTS
     test_save_compact
     test_free_run_emission
     test_reload_reset
+    test_reset_used_range
     test_clone
 )
 
