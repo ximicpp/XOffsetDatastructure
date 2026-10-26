@@ -548,9 +548,8 @@ namespace XOffsetDatastructure {
         void shrink_to_fit() {
             if (buffer_.empty()) return;
             auto used = used_end_clamped();
-            if (used < buffer_.size()) {
-                buffer_.resize_logical(used);
-            }
+            // N2: the bytes past used_end are zero.
+            if (used < buffer_.size()) buffer_.shrink_zero_tail(used);
         }
 
         const void* get_address() const { return buffer_.data(); }
@@ -1835,7 +1834,8 @@ namespace XOffsetDatastructure {
         }
 
         void reinit_from_bytes(const char* data, size_type size) {
-            reinit_from_storage(data, size, [&] { buffer_.assign_bytes(data, size); });
+            // N2: the old content's nonzero bytes end at its used_end.
+            reinit_from_storage(data, size, [&] { buffer_.assign_bytes_bounded(data, size, n2_dirty_end()); });
         }
 
         void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
@@ -1937,6 +1937,13 @@ namespace XOffsetDatastructure {
         // N2: the bytes past a loaded payload's used_end are zeroed, so the
         // invariant above holds after every load. A verified load has none
         // (used_end == used_bytes); an unverified one may carry any bytes there.
+        // Every way out of a load, reset or failed receive leaves a checked
+        // arena header (check_reinit_payload, reset_arena), so its used_end
+        // bounds the nonzero bytes of the content (N2).
+        size_type n2_dirty_end() const noexcept {
+            return arena() ? used_end_clamped() : buffer_.size();
+        }
+
         void zero_past_used_end() noexcept {
             const auto used = static_cast<size_type>(arena()->used_end);
             if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);

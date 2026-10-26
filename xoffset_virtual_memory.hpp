@@ -345,6 +345,41 @@ public:
         if (zero_from_ < length) zero_from_ = length;
     }
 
+    // assign_bytes with a bound on the old content: the caller states that
+    // the bytes in [dirty_end, logical) are zero. zero_from_ becomes the end
+    // of the bytes that may still be nonzero past `length` (the old content
+    // up to that bound, and any range an earlier shrink left exposed),
+    // instead of everything the old content exposed, so later growth clears
+    // only those. Nothing is cleared here.
+    void assign_bytes_bounded(const char* bytes, std::size_t length, std::size_t dirty_end) {
+        if (length > maximum_capacity_) {
+            throw std::invalid_argument("VM input length exceeds maximum capacity");
+        }
+        if (length != 0 && bytes == nullptr) {
+            throw std::invalid_argument("VM input is null");
+        }
+        if (length == 0) { logical_bytes_ = 0; return; }
+        if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
+            throw std::bad_alloc();
+        }
+        std::memcpy(base_, bytes, length);
+        const std::size_t old_logical = logical_bytes_;
+        // zero_from_ > old_logical: exposed bytes past the old length may be
+        // nonzero, so the bound stays.
+        if (zero_from_ <= old_logical) zero_from_ = (std::min)(dirty_end, old_logical);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+    }
+
+    // Logical shrink whose caller states that the bytes in
+    // [new_logical_bytes, logical) are zero: unlike resize_logical, the
+    // regrowth over them clears nothing.
+    void shrink_zero_tail(std::size_t new_logical_bytes) noexcept {
+        if (new_logical_bytes >= logical_bytes_) return;
+        if (zero_from_ <= logical_bytes_) zero_from_ = new_logical_bytes;
+        logical_bytes_ = new_logical_bytes;
+    }
+
     // In-place form of from_extents (same extent contract). Gap bytes are
     // cleared wherever the old content may have left them dirty.
     void assign_extents(const char* stored, const void* extents, std::size_t count,
