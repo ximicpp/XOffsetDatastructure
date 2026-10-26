@@ -71,6 +71,8 @@ FN_SUSPECT_MIN = 0.10                          # inlining suspects move >= 10% o
 # did not reverse D2 either. The flag is a diagnosis: it does not change the verdict.
 RECYCLE_FN = "FreeTableRecycler::recycle"
 RECYCLE_MIN_SHARE = 0.5                        # recycle carries at least half of the metric's net increase
+ALLOC_DROP_MIN_SHARE = 0.10                    # D2 kind: allocator self-Ir falls by >= 10% of the recycle growth
+                                               # (D2 0.28-0.55; COPS 0.013-0.025, noise next to the recycle growth)
 ALLOC_FN = re.compile(r"^(?:malloc|free|realloc|calloc|cfree|_int_malloc|_int_free\w*|_int_realloc|malloc_consolidate"
                       r"|tcache\w*|operator new|operator delete)\b")
 
@@ -688,7 +690,8 @@ def fn_diff(ref_tree, head_tree, metric, ref_role):
     alloc_recycle = None
     if net > 0 and recycle >= RECYCLE_MIN_SHARE * net:
         alloc_recycle = {"recycle": recycle, "alloc": alloc, "share": recycle / net,
-                         "kind": "alloc_calls_removed" if alloc < 0 else "more_recycle_work"}
+                         "kind": "alloc_calls_removed" if -alloc >= ALLOC_DROP_MIN_SHARE * recycle
+                         else "more_recycle_work"}
     top = sorted((f for f, d in delta.items() if d), key=lambda f: (-abs(delta[f]), f))[:FN_TOP]
     edges = re_ | he
     partners = collections.defaultdict(set)
