@@ -31,6 +31,17 @@
       "reason": "只作记录，不放行任何指标。#83（E-2，Linux 专用）把 ≥1 MiB 新输出的拷贝分成 256 KiB 一块，每块先 madvise(MADV_POPULATE_WRITE)。门禁关掉 glibc 的 rep movsb 路径之后（perf_gate.py IR_ENV），Linux 上 formal.emit_after 的 Ir head÷base 是 1.058：多出来的是分块拷贝和 mincore/madvise 的指令。换来的是缺页：新输出的陷入缺页从 3083 次降到 36 次，墙钟从约 6.3–7.8 ms 降到约 3.7–4.6 ms（云端，噪声大，只作参考）。Ir 看不到缺页的收益，所以这条说明 Ir 的 +5.8% 不代表变慢。没有 tunable 时 valgrind 把 rep movsb 按字节计数，同一指标是 5.96 倍，那是计数假象。macOS 头文件与 base 逐字节相同（0 类），Mac 门禁不适用。",
       "evidence": "PR #83 描述（缺页和墙钟表，populate_bench.cpp dcbc8c13…）；/mnt/project-files/perf-gate/ir/（pr83_gate_run1.json 无 tunable 5.9614，pr83_gate_tunable_no_rep_movsb.json 有 tunable 1.0579）；本 PR 描述里的对照表",
       "approved_by": "「性能优化」（2026-10-26 07:44Z，只作记录）"
+    },
+    {
+      "id": "pr85-alloc-recycle-flag",
+      "pr": 85,
+      "metric": "slg.B.in_decode",
+      "compiler": "*",
+      "max_ratio": 1.0593,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#85 给 perf_gate 加了“分配器回收型”诊断标记：警告或失败的指标里，净增 Ir 至少一半来自 FreeTableRecycler::recycle 时在说明和摘要里标出来（malloc/free 自身 Ir 下降为 D2 型，否则为 COPS 型），判定不变。依据是 2026-10-26 的 Ir 校准：D2（#33）两种 Ir 都判失败，slg.B.in_decode GCC 16 1.0593、P2996 1.0517，slg.A.req_decode 1.0465 / 1.0379；同一对在 Mac L2 上是变快，B.in_decode 0.989、A.req_decode 0.956，SLG A 0.970、B 0.965。COPS（#51 #52 #54 #55）GCC 16 slg.B 1.014，Mac B 0.977。回收循环的指令全额计入，省掉的 malloc/free 只按几十条指令算；cache-sim 下 D2 head 的 D1 读缺失反而是 2–3 倍，也翻不过来。所以这类 Ir 上升不代表变慢，按 MERGE_RULES_V2 仍是 L 类，由 Mac L2 下结论。",
+      "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/front4/FRONT4_RESULT.md（data/d2x/gate-*.json、cache-gcc16.json、mac_phases d2x.json）；/mnt/project-files/throughput-20261026/ir-calibration/IR_CALIBRATION_MERGED.md；PR #85 描述",
+      "approved_by": "「性能优化」（2026-10-26 09:31Z，0 类合并并记 ledger）"
     }
   ]
 }
