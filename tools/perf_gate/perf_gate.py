@@ -288,8 +288,12 @@ COLLECTED = re.compile(r"Collected\s*:\s*(\d+)")
 # its rep-movsb path (sizes between x86_rep_movsb_threshold and the non-temporal threshold) costs about one Ir
 # per byte, while the same bytes in one larger copy take the vector loop. #83 split 12 MiB output copies into
 # 256 KiB chunks and formal.emit_after Ir went x5.96 with no change in the work done. With the rep-movsb path
-# off, memcpy Ir follows the bytes copied (#83: x1.058). Every role and run gets the same setting.
-IR_ENV = {"GLIBC_TUNABLES": "glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff"}
+# off, memcpy Ir follows the bytes copied (#83: x1.058). memset has the same problem with `rep stosb` (sizes
+# from x86_rep_stosb_threshold, 2 KiB by default): a change that zeroes a 3 KiB block once instead of a few
+# small ones counted x10.7 on memset (A.simulate x1.416 for no change in work; A_SIMULATE_REGROW_20261026.md
+# section 4), so that path is off too. Every role and run gets the same setting.
+IR_ENV = {"GLIBC_TUNABLES": "glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:"
+                            "glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff"}
 
 
 def callgrind(valgrind, cmd, env, tmp: Path):
