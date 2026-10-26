@@ -31,7 +31,7 @@ Reported only:
 
 - **Node containers.** `std::map` / `std::set`, beside the flat containers.
 - **`*.reused`.** This is X1's protocol: the same keys every round, and lookups that walk the keys in insertion order. The branch predictor can learn this sequence: "容器操作提速" found that it makes std::flat_map lookups look fast. The fresh-key cases are the ones judged.
-- **`.plain`.** The same hero and army records, not declared ordinary. The `.ord` records are declared with `XOFFSET_ORDINARY_RECORDS`, as a user following the guide would write them; on a library without the macro, the two specializations are written out. `static_assert`s check that each declaration took effect.
+- **`.plain`.** The same hero and army records, not declared ordinary. The `.ord` records are declared with `XOFFSET_ORDINARY_RECORDS`, as a user following the guide would write them: together with the records they hold as container elements (`Skill`, `Buff`, `Troop`; user guide section 3.1). Before 2026-10-26 those three were not declared, so the `.ord` heroes took the element-by-element path of the `.plain` ones. On a library without the macro, the two specializations are written out. `static_assert`s check that each declaration took effect and, on a library with the macro, that `.ord` heroes move by SHIFT and `.plain` heroes do not.
 
 Choices worth knowing:
 
