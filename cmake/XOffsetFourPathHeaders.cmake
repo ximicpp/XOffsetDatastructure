@@ -5,6 +5,8 @@ set(XOFFSET_FULL_OWN_HEADERS
     receive_raw_fwd.hpp
     validation_scratch.hpp
     xoffset_core_lifetime.hpp
+    xoffset_schema.hpp
+    xoffset_schema_reflect.hpp
     xoffset_snapshot_index.hpp
     xoffset_snapshot_index_budget.hpp
     xoffset_validation_scratch.hpp
