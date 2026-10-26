@@ -226,6 +226,29 @@
       "approved_by": "「性能优化」（2026-10-26 15:40Z，按 0 类提 PR，参照 #85 重判已有门禁对）"
     },
     {
+      "id": "d5-shelved-pr87",
+      "pr": 87,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0364,
+      "record_only": true,
+      "class": "L",
+      "reason": "只作记录，不放行任何指标；#87 关闭、不合并。D5（VM owner 小块分配/回收前端环）的 Mac L2 失败：D5_FULL（p1 8cb6221 ÷ f8eebf4）SLG B 1.0276 [1.0188, 1.0364]，上界超过 1.03 直接失败；INT2 bisect-1 独立复现 B 1.0300（上界 1.0430）。formal 通过（合并最大上界 1.0142），SLG A 0.9938，C 1.0079。分阶段 B.in_decode +8%、B.out_encode +6%，每周期约多 55 µs；reloc hero.push_back_grow 慢 6%。原因：分配和回收路径上多出的前端判断，在 B 上的代价超过了 A 的收益。云端 Ir 也一致报警（GCC 16 formal.mutate 1.066、slg.D 1.043；P2996 slg.D 1.048、hero.push_back_grow 1.070）。以后再做，前端判断在 B 路径上的成本必须为零。max_ratio 记的是 SLG B 的 Mac 上界。",
+      "evidence": "/mnt/project-files/perf-gate/mac/2026-10-26-int2-737f43c/VERDICT.md（D5_FULL、INT2、分阶段 stages/）；/mnt/project-files/alloc-fastpath-20261022/d5/（云端 Ir 与本地验证）；PR #87 关闭说明",
+      "approved_by": "「性能优化」（2026-10-26 19:3xZ：D5 搁置，#87 关闭，ledger 记 record_only）"
+    },
+    {
+      "id": "reloc-ord-element-records",
+      "pr": 102,
+      "metric": "reloc.vec.push_back_grow",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。有意的基准变更：bench/reloc 原来只把 rb::xm::HeroOrd、ArmyOrd 声明为普通记录，漏了它们容器里的元素记录 rb::Skill、rb::Buff、rb::Troop；receive_raw_supported 要求类类型元素也有 ordinary_members，所以 HeroOrd 一直不满足 shift_relocate_supported，.ord 用例和 .plain 一样逐元素搬动（G9 里 hero.*.ord 比 std 慢 4.6× 的主因）。按使用指南 §3.1 补上，并加 static_assert 锁住 HeroOrd 走 SHIFT、HeroPlain 不走。门禁三份都用 head 的基准代码编，本 PR 不会改变任何门禁比值。同一库（主线 7620bc3）新基准÷旧基准 Ir，29 个用例全测：hero.mid_erase.ord P2996 0.5380 / GCC 16 0.4276，hero.mid_insert.ord 0.5486 / 0.4434，hero.push_back_grow.ord 0.9849 / 0.9721，nested.build.ord 0.9973 / 0.9922；唯一上升是 GCC 16 reloc.vec.push_back_grow 1.0001（+69 Ir），其余（全部 .plain、map、set、str、其他 vec、reset）两种编译器都是 1.0000。云端计时（P2996，3×41 轮，÷std）hero.mid_erase.ord 5.28× → 2.66×，hero.mid_insert.ord 5.18× → 2.62×。G9 的 hero.* 数字从本 PR 起是新基准，要在下一个 G8/G9 检查点或 reloc 批次重测，不能和之前的批次直接比；那一批 hero.*.ord 同时报旧声明（d924f24 的 bench/reloc，逐元素路径）和新声明两组数字。这是修基准缺陷，不是库的提速。bench/slg 对 Buff、Skill、Troop 的声明方式（XOFFSET_ORDINARY_RECORDS，无宏时写出两个特化）与修正后的 bench/reloc 一致。",
+      "evidence": "PR #102 描述；/mnt/project-files/pareto-rivals-20261024/round2/reloc_ir_old_vs_new_bench.txt（两种编译器 29 个用例新旧 Ir）与 reloc_timing/；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「G9 基准补声明」节",
+      "approved_by": "「性能优化」19:58Z 10-26 判 0 类（只改 bench；susu 16:54Z 授权）；下一次 reloc 批次 hero.*.ord 新旧声明两组数字并列报告"
+    },
+    {
       "id": "s-class-pr104",
       "pr": 104,
       "metric": "*",
@@ -237,7 +260,7 @@
       "base": "d924f2426910",
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：SR，SHIFT 搬动后重启内联容器头的两处改动，只动 xoffset_core_lifetime.hpp（+47/−15）。shift_rel32 改用 __builtin_add_overflow 加无分支的空值步长，溢出仍 std::terminate，结果与原 int64 检查逐位相同（MSVC 保留原写法）；逐成员重启改为 index_sequence 折叠并用文件内的 XOFFSET_DETAIL_SHIFT_INLINE 强制内联。不改 wire、布局签名、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 与 P2996 d77eff1 + libc++ 全部 65 个指标 head÷base 最大都是 1.0000（max_ratio 字段要求 > 1，取 1.0001）。声称的阶段：slg.B.season_edits GCC 16 0.9632、P2996 0.8413；slg.S.ticks_middle GCC 16 0.8374、P2996 0.8937；slg.B 合计 0.9857 / 0.9326。当前 bench/reloc 的 hero.*.ord 不走 SHIFT（#102 补声明），所以 reloc 指标不变。",
       "evidence": "PR #104 描述（两种 Ir 表与本地验证）；/mnt/project-files/pareto-rivals-20261024/round2/sr_validate/（sr_ac4ca46_REPORT.md、sr_ac4ca46_p2996_ctest_REPORT.md、sr_ac4ca46_gate_{gcc16,p2996}.json）；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「SR」节",
-      "approved_by": "待「性能优化」判类（按 S 类提交）"
+      "approved_by": "「性能优化」19:58Z 10-26 判 S 类（susu 16:54Z 授权），414dea4 以来第 4 个 S 类（#59、#91、#95、#104）；逐成员强制内联在 Mac 上可能有摆放效应，列为下一次阶段复核的二分点"
     }
   ]
 }
