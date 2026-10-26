@@ -3184,16 +3184,7 @@ namespace XOffsetDatastructure {
                 return;
             }
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
-                if (new_cap > max_size()) throw XBadAlloc();
-                auto alloc = binding();
-                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
-                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
-                auto* old = data();
-                auto old_cap = capacity_;
-                relocate_live_run(fresh, old);
-                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
-                capacity_ = new_cap;
-                fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+                reserve_relocate(new_cap);
             } else {
                 rebuild(size_, new_cap, [&](T* dst, size_type i) {
                     fixed_detail::transfer_construct(dst, data()[i], binding());
@@ -3201,6 +3192,29 @@ namespace XOffsetDatastructure {
             }
         }
 
+    private:
+        // reserve into a fresh block for relocatable T; out of line, so the
+        // paths above keep their size at the caller.
+        XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap) {
+            if (new_cap > max_size()) throw XBadAlloc();
+            bool published = false;
+            fixed_detail::regrow_dynamic_bytes(binding(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
+                                               static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T),
+                                               [&](void* block) -> void* {
+                auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
+                // An unreachable block is never published and is retired as "old".
+                if (!fixed_detail::rel32_reaches(&data_delta, fresh)) [[unlikely]] return block;
+                auto* old = data();
+                relocate_live_run(fresh, old);
+                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                capacity_ = new_cap;
+                published = true;
+                return old;
+            });
+            if (!published) [[unlikely]] fixed_detail::throw_rel32_range();
+        }
+
+    public:
         // Replaces all elements from stable live T objects. Self/subrange and
         // other live containers (including another arena) may overlap. Private
         // allocator control bytes that allocation itself mutates are not a
@@ -3412,6 +3426,13 @@ namespace XOffsetDatastructure {
                 std::min<std::uint64_t>(max_size(), capacity_ ? std::uint64_t(capacity_) * 2u : 4u)));
         }
 
+        template <bool OutOfLine>
+        void grow_for_insert() {
+            if constexpr (OutOfLine) reserve_for_insert(grown_capacity());
+            else reserve(grown_capacity());
+        }
+        XOFFSET_DETAIL_NOINLINE void reserve_for_insert(size_type new_cap) { reserve(new_cap); }
+
         // Build in arena storage and publish only after all potentially throwing work.
         template <typename Construct>
         void rebuild(size_type count, size_type cap, Construct&& construct) {
@@ -3442,7 +3463,10 @@ namespace XOffsetDatastructure {
             fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
         }
 
-        template <typename Construct>
+        // GrowOutOfLine: an insert into a full vector grows through an
+        // out-of-line reserve. Flat set/map inserts use it: with reserve
+        // inlined there, GCC stops inlining their insert/try_emplace.
+        template <bool GrowOutOfLine = false, typename Construct>
         iterator insert_construct(size_type index, Construct&& construct) {
             if (index == size_ && size_ < capacity_) [[likely]] {
                 // Append into spare capacity. capacity_ != 0 implies a bound
@@ -3462,13 +3486,13 @@ namespace XOffsetDatastructure {
                 alignas(T) std::byte storage[sizeof(T)];
                 auto* staged = reinterpret_cast<T*>(storage);
                 construct(staged);
-                if (size_ == capacity_) reserve(grown_capacity());
+                if (size_ == capacity_) grow_for_insert<GrowOutOfLine>();
                 std::memmove(data() + index + 1, data() + index, (size_ - index) * sizeof(T));
                 std::memcpy(data() + index, staged, sizeof(T));
                 ++size_;
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 with_staged(construct, [&](T& staged) {
-                    if (size_ == capacity_) reserve(grown_capacity());
+                    if (size_ == capacity_) grow_for_insert<GrowOutOfLine>();
                     // SHIFT: same bytes and deltas as the loop below, in one
                     // memmove plus an inline-head restart of the moved run.
                     auto* items = data();
@@ -3483,7 +3507,7 @@ namespace XOffsetDatastructure {
                 });
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 with_staged(construct, [&](T& staged) {
-                    if (size_ == capacity_) reserve(grown_capacity());
+                    if (size_ == capacity_) grow_for_insert<GrowOutOfLine>();
                     for (size_type i = size_; i > index; --i) {
                         fixed_detail::relocate_construct(data() + i, data()[i - 1]);
                         std::destroy_at(data() + i - 1);
@@ -3846,7 +3870,7 @@ namespace XOffsetDatastructure {
             if (index < Base::size() && fixed_detail::ordered_equal(items[index], value)) {
                 return {items + index, false};
             }
-            return {Base::insert_construct(index, [&](T* dst) {
+            return {Base::template insert_construct<true>(index, [&](T* dst) {
                 fixed_detail::transfer_construct(dst, value, Base::binding());
             }), true};
         }
@@ -3860,7 +3884,7 @@ namespace XOffsetDatastructure {
             if (index < Base::size() && fixed_detail::ordered_equal(items[index], arg)) {
                 return {items + index, false};
             }
-            return {Base::insert_construct(index, [&](T* dst) {
+            return {Base::template insert_construct<true>(index, [&](T* dst) {
                 fixed_detail::construct_bound(dst, Base::binding(), std::forward<Arg>(arg));
             }), true};
         }
@@ -3951,7 +3975,7 @@ namespace XOffsetDatastructure {
                 return {items + index, false};
             }
 
-            return {value_base::insert_construct(index, [&](value_type* dst) {
+            return {value_base::template insert_construct<true>(index, [&](value_type* dst) {
                 construct_entry(dst, std::forward<KeyArg>(key), std::forward<Args>(args)...);
             }), true};
         }
