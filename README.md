@@ -193,4 +193,6 @@ Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
-core guarantees (K1–K7) and which interfaces they cover.
+core guarantees (K0–K7, starting with K0: the payload holds no absolute
+address, so after any modification the whole region can still be copied to
+another address, process or machine) and which interfaces they cover.
