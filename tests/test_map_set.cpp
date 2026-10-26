@@ -5,23 +5,28 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct MapSetTest {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     MapSetTest(Allocator allocator) 
         : intSet(allocator),
           stringSet(allocator),
           intMap(allocator),
           stringMap(allocator) {}
+#endif
     
     XSet<int> intSet;
     XSet<XString> stringSet;
     XMap<int, XString> intMap;
     XMap<XString, int> stringMap;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(MapSetTest, (), intSet, stringSet, intMap, stringMap)
+#endif
 
 bool test_map_set_operations() {
     std::cout << "\n[TEST] Map and Set Operations\n";

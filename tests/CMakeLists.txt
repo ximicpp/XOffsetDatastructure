@@ -1,11 +1,19 @@
 # Tests that ask P2996 reflection or TypeLayout themselves (std::meta in the
 # test, TypeLayout signatures, member counts or safety levels, zero-boilerplate
-# records): C++26 builds only. The C++20/C++23 builds list them in
-# test-inventory.json as cxx26_only_not_built.
+# records), or whose records all need it (user constructors with custom
+# lifetimes): built only with the C++26 reflection schema backend. The other
+# builds (C++20/C++23, and C++26 with XOFFSET_SCHEMA_BACKEND=describe) list them
+# in test-inventory.json as cxx26_only_not_built.
+if(XOFFSET_CXX_STANDARD STREQUAL "26" AND NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe")
+    set(XOFFSET_TESTS_REFLECTION ON)
+else()
+    set(XOFFSET_TESTS_REFLECTION OFF)
+endif()
 set(XOFFSET_CXX26_ONLY_TESTS
     test_admission_typelayout
     test_canonical_cold_no_callback
     test_canonical_zero_target
+    test_custom_future_lifetime
     test_enum_support
     test_field_limit_fix
     test_reflection_advanced
@@ -21,7 +29,7 @@ function(xoffset_cxx26_only name)
 endfunction()
 
 function(add_xoffset_test test_name test_label)
-    if(NOT XOFFSET_CXX_STANDARD STREQUAL "26" AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+    if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
         xoffset_cxx26_only(${test_name})
         return()
     endif()
@@ -224,7 +232,7 @@ set_tests_properties(require_no_padding_fail PROPERTIES
 # XOFFSET_ORDINARY_RECORDS on a record that is not ordinary must fail the build.
 # The macro is the C++26 zero-boilerplate declaration; XOFFSET_RECORD carries
 # the same promises in the C++20/C++23 builds.
-if(XOFFSET_CXX_STANDARD STREQUAL "26")
+if(XOFFSET_TESTS_REFLECTION)
     foreach(variant overlap base bit_field)
         add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
         configure_xoffset_target(ordinary_records_${variant}_fail)
@@ -269,6 +277,21 @@ foreach(entry IN LISTS XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS)
     set_tests_properties(schema_describe_${variant}_fail PROPERTIES
         LABELS "schema" PASS_REGULAR_EXPRESSION "${diagnostic}")
 endforeach()
+
+# Without reflection, raw receive of an enum without a fixed underlying type
+# must fail the build clearly (test_receive_raw runs these enums only in C++26).
+if(NOT XOFFSET_TESTS_REFLECTION)
+    foreach(enum Nonfixed Negative Zero EmptyEnum Wide UnsignedWide)
+        add_executable(receive_raw_nonfixed_${enum}_fail EXCLUDE_FROM_ALL receive_raw/nonfixed_enum_fail.cpp)
+        configure_xoffset_target(receive_raw_nonfixed_${enum}_fail)
+        target_compile_definitions(receive_raw_nonfixed_${enum}_fail PRIVATE XOFFSET_TEST_ENUM=${enum})
+        add_test(NAME receive_raw_nonfixed_${enum}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receive_raw_nonfixed_${enum}_fail --config $<CONFIG>)
+        set_tests_properties(receive_raw_nonfixed_${enum}_fail PROPERTIES
+            LABELS "schema" PASS_REGULAR_EXPRESSION
+            "the enumerators of an enum without a fixed underlying type are unknown")
+    endforeach()
+endif()
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")

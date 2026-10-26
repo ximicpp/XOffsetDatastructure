@@ -36,6 +36,7 @@ struct CanonicalRegistryRoot{
     xo::XString label;
     xo::XVector<std::uint32_t> values;
 };
+XOFFSET_RECORD_DERIVED(CanonicalRegistryRoot, (), marker, label, values)
 XOFFSET_REGISTER_SCHEMA_NAME(CanonicalRegistryRoot,"receive.canonical-registry-v2.fixture")
 namespace XOffsetDatastructure{
 template<>struct wire_record_layout<CanonicalRegistryRoot>{static constexpr bool ordinary_members=true;};

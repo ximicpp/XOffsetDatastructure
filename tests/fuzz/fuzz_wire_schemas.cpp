@@ -46,6 +46,11 @@ struct Deep {
     float ratio{};
 };
 } // namespace ms
+XOFFSET_RECORD_DERIVED(ms::Cell, (), color, reserved, value)
+XOFFSET_RECORD_DERIVED(ms::Fixed, (), arr, cells, grid, marks, blob)
+XOFFSET_RECORD_DERIVED(ms::Inner, (), name, tags, score)
+XOFFSET_RECORD_DERIVED(ms::Maps, (), index, by_id)
+XOFFSET_RECORD_DERIVED(ms::Deep, (), cube, text, flag, ratio)
 
 XOFFSET_REGISTER_SCHEMA_NAME(ms::Fixed, "fuzz.schemas.fixed")
 XOFFSET_REGISTER_SCHEMA_NAME(ms::Maps, "fuzz.schemas.maps")

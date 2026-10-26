@@ -124,6 +124,9 @@ template<> struct StableEraseRelocator<EraseRecord> {
 struct ImplicitNested { xo::XString first; xo::XString second; };
 struct ImplicitRecord { std::uint32_t id{}; xo::XString name; xo::XVector<std::uint32_t> values;
                         ImplicitNested nested; std::uint32_t raw[3]{}; };
+XOFFSET_RECORD_DERIVED(ImplicitNested, (), first, second)
+XOFFSET_RECORD_DERIVED(EraseRecord, (), id, name, values)
+XOFFSET_RECORD_DERIVED(ImplicitRecord, (), id, name, values, nested, raw)
 namespace XOffsetDatastructure {
 // Audited source above has no bases or [[no_unique_address]]. Offsets below
 // independently confirm non-overlap for the actual compiler's ordinary layout.
@@ -153,6 +156,13 @@ template<> struct is_byte_copy_safe<OptedUserDestructor> : std::true_type {};
 }
 struct EraseRoot { xo::XVector<EraseRecord> records; xo::XVector<std::uint32_t> numbers;
                    xo::XVector<ImplicitRecord> implicit_records; };
+XOFFSET_RECORD_DERIVED(OwningBase, (), value)
+XOFFSET_RECORD_DERIVED(VolatileRecord, (), value)
+XOFFSET_RECORD_DERIVED(DerivedOwning, (OwningBase), id)
+XOFFSET_RECORD_DERIVED(OverlapUnapproved, (), value)
+XOFFSET_RECORD_DERIVED(UncustomizedRecord, (), name)
+XOFFSET_RECORD_DERIVED(OptedUserDestructor, (), name)
+XOFFSET_RECORD_DERIVED(EraseRoot, (), records, numbers, implicit_records)
 XOFFSET_REGISTER_SCHEMA_NAME(EraseRoot,"four-paths.stable-erase.v1")
 struct Always { template<class T> bool operator()(const T&) const { return true; } };
 template<class V> concept Erasable = requires(V& values) { values.stable_erase_if(Always{}); };
@@ -167,7 +177,9 @@ static_assert(!fd::stable_erase_supported<volatile std::uint32_t>());
 static_assert(!fd::stable_erase_supported<VolatileRecord>());
 static_assert(!fd::stable_erase_supported<DerivedOwning>());
 static_assert(!fd::stable_erase_supported<OverlapUnapproved>());
+#if defined(__cpp_lib_is_implicit_lifetime) // C++23 library trait; GCC 13/Clang 18 C++20 lack it
 static_assert(!std::is_implicit_lifetime_v<EraseRecord>);
+#endif
 // Source + reflection prove the standard aggregate/destructor branch. This
 // does not assert a different value for the actual SDK's std builtin trait.
 static_assert(std::is_aggregate_v<ImplicitRecord>);

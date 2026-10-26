@@ -39,6 +39,10 @@ template <std::size_t Alignment>
 struct alignas(Alignment) StableOveralignedRoot {
     std::int64_t value{};
 };
+XOFFSET_RECORD_DERIVED(StableItem, (), code, label)
+XOFFSET_RECORD_DERIVED(StableScalar, (), value)
+XOFFSET_RECORD_DERIVED(StableOveralignedRoot<131072>, (), value)
+XOFFSET_RECORD_DERIVED(StableOveralignedRoot<65536>, (), value)
 
 static_assert(is_byte_copy_safe_v<StableOveralignedRoot<65536>>);
 static_assert(is_byte_copy_safe_v<StableOveralignedRoot<131072>>);
@@ -54,6 +58,8 @@ struct StableRoot {
     XVector<std::int32_t> numbers;
     XVector<StableItem> items;
 };
+XOFFSET_RECORD_DERIVED(OtherStableRoot, (), id)
+XOFFSET_RECORD_DERIVED(StableRoot, (), id, independent_values, name, numbers, items)
 
 XOFFSET_REGISTER_SCHEMA_NAME(StableRoot, "test.StableRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(OtherStableRoot, "test.OtherStableRoot")

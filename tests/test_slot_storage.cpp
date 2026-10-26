@@ -17,6 +17,7 @@ struct SlotRoot {
     XVector<std::uint32_t> values;
     XVector<XString> labels;
 };
+XOFFSET_RECORD_DERIVED(SlotRoot, (), id, name, values, labels)
 XOFFSET_REGISTER_SCHEMA_NAME(SlotRoot, "test.SlotRoot")
 
 namespace {

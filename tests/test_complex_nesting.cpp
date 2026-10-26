@@ -94,6 +94,13 @@ struct ManyFields {
     XSet<int32_t> set1;
     XMap<int32_t, int32_t> map1;
 };
+XOFFSET_RECORD_DERIVED(Tag, (), id, label)
+XOFFSET_RECORD_DERIVED(Skill, (), skill_id, name, levels, tags)
+XOFFSET_RECORD_DERIVED(Character, (), char_id, name, health, skills, badges, stats)
+XOFFSET_RECORD_DERIVED(Guild, (), guild_id, guild_name, members, ranks)
+XOFFSET_RECORD_DERIVED(World, (), world_id, world_name, guilds, active_worlds)
+XOFFSET_RECORD_DERIVED(ContainerOnly, (), name, data, unique_ids)
+XOFFSET_RECORD_DERIVED(PodOnly, (), a, b, c, d, e, f)
 
 // ============================================================================
 // Tests
@@ -342,17 +349,18 @@ bool test_pod_only_struct() {
 
 // test_many_fields removed: covered by test_field_limit_fix.cpp
 
+// A root that holds a vector of ContainerOnly
+struct ContainerOnlyRoot {
+    XVector<ContainerOnly> items;
+};
+XOFFSET_RECORD_DERIVED(ContainerOnlyRoot, (), items)
+
 bool test_vector_of_container_only() {
     fprintf(stderr, "\n[TEST] XVector<ContainerOnly> — struct with no POD as element\n");
 
     XBuffer xbuf(32768);
 
-    // Use a root that holds a vector of ContainerOnly
-    struct Root {
-        XVector<ContainerOnly> items;
-    };
-
-    auto* r = xbuf.make<Root>();
+    auto* r = xbuf.make<ContainerOnlyRoot>();
 
     for (int i = 0; i < 20; i++) {
         r->items.emplace_back();
@@ -429,6 +437,9 @@ struct PersonRecord {
     ContactInfo contact;   // nested two levels deep
     XVector<int32_t> tags;
 };
+XOFFSET_RECORD_DERIVED(Address, (), city, street)
+XOFFSET_RECORD_DERIVED(ContactInfo, (), home, work, zip_code)
+XOFFSET_RECORD_DERIVED(PersonRecord, (), id, name, contact, tags)
 
 bool test_direct_composite_member() {
     fprintf(stderr, "\n[TEST] Direct composite struct member (Address inside ContactInfo inside PersonRecord)\n");
@@ -488,16 +499,17 @@ bool test_direct_composite_member() {
     return true;
 }
 
+struct PersonDirectory {
+    XVector<PersonRecord> people;
+};
+XOFFSET_RECORD_DERIVED(PersonDirectory, (), people)
+
 bool test_vector_of_direct_composite() {
     fprintf(stderr, "\n[TEST] XVector<PersonRecord> — composite member inside container element\n");
 
     XBuffer xbuf(65536);
 
-    struct Directory {
-        XVector<PersonRecord> people;
-    };
-
-    auto* dir = xbuf.make<Directory>();
+    auto* dir = xbuf.make<PersonDirectory>();
 
     for (int i = 0; i < 20; i++) {
         dir->people.emplace_back();

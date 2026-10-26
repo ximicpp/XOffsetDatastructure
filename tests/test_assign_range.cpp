@@ -35,10 +35,14 @@ struct BulkRoot {
     xo::XString blocker;
     xo::XVector<BulkAttr> attrs;
 };
+XOFFSET_RECORD_DERIVED(BulkAttr, (), key, value)
+XOFFSET_RECORD_DERIVED(BulkRoot, (), numbers, donor, fixed_bytes, bytes, blocker, attrs)
 XOFFSET_REGISTER_SCHEMA_NAME(BulkRoot, "test.v4.bulk-replacement.v1")
 struct PadRec { std::uint32_t id; std::uint64_t value; };
+XOFFSET_RECORD_DERIVED(PadRec, (), id, value)
 static_assert(xo::has_implicit_padding_v<PadRec> && sizeof(PadRec) == 16);
 struct PadRoot { xo::XVector<PadRec> dst, src; };
+XOFFSET_RECORD_DERIVED(PadRoot, (), dst, src)
 XOFFSET_REGISTER_SCHEMA_NAME(PadRoot, "test.v4.bulk-copy-assign.v1")
 struct WithDefaultCallback {
     static inline unsigned calls = 0;

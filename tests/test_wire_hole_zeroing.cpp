@@ -31,6 +31,8 @@ struct Root {
     xo::XVector<xo::XString> big;
 };
 } // namespace hz
+XOFFSET_RECORD_DERIVED(hz::Entry, (), flag, value, note)
+XOFFSET_RECORD_DERIVED(hz::Root, (), secret, entries, filler, big)
 
 XOFFSET_REGISTER_SCHEMA_NAME(hz::Root, "test.wire_hole_zeroing.root")
 namespace XOffsetDatastructure {

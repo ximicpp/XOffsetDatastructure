@@ -48,6 +48,8 @@ struct ScalarRoot {
     xo::XString blocker;
     xo::XVector<ScalarChild> children;
 };
+XOFFSET_RECORD_DERIVED(ScalarChild, (), numbers, bytes)
+XOFFSET_RECORD_DERIVED(ScalarRoot, (), numbers, bytes, reals, blocker, children)
 XOFFSET_REGISTER_SCHEMA_NAME(ScalarRoot, "test.v4.scalar-resize.v1")
 namespace {
 void need(bool value, const char* what) { if (!value) throw std::runtime_error(what); }

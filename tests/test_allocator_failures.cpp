@@ -19,6 +19,7 @@ void operator delete[](void* p) noexcept {std::free(p);}
 void operator delete(void* p,std::size_t) noexcept {std::free(p);}
 void operator delete[](void* p,std::size_t) noexcept {std::free(p);}
 struct AllocatorFailureRoot {XVector<std::uint32_t> values;};
+XOFFSET_RECORD_DERIVED(AllocatorFailureRoot, (), values)
 XOFFSET_REGISTER_SCHEMA_NAME(AllocatorFailureRoot,"test.AllocatorFailureRoot")
 namespace {
 using Holes=std::vector<XBufferCore::WireHole>;

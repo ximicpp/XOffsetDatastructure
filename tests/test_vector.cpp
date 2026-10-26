@@ -5,21 +5,26 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct VectorTest {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     VectorTest(Allocator allocator) 
         : intVector(allocator), 
           floatVector(allocator),
           stringVector(allocator) {}
+#endif
     
     XVector<int> intVector;
     XVector<float> floatVector;
     XVector<XString> stringVector;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(VectorTest, (), intVector, floatVector, stringVector)
+#endif
 
 bool test_vector_operations() {
     std::cout << "\n[TEST] Vector Operations\n";

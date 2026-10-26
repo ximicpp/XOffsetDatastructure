@@ -25,12 +25,15 @@ struct TailExpansionRoot {
     XString label;
     XVector<XString> nested;
 };
+XOFFSET_RECORD_DERIVED(TailExpansionRoot, (), id, values, other, label, nested)
 XOFFSET_REGISTER_SCHEMA_NAME(TailExpansionRoot, "test.TailExpansionRoot")
 
 struct alignas(65536) TailAlignedValue {
     std::int64_t value{};
 };
 struct TailAlignedRoot { XVector<TailAlignedValue> values; };
+XOFFSET_RECORD_DERIVED(TailAlignedValue, (), value)
+XOFFSET_RECORD_DERIVED(TailAlignedRoot, (), values)
 
 namespace {
 

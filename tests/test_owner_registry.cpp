@@ -35,6 +35,7 @@ void operator delete[](void* ptr, std::size_t) noexcept { std::free(ptr); }
 
 using namespace XOffsetDatastructure;
 struct RegistryRoot { std::int64_t value{}; };
+XOFFSET_RECORD_DERIVED(RegistryRoot, (), value)
 XOFFSET_REGISTER_SCHEMA_NAME(RegistryRoot, "test.RegistryRoot")
 
 namespace {

@@ -72,6 +72,8 @@ struct HiddenRawOnly { xo::XVector<RawOnly> later; };
 // An empty HiddenRawOnly::later is still future-negative: domain checking is
 // over types, not only the values present in the first received fixture.
 } // namespace receive_custom_v2_examples
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::RawOnly, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenRawOnly, (), later)
 
 // These two application-defined policies are separate from the library's
 // admission algorithm. Their layout/representation and complete ownership

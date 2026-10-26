@@ -6,7 +6,10 @@
 #include <iostream>
 #include <iomanip>
 #include "../xoffsetdatastructure.hpp"
+#if __has_include(<boost/typelayout.hpp>) // C++26 builds: TypeLayout prints the signature
 #include <boost/typelayout.hpp>
+#define XOFFSET_HELLO_TYPELAYOUT 1
+#endif
 #include "player.hpp"
 
 using namespace XOffsetDatastructure;
@@ -123,6 +126,7 @@ int main() {
         std::cout << "\n";
     }
     
+#ifdef XOFFSET_HELLO_TYPELAYOUT
     // 9. Show type signature (compile-time calculated via boost::typelayout)
     std::cout << "\n9. Type Signature (compile-time, zero runtime cost):\n";
     std::cout << "   Player definition signature:\n   ";
@@ -136,6 +140,7 @@ int main() {
     std::cout << "   - @8[name]:...:  Field 'name' (XString) at offset 8\n";
     std::cout << "   - @40[items]:...: Field 'items' (XVector) at offset 40\n";
     std::cout << "\n   [OK] Type signature matches memory layout!\n";
+#endif
     
     std::cout << "\n=== Done! ===\n\n";
     return 0;

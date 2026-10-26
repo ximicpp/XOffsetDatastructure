@@ -5,11 +5,12 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct InnerObject {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
 
     // Primary allocator constructor.
@@ -26,29 +27,43 @@ struct InnerObject {
     template <typename Allocator>
     InnerObject(InnerObject&& other, Allocator allocator)
         : id(other.id), data(std::move(other.data), allocator) {}
+#endif
 
     int id;
     XVector<int> data;
 };
 
 struct MiddleObject {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     MiddleObject(Allocator allocator) 
         : name(allocator), inner(allocator) {}
+#endif
     
     XString name;
     InnerObject inner;
 };
 
 struct OuterObject {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     OuterObject(Allocator allocator) 
         : title(allocator), middle(allocator), innerList(allocator) {}
+#endif
     
     XString title;
     MiddleObject middle;
     XVector<InnerObject> innerList;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(MiddleObject, (), name, inner)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(InnerObject, (), id, data)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(OuterObject, (), title, middle, innerList)
+#endif
 
 bool test_nested_structures() {
     std::cout << "\n[TEST] Nested Structures\n";

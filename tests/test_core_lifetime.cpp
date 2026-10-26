@@ -28,6 +28,9 @@ struct LifetimeRoot {
     xo::XVector<std::uint32_t> numbers;
     xo::XVector<LifetimeRecord> records;
 };
+XOFFSET_RECORD_DERIVED(LifetimeNested, (), text)
+XOFFSET_RECORD_DERIVED(LifetimeRecord, (), enabled, id, name, samples, nested)
+XOFFSET_RECORD_DERIVED(LifetimeRoot, (), source0, source1, words, numbers, records)
 namespace XOffsetDatastructure {
 template<> struct wire_record_layout<LifetimeNested> { static constexpr bool ordinary_members = true; };
 template<> struct wire_record_layout<LifetimeRecord> { static constexpr bool ordinary_members = true; };
