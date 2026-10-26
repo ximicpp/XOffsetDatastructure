@@ -82,39 +82,25 @@ void registration_failure_preserves_owners() {
     assert(loaded.root<RegistryRoot>().value == 42);
 }
 
-void actual_heap_failure_preserves_owners(bool seek_rehash) {
-    // Run in a fresh process so previous tests cannot leave a large bucket
-    // allocation behind and suppress the rehash case. A live seed means both
-    // failure modes must preserve an already-populated owner index.
+void actual_heap_failure_preserves_owners() {
+    // A live seed means the failure must preserve already-registered owners.
     std::vector<XBuffer> owners;
     owners.reserve(128);
     owners.push_back(make_buffer(0));
+    // The record is the first host allocation of a new ordinary owner.
+    fail_host_allocation_after = 0;
     bool observed_failure = false;
-    for (unsigned attempt = 1; attempt < 128 && !observed_failure; ++attempt) {
-        fail_host_allocation_after = seek_rehash ? 1 : 0;
-        try {
-            auto next = make_buffer(attempt);
-            // A successful insertion used only one node allocation. Disarm
-            // before unrelated test work, retain it and approach rehash.
-            fail_host_allocation_after = -1;
-            owners.push_back(std::move(next));
-        } catch (const XBadAlloc&) {
-            assert(fail_host_allocation_after == -1);
-            observed_failure = true;
-        }
-        fail_host_allocation_after = -1;
-    }
-    assert(observed_failure);
-    for (std::size_t i = 0; i < owners.size(); ++i) {
-        assert(owners[i].root<RegistryRoot>().value == static_cast<std::int64_t>(i));
-        auto alloc = owners[i].allocator<std::int64_t>();
-        auto* value = alloc.allocate(1);
-        *value = i + 71;
-        assert(*value == static_cast<std::int64_t>(i + 71));
-        alloc.deallocate(value, 1);
-    }
-    // Retry after the real allocator failure, then release every live owner.
-    // A stale key from the failed insertion would reject or misroute this owner.
+    try { (void)make_buffer(1); } catch (const XBadAlloc&) { observed_failure = true; }
+    assert(observed_failure && fail_host_allocation_after == -1);
+    fail_host_allocation_after = -1;
+    assert(owners[0].root<RegistryRoot>().value == 0);
+    auto seed_alloc = owners[0].allocator<std::int64_t>();
+    auto* seed_value = seed_alloc.allocate(1);
+    *seed_value = 71;
+    assert(*seed_value == 71);
+    seed_alloc.deallocate(seed_value, 1);
+    // Retry after the real allocator failure. A half-published record from
+    // the failed attempt would misroute this owner.
     auto retry = make_buffer(999);
     assert(retry.root<RegistryRoot>().value == 999);
     auto alloc = retry.allocator<std::int64_t>();
@@ -122,6 +108,30 @@ void actual_heap_failure_preserves_owners(bool seek_rehash) {
     *value = 123;
     assert(*value == 123);
     alloc.deallocate(value, 1);
+}
+
+void ordinary_registration_allocates_only_its_record() {
+    // Ordinary owners are not indexed (only direct-receive owners are, for
+    // canonical_bytes_at): registration is exactly one host allocation, so a
+    // failure armed for the second allocation is never reached, however many
+    // owners are live.
+    std::vector<XBuffer> owners;
+    owners.reserve(128);
+    for (unsigned i = 0; i < 128; ++i) {
+        fail_host_allocation_after = 1;
+        owners.push_back(make_buffer(i));
+        assert(fail_host_allocation_after == 0);
+        fail_host_allocation_after = -1;
+    }
+    for (std::size_t i = 0; i < owners.size(); ++i) {
+        assert(owners[i].root<RegistryRoot>().value == static_cast<std::int64_t>(i));
+        auto alloc = owners[i].allocator<std::int64_t>();
+        auto* value = alloc.allocate(1);
+        *value = i + 71;
+        assert(*value == static_cast<std::int64_t>(i + 71));
+        alloc.deallocate(value, 1);
+        if (i % 32 == 0) check_registry_identity(owners[i], static_cast<std::int64_t>(i));
+    }
 }
 
 void transfer_matrix() {
@@ -211,8 +221,8 @@ void independent_threads() {
 int main(int argc, char** argv) {
     if (argc == 2) {
         const std::string_view mode(argv[1]);
-        if (mode == "--fail-node") actual_heap_failure_preserves_owners(false);
-        else if (mode == "--fail-rehash") actual_heap_failure_preserves_owners(true);
+        if (mode == "--fail-record") actual_heap_failure_preserves_owners();
+        else if (mode == "--record-only") ordinary_registration_allocates_only_its_record();
         else return 2;
         return 0;
     }
