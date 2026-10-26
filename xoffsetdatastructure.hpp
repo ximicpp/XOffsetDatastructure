@@ -234,6 +234,17 @@ namespace XOffsetDatastructure {
     using XSlotStorageStats = detail::SlotStorageStats;
 
 
+// C++26 gives an uninitialized automatic object a defined (erroneous) value,
+// which GCC implements by zeroing it; a large scratch object that is filled
+// before it is read opts out.
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(indeterminate)
+#define XOFFSET_INDETERMINATE [[indeterminate]]
+#endif
+#endif
+#ifndef XOFFSET_INDETERMINATE
+#define XOFFSET_INDETERMINATE
+#endif
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_MOVE_INLINE __forceinline
 #define XOFFSET_DETAIL_MOVE_COLD __declspec(noinline)
@@ -652,38 +663,6 @@ namespace XOffsetDatastructure {
                 static_cast<const char*>(arena) - sizeof(void*));
         }
 
-        // D5 fast paths (see FrontRow), decided from the arena address alone:
-        // they touch the host prefix page and the block, never the Core, its
-        // free table or bin storage. `bytes` is a block size. A null result
-        // (false) leaves the request to the owner's allocate_block
-        // (retire_block), which decides it exactly as before.
-        static XOFFSET_DETAIL_MOVE_INLINE void* front_allocate(void* arena, std::uint32_t bytes,
-                                                               std::size_t alignment) noexcept {
-            auto* base = static_cast<char*>(arena);
-            if (bytes - 1u < front_max && alignment <= 8u && front_capable(base)) [[likely]] {
-                const auto bin = bytes / 8u - 1u;
-                if (front_row(base, bin).count != 0 && owner_from_arena_noexcept(base)) [[likely]]
-                    return base + front_pop(base, bin);
-            }
-            return nullptr;
-        }
-
-        // Only a push into a row with room; a full row spills through the owner.
-        static XOFFSET_DETAIL_MOVE_INLINE bool front_retire(void* arena, void* ptr, std::uint32_t bytes) noexcept {
-            auto* base = static_cast<char*>(arena);
-            if (bytes - 1u >= front_max || !front_capable(base)) return false;
-            const auto offset = reinterpret_cast<std::uintptr_t>(ptr) - reinterpret_cast<std::uintptr_t>(base);
-            const auto logical = detail::VirtualMemoryStorage::logical_bytes_at(base);
-            const auto bin = bytes / 8u - 1u;
-            if (offset >= logical || bytes > logical - offset || front_row(base, bin).count == front_ring ||
-                !owner_from_arena_noexcept(base)) return false;
-            // M3, as in retire_block_general.
-            zero_retired(ptr, bytes);
-            auto entry = static_cast<std::uint32_t>(offset);
-            (void)front_push(base, bin, entry);
-            return true;
-        }
-
         // ---- V2 allocator (host-side free table) ------------------------
         // `bytes` is a block size: a nonzero multiple of 8. Exact-size bins up
         // to free_small_max serve reuse in O(1); a larger free block is split
@@ -848,7 +827,7 @@ namespace XOffsetDatastructure {
             const auto identity = owner_record_;
             FreeTablePtr table; // no holes: an absent table is an exact, empty one
             const bool front = front_capable(buffer_.data());
-            FrontImage image;
+            FrontImage image XOFFSET_INDETERMINATE; // C++26 would zero 3 KiB per load
             try {
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
@@ -936,7 +915,7 @@ namespace XOffsetDatastructure {
         static const FrontTail& front_tail(const char* base) noexcept {
             return *reinterpret_cast<const FrontTail*>(base - 64);
         }
-        static std::uint32_t row_pop(FrontRow& row, FrontTail& tail, std::uint32_t bin) noexcept {
+        static XOFFSET_DETAIL_MOVE_INLINE std::uint32_t row_pop(FrontRow& row, FrontTail& tail, std::uint32_t bin) noexcept {
             std::uint32_t at = row.head + row.count - 1u;
             if (at >= front_ring) at -= front_ring;
             if (--row.count == 0) tail.bits &= ~(std::uint64_t(1) << bin);
@@ -946,7 +925,7 @@ namespace XOffsetDatastructure {
         }
         // False when the row was full: the entry took the oldest's place and
         // `offset` now names the evicted oldest, which belongs at V's end.
-        static bool row_push(FrontRow& row, FrontTail& tail, std::uint32_t bin, std::uint32_t& offset) noexcept {
+        static XOFFSET_DETAIL_MOVE_INLINE bool row_push(FrontRow& row, FrontTail& tail, std::uint32_t bin, std::uint32_t& offset) noexcept {
             if (row.count < front_ring) {
                 std::uint32_t at = row.head + row.count;
                 if (at >= front_ring) at -= front_ring;
@@ -962,10 +941,10 @@ namespace XOffsetDatastructure {
             offset = oldest;
             return false;
         }
-        static std::uint32_t front_pop(char* base, std::uint32_t bin) noexcept {
+        static XOFFSET_DETAIL_MOVE_INLINE std::uint32_t front_pop(char* base, std::uint32_t bin) noexcept {
             return row_pop(front_row(base, bin), front_tail(base), bin);
         }
-        static bool front_push(char* base, std::uint32_t bin, std::uint32_t& offset) noexcept {
+        static XOFFSET_DETAIL_MOVE_INLINE bool front_push(char* base, std::uint32_t bin, std::uint32_t& offset) noexcept {
             return row_push(front_row(base, bin), front_tail(base), bin, offset);
         }
         // A row whose bit is clear has count 0, so only set bits need clearing.
@@ -2542,7 +2521,6 @@ namespace XOffsetDatastructure {
                 throw XBadAlloc();
             }
             const auto block = block_bytes_of(bytes);
-            if (void* reused = XBufferCore::front_allocate(arena, block, alignment)) return reused;
             return XBufferCore::owner_from_arena(arena).allocate_block(block, alignment);
         }
 
@@ -2563,7 +2541,6 @@ namespace XOffsetDatastructure {
                                          void* ptr, std::uint32_t bytes) noexcept {
             if (!ptr || bytes == 0) return;
             const auto block = block_bytes_of(bytes);
-            if (alloc_ref.segment && XBufferCore::front_retire(alloc_ref.segment, ptr, block)) return;
             if (auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment))
                 owner->retire_block(ptr, block);
         }

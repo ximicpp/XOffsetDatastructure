@@ -103,8 +103,7 @@ struct SlotHeader {
     std::size_t dirty_end;  // payload offset from which every byte is zero
     std::uint32_t cls;
     std::uint32_t reserved;
-    char unused[SlotGeometry::header_bytes - 4 * sizeof(void*) - 2 * sizeof(std::uint32_t)];
-    std::size_t logical;    // payload - 16: copy of the owner's logical length
+    char unused[SlotGeometry::header_bytes - 3 * sizeof(void*) - 2 * sizeof(std::uint32_t)];
     void* owner;            // payload - 8: the XBufferCore owner word
 
     char* payload() noexcept { return reinterpret_cast<char*>(this) + SlotGeometry::header_bytes; }
@@ -114,7 +113,6 @@ struct SlotHeader {
 };
 static_assert(sizeof(SlotHeader) == SlotGeometry::header_bytes);
 static_assert(offsetof(SlotHeader, owner) == SlotGeometry::header_bytes - sizeof(void*));
-static_assert(offsetof(SlotHeader, logical) == SlotGeometry::header_bytes - 2 * sizeof(void*));
 
 struct SlotStorageStats {
     std::size_t chunks{0};              // mapped 4 MiB chunks (address space)
