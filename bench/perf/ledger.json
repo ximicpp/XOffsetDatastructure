@@ -224,6 +224,17 @@
       "reason": "只作记录，不放行任何指标。#98 让 callgrind 也关掉 glibc memset 的 rep stosb 路径（perf_gate.py IR_ENV 加 x86_rep_stosb_threshold，与 #84 的 movsb 同理）：valgrind 把 rep stosb 每次迭代算一条 Ir，≥ 2 KiB 的 memset 约每字节一条，是向量循环的 15–18 倍。从本 PR 起绝对 Ir 是新口径，不能和之前的门禁 JSON、校准表、ledger 里的绝对值比，head÷base 仍可比。重判 D2、P69、T4、COPS、SEND、COMPOSED、INT1 七对 × GCC 16 / P2996（同一二进制新旧口径各测一次）：14 个门禁判定全部不变，失败项不变；新旧之差全在 memset 函数，非 memset Ir 逐位相同。指标级唯一变化：D2（#33）P2996 reloc.reset 1.0065 → 1.0231（警告），base 和 head 的 memset 相同（3.14M → 0.17M Ir），head 多出的 +26,735 Ir 在 glibc 堆（malloc_consolidate），属于校准里方向不可信的分配器回收型，GCC 16 同一对是 0.9851；D2 本来判失败且已按 Mac L2 合并，不影响任何决定。改了大块清零的两对（SEND、INT1），新口径的幅度大多更接近 Mac，例如 INT1 reloc.reset 0.016/0.019 → 0.061/0.070（Mac 0.075），slg.C 0.862 → 0.987/0.979（Mac 0.962）。",
       "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/STOSB_REJUDGE.md（汇总表、逐项 memset 归因 data/moved_metrics_memset.txt、两种口径的 gate JSON 与原始 Ir）；/mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 4 节（RH 原型 A.simulate 1.416 → 1.0003）；PR #98 描述",
       "approved_by": "「性能优化」（2026-10-26 15:40Z，按 0 类提 PR，参照 #85 重判已有门禁对）"
+    },
+    {
+      "id": "reloc-ord-element-records",
+      "pr": 102,
+      "metric": "reloc.vec.push_back_grow",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。有意的基准变更：bench/reloc 原来只把 rb::xm::HeroOrd、ArmyOrd 声明为普通记录，漏了它们容器里的元素记录 rb::Skill、rb::Buff、rb::Troop；receive_raw_supported 要求类类型元素也有 ordinary_members，所以 HeroOrd 一直不满足 shift_relocate_supported，.ord 用例和 .plain 一样逐元素搬动（G9 里 hero.*.ord 比 std 慢 4.6× 的主因）。按使用指南 §3.1 补上，并加 static_assert 锁住 HeroOrd 走 SHIFT、HeroPlain 不走。门禁三份都用 head 的基准代码编，本 PR 不会改变任何门禁比值。同一库（主线 7620bc3）新基准÷旧基准 Ir，29 个用例全测：hero.mid_erase.ord P2996 0.5380 / GCC 16 0.4276，hero.mid_insert.ord 0.5486 / 0.4434，hero.push_back_grow.ord 0.9849 / 0.9721，nested.build.ord 0.9973 / 0.9922；唯一上升是 GCC 16 reloc.vec.push_back_grow 1.0001（+69 Ir），其余（全部 .plain、map、set、str、其他 vec、reset）两种编译器都是 1.0000。云端计时（P2996，3×41 轮，÷std）hero.mid_erase.ord 5.28× → 2.66×，hero.mid_insert.ord 5.18× → 2.62×。G9 的 hero.* 数字从本 PR 起是新基准，要在下一个 G8/G9 检查点或 reloc 批次重测，不能和之前的批次直接比。",
+      "evidence": "PR #102 描述；/mnt/project-files/pareto-rivals-20261024/round2/reloc_ir_old_vs_new_bench.txt（两种编译器 29 个用例新旧 Ir）与 reloc_timing/；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「G9 基准补声明」节",
+      "approved_by": "待「性能优化」批准（基准变更请求）"
     }
   ]
 }
