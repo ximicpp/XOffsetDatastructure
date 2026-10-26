@@ -1,3 +1,28 @@
+add_executable(bench_compare bench_compare.cpp)
+configure_xoffset_target(bench_compare)
+
+# Exact target-matrix inventory verifier.
+add_executable(check_signature_matrix check_signature_matrix.cpp)
+target_compile_features(check_signature_matrix PRIVATE cxx_std_17)
+target_include_directories(check_signature_matrix PRIVATE
+    "${PROJECT_SOURCE_DIR}")
+set_target_properties(check_signature_matrix PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+if(XOFFSET_BUILD_TESTS)
+add_test(
+    NAME check_signature_matrix
+    COMMAND $<TARGET_FILE:check_signature_matrix> "${PROJECT_SOURCE_DIR}/tools/sigs")
+set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
+endif()
+
+# Signature export and its checks use reflection and TypeLayout: C++26 only.
+if(NOT XOFFSET_CXX_STANDARD STREQUAL "26")
+    foreach(name export_signatures check_signature_regeneration check_compat)
+        set_property(GLOBAL APPEND PROPERTY XOFFSET_CXX26_ONLY_NOT_BUILT ${name})
+    endforeach()
+    return()
+endif()
+
 set(XOFFSET_SIG_BASELINES
     sigs/arm64_android_clang.sig.hpp
     sigs/arm64_ios_clang.sig.hpp
@@ -50,9 +75,6 @@ configure_file(
 add_executable(export_signatures export_signatures.cpp)
 configure_xoffset_target(export_signatures)
 
-add_executable(bench_compare bench_compare.cpp)
-configure_xoffset_target(bench_compare)
-
 if(XOFFSET_BUILD_TESTS)
 add_test(
     NAME check_signature_regeneration
@@ -62,20 +84,6 @@ add_test(
         -DGENERATED_SIG_DIR=${PROJECT_BINARY_DIR}/generated_sigs
         -P ${CMAKE_CURRENT_SOURCE_DIR}/check_signature_regeneration.cmake)
 set_tests_properties(check_signature_regeneration PROPERTIES LABELS "tooling")
-endif()
-
-# Exact target-matrix inventory verifier.
-add_executable(check_signature_matrix check_signature_matrix.cpp)
-target_compile_features(check_signature_matrix PRIVATE cxx_std_17)
-target_include_directories(check_signature_matrix PRIVATE
-    "${PROJECT_SOURCE_DIR}")
-set_target_properties(check_signature_matrix PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
-if(XOFFSET_BUILD_TESTS)
-add_test(
-    NAME check_signature_matrix
-    COMMAND $<TARGET_FILE:check_signature_matrix> "${PROJECT_SOURCE_DIR}/tools/sigs")
-set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
 endif()
 
 # Lightweight baseline verifier: consumes committed .sig.hpp files only.

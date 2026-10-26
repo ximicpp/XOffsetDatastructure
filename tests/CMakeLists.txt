@@ -1,4 +1,29 @@
+# Tests that ask P2996 reflection or TypeLayout themselves (std::meta in the
+# test, TypeLayout signatures, member counts or safety levels, zero-boilerplate
+# records): C++26 builds only. The C++20/C++23 builds list them in
+# test-inventory.json as cxx26_only_not_built.
+set(XOFFSET_CXX26_ONLY_TESTS
+    test_canonical_cold_no_callback
+    test_canonical_zero_target
+    test_enum_support
+    test_field_limit_fix
+    test_reflection_advanced
+    test_reflection_core
+    test_subtree_copy
+    test_type_safety
+    test_type_signatures
+    test_zero_boilerplate
+)
+
+function(xoffset_cxx26_only name)
+    set_property(GLOBAL APPEND PROPERTY XOFFSET_CXX26_ONLY_NOT_BUILT ${name})
+endfunction()
+
 function(add_xoffset_test test_name test_label)
+    if(NOT XOFFSET_CXX_STANDARD STREQUAL "26" AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+        xoffset_cxx26_only(${test_name})
+        return()
+    endif()
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
     xoffset_enable_test_assertions(${test_name})
@@ -194,18 +219,26 @@ set_tests_properties(require_no_padding_fail PROPERTIES
     PASS_REGULAR_EXPRESSION "has implicit padding bytes")
 
 # XOFFSET_ORDINARY_RECORDS on a record that is not ordinary must fail the build.
-foreach(variant overlap base bit_field)
-    add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
-    configure_xoffset_target(ordinary_records_${variant}_fail)
-    add_test(NAME ordinary_records_${variant}_fail
-        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ordinary_records_${variant}_fail --config $<CONFIG>)
-endforeach()
-set_tests_properties(ordinary_records_overlap_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "has overlapping members")
-set_tests_properties(ordinary_records_base_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
-set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
+# The macro is the C++26 zero-boilerplate declaration; XOFFSET_RECORD carries
+# the same promises in the C++20/C++23 builds.
+if(XOFFSET_CXX_STANDARD STREQUAL "26")
+    foreach(variant overlap base bit_field)
+        add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
+        configure_xoffset_target(ordinary_records_${variant}_fail)
+        add_test(NAME ordinary_records_${variant}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ordinary_records_${variant}_fail --config $<CONFIG>)
+    endforeach()
+    set_tests_properties(ordinary_records_overlap_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "has overlapping members")
+    set_tests_properties(ordinary_records_base_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
+    set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
+else()
+    foreach(variant overlap base bit_field)
+        xoffset_cxx26_only(ordinary_records_${variant}_fail)
+    endforeach()
+endif()
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
