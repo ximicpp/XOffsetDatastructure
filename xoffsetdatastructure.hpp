@@ -47,6 +47,9 @@
 #include <atomic>
 #include <map>
 #include <unordered_map>
+#if defined(__linux__)
+#include <cerrno>
+#endif
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
 #include <cstdio>
 #include <typeinfo>
@@ -633,7 +636,7 @@ namespace XOffsetDatastructure {
                         check_owner_resolves();
                         const auto offset = exact.back();
                         exact.pop_back();
-                        if (exact.empty()) table->nonempty[bin / 64u] &= ~(std::uint64_t(1) << (bin % 64u));
+                        if (exact.empty()) table->clear_nonempty(bin);
                         table->bytes -= bytes;
                         --table->count;
                         return payload_byte_address(offset);
@@ -688,7 +691,7 @@ namespace XOffsetDatastructure {
                     // M3, as in retire_block_general.
                     zero_retired(ptr, bytes);
                     slot.push_back(static_cast<std::uint32_t>(address - base));
-                    table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    table->mark_nonempty(bin);
                     table->bytes += bytes;
                     ++table->count;
                     return;
@@ -728,6 +731,25 @@ namespace XOffsetDatastructure {
             for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
         }
 
+        // Visits only free blocks of at least min_bytes (bins from min_bytes
+        // upward, then large blocks), in no particular offset order.
+        template <typename Fn>
+        void for_each_free_block_at_least(std::uint32_t min_bytes, Fn&& fn) const {
+            if (!free_table_) return;
+            const auto& table = *free_table_;
+            const std::uint32_t first = min_bytes <= 8u ? 0u : (min_bytes + 7u) / 8u - 1u;
+            for (std::uint32_t word = first / 64u; word < FreeTable::small_bins / 64u; ++word) {
+                auto bits = table.nonempty[word];
+                if (word == first / 64u) bits &= ~std::uint64_t(0) << (first % 64u);
+                for (; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    const auto bytes = (bin + 1u) * 8u;
+                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+                }
+            }
+            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
+        }
+
         // Writes free_block_count() little-endian entries.
         void write_free_blocks(char* out) const noexcept {
             for_each_free_block([&](WireHole hole) {
@@ -754,7 +776,7 @@ namespace XOffsetDatastructure {
                         auto& slot = table->bins[bin];
                         if (slot.size() == slot.capacity()) [[unlikely]] table->grown = true;
                         slot.push_back(hole.offset);
-                        table->nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table->mark_nonempty(bin);
                         table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     } else {
                         table->large.emplace(hole.bytes, hole.offset);
@@ -783,6 +805,9 @@ namespace XOffsetDatastructure {
             static constexpr std::uint32_t small_bins = small_max / 8;
             std::vector<std::uint32_t> bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
+            // Bit w is set exactly when nonempty[w] != 0, so a search for a
+            // larger bin skips empty words without loading them.
+            std::uint32_t nonempty_words = 0;
             // Bins that may own storage (set whenever a bin gets storage,
             // never cleared by removal), so recycling visits only those bins.
             std::uint64_t touched[small_bins / 64] = {};
@@ -795,6 +820,16 @@ namespace XOffsetDatastructure {
             // Every bin growth (load_free_blocks, insert_free_block,
             // copy_free_table) sets it.
             bool grown = false;
+
+            void mark_nonempty(std::uint32_t bin) noexcept {
+                nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                nonempty_words |= 1u << (bin / 64u);
+            }
+            void clear_nonempty(std::uint32_t bin) noexcept {
+                auto& word = nonempty[bin / 64u];
+                word &= ~(std::uint64_t(1) << (bin % 64u));
+                if (word == 0) nonempty_words &= ~(1u << (bin / 64u));
+            }
         };
 
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
@@ -847,14 +882,7 @@ namespace XOffsetDatastructure {
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
                 std::size_t kept = 0;
                 if (keep_bins && !table->grown) {
-                    for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                        for (auto bits = table->nonempty[word]; bits != 0; bits &= bits - 1u)
-                            table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
-                        table->nonempty[word] = 0;
-                    }
-                    table->large.clear();
-                    table->bytes = 0;
-                    table->count = 0;
+                    clear_entries(*table); // also clears the word summary
                     cache.tables[cache.count++] = table;
                     return;
                 }
@@ -874,11 +902,26 @@ namespace XOffsetDatastructure {
                     table->nonempty[word] = 0;
                     table->touched[word] = still_touched;
                 }
+                table->nonempty_words = 0;
                 table->large.clear();
                 table->bytes = 0;
                 table->count = 0;
                 table->grown = false;
                 cache.tables[cache.count++] = table;
+            }
+
+            // Removes every entry but keeps the bins' storage (touched stays
+            // set), so refilling the table needs no host allocation.
+            static void clear_entries(FreeTable& table) noexcept {
+                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                    for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u)
+                        table.bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
+                    table.nonempty[word] = 0;
+                }
+                table.nonempty_words = 0;
+                table.large.clear();
+                table.bytes = 0;
+                table.count = 0;
             }
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
@@ -908,6 +951,7 @@ namespace XOffsetDatastructure {
                 table->nonempty[word] = src.nonempty[word];
                 table->touched[word] |= src.nonempty[word];
             }
+            table->nonempty_words = src.nonempty_words;
             table->large = src.large;
             table->bytes = src.bytes;
             table->count = src.count;
@@ -973,6 +1017,27 @@ namespace XOffsetDatastructure {
         // directly. On host OOM the entry is lost and the table is marked
         // incomplete (save_verified recomputes it from the live graph).
         bool insert_free_block(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            return insert_free_block_inline(offset, bytes) || insert_free_block_general(offset, bytes);
+        }
+
+        // A small block entering a bin that already has spare capacity needs
+        // no host allocation and runs no host callback (as D3's retire_block),
+        // so it is published without copying the owner record.
+        bool insert_free_block_inline(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            FreeTable* table = free_table_.get();
+            if (!table || bytes > FreeTable::small_max) return false;
+            const auto bin = bytes / 8u - 1u;
+            auto& slot = table->bins[bin];
+            if (slot.size() == slot.capacity()) return false;
+            check_owner_resolves();
+            slot.push_back(offset);
+            table->mark_nonempty(bin);
+            table->bytes += bytes;
+            ++table->count;
+            return true;
+        }
+
+        XOFFSET_DETAIL_NOINLINE bool insert_free_block_general(std::uint32_t offset, std::uint32_t bytes) noexcept {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
             std::vector<std::uint32_t> spare_bin;
@@ -1009,7 +1074,7 @@ namespace XOffsetDatastructure {
                             table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         }
                         slot.push_back(offset);
-                        table.nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table.mark_nonempty(bin);
                     }
                     table.bytes += bytes;
                     ++table.count;
@@ -1032,7 +1097,25 @@ namespace XOffsetDatastructure {
 
         // Remainder publication and release of the extracted map node may run
         // host callbacks; the reused block was already removed from the table.
+        // The two common outcomes run none and are published directly:
+        //  - a large remainder of a large block reuses the extracted map node
+        //    (a node insert lands after equal keys, as the emplace would);
+        //  - a small remainder of a small block enters a bin with room.
         void finish_free_split(FreeSplit& split) {
+            if (split.node) {
+                if (split.bytes > FreeTable::small_max) {
+                    check_owner_resolves();
+                    auto& table = *free_table_;
+                    split.node.key() = split.bytes;
+                    split.node.mapped() = split.offset;
+                    table.large.insert(std::move(split.node));
+                    table.bytes += split.bytes;
+                    ++table.count;
+                    return;
+                }
+            } else if (split.bytes == 0 || insert_free_block_inline(split.offset, split.bytes)) {
+                return;
+            }
             const auto identity = owner_record_;
             { auto released = std::move(split.node); }
             if (split.bytes) push_free_block(split.offset, split.bytes);
@@ -1047,23 +1130,32 @@ namespace XOffsetDatastructure {
                 if (!exact.empty()) {
                     found_offset = exact.back();
                     exact.pop_back();
-                    if (exact.empty()) table.nonempty[bin / 64u] &= ~(std::uint64_t(1) << (bin % 64u));
+                    if (exact.empty()) table.clear_nonempty(bin);
                     table.bytes -= bytes;
                     --table.count;
                     return payload_byte_address(found_offset);
                 }
-                // Smallest larger nonempty bin.
-                for (auto word = (bin + 1u) / 64u; word < FreeTable::small_bins / 64u; ++word) {
-                    auto bits = table.nonempty[word];
-                    if (word == (bin + 1u) / 64u) bits &= ~std::uint64_t(0) << ((bin + 1u) % 64u);
-                    if (bits == 0) continue;
+                // Smallest larger nonempty bin: the rest of bin's own word,
+                // then the first nonempty word after it.
+                const auto first = (bin + 1u) / 64u;
+                std::uint64_t bits = 0;
+                std::uint32_t word = first;
+                if (first < FreeTable::small_bins / 64u)
+                    bits = table.nonempty[first] & (~std::uint64_t(0) << ((bin + 1u) % 64u));
+                if (bits == 0) {
+                    const auto later = table.nonempty_words & (~0u << first << 1u);
+                    if (later != 0) {
+                        word = static_cast<std::uint32_t>(std::countr_zero(later));
+                        bits = table.nonempty[word];
+                    }
+                }
+                if (bits != 0) {
                     const auto larger = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     auto& source = table.bins[larger];
                     found_offset = source.back();
                     found_bytes = (larger + 1u) * 8u;
                     source.pop_back();
-                    if (source.empty()) table.nonempty[larger / 64u] &= ~(std::uint64_t(1) << (larger % 64u));
-                    break;
+                    if (source.empty()) table.clear_nonempty(larger);
                 }
             }
             if (found_bytes == 0) {
@@ -1126,6 +1218,9 @@ namespace XOffsetDatastructure {
 
         // Host-only identity. A record follows one payload reservation, never a
         // particular Core object's address, and is never revived after release.
+        // Only direct-receive (canonical) records enter the global index, the
+        // sole consumer of which is canonical_bytes_at; an ordinary record is
+        // just the identity lease that host-callback revalidation reads.
         inline static std::atomic<std::size_t> canonical_active_count_{0};
         struct OwnerRecord {
             const void* const payload;
@@ -1133,6 +1228,8 @@ namespace XOffsetDatastructure {
             std::byte* const canonical_origin;
             const std::size_t canonical_extent;
             std::atomic<bool> canonical_registered{false};
+            // Written before the record is published, then read only by its owner.
+            bool indexed = false;
             OwnerRecord(const void* base, XBufferCore* value,
                     std::byte* origin = nullptr, std::size_t extent = 0) noexcept
                 : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
@@ -1207,47 +1304,6 @@ namespace XOffsetDatastructure {
 
         static size_type align_up(size_type value, size_type alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
-        }
-
-        static XBufferCore& owner_from_payload_ptr(const void* ptr) {
-            detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
-            OwnerCache* cache = nullptr;
-            if (owner_cache_available()) {
-                cache = &owner_cache();
-                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
-                    const auto slot = (cache->last + attempt) % 4u;
-                    auto& record = cache->records[slot];
-                    if (record && record->payload == ptr) {
-                        if (auto* owner = record->owner.load(std::memory_order_acquire)) {
-                            detail::owner_lookup_count(&detail::OwnerLookupStats::cache_hits);
-                            cache->last = slot;
-                            return *owner;
-                        }
-                        detail::owner_lookup_count(&detail::OwnerLookupStats::dead_records);
-                        record.reset();
-                    }
-                }
-            }
-            detail::owner_lookup_count(&detail::OwnerLookupStats::cold_lookups);
-            OwnerRecordPtr record;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                const auto found = state.owners.find(ptr);
-                if (found != state.owners.end()) record = found->second;
-            }
-            // Error construction and all shared-owner releases happen unlocked.
-            if (!record) throw XException("arena owner lookup failed");
-            if (cache) {
-                const auto slot = cache->next;
-                // Keep the local lease across release of an evicted record.
-                cache->records[slot] = record;
-                cache->last = slot;
-                cache->next = (slot + 1u) % 4u;
-            }
-            auto* owner = record->owner.load(std::memory_order_acquire);
-            if (!owner) throw XException("arena owner lookup failed");
-            return *owner;
         }
 
         static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
@@ -1334,6 +1390,7 @@ namespace XOffsetDatastructure {
                 throw XException(
                     "XBufferCore: payload used_end out of range");
             }
+            zero_past_used_end();
             publish_host_owner();
             register_registry();
         }
@@ -1365,6 +1422,8 @@ namespace XOffsetDatastructure {
             auto record = std::move(owner_record_);
             if (!record) return;
             record->owner.store(nullptr, std::memory_order_release);
+            // An ordinary record never entered the index: no mutex, no node.
+            if (!record->indexed) return;
             RegistryOwners::node_type retired_node;
             {
                 auto& state = registry_state();
@@ -1378,29 +1437,17 @@ namespace XOffsetDatastructure {
             // The node/control block destructor and operator delete are unlocked.
         }
 
+        // Ordinary owners (init_fresh / init_from_storage) only; direct-receive
+        // owners are indexed by VerifiedReceiveAccess. An ordinary record is
+        // not indexed: canonical_bytes_at returns null for it anyway, and
+        // reservations never overlap (each payload follows its own host page),
+        // so leaving it out cannot change any canonical query result.
         void register_registry() {
             if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
             try {
-                // Both allocations, including any new_handler reentry, precede
-                // the mutex. std::map inserts this same-allocator node without
-                // allocation, comparison callbacks, rehash or record creation.
-                auto record = std::make_shared<OwnerRecord>(buffer_.data(), this,
-                    buffer_.canonical_byte_origin(), buffer_.maximum_capacity());
-                RegistryOwners prepared;
-                prepared.emplace(record->payload, record);
-                auto node = prepared.extract(prepared.begin());
-                bool inserted = false;
-                {
-                    auto& state = registry_state();
-                    std::lock_guard lock(state.mutex);
-                    if (state.owners.find(record->payload) == state.owners.end()) {
-                        state.owners.insert(std::move(node));
-                        owner_record_ = record;
-                        mark_canonical_registration(*record);
-                        inserted = true;
-                    }
-                }
-                if (!inserted) throw XException("duplicate arena owner registration");
+                // The only allocation, including any new_handler reentry,
+                // precedes publication of the record.
+                owner_record_ = std::make_shared<OwnerRecord>(buffer_.data(), this);
                 detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
                 detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
             } catch (const std::bad_alloc&) {
@@ -1498,9 +1545,18 @@ namespace XOffsetDatastructure {
         // are kept; every typed pointer into the old content is invalidated
         // (epoch), and the owner is left without typed root access until the
         // caller finishes verification.
-        void begin_reinit() noexcept {
+        void begin_reinit(bool keep_table = false) noexcept {
             ++m_epoch;
-            if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
+            if (keep_table && free_table_) {
+                // Emptied detached (releasing map nodes may reenter), then
+                // kept with its bin storage: the next holes need neither a
+                // fresh 12 KiB table nor fresh bins.
+                FreeTablePtr kept = std::move(free_table_);
+                FreeTableRecycler::clear_entries(*kept);
+                if (!free_table_) free_table_ = std::move(kept);
+            } else {
+                if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
+            }
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
@@ -1510,19 +1566,11 @@ namespace XOffsetDatastructure {
         }
 
         // Same admission as init_from_storage, against this owner's maximum.
+        // The two halves are forced inline so that reload_verified compiles
+        // as it did before begin_verified_reload shared them.
         template <typename Assign>
         void reinit_from_storage(const char* data, size_type size, Assign&& assign) {
-            if (buffer_.empty() && buffer_.maximum_capacity() == 0)
-                throw XException("XBufferCore: buffer has no storage");
-            begin_reinit();
-            if (size > MAX_PAYLOAD) throw XBadAlloc();
-            if (!data || size < sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload too small");
-            }
-            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
-            // Holes are unknown until verification supplies the hole table.
-            free_table_lost_ = true;
+            admit_reinit(size, data != nullptr);
             try {
                 assign();
             } catch (const std::bad_alloc&) {
@@ -1530,6 +1578,24 @@ namespace XOffsetDatastructure {
             } catch (const std::length_error&) {
                 throw XBadAlloc();
             }
+            check_reinit_payload();
+        }
+
+        XOFFSET_DETAIL_MOVE_INLINE void admit_reinit(size_type size, bool has_source = true) {
+            if (buffer_.empty() && buffer_.maximum_capacity() == 0)
+                throw XException("XBufferCore: buffer has no storage");
+            begin_reinit();
+            if (size > MAX_PAYLOAD) throw XBadAlloc();
+            if (!has_source || size < sizeof(arena_header)) {
+                throw XException(
+                    "XBufferCore: payload too small");
+            }
+            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
+            // Holes are unknown until verification supplies the hole table.
+            free_table_lost_ = true;
+        }
+
+        XOFFSET_DETAIL_MOVE_INLINE void check_reinit_payload() {
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
@@ -1540,6 +1606,7 @@ namespace XOffsetDatastructure {
                 throw XException(
                     "XBufferCore: payload used_end out of range");
             }
+            zero_past_used_end();
         }
 
         void reinit_from_bytes(const char* data, size_type size) {
@@ -1548,6 +1615,18 @@ namespace XOffsetDatastructure {
 
         void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
             reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
+        }
+
+        // In-place direct receive (XBuffer::begin_verified_reload): the
+        // admission of reinit, then [0, size) exposed to the writer without
+        // clearing. Returns the offset from which bytes are still zero.
+        std::size_t reinit_for_overwrite(size_type size) {
+            admit_reinit(size);
+            try {
+                return buffer_.expose_for_overwrite(size);
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            }
         }
 
         // clone()/clone_into(): the host state that travels with a payload
@@ -1600,15 +1679,31 @@ namespace XOffsetDatastructure {
             return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool()};
         }
 
-        // Empty arena: header only, no root, empty exact free table. Bytes
-        // above the header become dirty-below-zero_from_ and are zeroed by the
-        // regrowth to `logical` (or by any later growth). noexcept: if the
-        // storage cannot hold a header the owner simply stays without one.
+        // Empty arena: header only, no root, empty exact free table.
+        // N2: every logical byte at or past used_end is zero (growth zeroes
+        // what it exposes, used_end only rises until a reset, and loads zero
+        // the bytes past the loaded used_end), so a reset that keeps the
+        // logical length clears exactly [header, used_end): live blocks and
+        // holes alike. Otherwise bytes above the header become
+        // dirty-below-zero_from_ and are zeroed by the regrowth to `logical`
+        // (or by any later growth). noexcept: if the storage cannot hold a
+        // header the owner simply stays without one.
         void reset_arena(size_type logical) noexcept {
-            begin_reinit();
+            begin_reinit(true);
             if (buffer_.maximum_capacity() < min_payload_size()) return;
+            if (logical == buffer_.size() && logical >= min_payload_size()) {
+                const auto used = used_end_clamped();
+                std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
+                write_empty_header();
+                return;
+            }
             if (buffer_.size() < min_payload_size() && !buffer_.grow_to(min_payload_size())) return;
             if (buffer_.size() > min_payload_size()) buffer_.resize_logical(min_payload_size());
+            write_empty_header();
+            if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
+        void write_empty_header() noexcept {
             auto* sm = arena();
             std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
             sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
@@ -1617,7 +1712,14 @@ namespace XOffsetDatastructure {
             sm->used_end = min_payload_size();
             sm->reserved0 = 0;
             sm->reserved1 = 0;
-            if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
+        // N2: the bytes past a loaded payload's used_end are zeroed, so the
+        // invariant above holds after every load. A verified load has none
+        // (used_end == used_bytes); an unverified one may carry any bytes there.
+        void zero_past_used_end() noexcept {
+            const auto used = static_cast<size_type>(arena()->used_end);
+            if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);
         }
 
         // Storage-associated access/schema state belongs to the owner so even
@@ -1851,6 +1953,29 @@ namespace XOffsetDatastructure {
         T* resolve_rel32_live(const std::int32_t* origin, std::int32_t delta) noexcept {
             auto* base = reinterpret_cast<const char*>(origin);
             return std::launder(reinterpret_cast<T*>(const_cast<char*>(base + delta)));
+        }
+
+        // memmove of 1..16 bytes without a library call: every source byte is
+        // loaded before any store, so src may overlap dst.
+        inline void move_short_bytes(char* dst, const char* src, std::size_t count) noexcept {
+            if (count >= 8) {
+                std::uint64_t head, tail;
+                std::memcpy(&head, src, 8);
+                std::memcpy(&tail, src + count - 8, 8);
+                std::memcpy(dst, &head, 8);
+                std::memcpy(dst + count - 8, &tail, 8);
+            } else if (count >= 4) {
+                std::uint32_t head, tail;
+                std::memcpy(&head, src, 4);
+                std::memcpy(&tail, src + count - 4, 4);
+                std::memcpy(dst, &head, 4);
+                std::memcpy(dst + count - 4, &tail, 4);
+            } else {
+                const char first = src[0], middle = src[count >> 1], last = src[count - 1];
+                dst[0] = first;
+                dst[count >> 1] = middle;
+                dst[count - 1] = last;
+            }
         }
 
         template <typename T>
@@ -2343,6 +2468,30 @@ namespace XOffsetDatastructure {
         }
 
         void assign(std::string_view rhs) {
+            if (is_inline()) {
+                // A nonempty short value into a bound inline head stays
+                // inline: the general path below would do the same after
+                // its checks. rhs may alias the inline bytes (store_inline
+                // reads them all first).
+                if (rhs.size() - 1u < inline_max && is_bound()) [[likely]] {
+                    store_inline(rhs.data(), static_cast<std::uint32_t>(rhs.size()));
+                    return;
+                }
+            } else if (rhs.size() - 1u < capacity_) [[likely]] {
+                // Nonempty and fits the out-of-line block. capacity_ != 0
+                // without the inline flag implies a bound head with a live
+                // block, and capacity_ < MAX_PAYLOAD: the checks below are
+                // implied. rhs may alias the block (memmove).
+                auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+                const auto new_size = static_cast<std::uint32_t>(rhs.size());
+                const auto old_size = size_;
+                std::memmove(chars, rhs.data(), new_size);
+                chars[new_size] = '\0';
+                // M4: zero the old characters after the terminator.
+                if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
+                size_ = new_size;
+                return;
+            }
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
@@ -2421,6 +2570,28 @@ namespace XOffsetDatastructure {
             assign(rhs ? std::string_view(rhs) : std::string_view{});
             return *this;
         }
+
+        // Appends rhs, which may view this string's own characters. Growth at
+        // least doubles the capacity, so a run of appends is amortized O(1)
+        // per character.
+        XFixedString& append(std::string_view rhs) {
+            const auto count = rhs.size();
+            if (!is_inline() && count - 1u < std::size_t(capacity_ - size_)) [[likely]] {
+                // Nonempty and fits the out-of-line block (capacity_ != 0
+                // without the inline flag: bound, live block, below
+                // MAX_PAYLOAD). The spare bytes are zero (M4).
+                auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+                if (count <= 16) fixed_detail::move_short_bytes(chars + size_, rhs.data(), count);
+                else std::memmove(chars + size_, rhs.data(), count);
+                size_ += static_cast<std::uint32_t>(count);
+                chars[size_] = '\0';
+                return *this;
+            }
+            append_general(rhs);
+            return *this;
+        }
+
+        XFixedString& operator+=(std::string_view rhs) { return append(rhs); }
 
         bool operator==(const XFixedString& rhs) const noexcept { return view() == rhs.view(); }
         bool operator==(std::string_view rhs) const noexcept { return view() == rhs; }
@@ -2503,6 +2674,37 @@ namespace XOffsetDatastructure {
             hi |= (0x80u | count) << 24;
             std::memcpy(inline_bytes(), &lo, 8);
             std::memcpy(inline_bytes() + 8, &hi, 4);
+        }
+
+        // append() when the value is inline or null, or does not fit.
+        XOFFSET_DETAIL_NOINLINE void append_general(std::string_view rhs) {
+            ensure_bound();
+            if (rhs.empty()) return;
+            const std::size_t old_size = size();
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) throw XBadAlloc();
+            const auto new_size = static_cast<std::uint32_t>(old_size + rhs.size());
+            if (new_size <= inline_max && (is_inline() || data_delta == 0)) {
+                char bytes[inline_max];
+                if (old_size != 0) std::memcpy(bytes, inline_bytes(), old_size);
+                std::memcpy(bytes + old_size, rhs.data(), rhs.size());
+                store_inline(bytes, new_size);
+                return;
+            }
+            // rhs may view the current characters, which reserve() may move
+            // (and retire, zeroed). The new storage repeats the old extent:
+            // the characters, the terminator, then zero bytes (I1 inline
+            // padding, M4 spare capacity). Read from there after the move.
+            const char* const old_chars = data();
+            const std::size_t extent = is_inline() ? 11u : std::size_t(capacity_) + 1u;
+            const auto offset = reinterpret_cast<std::uintptr_t>(rhs.data()) -
+                reinterpret_cast<std::uintptr_t>(old_chars);
+            const bool aliases = old_chars && offset < extent;
+            const auto grown = std::max<std::uint64_t>(new_size, std::uint64_t(capacity()) * 2u);
+            reserve(static_cast<std::size_t>(std::min<std::uint64_t>(grown, XBufferCore::MAX_PAYLOAD - 1u)));
+            auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+            std::memmove(chars + old_size, aliases ? chars + offset : rhs.data(), rhs.size());
+            size_ = new_size;
+            chars[new_size] = '\0';
         }
 
         // The head has no out-of-line storage (inline or null). src may alias
@@ -2698,6 +2900,14 @@ namespace XOffsetDatastructure {
             ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
+            if (capacity_ == 0) {
+                // First storage: nothing to expand, move or retire.
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                    binding(), static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
+                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                capacity_ = new_cap;
+                return;
+            }
             if (fixed_detail::try_expand_dynamic_bytes(
                     binding(), data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                     static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T))) {
@@ -3548,6 +3758,8 @@ namespace XOffsetDatastructure {
         using Base::empty;
         using Base::clear;
         using Base::reserve;
+        using Base::append;
+        using Base::operator+=;
         using Base::data;
         using Base::c_str;
 
@@ -3980,20 +4192,27 @@ namespace XOffsetDatastructure {
             std::uint64_t* words(std::size_t count) {
                 if (count > capacity_) {
                     auto* fresh = new std::uint64_t[count];
-                    release();
+                    delete[] words_; // the tables may be in use (direct reload)
                     words_ = fresh;
                     capacity_ = count;
                 }
                 return words_;
             }
-            void release() noexcept {
+            // Header, extent table and hole table of a direct reload.
+            std::byte* tables(std::size_t bytes) {
+                if (bytes > tables_.size()) tables_.resize(bytes);
+                return tables_.data();
+            }
+            void release(bool tables = true) noexcept {
                 delete[] words_;
                 words_ = nullptr;
                 capacity_ = 0;
+                if (tables) std::vector<std::byte>().swap(tables_);
             }
         private:
             std::uint64_t* words_ = nullptr;
             std::size_t capacity_ = 0;
+            std::vector<std::byte> tables_;
         };
 
         // V2 validation index: one bit per 8-byte granule of the payload, one
@@ -4092,19 +4311,6 @@ namespace XOffsetDatastructure {
 
             bool member(bool free, std::size_t granule) const noexcept {
                 return ((free ? free_ : owned_)[granule / 64u] >> (granule % 64u)) & 1u;
-            }
-
-            // True when every granule of [g0, g1) is free.
-            bool all_free(std::size_t g0, std::size_t g1) const noexcept {
-                if (g0 >= g1) return true;
-                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
-                const auto first = ~std::uint64_t(0) << (g0 % 64u);
-                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
-                if (w0 == w1) return (free_[w0] & first & last) == (first & last);
-                if ((free_[w0] & first) != first) return false;
-                for (auto w = w0 + 1u; w < w1; ++w)
-                    if (free_[w] != ~std::uint64_t(0)) return false;
-                return (free_[w1] & last) == last;
             }
 
         private:
@@ -4389,22 +4595,6 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // N10: every byte skipped by a sparse wire must lie inside a hole.
-        // Holes are whole granules, so a byte is free exactly when its
-        // granule is; a trailing partial granule never is.
-        inline void require_gaps_free(const XBufferCore::WireHole* gaps, std::size_t count,
-                                      WireValidationContext& ctx) {
-            for (std::size_t i = 0; i < count; ++i) {
-                const auto gap = gaps[i];
-                if (gap.bytes == 0) continue;
-                const auto& index = ctx.general();
-                const auto g0 = std::size_t(gap.offset) / 8u;
-                const auto g1 = (std::size_t(gap.offset) + gap.bytes + 7u) / 8u;
-                if (g1 > index.granules() || !index.all_free(g0, g1))
-                    wire_reject("wire validation failed: sparse gap is not free");
-            }
-        }
-
         inline void require_exact_coverage(const WireValidationContext& ctx) {
             if (ctx.owned_bytes + ctx.free_bytes != static_cast<std::uint64_t>(ctx.end - ctx.base)) {
                 wire_reject(
@@ -4632,7 +4822,6 @@ namespace XOffsetDatastructure {
                                           std::size_t hole_count,
                                           bool check_coverage = true,
                                           std::vector<XBufferCore::WireHole>* recomputed = nullptr,
-                                          const std::vector<XBufferCore::WireHole>* gaps = nullptr,
                                           WireValidationScratch* retained = nullptr) {
             if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
@@ -4659,7 +4848,6 @@ namespace XOffsetDatastructure {
             register_allocation(&root, sizeof(T), alignof(T), ctx);
             validate_wire_value(root, ctx);
             if (check_coverage) require_exact_coverage(ctx);
-            if (gaps) require_gaps_free(gaps->data(), gaps->size(), ctx);
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
             auto& stats = wire_layout_stats<T>();
             if (ctx.cursor != WireValidationContext::no_cursor) {
@@ -5032,11 +5220,42 @@ namespace XOffsetDatastructure {
         std::uint32_t reserved0;
         // 0: the payload follows as used_bytes contiguous bytes. Otherwise an
         // extent table (extent_count x {u32 offset, u32 bytes}) precedes the
-        // concatenated extents; the gaps between extents (N10 sparse wire)
-        // must lie entirely inside holes and load as zero bytes.
+        // concatenated extents; the gaps between extents load as zero bytes
+        // (sparse wire). A gap may cover any payload bytes: the loaded
+        // payload is validated exactly like a dense one.
         std::uint64_t extent_count;
     };
     static_assert(sizeof(XWireHeaderV2) == 96 && alignof(XWireHeaderV2) == 8);
+
+    // Emission forms of save_verified / save_verified_into. Receivers
+    // accept every form; the loaded payload is byte-identical.
+    enum class XWireEmission : std::uint8_t {
+        // Default. Skips each run of at least 4 KiB of adjacent free blocks
+        // of at least 256 B (one large deletion, for example); everything
+        // else is copied. Skipped bytes are all holes, so every V2 receiver
+        // accepts it.
+        free_runs,
+        // One copy of the whole payload.
+        dense,
+        // Skips every zero run of at least 64 bytes (capacity slack, holes,
+        // zero fields), for cross-machine sends. Costs a scan of the payload.
+        // Payloads below 4 KiB, or where it would save less than max(256 B,
+        // 1/16 of the payload), stay dense.
+        zero_runs,
+    };
+    struct XSaveOptions {
+        XWireEmission emission = XWireEmission::free_runs;
+    };
+
+    // Options of save_compact / save_compact_into.
+    struct XCompactOptions {
+        // Vectors of at least 8 elements (not strings) keep size / slack_div
+        // + 1 zeroed spare elements, so a receiver that edits them does not
+        // relocate on the first insert. 0: capacity == size, byte-identical
+        // to XCompactor::compact followed by save_verified (for stored or
+        // read-only receivers).
+        std::uint32_t slack_div = 8;
+    };
 
     inline constexpr char XWIRE_MAGIC_V1[8] = {'X', 'O', 'F', 'F', 'V', '1', '\0', '\0'};
     inline constexpr char XWIRE_MAGIC_V2[8] = {'X', 'O', 'F', 'F', 'V', '2', '\0', '\0'};
@@ -5071,7 +5290,6 @@ namespace XOffsetDatastructure {
         }
 
         // ---- V2 wire layout (dense or sparse) -----------------------------
-        inline constexpr std::size_t wire_sparse_min_gap = 4096;
 
         struct WireLayout {
             const char* stored = nullptr;   // payload bytes (dense) or concatenated extents
@@ -5156,48 +5374,24 @@ namespace XOffsetDatastructure {
             return layout;
         }
 
-        // N10: payload ranges skipped by a sparse emission: maximal runs of
-        // free bytes of at least wire_sparse_min_gap.
-        inline std::vector<XBufferCore::WireHole> wire_sparse_gaps(const XBufferCore& core,
-                                                                   std::size_t used) {
-            std::vector<XBufferCore::WireHole> gaps;
-            if (core.free_block_bytes() < wire_sparse_min_gap || used == 0) return gaps;
-            const std::size_t units = used / 8u; // all offsets/sizes are multiples of 8
-            std::vector<std::uint64_t> bits((units + 63u) / 64u);
-            core.for_each_free_block([&](XBufferCore::WireHole hole) {
-                std::size_t b = hole.offset / 8u;
-                const std::size_t e = (std::size_t(hole.offset) + hole.bytes) / 8u;
-                while (b < e) {
-                    const auto word = b / 64u, bit = b % 64u;
-                    const auto n = std::min<std::size_t>(64u - bit, e - b);
-                    const auto mask = n == 64u ? ~std::uint64_t(0) : ((std::uint64_t(1) << n) - 1u) << bit;
-                    bits[word] |= mask;
-                    b += n;
-                }
-            });
-            // A run of at least min_units (>= 512) bits contains at least
-            // seven all-ones words: scan for all-ones stretches and extend
-            // each into its neighbouring partial words.
-            const std::size_t min_units = wire_sparse_min_gap / 8u;
-            const std::size_t words = bits.size();
-            constexpr auto full = ~std::uint64_t(0);
-            for (std::size_t w = 0; w < words;) {
-                if (bits[w] != full) { ++w; continue; }
-                std::size_t e = w + 1;
-                while (e < words && bits[e] == full) ++e;
-                std::size_t start = w * 64u, stop = std::min(units, e * 64u);
-                if (w != 0) start -= static_cast<std::size_t>(std::countl_one(bits[w - 1]));
-                if (e < words) stop = std::min(units, stop + static_cast<std::size_t>(std::countr_one(bits[e])));
-                if (stop - start >= min_units)
-                    gaps.push_back({static_cast<std::uint32_t>(start * 8u),
-                                    static_cast<std::uint32_t>((stop - start) * 8u)});
-                w = e;
-            }
-            return gaps;
-        }
-
         // E1 (N8): on Darwin, outputs of at least 1 MiB are copied in 256 KiB
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
+#if defined(__linux__)
+        // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
+        // 256 KiB whose next-to-last page is not resident (a fresh mapping, not
+        // a reused string) goes in 256 KiB chunks, each preceded by
+        // madvise(MADV_POPULATE_WRITE), so the kernel faults the chunk's pages
+        // in one call instead of one trap per page.
+        // A kernel without it (before 5.14) answers EINVAL once; the output
+        // is then copied as before for the rest of the process.
+#ifndef MADV_POPULATE_WRITE
+#define MADV_POPULATE_WRITE 23
+#endif
+#ifndef XOFFSET_WIRE_MADVISE
+#define XOFFSET_WIRE_MADVISE ::madvise
+#endif
+        inline std::atomic<bool> wire_populate_unsupported{false};
+#endif
         struct WireCopier {
             bool prefault = false;
             std::size_t page = 0;
@@ -5214,6 +5408,32 @@ namespace XOffsetDatastructure {
                     }
                     return;
                 }
+#elif defined(__linux__)
+                constexpr std::size_t chunk = std::size_t(256) << 10;
+                unsigned char probe_page = 1;
+                // Not the last page: libc++'s resize_and_overwrite writes the
+                // terminator before the output is filled, which makes that page
+                // resident in a fresh mapping too. n >= 256 KiB, so the page
+                // before it is still inside the copy.
+                if (prefault && n >= chunk && !wire_populate_unsupported.load(std::memory_order_relaxed) &&
+                    ::mincore(reinterpret_cast<void*>((reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)) - page),
+                              page, &probe_page) == 0 && (probe_page & 1u) == 0) {
+                    bool populate = true;
+                    for (std::size_t off = 0; off < n; off += chunk) {
+                        const auto len = std::min(chunk, n - off);
+                        if (populate) {
+                            const auto lo = reinterpret_cast<std::uintptr_t>(dst + off) & ~(page - 1u);
+                            const auto hi = (reinterpret_cast<std::uintptr_t>(dst + off) + len + page - 1u) & ~(page - 1u);
+                            if (XOFFSET_WIRE_MADVISE(reinterpret_cast<void*>(lo), hi - lo, MADV_POPULATE_WRITE) != 0 &&
+                                errno == EINVAL) {
+                                wire_populate_unsupported.store(true, std::memory_order_relaxed);
+                                populate = false;
+                            }
+                        }
+                        std::memcpy(dst + off, src + off, len);
+                    }
+                    return;
+                }
 #endif
                 std::memcpy(dst, src, n);
             }
@@ -5226,70 +5446,199 @@ namespace XOffsetDatastructure {
                 copier.page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
                 if (copier.page == 0 || (copier.page & (copier.page - 1u)) != 0) copier.prefault = false;
             }
+#elif defined(__linux__)
+            if (output_bytes >= (std::size_t(1) << 20) && !wire_populate_unsupported.load(std::memory_order_relaxed)) {
+                copier.page = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+                copier.prefault = copier.page != 0 && (copier.page & (copier.page - 1u)) == 0;
+            }
 #else
             (void)output_bytes;
 #endif
             return copier;
         }
 
-        inline std::size_t wire_output_size(const XWireHeaderV2& header,
-                                            const std::vector<XBufferCore::WireHole>& gaps) {
-            std::uint64_t skipped = 0;
-            for (const auto& gap : gaps) skipped += gap.bytes;
-            const std::uint64_t total = sizeof(XWireHeaderV2) + header.extent_count * 8u +
-                (header.used_bytes - skipped) + header.hole_count * 8u;
+        // Dense wire size: header, used_bytes of payload, hole table. Every
+        // other emission is smaller (see write_wire).
+        inline std::size_t wire_dense_size(const XWireHeaderV2& header, const char* who) {
+            const std::uint64_t total = sizeof(XWireHeaderV2) + header.used_bytes +
+                header.hole_count * sizeof(XBufferCore::WireHole);
             if (total > (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error("save_verified<T>(): output size exceeds string limit");
+                throw std::length_error(std::string(who) + ": output size exceeds string limit");
             return static_cast<std::size_t>(total);
         }
 
-        // Header must already carry used/holes; sets extent_count from gaps.
-        inline void wire_apply_gaps(XWireHeaderV2& header,
-                                    const std::vector<XBufferCore::WireHole>& gaps) {
-            if (gaps.empty()) { header.extent_count = 0; return; }
-            std::size_t extents = gaps.size();
-            if (std::uint64_t(gaps.back().offset) + gaps.back().bytes < header.used_bytes) ++extents;
-            header.extent_count = extents;
+        // ---- Free-run emission (XWireEmission::free_runs, the default) ------
+        // Candidates are free blocks of at least wire_free_run_min_block
+        // bytes (only those bins and the large blocks are visited); sorted by
+        // offset (LSD radix, 11-bit digits), adjacent candidates merge, and
+        // every merged run of at least wire_free_run_min_gap is skipped.
+        inline constexpr std::uint32_t wire_free_run_min_block = 256;
+        inline constexpr std::uint32_t wire_free_run_min_gap = 4096;
+
+        struct WireGaps {
+            std::vector<XBufferCore::WireHole> runs; // ascending, disjoint
+            std::uint64_t skipped = 0;
+            std::size_t extent_count = 0;
+        };
+
+        inline WireGaps wire_free_runs(const XBufferCore& core, std::uint64_t used) {
+            WireGaps gaps;
+            if (core.free_block_bytes() < wire_free_run_min_gap || used == 0) return gaps;
+            std::vector<XBufferCore::WireHole> candidates;
+            std::uint64_t total = 0;
+            core.for_each_free_block_at_least(wire_free_run_min_block, [&](XBufferCore::WireHole hole) {
+                candidates.push_back(hole);
+                total += hole.bytes;
+            });
+            if (total < wire_free_run_min_gap) return gaps;
+            std::vector<XBufferCore::WireHole> sorted(candidates.size());
+            unsigned bits = 0;
+            while (bits < 32u && (std::uint64_t(1) << bits) < used) ++bits;
+            for (unsigned shift = 0; shift < bits; shift += 11u) {
+                std::uint32_t count[2049] = {};
+                for (const auto& hole : candidates) ++count[((hole.offset >> shift) & 2047u) + 1u];
+                for (std::size_t i = 0; i < 2048u; ++i) count[i + 1u] += count[i];
+                for (const auto& hole : candidates) sorted[count[(hole.offset >> shift) & 2047u]++] = hole;
+                candidates.swap(sorted);
+            }
+            std::uint64_t start = 0, end = 0;
+            auto close = [&] {
+                if (end - start >= wire_free_run_min_gap) {
+                    gaps.runs.push_back({static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(end - start)});
+                    gaps.skipped += end - start;
+                }
+            };
+            for (const auto& hole : candidates) {
+                if (hole.offset == end && end != 0) { end += hole.bytes; continue; }
+                close();
+                start = hole.offset;
+                end = std::uint64_t(hole.offset) + hole.bytes;
+            }
+            close();
+            if (!gaps.runs.empty()) {
+                // The arena header is live, so no run starts at 0.
+                const auto& last = gaps.runs.back();
+                gaps.extent_count = gaps.runs.size() + (std::uint64_t(last.offset) + last.bytes < used ? 1u : 0u);
+            }
+            return gaps;
         }
 
-        // Writes header, extent table, extents and hole table (no allocation).
-        inline void write_wire(char* out, std::size_t output_size, const XWireHeaderV2& header,
-                               const std::vector<XBufferCore::WireHole>& gaps,
-                               const char* payload, const XBufferCore& core) noexcept {
-            const auto copier = wire_copier(output_size);
-            std::memcpy(out, &header, sizeof(header));
-            out += sizeof(header);
-            const auto used = static_cast<std::uint32_t>(header.used_bytes);
-            if (gaps.empty()) {
-                copier.copy(out, payload, used);
-                out += used;
-            } else {
+        // Exact wire size of a free-run emission (dense when `gaps` is empty).
+        inline std::size_t wire_free_run_size(const XWireHeaderV2& header, const WireGaps& gaps,
+                                              const char* who) {
+            return wire_dense_size(header, who) - static_cast<std::size_t>(gaps.skipped) +
+                gaps.extent_count * 8u;
+        }
+
+        // ---- Zero-run elision (XWireEmission::zero_runs) ---------------
+        // Payloads below wire_zero_scan_min_payload are not scanned. A run is
+        // found from a 64-byte aligned all-zero block and extended word by
+        // word on both sides; every skipped run is at least
+        // wire_zero_run_min bytes. The sparse form is used only when it saves
+        // at least max(wire_zero_min_saving, used / 16) bytes.
+        inline constexpr std::size_t wire_zero_run_min = 64;
+        inline constexpr std::size_t wire_zero_scan_min_payload = 4096;
+        inline constexpr std::size_t wire_zero_min_saving = 256;
+
+        // Writes the extent table of `payload` (8-aligned, `used` a multiple
+        // of 8) at `table` and returns the extent count, or 0 when no run is
+        // skipped. The table never exceeds `used` bytes: every extent holds
+        // at least one nonzero word. The first extent starts at 0 and holds
+        // the arena header (whose magic is never zero).
+        inline std::size_t wire_zero_run_extents(const char* payload, std::size_t used,
+                                                 char* table, std::uint64_t& skipped) noexcept {
+            auto word = [&](std::size_t at) noexcept {
+                std::uint64_t w;
+                std::memcpy(&w, payload + at, sizeof(w));
+                return w;
+            };
+            auto block_zero = [&](std::size_t block) noexcept {
+                std::uint64_t w[8];
+                std::memcpy(w, payload + block * 64u, sizeof(w));
+                return ((w[0] | w[1]) | (w[2] | w[3]) | (w[4] | w[5]) | (w[6] | w[7])) == 0;
+            };
+            std::size_t count = 0, cursor = 0;
+            auto emit = [&](std::size_t begin, std::size_t end) noexcept {
+                const std::uint32_t entry[2] = {static_cast<std::uint32_t>(begin),
+                                                static_cast<std::uint32_t>(end - begin)};
+                std::memcpy(table + count * 8u, entry, sizeof(entry));
+                ++count;
+            };
+            skipped = 0;
+            const std::size_t blocks = used / 64u;
+            for (std::size_t b = 0; b < blocks;) {
+                if (!block_zero(b)) { ++b; continue; }
+                std::size_t start = b * 64u;
+                while (start > cursor && word(start - 8u) == 0) start -= 8u;
+                std::size_t e = b + 1u;
+                while (e < blocks && block_zero(e)) ++e;
+                std::size_t stop = e * 64u;
+                while (stop < used && word(stop) == 0) stop += 8u;
+                if (start < 8u) start = 8u;
+                if (stop - start >= wire_zero_run_min) {
+                    emit(cursor, start);
+                    skipped += stop - start;
+                    cursor = stop;
+                }
+                // The block holding `stop` has a nonzero word at `stop`.
+                b = stop / 64u + 1u;
+            }
+            if (count == 0) return 0;
+            if (cursor < used) emit(cursor, used);
+            return count;
+        }
+
+        // Writes the wire for `header` (extent_count is set here) into `out`,
+        // which holds at least wire_free_run_size(header, gaps) bytes, or
+        // wire_dense_size(header) for zero_runs, and returns the bytes
+        // written. `gaps` comes from wire_free_runs (free_runs) or is empty.
+        // No allocation and no callback.
+        inline std::size_t write_wire(char* out, XWireHeaderV2 header, const char* payload,
+                                      const XBufferCore& core, XWireEmission emission,
+                                      const WireGaps& gaps) noexcept {
+            const auto used = static_cast<std::size_t>(header.used_bytes);
+            char* at = out + sizeof(XWireHeaderV2);
+            std::size_t extents = 0;
+            if (emission == XWireEmission::free_runs && gaps.extent_count) {
+                extents = gaps.extent_count;
                 std::uint32_t begin = 0;
-                char* table = out;
-                for (const auto& gap : gaps) {
+                for (const auto& gap : gaps.runs) {
                     const std::uint32_t entry[2] = {begin, gap.offset - begin};
-                    std::memcpy(table, entry, sizeof(entry));
-                    table += sizeof(entry);
+                    std::memcpy(at, entry, sizeof(entry));
+                    at += sizeof(entry);
                     begin = gap.offset + gap.bytes;
                 }
                 if (begin < used) {
-                    const std::uint32_t entry[2] = {begin, used - begin};
-                    std::memcpy(table, entry, sizeof(entry));
-                    table += sizeof(entry);
+                    const std::uint32_t entry[2] = {begin, static_cast<std::uint32_t>(used - begin)};
+                    std::memcpy(at, entry, sizeof(entry));
                 }
-                out = table;
-                begin = 0;
-                for (const auto& gap : gaps) {
-                    copier.copy(out, payload + begin, gap.offset - begin);
-                    out += gap.offset - begin;
-                    begin = gap.offset + gap.bytes;
-                }
-                if (begin < used) {
-                    copier.copy(out, payload + begin, used - begin);
-                    out += used - begin;
+                at = out + sizeof(XWireHeaderV2);
+            } else if (emission == XWireEmission::zero_runs && used >= wire_zero_scan_min_payload) {
+                std::uint64_t skipped = 0;
+                extents = wire_zero_run_extents(payload, used, at, skipped);
+                if (extents && skipped - extents * 8u < (std::max)(std::uint64_t(wire_zero_min_saving),
+                                                                    std::uint64_t(used / 16u)))
+                    extents = 0;
+            }
+            header.extent_count = extents;
+            std::memcpy(out, &header, sizeof(header));
+            const auto copier = wire_copier(sizeof(XWireHeaderV2) + used);
+            if (extents == 0) {
+                copier.copy(at, payload, used);
+                at += used;
+            } else {
+                const char* table = at;
+                at += extents * 8u;
+                for (std::size_t i = 0; i < extents; ++i) {
+                    std::uint32_t entry[2];
+                    std::memcpy(entry, table + i * 8u, sizeof(entry));
+                    copier.copy(at, payload + entry[0], entry[1]);
+                    at += entry[1];
                 }
             }
-            core.write_free_blocks(out);
+            core.write_free_blocks(at);
+            return static_cast<std::size_t>(at - out) +
+                core.free_block_count() * sizeof(XBufferCore::WireHole);
         }
     }
 
@@ -5975,7 +6324,8 @@ namespace XOffsetDatastructure {
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
             template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
-            template<class T> static void save_into(XBufferCore&, std::string&);
+            template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
             static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
@@ -5984,6 +6334,10 @@ namespace XOffsetDatastructure {
             template<class T> static void publish_received(XBufferCore&) noexcept;
         };
     }
+
+    // XBuffer::begin_verified_reload / VerifiedReloadToken are available.
+#define XOFFSET_VERIFIED_RELOAD_API 1
+    template <typename T> class VerifiedReloadToken;
 
     class XBuffer : public XBufferCore {
     public:
@@ -6028,6 +6382,7 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             XBufferCore::swap(other);
             reload_scratch_.swap(other.reload_scratch_);
+            std::swap(direct_reload_open_, other.direct_reload_open_);
         }
 
         friend void swap(XBuffer& a, XBuffer& b) noexcept { a.swap(b); }
@@ -6167,8 +6522,30 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        void save_verified_into(std::string& out) {
-            detail::VerifiedPathsAccess::save_into<T>(*this, out);
+        void save_verified_into(std::string& out, XSaveOptions options = {}) {
+            detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
+        }
+
+        // Compacted wire written by direct traversal: preorder blocks, strings
+        // of at most 10 bytes inline, no holes, and capacity == size except
+        // for the bounded slack of XCompactOptions (slack_div = 0: the
+        // canonical wire of XCompactor, the smallest one). Same checks as
+        // save_verified; the source is not changed. A valid V2 wire: every
+        // receiver accepts it.
+        template <typename T>
+        void save_compact_into(std::string& out, XCompactOptions options = {}) {
+            require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
+            require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+            if (!detail::find_root<T>(*this))
+                throw XException("save_compact<T>(): no root object of requested type");
+            detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+        }
+
+        template <typename T>
+        std::string save_compact(XCompactOptions options = {}) {
+            std::string out;
+            save_compact_into<T>(out, options);
+            return out;
         }
 
         // V2: if a host allocation failure (or an unverified load) left the
@@ -6207,7 +6584,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        std::string save_verified() {
+        std::string save_verified(XSaveOptions options = {}) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
@@ -6224,21 +6601,22 @@ namespace XOffsetDatastructure {
             }
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
-            auto header = wire_header_v2(*root_ptr);
-            const auto gaps = detail::wire_sparse_gaps(*this, this->segment_size());
-            detail::wire_apply_gaps(header, gaps);
-            const auto output_size = detail::wire_output_size(header, gaps);
+            const auto header = wire_header_v2(*root_ptr);
+            detail::WireGaps gaps;
+            if (options.emission == XWireEmission::free_runs) gaps = detail::wire_free_runs(*this, header.used_bytes);
+            const auto output_size = options.emission == XWireEmission::zero_runs
+                ? detail::wire_dense_size(header, "save_verified<T>()")
+                : detail::wire_free_run_size(header, gaps, "save_verified<T>()");
             std::string out;
             if (output_size > out.max_size())
                 throw std::length_error("save_verified<T>(): output size exceeds string limit");
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                detail::write_wire(output, output_size, header, gaps, base, *this);
-                return output_size;
+                return detail::write_wire(output, header, base, *this, options.emission, gaps);
             });
 #else
             out.resize(output_size);
-            detail::write_wire(out.data(), output_size, header, gaps, base, *this);
+            out.resize(detail::write_wire(out.data(), header, base, *this, options.emission, gaps));
 #endif
             return out;
         }
@@ -6346,7 +6724,8 @@ namespace XOffsetDatastructure {
 
         /// Returns the retained reload scratch words to the host allocator.
         void release_reload_scratch() noexcept {
-            if (reload_scratch_) reload_scratch_->release();
+            // An open direct reload keeps its tables until it finishes.
+            if (reload_scratch_) reload_scratch_->release(!direct_reload_open_);
         }
 
     private:
@@ -6373,9 +6752,56 @@ namespace XOffsetDatastructure {
             }
         }
 
+        detail::WireValidationScratch& retained_reload_scratch() {
+            if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::WireValidationScratch>();
+            return *reload_scratch_;
+        }
+
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
+        bool direct_reload_open_ = false;
+        template <typename> friend class VerifiedReloadToken;
 
     public:
+        /// Direct receive into this buffer: reload_verified<T>() without the
+        /// library copy. The transport writes the wire's sections into the
+        /// token's spans (header; extent table; the payload, densely or each
+        /// extent at its offset with gaps untouched; hole table), calls
+        /// complete() with the byte counts it wrote, then finish().
+        /// `payload_bytes`, `holes` and `extents` are the header's used_bytes,
+        /// hole_count and extent_count. Admission, verification, rejection
+        /// and the result are exactly those of reload_verified<T>() on the
+        /// same wire; a length that disagrees with the header, an incomplete
+        /// transfer, or a token dropped before finish() rejects. From begin
+        /// until finish() succeeds the buffer has no typed root access, and
+        /// after any failure it is left empty as after a failed reload.
+        /// The buffer must not be used, moved or destroyed while the token is
+        /// open; one token per buffer at a time. No host allocation per
+        /// message once the retained scratch has grown (sparse wires excepted).
+        template <typename T>
+        VerifiedReloadToken<T> begin_verified_reload(std::size_t payload_bytes,
+                                                     std::size_t holes = 0,
+                                                     std::size_t extents = 0) {
+            static_assert(is_v1_wire_admitted_v<T>,
+                "begin_verified_reload<T>() requires an admitted fixed-schema wire type.");
+            if (direct_reload_open_)
+                throw XException("begin_verified_reload<T>(): a direct reload is already open");
+            try {
+                // Holes and extents are disjoint, non-empty 8-byte multiples
+                // inside the payload, so larger counts never verify; they
+                // are refused before the tables are sized.
+                if (holes > payload_bytes / 8u || extents > payload_bytes / 8u)
+                    throw XException("reload_verified<T>(): used size mismatch");
+                const auto clean_from = reinit_for_overwrite(payload_bytes);
+                auto* tables = retained_reload_scratch().tables(
+                    sizeof(XWireHeaderV2) + extents * 8u + holes * sizeof(WireHole));
+                direct_reload_open_ = true;
+                return VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from);
+            } catch (...) {
+                reset_arena(0);
+                throw;
+            }
+        }
+
         /// Empties this buffer and constructs a fresh root of type T in it,
         /// reusing the mapping and owner registration; equivalent to
         /// `*this = create<T>(get_size(), this buffer's MaximumCapacity)`.
@@ -6473,7 +6899,7 @@ namespace XOffsetDatastructure {
                 throw XException(std::string(who) + ": root offset mismatch");
             }
             detail::verify_structural_wire_graph(*root_ptr, *this, upstream, layout.holes, layout.hole_count,
-                                                 true, nullptr, &layout.gaps, retained);
+                                                 true, nullptr, retained);
             this->load_free_blocks(layout.holes, layout.hole_count);
             typed_root_access_allowed_ = true;
             bind_schema<T>();
@@ -6509,6 +6935,109 @@ namespace XOffsetDatastructure {
             }
         }
 
+    };
+
+    // Open direct reload of one XBuffer (XBuffer::begin_verified_reload).
+    template <typename T>
+    class VerifiedReloadToken {
+    public:
+        VerifiedReloadToken(VerifiedReloadToken&& other) noexcept
+            : buffer_(std::exchange(other.buffer_, nullptr)), tables_(other.tables_),
+              payload_(other.payload_), holes_(other.holes_), extents_(other.extents_),
+              clean_from_(other.clean_from_), received_(other.received_), complete_(other.complete_) {}
+        VerifiedReloadToken& operator=(VerifiedReloadToken&&) = delete;
+        VerifiedReloadToken(const VerifiedReloadToken&) = delete;
+        VerifiedReloadToken& operator=(const VerifiedReloadToken&) = delete;
+        ~VerifiedReloadToken() { if (buffer_) abort(); }
+
+        explicit operator bool() const noexcept { return buffer_ != nullptr; }
+        std::span<std::byte> header_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_, sizeof(XWireHeaderV2)) : std::span<std::byte>{};
+        }
+        std::span<std::byte> extent_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2), extents_ * 8u)
+                           : std::span<std::byte>{};
+        }
+        std::span<std::byte> payload_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()), payload_)
+                           : std::span<std::byte>{};
+        }
+        std::span<std::byte> hole_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u,
+                                                  holes_ * sizeof(XBufferCore::WireHole))
+                           : std::span<std::byte>{};
+        }
+        // payload_bytes counts the logical payload including sparse gaps.
+        void complete(std::size_t header_bytes, std::size_t payload_bytes,
+                      std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
+            received_ = {header_bytes, payload_bytes, hole_bytes, extent_bytes};
+            complete_ = true;
+        }
+
+        /// Verifies and publishes the received wire; consumes the token.
+        void finish() {
+            constexpr const char* who = "reload_verified<T>()";
+            auto* buffer = std::exchange(buffer_, nullptr);
+            if (!buffer) throw XException("verified reload: token consumed");
+            struct Close { XBuffer& b; ~Close() { b.direct_reload_open_ = false; } } close{*buffer};
+            try {
+                if (!complete_ || received_[0] != sizeof(XWireHeaderV2) || received_[1] != payload_ ||
+                    received_[2] != holes_ * sizeof(XBufferCore::WireHole) || received_[3] != extents_ * 8u)
+                    throw XException("verified reload: incomplete input");
+                XWireHeaderV2 header{};
+                std::memcpy(&header, tables_, sizeof(header));
+                // admit_wire_header and parse_wire_layout, with the section
+                // lengths fixed by begin instead of read from one wire.
+                detail::check_wire_format(header, who);
+                if (header.root_type_id != detail::wire_root_type_id<T>())
+                    throw XException(std::string(who) + ": root type id mismatch");
+                if (header.schema_hash_lo != detail::wire_schema_hash<T>() || header.schema_hash_hi != 0)
+                    throw XException(std::string(who) + ": schema hash mismatch");
+                if (header.used_bytes != payload_ || header.extent_count != extents_ ||
+                    header.hole_count != holes_)
+                    throw XException(std::string(who) + ": used size mismatch");
+                detail::WireLayout layout;
+                layout.extent_count = extents_;
+                if (extents_) layout.extents = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2));
+                (void)detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps);
+                if (header.root_offset >= header.used_bytes)
+                    throw XException(std::string(who) + ": root offset out of bounds");
+                layout.holes = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u);
+                layout.hole_count = holes_;
+                detail::check_hole_byte_sum(header, layout.holes, holes_, who);
+                // Gaps read as zero, as in assign_extents: clear what an
+                // earlier content may have left below clean_from_.
+                auto* base = buffer->data();
+                for (const auto& gap : layout.gaps) {
+                    const auto end = std::min<std::size_t>(std::size_t(gap.offset) + gap.bytes, clean_from_);
+                    if (gap.offset < end) std::memset(base + gap.offset, 0, end - gap.offset);
+                }
+                buffer->check_reinit_payload();
+                buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(), who,
+                                                         &buffer->retained_reload_scratch());
+            } catch (...) {
+                buffer->reset_arena(0);
+                throw;
+            }
+        }
+
+    private:
+        friend class XBuffer;
+        VerifiedReloadToken(XBuffer& buffer, std::byte* tables, std::size_t payload, std::size_t holes,
+                            std::size_t extents, std::size_t clean_from) noexcept
+            : buffer_(&buffer), tables_(tables), payload_(payload), holes_(holes), extents_(extents),
+              clean_from_(clean_from) {}
+        void abort() noexcept {
+            auto* buffer = std::exchange(buffer_, nullptr);
+            buffer->reset_arena(0);
+            buffer->direct_reload_open_ = false;
+        }
+
+        XBuffer* buffer_;
+        std::byte* tables_;
+        std::size_t payload_, holes_, extents_, clean_from_;
+        std::array<std::size_t, 4> received_{};
+        bool complete_ = false;
     };
 
     // ========================================================================
@@ -6575,7 +7104,7 @@ namespace XOffsetDatastructure {
             return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
-        std::string save_verified() { return XBuffer::save_verified<T>(); }
+        std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
         T& reset() { return XBuffer::reset<T>(); }
@@ -6583,7 +7112,11 @@ namespace XOffsetDatastructure {
         TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
         void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }
 
-        void save_verified_into(std::string& out) { XBuffer::save_verified_into<T>(out); }
+        void save_verified_into(std::string& out, XSaveOptions options = {}) {
+            XBuffer::save_verified_into<T>(out, options);
+        }
+        std::string save_compact(XCompactOptions options = {}) { return XBuffer::save_compact<T>(options); }
+        void save_compact_into(std::string& out, XCompactOptions options = {}) { XBuffer::save_compact_into<T>(out, options); }
 
         static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
