@@ -208,9 +208,7 @@ static_assert(!xo::is_v1_wire_admitted_v<model::Fixed>);
 static_assert(!rd::receive_raw_supported<model::Fixed>());
 static_assert(xo::is_v1_wire_admitted_v<model::FixedScalars>);
 static_assert(rd::receive_raw_supported<model::FixedScalars>());
-#if XOFFSET_SCHEMA_REFLECTION // a user constructor or a bit-field: no field list possible
 static_assert(!rd::receive_raw_supported<model::Constructor>());
-#endif
 static_assert(!rd::receive_raw_supported<model::Destructor>());
 static_assert(!rd::receive_raw_supported<model::Assignment>());
 static_assert(!rd::raw_only_implicit_special_members<model::Assignment>());

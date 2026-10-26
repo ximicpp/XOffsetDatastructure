@@ -172,7 +172,9 @@ static_assert(Erasable<xo::XVector<EraseRecord>>);
 static_assert(!Erasable<xo::XVector<ThrowingDestructor>>);
 static_assert(!Erasable<xo::XVector<std::string>>);
 static_assert(!Erasable<xo::XVector<UncustomizedRecord>>);
+#if XOFFSET_SCHEMA_REFLECTION // its user destructor is a promise without reflection (XString member)
 static_assert(!Erasable<xo::XVector<OptedUserDestructor>>);
+#endif
 static_assert(!fd::stable_erase_supported<volatile std::uint32_t>());
 static_assert(!fd::stable_erase_supported<VolatileRecord>());
 static_assert(!fd::stable_erase_supported<DerivedOwning>());
@@ -184,7 +186,9 @@ static_assert(!std::is_implicit_lifetime_v<EraseRecord>);
 // does not assert a different value for the actual SDK's std builtin trait.
 static_assert(std::is_aggregate_v<ImplicitRecord>);
 static_assert(fd::stable_erase_implicit_lifetime<ImplicitRecord>());
+#if XOFFSET_SCHEMA_REFLECTION // its user destructor is a promise without reflection (XString member)
 static_assert(!fd::stable_erase_implicit_lifetime<OptedUserDestructor>());
+#endif
 static_assert(XOffsetDatastructure::is_byte_copy_safe_v<ImplicitRecord>);
 static_assert(xo::is_v1_wire_admitted_v<EraseRoot>);
 static_assert(Erasable<xo::XVector<ImplicitRecord>>);
