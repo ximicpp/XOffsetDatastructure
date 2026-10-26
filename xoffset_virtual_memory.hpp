@@ -24,11 +24,14 @@
 #  error "XOffset virtual memory storage requires Windows, Linux, or macOS"
 #endif
 
+#include "xoffset_slot_storage.hpp"
+
 namespace XOffsetDatastructure {
 namespace detail {
 
 // Deterministic, thread-local, one-shot failure injection. Enable is consumed
 // only when additional pages are required; Prepare precedes logical publication.
+// Reserve also models taking a slot (slot storage has no other OS step).
 enum class VmOperation : std::uint8_t { Reserve, Enable, Prepare, Reclaim, Protect };
 
 inline thread_local unsigned vm_pending_failures = 0;
@@ -295,6 +298,32 @@ public:
         return owner;
     }
 
+    // Slot owner (R1): an empty owner on a slot of class `cls`. The slot's
+    // payload capacity is accessible_bytes(); maximum_capacity may exceed it
+    // only for a movable owner, whose growth past the slot is the caller's
+    // relocation. A slot has no OS step, so the owner never fails to grow
+    // inside it except by failure injection.
+    static VirtualMemoryStorage for_slot(std::size_t cls, std::size_t maximum_capacity, bool movable) {
+        if (cls >= SlotGeometry::classes)
+            throw std::invalid_argument("slot class out of range");
+        if (!movable && maximum_capacity > SlotGeometry::payload_bytes(cls))
+            throw std::invalid_argument("pinned slot smaller than maximum capacity");
+        if (consume_vm_failure(VmOperation::Reserve)) throw std::bad_alloc();
+        SlotHeader* slot = SlotSlab::acquire(cls);
+        if (!slot) throw std::bad_alloc();
+        VirtualMemoryStorage owner;
+        owner.base_ = slot->payload();
+        owner.reserved_bytes_ = SlotGeometry::slot_bytes(cls);
+        owner.accessible_bytes_ = SlotGeometry::payload_bytes(cls);
+        owner.maximum_capacity_ = maximum_capacity;
+        owner.zero_from_ = slot->dirty_end;
+        owner.page_size_ = owner.reservation_granularity_ = SlotSlab::page_size();
+        owner.slot_class_ = static_cast<std::uint8_t>(cls);
+        owner.movable_ = movable;
+        owner.set_host_owner(nullptr);
+        return owner;
+    }
+
     // In-place reload: replace the logical content of this owner with
     // `length` bytes, keeping the reservation, its accessible pages and the
     // payload address. Bytes beyond `length` that the old content exposed
@@ -382,6 +411,9 @@ public:
     std::size_t zero_from() const noexcept { return zero_from_; }
     std::size_t accessible_bytes() const noexcept { return accessible_bytes_; }
     std::size_t page_size() const noexcept { return page_size_; }
+    bool is_slot() const noexcept { return slot_class_ != no_slot; }
+    // A movable slot owner may be replaced by a larger owner at explicit points.
+    bool movable() const noexcept { return movable_; }
     std::size_t reservation_granularity() const noexcept { return reservation_granularity_; }
     bool empty() const noexcept { return logical_bytes_ == 0; }
 
@@ -424,7 +456,7 @@ public:
     // newly exposed byte, including stale bytes in that retained partial page.
     // No caller may independently map, unmap, or protect any owned address.
     VmReclaimResult reclaim_tail() noexcept {
-        if (!base_ || accessible_bytes_ == 0) return {};
+        if (!base_ || accessible_bytes_ == 0 || is_slot()) return {};
         std::size_t retained = 0;
         if (!checked_vm_round_up(logical_bytes_, page_size_, retained) ||
             retained > accessible_bytes_) return {VmReclaimStatus::Failed};
@@ -484,6 +516,8 @@ private:
         swap(zero_from_, other.zero_from_);
         swap(page_size_, other.page_size_);
         swap(reservation_granularity_, other.reservation_granularity_);
+        swap(slot_class_, other.slot_class_);
+        swap(movable_, other.movable_);
     }
 
     bool acquire_from_pool() noexcept;
@@ -491,6 +525,8 @@ private:
     // Publish permissions separately from logical bytes. Both initialization
     // paths keep an accurate accessible extent if preparation later fails.
     bool enable_prefix(std::size_t new_logical_bytes) noexcept {
+        // A slot is read/write in full from the start.
+        if (is_slot()) return new_logical_bytes <= accessible_bytes_;
         std::size_t new_accessible_bytes = 0;
         if (!checked_vm_round_up(new_logical_bytes, page_size_, new_accessible_bytes) ||
             new_accessible_bytes > reserved_bytes_) return false;
@@ -529,6 +565,20 @@ private:
         if (page_size_ == 0 || reservation_granularity_ == 0) throw std::bad_alloc();
     }
 
+    void release_slot() noexcept {
+        auto* slot = SlotHeader::from_payload(base_);
+        slot->owner = nullptr;
+        // zero_from_ >= logical_bytes_: everything from it on is still zero.
+        slot->dirty_end = zero_from_ < accessible_bytes_ ? zero_from_ : accessible_bytes_;
+        SlotSlab::release(slot);
+        base_ = nullptr;
+        reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
+        zero_from_ = 0;
+        page_size_ = reservation_granularity_ = 0;
+        slot_class_ = no_slot;
+        movable_ = false;
+    }
+
     void release_mapping() noexcept {
         if (base_) {
 #if defined(_WIN32)
@@ -555,6 +605,9 @@ private:
     std::size_t zero_from_{0};
     std::size_t page_size_{0};
     std::size_t reservation_granularity_{0};
+    static constexpr std::uint8_t no_slot = 0xff;
+    std::uint8_t slot_class_{no_slot};
+    bool movable_{false};
     VmStoragePool pool_;
 };
 
@@ -612,6 +665,10 @@ inline void VirtualMemoryStorage::release() noexcept {
     // Keep the state alive until its mutex is released, even when this is the
     // final external reference. Idle owners never retain their pool's state.
     auto state = std::move(pool_.state_);
+    if (is_slot()) {
+        release_slot();
+        return;
+    }
     if (base_ && state) {
         std::lock_guard<std::mutex> lock(state->mutex);
         const auto& limits = state->limits;
