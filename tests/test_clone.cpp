@@ -4,13 +4,28 @@
 // clone_into must reuse the destination like reload_verified, refuse a self
 // copy without touching the buffer, and leave the destination an empty arena
 // on failure. (Clones of fuzzed accepted wires: test_v2_fuzz, exercise().)
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <new>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include "../xoffsetdatastructure.hpp"
 using namespace XOffsetDatastructure;
+
+// Counts host allocations, so a test can see whether a bin kept its storage.
+namespace host_new { std::size_t calls = 0; }
+void* operator new(std::size_t n) {
+    ++host_new::calls;
+    if (void* p = std::malloc(n ? n : 1)) return p;
+    throw std::bad_alloc();
+}
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void* operator new[](std::size_t n) { return ::operator new(n); }
+void operator delete[](void* p) noexcept { ::operator delete(p); }
+void operator delete[](void* p, std::size_t) noexcept { ::operator delete(p); }
 
 struct CloneRoot {
     std::uint64_t id{};
@@ -165,6 +180,41 @@ void later_word_hole_is_found_after_clone() {
     need(b - c.data() == a - src.data() && t - target.data() == a - src.data(),
          "clone missed a hole in a later bin word");
     need(same_free_table(c, src) && same_free_table(target, src), "free table after split diverged");
+}
+
+// A copied table's bins were assigned, so it counts as grown: the first
+// keep-recycle (reload_verified) must take the full path and drop bin storage
+// over keep_bin_entries, as it does for the source, whose bin grew by
+// insertion. Taking the fast path would keep the copy's 100-entry bin, and
+// refilling it would then need no host allocation where the source needs some.
+void copied_table_first_recycle_applies_limits() {
+    constexpr int holes = 100; // > keep_bin_entries (64)
+    auto fill = [](XBuffer& b) {
+        std::vector<void*> p;
+        for (int i = 0; i < holes; ++i) {
+            p.push_back(b.arena()->allocate_aligned(16, 8)); // bin 1
+            b.arena()->allocate_aligned(16, 8);              // keeps the holes apart
+        }
+        for (auto* q : p) b.arena()->deallocate(q, 16);
+        need(b.free_block_count() == std::size_t(holes), "fixture should have one hole per pair");
+    };
+    const auto wire = XBuffer::create<CloneRoot>(1u << 16, cap()).save_verified<CloneRoot>();
+    auto refill_calls = [&](XBuffer& b) {
+        b.reload_verified<CloneRoot>(wire); // keep-recycle of b's table
+        const auto before = host_new::calls;
+        fill(b);
+        return host_new::calls - before;
+    };
+    XBufferCore::trim_free_table_cache();
+    auto src = XBuffer::create<CloneRoot>(1u << 16, cap());
+    fill(src);
+    auto c = src.clone();
+    auto target = XBuffer::create<CloneRoot>(4096, cap());
+    src.clone_into(target);
+    const auto from_src = refill_calls(src);
+    need(from_src > 0, "the source's over-limit bin kept its storage");
+    need(refill_calls(c) == from_src, "clone: first keep-recycle kept bin storage over the limit");
+    need(refill_calls(target) == from_src, "clone_into: first keep-recycle kept bin storage over the limit");
 }
 
 void wire_identical_and_round_trip() {
@@ -370,6 +420,7 @@ int main() {
         clone_is_independent();
         free_table_and_allocation_match();
         later_word_hole_is_found_after_clone();
+        copied_table_first_recycle_applies_limits();
         wire_identical_and_round_trip();
         clone_into_reuses_destination();
         explicit_growth_keeps_room();
