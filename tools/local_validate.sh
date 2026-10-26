@@ -3,9 +3,10 @@
 # for good (susu 2026-10-23), so this is the merge evidence: it validates the checked-out
 # working tree (HEAD) against a base commit and writes REPORT.md for the PR description.
 #
-#   tools/local_validate.sh [--base REV] [--steps LIST] [--work DIR] [-j N] [--fail-fast]
+#   tools/local_validate.sh [--base REV] [--steps LIST] [--work DIR] [-j N] [--columns K] [--fail-fast]
 #
-# Steps, in this order (default: every step the host can run):
+# Steps, in this order (default: every step the host can run; LIST may also name the
+# groups "classic" = the first eight and "matrix" = the C++20/C++23 columns):
 #   gcc       GCC 16 Release: build + full CTest
 #   asan      GCC 16 Debug, -fsanitize=address,undefined -fno-sanitize-recover=undefined
 #             (no exclusions): build + full CTest
@@ -16,6 +17,18 @@
 #   p2996     P2996 Clang + libc++ Release via ./build.sh: build, CTest, signature
 #             export/matrix/compat; tools/sigs must not change (the old P2996 CI job)
 #   p2996-ir  tools/perf_gate with P2996 Clang + libc++ (the Mac's compiler and library)
+# The C++20/C++23 build matrix (XOFFSET_CXX_STANDARD, XOFFSET_RECORD field lists), each
+# column a Release build + full CTest unless named -asan:
+#   gcc13-c++20          the host's GCC 13         gcc13-c++20-asan    same, Debug + ASan/UBSan
+#   clang18-c++20        the host's Clang 18       clang18-c++20-asan  same, Debug + ASan/UBSan
+#   gcc16-c++20          GCC 16 image, C++20       gcc16-c++23         GCC 16 image, C++23
+#   p2996-c++20          P2996 Clang + libc++, C++20 (no reflection)
+#   diff-c++20           GCC 16: tools/validation_differential.sh, the C++26 reflection build
+#                        against the C++20 field-list build of HEAD, 200000 cases, seeds 1 2;
+#                        the wires must be the same bytes and the outcomes identical
+# The matrix columns run in parallel after the other steps, at most K at a time (--columns,
+# default min(4, columns)), each with -j max(1, N/K). A column whose compiler, sanitizer
+# runtime or image is missing, or a tree without the C++20 build, is reported as "not run".
 #
 # The GCC steps run in the pinned gcc:16 image (the digest the CI used). The P2996 steps
 # run on the host with the toolchain at $P2996_ROOT (default /opt/p2996-toolchain): if it
@@ -38,7 +51,10 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-ALL_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir"
+CLASSIC_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir"
+MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 p2996-c++20 diff-c++20"
+ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS"
+COLUMNS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -46,8 +62,9 @@ while [[ $# -gt 0 ]]; do
         --steps) STEPS=${2//,/ }; shift 2 ;;
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
+        --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
-        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,44p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -62,6 +79,9 @@ WORK=${WORK:-$HOME/xo-validate-${HEAD_SHA:0:7}}
 mkdir -p "$WORK/logs" "$CACHE"
 WORK=$(cd "$WORK" && pwd)
 STEPS=${STEPS:-$ALL_STEPS}
+STEPS=" $STEPS "
+STEPS=${STEPS// classic / $CLASSIC_STEPS }
+STEPS=${STEPS// matrix / $MATRIX_STEPS }
 DIRTY=$(git status --porcelain --untracked-files=no | wc -l)
 RESULTS="$WORK/results.tsv"
 : > "$RESULTS"
@@ -81,10 +101,11 @@ docker_up() {
     return 1
 }
 
-need_gcc=0; need_p2996=0
+need_gcc=0; need_p2996=0; want_gcc=0
 for s in $STEPS; do
     case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step: $s" >&2; exit 2 ;; esac
-    case $s in p2996*) need_p2996=1 ;; *) need_gcc=1 ;; esac
+    # The GCC 16 matrix columns report "not run" without docker; the classic steps need it.
+    case $s in p2996*) need_p2996=1 ;; gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20) want_gcc=1 ;; *) need_gcc=1 ;; esac
 done
 
 log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, work $WORK"
@@ -97,9 +118,13 @@ CMAKE_BIN=$REPO/build/cmake-tool/root/bin
 [[ -d $CACHE/cereal/include ]] || { git clone -q https://github.com/USCiLab/cereal.git "$CACHE/cereal" && git -C "$CACHE/cereal" checkout -q ebef1e929807629befafbb2918ea1a08c7194554; }
 [[ -f $CACHE/vginc/valgrind/callgrind.h ]] || { mkdir -p "$CACHE/vginc" && cp -r /usr/include/valgrind "$CACHE/vginc/"; }
 
+GCC_OK=0
 if (( need_gcc )); then
     docker_up || exit 2
     docker image inspect "$IMG" >/dev/null 2>&1 || docker pull -q "$IMG" >/dev/null || exit 2
+    GCC_OK=1
+elif (( want_gcc )); then
+    docker_up && { docker image inspect "$IMG" >/dev/null 2>&1 || docker pull -q "$IMG" >/dev/null; } && GCC_OK=1
 fi
 P2996_OK=0
 if (( need_p2996 )); then
@@ -215,10 +240,76 @@ step_p2996() {
 
 step_p2996_ir() { perf_gate p2996; }
 
+# ---------------------------------------------------------------- C++20/C++23 matrix
+
+# Why a matrix column cannot run here, or nothing when it can.
+matrix_blocker() {
+    local s=$1
+    if ! grep -q XOFFSET_CXX_STANDARD CMakeLists.txt || ! grep -qs '#define XOFFSET_RECORD(' ./*.hpp; then
+        echo "this tree has no C++20 build (XOFFSET_CXX_STANDARD / XOFFSET_RECORD missing)"; return
+    fi
+    case $s in
+        gcc13-*|clang18-*)
+            local cxx=g++-13; [[ $s == clang18-* ]] && cxx=clang++-18
+            command -v $cxx >/dev/null || { echo "no $cxx on the host"; return; }
+            if [[ $s == *-asan ]]; then
+                printf 'int main() { return 0; }\n' > "$WORK/san_probe.cpp"
+                $cxx -fsanitize=address,undefined "$WORK/san_probe.cpp" -o "$WORK/san_probe" 2>/dev/null ||
+                    echo "$cxx has no ASan/UBSan runtime (for clang 18: apt-get install libclang-rt-18-dev)"
+            fi ;;
+        p2996-*) (( P2996_OK )) || echo "no P2996 toolchain at $P2996_ROOT (and no $P2996_TARBALL)" ;;
+        *) (( GCC_OK )) || echo "no GCC 16 image (docker or $IMG unavailable)" ;;
+    esac
+}
+
+# Configure, build and CTest one column on the host: <dir> <cxx> <std> <type> <cxxflags> <ldflags>.
+host_column() {
+    local dir=$1 cxx=$2 std=$3 type=$4 flags=$5 ldflags=$6 timeout=900
+    [[ $type == Debug ]] && timeout=1800
+    $cxx --version | head -n 1
+    PATH="$CMAKE_BIN:$PATH" cmake -S . -B "$dir" -DCMAKE_BUILD_TYPE=$type -DCMAKE_CXX_COMPILER=$cxx \
+        -DXOFFSET_CXX_STANDARD=$std "-DCMAKE_CXX_FLAGS=$flags" "-DCMAKE_EXE_LINKER_FLAGS=$ldflags" &&
+    PATH="$CMAKE_BIN:$PATH" cmake --build "$dir" --parallel "$COL_JOBS" &&
+    UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+        PATH="$CMAKE_BIN:$PATH" ctest --test-dir "$dir" --output-on-failure --parallel "$COL_JOBS" --timeout $timeout
+}
+
+gcc16_column() {
+    local dir=$1 std=$2
+    in_gcc "g++ --version | head -n 1 &&
+        cmake -S . -B '$dir' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_CXX_STANDARD=$std &&
+        cmake --build '$dir' --parallel $COL_JOBS &&
+        ctest --test-dir '$dir' --output-on-failure --parallel $COL_JOBS --timeout 900"
+}
+
+step_matrix() {
+    local s=$1 dir="$WORK/m-$1" lib="$P2996_ROOT/lib/x86_64-unknown-linux-gnu"
+    case $s in
+        gcc13-c++20) host_column "$dir" g++-13 20 Release "" "" ;;
+        gcc13-c++20-asan) host_column "$dir" g++-13 20 Debug "$SANITIZE" "-fsanitize=address,undefined" ;;
+        clang18-c++20) host_column "$dir" clang++-18 20 Release "" "" ;;
+        clang18-c++20-asan) host_column "$dir" clang++-18 20 Debug "$SANITIZE" "-fsanitize=address,undefined" ;;
+        gcc16-c++20) gcc16_column "$dir" 20 ;;
+        gcc16-c++23) gcc16_column "$dir" 23 ;;
+        p2996-c++20) host_column "$dir" "$P2996_ROOT/bin/clang++" 20 Release "-stdlib=libc++" \
+                         "-stdlib=libc++ -Wl,-rpath,$lib" ;;
+        diff-c++20)
+            in_gcc "XOFFSET_DIFF_OUT='$dir' XOFFSET_DIFF_BASE_FLAGS='-std=c++26 -freflection' \
+                XOFFSET_DIFF_FLAGS='-std=c++20' XOFFSET_DIFF_SAME_INPUTS=1 \
+                tools/validation_differential.sh '$REPO' '$REPO' 200000 1 2" ;;
+    esac
+}
+
 detail_of() {
     local s=$1 f="$WORK/logs/$1.log" w
     case $s in
         gcc|asan) ctest_line "$f" ;;
+        diff-c++20) grep -E '^seed [0-9]+:' "$f" | sed 's/^/C++26 vs C++20 /' | paste -sd ';' ;;
+        gcc13-*|clang18-*|gcc16-c++*|p2996-c++*)
+            { grep -qE "tests passed|tests failed" "$f" && ctest_line "$f" || grep -m1 -A1 -E '^CMake Error' "$f" | tail -n 1 | sed 's/^ */configure: /'
+              [[ -f $WORK/m-$s/test-inventory.json ]] && python3 -c 'import json, sys
+n = len(json.load(open(sys.argv[1])).get("cxx26_only_not_built", []))
+print(f"{n} C++26-only tests/tools not built")' "$WORK/m-$s/test-inventory.json"; } | paste -sd ';' ;;
         p2996) { ctest_line "$f"; grep -m1 -E 'type signatures changed|completed successfully' "$f"; } | paste -sd ';' ;;
         fuzz) grep -E '^test_v2_fuzz: seed=' "$f" | sed -E 's/.*seed=([0-9]+).* cases=([0-9]+).*inconsistencies=([0-9]+).*/seed \1: \2 cases, \3 inconsistencies/' | paste -sd ';' ;;
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
@@ -232,8 +323,17 @@ print(f"verdict {v}; S-class Ir condition: " + ("yes" if v == "pass" else "no"))
 }
 
 overall=0
-for s in $ALL_STEPS; do
-    case " $STEPS " in *" $s "*) ;; *) continue ;; esac
+record() {   # <step> <rc> <minutes>
+    local s=$1 rc=$2 mins=$3 res detail
+    if (( rc == 0 )); then res=pass; else res=FAIL; overall=1; fi
+    # build.sh colours its last line; keep escape codes out of the table.
+    detail=$(detail_of "$s" 2>/dev/null | sed -E $'s/\x1b\\[[0-9;]*m//g' | tr '\t\n' '  ')
+    printf '%s\t%s\t%s\t%s\n' "$s" "$res" "$mins" "$detail" >> "$RESULTS"
+    log "$s: $res in ${mins} min${detail:+ ($detail)}"
+}
+stopped=0
+for s in $CLASSIC_STEPS; do
+    case "$STEPS" in *" $s "*) ;; *) continue ;; esac
     if [[ $s == p2996* ]] && (( ! P2996_OK )); then
         printf '%s\tnot run\t0\tno P2996 toolchain at %s (and no %s)\n' "$s" "$P2996_ROOT" "$P2996_TARBALL" >> "$RESULTS"
         log "$s: not run (no toolchain)"
@@ -243,13 +343,44 @@ for s in $ALL_STEPS; do
     t0=$(date +%s)
     "step_${s//-/_}" > "$WORK/logs/$s.log" 2>&1
     rc=$?
-    mins=$(( ($(date +%s) - t0 + 30) / 60 ))
-    if (( rc == 0 )); then res=pass; else res=FAIL; overall=1; fi
-    # build.sh colours its last line; keep escape codes out of the table.
-    detail=$(detail_of "$s" 2>/dev/null | sed -E $'s/\x1b\\[[0-9;]*m//g' | tr '\t\n' '  ')
-    printf '%s\t%s\t%s\t%s\n' "$s" "$res" "$mins" "$detail" >> "$RESULTS"
-    log "$s: $res in ${mins} min${detail:+ ($detail)}"
-    if (( rc != 0 && FAIL_FAST )); then break; fi
+    record "$s" $rc $(( ($(date +%s) - t0 + 30) / 60 ))
+    if (( rc != 0 && FAIL_FAST )); then stopped=1; break; fi
+done
+
+# The matrix columns, in parallel: at most COLUMNS at a time, results in canonical order.
+cols=()
+for s in $MATRIX_STEPS; do
+    case "$STEPS" in *" $s "*) ;; *) continue ;; esac
+    (( stopped )) && break
+    why=$(matrix_blocker "$s")
+    if [[ -n $why ]]; then
+        printf '%s\tnot run\t0\t%s\n' "$s" "$why" > "$WORK/col-$s.tsv"
+        log "$s: not run ($why)"
+    else
+        cols+=("$s")
+    fi
+done
+if (( ${#cols[@]} )); then
+    (( COLUMNS > 0 )) || COLUMNS=$(( ${#cols[@]} < 4 ? ${#cols[@]} : 4 ))
+    COL_JOBS=$(( JOBS / COLUMNS )); (( COL_JOBS > 0 )) || COL_JOBS=1
+    log "matrix: ${#cols[@]} columns, $COLUMNS at a time, -j $COL_JOBS each"
+    running=0
+    for s in "${cols[@]}"; do
+        if (( running >= COLUMNS )); then wait -n; running=$((running - 1)); fi
+        log "$s: start"
+        ( t0=$(date +%s); step_matrix "$s" > "$WORK/logs/$s.log" 2>&1; rc=$?
+          echo "$rc $(( ($(date +%s) - t0 + 30) / 60 ))" > "$WORK/col-$s.rc" ) &
+        running=$((running + 1))
+    done
+    wait
+fi
+for s in $MATRIX_STEPS; do
+    if [[ -f $WORK/col-$s.tsv ]]; then
+        cat "$WORK/col-$s.tsv" >> "$RESULTS"; rm -f "$WORK/col-$s.tsv"
+    elif [[ -f $WORK/col-$s.rc ]]; then
+        read -r rc mins < "$WORK/col-$s.rc"; rm -f "$WORK/col-$s.rc"
+        record "$s" "$rc" "$mins"
+    fi
 done
 
 {
