@@ -1,0 +1,111 @@
+{
+ "checkpoint": "2026-10-26-int2-737f43c",
+ "failed_metrics": {
+  "slg:B": 1.0051455787460617,
+  "slg:C": 1.0197143579830035
+ },
+ "points": [
+  {
+   "commit": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "label": "anchor",
+   "role": "anchor"
+  },
+  {
+   "commit": "8cb6221304c90c1df7387b560e9c855a7a78861f",
+   "label": "p1 +#87 D5 (8cb6221, tree = #87 0e4c326d)",
+   "role": "commit"
+  },
+  {
+   "commit": "737f43c0b830dc0a9edc350b86d28b17db278778",
+   "label": "head",
+   "role": "head"
+  }
+ ],
+ "steps": [
+  {
+   "step": 1,
+   "dir": "bisect-1",
+   "point": "8cb6221304c90c1df7387b560e9c855a7a78861f",
+   "label": "p1 +#87 D5 (8cb6221, tree = #87 0e4c326d)",
+   "lo": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "hi": "737f43c0b830dc0a9edc350b86d28b17db278778",
+   "f": 0.21340249187133978,
+   "own": {
+    "slg:B": 5.7672841374250225,
+    "slg:C": -0.17044809537612496
+   },
+   "spread": [],
+   "side": "mid-hi",
+   "timed": true,
+   "_slg": {
+    "groups": [
+     "slg"
+    ],
+    "new": {
+     "A": {
+      "geo": 0.9891549719973942,
+      "low": 0.9646868922283058,
+      "high": 1.0142436540908322,
+      "df": 7.438670294504231,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "B": {
+      "geo": 1.0300423577742408,
+      "low": 1.0172706669111593,
+      "high": 1.0429743954287987,
+      "df": 7.311463356435148,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "C": {
+      "geo": 0.9966779493283011,
+      "low": 0.9784063139350986,
+      "high": 1.01529080559793,
+      "df": 9.942365654589256,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "D": {
+      "geo": 1.0334889409989156,
+      "low": 1.0156302058538582,
+      "high": 1.0516617022719308,
+      "df": 6.861449678007195,
+      "n": [
+       6,
+       6
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "range": {
+  "lo": "8cb6221304c90c1df7387b560e9c855a7a78861f",
+  "hi": "737f43c0b830dc0a9edc350b86d28b17db278778",
+  "lo_label": "p1 +#87 D5 (8cb6221, tree = #87 0e4c326d)",
+  "hi_label": "head"
+ },
+ "status": "culprit",
+ "rules": {
+  "rule": "merge rules v2 (\u6027\u80fd\u4f18\u5316 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze the binaries of every first-parent commit between them are built and stored (--bisect), so a failing checkpoint is bisected in the same session",
+  "points": "anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are identical collapse into the earliest one (a point identical to the anchor or the head takes its value without timing)",
+  "step": "the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> (head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch and/or one SLG group, under the same start, environment and replacement rules",
+  "decision": "failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]",
+  "spread": "a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges",
+  "deferred": "\u6027\u80fd\u4f18\u5316 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head still give its value without timing, so a build costs no timed step",
+  "max_steps": 2,
+  "result": "hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported"
+ },
+ "culprit": {
+  "commit": "737f43c0b830dc0a9edc350b86d28b17db278778",
+  "label": "head",
+  "same_binaries": []
+ }
+}

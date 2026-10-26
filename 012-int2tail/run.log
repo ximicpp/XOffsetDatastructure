@@ -1,0 +1,50 @@
+== 2026-10-26T16:44:21Z 0. tools
+int2: /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-int2-737f43c
+ckpt1: /Volumes/XOffsetCS/perf-gate/runs/2026-10-26-ckpt1-f8eebf4
+removing 008 leftover /Volumes/XOffsetCS/perf-gate/build/int2
+removing 008 leftover /Volumes/XOffsetCS/perf-gate/src/int2
+removing 008 leftover /Volumes/XOffsetCS/perf-gate/wire/int2
+removing 008 leftover /Volumes/XOffsetCS/perf-gate/prep-int2
+removing 008 leftover /Volumes/XOffsetCS/perf-gate/int2-points.tsv
+== 2026-10-26T16:44:21Z 1. export
+anchor f8eebf46565c746a69ed64dbe9e406546032f892 tree 40d4a6e1a594f1b062108e0bf1e8ec4420d6e68a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+p2 737f43c0b830dc0a9edc350b86d28b17db278778 tree bb90c2ca52699acbaa71871c68068b3b69d2e6ae typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-10-26T16:44:23Z 2. build
+reloc anchor: bincache reloc-40d4a6e1a594-f1cf98f6fe45-p2996-d77eff1-3f9a226d
+reloca anchor: bincache reloca-40d4a6e1a594-f1cf98f6fe45-p2996-d77eff1-fb6e6b0c
+reloc p2: bincache reloc-bb90c2ca5269-f1cf98f6fe45-p2996-d77eff1-3f9a226d
+reloca p2: bincache reloca-bb90c2ca5269-f1cf98f6fe45-p2996-d77eff1-fb6e6b0c
+== 2026-10-26T16:44:23Z 3. reloc
+29 cases; checks: all passed
+29 cases; checks: all passed
+29 cases; checks: all passed
+29 cases; checks: all passed
+| build | case | side | file 1 | file 2 | file 3 | file 4 | GM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| plain | map.insert.fresh | anchor | 35.56 | 35.97 | 35.64 | 35.48 | 35.66 |
+| plain | map.insert.fresh | int2 | 35.48 | 35.56 | 35.48 | 35.52 | 35.51 |
+| plain | map.insert.reused | anchor | 33.45 | 33.61 | 33.29 | 33.37 | 33.43 |
+| plain | map.insert.reused | int2 | 33.20 | 33.20 | 33.45 | 33.20 | 33.26 |
+| align64 | map.insert.fresh | anchor | 43.91 | 45.65 | 43.70 | 45.25 | 44.62 |
+| align64 | map.insert.fresh | int2 | 43.86 | 43.86 | 45.25 | 43.25 | 44.05 |
+| align64 | map.insert.reused | anchor | 37.96 | 39.31 | 37.84 | 39.31 | 38.60 |
+| align64 | map.insert.reused | int2 | 38.05 | 39.14 | 39.06 | 37.52 | 38.44 |
+
+int2 / anchor (GM of per-file medians, ns per op):
+- plain: map.insert.fresh 0.996, map.insert.reused 0.995
+- align64: map.insert.fresh 0.987, map.insert.reused 0.996
+== 2026-10-26T17:34:47Z 4. ctest
+100% tests passed out of 104
+configure/build/ctest rc=0
+test_allocator_failures: {"status":"passed","actual_failure_points":55,"max_unreclaimed_bytes":256}
+test_canonical_cold_no_callback: canonical-v4: cold no-eviction/no-C++-allocation; real free-table growth and exact terminal-delete owner-move controls passed
+test_verified_receive: verified receive: seven groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V2 hole table/sparse passed
+test_wire_validation: Wire mutation sweep: 501 rejected, 411 mutable; 151 targeted V2 rejections
+test_free_table_policy: {"status":"passed","performance_measurement":false}
+test_reset_used_range: test_reset_used_range: 203 resets byte-identical to fresh buffers
+test_owner_registry: 
+test_slot_storage: Slot storage tests passed
+test_v2_golden: test_v2_golden: dense=1792 large=1800 large dense=9984 elided=1632 ok
+test_save_composed: test_save_composed: 300 random cases, 600 composed wires byte-identical to assign + save_compact
+test_wire_populate: test_wire_populate: not Linux, wire checks passed
+== 2026-10-26T17:36:37Z finish rc=0

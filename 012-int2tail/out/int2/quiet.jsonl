@@ -1,0 +1,3 @@
+{"label": "formal-1", "utc": "2026-10-26T12:57:04+00:00", "ok": true, "quiet_s_required": 180.0, "waited_s": 241.0, "load1": 2.18, "quiet_s": 240.9, "screen": {"WindowServer": 3.3, "UURemoteServer": 0.0, "parsecd": 0.0}, "remote_active": []}
+{"label": "formal-2", "utc": "2026-10-26T13:09:09+00:00", "ok": true, "quiet_s_required": 180.0, "waited_s": 241.0, "load1": 1.99, "quiet_s": 240.9, "screen": {"WindowServer": 3.3, "UURemoteServer": 0.0, "parsecd": 0.0}, "remote_active": []}
+{"label": "slg", "utc": "2026-10-26T13:20:20+00:00", "ok": true, "quiet_s_required": 180.0, "waited_s": 241.0, "load1": 1.39, "quiet_s": 240.9, "screen": {"WindowServer": 4.4, "UURemoteServer": 0.0, "parsecd": 0.0}, "remote_active": []}

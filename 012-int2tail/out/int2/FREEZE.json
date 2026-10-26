@@ -1,0 +1,239 @@
+{
+ "schema": "xoffset-perf-gate-l2-v1",
+ "name": "2026-10-26-int2-737f43c",
+ "head": {
+  "commit": "737f43c0b830dc0a9edc350b86d28b17db278778",
+  "desc": "INT2 = p2 = INT2 +P4 (737f43c, tree = c47680cc), build-r3d params"
+ },
+ "anchor": {
+  "commit": "f8eebf46565c746a69ed64dbe9e406546032f892",
+  "desc": "next_cpp26 f8eebf4 (INT1 merged), build-r3d params"
+ },
+ "lib_identity_note": "INT2 = f8eebf4 + #87 D5 (p1: xoffsetdatastructure.hpp, xoffset_verified_receive.hpp) + P4 (p2: xoffsetdatastructure.hpp); bench/ unchanged from the anchor; M wire identical",
+ "binaries": {
+  "head": "3ba5652fe506806f892a33323cf2a388d36f81bf84c4c7cc9973267e82470683",
+  "head_aa": "3ba5652fe506806f892a33323cf2a388d36f81bf84c4c7cc9973267e82470683",
+  "anchor": "13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c",
+  "r3": "0492f332857b93f0eac7ce1ec9d61d5fe4423370c20c08a28922221cadb9f4f3",
+  "cista": "13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31",
+  "flatbuffers": "684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade",
+  "capnproto": "5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a",
+  "cereal": "c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565"
+ },
+ "input_wires": {
+  "head": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "head_aa": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "anchor": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "r3": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "cista": "1d54344941e86b63bd3525b694971a0593a009d022052f440c89db20c2d9b84a",
+  "flatbuffers": "d53fb8e89a71eef77efd47f680c1c37bd0e187a5bb93fc2243eb7fa59a05987f",
+  "capnproto": "cc27816e0af6bc816624fa50840117bd5cf79071ab44e2e2ad84d2158420167b",
+  "cereal": "aba30c823a57f80470a928cfd15c94d6103ec1f7226ebb6f5868bfd5281cedfb"
+ },
+ "slg": {
+  "head": "564d14b029da187de5da51bb767d58181f5e0347584f2f5161897087d3209aed",
+  "anchor": "8ee1d0a98cd94164c30f602c5ca143b035c4ec6871c6b3853fe0c96027a662f5",
+  "tree": "bench/slg of f8eebf4 (v3 tree, git tree ffd88a16), used for every point",
+  "tree_sha256": "2a010b04d53b4049727c4061b9ac750f26ff55bff2bb56da78a3f65c1c91081e"
+ },
+ "r3_dir": "/Volumes/XOffsetCS/formal/R3-formal-mac-v1",
+ "trace": "/Volumes/XOffsetCS/mac-validation/prepared-v1/M/trace.bin",
+ "trace_sha256": "a7751706365dfb48ff9e1570773a5f6e1bdd62b06982c39ae4466c477527533a",
+ "mac_gate_py_sha256": "d3b2fa67368047e12c7115dc0ec46e4c5bd425aa6ec04bf42b31711444e14a5f",
+ "xc_ab_py_sha256": "a95160a635e4d59f61cfaa66fdcbd31366a41a2ba645b1f9ddaf6164942abc60",
+ "sources": {
+  "head": null,
+  "anchor": null
+ },
+ "prep": {
+  "gate_sml_head": {
+   "log": "gate_sml_head.log",
+   "log_sha256": "f517082c2cccc31ebd9c9d4b3dc842e6106903a8fde545e0274bc7cd4439b734",
+   "exit": 0
+  },
+  "slg_verify_reuse_head": {
+   "log": "slg_verify_reuse_head.log",
+   "log_sha256": "e632a1e3434b8de33430e5bd8b2b2ceb2b2ed3fe127a8f356d2b3314b05c039b",
+   "exit": 0
+  },
+  "slg_verify_default_head": {
+   "log": "slg_verify_default_head.log",
+   "log_sha256": "f8ce3e952ec773f347b9c6de58d2c4fd1d1dc267ed00849b2a8adb5b2db792b1",
+   "exit": 0
+  },
+  "gate_sml_anch": {
+   "log": "gate_sml_anch.log",
+   "log_sha256": "f517082c2cccc31ebd9c9d4b3dc842e6106903a8fde545e0274bc7cd4439b734",
+   "exit": 0
+  },
+  "slg_verify_reuse_anch": {
+   "log": "slg_verify_reuse_anch.log",
+   "log_sha256": "4fcf367e490ada5ab354924aa122f26fad18aae5993f111f05739870dde15b7b",
+   "exit": 0
+  },
+  "slg_verify_default_anch": {
+   "log": "slg_verify_default_anch.log",
+   "log_sha256": "e8985437fb587b5c7a0edac9df5eeac3b87e4741bf6a2009c857f3ce852a123f",
+   "exit": 0
+  }
+ },
+ "rules": {
+  "formal": {
+   "cycles": 65,
+   "rounds_per_cycle": 3,
+   "warmup_cycles": 1,
+   "batches": 2,
+   "seed": "random.Random(20261022 + 1000 * (batch - 1) + round).shuffle(order of the 8 binaries)",
+   "child_timeout_s": 30,
+   "file_names": {
+    "head": "head",
+    "head_aa": "hdaa",
+    "anchor": "anch",
+    "r3": "r3fz",
+    "cista": "cist",
+    "flatbuffers": "flat",
+    "capnproto": "capn",
+    "cereal": "cere"
+   },
+   "copies": 3,
+   "copy_rule": "every binary and wire is stored as `copies` separate files <name><i>; round r runs copy r % copies",
+   "child_env": "every child gets the same environment and the same working directory (the batch directory); its temporary directory names have a fixed length",
+   "gate": {
+    "statistic": "head/anchor per-cycle mean log ratio (formal_r3.py), cycles of all included batches pooled; one-sided 95% upper bound, Bonferroni k=3, t(1-0.05/3, df)",
+    "phases": [
+     "read_sum",
+     "mutate",
+     "emit_after"
+    ],
+    "pass_le": 1.02,
+    "fail_gt": 1.03,
+    "rule": "after 2 batches: max upper bound <=1.02 pass, (1.02,1.03] pending, >1.03 fail; pending -> diagnose, run one extra batch, pool all 3: <=1.02 pass, otherwise fail",
+    "consistency": "before pooling: for every gate phase and every pair of batches, the per-batch head/anchor geometric means differ by <=2% and the per-batch two-sided k=12 intervals overlap; otherwise do not pool: pending, diagnose, run a third batch",
+    "max_batch_gap": 0.02,
+    "quantiles": "per gate phase, median and 10%/90% quantiles of the per-cycle ratios, per batch and pooled; report only"
+   },
+   "validity": {
+    "pair": "head_aa/head",
+    "phases": [
+     "read_sum",
+     "mutate",
+     "emit_after"
+    ],
+    "rule": "same pooled statistic; for every gate phase the two-sided 95% interval (k=3) contains 1 and |geo-1| <= 0.01; otherwise the gate is invalid: diagnose (start conditions, CPU samples, per-batch A/A) before any rerun, and write the replacement into the report",
+    "max_offset": 0.01
+   },
+   "report": {
+    "ratios": [
+     "head/anchor",
+     "head/r3"
+    ],
+    "metrics": [
+     "load",
+     "read_sum",
+     "mutate",
+     "emit_after",
+     "reload",
+     "total"
+    ],
+    "interval": "two-sided 95%, Bonferroni k=12 (6 metrics x 2 references), per batch and pooled; report only (head/r3 is G4 data, judged by \u6027\u80fd\u4f18\u5316)"
+   },
+   "old_protocol": {
+    "family": "12 = {cista,flatbuffers,capnproto,cereal} x {read_sum<=1.05, mutate<=1.05, emit_after<=0.20}; ratio head/rival; joint one-sided 95% upper bound t(1-0.05/12, df), per batch",
+    "aa": "head_aa/head, 8 phases, two-sided t(1-0.05/16, df) inside [1/1.05, 1.05]; reported, does not invalidate a gate batch",
+    "auxiliary": "reload head/rival two-sided t(1-0.05/8, df), report only"
+   },
+   "legacy_norm": {
+    "item": "cereal:mutate norm head/anchor = (head/cereal)/(anchor/cereal) in the same round (identical to head/anchor because cereal cancels); criterion on the pooled geometric mean (the 1.014-1.017 noise floor was a point estimate); one-sided 95% upper bound k=2 reported, not a criterion",
+    "threshold": 1.016
+   }
+  },
+  "slg": {
+   "order": "ABBA ABBA ABBA, A=head B=anchor, 6 processes each",
+   "argv": "--mode bench --scale M --cycles 41 --formats xoffset,cereal,protobuf,flatbuffers",
+   "env": {
+    "SLG_REUSE": "1"
+   },
+   "process_value": "per scenario: mean over cycles 1-40 of log(xoffset total / geometric mean of cereal, protobuf, flatbuffers totals in the same cycle)",
+   "ratio": "head/anchor = exp(mean head values - mean anchor values), Welch t interval, two-sided 95%, Bonferroni k=4 (A-D)",
+   "gate": "A, B, C upper bound <=1.02; D report only",
+   "pass_le": 1.02,
+   "fail_gt": 1.03,
+   "max_groups": 2,
+   "pending": "frozen by \u6027\u80fd\u4f18\u5316 2026-10-23 11:53Z: max upper bound of A, B, C in (1.02, 1.03] -> pending: run one extra ABBA x3 group (slg-2), pool both groups (Welch on all processes): <=1.02 pass, otherwise fail; >1.03 fail. No further groups (no rerun until pass)",
+   "trend_adjusted": "per group, OLS of the process value on process order plus a head indicator; two-sided 95% k=4; report only (diagnosis of in-session drift), never part of the verdict",
+   "old_protocol": "G1-G3: head processes pooled; per process geo log ratio xoffset/rival on the scenario total, run-level t (df = processes-1), one-sided 95%, k=12; plus analyze.py-style per-cycle bound of the first head process"
+  },
+  "quiet": "before each batch and before the SLG part: no compiler process for 3 minutes and 1-minute load < 3; then for 60 s (ps pcpu, every 5 s) WindowServer < 20%; remote-desktop processes are recorded only (susu 2026-10-26 04:23Z: a connected remote does not affect the timing); on timeout (30 min) nothing is timed",
+  "screen": {
+   "max": {
+    "WindowServer": 20.0
+   },
+   "remote_procs": [
+    "UURemoteServer",
+    "screensharingd",
+    "ScreensharingAgent",
+    "AnyDesk",
+    "TeamViewer",
+    "ToDesk",
+    "SunloginClient",
+    "RustDesk",
+    "parsecd"
+   ],
+   "remote_max": 5.0,
+   "hold_s": 60.0,
+   "remote_gated": false
+  },
+  "identical_binaries": "frozen by \u6027\u80fd\u4f18\u5316 2026-10-25 10:35Z, not retroactive: at freeze the head and anchor binaries are compared, the formal pair (sc_xoffset) and the SLG pair (slg_bench) separately. A part whose two binaries are byte-identical is not applicable: it is not timed and takes no part in the verdict, and the report states the sha256 (T4-r2: slg_head = slg_anch = 3b37bd3f..., so its SLG C bound 1.0201 was an A/A of one binary)",
+  "checkpoint": {
+   "rule": "merge rules v2 (\u6027\u80fd\u4f18\u5316 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze the binaries of every first-parent commit between them are built and stored (--bisect), so a failing checkpoint is bisected in the same session",
+   "points": "anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are identical collapse into the earliest one (a point identical to the anchor or the head takes its value without timing)",
+   "step": "the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> (head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch and/or one SLG group, under the same start, environment and replacement rules",
+   "decision": "failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]",
+   "spread": "a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges",
+   "deferred": "\u6027\u80fd\u4f18\u5316 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head still give its value without timing, so a build costs no timed step",
+   "max_steps": 2,
+   "result": "hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported"
+  },
+  "env_invalid": {
+   "rule": "frozen by \u6027\u80fd\u4f18\u5316 2026-10-23 14:51Z, not retroactive: during timing WindowServer and remote-desktop pcpu are sampled every 4 s; a sample is busy when one of them is at or above its start limit. A formal batch or SLG group with more than 5% busy samples (or none at all) is invalid by environment. The script decides it from the samples alone, before computing any result; the batch stays in RESULT, marked invalid with its sample counts. Each one may be replaced once in the same directory (formal --replaces N, slg --group G --replace); an invalid replacement stops the run for a report. Nothing is ever closed; load is only recorded",
+   "interval_s": 4.0,
+   "max_busy_frac": 0.05,
+   "screen_max": {
+    "WindowServer": 20.0
+   },
+   "remote_procs": [
+    "UURemoteServer",
+    "screensharingd",
+    "ScreensharingAgent",
+    "AnyDesk",
+    "TeamViewer",
+    "ToDesk",
+    "SunloginClient",
+    "RustDesk",
+    "parsecd"
+   ],
+   "remote_max": 5.0,
+   "max_replacements": 1
+  }
+ },
+ "host": "macOS-26.3-arm64-arm-64bit",
+ "frozen_utc": "2026-10-26T12:57:04+00:00",
+ "pmset_therm": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+ "bisect": [
+  {
+   "commit": "8cb6221304c90c1df7387b560e9c855a7a78861f",
+   "label": "p1 +#87 D5 (8cb6221, tree = #87 0e4c326d)",
+   "dir": "bisect/00-8cb6221",
+   "formal": null,
+   "wire": null,
+   "slg": null,
+   "deferred": true
+  }
+ ],
+ "reference": {
+  "commit": "414dea49870365fa016d65e267cb6530ce40f7c4",
+  "desc": "414dea4 (#81 merge, CKPT1 anchor); INT2/414dea4 report only",
+  "binary": "0492f332857b93f0eac7ce1ec9d61d5fe4423370c20c08a28922221cadb9f4f3",
+  "wire": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4"
+ }
+}

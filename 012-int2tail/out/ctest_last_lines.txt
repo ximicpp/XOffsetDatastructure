@@ -1,0 +1,11 @@
+test_allocator_failures: {"status":"passed","actual_failure_points":55,"max_unreclaimed_bytes":256}
+test_canonical_cold_no_callback: canonical-v4: cold no-eviction/no-C++-allocation; real free-table growth and exact terminal-delete owner-move controls passed
+test_verified_receive: verified receive: seven groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V2 hole table/sparse passed
+test_wire_validation: Wire mutation sweep: 501 rejected, 411 mutable; 151 targeted V2 rejections
+test_free_table_policy: {"status":"passed","performance_measurement":false}
+test_reset_used_range: test_reset_used_range: 203 resets byte-identical to fresh buffers
+test_owner_registry: 
+test_slot_storage: Slot storage tests passed
+test_v2_golden: test_v2_golden: dense=1792 large=1800 large dense=9984 elided=1632 ok
+test_save_composed: test_save_composed: 300 random cases, 600 composed wires byte-identical to assign + save_compact
+test_wire_populate: test_wire_populate: not Linux, wire checks passed
