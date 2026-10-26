@@ -424,6 +424,9 @@ public:
     // The pool this storage was acquired through (empty when none).
     const VmStoragePool& pool() const noexcept { return pool_; }
     std::size_t reserved_bytes() const noexcept { return reserved_bytes_; }
+    // Bytes at or beyond this offset have not been exposed since the OS
+    // supplied them; growth below it zeroes what it exposes.
+    std::size_t zero_from() const noexcept { return zero_from_; }
     std::size_t accessible_bytes() const noexcept { return accessible_bytes_; }
     std::size_t page_size() const noexcept { return page_size_; }
     bool is_slot() const noexcept { return slot_class_ != no_slot; }
