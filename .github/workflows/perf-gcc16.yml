@@ -1,0 +1,201 @@
+# H1: GCC 16 vs clang-p2996 on GitHub-hosted Linux runners (corroboration only; the
+# primary H1 data is the M4 Linux VM). Design: beta2-20261022/H1_GCC16_PERF_DESIGN_20261022.md.
+#
+# Each matrix job is one independent run on its own VM: build both toolchains, gates V1-V6,
+# then the xcomp batch (tools/perf/h1_linux_batch.sh). Three repetitions per platform.
+# Manual only (workflow_dispatch): no automatic runs (GitHub Actions minutes, susu 2026-10-22).
+#   x86-64  clang = CI P2996 image (a5270822), GCC = gcc:16 (x86-64 digest)
+#   arm64   GCC-only (Q1 + A/A) until tools/perf/h1_toolchains.json names the
+#           clang-p2996 d77eff1 aarch64 artifact from p2996-toolchain.yml; then Q2 as well
+name: perf-gcc16
+
+on:
+  workflow_dispatch:
+    inputs:
+      pairs:
+        description: "A/B pairs of the primary protocol"
+        default: "16"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  h1:
+    name: H1 ${{ matrix.platform }} run ${{ matrix.rep }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ x86-64, arm64 ]
+        rep: [ 1, 2, 3 ]
+        include:
+          - platform: x86-64
+            runner: ubuntu-latest
+            docker_platform: linux/amd64
+            cmake_platform: linux-x86_64
+            gcc_image: gcc@sha256:27470de79376e1033091a1f2cbfa805a10d790dcbd980389a07c4d6dc3606240
+          - platform: arm64
+            runner: ubuntu-24.04-arm
+            docker_platform: linux/arm64
+            cmake_platform: linux-aarch64
+            gcc_image: gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      W: ${{ github.workspace }}/h1work
+      PAIRS: ${{ inputs.pairs || '16' }}
+      PAIRS_SEC: '8'
+      PAIRS_O2: '8'
+      CYCLES: '41'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Runner
+        run: |
+          set -x
+          nproc; lscpu; free -g; df -h .; cat /proc/loadavg; uname -a
+          git rev-parse HEAD
+
+      - name: Images, CMake, dependency sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform ${{ matrix.docker_platform }} "${{ matrix.gcc_image }}"
+          python3 tools/prepare_vm_cmake.py --platform ${{ matrix.cmake_platform }} --out build/cmake-tool
+          mkdir -p "$W/deps-src"
+          clone() { git clone -q --depth 1 --branch "$3" "$2" "$W/deps-src/$1"; c=$(git -C "$W/deps-src/$1" rev-parse HEAD); \
+                    [ "$c" = "$4" ] || { echo "$1 at $c, expected $4"; exit 1; }; echo "$c" > "$W/deps-src/$1/.commit"; }
+          clone protobuf-v21.12 https://github.com/protocolbuffers/protobuf v21.12 f0dc78d7e6e331b8c6bb2d5283e06aa26883ca7c
+          clone flatbuffers-v25.12.19 https://github.com/google/flatbuffers v25.12.19 7e163021e59cca4f8e1e35a7c828b5c6b7915953
+          clone cereal-v1.3.2 https://github.com/USCiLab/cereal v1.3.2 ebef1e929807629befafbb2918ea1a08c7194554
+
+      - name: Select clang
+        id: clang
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = x86-64 ]; then
+            IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
+            docker pull --platform linux/amd64 "$IMAGE"
+            echo "mode=image" >> "$GITHUB_OUTPUT"; echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          else
+            RUN=$(python3 -c 'import json; print(json.load(open("tools/perf/h1_toolchains.json")).get("arm64", {}).get("run_id", ""))')
+            if [ -n "$RUN" ]; then
+              echo "mode=artifact" >> "$GITHUB_OUTPUT"; echo "run_id=$RUN" >> "$GITHUB_OUTPUT"
+              python3 -c 'import json; t=json.load(open("tools/perf/h1_toolchains.json"))["arm64"]; print("artifact="+t["artifact"]); print("tar="+t["tar"]); print("sha256="+t["sha256"])' >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=none" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Download clang-p2996 aarch64 artifact
+        if: steps.clang.outputs.mode == 'artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.clang.outputs.artifact }}
+          run-id: ${{ steps.clang.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ github.workspace }}/h1work/toolchain
+
+      - name: Unpack clang-p2996 aarch64
+        if: steps.clang.outputs.mode == 'artifact'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ steps.clang.outputs.sha256 }}  $W/toolchain/${{ steps.clang.outputs.tar }}" | sha256sum -c
+          sudo mkdir -p /opt/p2996-toolchain
+          sudo tar -xf "$W/toolchain/${{ steps.clang.outputs.tar }}" -C /opt/p2996-toolchain --strip-components=1
+          /opt/p2996-toolchain/bin/clang++ --version | head -2
+
+      - name: Build GCC 16 (deps, slg_bench, path_audit, tests) and run Release CTest (V1, V2)
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform ${{ matrix.docker_platform }} \
+            -v "${{ github.workspace }}:${{ github.workspace }}" -w "${{ github.workspace }}" \
+            -e PATH=${{ github.workspace }}/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e DEPS_SRC="$W/deps-src" -e FB_GEN="$W/fbgen" -e JOBS=4 \
+            "${{ matrix.gcc_image }}" bash -c "
+              g++ --version | head -1 &&
+              g++ -std=c++26 -freflection -dM -E -x c++ /dev/null | grep -c _GLIBCXX_ASSERTIONS | grep -qx 0 &&
+              tools/perf/h1_build.sh gcc $W/gcc 'deps slg audit tests' &&
+              ctest --test-dir $W/gcc/b-tests --output-on-failure --parallel 4 --timeout 900" \
+            2>&1 | tee "$W-gcc-build.log"
+
+      - name: Build GCC 16 -O2 slg_bench (secondary, x86-64)
+        if: matrix.platform == 'x86-64'
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform ${{ matrix.docker_platform }} \
+            -v "${{ github.workspace }}:${{ github.workspace }}" -w "${{ github.workspace }}" \
+            -e PATH=${{ github.workspace }}/build/cmake-tool/root/bin:/usr/local/bin:/usr/bin:/bin \
+            -e DEPS_SRC="$W/deps-src" -e DEPS_PREFIX="$W/gcc/deps" -e OPT="-O2 -DNDEBUG" -e JOBS=4 \
+            "${{ matrix.gcc_image }}" bash -c "tools/perf/h1_build.sh gcc $W/gcc-o2 slg" 2>&1 | tee "$W-gcc-o2-build.log"
+
+      - name: Build clang-p2996 (deps, slg_bench, path_audit, tests) and run Release CTest (V1)
+        if: steps.clang.outputs.mode != 'none'
+        shell: bash
+        run: |
+          set -o pipefail
+          if [ "${{ steps.clang.outputs.mode }}" = image ]; then
+            IMG="${{ steps.clang.outputs.image }}"; TCMOUNT=()
+          else
+            IMG="${{ matrix.gcc_image }}"; TCMOUNT=(-v /opt/p2996-toolchain:/opt/p2996-toolchain:ro)
+          fi
+          docker run --rm --platform ${{ matrix.docker_platform }} "${TCMOUNT[@]}" \
+            -v "${{ github.workspace }}:${{ github.workspace }}" -w "${{ github.workspace }}" \
+            -e PATH=${{ github.workspace }}/build/cmake-tool/root/bin:/opt/p2996-toolchain/bin:/usr/local/bin:/usr/bin:/bin \
+            -e DEPS_SRC="$W/deps-src" -e FB_GEN="$W/fbgen" -e JOBS=4 -e CLANG_ROOT=/opt/p2996-toolchain \
+            "$IMG" bash -c "
+              /opt/p2996-toolchain/bin/clang++ --version | head -2 &&
+              grep -h _LIBCPP_HARDENING_MODE_DEFAULT \$(find /opt/p2996-toolchain/include -name __config_site) &&
+              printf '#include <cstddef>\\nstatic_assert(_LIBCPP_HARDENING_MODE == _LIBCPP_HARDENING_MODE_NONE);\\n' |
+                /opt/p2996-toolchain/bin/clang++ -std=c++26 -stdlib=libc++ -fsyntax-only -x c++ - &&
+              echo 'libc++ hardening: none' &&
+              tools/perf/h1_build.sh clang $W/clang 'deps slg audit tests' &&
+              ctest --test-dir $W/clang/b-tests --output-on-failure --parallel 4 --timeout 900" \
+            2>&1 | tee "$W-clang-build.log"
+          python3 tools/perf/xc_ab.py compare-cc --a-build "$W/clang/b-slg" --b-build "$W/gcc/b-slg" \
+            --a-prefix "$W/clang/deps" --b-prefix "$W/gcc/deps" --root "${{ github.workspace }}" --json "$W/compare_cc.json"
+
+      - name: Gates V3-V6 and timing (runtime container gcc:16, glibc malloc)
+        shell: bash
+        run: |
+          set -o pipefail
+          RT=()
+          if [ "${{ steps.clang.outputs.mode }}" != none ]; then
+            RT=(-v "$W/clang/clang-rt:$(cat "$W/clang/libcxx_dir.txt"):ro"); CL="$W/clang"
+          else
+            CL=""
+          fi
+          O2=""; [ -d "$W/gcc-o2" ] && O2="$W/gcc-o2"
+          docker run --rm --platform ${{ matrix.docker_platform }} "${RT[@]}" \
+            -v "${{ github.workspace }}:${{ github.workspace }}" -w "${{ github.workspace }}" \
+            -e GCC_OUT="$W/gcc" -e CLANG_OUT="$CL" -e O2_OUT="$O2" -e PAIRS -e PAIRS_SEC -e PAIRS_O2 -e CYCLES \
+            -e LIB_COMMIT="$(python3 -c 'import json; print(json.load(open("tools/perf/h1_toolchains.json"))["library_commit"])')" \
+            -e RUNTIME_IMAGE="${{ matrix.gcc_image }}" \
+            "${{ matrix.gcc_image }}" bash -c "tools/perf/h1_linux_batch.sh $W/batch" 2>&1 | tee "$W-batch.log"
+          cat "$W/batch/SUMMARY.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h1-${{ matrix.platform }}-run${{ matrix.rep }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            h1work/batch/
+            h1work-*.log
+            h1work/compare_cc.json
+            h1work/*/compile_commands.json
+            h1work/*/b-slg/compile_commands.json
+            h1work/*/compiler_version.txt
+            h1work/*/compiler_v.txt
+            h1work/*/build_times.txt
+            h1work/*/b-tests/Testing/Temporary/LastTest.log
