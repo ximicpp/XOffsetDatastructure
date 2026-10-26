@@ -61,6 +61,11 @@ struct ProtocolError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+// The peer closed (or reset) the connection between frames.
+struct PeerClosed : ProtocolError {
+    using ProtocolError::ProtocolError;
+};
+
 class Conn {
 public:
     Conn() = default;
@@ -94,6 +99,14 @@ public:
     // checks as recv(). Throws ProtocolError on EOF or a bad header.
     std::optional<Frame> try_recv(std::initializer_list<MsgType> allowed);
 
+    // ---- payload buffer recycling (optional, --buffers reuse) ----
+    // Hands a consumed payload back: the next received frame is sized into
+    // its capacity instead of a new allocation.
+    void recycle_rx(std::string&& buffer) noexcept;
+    // The payload of the last frame enqueue() finished writing, cleared with
+    // its capacity kept (an empty string when there is none).
+    std::string take_tx_buffer() noexcept;
+
     std::uint64_t bytes_sent() const noexcept { return bytes_sent_; }
     std::uint64_t bytes_received() const noexcept { return bytes_received_; }
 
@@ -110,8 +123,10 @@ private:
     bool rx_have_header_ = false;
     std::string rx_payload_;
     std::size_t rx_payload_got_ = 0;
+    std::string rx_spare_;
     // send state
     std::deque<Pending> tx_;
+    std::string tx_spare_;
     std::uint64_t bytes_sent_ = 0;
     std::uint64_t bytes_received_ = 0;
 };
