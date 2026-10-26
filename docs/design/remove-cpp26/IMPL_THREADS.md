@@ -20,6 +20,7 @@ A、B 合完 ── 协调者请产品定位线程做阶段 5（K0/K1/K7/K8、�
 ## 1. 三个线程共用的约束（每个线程的指令里都要带上）
 
 - **不影响现有开发**：INT3（性能优化的下一个集成批次，含 #87、#93）合入 next_cpp26 之前，不往 next_cpp26 合任何东西（D4）。PR 可以先以草稿打开。不动在途 PR 和它们的分支（#87、#93、#40、#44、#47、#56 等），冲突只在自己的分支上解。INT3 是否已合入，以 `git log origin/next_cpp26` 里 #87/#93 的合并提交为准，拿不准就问协调者。
+- **自动执行**（susu 16:54Z，cmsg_01W8h2niLCspyDhp6DxMomYu9pZUUpknta2bAxHCSdRBpY：“所有会话都按推荐来进行，不需要我确认，自动执行，直到完成会话目的。”）：设计层面的选择直接按推荐项定，写进 PR 正文或报告，不停下来等确认。只有必须 susu 本人动手的事（例如在 Mac 上装 Xcode、登录 Apple ID）才去问。
 - **合并授权**：susu 16:36Z 的“全按推荐”就是 D4 的批准，即 INT3 后分批合。权限检查拦合并时，附上这条消息；还拦就告诉协调者是哪个线程，不要换路绕过。
 - **0 类判据（MERGE_RULES_V2，sha256 `62d178d46830c3ecc3625689adbebc04a2626616664d1b29f22e4c1c89f55dfc`，第 0 类第 16 行）**：在云端 GCC 16 和 P2996 d77eff1 两种编译器下，正式 harness、bench/slg、bench/reloc 每个函数的反汇编逐条相同（比较时忽略地址和符号名），PR 里要附两种编译器的比对脚本输出。.text 里函数的顺序和大小也相同，直接算 0 类；只是摆放（顺序或大小）变了，仍算 0 类，但要在 PR 正文里写明，并记进性能优化的 ledger，作为下一次阶段复核的单独二分点（起因：INT1 里 map.insert 指令完全相同，只是对齐变了，Mac 上就慢了 6–8%）。Mac 在下一次阶段复核时顺带核对二进制。纯 Linux 的 CMake、测试、工具改动按原有 0 类（Apple 头文件文本逐字节不变）。
 - **验证**：没有 GitHub CI，用 `tools/local_validate.sh`（GCC 16 全量 ctest、ASan/UBSan、fuzz、差分、smoke、Ir、P2996 ctest 和签名、P2996 Ir）。P2996 全量 ctest 必须全过（当前 98/98）。云端 P2996 工具链在 `/mnt/project-files/toolchains/`。dockerd 要手动起（`nohup dockerd &`），GCC 16 镜像 digest 在 `local_validate.sh` 里。
@@ -27,7 +28,7 @@ A、B 合完 ── 协调者请产品定位线程做阶段 5（K0/K1/K7/K8、�
 - **性能优先**：任何构建模式的性能退化都要量化报告，不能静默降级；性能宣称以 C++23 构建为准（D1）。
 - **其他硬约束**：不保留 V1 兼容；公开 API 可以改（`XOFFSET_ORDINARY_RECORDS` 在 C++26 下保留）；不能要求用户加 `-fconstexpr-steps`；不写 `f<[:x:]>()`；TypeLayout 头文件是 CRLF，按字节改；Mac 队列只放决定合并的批次（susu 04:23Z 精简规则），这三个线程不排计时批次。
 - **可复用的探针**：`/mnt/project-files/remove-cpp26-20261026/probes/`（分支 `claude/remove-cpp26-design-20261026` 的 `docs/design/remove-cpp26/probes/` 同一份）。`xo_describe.hpp` 是字段表后端的起点，`cmp_asm2.py` 是反汇编比对脚本的起点，`probe_dump.cpp` 是 describe_dump 的起点，`run_probes.sh` 一键复现。
-- **交付文件**放在 `/mnt/project-files/remove-cpp26-20261026/<线程子目录>/`；改变目标的选择走 request_decision（经协调者放到项目对话），附推荐项。
+- **交付文件**放在 `/mnt/project-files/remove-cpp26-20261026/<线程子目录>/`；设计层面的选择按推荐项直接定（见下条“自动执行”）。
 
 ---
 
@@ -105,7 +106,7 @@ A、B 合完 ── 协调者请产品定位线程做阶段 5（K0/K1/K7/K8、�
    - 查清 `std::pmr` 在 Apple 系统 libc++ 上的最低部署版本：用 `-mmacosx-version-min` 从低往高试编译和链接。
    - 用 Linux x86-64 的参照语料核对 wire，要逐字节相同、互相能载入。签名要与 `tools/sigs` 基线一致。
    - 走 Mac 队列（`tools/perf_gate/mac_queue.sh add-batch`）时排成不计时的批次，放在决定合并的门禁批次后面，不能插进计时步骤之间。排之前请协调者和性能优化确认位置。给 Mac 的文件写清路径和完整 sha256。
-2. **iOS 模拟器**：需要 Xcode 和 iOS SDK。如果 Mac 上没有，装 Xcode 是 susu 的操作（体积大，要 Apple ID，还要先腾磁盘）。经协调者问一次 susu，附推荐，不要因此停下其他目标。装好之后：构建，用 `xcrun simctl spawn` 跑 ctest，核对 wire 语料。
+2. **iOS 模拟器**：需要 Xcode 和 iOS SDK。如果 Mac 上没有，装 Xcode 是 susu 的操作（体积大，要 Apple ID，还要先腾磁盘）。这一步只能 susu 本人做：经协调者请 susu 装一次（附推荐和需要腾出的磁盘），不要因此停下其他目标。装好之后：构建，用 `xcrun simctl spawn` 跑 ctest，核对 wire 语料。
 3. **Android arm64-v8a**（NDK Clang）：在云端交叉编译 C++20。
    - 能跑就跑：静态链接后用 qemu-aarch64 用户态跑，或在有 KVM 时用模拟器；都不行就只编译和链接，并写明“未运行”。
    - 记录 NDK libc++ 的 `std::pmr` 是否可用。
