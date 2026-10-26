@@ -23,7 +23,7 @@ STORAGE = ("test_virtual_memory_storage", "test_vm_pool")
 SANITIZED = ("test_nested", "test_compaction", "test_xbuffer_api", "test_xhandle",
              "test_error_paths", "test_complex_nesting", "test_adaptive_reservation",
              "test_main_containers", "test_runtime_regressions", "test_mutation_failures",
-             "test_wire_validation", "test_stable_storage", *STORAGE,
+             "test_wire_validation", "test_append_grow", "test_stable_storage", *STORAGE,
              "test_storage_policies", "test_vm_lifecycle", "test_vm_transport",
              "test_owner_registry", "test_tail_expansion", "test_allocator_model",
              "test_allocator_failures")

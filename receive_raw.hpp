@@ -680,13 +680,11 @@ RawWireVerification verify_structural_wire_graph_raw_at(
         const void* gaps=nullptr,std::size_t gap_count=0) {
     static_assert(receive_raw_supported<T>(), "unsupported raw wire activation domain");
     if(!upstream)throw std::invalid_argument("validation scratch: null upstream");
-    auto* resource=upstream;
     WireValidationContext ctx{
         .base = base,
         .end = raw_advance(base,extent,bytes),
         .segment = reinterpret_cast<XArena*>(const_cast<char*>(base)),
-        .range_resource = std::pmr::monotonic_buffer_resource{std::size_t{4096}, resource},
-        .free_range_resource = std::pmr::monotonic_buffer_resource{std::size_t{4096}, resource}
+        .upstream = upstream
     };
     if (arena.flags != 0 || arena.reserved0 != 0 || arena.reserved1 != 0)
         throw XException("wire validation: unsupported arena header flags");

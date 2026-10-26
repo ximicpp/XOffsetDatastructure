@@ -69,6 +69,47 @@ Outcome exercise(long n,bool cold) {
             "post-failure hole table does not cover every unreachable byte");
     return result;
 }
+// D2: an in-place reload releases the free table into the per-thread cache
+// with the storage of its small bins (<= 64 entries each) kept, so the first
+// retires after the reload, which take the same table back, make no host
+// allocation; a bin that grew past 64 entries returns its storage, and so does
+// every bin of a table released by destroying its buffer. The hole table is
+// the same as with freshly allocated bins.
+void reload_keeps_small_bin_storage() {
+    XBufferCore::trim_free_table_cache();
+    auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024).with_growth(XGrowPolicy::Automatic));
+    b.root<AllocatorFailureRoot>().values.push_back(77);
+    const auto frame=b.save_verified<AllocatorFailureRoot>();
+    auto round=[&](std::size_t& small_attempts,std::size_t& many_attempts) {
+        b.reload_verified<AllocatorFailureRoot>(frame);
+        require(b.free_block_count()==0,"fixture wire has holes");
+        std::array<void*,8> small{}; std::array<void*,100> many{};
+        for(auto& p:small) p=b.arena()->allocate_aligned(64,8);
+        for(auto& p:many) p=b.arena()->allocate_aligned(32,8);
+        attempts=hits=0;fail_after=-1;watch=true;
+        for(auto p:small) b.arena()->deallocate(p,64);
+        small_attempts=attempts; attempts=0;
+        for(auto p:many) b.arena()->deallocate(p,32);
+        watch=false; many_attempts=attempts;
+        require(b.free_table_complete(),"retires lost an entry");
+        return holes_of(b);
+    };
+    std::size_t s0=0,m0=0,s1=0,m1=0,s2=0,m2=0;
+    const auto first=round(s0,m0);
+    const auto second=round(s1,m1);
+    const auto third=round(s2,m2);
+    require(s0>=2 && m0>=1,"first round: table and bin storage were not host allocations");
+    require(s1==0 && s2==0,"reload did not keep the small bin's storage");
+    require(m1>=1 && m2>=1,"bin storage above the keep limit was kept");
+    require(same(first,second) && same(first,third),"kept bin storage changed the hole table");
+    b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
+    auto* p=b.arena()->allocate_aligned(64,8);
+    attempts=hits=0;fail_after=-1;watch=true;
+    b.arena()->deallocate(p,64);
+    watch=false;
+    require(attempts==1,"a table released by destroying its buffer kept bin storage");
+    XBufferCore::trim_free_table_cache();
+}
 // V2 replacement for the V1 release_cached_blocks transfer (in-arena free lists
 // moved into the Core table; both are gone). Free metadata now enters the host
 // table from the wire hole table inside load_verified. A real host failure at
@@ -207,6 +248,7 @@ void growth_probe_keeps_cached_blocks() {
 }
 int main() {try {
     std::size_t points=0,max_lost=0;
+    reload_keeps_small_bin_storage();
     for(bool cold:{true,false}) {
         auto normal=exercise(-1,cold); require(normal.attempts>0,"no real metadata allocations observed");
         if(!cold) (void)exercise(-1,false); // the previous run's table is now cached

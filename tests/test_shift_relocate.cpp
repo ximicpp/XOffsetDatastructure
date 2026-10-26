@@ -1,5 +1,6 @@
 // SHIFT regression: XVector erase/insert of records that own inline heads move
-// the tail with one memmove and restart only the inline heads. Content must
+// the tail with one memmove and restart only the inline heads; growth and
+// reserve move the whole live run to the new block with one memcpy. Content must
 // match a std model after every operation, and every state must survive a
 // full save_verified/load_verified round trip. test_v2_golden pins the bytes.
 #include "xoffsetdatastructure.hpp"
@@ -205,6 +206,11 @@ template <class Root> std::vector<std::string> run() {
         }
         }
         if (op % 97 == 0) {
+            // Explicit reserve past capacity: block relocation of the live run.
+            if (rng.below(3) == 0) {
+                auto& live = buf.root<Root>().recs;
+                live.reserve(live.capacity() + 1 + rng.below(8));
+            }
             compare(buf.root<Root>(), model, "mutate");
             std::string wire = buf.save_verified<Root>();
             xo::XBuffer loaded = xo::XBuffer::load_verified<Root>(wire, policy());

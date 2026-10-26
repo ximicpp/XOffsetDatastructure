@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace slg {
@@ -217,9 +218,18 @@ template <class Msg> void simulate_battle(Msg& m) {
 
 // Scene server applies a battle result to the army it owns.
 template <class Dst, class Src> void apply_battle_army(Dst& army, const Src& result) {
-    copy_vec(army.troops, result.troops, [](auto& a, const auto& b) { copy_troop(a, b); });
-    for (std::size_t i = 0; i < army.heroes.size() && i < result.heroes.size(); ++i)
-        copy_vec(army.heroes[i].buffs, result.heroes[i].buffs, [](auto& a, const auto& b) { copy_buff(a, b); });
+    // T4 adapter (c): a copy between two values of the same model is the
+    // model's own whole-container assignment (std::vector or XVector).
+    if constexpr (std::is_same_v<decltype(army.troops), decltype(result.troops)>)
+        army.troops = result.troops;
+    else
+        copy_vec(army.troops, result.troops, [](auto& a, const auto& b) { copy_troop(a, b); });
+    for (std::size_t i = 0; i < army.heroes.size() && i < result.heroes.size(); ++i) {
+        if constexpr (std::is_same_v<decltype(army.heroes[i].buffs), decltype(result.heroes[i].buffs)>)
+            army.heroes[i].buffs = result.heroes[i].buffs;
+        else
+            copy_vec(army.heroes[i].buffs, result.heroes[i].buffs, [](auto& a, const auto& b) { copy_buff(a, b); });
+    }
 }
 
 // ---- scenario B: season edits on a migrated player ------------------------
