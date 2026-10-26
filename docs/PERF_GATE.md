@@ -4,6 +4,8 @@
 
 设计依据：H3 设计 `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md` 第 5 节。本页是实现说明。
 
+**运行状态（2026-10-26）**：GitHub CI 已停用（susu 10-23 决定），`perf-gate.yml` 保留但不再自动运行，门禁改由本地验证脚本运行（命令见第 6 节）。实现验收：1（历史回放）、2（人为回归被拦）已通过；3（一周稳定）作废：GitHub CI 停用，门禁改由本地验证脚本运行。
+
 ## 1. 它做什么
 
 `.github/workflows/perf-gate.yml` 在 PR 指向 `next_cpp26`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `next_cpp26` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
