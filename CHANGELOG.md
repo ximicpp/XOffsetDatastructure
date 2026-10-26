@@ -2,6 +2,72 @@
 
 ## Unreleased
 
+- Owner registration: an ordinary owner (created, loaded or reloaded) keeps
+  only its identity record and no longer enters the process-wide index or
+  takes its mutex. Only direct-receive owners, the ones
+  `canonical_bytes_at` can answer for, are indexed. Creating and destroying
+  an owner costs one host allocation instead of two plus a global lock.
+  The unused private `owner_from_payload_ptr` is gone. The CTest cases
+  `test_owner_registry_fail_node`/`_fail_rehash` became
+  `test_owner_registry_fail-record`/`_record-only`.
+- Linux output prefetch: in a `save_verified` / `save_verified_into` output of
+  at least 1 MiB, each copy of at least 256 KiB into pages that are not yet
+  resident is preceded, per 256 KiB chunk, by `madvise(MADV_POPULATE_WRITE)`,
+  so the kernel faults the pages in one call instead of one trap per page.
+  Reused (resident) outputs and smaller ones are unchanged. Kernels before
+  5.14 answer `EINVAL` once, after which outputs are copied plainly. Same wire
+  bytes; Darwin and Windows code unchanged. On the formal M final state (12.6
+  MB) a new output takes 36 page-fault traps instead of 3083 (cloud, GCC 16).
+- Send path: `XSaveOptions{.emission}` picks the wire form of
+  `save_verified` / `save_verified_into`; both APIs emit the same bytes for
+  the same state.
+  - `XWireEmission::free_runs` (default) skips each run of at least 4 KiB of
+    adjacent free blocks of at least 256 B. It replaces N10 (which built a
+    1 bit / 8 B free bitmap on every save of a buffer with 4 KiB of holes):
+    only the bins of at least 256 B and the large blocks are visited, sorted
+    by offset with a radix sort and merged. On the formal M final state it
+    skips the same run as N10 (about 6x cheaper to find, cloud box), and on the
+    golden model its bytes equal the earlier N10 pin. Skipped bytes are all
+    holes, so 0.3.0-beta.1 receivers accept it.
+  - `XWireEmission::dense`: one copy of the payload.
+  - `XWireEmission::zero_runs` skips every zero run of at least 64 bytes
+    (capacity slack, holes, zero fields), for cross-machine sends; the
+    receiver loads a byte-identical payload, so spare capacity is kept (K5
+    unchanged).
+  Receivers no longer require gap bytes to lie in holes: gaps load as zero and
+  the payload is validated as before, so the payload-level accept/reject set is
+  unchanged (fuzzed: every sparse wire has the outcome and error of its dense
+  equivalent); the wire-level accept set grows by sparse wires whose gaps
+  cover live zero bytes.
+- `save_verified_into` into an output whose capacity already holds the dense
+  wire examines and normalizes the source once instead of twice.
+- New `save_compact<T>(XCompactOptions)` / `save_compact_into<T>(out, ...)`
+  write a compact wire (preorder layout, no holes) by direct traversal of the
+  source graph, with no temporary buffer; the source is not modified. By
+  default vectors of at least 8 elements (not strings) keep size / 8 + 1
+  zeroed spare elements (`slack_div = 8`), so a receiver that edits them does
+  not relocate on the first insert. With `slack_div = 0` capacity == size and
+  the bytes are identical to `XCompactor::compact<T>(b).save_verified<T>()`
+  (tested over 600 random models), 7x (840 KB shard) to 85x (1.6 KB) faster
+  than compact-then-save on the cloud box.
+- Same-process whole-buffer copy: `XBuffer::clone()` (a new owner with the
+  source's size, maximum capacity, growth policy and pool) and
+  `clone_into(dst)` (reuses dst's mapping and address like `reload_verified`;
+  dst's epoch advances; on failure dst is left an empty arena, a self copy is
+  refused unchanged). One copy of the used payload; the exact free table,
+  typed root access and schema binding come along, so no wire and no
+  verification. `TypedXBuffer<T>` has both. See `docs/BUFFER_REUSE.md`.
+- Nightly fuzz without GitHub Actions (threat model F4): `tools/fuzz_nightly.sh`
+  runs the GCC 16 ASan+UBSan differential fuzz (`test_v2_fuzz`, 4 processes,
+  date-based seeds, about 45 minutes) and the replay of
+  `tests/fuzz/regressions/` and the seed corpora on any Linux host with
+  Docker, writing findings.json per job. `tools/fuzz_report.py` turns those
+  (or the Actions artifacts) into one issue per crash signature (`fuzz-crash`:
+  a new signature opens it, a repeat comments, a closed one is reopened as a
+  regression) and pushes the input to `fuzz-crash/<signature>` as
+  `tests/fuzz/regressions/<target>/<signature>`; failures without a finding go
+  to one rolling `fuzz-infra` issue, closed by the next green nightly. The
+  libFuzzer jobs need P2996 Clang and are not part of this nightly.
 - Fuzz regressions (threat model F4): the two libFuzzer harnesses also build
   without libFuzzer as `fuzz_v2_wire_replay` and `fuzz_wire_schemas_replay`
   (any compiler, not gated by `XOFFSET_BUILD_FUZZERS`). CTest replays
@@ -12,6 +78,35 @@
   `-DXOFFSET_FUZZ_INJECT_CRASH=ON` (drill builds only) makes inputs starting
   with `XOFFSET-INJECT` crash the harnesses. The case streams changed, so a
   given seed now generates different cases than in 0.3.0-beta.1.
+- Performance: verified loads index the payload with one bit per 8-byte
+  granule (live and free bitmaps; inline up to 32 KiB, otherwise one scratch
+  block, retained by `reload_verified`) instead of the paged byte index and two
+  monotonic resources, and check each container head once (binding, block
+  bounds and alignment) before falling back to the full check sequence for its
+  error. Accept/reject sets and first error messages are unchanged
+  (`tools/validation_differential.sh`, CI job `validation-differential`).
+- Performance: canonical wires (no holes, blocks laid out back to back in
+  visiting order, as `XCompactor::compact` writes them) are validated with a
+  single cursor instead of the bitmaps, and take no scratch memory at any
+  size. At the first block elsewhere or the first hole the live bitmap is set
+  to the cursor's prefix and validation continues there, so accept/reject sets
+  and first errors are unchanged (`test_v2_fuzz` compares every case with the
+  cursor off). Map/set key order is checked without an early exit, and
+  validation errors are raised from one out-of-line function.
+- API: `XBuffer::begin_verified_reload<T>(used, holes, extents)` receives a
+  wire directly into an existing buffer (no library copy, no new owner): the
+  transport writes the header, extent table, payload (dense, or each extent at
+  its offset) and hole table into the token's spans, calls `complete()` with
+  the counts written, then `finish()`. Verification is `reload_verified`'s
+  (same validator, same accept/reject set, `test_v2_fuzz` acceptor 6); an
+  incomplete, aborted or mis-declared delivery rejects and leaves the buffer
+  rootless. Nothing is cleared at begin: a dense payload is overwritten whole,
+  and only the parts of sparse gaps that earlier content made dirty are
+  zeroed at finish. `VerifiedReloadToken<T>`; `XOFFSET_VERIFIED_RELOAD_API`.
+- Diagnostics: building with `XOFFSET_VALIDATION_LAYOUT_STATS` counts, per
+  root type, canonical / ascending-with-holes / out-of-order wires that pass
+  verified validation and prints them to stderr at exit (not thread-safe;
+  diagnostic builds only).
 
 ## 0.3.0-beta.1: production-readiness beta
 

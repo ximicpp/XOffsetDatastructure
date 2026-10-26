@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Map state demo: check and tabulate the output of run_all_tiers.sh.
 
-OWNER: integration thread. Reads OUT_ROOT/{selftest,tier_<N>,evil}/ (CSV
-formats in demo/mapstate/INTERFACES.md section 6) and writes one Markdown
-report plus a JSON summary. Exit 0 only when every verdict passes.
+Reads OUT_ROOT/{selftest,tier_<N>_<mode>,evil_<mode>}/ (CSV formats in
+demo/mapstate/INTERFACES.md section 6; a plain tier_<N> or evil directory
+from older runs is read too) and writes one Markdown report plus a JSON
+summary. Exit 0 only when every verdict passes.
 
 Verdicts per tier:
   * a, b and client exited 0;
-  * every metric name of INTERFACES.md section 6 recorded (headless: no draw);
-  * a_steps.csv has at least --min-steps rows, ticks consecutive, check_ok all 1;
+  * every metric name of INTERFACES.md section 6 recorded (headless: no draw;
+    --buffers reuse: no per-message destroy);
+  * a_steps.csv has at least --min-steps rows, ticks consecutive, check_ok all 1,
+    and a request and result wire digest on every row;
   * a_checks.csv and client_checks.csv exist, non-empty, every row "pass";
     a_checks.csv has the six fixed row names;
   * every snapshot request id logged by A was logged by the client and vice
@@ -16,9 +19,14 @@ Verdicts per tier:
   * normal, full and empty categories each sampled on both sides; every
     empty snapshot has visible == 0; every full-scene snapshot has
     visible == units; check_ok all 1 on both sides.
+Across tiers: for each unit count run in both modes, the fresh and reuse
+runs sent byte-identical step wires (equal digests at every tick).
+--compare OTHER_ROOT: every tier here sent the same step wires, tick by tick,
+as the tier of the same unit count in OTHER_ROOT (another compiler,
+platform or build), over at least --min-steps common ticks.
 Self-test: exit 0 and every selftest_checks.csv row "pass".
-Evil: a, b, client exited 0, A logged at least 3 "rejected:" lines and every
-row of the evil client's client_checks.csv passes.
+Evil (each mode): a, b, client exited 0, A logged at least 4 "rejected:"
+lines and every row of the evil client's client_checks.csv passes.
 
 Per-category numbers are computed here from the per-request rows
 (nearest-rank percentiles); whole-run numbers come from the processes'
@@ -38,12 +46,12 @@ BATCH_METRICS = (
     ("a.step_req_bytes", "A->B request wire"),
     ("a.step_res_bytes", "B->A result wire"),
     ("a.ab_rtt_us", "A<->B round trip (send start -> StepRes complete)"),
-    ("a.save_us", "A save_verified (batch)"),
-    ("a.load_us", "A load_verified (B's result)"),
+    ("a.save_us", "A save (batch)"),
+    ("a.load_us", "A verify B's result (load / reload)"),
     ("a.destroy_us", "A destroy old batch"),
-    ("b.load_us", "B load_verified"),
+    ("b.load_us", "B verify the request (load / reload)"),
     ("b.modify_us", "B step in place"),
-    ("b.save_us", "B save_verified"),
+    ("b.save_us", "B save"),
     ("b.send_us", "B send"),
     ("b.destroy_us", "B destroy received buffer"),
     ("b.in_bytes", "B bytes in"),
@@ -51,15 +59,15 @@ BATCH_METRICS = (
     ("a.check_us", "A checks (reference model; not part of the path)"),
 )
 VIEW_METRICS = (
-    ("a.req_load_us", "A load_verified (ViewRequest)"),
+    ("a.req_load_us", "A verify ViewRequest (load / reload)"),
     ("a.filter_us", "A filter"),
     ("a.snap_build_us", "A snapshot build"),
-    ("a.snap_save_us", "A snapshot save_verified"),
+    ("a.snap_save_us", "A snapshot save"),
     ("a.snap_destroy_us", "A snapshot destroy"),
     ("a.snap_bytes", "snapshot wire (A)"),
     ("a.visible_count", "visible units (A)"),
     ("c.view_rtt_us", "client view round trip (ViewReq sent -> snapshot complete)"),
-    ("c.load_us", "client load_verified (snapshot)"),
+    ("c.load_us", "client verify snapshot (load / reload)"),
     ("c.read_present_us", "client field read + presentation data (MERGED)"),
     ("c.draw_us", "client draw"),
     ("c.present_us", "client present"),
@@ -73,10 +81,45 @@ VIEW_METRICS = (
 A_CHECK_NAMES = ("batch_roundtrip", "reference_model", "modification_coverage",
                  "view_snapshot", "snapshot_paths", "rejected_requests")
 
-# INTERFACES.md section 6; the headless client has no draw / present.
+# INTERFACES.md section 6; the headless client has no draw / present, and
+# with --buffers reuse nothing is destroyed per message.
 HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
+DESTROY_METRICS = ("a.destroy_us", "b.destroy_us", "a.snap_destroy_us", "c.destroy_us")
 REQUIRED_METRICS = tuple(k for k, _ in BATCH_METRICS + VIEW_METRICS
                          if k not in HEADLESS_OPTIONAL) + ("a.units_count", "a.ticks_per_s")
+MODES = ("fresh", "reuse")
+
+
+def required_metrics(mode):
+    if mode == "reuse":
+        return tuple(k for k in REQUIRED_METRICS if k not in DESTROY_METRICS)
+    return REQUIRED_METRICS
+
+
+def tier_key(name):
+    """tier_<N>[_<mode>] -> (N, mode order) for sorting."""
+    m = re.match(r"tier_(\d+)(?:_(\w+))?$", name)
+    if not m:
+        return (0, 9)
+    mode = m.group(2) or "fresh"
+    return (int(m.group(1)), MODES.index(mode) if mode in MODES else 9)
+
+
+def step_digests(rows):
+    """tick -> (req_digest, res_digest) for rows that carry both."""
+    out = {}
+    for r in rows or []:
+        rq, rs = r.get("req_digest") or "", r.get("res_digest") or ""
+        if rq and rs:
+            out[r.get("tick")] = (rq, rs)
+    return out
+
+
+def compare_digests(a, b):
+    """(common ticks, mismatching ticks list)"""
+    common = sorted(set(a) & set(b), key=lambda t: int(num(t)) if not math.isnan(num(t)) else -1)
+    bad = [t for t in common if a[t] != b[t]]
+    return common, bad
 
 
 def read_csv(path):
@@ -178,7 +221,8 @@ def summarize_tier(root, name, min_steps):
     v = Verdicts()
     meta = read_kv(os.path.join(d, "meta.txt"))
     codes = read_kv(os.path.join(d, "exit_codes.txt"))
-    units = int(meta.get("units", re.sub(r"\D", "", name) or 0))
+    units = int(meta.get("units", tier_key(name)[0]))
+    mode = meta.get("buffers", "fresh")
     exit_code_verdicts(v, scope, codes, ("a", "b", "client"))
 
     steps = read_csv(os.path.join(d, "a_steps.csv"))
@@ -197,6 +241,9 @@ def summarize_tier(root, name, min_steps):
                                                  ticks[-1] if ticks else "-", gaps))
         v.add(scope, "step check_ok all 1", bad == 0 and len(steps) > 0,
               "{} rows with check_ok != 1".format(bad))
+        digested = len(step_digests(steps))
+        v.add(scope, "step wire digests on every row", digested == len(steps) and digested > 0,
+              "{} of {} rows".format(digested, len(steps)))
         tick_info = {"steps": len(steps), "first_tick": ticks[0] if ticks else None,
                      "last_tick": ticks[-1] if ticks else None}
 
@@ -282,16 +329,18 @@ def summarize_tier(root, name, min_steps):
     metrics = {**metrics_map(read_csv(os.path.join(d, "a_metrics.csv"))),
                **metrics_map(read_csv(os.path.join(d, "b_metrics.csv"))),
                **metrics_map(read_csv(os.path.join(d, "client_metrics.csv")))}
-    missing = [k for k in REQUIRED_METRICS if k not in metrics]
+    wanted = required_metrics(mode)
+    missing = [k for k in wanted if k not in metrics]
     v.add(scope, "every metric of INTERFACES.md section 6 recorded", not missing,
-          "missing: " + ", ".join(missing) if missing else "{} metrics".format(len(REQUIRED_METRICS)))
+          "missing: " + ", ".join(missing) if missing else "{} metrics ({})".format(len(wanted), mode))
     ucount = metrics.get("a.units_count")
     if ucount is not None:
         v.add(scope, "a.units_count == units", num(ucount.get("max")) == units,
               "max {}".format(ucount.get("max")))
 
     return {
-        "name": name, "units": units, "meta": meta, "exit_codes": codes,
+        "name": name, "units": units, "mode": mode, "meta": meta, "exit_codes": codes,
+        "digests": step_digests(steps),
         "ticks": tick_info,
         "steps_stats": {k: stats([num(r.get(k)) for r in steps]) for k in
                         ("req_bytes", "res_bytes", "ab_rtt_us", "save_us", "load_us",
@@ -302,13 +351,16 @@ def summarize_tier(root, name, min_steps):
     }
 
 
-def metric_table(lines, metrics, wanted):
+def metric_table(lines, metrics, wanted, mode="fresh"):
     lines.append("| metric | meaning | count | mean | p50 | p95 | max |")
     lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
     for key, meaning in wanted:
         r = metrics.get(key)
         if r is None:
-            lines.append("| `{}` | {} | missing | | | | |".format(key, meaning))
+            if mode == "reuse" and key in DESTROY_METRICS:
+                lines.append("| `{}` | {} | n/a (reuse: nothing destroyed per message) | | | | |".format(key, meaning))
+            else:
+                lines.append("| `{}` | {} | missing | | | | |".format(key, meaning))
             continue
         lines.append("| `{}` | {} | {} | {} | {} | {} | {} |".format(
             key, meaning, r.get("count", "-"),
@@ -321,8 +373,12 @@ def mean_p95(s, metric=""):
     return "{} / {}".format(fmt(s["mean"], metric), fmt(s["p95"], metric))
 
 
+def tier_label(t):
+    return "{} unit(s), {}".format(t["units"], t["mode"])
+
+
 def render_tier(lines, t):
-    lines.append("## Tier: {} unit(s)".format(t["units"]))
+    lines.append("## Tier: {}".format(tier_label(t)))
     lines.append("")
     m = t["metrics"]
     tps = m.get("a.ticks_per_s")
@@ -336,7 +392,7 @@ def render_tier(lines, t):
     lines.append("")
     lines.append("### A <-> B full batch round trip (per step)")
     lines.append("")
-    metric_table(lines, m, BATCH_METRICS)
+    metric_table(lines, m, BATCH_METRICS, t["mode"])
     ss = t["steps_stats"]
     lines.append("")
     lines.append("Free blocks carried in the batch (a_steps.csv): blocks mean/max {} / {}, bytes mean/max {} / {}.".format(
@@ -359,19 +415,19 @@ def render_tier(lines, t):
     row("wire bytes mean / p95 / max", lambda c: "{} / {} / {}".format(
         fmt(c["wire_bytes"]["mean"], "_bytes"), fmt(c["wire_bytes"]["p95"], "_bytes"),
         fmt(c["wire_bytes"]["max"], "_bytes")))
-    row("A load_verified request (us)", lambda c: mean_p95(c["a.req_load_us"]))
+    row("A verify request (us)", lambda c: mean_p95(c["a.req_load_us"]))
     row("A filter (us)", lambda c: mean_p95(c["a.filter_us"]))
     row("A build (us)", lambda c: mean_p95(c["a.build_us"]))
-    row("A save_verified (us)", lambda c: mean_p95(c["a.save_us"]))
+    row("A save (us)", lambda c: mean_p95(c["a.save_us"]))
     row("A destroy (us)", lambda c: mean_p95(c["a.destroy_us"]))
     row("client round trip (us)", lambda c: mean_p95(c["c.rtt_us"]))
-    row("client load_verified (us)", lambda c: mean_p95(c["c.load_us"]))
+    row("client verify snapshot (us)", lambda c: mean_p95(c["c.load_us"]))
     row("client read + present data, MERGED (us)", lambda c: mean_p95(c["c.read_present_us"]))
     row("client destroy (us)", lambda c: mean_p95(c["c.destroy_us"]))
     lines.append("")
     lines.append("### View path, whole run (process metrics)")
     lines.append("")
-    metric_table(lines, m, VIEW_METRICS)
+    metric_table(lines, m, VIEW_METRICS, t["mode"])
     lines.append("")
     dg = t["digest"]
     lines.append("### A / client snapshot digest comparison")
@@ -391,9 +447,13 @@ def render_tier(lines, t):
 
 
 def render_overview(lines, tiers):
-    lines.append("## Three tiers side by side (mean / p95)")
+    lines.append("## All tiers side by side (mean / p95)")
     lines.append("")
-    lines.append("| | " + " | ".join("{} unit(s)".format(t["units"]) for t in tiers) + " |")
+    lines.append("fresh = a new XBuffer per message (load_verified / save_verified, destroyed after use); "
+                 "reuse = kept buffers refilled in place (reload_verified / reset / save_verified_into). "
+                 "Both send byte-identical wires (see the verdicts).")
+    lines.append("")
+    lines.append("| | " + " | ".join(tier_label(t) for t in tiers) + " |")
     lines.append("| --- | " + " | ".join("---:" for _ in tiers) + " |")
 
     def mrow(label, key):
@@ -413,19 +473,19 @@ def render_overview(lines, tiers):
     mrow("batch wire A->B (bytes)", "a.step_req_bytes")
     mrow("batch wire B->A (bytes)", "a.step_res_bytes")
     mrow("A<->B round trip (us)", "a.ab_rtt_us")
-    mrow("A save_verified (us)", "a.save_us")
-    mrow("A load_verified (us)", "a.load_us")
+    mrow("A save (us)", "a.save_us")
+    mrow("A verify B's result (us)", "a.load_us")
     mrow("A destroy (us)", "a.destroy_us")
-    mrow("B load_verified (us)", "b.load_us")
+    mrow("B verify the request (us)", "b.load_us")
     mrow("B step in place (us)", "b.modify_us")
-    mrow("B save_verified (us)", "b.save_us")
+    mrow("B save (us)", "b.save_us")
     mrow("B destroy (us)", "b.destroy_us")
     for cat in CATEGORIES:
         crow("{} snapshot wire (bytes)".format(cat), cat, "wire_bytes", "_bytes")
         crow("{} snapshot visible units".format(cat), cat, "visible")
         crow("{} view round trip (us)".format(cat), cat, "c.rtt_us")
         crow("{} A snapshot build (us)".format(cat), cat, "a.build_us")
-        crow("{} client load_verified (us)".format(cat), cat, "c.load_us")
+        crow("{} client verify snapshot (us)".format(cat), cat, "c.load_us")
         crow("{} client read + present, MERGED (us)".format(cat), cat, "c.read_present_us")
     lines.append("")
 
@@ -438,16 +498,55 @@ def main():
     ap.add_argument("--label", default="", help="free text, e.g. machine and compiler")
     ap.add_argument("--out", help="Markdown report path (default: stdout)")
     ap.add_argument("--json", help="JSON summary path")
+    ap.add_argument("--compare", help="another OUT_ROOT whose step wire digests must equal these")
     args = ap.parse_args()
 
     root = args.root
     tier_dirs = sorted((n for n in os.listdir(root)
                         if n.startswith("tier_") and os.path.isdir(os.path.join(root, n))),
-                       key=lambda n: int(re.sub(r"\D", "", n) or 0))
+                       key=tier_key)
     overall = Verdicts()
     if not tier_dirs:
         overall.add("tiers", "at least one tier", False, "no tier_* directories")
     tiers = [summarize_tier(root, n, args.min_steps) for n in tier_dirs]
+
+    # Both buffer modes must put the same bytes on the wire at every tick.
+    by_units = {}
+    for t in tiers:
+        by_units.setdefault(t["units"], {})[t["mode"]] = t
+    for units, modes in sorted(by_units.items()):
+        if "fresh" in modes and "reuse" in modes:
+            common, bad = compare_digests(modes["fresh"]["digests"], modes["reuse"]["digests"])
+            overall.add("modes", "{} unit(s): fresh and reuse send identical step wires".format(units),
+                        len(common) >= args.min_steps and not bad,
+                        "{} common ticks, {} differ{}".format(len(common), len(bad),
+                                                             (": first at tick " + bad[0]) if bad else ""))
+
+    # Same bytes as another run (another compiler, platform or build).
+    if args.compare:
+        other_dirs = sorted(n for n in os.listdir(args.compare)
+                            if n.startswith("tier_") and os.path.isdir(os.path.join(args.compare, n)))
+        other = {}
+        for n in other_dirs:
+            meta = read_kv(os.path.join(args.compare, n, "meta.txt"))
+            u = int(meta.get("units", tier_key(n)[0]))
+            d = step_digests(read_csv(os.path.join(args.compare, n, "a_steps.csv")))
+            if d:
+                other.setdefault(u, (n, meta, d))
+        if not other:
+            overall.add("compare", "reference run has step digests", False, args.compare)
+        for t in tiers:
+            ref = other.get(t["units"])
+            if ref is None:
+                overall.add("compare", "{}: same step wires as the reference".format(t["name"]), False,
+                            "no tier with {} unit(s) in {}".format(t["units"], args.compare))
+                continue
+            common, bad = compare_digests(t["digests"], ref[2])
+            ok = len(common) >= args.min_steps and not bad
+            overall.add("compare", "{}: same step wires as {}".format(t["name"], ref[0]), ok,
+                        "{} common ticks, {} differ{}; reference host {}".format(
+                            len(common), len(bad), (": first at tick " + bad[0]) if bad else "",
+                            ref[1].get("host", "-")))
 
     st_codes = read_kv(os.path.join(root, "selftest", "exit_codes.txt"))
     exit_code_verdicts(overall, "selftest", st_codes, ("selftest",))
@@ -455,12 +554,17 @@ def main():
     check_rows(overall, "selftest", "selftest_checks", st_rows)
 
     if not args.no_evil:
-        ev = read_kv(os.path.join(root, "evil", "exit_codes.txt"))
-        exit_code_verdicts(overall, "evil", ev, ("a", "b", "client"))
-        rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
-        overall.add("evil", "A logged >= 3 rejected requests", rej >= 3, "{} line(s)".format(rej))
-        check_rows(overall, "evil", "evil client_checks",
-                   read_csv(os.path.join(root, "evil", "client_checks.csv")))
+        evil_dirs = sorted(n for n in os.listdir(root)
+                           if n.startswith("evil") and os.path.isdir(os.path.join(root, n)))
+        if not evil_dirs:
+            overall.add("evil", "evil run present", False, "no evil* directory")
+        for n in evil_dirs:
+            ev = read_kv(os.path.join(root, n, "exit_codes.txt"))
+            exit_code_verdicts(overall, n, ev, ("a", "b", "client"))
+            rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
+            overall.add(n, "A logged >= 4 rejected requests", rej >= 4, "{} line(s)".format(rej))
+            check_rows(overall, n, "evil client_checks",
+                       read_csv(os.path.join(root, n, "client_checks.csv")))
 
     all_items = list(overall.items)
     for t in tiers:
@@ -475,6 +579,8 @@ def main():
     lines.append("- overall: **{}** ({} verdicts, {} failed)".format(
         "PASS" if passed else "FAIL", len(all_items), sum(1 for i in all_items if not i[2])))
     lines.append("- percentiles: process metrics as the processes computed them; per-category rows here, nearest rank")
+    if args.compare:
+        lines.append("- step wires compared with: {}".format(args.compare))
     lines.append("")
     lines.append("## Verdicts")
     lines.append("")
@@ -505,9 +611,9 @@ def main():
     else:
         sys.stdout.write(text)
     if args.json:
-        js = {"label": args.label, "passed": passed,
+        js = {"label": args.label, "passed": passed, "compare": args.compare or "",
               "verdicts": [{"scope": s, "name": n, "ok": o, "detail": d} for s, n, o, d in all_items],
-              "tiers": [{k: v for k, v in t.items() if k != "verdicts"} for t in tiers]}
+              "tiers": [{k: v for k, v in t.items() if k not in ("verdicts", "digests")} for t in tiers]}
         with open(args.json, "w") as f:
             json.dump(js, f, indent=1, sort_keys=True, default=str)
     for scope, name, ok, detail in all_items:

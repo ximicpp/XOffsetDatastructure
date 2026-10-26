@@ -82,13 +82,14 @@ and does not change the epoch. Save remains a copying normalized transport API.
 Its wire reservation field describes the normalized logical payload, never the
 process-local VM reservation. Existing v1 layout and signatures remain unchanged.
 
-The owner registry maps exact arena bases to their current owners under one
-mutex. Its address hash mixes all address bits, including page-aligned keys;
-lookup has expected average constant cost, not a worst-case constant guarantee.
-The index and mutex share process lifetime so global/static buffers can safely
-unregister during shutdown. Registration may allocate and reports `XBadAlloc`
-on allocation failure. Move/swap update existing nodes; destruction erases them
-without allocating. Empty-index buckets remain until process exit. A buffer's
+Every owner holds one identity record (the current owner, used to re-resolve
+the owner after a host callback). Only direct-receive owners, the ones that
+`canonical_bytes_at` can answer for, also enter a process-wide ordered index
+under one mutex; ordinary owners never touch the index or its mutex. The index
+and mutex share process lifetime so global/static buffers can safely unregister
+during shutdown. Registration allocates the record (and, for a direct-receive
+owner, its index node) and reports `XBadAlloc` on allocation failure. Move/swap
+update the existing record; destruction detaches it without allocating. A buffer's
 own writes, moves, and destruction still require external synchronization.
 
 Fresh-owner byte load enables its destination pages and completely copies input

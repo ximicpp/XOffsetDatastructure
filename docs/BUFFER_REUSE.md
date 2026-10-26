@@ -25,6 +25,39 @@ for (...) {
 
 `TypedXBuffer<T>` 有同名的 `reload_verified(wire)`、`reset()`、`save_verified_into(out)`。
 
+## 直接接收进复用槽
+
+`reload_verified(wire)` 要先有一整段连续的 wire，库再把 payload 拷进 buffer。传输层可以
+省掉这次拷贝，直接把收到的字节写进 buffer：
+
+```cpp
+XWireHeaderV2 h = read_header(conn);         // 先收 wire 头，拿到三个长度
+auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.hole_count, h.extent_count);
+std::memcpy(t.header_bytes().data(), &h, sizeof h);
+recv_exact(conn, t.extent_bytes());          // 稀疏 wire 的 extent 表
+recv_exact(conn, t.payload_bytes());         // 稠密：整段；稀疏：每个 extent 写到它的偏移
+recv_exact(conn, t.hole_bytes());            // 空洞表
+t.complete(t.header_bytes().size(), t.payload_bytes().size(),
+           t.hole_bytes().size(), t.extent_bytes().size());
+t.finish();                                  // 与 reload_verified 同一个校验器
+handle(in.root<Msg>());
+```
+
+- 接纳、校验、拒绝集合和结果与对同一条 wire 调用 `reload_verified<T>()` 完全相同。
+- `complete()` 报的是实际写入的字节数；稀疏 wire 的 payload 计数包括 gap，即全部 extent
+  落地后的逻辑长度。消息比头里声明的短或长、没有调用 `complete()`、计数不符、声明的
+  长度与头不符，都拒绝。
+- token 在 `finish()` 之前被销毁（例如连接中途断开）等同于一次失败的 reload：buffer
+  变成空的，没有可用的根。
+- 从 begin 到 `finish()` 成功之前，buffer 没有可用的根；期间不能使用、移动或销毁 buffer，
+  同一个 buffer 同时只能有一个 token。
+- begin 不清零：稠密 payload 由传输层整段覆盖；稀疏 wire 的 gap 只在 finish 时清掉旧内容
+  弄脏的部分（从未暴露过的页本来就是零）。
+- header、extent 表和空洞表放在 buffer 保留的暂存里（与校验位图一起由
+  `release_reload_scratch()` 归还），稠密 wire 每条消息不向宿主申请内存。
+- 传输层按未校验的 extent 表写入时要自己检查每个 extent 落在 `payload_bytes()` 之内；
+  越界的表在 finish 时一定会被拒绝。
+
 ## 语义
 
 - `reload_verified<T>(wire)` 的接纳和校验与 `load_verified<T>(wire, 该 buffer 的 MaximumCapacity)`
@@ -38,7 +71,7 @@ for (...) {
 
 ## 失效规则
 
-调用 `reload_verified` 或 `reset` 之后：
+调用 `reload_verified`、`begin_verified_reload` 或 `reset` 之后：
 
 - 之前取得的根引用、元素指针或引用、`view()` 得到的 `string_view`、借用的 span 全部失效，
   不能再使用；
@@ -52,14 +85,49 @@ for (...) {
 再次 `reload_verified` 或 `reset<T>()`。旧内容不保留；需要"失败时保留旧内容"时继续用
 `load_verified` 构造新 buffer。
 
+## 同进程复制：`clone()` 与 `clone_into()`
+
+```cpp
+XBuffer copy = buf.clone();   // 新 owner
+buf.clone_into(scratch);      // 复用 scratch
+```
+
+`TypedXBuffer<T>` 有同名的 `clone()` 和 `clone_into(TypedXBuffer<T>&)`。
+
+- `clone()` 新建一个 owner，大小、`maximum_capacity`、增长策略和池都与源相同，把源的
+  已用区拷贝过去；`clone_into(dst)` 把同样的内容拷进 dst，复用 dst 的映射、地址和 owner
+  登记，dst 的 `maximum_capacity` 和增长策略不变，大小变成源的大小（不超过 dst 的上限）。
+- 空闲表原样带过去（不完整的空闲表仍不完整），所以副本和源之后做同样的修改，分配位置
+  和字节完全相同；`save_verified` 输出与源相同。类型化根访问和 schema 绑定也带过去：
+  未校验的源复制后仍然只能 `unsafe_root<T>()`。
+- 不经过 wire，也不做校验：源是本进程里正在使用的 buffer，字节本身就是可信的。
+- 副本与源互相独立，任何一方修改或销毁都不影响另一方。dst 原有内容留下的字节不会
+  出现在副本里：已用区之外的尾部和之后增长出来的字节都读为零。
+
+失效规则：`clone_into(dst)` 之后，dst 原有内容的根引用、元素指针或引用、`view()`
+得到的 `string_view`、借用的 span 全部失效；`dst.epoch()` 加一，`XHandle` 按新的内容
+重新解析；dst 的 `get_address()` 不变。`clone()` 不改动源，源上的引用照常有效。
+
+失败：
+
+- `clone_into(dst)` 的源就是 dst：抛 `XException`，buffer 不变。
+- 源的已用区超过 dst 的 `maximum_capacity`，或系统分配失败：抛 `XBadAlloc`。
+- 源没有 arena：抛 `XException`。
+- 除自拷贝外，`clone_into` 失败后 dst 是没有根的空 arena（与 `reload_verified` 失败相同），
+  之后可以再 `clone_into`、`reload_verified` 或 `reset<T>()`。
+- `clone()` 失败只抛异常，源不变。
+
 ## 内存
 
 复用不会自动归还已提交的页：先收一条大消息、再收小消息时，大消息用过的页仍然提交着。
 需要归还时调用 `reclaim_tail_pages()`（释放逻辑末尾之后的整页），或者销毁 buffer。
 
-`reload_verified(wire)`（不带资源参数的形式）的校验临时内存来自这个 buffer
-自己的小块缓存：最多 8 块、每块不超过 64 KiB，按大小和对齐原样复用，所以循环
-reload 时每条消息不再向宿主分配器申请校验内存。这些块只是宿主侧临时内存，
-不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
-`release_reload_scratch()` 提前归还。`reload_verified_with_resource` 照常使用
-调用方给的资源。
+校验用两张位图（每 8 字节一位，活块一张、空洞一张）。payload 不超过 32 KiB 时
+位图在栈上，不申请任何宿主内存。更大的 payload：`reload_verified(wire)`（不带资源
+参数的形式）用这个 buffer 自己保留的一块位图内存，按收到过的最大 payload 增长、
+之后原样复用，所以循环 reload 时每条消息不再向宿主分配器申请校验内存。这块内存
+只是宿主侧临时内存，不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
+`release_reload_scratch()` 提前归还。`load_verified_with_resource` 和
+`reload_verified_with_resource` 向调用方给的资源申请一块。
+规范布局的 wire（没有空洞，块按访问顺序首尾相接，例如 `XCompactor::compact` 的
+结果）走游标路径，只记一个偏移，不碰位图，任何大小都不申请校验内存。

@@ -67,8 +67,8 @@ template<> struct wire_record_layout<CustomReceiveRoot>{static constexpr bool or
 namespace {
 const char* stage="entry";
 void need(bool value,const char* message){if(!value)throw std::runtime_error(message);}
-auto make_source(){
-    auto source=xo::TypedXBuffer<ReceiveRoot>::create(32768);
+auto make_source(std::size_t name_reserve=256){
+    auto source=xo::TypedXBuffer<ReceiveRoot>::create(name_reserve>16384?65536:32768);
     auto& r=source.root();r.marker=0x9988776655443322ULL;r.counter=7;r.enabled=true;r.name="direct receive";
     r.attrs.resize(3);for(unsigned i=0;i<3;++i){r.attrs[i].key="short";r.attrs[i].value.resize(24);r.attrs[i].value[3]=std::uint8_t(10+i);}
     r.flags.reserve(8);r.flags.push_back(true);
@@ -76,7 +76,7 @@ auto make_source(){
     reinterpret_cast<unsigned char*>(r.flags.data())[7]=2;
     r.tail.resize(80);for(unsigned i=0;i<80;++i)r.tail[i]=std::uint8_t(i+1);
     r.numbers.reserve(4);r.numbers.resize(1);r.numbers[0]=9;
-    r.name.reserve(256); // retain a genuine V2 hole-table entry for raw validation
+    r.name.reserve(name_reserve); // retain a genuine V2 hole-table entry for raw validation
     return source;
 }
 void check(const ReceiveRoot& r){
@@ -323,10 +323,16 @@ void rollback_and_rejection(){
         }
         need(finished&&failures>2,"finish host-allocation points (registry + free table) not exercised");
     }
-    for(unsigned point=0;point<2;++point){
-        auto token=receive(wire);const auto before=body_image(token);const auto*base=token.payload_address();Resource resource(point);bool failed=false;
+    {   // Payloads up to 32 KiB validate in inline scratch: the resource is unused.
+        auto token=receive(wire);Resource resource(0);auto out=xo::finish_verified(token,&resource);check(out.root());
+        need(resource.attempt==0,"small payload used the raw scratch resource");
+    }
+    {   // Larger payloads take one scratch block; its failure leaves the token intact.
+        auto big_source=make_source(40000);const auto big=big_source.save_verified();const auto big_n=framing_of(big).payload;
+        need(big_n>32768,"large receive fixture is not above the inline scratch limit");
+        auto token=receive(big);const auto before=body_image(token);const auto*base=token.payload_address();Resource resource(0);bool failed=false;
         try{(void)xo::finish_verified(token,&resource);}catch(const std::bad_alloc&){failed=true;}
-        need(failed&&resource.live==0&&token.payload_address()==base&&body_image(token)==before&&token.received_length()==n,"raw scratch OOM lost token/bytes");
+        need(failed&&resource.live==0&&token.payload_address()==base&&body_image(token)==before&&token.received_length()==big_n,"raw scratch OOM lost token/bytes");
         auto out=xo::finish_verified(token);check(out.root());
     }
     auto token=receive(wire);const auto before=body_image(token);xo::detail::fail_next_registry_registration();
@@ -374,8 +380,9 @@ void rollback_and_rejection(){
         observation.complete(sizeof(h),n,framing.holes*sizeof(xo::XBufferCore::WireHole),framing.extents*8u);
     }
 }
-// N10: a free run of at least 4 KiB is skipped by an extent table. The
-// transport scatters each extent to its payload offset; gaps arrive as zero.
+// Zero-run elision skips the 12 KiB hole and the tail slack through an
+// extent table. The transport scatters each extent to its payload offset;
+// gaps arrive as zero.
 void sparse_wire_receive(){
     auto source=xo::TypedXBuffer<ReceiveRoot>::create(65536,
         xo::XBuffer::maximum_capacity(1u<<20).with_growth(xo::XGrowPolicy::Automatic));
@@ -383,7 +390,8 @@ void sparse_wire_receive(){
     r.tail.resize(12288);for(std::size_t i=0;i<r.tail.size();++i)r.tail[i]=std::uint8_t(i%251+1);
     r.numbers.reserve(16);r.numbers.resize(3,77u); // keeps the tail block off the arena tail
     r.tail.reserve(20000); // relocates: the old 12 KiB block becomes one hole
-    const auto wire=source.save_verified();const auto f=framing_of(wire);
+    const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
+    const auto wire=source.save_verified(elide);const auto f=framing_of(wire);
     need(f.extents!=0&&f.holes!=0,"sparse fixture produced a dense wire");
     need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload,"sparse wire did not skip its free run");
     auto token=receive(wire,xo::XBuffer::maximum_capacity(f.payload+65536).with_growth(xo::XGrowPolicy::Automatic));
@@ -393,7 +401,8 @@ void sparse_wire_receive(){
          o.tail.size()==12288&&o.numbers.size()==3&&o.numbers[2]==77u,"sparse receive contents differ");
     for(std::size_t i=0;i<o.tail.size();++i)need(o.tail[i]==std::uint8_t(i%251+1),"sparse receive tail differs");
     need(output.free_block_count()==f.holes,"sparse receive hole table not installed");
-    need(output.save_verified()==wire,"sparse receive did not re-emit identical V2 bytes");
+    need(output.save_verified(elide)==wire,"sparse receive did not re-emit identical V2 bytes");
+    need(output.save_verified()==source.save_verified(),"sparse receive payload differs from the source");
     // A wrong extent count in the transport framing is rejected without consuming the token.
     auto wrong=receive(wire,std::nullopt,f);
     {
