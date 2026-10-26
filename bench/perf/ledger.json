@@ -42,6 +42,20 @@
       "reason": "只作记录，不放行任何指标。#85 给 perf_gate 加了“分配器回收型”诊断标记：警告或失败的指标里，净增 Ir 至少一半来自 FreeTableRecycler::recycle 时在说明和摘要里标出来（malloc/free 自身 Ir 下降为 D2 型，否则为 COPS 型），判定不变。依据是 2026-10-26 的 Ir 校准：D2（#33）两种 Ir 都判失败，slg.B.in_decode GCC 16 1.0593、P2996 1.0517，slg.A.req_decode 1.0465 / 1.0379；同一对在 Mac L2 上是变快，B.in_decode 0.989、A.req_decode 0.956，SLG A 0.970、B 0.965。COPS（#51 #52 #54 #55）GCC 16 slg.B 1.014，Mac B 0.977。回收循环的指令全额计入，省掉的 malloc/free 只按几十条指令算；cache-sim 下 D2 head 的 D1 读缺失反而是 2–3 倍，也翻不过来。所以这类 Ir 上升不代表变慢，按 MERGE_RULES_V2 仍是 L 类，由 Mac L2 下结论。",
       "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/front4/FRONT4_RESULT.md（data/d2x/gate-*.json、cache-gcc16.json、mac_phases d2x.json）；/mnt/project-files/throughput-20261026/ir-calibration/IR_CALIBRATION_MERGED.md；PR #85 描述",
       "approved_by": "「性能优化」（2026-10-26 09:31Z，0 类合并并记 ledger）"
+    },
+    {
+      "id": "s-class-pr59",
+      "pr": 59,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0018,
+      "record_only": true,
+      "class": "S",
+      "head": "8a8982522083",
+      "base": "f1724e29da3b",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：I2 owner 登记瘦身，普通 owner 不再进全局 map、不拿全局锁，只有直接接收的 canonical owner 进。不改 wire、校验、分配位置、清零和页面行为、arena 分配器元数据和容量策略，无新公开 API；库头 diff 79 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），≥5% 阶段最大 1.0007（slg.A.req_decode）；P2996 d77eff1 + libc++ 合计最大 1.0001（slg.A），阶段最大 1.0018（slg.A.simulate）。门禁场景走复用协议，不新建 owner，所以 Ir 上不宣称收益；收益只在新建 owner 的路径（云端微基准：池化 create+destroy 约 155→100 ns，4 线程 1.8–2.4→0.70–0.82 µs），留待阶段复核。",
+      "evidence": "PR #59 描述（两种 Ir 表与本地验证）；/mnt/project-files/relocatable-20261022/i2/s-class-20261026/（ir_gcc16_*.json/md、ir_p2996_*.json/md、p2996_local_validate_REPORT.md）；/mnt/project-files/relocatable-20261022/i2/registry_bench.cpp",
+      "approved_by": "「性能优化」（2026-10-26，按合并规则 v2 判 S 类）"
     }
   ]
 }
