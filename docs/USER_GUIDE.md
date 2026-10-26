@@ -37,6 +37,40 @@ XOFFSET_REGISTER_SCHEMA_NAME(Profile, "example.Profile")
   `std::string`/`std::vector` 等都会在编译期被拒绝。
 - 每种根类型用 `XOFFSET_REGISTER_SCHEMA_NAME` 注册一个唯一且稳定的名称。
 
+### 2.1 字段表：`XOFFSET_RECORD`
+
+没有反射的构建（C++20/C++23，或 `XOFFSET_SCHEMA_BACKEND_DESCRIBE=1`）里，库从一行字段表
+知道记录的形状。C++26 构建可以不写；写了，宏会和反射逐条核对（成员、顺序、偏移、类型、基类），
+不一致就编译失败，所以同一份源码在两种构建下描述的是同一个 schema，wire 字节相同。
+
+```cpp
+struct Troop { std::int32_t type{}; std::int32_t count{}; };
+struct March { std::int64_t id{}; std::int32_t eta{}; XVector<Troop> troops; };
+struct Entity { std::int64_t id{}; };
+struct Player : Entity { std::int32_t level{}; XVector<std::int32_t> items; };
+
+// 全局作用域，放在类型定义之后、第一次使用之前；被包含的记录写在前面。
+XOFFSET_RECORD(Troop, type, count)
+XOFFSET_RECORD(March, id, eta, troops)
+XOFFSET_RECORD(Entity, id)
+XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺序写在括号里
+```
+
+- 按声明顺序列出**全部**非静态数据成员。写错名字编译不过；漏写、重复、顺序错由编译期
+  完整性证明拦下：偏移严格递增且不重叠，加上聚合体初始化计数（`T{x1..xE}` 合法而
+  `T{x1..xE+1}` 不合法）。只看 `sizeof` 不够：漏掉一个看起来像补齐的 1 字节成员，大小不变。
+- 因此记录必须是聚合体（没有用户声明的构造函数、私有或受保护成员、虚函数）。类型名带逗号时用别名。
+- `XOFFSET_RECORD` 同时就是 `XOFFSET_ORDINARY_RECORDS` 的声明（第 3.1 节），两者不要对同一个
+  类型都写。没有反射时，「普通记录」的声明（不论用哪个宏，还是手写 `wire_record_layout`
+  特化）还承诺记录没有用户声明的析构、拷贝/移动构造或赋值；库查不了这一条，C++26 构建会查。
+  不能作这个承诺的记录用 `XOFFSET_RECORD_DERIVED(T, (), 成员...)`：只给字段表，不声明普通记录。
+- 没有反射时，直接接收（raw receive）用到的枚举必须有固定底层类型（`enum class`，或
+  `enum E : std::uint8_t {...}`），否则编译报错并给出改法。
+- `XString`、`XVector`、`XSet`、`XMap`、`XKeyValue` 和 `std::array` 由库自带字段表。
+- 迁移助手 `tools/describe_dump`：在 GCC 16 或 P2996 上编译，传入根类型，用反射按依赖顺序印出
+  所有可达记录的这几行（`bench/slg` 的 13 行就是它的输出，`describe_dump_slg` 测试保持一致）。
+- 发布前至少用一个 C++26 编译器把 schema 编一次，让反射核对字段表和承诺。
+
 ## 3. 构建与修改
 
 ```cpp

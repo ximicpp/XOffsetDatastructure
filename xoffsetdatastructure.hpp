@@ -4261,6 +4261,78 @@ namespace XOffsetDatastructure {
     using XBlob = XVector<std::byte>;
     template <typename T> using XFlatSet = XSet<T>;
     template <typename K, typename V> using XFlatMap = XMap<K, V>;
+} // namespace XOffsetDatastructure
+
+// Field lists of the library's own types, for the field-list backend (a C++26
+// build compares them with reflection in test_schema_describe). The containers
+// are not aggregates, so they carry no completeness proof; XKeyValue and
+// std::array keep the XOFFSET_RECORD promise, as reflection finds.
+namespace XOffsetDatastructure::schema {
+    namespace describe_detail {
+        template <class H>
+        struct head_fields {
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, arena_delta)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, data_delta)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, size_)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, capacity_)
+        };
+        template <class H, class F = head_fields<H>>
+        using head_record = record<H, false, bases<>, typename F::field_arena_delta,
+                                   typename F::field_data_delta, typename F::field_size_,
+                                   typename F::field_capacity_>;
+
+        template <class K, class V>
+        struct key_value_fields {
+            using C = XKeyValue<K, V>;
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, first)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, second)
+        };
+    } // namespace describe_detail
+
+    template <> struct description<XFixedString> : describe_detail::head_record<XFixedString> {};
+    template <> struct description<XString>
+        : describe_detail::record<XString, false, describe_detail::bases<XFixedString>> {};
+    template <class T> struct description<XFixedVector<T>> : describe_detail::head_record<XFixedVector<T>> {};
+    template <class T> struct description<XVector<T>>
+        : describe_detail::record<XVector<T>, false, describe_detail::bases<XFixedVector<T>>> {};
+    template <class T> struct description<XFixedFlatSet<T>>
+        : describe_detail::record<XFixedFlatSet<T>, false, describe_detail::bases<XFixedVector<T>>> {};
+    template <class T> struct description<XSet<T>>
+        : describe_detail::record<XSet<T>, false, describe_detail::bases<XFixedFlatSet<T>>> {};
+    template <class K, class V> struct description<XFixedFlatMap<K, V>>
+        : describe_detail::record<XFixedFlatMap<K, V>, false,
+                                  describe_detail::bases<XFixedVector<XKeyValue<K, V>>>> {};
+    template <class K, class V> struct description<XMap<K, V>>
+        : describe_detail::record<XMap<K, V>, false, describe_detail::bases<XFixedFlatMap<K, V>>> {};
+    template <class K, class V> struct description<XKeyValue<K, V>>
+        : describe_detail::record<XKeyValue<K, V>, true, describe_detail::bases<>,
+              typename describe_detail::key_value_fields<K, V>::field_first,
+              typename describe_detail::key_value_fields<K, V>::field_second> {};
+
+    // std::array<E, N>: its one member, under the standard library's name.
+#if defined(_LIBCPP_VERSION)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS __elems_
+#elif defined(__GLIBCXX__)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS _M_elems
+#elif defined(_MSC_VER)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS _Elems
+#endif
+#ifdef XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS
+    namespace describe_detail {
+        template <class E, std::size_t N>
+        struct array_fields {
+            using C = std::array<E, N>;
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS)
+        };
+    } // namespace describe_detail
+    template <class E, std::size_t N> struct description<std::array<E, N>>
+        : describe_detail::record<std::array<E, N>, true, describe_detail::bases<>,
+              typename describe_detail::array_fields<E, N>::field_XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS> {};
+#undef XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS
+#endif
+} // namespace XOffsetDatastructure::schema
+
+namespace XOffsetDatastructure {
 
     namespace detail {
         template <typename T>
@@ -5294,7 +5366,15 @@ namespace XOffsetDatastructure {
         // SDK's std trait is not used as a necessary condition for this branch.
         template<class T> consteval bool stable_erase_implicit_lifetime() {
             if constexpr (std::is_const_v<T> || std::is_volatile_v<T>) return false;
+#if defined(__cpp_lib_is_implicit_lifetime)
             else if constexpr (std::is_implicit_lifetime_v<T>) return true;
+#elif defined(__clang__)
+#if __has_builtin(__builtin_is_implicit_lifetime)
+            else if constexpr (__builtin_is_implicit_lifetime(T)) return true;
+#elif __has_builtin(__is_implicit_lifetime)
+            else if constexpr (__is_implicit_lifetime(T)) return true;
+#endif
+#endif
             else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> &&
                                StableEraseOrdinaryMembers<T>::value) {
                 return schema::implicit_lifetime_aggregate<T>();
@@ -7645,6 +7725,10 @@ struct _XOffset_NS_Sentinel {};
     static_assert(::XOffsetDatastructure::detail::ordinary_record_members_disjoint<Type>(), \
         "XOFFSET_ORDINARY_RECORDS: " #Type " has overlapping members "       \
         "([[no_unique_address]]?); it is not an ordinary record");           \
+    XOFFSET_SCHEMA_DETAIL_ORDINARY(Type)
+
+// The declaration part, shared with XOFFSET_RECORD.
+#define XOFFSET_SCHEMA_DETAIL_ORDINARY(Type)                                   \
     template<> struct XOffsetDatastructure::wire_record_layout<Type> {        \
         static constexpr bool ordinary_members = true;                         \
     };                                                                         \
