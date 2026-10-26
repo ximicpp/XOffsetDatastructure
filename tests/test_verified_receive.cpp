@@ -380,8 +380,9 @@ void rollback_and_rejection(){
         observation.complete(sizeof(h),n,framing.holes*sizeof(xo::XBufferCore::WireHole),framing.extents*8u);
     }
 }
-// N10: a free run of at least 4 KiB is skipped by an extent table. The
-// transport scatters each extent to its payload offset; gaps arrive as zero.
+// Zero-run elision skips the 12 KiB hole and the tail slack through an
+// extent table. The transport scatters each extent to its payload offset;
+// gaps arrive as zero.
 void sparse_wire_receive(){
     auto source=xo::TypedXBuffer<ReceiveRoot>::create(65536,
         xo::XBuffer::maximum_capacity(1u<<20).with_growth(xo::XGrowPolicy::Automatic));
@@ -389,7 +390,8 @@ void sparse_wire_receive(){
     r.tail.resize(12288);for(std::size_t i=0;i<r.tail.size();++i)r.tail[i]=std::uint8_t(i%251+1);
     r.numbers.reserve(16);r.numbers.resize(3,77u); // keeps the tail block off the arena tail
     r.tail.reserve(20000); // relocates: the old 12 KiB block becomes one hole
-    const auto wire=source.save_verified();const auto f=framing_of(wire);
+    const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
+    const auto wire=source.save_verified(elide);const auto f=framing_of(wire);
     need(f.extents!=0&&f.holes!=0,"sparse fixture produced a dense wire");
     need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload,"sparse wire did not skip its free run");
     auto token=receive(wire,xo::XBuffer::maximum_capacity(f.payload+65536).with_growth(xo::XGrowPolicy::Automatic));
@@ -399,7 +401,8 @@ void sparse_wire_receive(){
          o.tail.size()==12288&&o.numbers.size()==3&&o.numbers[2]==77u,"sparse receive contents differ");
     for(std::size_t i=0;i<o.tail.size();++i)need(o.tail[i]==std::uint8_t(i%251+1),"sparse receive tail differs");
     need(output.free_block_count()==f.holes,"sparse receive hole table not installed");
-    need(output.save_verified()==wire,"sparse receive did not re-emit identical V2 bytes");
+    need(output.save_verified(elide)==wire,"sparse receive did not re-emit identical V2 bytes");
+    need(output.save_verified()==source.save_verified(),"sparse receive payload differs from the source");
     // A wrong extent count in the transport framing is rejected without consuming the token.
     auto wrong=receive(wire,std::nullopt,f);
     {
