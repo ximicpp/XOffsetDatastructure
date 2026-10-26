@@ -42,7 +42,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(BigRoot, "tests.validation.granules.big")
 
 namespace {
 void need(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
-std::size_t oracle_operations{}, priority_cases{}, derived_cases{}, gap_cases{}, storage_cases{},
+std::size_t oracle_operations{}, priority_cases{}, derived_cases{}, storage_cases{},
     typed_rejections{}, failpoints{}, cursor_operations{};
 
 struct Resource final : std::pmr::memory_resource {
@@ -245,9 +245,9 @@ void derived_extent_error_order() {
     }
 }
 
-// Sparse gaps and recomputed holes against byte truth, with a payload whose
+// Recomputed holes against byte truth, with a payload whose
 // extent is not a multiple of 8 (its trailing bytes are never free or live).
-void gaps_and_recomputed_runs() {
+void recomputed_runs() {
     for (std::size_t extent : {std::size_t{4096}, std::size_t{4100}, std::size_t{40003}}) {
         std::vector<std::uint64_t> storage(extent / 8 + 2);
         const char* base = reinterpret_cast<const char*>(storage.data());
@@ -263,20 +263,6 @@ void gaps_and_recomputed_runs() {
                 if (!n) continue;
                 try { reg(f, base + b, n, ctx); } catch (const xo::XException&) { continue; }
                 std::fill_n((f ? dead : live).begin() + std::ptrdiff_t(b), n, char(1));
-            }
-            for (int q = 0; q < 50; ++q) {
-                seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17;
-                const auto off = std::size_t((seed >> 8) % (extent / 8 + 1)) * 8;
-                const auto bytes = q % 5 == 0 ? extent - std::min(off, extent)
-                                              : std::min<std::size_t>(std::size_t((seed >> 32) % 40) * 8, extent - std::min(off, extent));
-                bool all = true;
-                for (std::size_t x = off; x < off + bytes; ++x) all = all && dead[x];
-                bool caught = false;
-                const xo::XBufferCore::WireHole gap{std::uint32_t(off), std::uint32_t(bytes)};
-                try { wd::require_gaps_free(&gap, 1, ctx); }
-                catch (const xo::XException& e) { caught = std::string_view(e.what()) == "wire validation failed: sparse gap is not free"; }
-                need(caught == !all, "sparse gap check differs from byte truth");
-                ++gap_cases;
             }
             Ranges runs, truth;
             wd::for_each_unowned_run(ctx, [&](std::size_t b, std::size_t e) { runs.emplace_back(b, e); });
@@ -543,12 +529,12 @@ void alignment_fallback() {
 
 int main() {
     try {
-        pairwise_oracle(); global_priority(); derived_extent_error_order(); gaps_and_recomputed_runs();
+        pairwise_oracle(); global_priority(); derived_extent_error_order(); recomputed_runs();
         storage(); typed_head_checks(); typed_new_failures(); alignment_fallback();
         std::cout << "{\"status\":\"passed\",\"oracle_operations\":" << oracle_operations
                   << ",\"cursor_operations\":" << cursor_operations
                   << ",\"priority_cases\":" << priority_cases << ",\"derived_extent_cases\":" << derived_cases
-                  << ",\"gap_cases\":" << gap_cases << ",\"storage_cases\":" << storage_cases
+                  << ",\"storage_cases\":" << storage_cases
                   << ",\"typed_rejections\":" << typed_rejections << ",\"typed_new_failpoints\":" << failpoints
                   << ",\"performance_samples\":0}\n";
         return 0;

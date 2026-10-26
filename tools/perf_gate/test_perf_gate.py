@@ -122,6 +122,14 @@ def main():
     rc, out = run_case(tree(formal=f), ledger_head=[entry(max_ratio=1.012)])
     expect("regression above the ledger cap fails", rc == 1)
 
+    rc, out = run_case(tree(formal=f), ledger_head=[entry(max_ratio=1.02, record_only=True)])
+    expect("a record-only ledger entry allows nothing", rc == 1 and row(out, "formal.mutate")["verdict"] == "fail")
+
+    rc, out = run_case(tree(), ledger_head=[entry(max_ratio=1.06, record_only=True)])
+    expect("a record-only scenario entry above 2% needs no susu", rc == 0)
+
+    expect("callgrind runs with glibc's rep-movsb path off", "x86_rep_movsb_threshold" in pg.IR_ENV["GLIBC_TUNABLES"])
+
     rc, out = run_case(tree(), ledger_head=[entry(max_ratio=1.03)])
     expect("scenario-level entry above 2% without susu fails", rc == 1 and any("susu" in x for x in out["failures"]))
 
@@ -206,6 +214,45 @@ def main():
     fh = dict(keys, **{"slg.D.read": prof({"write(int, bool)": 932_000, "other": 100_000})})
     rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb2))
     expect("a signature change is not inlining", not row(out, "slg.D")["functions"]["inline_suspect"])
+
+    # B.in_decode: calls to malloc/free replaced by recycling the free table in place (D2, #33).
+    rec = "XOffsetDatastructure::XBufferCore::FreeTableRecycler::recycle(XOffsetDatastructure::XBufferCore::FreeTable&)"
+    lfb = "XOffsetDatastructure::XBufferCore::load_free_blocks(void const*, unsigned long)"
+    fb3 = dict(keys, **{"slg.B.in_decode": prof({"free": 128_000, "malloc": 63_000, "operator new(unsigned long)": 21_000,
+                                                 lfb: 188_000, "other": 4_600_000})})
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 904_000, "malloc": 300, lfb: 107_000, "other": 4_600_000})})
+    s3 = dict(BASE_SLG, **{"B.in_decode": 5_000_000 + 531_000})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("allocator calls replaced by recycling are flagged, verdict unchanged",
+           rc == 1 and row(out, "slg.B.in_decode")["verdict"] == "fail" and d["alloc_recycle"]
+           and d["alloc_recycle"]["kind"] == "alloc_calls_removed" and d["alloc_recycle"]["alloc"] == -211_700
+           and any("分配器回收型" in x and "D2 型" in x for x in out["notes"]))
+    summary = pg.render_summary(out, {}, {})
+    expect("the function table header carries the recycle flag", "分配器回收型（只是诊断，不放行）" in summary)
+
+    # The same recycle growth without fewer allocator calls: more bins to recycle (COPS).
+    fb3 = dict(keys, **{"slg.B.in_decode": prof({rec: 400_000, "malloc": 63_000, "other": 4_537_000})})
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 900_000, "malloc": 63_000, "other": 4_568_000})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("more recycle work with the same allocator calls is flagged as the COPS kind",
+           d["alloc_recycle"] and d["alloc_recycle"]["kind"] == "more_recycle_work"
+           and any("COPS 型" in x for x in out["notes"]))
+
+    # A noise-level allocator drop next to the recycle growth (COPS slg.B: -1,730 against +132,242) is still COPS.
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 900_000, "malloc": 56_500, "other": 4_574_500})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    d = row(out, "slg.B.in_decode")["functions"]
+    expect("an allocator drop below a tenth of the recycle growth stays the COPS kind",
+           d["alloc_recycle"] and d["alloc_recycle"]["alloc"] == -6_500
+           and d["alloc_recycle"]["kind"] == "more_recycle_work")
+
+    fh = dict(keys, **{"slg.B.in_decode": prof({rec: 500_000, "malloc": 63_000, "other": 5_068_000})})
+    rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
+    expect("recycle growth below half of the increase is not flagged",
+           row(out, "slg.B.in_decode")["functions"]["alloc_recycle"] is None
+           and not any("分配器回收型" in x for x in out["notes"]))
 
     r = dict(BASE_RELOC, **{"map.insert.fresh": int(900_000 * 1.06)})
     rc, out = run_case(tree(reloc=r))
