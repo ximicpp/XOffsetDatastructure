@@ -92,3 +92,35 @@ if(XOFFSET_BUILD_TESTS)
 add_test(NAME check_compat COMMAND $<TARGET_FILE:check_compat>)
 set_tests_properties(check_compat PROPERTIES LABELS "tooling")
 endif()
+
+# describe_dump: prints XOFFSET_RECORD lines with reflection (C++26 only). The
+# SLG instance checks that bench/slg's committed lines are its output, verbatim.
+if(NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe" AND
+   (NOT DEFINED XOFFSET_CXX_STANDARD OR XOFFSET_CXX_STANDARD STREQUAL "26"))
+add_executable(describe_dump_slg describe_dump.cpp)
+configure_xoffset_target(describe_dump_slg)
+target_include_directories(describe_dump_slg PRIVATE "${PROJECT_SOURCE_DIR}/bench/slg/include")
+target_compile_definitions(describe_dump_slg PRIVATE
+    "XOFFSET_DESCRIBE_DUMP_INCLUDE=\"slg/model_xoffset.hpp\""
+    "XOFFSET_DESCRIBE_DUMP_ROOTS=slg::xm::PlayerState, slg::xm::BattleMsg, slg::xm::ShardState")
+if(XOFFSET_BUILD_TESTS)
+add_test(NAME describe_dump_slg
+    COMMAND $<TARGET_FILE:describe_dump_slg> --check
+        "${PROJECT_SOURCE_DIR}/bench/slg/include/slg/model_xoffset.hpp")
+set_tests_properties(describe_dump_slg PROPERTIES LABELS "tooling")
+endif()
+# Records derived from XOffset heads, a std::string reached through a member,
+# overlapping [[no_unique_address]] members.
+add_executable(describe_dump_cases describe_dump.cpp)
+configure_xoffset_target(describe_dump_cases)
+target_include_directories(describe_dump_cases PRIVATE "${PROJECT_SOURCE_DIR}/tests/schema_describe")
+target_compile_definitions(describe_dump_cases PRIVATE
+    "XOFFSET_DESCRIBE_DUMP_INCLUDE=\"dump_cases.hpp\""
+    "XOFFSET_DESCRIBE_DUMP_ROOTS=sdc::CaseRoot, sdc::Overlap")
+if(XOFFSET_BUILD_TESTS)
+add_test(NAME describe_dump_cases
+    COMMAND $<TARGET_FILE:describe_dump_cases> --check
+        "${PROJECT_SOURCE_DIR}/tests/schema_describe/dump_cases.hpp")
+set_tests_properties(describe_dump_cases PROPERTIES LABELS "tooling")
+endif()
+endif()

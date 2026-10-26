@@ -13,6 +13,7 @@
 #endif
 #include <cstddef>
 #include <type_traits>
+#include <utility>
 
 namespace XOffsetDatastructure::schema {
     namespace reflect_detail {
@@ -62,6 +63,9 @@ namespace XOffsetDatastructure::schema {
     template <class T>
     inline constexpr bool is_described_v = std::is_class_v<T> || std::is_union_v<T>;
 
+    template <class T>
+    inline constexpr bool is_undescribable_v = false;
+
     template <class E>
     consteval auto enum_range() {
         static_assert(std::is_enum_v<E>);
@@ -93,6 +97,48 @@ namespace XOffsetDatastructure::schema {
                 return false;
         return true;
     }
+
+    // XOFFSET_RECORD under reflection: the field list must say what reflection
+    // sees, and an XOFFSET_RECORD must keep its promise.
+    namespace reflect_detail {
+        template <class T>
+        consteval bool description_bases_match() {
+            using D = description<T>;
+            if constexpr (D::base_count != base_count_v<T>) return false;
+            else return []<std::size_t... I>(std::index_sequence<I...>) {
+                return (std::is_same_v<typename D::template base<I>, base_t<T, I>> && ...);
+            }(std::make_index_sequence<D::base_count>{});
+        }
+
+        template <class T>
+        consteval bool description_members_match() {
+            using D = description<T>;
+            if constexpr (D::member_count != member_count_v<T>) return false;
+            else return []<std::size_t... I>(std::index_sequence<I...>) {
+                return ((!member_t<T, I>::is_bit_field &&
+                         std::is_same_v<typename D::template member<I>::type, member_type_t<T, I>> &&
+                         D::template member<I>::offset == member_t<T, I>::offset) && ...);
+            }(std::make_index_sequence<D::member_count>{});
+        }
+
+        template <class T>
+        consteval bool description_promise_holds() {
+            if constexpr (!description<T>::ordinary) return true;
+            else return base_count_v<T> == 0 && implicit_lifetime_aggregate<T>() &&
+                        only_implicit_special_members<T>();
+        }
+    } // namespace reflect_detail
 } // namespace XOffsetDatastructure::schema
+
+#define XOFFSET_SCHEMA_DETAIL_REFLECTION_CHECK(macro, T)                       \
+    static_assert(::XOffsetDatastructure::schema::reflect_detail::description_bases_match<T>(), \
+        macro "(" #T ", ...): the base classes differ from what reflection sees"); \
+    static_assert(::XOffsetDatastructure::schema::reflect_detail::description_members_match<T>(), \
+        macro "(" #T ", ...): the members differ from what reflection sees "  \
+        "(names, order, offsets or types)");                                   \
+    static_assert(::XOffsetDatastructure::schema::reflect_detail::description_promise_holds<T>(), \
+        macro "(" #T ", ...): " #T " declares a destructor, copy/move "        \
+        "constructor or assignment, so it is not an ordinary record; describe " \
+        "it with XOFFSET_RECORD_DERIVED(" #T ", (), ...)");
 
 #endif // X_OFFSET_SCHEMA_REFLECT_HPP
