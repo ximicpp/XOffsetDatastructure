@@ -74,7 +74,10 @@ int main() {
     // Create some fragmentation by adding and removing data
     std::cout << "   Creating fragmentation...\n";
     // Saving normalized the logical length; expose more bytes before mutation.
+    // On a movable slot (the default here) grow() may move the payload:
+    // take the root again afterwards.
     if (!xbuf.grow(4096)) throw XBadAlloc();
+    player = &xbuf.root<Player>();
     player->items.push_back(201);
     player->items.push_back(202);
     player->items.push_back(203);

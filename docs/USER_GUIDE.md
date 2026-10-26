@@ -6,8 +6,8 @@
 
 ## 1. 基本模型
 
-- 一个 `XBuffer` 拥有一块地址稳定的虚拟内存 arena。根对象和它引用的所有字符串、
-  数组、集合都放在这块 arena 里，彼此之间用相对偏移相连。
+- 一个 `XBuffer` 拥有一块连续的 arena。根对象和它引用的所有字符串、数组、集合都放在
+  这块 arena 里，彼此之间用相对偏移相连，所以 arena 放在哪里都一样（存储见 3.4 节）。
 - arena 的字节就是序列化结果，读写字段不需要编码或解码。
 - `save_verified` 把 arena 复制成一份调用方独占的 wire（`std::string`），发送方之后
   可以继续修改原 buffer。
@@ -63,7 +63,8 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
   原生值，不要在栈上构造绑定 arena 的 `XString` 临时对象。
 - 容器扩容、插入、删除会移动元素，规则和 `std::vector` 相同；`XSet`、`XMap` 是有序
   平铺数组，规则和 `std::flat_set`、`std::flat_map` 相同，**和 `std::set`、`std::map`
-  不同**。逐个操作的规则见第 3.2 节；arena 基址和根对象地址在增长时保持不变。
+  不同**。逐个操作的规则见第 3.2 节。Automatic 增长和容器操作不移动 arena；显式 `grow()`
+  在可搬槽位上可能移动它（第 3.4 节）。
 - **元素是含 `XString`、`XVector`、`XMap` 等成员的记录类型时，先把这些记录声明为
   普通记录（第 3.1 节），例如在全局作用域写 `XOFFSET_ORDINARY_RECORDS(Troop, March)`。**
   不声明也完全正确，只是中间插入删除、扩容要逐个元素搬移：
@@ -150,11 +151,12 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 
 | 操作 | 根对象和区域的地址 | 指进 payload 的引用、span、迭代器 | epoch |
 | --- | --- | --- | --- |
-| 容器操作触发的 Automatic 增长、显式 `grow()` | 不变（在虚拟内存预留里扩展） | 只按上表失效 | 不变 |
+| 容器操作触发的 Automatic 增长；显式 `grow()` 没有超出当前存储 | 不变（在预留或槽位里扩展） | 只按上表失效 | 不变 |
+| 可搬槽位上显式 `grow()` 超出槽位（第 3.4 节） | 改变：搬到新存储 | 全部失效 | 加一 |
 | `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
-| `reload_verified`、`reset<T>()` | 不变（复用映射） | 全部失效 | 加一 |
-| `src.clone_into(dst)` | dst 不变（复用映射） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
-| `clone()` | 结果是新 buffer | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
+| `reload_verified`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效 | 加一 |
+| `src.clone_into(dst)` | dst 不变（复用映射）；dst 是可搬槽位且放不下时换存储（第 3.4 节） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
+| `clone()` | 结果是新 buffer，存储种类与源相同（可搬槽位或地址稳定） | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
 | `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
 | `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
 | `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
@@ -184,6 +186,33 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
    图，存元素下标或 ID（例如 `std::uint32_t` 下标，或 `XMap` 的键）。拷贝赋值是深拷贝，
    同一个 buffer 里的移动赋值是转移所有权。**不要把一个容器移动赋值给它自己子树里的
    容器，或者反过来**：Release 构建不检查这种情况，结果是未定义行为。
+
+### 3.4 存储：VM、钉住槽位、可搬槽位
+
+创建 buffer（`create`、构造函数、`load*`）时按参数选存储，`storage_kind()` 可以查：
+
+| 存储 | 什么时候选 | 地址 |
+| --- | --- | --- |
+| VM（`XStorageKind::Vm`） | 带 `XBufferPool`；`with_storage(XStorage::Pinned)`；Automatic 且上限大于 `XBuffer::SLOT_MAX`；初始大小大于 `SLOT_MAX` | 整个生命周期不变 |
+| 钉住槽位（`PinnedSlot`） | 上限不超过 `SLOT_MAX`（任何增长策略） | 整个生命周期不变 |
+| 可搬槽位（`MovableSlot`） | 其余情况：Explicit 增长（默认）、上限更大、初始大小放得进槽位 | 只在下面几个显式点改变 |
+
+- `SLOT_MAX` 默认是 256 KiB − 64 B，编译期可以用 `XOFFSET_SLOT_MAX_BYTES`（2 的幂，0 表示
+  不用槽位）调整。槽位来自库内的 slab，按 2 的幂分级，小消息不再每个 buffer 预留一段
+  虚拟地址；建立和销毁一个槽位不走系统调用。
+- 可搬槽位的搬家点：`grow()` 超出当前槽位时搬到更大的槽位（超过 `SLOT_MAX` 时搬到 VM，
+  之后钉住）；`reload_verified`、`begin_verified_reload` 收到放不下的内容时先换存储（不复制
+  旧内容）；`set_growth_policy(XGrowPolicy::Automatic)` 会先搬到 VM，因为自动增长发生在
+  容器操作内部，那里不能搬。
+- 搬家后，之前拿到的根引用、元素指针、`allocator<T>()`、`arena()` 和借用的 span 全部失效，
+  `epoch()` 改变。用 `XHandle`（自动重新定位）或重新调用 `root<T>()`。`address_stable()` 为
+  真时不会搬；需要地址永远不变就写 `with_storage(XStorage::Pinned)`。
+- Automatic 增长、容器操作、`save*`、`shrink_to_fit`、`reset<T>()` 都不搬。
+- 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
+- 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
+  `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
+- 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
+  `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
 
 ## 4. 保存与加载
 
@@ -218,14 +247,16 @@ std::string_view who = r.name.view();
 - 直接把数据收进最终 arena 的接收接口是 `begin_verified_receive<T>` /
   `finish_verified`（`xoffset_verified_receive.hpp`），校验强度与 `load_verified` 相同。
 
-### 4.1 大量小消息：用 `XBufferPool` 复用映射
+### 4.1 大量小消息：槽位，或用 `XBufferPool` 复用映射
 
-每个 `XBuffer` 都有自己的虚拟内存预留：建立时预留 `maximum_capacity` 并开启宿主
+VM 存储的 `XBuffer` 都有自己的虚拟内存预留：建立时预留 `maximum_capacity` 并开启宿主
 前缀页和载荷页，销毁时整块释放。这套系统调用和缺页在 Apple M4 上约 4.4 µs，
 与预留大小关系不大。消息只有几 KB、而且每条都新建、销毁一个 buffer 时（战斗服往返、
 只读战报、客户端收包），这部分开销会远大于校验本身。
 
-这类接收方和发送方应当共用一个池，让销毁后的映射留给下一条消息复用：
+不带池、Explicit 增长（默认）的小消息落在槽位上（3.4 节），不走这套系统调用。
+Automatic 增长且上限较大的用法仍是 VM，这类接收方和发送方应当共用一个池，让销毁后的
+映射留给下一条消息复用：
 
 ```cpp
 XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // 最多缓存 16 块空闲映射
@@ -255,7 +286,7 @@ SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
 同一进程里需要一份独立副本时（状态分叉、回滚、快照后继续改），不必经过 wire：
 
 ```cpp
-XBuffer snapshot = buf.clone();     // 新 owner：大小、maximum_capacity、增长策略、池都同 buf
+XBuffer snapshot = buf.clone();     // 新 owner：大小、maximum_capacity、增长策略、池、存储种类都同 buf
 buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 reload_verified
 ```
 
@@ -349,7 +380,7 @@ Windows、Android、iOS，能接收、读写、校验、再发。三个客户端
 | --- | --- | --- |
 | E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 零拷贝分段发送、直接收进最终 arena |
 | E2 | `save_verified_into`、`TypedXBuffer<T>` | 便利接口 |
-| E3 | `XBufferPool`、预留与增长策略细节 | 小 buffer 高频场景 |
+| E3 | `XBufferPool`、预留与增长策略细节、`XStorage` / `storage_kind()`、`SLOT_MAX`、`trim_slot_storage` | 小 buffer 高频场景 |
 | E4 | `load_unverified` | 只用于调用方已信任的数据 |
 | E5 | `XCompactor` | 同类型压缩整理 |
 

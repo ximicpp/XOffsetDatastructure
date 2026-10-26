@@ -64,6 +64,11 @@ static_assert(std::is_same_v<decltype(std::declval<const XBuffer&>().get_buffer(
                              std::span<const char>>);
 
 namespace {
+// This file checks VM address stability, page permissions and reservations,
+// so every bounded buffer asks for Pinned (VM) storage explicitly.
+XBufferCore::MaximumCapacity stable_capacity(std::size_t bytes) {
+    return XBufferCore::maximum_capacity(bytes).with_storage(XStorage::Pinned);
+}
 
 std::size_t system_page_size() {
 #if defined(_WIN32)
@@ -130,7 +135,8 @@ void check_extents(const XBuffer& buffer) {
     assert(buffer.get_size() <= buffer.reserved_capacity());
     assert(buffer.get_size() <= buffer.accessible_bytes());
     assert(buffer.accessible_bytes() <= buffer.reserved_bytes());
-    assert(buffer.reserved_capacity() <= buffer.reserved_bytes());
+    // A movable slot reserves only its slot; it moves to reach its maximum.
+    assert(!buffer.address_stable() || buffer.reserved_capacity() <= buffer.reserved_bytes());
     assert(buffer.bytes().size_bytes() == buffer.get_size());
     assert(buffer.get_buffer().size() == buffer.get_size());
     assert(buffer.get_buffer().data() == buffer.get_address());
@@ -168,7 +174,7 @@ void check_root(const StableRoot& root, std::int32_t id) {
 void page_boundaries_and_capacity() {
     const auto page = system_page_size();
     const auto maximum = page * 3 + 17;
-    XBuffer buffer(512, XBuffer::maximum_capacity(maximum));
+    XBuffer buffer(512, stable_capacity(maximum));
     auto* root = buffer.make<StableScalar>();
     root->value = 123456789;
     auto handle = buffer.handle<StableScalar>(); // Locally constructed types need no schema name.
@@ -225,23 +231,26 @@ void page_boundaries_and_capacity() {
     assert(buffer.data()[0] == 'X');
 
     require_rejection([&] {
-        XBuffer invalid(maximum + 1, XBuffer::maximum_capacity(maximum));
+        XBuffer invalid(maximum + 1, stable_capacity(maximum));
     });
     require_rejection([&] {
-        XBuffer invalid(512, XBuffer::maximum_capacity(
+        XBuffer invalid(512, stable_capacity(
             std::numeric_limits<std::size_t>::max()));
     });
     require_rejection([&] {
         XBuffer invalid(std::numeric_limits<std::size_t>::max());
     });
 
-    // The historical max_capacity parameter remains a reservation hint.
+    // The historical max_capacity parameter remains a reservation hint. It
+    // does not pin: a small hinted buffer starts on a movable slot (R1).
     XBuffer hinted(512, XBuffer::max_capacity(512));
     assert(hinted.reserved_capacity() >= XBuffer::DEFAULT_MAXIMUM_CAPACITY);
     assert(hinted.reserved_capacity() >= 512);
     const auto* hinted_base = hinted.get_address();
+    const auto hinted_epoch = hinted.epoch();
     assert(hinted.grow(std::min(page * 2, hinted.reserved_capacity() - hinted.get_size())));
-    assert(hinted.get_address() == hinted_base);
+    assert(hinted.address_stable() ? hinted.get_address() == hinted_base
+                                   : hinted.epoch() != hinted_epoch);
 }
 
 template <std::size_t Alignment>
@@ -280,7 +289,7 @@ void actual_addresses_honor_large_alignment() {
         // Keep odd-page reservations alive together so the OS can supply bases
         // with different residues; a single lucky aligned mapping hid this bug.
         buffer = XBuffer(alignments.back() * 5,
-                         XBuffer::maximum_capacity(page * 257));
+                         stable_capacity(page * 257));
         const auto base = reinterpret_cast<std::uintptr_t>(buffer.get_address());
         if (base % alignments.back() != 0) ++unaligned_bases;
         std::array<char*, 2> allocations{};
@@ -328,7 +337,7 @@ void actual_addresses_honor_large_alignment() {
     // and record whether this run also covered a non-aligned reservation base.
     std::cout << "Large-alignment mappings with non-aligned bases: " << unaligned_bases << '\n';
 
-    XBufferCore exact(512, XBufferCore::maximum_capacity(alignments.back() * 2));
+    XBufferCore exact(512, stable_capacity(alignments.back() * 2));
     const auto base = reinterpret_cast<std::uintptr_t>(exact.get_address());
     const auto first = base + exact.arena()->used_end; // V2: blocks have no header
     const auto address = (first + alignments.back() - 1) & ~(alignments.back() - 1);
@@ -343,7 +352,7 @@ void actual_addresses_honor_large_alignment() {
     assert(reinterpret_cast<std::uintptr_t>(allocation) == address);
     assert(exact.arena()->used_end == required);
 
-    XBufferCore limited(512, XBufferCore::maximum_capacity(512));
+    XBufferCore limited(512, stable_capacity(512));
     const auto before = *limited.arena();
     for (const auto alignment : {std::size_t(0), std::size_t(65537),
                                 std::size_t{1} << 31,
@@ -362,7 +371,7 @@ void actual_addresses_honor_large_alignment() {
 
 void objects_and_relative_references_survive_growth() {
     const auto page = system_page_size();
-    XBuffer buffer(page * 4, XBuffer::maximum_capacity(page * 64));
+    XBuffer buffer(page * 4, stable_capacity(page * 64));
     auto* root = buffer.make<StableRoot>();
     fill_root(*root, 73);
     auto handle = buffer.handle<StableRoot>();
@@ -414,7 +423,7 @@ void objects_and_relative_references_survive_growth() {
 
 void shrink_regrow_and_transport() {
     const auto page = system_page_size();
-    XBuffer buffer(page * 4, XBuffer::maximum_capacity(page * 32 + 17));
+    XBuffer buffer(page * 4, stable_capacity(page * 32 + 17));
     auto* root = buffer.make<StableRoot>();
     fill_root(*root, 91);
     const auto* base = buffer.get_address();
@@ -469,7 +478,7 @@ void shrink_regrow_and_transport() {
             grow_preserving_storage(buffer, page * 2 + round + 1);
             check_root(*root, 91);
 
-            const auto limit = XBuffer::maximum_capacity(page * 32 + 17);
+            const auto limit = stable_capacity(page * 32 + 17);
             auto loaded = verified_path ? XBuffer::load_verified<StableRoot>(frame, limit)
                 : XBuffer::load_unverified(frame, limit);
             const auto* round_base = loaded.get_address();
@@ -515,7 +524,7 @@ void shrink_regrow_and_transport() {
     assert(buffer.grow(page * 2));
     check_root(*root, 91);
 
-    auto raw_loaded = XBuffer::load_unverified(raw);
+    auto raw_loaded = XBuffer::load_unverified(raw, stable_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
     const auto* loaded_base = raw_loaded.get_address();
     auto* loaded_root = &raw_loaded.unsafe_root<StableRoot>();
     const auto loaded_epoch = raw_loaded.epoch();
@@ -526,21 +535,22 @@ void shrink_regrow_and_transport() {
     assert(raw_loaded.epoch() == loaded_epoch);
     check_root(*loaded_root, 91);
 
-    auto bounded_raw = XBuffer::load_unverified(raw, XBuffer::maximum_capacity(raw.size() + 19));
+    auto bounded_raw = XBuffer::load_unverified(raw, stable_capacity(raw.size() + 19));
     const auto* bounded_raw_base = bounded_raw.get_address();
     assert(bounded_raw.grow(19));
     assert(!bounded_raw.grow(1));
     assert(bounded_raw.get_address() == bounded_raw_base);
     check_root(bounded_raw.unsafe_root<StableRoot>(), 91);
     require_rejection([&] {
-        (void)XBuffer::load_unverified(raw, XBuffer::maximum_capacity(raw.size() - 1));
+        (void)XBuffer::load_unverified(raw, stable_capacity(raw.size() - 1));
     });
 
     auto verified = buffer.save_verified<StableRoot>();
     const auto header = check_verified_frame(verified, buffer);
     assert(buffer.get_address() == base && buffer.epoch() == epoch);
     assert(handle.get() == root);
-    auto verified_loaded = XBuffer::load_verified<StableRoot>(verified);
+    auto verified_loaded = XBuffer::load_verified<StableRoot>(verified,
+        stable_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
     auto verified_handle = verified_loaded.handle<StableRoot>();
     const auto* verified_base = verified_loaded.get_address();
     assert(verified_loaded.grow(page * 2 + 1));
@@ -548,19 +558,19 @@ void shrink_regrow_and_transport() {
     check_root(*verified_handle, 91);
 
     auto bounded_verified = XBuffer::load_verified<StableRoot>(
-        verified, XBuffer::maximum_capacity(static_cast<std::size_t>(header.used_bytes) + 19));
+        verified, stable_capacity(static_cast<std::size_t>(header.used_bytes) + 19));
     const auto* bounded_verified_base = bounded_verified.get_address();
     assert(bounded_verified.grow(19));
     assert(!bounded_verified.grow(1));
     assert(bounded_verified.get_address() == bounded_verified_base);
     check_root(bounded_verified.root<StableRoot>(), 91);
     auto typed = TypedXBuffer<StableRoot>::load(verified,
-        XBuffer::maximum_capacity(static_cast<std::size_t>(header.used_bytes) + 1));
+        stable_capacity(static_cast<std::size_t>(header.used_bytes) + 1));
     assert(typed.grow(1) && !typed.grow(1));
     check_root(typed.root(), 91);
     require_rejection([&] {
         (void)XBuffer::load_verified<StableRoot>(verified,
-            XBuffer::maximum_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
+            stable_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
     });
 
     // V1 frames carried a historic reservation hint (reserved_bytes). V2 has no
@@ -592,7 +602,7 @@ void shrink_regrow_and_transport() {
 }
 
 XBuffer make_lifecycle_buffer(std::int32_t id) {
-    XBuffer buffer(4096);
+    XBuffer buffer(4096, stable_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
     buffer.make<StableRoot>()->id = id;
     return buffer;
 }
@@ -604,7 +614,7 @@ void deterministic_growth_failures() {
     detail::clear_vm_failures();
 
     const auto page = system_page_size();
-    XBuffer buffer(page * 4, XBuffer::maximum_capacity(page * 64));
+    XBuffer buffer(page * 4, stable_capacity(page * 64));
     auto* root = buffer.make<StableRoot>();
     fill_root(*root, 87);
     auto handle = buffer.handle<StableRoot>();
@@ -801,7 +811,7 @@ void independent_buffer_threads() {
             for (unsigned instance = 0; instance < 16; ++instance) {
                 // Each worker owns its own buffer. Only the process-wide owner
                 // registry is shared, including concurrent registration and removal.
-                XBuffer buffer(512, XBuffer::maximum_capacity(page * 64));
+                XBuffer buffer(512, stable_capacity(page * 64));
                 auto* root = buffer.make<StableScalar>();
                 root->value = worker * 1000 + instance;
                 const auto* base = buffer.get_address();

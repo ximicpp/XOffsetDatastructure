@@ -140,6 +140,18 @@
       "reason": "D6：在先前用过的范围内按 4 KiB 步长重新增长。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
       "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
       "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
+    },
+    {
+      "id": "int1-pr82",
+      "pr": 82,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0175,
+      "record_only": true,
+      "class": "L",
+      "reason": "R1 I1：小 buffer 用 slab 槽位存储，可搬，显式 grow()。合并提交里按 #59 的语义解决了与 #59 的冲突：可搬槽位的 replace_storage 只建记录、不建索引、不拿锁；锁定测试在 test_owner_registry（可搬槽位 grow 只允许一次宿主分配）。这段适配 #59，S 类判定（「性能优化」2026-10-26 12:12Z）：末点对\"p5 + 主线\"库头差 65 行；两种 Ir 组合检查（新主线上的 INT1 比值对旧锚点上的比值）场景合计最大 1.0003、阶段最大 1.0034（P2996 slg.A.apply），没有新增警告；TSan 103/103。只作记录，不放行任何指标。INT1 集成批次（anchor ef1f398，head 445f2a0）的 L 类合并，每个 PR 一个合并提交。max_ratio 是整批在新主线上的云端 Ir 最大 head÷base（P2996 slg.D 1.0175，GCC 16 1.0161，旧锚点上同样出现），不是本 PR 单独的值；Mac 计时结论以 L2 为准。",
+      "evidence": "Mac INT1_r2 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int1-445f2a0/gate_INT1_VERDICT.md（L2 pass：正式最大上界 1.0122，SLG A/B/C 上界 0.851/0.949/0.981，P2996 ctest 103/103）；试合与验证 /mnt/project-files/alloc-fastpath-20261022/int1-merge/INT1_MERGE_TRIAL.md（末点 local_validate 全套、P2996 103/103、TSan、两种 Ir 组合检查）",
+      "approved_by": "「性能优化」（2026-10-26 11:34Z，INT1 按 G9 → #78 → #39 → #82 → #80 逐个合并；L2 由「Mac 门禁批次」11:37Z 判 pass）"
     }
   ]
 }

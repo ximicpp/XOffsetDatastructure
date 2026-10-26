@@ -672,6 +672,54 @@ void test_g1_zeroing() {
 
 } // namespace
 
+// R1 slot backend: geometry, growth inside the slot, the owner word at
+// payload - 8, and zeroing of a reused slot through its recorded dirty_end.
+void test_slot_owner() {
+    using XOffsetDatastructure::detail::SlotGeometry;
+    using XOffsetDatastructure::detail::SlotSlab;
+    if (!SlotGeometry::enabled) return;
+    static_assert(SlotGeometry::class_for(1) == 0, "smallest class");
+    static_assert(SlotGeometry::class_for(1024 - 64) == 0 && SlotGeometry::class_for(1024 - 63) == 1,
+                  "payload capacity is 2^k - 64");
+    static_assert(SlotGeometry::class_for(SlotGeometry::max_payload) == SlotGeometry::classes - 1, "SLOT_MAX");
+    static_assert(SlotGeometry::class_for(SlotGeometry::max_payload + 1) == SlotGeometry::classes, "beyond");
+
+    const auto cls = SlotGeometry::class_for(3000);
+    const void* first = nullptr;
+    {
+        auto slot = VirtualMemoryStorage::for_slot(cls, 1u << 20, true);
+        check(slot.is_slot() && slot.movable(), "slot owner kind");
+        check(slot.reserved_bytes() == 4096 && slot.accessible_bytes() == 4096 - 64, "4 KiB class");
+        check(reinterpret_cast<std::uintptr_t>(slot.data()) % 64 == 0, "payload 64-byte aligned");
+        check(reinterpret_cast<std::uintptr_t>(slot.data() - 64) % 4096 == 0, "slot aligned to its size");
+        check(slot.grow_to(slot.accessible_bytes()), "grow to the slot capacity");
+        check(!slot.grow_to(slot.accessible_bytes() + 1), "no growth past the slot");
+        check(slot.reclaim_tail().status == VmReclaimStatus::NoOp, "reclaim is a no-op on a slot");
+        int owner = 0;
+        slot.set_host_owner(&owner);
+        check(*reinterpret_cast<void**>(slot.data() - sizeof(void*)) == &owner, "owner word at payload - 8");
+        std::memset(slot.data(), 'd', slot.size());
+        slot.resize_logical(100);
+        first = slot.data();
+    }
+    auto again = VirtualMemoryStorage::for_slot(cls, 4000, false);
+    check(again.data() == first, "this thread's cache returns the slot just freed");
+    check(again.host_owner() == nullptr, "a reused slot has no owner");
+    check(again.grow_to(again.maximum_capacity()), "regrow the reused slot");
+    check_bytes(again.data(), again.size(), '\0', "a reused slot exposes only zero bytes");
+
+    expect_exception<std::invalid_argument>([&] {
+        (void)VirtualMemoryStorage::for_slot(cls, 1u << 20, false);
+    }, "a pinned slot must hold its maximum");
+    fail_next_vm_operation(VmOperation::Reserve);
+    expect_exception<std::bad_alloc>([&] {
+        (void)VirtualMemoryStorage::for_slot(cls, 4000, false);
+    }, "slot acquisition failure");
+    VirtualMemoryStorage moved(std::move(again));
+    check(moved.is_slot() && !again.is_slot() && again.data() == nullptr, "move transfers the slot");
+    check(SlotSlab::stats().chunks > 0, "chunks mapped");
+}
+
 int main() {
     clear_vm_failures();
     VirtualMemoryStorage probe(0, 1);
@@ -689,6 +737,7 @@ int main() {
     test_from_bytes_failure_and_live_input(page);
     test_move_swap_and_release(page);
     test_g1_zeroing();
+    test_slot_owner();
     clear_vm_failures();
     std::cout << "Virtual memory storage tests passed (page_size=" << page
               << ", reservation_granularity=" << probe.reservation_granularity() << ")\n";
