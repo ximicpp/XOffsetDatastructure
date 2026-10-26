@@ -212,8 +212,10 @@ def cmd_freeze(a):
         'r3': (os.path.join(a.r3_dir, 'bin', 'xoffset_cand'), os.path.join(a.r3_dir, 'wire', 'xoffset_cand.input.wire')),
     }
     for k in RIVALS: src[k] = (os.path.join(a.r3_dir, 'bin', k), os.path.join(a.r3_dir, 'wire', k + '.input.wire'))
+    ref = getattr(a, 'ref_bin', None)
+    if ref: src['r3'] = (a.ref_bin, a.ref_wire)  # the r3 slot holds another reference build (report only, e.g. a checkpoint)
     problems = []
-    for k in ['r3'] + RIVALS:  # references must be exactly the R3 formal ones
+    for k in ([] if ref else ['r3']) + RIVALS:  # references must be exactly the R3 formal ones
         rk = 'xoffset_cand' if k == 'r3' else k
         if h(src[k][0]) != r3['binaries'][rk] or h(src[k][1]) != r3['input_wires'][rk]:
             problems.append(f'{k}: binary or wire differs from {a.r3_dir}/FREEZE.json')
@@ -265,6 +267,9 @@ def cmd_freeze(a):
             for x, y in ((b, 'sc'), (w, 'sc.input.wire'), (sl, 'slg')): shutil.copy2(x, f'{D}/{P}/{y}')
             fr['bisect'].append({'commit': c, 'label': lab, 'dir': P, 'formal': h(f'{D}/{P}/sc'), 'wire': h(f'{D}/{P}/sc.input.wire'),
                                  'slg': h(f'{D}/{P}/slg')})
+    if ref: fr['reference'] = {'commit': a.ref_commit, 'desc': a.ref_desc or '', 'binary': fr['binaries']['r3'], 'wire': fr['input_wires']['r3']}
+    if bis and getattr(a, 'bisect_max_steps', None):
+        fr['rules'] = {**fr['rules'], 'checkpoint': {**fr['rules']['checkpoint'], 'max_steps': a.bisect_max_steps}}
     fr.update(getattr(a, 'extra', None) or {})
     for k in src:
         for i in range(1, COPIES):
@@ -925,7 +930,10 @@ def render_md(fr, res):
     for ref in ['anchor', 'r3']:
         if 'report' in ov: p(f'| 合并 head÷{ref} | ' + ' | '.join(iv4(ov['report']['ratios'][f'head/{ref}:{m}']) for m in NEW_METRICS) + ' |')
         for b in bs: p(f'| {b["batch_dir"]} head÷{ref} | ' + ' | '.join(iv4(b['report']['ratios'][f'head/{ref}:{m}']) for m in NEW_METRICS) + ' |')
-    p('\nhead÷r3 是 G4 的数据（R3 冻结二进制 df876f6c），G4 判定归「性能优化」。\n')
+    if 'reference' in fr:
+        rf = fr['reference']
+        p(f'\n**本批的 r3 槽不是 R3**：放的是参照 {rf["commit"][:12]}（{rf["desc"]}，sc_xoffset {rf["binary"][:12]}）。表里的 head÷r3 就是 head÷该参照，只报不判。\n')
+    else: p('\nhead÷r3 是 G4 的数据（R3 冻结二进制 df876f6c），G4 判定归「性能优化」。\n')
     p('### 旧 norm 项（#30 等合并判据）\n')
     p(f'cereal:mutate norm head÷anchor（同轮里 cereal 约掉，等于 head÷anchor 的 mutate）。判据：合并后的几何均值 ≤{R["legacy_norm"]["threshold"]}；单侧 95% 上界（k=2）只报。\n')
     p('| 范围 | 几何均值 | 单侧上界 | 几何均值 ≤门槛 |')
@@ -1258,6 +1266,8 @@ def cmd_bisect(a):
                     anchor_desc=fr['anchor']['desc'], anchor_src=None, r3_dir=fr['r3_dir'], trace=fr['trace'],
                     slg_head=f'{D}/{p["dir"]}/slg', slg_anchor=f'{D}/bin/slg_anch', slg_tree=fr['slg']['tree'],
                     slg_tree_sha=fr['slg']['tree_sha256'], expect_wire=None, prep=None, bisect=None,
+                    **({'ref_bin': f'{D}/bin/r3fz0', 'ref_wire': f'{D}/wire/r3fz0.input.wire', 'ref_commit': fr['reference']['commit'],
+                        'ref_desc': fr['reference']['desc']} if 'reference' in fr else {}),
                     lib_note=f'bisection step {k} of checkpoint {fr["name"]} (FREEZE sha256 {h(D + "/FREEZE.json")}): {p["commit"]} {p["label"]}',
                     extra={'bisect_step': {'k': k, 'parent': fr['name'], 'parent_freeze_sha256': h(D + '/FREEZE.json'), 'point': p['commit'],
                                            'lo': pts[lo]['commit'], 'hi': pts[hi]['commit'], 'parts': sorted(parts)}}))
@@ -1557,6 +1567,16 @@ def cmd_selftest(a):
     chk(f'regression in the head merge itself -> culprit head ({o.get("culprit", {}).get("label")})', o['status'] == 'culprit' and o['culprit']['label'] == 'head')
     Dc, o = ckpt('c3', {'mutate': 1.04}, effect_of=lambda q: {'mutate': 1.02} if q in ('c3', 'c4') else {'mutate': 1.04} if q in ('c5', 'head') else {})
     chk('a half-size step effect is reported as possibly spread', any(s['spread'] for s in o['steps']))
+    T2 = tempfile.mkdtemp(prefix='mac_gate_selftest_'); rb = T2 + '/ref'; open(rb, 'wb').write(b'REF414'); rw = T2 + '/rw'; open(rw, 'wb').write(b'w')
+    fr0 = json.load(open(Dc + '/FREEZE.json')); src0 = os.path.dirname(fr0['r3_dir'])
+    cmd_freeze(argparse.Namespace(dir=T2 + '/int', head_bin=src0 + '/sc-head', head_wire=src0 + '/w.wire', head_commit='h' * 40, head_desc='',
+               head_src=None, anchor_bin=src0 + '/sc-anch', anchor_wire=src0 + '/w.wire', anchor_commit='a' * 40, anchor_desc='', anchor_src=None,
+               r3_dir=fr0['r3_dir'], trace=fr0['trace'], slg_head=src0 + '/slg', slg_anchor=src0 + '/slg-a', slg_tree='t', slg_tree_sha='0',
+               expect_wire=None, lib_note='', prep=None, ref_bin=rb, ref_wire=rw, ref_commit='4' * 40, ref_desc='414dea4', bisect_max_steps=2,
+               bisect=[f'{"c1" * 20}|+G9|{src0}/sc-c1|{src0}/w.wire|{src0}/slg']))
+    fi = json.load(open(T2 + '/int/FREEZE.json'))
+    chk('reference build in the r3 slot, max steps 2', fi['binaries']['r3'] == h(rb) and fi['reference']['commit'] == '4' * 40
+        and fi['rules']['checkpoint']['max_steps'] == 2 and RULES['checkpoint']['max_steps'] == 3)
     chk('bisect refused on a checkpoint that passed', 'not fail' in (refused(lambda: cmd_bisect(argparse.Namespace(dir=ckpt('c3', {})[0]))) or ''))
     print(f'selftest dir {D}')
     sys.exit(0 if all(checks) else 1)
@@ -1578,6 +1598,9 @@ def main():
     f.add_argument('--expect-wire', help='expected sha256 of both M input wires')
     f.add_argument('--lib-note', default='', help='one line on how head and anchor library code relate')
     f.add_argument('--prep', action='append', help='NAME=LOGFILE:EXITCODE of a prep check (repeatable)')
+    f.add_argument('--ref-bin', help='put this sc_xoffset in the r3 slot instead of the R3 one (report only)')
+    f.add_argument('--ref-wire'); f.add_argument('--ref-commit'); f.add_argument('--ref-desc')
+    f.add_argument('--bisect-max-steps', type=int, help='checkpoint: timed bisection steps allowed (default 3)')
     f.add_argument('--bisect', action='append', help='checkpoint: COMMIT|LABEL|FORMAL_BIN|WIRE|SLG_BIN of each first-parent '
                    'commit between anchor and head, oldest first (repeatable)')
     for name in ['formal', 'slg']:
