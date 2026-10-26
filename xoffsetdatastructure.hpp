@@ -878,6 +878,19 @@ namespace XOffsetDatastructure {
                 table->count = 0;
                 cache.tables[cache.count++] = table;
             }
+
+            // Removes every entry but keeps the bins' storage (touched stays
+            // set), so refilling the table needs no host allocation.
+            static void clear_entries(FreeTable& table) noexcept {
+                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                    for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u)
+                        table.bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
+                    table.nonempty[word] = 0;
+                }
+                table.large.clear();
+                table.bytes = 0;
+                table.count = 0;
+            }
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
 
@@ -1330,6 +1343,7 @@ namespace XOffsetDatastructure {
                 throw XException(
                     "XBufferCore: payload used_end out of range");
             }
+            zero_past_used_end();
             publish_host_owner();
             register_registry();
         }
@@ -1494,9 +1508,18 @@ namespace XOffsetDatastructure {
         // are kept; every typed pointer into the old content is invalidated
         // (epoch), and the owner is left without typed root access until the
         // caller finishes verification.
-        void begin_reinit() noexcept {
+        void begin_reinit(bool keep_table = false) noexcept {
             ++m_epoch;
-            if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
+            if (keep_table && free_table_) {
+                // Emptied detached (releasing map nodes may reenter), then
+                // kept with its bin storage: the next holes need neither a
+                // fresh 12 KiB table nor fresh bins.
+                FreeTablePtr kept = std::move(free_table_);
+                FreeTableRecycler::clear_entries(*kept);
+                if (!free_table_) free_table_ = std::move(kept);
+            } else {
+                if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
+            }
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
@@ -1536,6 +1559,7 @@ namespace XOffsetDatastructure {
                 throw XException(
                     "XBufferCore: payload used_end out of range");
             }
+            zero_past_used_end();
         }
 
         void reinit_from_bytes(const char* data, size_type size) {
@@ -1596,15 +1620,31 @@ namespace XOffsetDatastructure {
             return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool()};
         }
 
-        // Empty arena: header only, no root, empty exact free table. Bytes
-        // above the header become dirty-below-zero_from_ and are zeroed by the
-        // regrowth to `logical` (or by any later growth). noexcept: if the
-        // storage cannot hold a header the owner simply stays without one.
+        // Empty arena: header only, no root, empty exact free table.
+        // N2: every logical byte at or past used_end is zero (growth zeroes
+        // what it exposes, used_end only rises until a reset, and loads zero
+        // the bytes past the loaded used_end), so a reset that keeps the
+        // logical length clears exactly [header, used_end): live blocks and
+        // holes alike. Otherwise bytes above the header become
+        // dirty-below-zero_from_ and are zeroed by the regrowth to `logical`
+        // (or by any later growth). noexcept: if the storage cannot hold a
+        // header the owner simply stays without one.
         void reset_arena(size_type logical) noexcept {
-            begin_reinit();
+            begin_reinit(true);
             if (buffer_.maximum_capacity() < min_payload_size()) return;
+            if (logical == buffer_.size() && logical >= min_payload_size()) {
+                const auto used = used_end_clamped();
+                std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
+                write_empty_header();
+                return;
+            }
             if (buffer_.size() < min_payload_size() && !buffer_.grow_to(min_payload_size())) return;
             if (buffer_.size() > min_payload_size()) buffer_.resize_logical(min_payload_size());
+            write_empty_header();
+            if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
+        void write_empty_header() noexcept {
             auto* sm = arena();
             std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
             sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
@@ -1613,7 +1653,14 @@ namespace XOffsetDatastructure {
             sm->used_end = min_payload_size();
             sm->reserved0 = 0;
             sm->reserved1 = 0;
-            if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
+        // N2: the bytes past a loaded payload's used_end are zeroed, so the
+        // invariant above holds after every load. A verified load has none
+        // (used_end == used_bytes); an unverified one may carry any bytes there.
+        void zero_past_used_end() noexcept {
+            const auto used = static_cast<size_type>(arena()->used_end);
+            if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);
         }
 
         // Storage-associated access/schema state belongs to the owner so even
