@@ -36,6 +36,10 @@ struct BulkRoot {
     xo::XVector<BulkAttr> attrs;
 };
 XOFFSET_REGISTER_SCHEMA_NAME(BulkRoot, "test.v4.bulk-replacement.v1")
+struct PadRec { std::uint32_t id; std::uint64_t value; };
+static_assert(xo::has_implicit_padding_v<PadRec> && sizeof(PadRec) == 16);
+struct PadRoot { xo::XVector<PadRec> dst, src; };
+XOFFSET_REGISTER_SCHEMA_NAME(PadRoot, "test.v4.bulk-copy-assign.v1")
 struct WithDefaultCallback {
     static inline unsigned calls = 0;
     std::uint32_t value;
@@ -209,6 +213,39 @@ void bulk_workload_operation_gate_and_lifecycle() {
     std::cout<<"bulk gate: "<<n<<" replacements, skipped_zero_bytes="<<n*16u
              <<" skipped_old_copy_bytes="<<n*16u<<"; mechanism counts, no timing\n";
 }
+// Whole-container copy assignment of a padded POD element: in place when the
+// capacity holds the source (storage kept, padding zeroed (M6), the shrunk
+// tail zeroed (M4)), and by regrowth otherwise.
+void copy_assign_in_place_and_regrow() {
+    auto policy64 = policy(); auto b = xo::XBuffer::create<PadRoot>(1u << 16, policy64);
+    auto foreign = xo::XBuffer::create<PadRoot>(1u << 16, policy64);
+    auto& r = b.root<PadRoot>(); auto& f = foreign.root<PadRoot>();
+    for (std::uint32_t i = 0; i < 6; ++i) r.dst.push_back(PadRec{i, 100u + i});
+    r.dst.reserve(8);
+    for (std::uint32_t i = 0; i < 3; ++i) f.src.push_back(PadRec{50u + i, 500u + i});
+    for (std::uint32_t i = 0; i < 3; ++i) std::memset(reinterpret_cast<unsigned char*>(f.src.data() + i) + 4, 0xa5, 4);
+    auto* p = r.dst.data(); const auto cap = r.dst.capacity();
+    need(cap == 8, "reserve");
+    r.dst = f.src;
+    need(r.dst.data() == p && r.dst.capacity() == cap && r.dst.size() == 3, "in-place copy changed storage");
+    const auto* bytes = reinterpret_cast<const unsigned char*>(r.dst.data());
+    for (std::uint32_t i = 0; i < 3; ++i) {
+        need(r.dst[i].id == 50u + i && r.dst[i].value == 500u + i, "in-place copy values");
+        for (unsigned k = 4; k < 8; ++k) need(bytes[i * 16u + k] == 0, "in-place copy kept source padding");
+    }
+    for (std::size_t k = 3 * 16; k < std::size_t(cap) * 16; ++k) need(bytes[k] == 0, "in-place copy left the shrunk tail");
+    r.dst = r.dst;
+    need(r.dst.size() == 3 && r.dst[2].id == 52u && r.dst.data() == p, "self copy");
+    r.dst = r.src;
+    need(r.dst.empty() && r.dst.capacity() == cap && r.dst.data() == p, "empty source changed storage");
+    for (std::size_t k = 0; k < std::size_t(cap) * 16; ++k) need(bytes[k] == 0, "empty source left elements");
+    for (std::uint32_t i = 3; i < 12; ++i) f.src.push_back(PadRec{50u + i, 500u + i});
+    r.dst = f.src;
+    need(r.dst.size() == 12 && r.dst.capacity() >= 12 && r.dst[11].value == 511u && r.dst.data() != p,
+         "regrowth copy");
+    auto loaded = xo::XBuffer::load_verified<PadRoot>(b.save_verified<PadRoot>(), policy64);
+    need(loaded.root<PadRoot>().dst.size() == 12 && loaded.root<PadRoot>().dst[5].id == 55u, "copy roundtrip");
+}
 void iterator_assign_paths() {
     auto b=make_buffer(); auto& v=b.root<BulkRoot>().numbers;
     assign(v,std::vector<std::uint32_t>{1,2});
@@ -234,7 +271,7 @@ int main() {
         self_subrange_overlap_and_empty(); fresh_same_foreign_and_nested_sources();
         no_default_constructor_and_no_alias_staging(); failed_growth_keeps_old_descriptor_and_source();
         no_host_staging_under_host_oom(); bulk_workload_operation_gate_and_lifecycle();
-        iterator_assign_paths();
-        std::cout<<"7 bulk assignment groups passed; no timing\n";
+        iterator_assign_paths(); copy_assign_in_place_and_regrow();
+        std::cout<<"8 bulk assignment groups passed; no timing\n";
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
 }
