@@ -1125,6 +1125,9 @@ namespace XOffsetDatastructure {
 
         // Host-only identity. A record follows one payload reservation, never a
         // particular Core object's address, and is never revived after release.
+        // Only direct-receive (canonical) records enter the global index, the
+        // sole consumer of which is canonical_bytes_at; an ordinary record is
+        // just the identity lease that host-callback revalidation reads.
         inline static std::atomic<std::size_t> canonical_active_count_{0};
         struct OwnerRecord {
             const void* const payload;
@@ -1132,6 +1135,8 @@ namespace XOffsetDatastructure {
             std::byte* const canonical_origin;
             const std::size_t canonical_extent;
             std::atomic<bool> canonical_registered{false};
+            // Written before the record is published, then read only by its owner.
+            bool indexed = false;
             OwnerRecord(const void* base, XBufferCore* value,
                     std::byte* origin = nullptr, std::size_t extent = 0) noexcept
                 : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
@@ -1206,47 +1211,6 @@ namespace XOffsetDatastructure {
 
         static size_type align_up(size_type value, size_type alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
-        }
-
-        static XBufferCore& owner_from_payload_ptr(const void* ptr) {
-            detail::owner_lookup_count(&detail::OwnerLookupStats::entries);
-            OwnerCache* cache = nullptr;
-            if (owner_cache_available()) {
-                cache = &owner_cache();
-                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
-                    const auto slot = (cache->last + attempt) % 4u;
-                    auto& record = cache->records[slot];
-                    if (record && record->payload == ptr) {
-                        if (auto* owner = record->owner.load(std::memory_order_acquire)) {
-                            detail::owner_lookup_count(&detail::OwnerLookupStats::cache_hits);
-                            cache->last = slot;
-                            return *owner;
-                        }
-                        detail::owner_lookup_count(&detail::OwnerLookupStats::dead_records);
-                        record.reset();
-                    }
-                }
-            }
-            detail::owner_lookup_count(&detail::OwnerLookupStats::cold_lookups);
-            OwnerRecordPtr record;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                const auto found = state.owners.find(ptr);
-                if (found != state.owners.end()) record = found->second;
-            }
-            // Error construction and all shared-owner releases happen unlocked.
-            if (!record) throw XException("arena owner lookup failed");
-            if (cache) {
-                const auto slot = cache->next;
-                // Keep the local lease across release of an evicted record.
-                cache->records[slot] = record;
-                cache->last = slot;
-                cache->next = (slot + 1u) % 4u;
-            }
-            auto* owner = record->owner.load(std::memory_order_acquire);
-            if (!owner) throw XException("arena owner lookup failed");
-            return *owner;
         }
 
         static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
@@ -1364,6 +1328,8 @@ namespace XOffsetDatastructure {
             auto record = std::move(owner_record_);
             if (!record) return;
             record->owner.store(nullptr, std::memory_order_release);
+            // An ordinary record never entered the index: no mutex, no node.
+            if (!record->indexed) return;
             RegistryOwners::node_type retired_node;
             {
                 auto& state = registry_state();
@@ -1377,29 +1343,17 @@ namespace XOffsetDatastructure {
             // The node/control block destructor and operator delete are unlocked.
         }
 
+        // Ordinary owners (init_fresh / init_from_storage) only; direct-receive
+        // owners are indexed by VerifiedReceiveAccess. An ordinary record is
+        // not indexed: canonical_bytes_at returns null for it anyway, and
+        // reservations never overlap (each payload follows its own host page),
+        // so leaving it out cannot change any canonical query result.
         void register_registry() {
             if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
             try {
-                // Both allocations, including any new_handler reentry, precede
-                // the mutex. std::map inserts this same-allocator node without
-                // allocation, comparison callbacks, rehash or record creation.
-                auto record = std::make_shared<OwnerRecord>(buffer_.data(), this,
-                    buffer_.canonical_byte_origin(), buffer_.maximum_capacity());
-                RegistryOwners prepared;
-                prepared.emplace(record->payload, record);
-                auto node = prepared.extract(prepared.begin());
-                bool inserted = false;
-                {
-                    auto& state = registry_state();
-                    std::lock_guard lock(state.mutex);
-                    if (state.owners.find(record->payload) == state.owners.end()) {
-                        state.owners.insert(std::move(node));
-                        owner_record_ = record;
-                        mark_canonical_registration(*record);
-                        inserted = true;
-                    }
-                }
-                if (!inserted) throw XException("duplicate arena owner registration");
+                // The only allocation, including any new_handler reentry,
+                // precedes publication of the record.
+                owner_record_ = std::make_shared<OwnerRecord>(buffer_.data(), this);
                 detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
                 detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
             } catch (const std::bad_alloc&) {
@@ -5180,8 +5134,8 @@ namespace XOffsetDatastructure {
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
 #if defined(__linux__)
         // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
-        // 256 KiB whose last page is not resident (a fresh mapping, not a
-        // reused string) goes in 256 KiB chunks, each preceded by
+        // 256 KiB whose next-to-last page is not resident (a fresh mapping, not
+        // a reused string) goes in 256 KiB chunks, each preceded by
         // madvise(MADV_POPULATE_WRITE), so the kernel faults the chunk's pages
         // in one call instead of one trap per page.
         // A kernel without it (before 5.14) answers EINVAL once; the output
@@ -5212,10 +5166,14 @@ namespace XOffsetDatastructure {
                 }
 #elif defined(__linux__)
                 constexpr std::size_t chunk = std::size_t(256) << 10;
-                unsigned char last_page = 1;
+                unsigned char probe_page = 1;
+                // Not the last page: libc++'s resize_and_overwrite writes the
+                // terminator before the output is filled, which makes that page
+                // resident in a fresh mapping too. n >= 256 KiB, so the page
+                // before it is still inside the copy.
                 if (prefault && n >= chunk && !wire_populate_unsupported.load(std::memory_order_relaxed) &&
-                    ::mincore(reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)),
-                              page, &last_page) == 0 && (last_page & 1u) == 0) {
+                    ::mincore(reinterpret_cast<void*>((reinterpret_cast<std::uintptr_t>(dst + n - 1u) & ~(page - 1u)) - page),
+                              page, &probe_page) == 0 && (probe_page & 1u) == 0) {
                     bool populate = true;
                     for (std::size_t off = 0; off < n; off += chunk) {
                         const auto len = std::min(chunk, n - off);
