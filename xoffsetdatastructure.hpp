@@ -4800,23 +4800,6 @@ namespace XOffsetDatastructure {
                 return dead ? 2 : 0;
             }
 
-            // overlap(g0, g1), and when it is 0 also mark(free, g0, g1). A
-            // range inside one word (blocks up to 64 granules) is one combined
-            // test of both bitmaps.
-            unsigned claim(bool free, std::size_t g0, std::size_t g1) noexcept {
-                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
-                if (w0 == w1) [[likely]] {
-                    const auto m = (~std::uint64_t(0) << (g0 % 64u)) &
-                                   (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u));
-                    if ((owned_[w0] | free_[w0]) & m) [[unlikely]] return (owned_[w0] & m) ? 1u : 2u;
-                    (free ? free_ : owned_)[w0] |= m;
-                    return 0;
-                }
-                const auto overlapping = overlap(g0, g1);
-                if (overlapping == 0) mark(free, g0, g1);
-                return overlapping;
-            }
-
             void mark(bool free, std::size_t g0, std::size_t g1) noexcept {
                 auto* bits = free ? free_ : owned_;
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
@@ -4924,11 +4907,6 @@ namespace XOffsetDatastructure {
                 return granules;
             }
             // The bitmaps with the cursor's live range folded in.
-            [[gnu::always_inline]] WireGranuleIndex& bitmaps() {
-                if (cursor == no_cursor && granules.prepared()) [[likely]] return granules;
-                return first_bitmaps();
-            }
-            [[gnu::noinline, gnu::cold]] WireGranuleIndex& first_bitmaps() { return general(); }
             WireGranuleIndex& general() {
                 auto& bits = index();
                 if (cursor != no_cursor) {
@@ -4990,15 +4968,17 @@ namespace XOffsetDatastructure {
         // cursor path inlines into stay small.
         [[gnu::noinline]] inline void register_owned_bitmap(std::size_t begin, std::size_t bytes,
                                                             WireValidationContext& ctx) {
+            auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
-            const auto overlap = ctx.bitmaps().claim(false, g0, g1);
-            if (overlap == 1) [[unlikely]] {
+            const auto overlap = index.overlap(g0, g1);
+            if (overlap == 1) {
                 wire_reject(
                     "wire validation detected overlapping dynamic ranges");
             }
-            if (overlap == 2) [[unlikely]] {
+            if (overlap == 2) {
                 wire_reject("wire validation detected live/free overlap");
             }
+            index.mark(false, g0, g1);
             ctx.owned_bytes += bytes;
             /* XBV3: owned-registered */
         }
@@ -5030,8 +5010,9 @@ namespace XOffsetDatastructure {
             if (bytes == 0 || !ptr) return;
             validate_storage_range(ptr, bytes, 1, ctx, what);
             const auto begin = granule_range_offset(ptr, bytes, ctx, what);
+            auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
-            const auto overlap = ctx.bitmaps().claim(true, g0, g1);
+            const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
                 wire_reject(
                     "wire validation detected free-list overlap with live ranges");
@@ -5040,6 +5021,7 @@ namespace XOffsetDatastructure {
                 wire_reject(
                     "wire validation detected overlapping free-list ranges");
             }
+            index.mark(true, g0, g1);
             ctx.free_bytes += bytes;
             /* XBV3: free-registered */
         }
@@ -5192,6 +5174,23 @@ namespace XOffsetDatastructure {
 
 
 
+        // Padding bytes [n, 11) of an inline string of length n, as masks of
+        // bytes 0..7 and 8..10 (little endian). A table keeps the check free
+        // of length-dependent branches.
+        struct InlinePadMasks {
+            std::uint64_t low[XFixedString::inline_max + 1];
+            std::uint32_t high[XFixedString::inline_max + 1];
+        };
+        inline constexpr InlinePadMasks inline_pad_masks = [] {
+            InlinePadMasks masks{};
+            for (unsigned n = 0; n <= XFixedString::inline_max; ++n)
+                for (unsigned i = n; i < 11u; ++i) {
+                    if (i < 8u) masks.low[n] |= std::uint64_t(0xff) << (8u * i);
+                    else masks.high[n] |= std::uint32_t(0xff) << (8u * (i - 8u));
+                }
+            return masks;
+        }();
+
         // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
         inline void validate_inline_string_bytes(const char* head) {
             unsigned char bytes[12];
@@ -5199,14 +5198,12 @@ namespace XOffsetDatastructure {
             const unsigned length = bytes[11] & 0x7fu;
             if (length > XFixedString::inline_max)
                 wire_reject("wire validation failed: inline XFixedString length exceeds 10");
-            // bytes[length..10] must be zero: two masked words, little endian.
+            // bytes[length..10] must be zero.
             std::uint64_t low;
             std::uint32_t high;
             std::memcpy(&low, bytes, sizeof(low));
             std::memcpy(&high, bytes + 8, sizeof(high));
-            const std::uint64_t low_mask = length >= 8u ? 0u : ~std::uint64_t(0) << (8u * length);
-            const std::uint32_t high_mask = length <= 8u ? 0xffffffu : (0xffffffu << (8u * (length - 8u))) & 0xffffffu;
-            if ((low & low_mask) != 0 || (high & high_mask) != 0)
+            if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
                 wire_reject("wire validation failed: inline XFixedString has nonzero padding");
         }
 
