@@ -44,7 +44,7 @@
 #                                   cancelled
 #   queue/<NNN>-<NAME>/run.log      stdout and stderr of run.sh
 #   queue/<NNN>-<NAME>/out/         RESULT.md, tar.gz and anything else run.sh copies there
-#   runner.log, runner.pid, runner.version, STOP, publish.log
+#   runner.log, runner.pid, runner.version, restart.pid, STOP, publish.log
 #
 # A batch script is a complete, unattended version of its MAC_STEPS file: it stops itself
 # (exit != 0) wherever the steps file says "stop and report", it waits for the quiet gate
@@ -214,8 +214,11 @@ case $cmd in
         p=$(running_pid) || exec /bin/bash "$0" start
         if [ -n "$XOQ_PUBLISH" ] && [ ! -x "$XOQ_PUBLISH" ]; then echo "XOQ_PUBLISH is not executable: $XOQ_PUBLISH" >&2; exit 2; fi
         touch "$XOQ/STOP"
-        nohup /bin/bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 20; done; exec /bin/bash "$2" start' \
-            _ "$p" "$0" > /dev/null 2>&1 < /dev/null &
+        # A later restart replaces a pending one, so the newest environment wins.
+        old=$(cat "$XOQ/restart.pid" 2>/dev/null) && [ -n "$old" ] && kill "$old" 2>/dev/null
+        nohup /bin/bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 20; done; rm -f "$3/restart.pid"; exec /bin/bash "$2" start' \
+            _ "$p" "$0" "$XOQ" > /dev/null 2>&1 < /dev/null &
+        echo $! > "$XOQ/restart.pid"
         echo "runner $p stops after its current batch; this script starts in its place then" ;;
     _loop) loop ;;
     add)
