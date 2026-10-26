@@ -18,9 +18,9 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | K3 | 独立输出：`save_verified` 发出调用方独占的副本，发完可以继续改 | `test_stability_contract`（K3 部分） | 保存后修改、扩容、清空、销毁源 buffer，已发出的 wire 不变且仍能加载出原内容 |
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
 | K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
-| | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive 三条路径对变异 wire 的接受/拒绝一致 |
+| | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive、`reload_verified`、直接接收复用槽（`begin_verified_reload`）对变异 wire 的接受/拒绝一致；直接接收中途中止、少报长度、声明长度与头不符一律拒绝 |
 | | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料；ci.yml 的每个作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）都包含它们，Actions 停用期间由全量 CTest 和每日长跑（GCC 16 ASan+UBSan）执行 |
-| | | `test_receive_raw`、`test_verified_receive` | 原始接收与分段接收路径 |
+| | | `test_receive_raw`、`test_verified_receive`、`test_reload_reset` | 原始接收、分段接收与直接接收复用槽路径 |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | `test_stability_contract`（K5 部分） | 重新加载后释放再分配复用空洞、尾部不增长；接收方的分配决定与发送方逐字节一致；第二跳同样成立 |
 | | | `test_free_table_policy`（`lifecycle_move_swap_reload`） | 空洞表写-读-写字节一致，重新加载后的分配决定与原 buffer 相同 |
 | K6 | schema 指纹精确匹配，不同就拒 | `test_schema_envelope`、`test_wire_admission` | schema 哈希、根类型 id、magic、端序标记不符时拒绝；V1 wire 明确拒绝 |
@@ -34,6 +34,10 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 - K2、K3 的性能（读、改 ≤ 1.05，独立输出 ≤ 0.20）由正式测量协议在固定机器上判定，
   不在 CI 里。结果见仓库外的性能报告。
 - 内容完整性不在承诺内：只改一个字段值的 wire 会被接受。不要把 K4 说成防篡改。
+- 版本间的 K4 对比：`tools/validation_differential.sh <旧版目录> <新版目录> <例数> <seed>...` 用同一批变异
+  wire 比较两个库版本的校验结果（含确切错误信息）。比较按 payload 进行：带 extent 表的 wire 先展开成
+  等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
+  同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
 - K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
