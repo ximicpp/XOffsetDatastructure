@@ -293,11 +293,13 @@ void test_container_signatures() {
     std::cout << "  WithVector: " << sig_vector << "\n";
 
     // TypeLayout reflects the physical fields; semantic container tokens belong
-    // to XOffset's wire ABI signature, not TypeLayout's opaque mechanism.
+    // to XOffset's wire ABI signature, not TypeLayout's opaque mechanism. Both
+    // heads are {i32 data_delta, size_, capacity_}; a vector's counts are
+    // char32_t (a distinct type for alias analysis), a string's are u32.
     std::string str_sig = sig_string.value;
     std::string vec_sig = sig_vector.value;
-    assert(str_sig == vec_sig);
     assert(str_sig.find("@4:i32[s:4,a:4],@8:u32[s:4,a:4],@12:u32[s:4,a:4]") != std::string::npos);
+    assert(vec_sig.find("@4:i32[s:4,a:4],@8:char32[s:4,a:4],@12:char32[s:4,a:4]") != std::string::npos);
     assert(std::string_view(wire_abi_signature<XString>()).find("xstring") != std::string_view::npos);
     assert(std::string_view(wire_abi_signature<XVector<int32_t>>()).find("xvector") != std::string_view::npos);
 

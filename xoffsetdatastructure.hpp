@@ -3156,9 +3156,13 @@ namespace XOffsetDatastructure {
         using iterator = T*;
         using const_iterator = const T*;
 
+        // size_ and capacity_ are char32_t (32-bit unsigned, converts like
+        // std::uint32_t) because it is a distinct type for type-based alias
+        // analysis: a store to an int or unsigned element cannot alias them,
+        // so a push_back loop keeps capacity_ in a register.
         std::int32_t data_delta = 0;
-        std::uint32_t size_ = 0;
-        std::uint32_t capacity_ = 0;
+        char32_t size_ = 0;
+        char32_t capacity_ = 0;
 
         XFixedVector() = default;
         // As XFixedString: the head's address names its payload.
@@ -3486,11 +3490,16 @@ namespace XOffsetDatastructure {
                 size_ = n + 1u;
                 return;
             }
-            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
-            else push_back_general<const T&>(value);
-            // The general path appended exactly one element. Restating size_
-            // here makes it known on both paths, so a caller's push_back loop
-            // keeps it in a register instead of reloading it through memory.
+            const Grown grown = [&] {
+                if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
+                else return push_back_general<const T&>(value);
+            }();
+            // The general path appended exactly one element. Restating the
+            // head here makes it known on both paths, so a caller's push_back
+            // loop keeps size_ and capacity_ in registers instead of
+            // reloading them through memory.
+            data_delta = grown.data_delta;
+            capacity_ = grown.capacity;
             size_ = n + 1u;
         }
 
@@ -3581,13 +3590,21 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        struct Grown {
+            std::int32_t data_delta;
+            char32_t capacity;
+        };
+
         // push_back beyond capacity or on an unbound head. A small trivially
-        // copyable value arrives by value (registers), not by reference.
+        // copyable value arrives by value (registers), not by reference. The
+        // head fields it changed come back in registers for push_back to
+        // restate.
         template <typename V>
-        XOFFSET_DETAIL_NOINLINE void push_back_general(V value) {
+        XOFFSET_DETAIL_NOINLINE Grown push_back_general(V value) {
             insert_construct(size_, [&](T* dst) {
                 fixed_detail::transfer_construct(dst, static_cast<const T&>(value), element_binding());
             });
+            return {data_delta, capacity_};
         }
 
         static size_type checked_count(std::size_t count) {
