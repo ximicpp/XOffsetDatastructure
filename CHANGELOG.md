@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Nightly libFuzzer without GitHub Actions or Docker (threat model F1, F2):
+  `tools/fuzz_libfuzzer.sh` builds `fuzz_v2_wire` and `fuzz_wire_schemas` with
+  the P2996 toolchain's own libFuzzer runtime (ASan+UBSan) and runs the steps
+  of `fuzz.yml`'s libfuzzer job on the host: corpus replay, `-fork=4` fuzzing,
+  merge, then `tools/fuzz_findings.py` findings and summary. The corpus is kept
+  across nights as a tarball; debug paths map to `/workspace`, so signatures
+  match the Docker jobs. Its `libfuzzer` result joins `tools/fuzz_nightly.sh`'s
+  needs.json for one `tools/fuzz_report.py` report. `fuzz_report.py` now files
+  the issue when GitHub refuses the `fuzz-crash/<signature>` branch push, and
+  writes inputs up to 4 KiB into the issue as base64.
+- Fuzz harness: a wire shorter than the V2 header no longer fails the
+  direct-reload check. The transport refuses it before a reload begins, so the
+  target keeps its root; the check required the root to be gone (#130, found
+  by the first libFuzzer night; input in `tests/fuzz/regressions/v2_wire/`).
+
 ## 3.0.0: first release of the C++26 line
 
 The tags `v1.0.0` (2024) and `v2.0-*` belong to the two earlier

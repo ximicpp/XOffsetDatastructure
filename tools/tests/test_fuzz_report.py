@@ -112,6 +112,19 @@ class Report(unittest.TestCase):
                          (SHA, f'tests/fuzz/regressions/v2_wire/{SIG}', b'XOFFSET-INJECT'))
         self.assertEqual(result['infra_failures'], [])  # the failure is explained by the finding
 
+    def test_refused_branch_push_still_files_the_issue_with_the_input(self):
+        def refuse(*args):
+            raise fuzz_report.GhError(403, 'gh api POST git/blobs: not permitted (HTTP 403)')
+        self.gh.create_branch_with_file = refuse
+        write_job(self.root, 'v2_wire', [SIG], input_bytes=b'\x00\x01wire')
+        write_job(self.root, 'wire_schemas')
+        result = self.run_report(needs={'libfuzzer': {'result': 'failure'}})
+        [issue] = self.gh.issues_list
+        self.assertIn('not pushed (GitHub refused the write, HTTP 403)', issue['body'])
+        self.assertIn(f'add `tests/fuzz/regressions/v2_wire/{SIG}` by hand', issue['body'])
+        self.assertIn('AAF3aXJl', issue['body'])  # base64 of the input
+        self.assertIn(f'could not push `fuzz-crash/{SIG}`', ' '.join(result['actions']))
+
     def test_same_signature_comments_and_keeps_branch(self):
         write_job(self.root, 'v2_wire', [SIG])
         write_job(self.root, 'wire_schemas')
