@@ -278,7 +278,7 @@ public:
 
     uint64_t world_digest() override {
         Digest g;
-        for (auto& b : players_) dig_player(g, b.root<PlayerState>());
+        for (auto& b : players_) dig_player(g, b.template root<PlayerState>());
         dig_shard(g, shard_->root<ShardState>());
         return g.h;
     }
@@ -302,7 +302,7 @@ private:
             16, 16 * (std::size_t(256) << 20), std::size_t(256) << 20});
         return p;
     }
-    PlayerState& player(int i) { return players_[std::size_t(i)].root<PlayerState>(); }
+    PlayerState& player(int i) { return players_[std::size_t(i)].template root<PlayerState>(); }
 
     // Receive in the reuse protocol. Default: reload_verified copies the wire into the
     // slot's long-lived buffer and verifies it there. Direct ("xoffset_direct", the
