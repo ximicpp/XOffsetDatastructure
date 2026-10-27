@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 3.0.0: first release of the C++26 line
+
+The tags `v1.0.0` (2024) and `v2.0-*` belong to the two earlier
+implementations. This release is `next_cpp26` at the G8 checkpoint plus the
+G9 fixes merged after it; the changes since 0.3.0-beta.1 are listed below.
+Same V2 wire format as 0.3.0-beta.1 (its receivers accept the default
+`save_verified` emission; `zero_runs` wires need 3.0.0 receivers), same
+toolchains (P2996 Clang with libc++, or GCC 16 with libstdc++). Mac M4 at
+the G8 checkpoint (SLG M scale, six formats in one process, upper bound of
+the geometric mean, XOffset ÷ zpp_bits): A 0.778, B 0.261, C 0.365; D
+(read-only report, tracked, not a goal) 1.589, and 1.383 against
+FlatBuffers. The Mac checkpoint after the G9 fixes (CKPT3, 30af216 against
+the G8 checkpoint 3549272) found no regression: formal upper bound 1.0074,
+SLG A 0.979, B 0.970, C 0.990 (upper bound 1.009), P2996 CTest 106/106 on
+macOS. Known gaps: the G9 relocation tax is not closed, the D scenario
+is slower than zpp_bits and FlatBuffers, schema evolution is not supported,
+and iOS, Android and MSVC full builds are not verified
+(`docs/CLIENT_TARGETS.md`).
+
+- Performance (G9 relocation tax; same wire bytes, same behavior):
+  `XVector::push_back` restates `size_` after the general path; under Clang,
+  the SHIFT rebase checks overflow once per moved run and the general path of
+  `XString::assign` is out of line; copy-assigning an inline `XString` into a
+  bound inline head copies 12 bytes. `bench/reloc` reports
+  `str.assign_short.view` and `str.assign_short.copy`.
 - Documentation: `docs/RELEASING.md` is the fixed release procedure (Mac
   checkpoint, local validation with TSan, the release PR, the three tag
   commands); `docs/USER_GUIDE.md` 4.3 explains the two conventions behind the

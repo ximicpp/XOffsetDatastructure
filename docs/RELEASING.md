@@ -8,11 +8,13 @@
 
 ## 1. 版本号
 
-- 唯一的版本来源是根目录的 `XOFFSET_VERSION`：正式版 `MAJOR.MINOR.PATCH`（如 `1.0.0`），
+- 唯一的版本来源是根目录的 `XOFFSET_VERSION`：正式版 `MAJOR.MINOR.PATCH`（如 `3.0.0`），
   预发布版再加一个 `-(alpha|beta|rc).N`（如 `1.1.0-rc.1`），不带前导零。
   `cmake/XOffsetVersion.cmake`、`tools/validate_vm_package.py` 和
   `tools/prepare_release.py` 都从它读，格式不对时配置或打包直接失败。
-- tag 名是 `v` 加版本号（`v1.0.0`），注释 tag，打在发版 PR 的合并提交上。
+- tag 名是 `v` 加版本号（`v3.0.0`），注释 tag，打在发版 PR 的合并提交上。仓库里 `v1.0.0`（2024，
+  旧 v1 库，带公开 Release）和 `v2.0-*` 属于前两代实现，版本号不能和它们重名，发版前用
+  `git ls-remote --tags origin` 核对一次。
 - 安装包只接受完整版本字符串：`find_package` 的数字、`EXACT` 和范围请求一律拒绝，
   消费方用 `XOffsetDatastructure_VERSION STREQUAL "<版本>"` 自己核对（README「Build and consume」）。
   任何两个版本之间都不承诺 API、ABI 或 wire 兼容；1.x 内 wire 的冻结范围以 CHANGELOG 为准。
