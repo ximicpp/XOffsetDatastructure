@@ -31,7 +31,6 @@ constexpr const char* kHoleEntry = "wire validation failed: invalid hole table e
 constexpr const char* kLiveFree = "wire validation detected live/free overlap";
 constexpr const char* kLiveLive = "wire validation detected overlapping dynamic ranges";
 constexpr const char* kFreeFree = "wire validation detected overlapping free-list ranges";
-constexpr const char* kBinding = "wire validation: invalid allocator binding";
 constexpr const char* kRelative = "wire validation: relative pointer out of bounds";
 
 std::size_t precise_rejections = 0;
@@ -356,25 +355,6 @@ int main() {
         reject(bytes, "wire validation: map keys not strictly ordered");
     }
 
-    // ---- Container heads: arena_delta -------------------------------------
-    {
-        auto bytes = original;
-        write(bytes, root + offsetof(CheckedRoot, labels) + offsetof(XFixedString, arena_delta), INT32_MAX);
-        reject(bytes, kRelative);
-        const auto at = proot + offsetof(CheckedRoot, values) + offsetof(XFixedVector<int32_t>, arena_delta);
-        for (std::int32_t delta : {0, 8, 48, -8}) {
-            auto p = base;
-            write(p.payload, at, delta == 0 ? 0 : read<std::int32_t>(p.payload, at) + delta);
-            // Must resolve exactly to the payload base; below the base is out of bounds.
-            reject(build(p), delta < 0 ? kRelative : kBinding);
-        }
-        auto p = base; // an inline string's binding is checked too
-        const auto label0 = head_target(base.payload, proot + offsetof(CheckedRoot, labels));
-        const auto label_at = label0 + offsetof(XFixedString, arena_delta);
-        write(p.payload, label_at, read<std::int32_t>(p.payload, label_at) + 16);
-        reject(build(p), kBinding);
-    }
-
     // ---- Container heads: data_delta --------------------------------------
     {
         auto bytes = original; // values aliases the root block
@@ -461,31 +441,31 @@ int main() {
         const auto label0 = head_target(base.payload, proot + offsetof(CheckedRoot, labels));
         const auto label1 = label0 + sizeof(XString);
         auto p = base; // length byte 11 > inline_max
-        p.payload[label1 + 15] = static_cast<char>(0x80 | 11);
+        p.payload[label1 + 11] = static_cast<char>(0x80 | 11);
         reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
         p = base;
-        p.payload[label1 + 15] = static_cast<char>(0xff);
+        p.payload[label1 + 11] = static_cast<char>(0xff);
         reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
         p = base; // terminator (data[len]) must be zero: "array-one" has len 9
-        p.payload[label1 + 4 + 9] = 'x';
+        p.payload[label1 + 9] = 'x';
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
-        p = base; // last padding byte (head byte 14)
-        p.payload[label1 + 14] = 1;
+        p = base; // last padding byte (head byte 10)
+        p.payload[label1 + 10] = 1;
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // a 10-byte inline string still needs data[10] == 0
-        p.payload[label0 + 14] = 1;
+        p.payload[label0 + 10] = 1;
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // shorter length: the cut-off characters become nonzero padding
-        p.payload[label0 + 15] = static_cast<char>(0x80 | 5);
+        p.payload[label0 + 11] = static_cast<char>(0x80 | 5);
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // longer length over zero padding is a well-formed (different) value
-        p.payload[label1 + 15] = static_cast<char>(0x80 | 10);
+        p.payload[label1 + 11] = static_cast<char>(0x80 | 10);
         {
             auto b = XBuffer::load_verified<CheckedRoot>(build(p));
             need(b.root<CheckedRoot>().labels[1].size() == 10, "inline length change not observed");
         }
         p = base; // clearing the inline flag reinterprets the chars as a heap head
-        p.payload[label1 + 15] = static_cast<char>(9);
+        p.payload[label1 + 11] = static_cast<char>(9);
         reject(build(p));
         // Every length 0..10 against every byte position 0..10: a nonzero
         // byte at or past the length is padding (rejected), one before it a
@@ -493,9 +473,9 @@ int main() {
         for (unsigned length = 0; length <= 10; ++length) {
             for (unsigned at = 0; at < 11; ++at) {
                 p = base;
-                for (unsigned i = 0; i < 11; ++i) p.payload[label1 + 4 + i] = i < length ? 'a' : 0;
-                p.payload[label1 + 15] = static_cast<char>(0x80 | length);
-                p.payload[label1 + 4 + at] = 1;
+                for (unsigned i = 0; i < 11; ++i) p.payload[label1 + i] = i < length ? 'a' : 0;
+                p.payload[label1 + 11] = static_cast<char>(0x80 | length);
+                p.payload[label1 + at] = 1;
                 if (at >= length) {
                     reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
                 } else {

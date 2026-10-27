@@ -151,9 +151,9 @@ void* warm_free_bin(XBuffer& buffer, std::uint32_t bytes) {
     return block;
 }
 template <typename Head>
-std::array<unsigned char, 16> descriptor(const Head& h) {
-    static_assert(sizeof(Head) == 16);
-    std::array<unsigned char, 16> result{};
+std::array<unsigned char, 12> descriptor(const Head& h) {
+    static_assert(sizeof(Head) == 12);
+    std::array<unsigned char, 12> result{};
     std::memcpy(result.data(), &h, result.size());
     return result;
 }
@@ -245,14 +245,12 @@ void cross_arena_and_provenance() {
     d.left.assign("different"); d.a[0] = 444;
     require(s.right.view() == "cross-arena" && s.b[0] == 123, "cross-arena storage aliases");
     verified_roundtrip(destination); verified_roundtrip(source);
-    // V2 has a single provenance: every head binds to its payload base. (V1's
-    // state-bound vs legacy segment-bound distinction no longer exists.) An
-    // explicit rebind to the same arena is therefore the same allocator.
+    // V2.1: a head binds to the payload it lies in (the owner table); there
+    // is no per-head binding to set, and every head in a payload has the
+    // same allocator.
     auto local = make_buffer(); auto& r = local.root<MoveRoot>();
-    r.right.bind(fixed_detail::allocator_ref_of(local.arena()));
-    r.b.bind(fixed_detail::allocator_ref_of(local.arena()));
     require(same_binding(r.right.binding(), r.left.binding()) && same_binding(r.b.binding(), r.a.binding()) &&
-            r.right.binding().segment == local.arena(), "rebind to the payload base differs");
+            r.right.binding().segment == local.arena(), "heads in one payload differ in binding");
     r.right.assign("segment-bound"); r.b.push_back(42);
     auto* old_text = r.right.data(); auto* old_values = r.b.data();
     r.left = std::move(r.right); r.a = std::move(r.b);
@@ -262,24 +260,21 @@ void cross_arena_and_provenance() {
     ++cases;
 }
 
-void unbound_fallback() {
+// V2.0 built a head unbound when it was constructed in place without an
+// allocator, and a move into it fell back to a copy. In V2.1 the head is bound
+// by its address, so the move takes the source payload.
+void reconstructed_heads_bound() {
     auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
     std::destroy_at(&r.left); std::construct_at(&r.left);
     std::destroy_at(&r.a); std::construct_at(&r.a);
+    require(r.left.is_bound() && r.a.is_bound() && r.left.binding().segment == buffer.arena(),
+        "a head constructed in a payload is unbound");
     r.right.assign("bound-source"); r.b.push_back(88);
     auto* text = r.right.data(); auto* values = r.b.data();
     r.left = std::move(r.right); r.a = std::move(r.b);
-    require(r.left.view() == "bound-source" && r.a[0] == 88, "unbound destination fallback failed");
-    require(r.right.data() == text && r.b.data() == values, "unbound fallback stole source payload");
-    require(same_binding(r.left.binding(), r.right.binding()) && same_binding(r.a.binding(), r.b.binding()),
-        "unbound destination not rebound by existing copy path");
-    std::destroy_at(&r.right); std::construct_at(&r.right);
-    std::destroy_at(&r.b); std::construct_at(&r.b);
-    r.left = std::move(r.right); r.a = std::move(r.b);
-    require(r.left.empty() && r.a.empty() && r.left.is_bound() && r.a.is_bound(),
-        "empty unbound source changed bound destination semantics");
-    require(!r.right.is_bound() && !r.b.is_bound(), "empty unbound source acquired ownership");
-    r.right.bind(r.left.binding()); r.b.bind(r.a.binding());
+    require(r.left.view() == "bound-source" && r.a[0] == 88, "reconstructed destination lost the value");
+    require(r.left.data() == text && r.a.data() == values, "reconstructed destination copied the source payload");
+    require_empty_reusable_binding(r.right, r.left.binding()); require_empty_reusable_binding(r.b, r.a.binding());
     verified_roundtrip(buffer); ++cases;
 }
 
@@ -461,9 +456,9 @@ int main() {
     try {
         static_assert(!std::is_move_constructible_v<XFixedString>);
         static_assert(!std::is_move_constructible_v<XFixedVector<std::uint32_t>>);
-        static_assert(sizeof(XFixedString) == 16 && sizeof(XFixedVector<std::uint32_t>) == 16);
+        static_assert(sizeof(XFixedString) == 12 && sizeof(XFixedVector<std::uint32_t>) == 12);
         same_arena_and_self(); empty_capacity_transfer(); cross_arena_and_provenance();
-        unbound_fallback(); nested_compaction_and_rebuild(); parent_child_alias_guards();
+        reconstructed_heads_bound(); nested_compaction_and_rebuild(); parent_child_alias_guards();
         reloaded_moves(); retire_metadata_failure(); cross_arena_failure_guarantees();
         leaf_owns_and_binding_reuse();
         std::cout << "{\"status\":\"passed\",\"cases\":" << cases

@@ -57,15 +57,16 @@ inline char* raw_advance(char* p,std::size_t n,const CanonicalRawBytes* bytes=nu
 inline char* raw_retreat(char* p,std::size_t n,const CanonicalRawBytes* bytes=nullptr) noexcept {
     return bytes?bytes->at(bytes->offset(p)-n):p-n;
 }
-struct alignas(8) RawOwningDescriptor {
-    std::int32_t arena_delta, data_delta;
+// V2.1 container head: {data_delta, size, capacity}, 12 bytes, 4-aligned. The
+// data rel32 (and an inline string's bytes) start at the head's address.
+struct RawOwningDescriptor {
+    std::int32_t data_delta;
     std::uint32_t size, capacity;
 };
-static_assert(sizeof(RawOwningDescriptor) == 16);
-static_assert(offsetof(RawOwningDescriptor, arena_delta) == 0);
-static_assert(offsetof(RawOwningDescriptor, data_delta) == 4);
-static_assert(offsetof(RawOwningDescriptor, size) == 8);
-static_assert(offsetof(RawOwningDescriptor, capacity) == 12);
+static_assert(sizeof(RawOwningDescriptor) == 12);
+static_assert(offsetof(RawOwningDescriptor, data_delta) == 0);
+static_assert(offsetof(RawOwningDescriptor, size) == 4);
+static_assert(offsetof(RawOwningDescriptor, capacity) == 8);
 static_assert(sizeof(RawPayloadHeader) == sizeof(XArena));
 static_assert(alignof(RawPayloadHeader) == alignof(XArena));
 
@@ -118,15 +119,6 @@ inline const char* raw_checked_relative(const char* field, std::int32_t delta,
     return result;
 }
 
-inline void raw_validate_binding(const char* field, std::int32_t delta,
-                                 const WireValidationContext& ctx,
-                                 const CanonicalRawBytes* bytes=nullptr) {
-    // V2: a head binds to the payload base (arena header) itself.
-    if (delta == 0 ||
-        raw_checked_relative(field, delta, ctx,bytes) != ctx.base)
-        throw XException("wire validation: invalid allocator binding");
-}
-
 // Only called after complete raw verification. It does not evaluate a typed
 // object or derive rel32 from a stack-POD field's DIFFERENT address.
 inline char* raw_verified_relative(char* field, std::int32_t delta,
@@ -153,10 +145,10 @@ inline std::uint32_t raw_inline_string_size(const RawOwningDescriptor& head) noe
 
 inline std::string_view raw_verified_string(const char* address) noexcept {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
-    if (raw_inline_string(head)) return {address + 4, raw_inline_string_size(head)};
+    if (raw_inline_string(head)) return {address, raw_inline_string_size(head)};
     if (!head.capacity) return {};
     const auto* data = raw_verified_relative(
-        const_cast<char*>(address + 4), head.data_delta);
+        const_cast<char*>(address), head.data_delta);
     return {data, head.size};
 }
 
@@ -247,11 +239,11 @@ template<class T> consteval bool raw_descriptor_layout() {
     // The legacy recognition traits use is_base_of. A user-derived head with a
     // noexcept default constructor is not thereby a no-callback library head.
     return fixed_detail::is_owning_head<T>::value &&
-        sizeof(T) == 16 && alignof(T) == 8 &&
+        sizeof(T) == 12 && alignof(T) == 4 &&
         std::is_standard_layout_v<T> &&
         std::is_nothrow_default_constructible_v<T> &&
-        offsetof(T, arena_delta) == 0 && offsetof(T, data_delta) == 4 &&
-        offsetof(T, size_) == 8 && offsetof(T, capacity_) == 12;
+        offsetof(T, data_delta) == 0 && offsetof(T, size_) == 4 &&
+        offsetof(T, capacity_) == 8;
 }
 
 template<class Key> consteval bool raw_builtin_enum_order() {
@@ -308,8 +300,8 @@ bool raw_compare_keys(const char* lhs,const char* rhs,const WireValidationContex
                 const auto a=raw_wire_pod<RawOwningDescriptor>(lhs);
                 const auto b=raw_wire_pod<RawOwningDescriptor>(rhs);
                 auto chars=[&](const char* head,const RawOwningDescriptor& d) -> const char* {
-                    if(raw_inline_string(d)) return raw_advance(head,4,bytes);
-                    return d.capacity?raw_verified_relative(const_cast<char*>(raw_advance(head,4,bytes)),d.data_delta,bytes):nullptr;
+                    if(raw_inline_string(d)) return head;
+                    return d.capacity?raw_verified_relative(const_cast<char*>(head),d.data_delta,bytes):nullptr;
                 };
                 const auto as=raw_inline_string(a)?raw_inline_string_size(a):a.size;
                 const auto bs=raw_inline_string(b)?raw_inline_string_size(b):b.size;
@@ -559,7 +551,6 @@ template<class T> void validate_wire_value_raw(const char*,WireValidationContext
 
 inline void validate_string_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
-    raw_validate_binding(address,head.arena_delta,ctx,bytes);
     if (raw_inline_string(head)) {
         validate_inline_string_bytes(address);
         return;
@@ -571,7 +562,7 @@ inline void validate_string_raw(const char* address,WireValidationContext& ctx,c
             throw XException("wire validation failed: empty XFixedString has invalid payload");
         return;
     }
-    const auto* data=raw_checked_relative(raw_advance(address,4,bytes),head.data_delta,ctx,bytes);
+    const auto* data=raw_checked_relative(address,head.data_delta,ctx,bytes);
     validate_storage_range(data, std::size_t(head.capacity) + 1, alignof(char), ctx,
         "wire validation failed: XFixedString payload out of bounds");
     raw_register_allocation(data,
@@ -584,7 +575,6 @@ template<class Element>
 RawOwningDescriptor validate_vector_raw(const char* address,
                                         WireValidationContext& ctx,const CanonicalRawBytes* view=nullptr) {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
-    raw_validate_binding(address,head.arena_delta,ctx,view);
     if (head.size > head.capacity ||
         head.capacity > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(Element))
         throw XException("wire validation failed: XFixedVector size exceeds capacity");
@@ -593,7 +583,7 @@ RawOwningDescriptor validate_vector_raw(const char* address,
             throw XException("wire validation failed: empty XFixedVector has invalid payload");
         return head;
     }
-    const auto* data=raw_checked_relative(raw_advance(address,4,view),head.data_delta,ctx,view);
+    const auto* data=raw_checked_relative(address,head.data_delta,ctx,view);
     const auto bytes = std::size_t(head.capacity) * sizeof(Element);
     validate_storage_range(data, bytes, alignof(Element), ctx,
         "wire validation failed: XFixedVector payload out of bounds");
@@ -639,7 +629,7 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
         const auto head=validate_vector_raw<E>(address,ctx,bytes);
         if (head.size > 1) {
             const auto* data = raw_verified_relative(
-                const_cast<char*>(raw_advance(address,4,bytes)),head.data_delta,bytes);
+                const_cast<char*>(address),head.data_delta,bytes);
             for (std::uint32_t i = 1; i < head.size; ++i)
                 if(!raw_compare_keys<E>(raw_advance(data,std::size_t(i-1)*sizeof(E),bytes),
                     raw_advance(data,std::size_t(i)*sizeof(E),bytes),ctx,bytes))
@@ -651,7 +641,7 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
         const auto head=validate_vector_raw<E>(address,ctx,bytes);
         if (head.size > 1) {
             const auto* data = raw_verified_relative(
-                const_cast<char*>(raw_advance(address,4,bytes)),head.data_delta,bytes);
+                const_cast<char*>(address),head.data_delta,bytes);
             for (std::uint32_t i = 1; i < head.size; ++i)
                 if(!raw_compare_keys<K>(
                     raw_advance(data,std::size_t(i-1)*sizeof(E)+offsetof(E,first),bytes),
@@ -756,7 +746,7 @@ void reactivate_inline_value_raw(char* address,const CanonicalRawBytes* bytes=nu
         static_assert(raw_descriptor_layout<T>());
         const auto saved = raw_wire_pod<RawOwningDescriptor>(address);
         auto* object = ::new (static_cast<void*>(address)) T;
-        object->arena_delta=saved.arena_delta; object->data_delta=saved.data_delta;
+        object->data_delta=saved.data_delta;
         object->size_=saved.size; object->capacity_=saved.capacity;
     } else if constexpr (std::is_array_v<T>) {
         using E=std::remove_extent_t<T>;
@@ -786,20 +776,19 @@ template<class T> void activate_wire_value_raw(char* address,
         const auto saved = raw_wire_pod<RawOwningDescriptor>(address);
         static_assert(raw_descriptor_layout<T>());
         auto* object = ::new (static_cast<void*>(address)) T;
-        object->arena_delta = saved.arena_delta;
         object->data_delta = saved.data_delta;
         object->size_ = saved.size;
         object->capacity_ = saved.capacity;
         ++stats.owning_heads;
         if constexpr (is_fixed_string_v<T>) {
             if(saved.capacity && !raw_inline_string(saved)) {
-                auto* data=raw_verified_relative(raw_advance(address,4,bytes),saved.data_delta,bytes);
+                auto* data=raw_verified_relative(address,saved.data_delta,bytes);
                 (void)raw_recover_array_object<char>(data,std::size_t(saved.capacity)+1,bytes);
                 ++stats.capacity_arrays;
             }
         } else {
             using E = typename T::value_type;
-            auto* data=saved.capacity?raw_verified_relative(raw_advance(address,4,bytes),saved.data_delta,bytes):nullptr;
+            auto* data=saved.capacity?raw_verified_relative(address,saved.data_delta,bytes):nullptr;
             // ALWAYS recover the complete pre-fill parent array, including
             // scalar and size==0/spare capacity. No typed tail values are read.
             if(saved.capacity) {
