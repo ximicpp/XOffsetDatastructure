@@ -83,7 +83,10 @@ The 39 executables plus 5 lifecycle exit scenarios, 2 actual registry allocation
 failure scenarios, and 3 tooling checks total 49 CTest cases. Configure-time
 reflection, positive admission and polymorphic-rejection checks are separate.
 The generated `build/test-inventory.json` is authoritative for the selected mode;
-storage-only currently has 2 programs/2 CTest cases.
+storage-only currently has 3 programs/3 CTest cases (with `test_vm_storage_noexc`).
+Builds without exceptions: `NO_EXCEPTIONS_TESTS` in `tests/CMakeLists.txt` are built
+again as `<name>_noexc` with `xoffset_disable_exceptions()`; add a test there when it
+needs no try/catch of its own.
 
 When adding a test: register in the appropriate list in `tests/CMakeLists.txt`.
 `build.sh` runs CTest's inventory directly. Keep the CI inventory and docs current.

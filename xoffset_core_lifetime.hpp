@@ -626,9 +626,9 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     const typename XFixedVector<T>::allocator_type alloc{arena};
     const auto size = src.size_;
     char* fresh = nullptr;
-    try {
+    XOFFSET_TRY {
         fresh = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(alloc, bytes, 8));
-    } catch (const XBadAlloc&) {
+    } XOFFSET_CATCH(const XBadAlloc&) {
         XOFFSET_DETAIL_SUBTREE_COUNT(fallback_alloc, 1);
         return false;
     }
@@ -649,11 +649,11 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
         XOFFSET_DETAIL_SUBTREE_COUNT(compact_hits, 1);
     }
     std::int32_t delta = 0;
-    try {
+    XOFFSET_TRY {
         fixed_detail::set_rel32(delta, &dst.data_delta, top);
-    } catch (...) {
+    } XOFFSET_CATCH(...) {
         fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
-        throw;
+        XOFFSET_RETHROW;
     }
     T* old = dst.data();
     const auto old_size = dst.size_;
