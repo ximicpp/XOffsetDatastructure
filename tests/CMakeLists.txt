@@ -163,6 +163,13 @@ foreach(test_name ${EVOLUTION_TESTS})
     add_xoffset_test(${test_name} "reflection;evolution")
 endforeach()
 
+# tools/schema_freeze: snapshots and lock file against the checked-in copies.
+add_executable(test_schema_freeze test_schema_freeze.cpp)
+configure_xoffset_target(test_schema_freeze)
+xoffset_enable_test_assertions(test_schema_freeze)
+add_test(NAME test_schema_freeze COMMAND test_schema_freeze "${CMAKE_CURRENT_SOURCE_DIR}/schema_freeze")
+set_tests_properties(test_schema_freeze PROPERTIES LABELS "reflection;evolution")
+
 # Schema evolution: conversions the default rules do not cover, hooks that
 # name a field neither version has, and lineages whose versions share a
 # schema_hash must fail the build, naming the field or the versions.
