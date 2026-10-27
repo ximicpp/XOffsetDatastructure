@@ -172,7 +172,7 @@ void reload_scratch_survives_release_and_swap() {
     in.reload_verified<ReloadRoot>(good);
     need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
 }
-// The small dense path (payload <= 4 KiB, no extent table) is a shortcut of
+// The small dense path (payload <= 32 KiB, no extent table) is a shortcut of
 // the general reload: with it off, every outcome, first error and resulting
 // state must be the same, for every kind of target storage.
 struct SmallReloadOutcome {
@@ -214,12 +214,13 @@ void small_reload_matches_general_path() {
         [] { return XBuffer::create<ReloadRoot>(4096, XBuffer::maximum_capacity(8192)); },    // pinned slot
         [] { return XBuffer::create<ReloadRoot>(512, XBuffer::maximum_capacity(1024)); },     // maximum below some wires
     };
-    const std::string wires[] = {make_wire(5, 3), make_wire(6, 3, 2), make_wire(7, 400, 1), make_wire(8, 2000)};
+    const std::string wires[] = {make_wire(5, 3), make_wire(6, 3, 2), make_wire(7, 400, 1), make_wire(8, 2000),
+                                 make_wire(9, 9000)};
     std::size_t fast_eligible = 0;
     for (const auto& w : wires) {
         std::uint64_t used = 0;
         std::memcpy(&used, w.data() + 16, sizeof(used));
-        fast_eligible += used <= 4096;
+        fast_eligible += used <= 32768;
         // Every target kind, fresh and after a larger and a smaller content.
         for (const auto make : targets) {
             auto on = make(), off = make();
@@ -248,7 +249,7 @@ void small_reload_matches_general_path() {
             need(same(small_reload(on, w + std::string(extra, '\0'), true), small_reload(off, w + std::string(extra, '\0'), false)),
                  "extended wire outcome differs");
     }
-    need(fast_eligible >= 3, "too few small wires");
+    need(fast_eligible >= 3 && fast_eligible < std::size(wires), "need small wires and one above the limit");
     // An injected preparation failure on the in-place copy: XBadAlloc, rootless.
     for (const bool fast : {true, false}) {
         auto in = XBuffer::create<ReloadRoot>(4096, cap());
