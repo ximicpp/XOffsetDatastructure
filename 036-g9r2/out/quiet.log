@@ -1,0 +1,7 @@
+2026-10-27T07:32:44Z probe 1 start: waited 210s load 2.01 WindowServer 4.7% remote 6
+2026-10-27T07:35:46Z reloc t0 1 start: waited 180s load 1.77 WindowServer 4.1% remote 6
+2026-10-27T07:38:48Z reloc t1 1 start: waited 180s load 2.33 WindowServer 4.5% remote 6
+2026-10-27T07:41:50Z reloc t1 2 start: waited 180s load 1.70 WindowServer 4.7% remote 6
+2026-10-27T07:44:52Z reloc t0 2 start: waited 180s load 1.63 WindowServer 4.8% remote 6
+2026-10-27T07:47:54Z reloc aligned start: waited 180s load 1.98 WindowServer 4.6% remote 6
+2026-10-27T07:50:58Z probe 2 start: waited 180s load 2.45 WindowServer 4.6% remote 6

@@ -1,0 +1,18 @@
+g9r2_probe: M 2048, K 512, 101 rounds (+3 warm-up)
+placement (address % 4096 / % 64): xo head 48/48 data 64/0 cap 4096; std data 0/0 cap 4096; raw.stdpos data 0/0; std.xopos data 64/0
+ins  xo                     54.77 ns/op (median of 101 rounds)
+ins  raw                    50.38 ns/op (median of 101 rounds)
+ins  raw.size_first         48.91 ns/op (median of 101 rounds)
+ins  raw.ldr                49.80 ns/op (median of 101 rounds)
+ins  raw.stdpos             50.29 ns/op (median of 101 rounds)
+ins  std                    49.97 ns/op (median of 101 rounds)
+ins  std.xopos              49.40 ns/op (median of 101 rounds)
+era  xo                     44.03 ns/op (median of 101 rounds)
+era  raw                    42.89 ns/op (median of 101 rounds)
+era  raw.size_first         42.72 ns/op (median of 101 rounds)
+era  raw.ldr                42.56 ns/op (median of 101 rounds)
+era  raw.noscrub            43.05 ns/op (median of 101 rounds)
+era  raw.stdpos             42.81 ns/op (median of 101 rounds)
+era  std                    42.89 ns/op (median of 101 rounds)
+era  std.xopos              43.05 ns/op (median of 101 rounds)
+checks: all passed
