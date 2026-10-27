@@ -17,6 +17,7 @@ namespace dt = xo::detail;
 namespace host_failure {
 bool fail_once = false;
 unsigned handler_calls = 0;
+unsigned news = 0;
 xo::XBuffer* from = nullptr;
 xo::XBuffer* to = nullptr;
 void move_owner_handler() {
@@ -29,6 +30,7 @@ void move_owner_handler() {
 // locked libc++ toolchain the XBadAlloc message allocates after grow_to has
 // returned false; moving Core there must not revive a stale owner cache.
 void* operator new(std::size_t n) {
+    ++host_failure::news;
     for (;;) {
         if (host_failure::fail_once) host_failure::fail_once = false;
         else if (void* p = std::malloc(n ? n : 1)) return p;
@@ -175,6 +177,15 @@ void size_guard_and_owner_lifetimes() {
     roundtrip(other); roundtrip(moved);
 }
 void new_handler_owner_move_during_failed_tail_growth() {
+    // The host allocation that fails here is the XBadAlloc message (libc++,
+    // libstdc++). The MSVC STL copies exception messages with malloc, so no
+    // operator new runs between the failed grow and the throw: nothing to test.
+    const unsigned before = host_failure::news;
+    try { throw xo::XBadAlloc(); } catch (const xo::XBadAlloc&) {}
+    if (host_failure::news == before) {
+        std::cout << "new-handler Core move: skipped (exception messages bypass operator new)\n";
+        return;
+    }
     auto source = make_buffer(4096); xo::XBuffer receiver;
     auto& v = source.root<ScalarRoot>().numbers; v.resize(4, 57u);
     const auto d = descriptor(v); const auto content = values(v);
