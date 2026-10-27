@@ -20,6 +20,7 @@ struct Player {
     std::int32_t level;
     XVector<std::int32_t> items;
 };
+XOFFSET_RECORD(Player, name, level, items)
 XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
 namespace {

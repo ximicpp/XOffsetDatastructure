@@ -143,8 +143,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         std::string local_name() {
-            using namespace std::meta;
-            return std::string(identifier_of(dealias(^^T)));
+            return std::string(schema::identifier_v<T>);
         }
 
         template <typename T>
@@ -166,6 +165,37 @@ namespace XOffsetDatastructure {
         template <typename T>
         void define(Snapshot& s);
 
+        // The library's container templates, spelled with their element types.
+        template <typename T>
+        struct container {
+            static constexpr bool known = false;
+        };
+#define XOFFSET_FREEZE_CONTAINER_(Tmpl)                                                     \
+        template <typename E>                                                               \
+        struct container<Tmpl<E>> {                                                         \
+            static constexpr bool known = true;                                             \
+            static std::string spell(Snapshot& s) {                                         \
+                return "XOffsetDatastructure::" #Tmpl "<" + freeze::spell<E>(s) + ">";       \
+            }                                                                               \
+        };
+        XOFFSET_FREEZE_CONTAINER_(XVector)
+        XOFFSET_FREEZE_CONTAINER_(XFixedVector)
+        XOFFSET_FREEZE_CONTAINER_(XSet)
+        XOFFSET_FREEZE_CONTAINER_(XFixedFlatSet)
+#undef XOFFSET_FREEZE_CONTAINER_
+#define XOFFSET_FREEZE_CONTAINER_(Tmpl)                                                     \
+        template <typename K, typename V>                                                   \
+        struct container<Tmpl<K, V>> {                                                      \
+            static constexpr bool known = true;                                             \
+            static std::string spell(Snapshot& s) {                                         \
+                return "XOffsetDatastructure::" #Tmpl "<" + freeze::spell<K>(s) + ", " +     \
+                       freeze::spell<V>(s) + ">";                                           \
+            }                                                                               \
+        };
+        XOFFSET_FREEZE_CONTAINER_(XMap)
+        XOFFSET_FREEZE_CONTAINER_(XFixedFlatMap)
+#undef XOFFSET_FREEZE_CONTAINER_
+
         template <typename E>
         void define_enum(Snapshot& s) {
             if (!claim<E>(s)) return;
@@ -173,18 +203,18 @@ namespace XOffsetDatastructure {
             std::string text = "enum class " + local_name<E>() + " : " + spell<U>(s) + " {";
             [&]<std::size_t... Is>(std::index_sequence<Is...>) {
                 auto one = [&]<std::size_t I>() {
-                    constexpr auto e = enumerators_of(^^E)[I];
+                    using e = schema::enumerator_t<E, I>;
                     if (I) text += ',';
                     text += ' ';
-                    text += identifier_of(e);
+                    text += e::name;
                     text += " = ";
                     if constexpr (std::is_signed_v<U>)
-                        text += std::to_string(static_cast<long long>(static_cast<U>([:e:])));
+                        text += std::to_string(static_cast<long long>(static_cast<U>(e::value)));
                     else
-                        text += std::to_string(static_cast<unsigned long long>(static_cast<U>([:e:])));
+                        text += std::to_string(static_cast<unsigned long long>(static_cast<U>(e::value)));
                 };
                 (one.template operator()<Is>(), ...);
-            }(std::make_index_sequence<enumerators_of(^^E).size()>{});
+            }(std::make_index_sequence<schema::enumerator_count_v<E>>{});
             text += " };";
             const std::string name = local_name<E>();
             const std::string prev = reuse(s, "enum", name, text, "");
@@ -241,7 +271,6 @@ namespace XOffsetDatastructure {
         template <typename T>
         std::string spell(Snapshot& s) {
             using U = std::remove_cv_t<T>;
-            using namespace std::meta;
             if constexpr (std::is_same_v<U, bool>) return "bool";
             else if constexpr (std::is_same_v<U, char>) return "char";
             else if constexpr (std::is_same_v<U, std::byte>) return "std::byte";
@@ -260,26 +289,9 @@ namespace XOffsetDatastructure {
                 return local_name<U>();
             } else if constexpr (std::is_same_v<U, XString>) return "XOffsetDatastructure::XString";
             else if constexpr (std::is_same_v<U, XFixedString>) return "XOffsetDatastructure::XFixedString";
-            else if constexpr (has_template_arguments(dealias(^^U))) {
-                constexpr info tmpl = template_of(dealias(^^U));
-                if constexpr (tmpl == ^^XVector)
-                    return "XOffsetDatastructure::XVector<" + spell<typename U::value_type>(s) + ">";
-                else if constexpr (tmpl == ^^XFixedVector)
-                    return "XOffsetDatastructure::XFixedVector<" + spell<typename U::value_type>(s) + ">";
-                else if constexpr (tmpl == ^^XSet)
-                    return "XOffsetDatastructure::XSet<" + spell<typename U::value_type>(s) + ">";
-                else if constexpr (tmpl == ^^XFixedFlatSet)
-                    return "XOffsetDatastructure::XFixedFlatSet<" + spell<typename U::value_type>(s) + ">";
-                else if constexpr (tmpl == ^^XMap)
-                    return "XOffsetDatastructure::XMap<" + spell<typename U::key_type>(s) + ", " +
-                           spell<typename U::mapped_type>(s) + ">";
-                else if constexpr (tmpl == ^^XFixedFlatMap)
-                    return "XOffsetDatastructure::XFixedFlatMap<" + spell<typename U::key_type>(s) + ", " +
-                           spell<typename U::mapped_type>(s) + ">";
-                else {
-                    static_assert(sizeof(U) == 0, "schema_freeze: a class template that is not an XOffset container");
-                    return {};
-                }
+            else if constexpr (container<U>::known) return container<U>::spell(s);
+            else if constexpr (detail::schema_names::is_std_array<U>::value) {
+                return "std::array<" + spell<typename U::value_type>(s) + ", " + std::to_string(std::tuple_size_v<U>) + ">";
             } else if constexpr (ev::kind_of<U>() == ev::Kind::record) {
                 define_record<U>(s);
                 return local_name<U>();

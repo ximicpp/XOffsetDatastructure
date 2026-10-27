@@ -63,20 +63,33 @@ struct ResizeRoot {
     xo::XVector<ResizeRecord> records;
     xo::XVector<xo::XString> words;
     xo::XVector<std::uint32_t> numbers;
+#if XOFFSET_SCHEMA_REFLECTION
+    // Elements with throwing user constructors: a C++26-only record shape.
     xo::XVector<LateTail> late;
     xo::XVector<HostTail> host;
+#endif
 };
+XOFFSET_RECORD_DERIVED(ResizeAttr, (), key, value)
+XOFFSET_RECORD_DERIVED(ResizeRecord, (), attrs)
+#if XOFFSET_SCHEMA_REFLECTION
+XOFFSET_RECORD_DERIVED(ResizeRoot, (), attrs, records, words, numbers, late, host)
+#else
+XOFFSET_RECORD_DERIVED(ResizeRoot, (), attrs, records, words, numbers)
+#endif
 XOFFSET_REGISTER_SCHEMA_NAME(ResizeRoot, "test.P2.resize-growth.v1")
 
 // Explicit non-relocatable fallback: destructor may throw by type, but the
 // enumerated test destructor does not. The same reflected string is copied.
 struct Fallback { xo::XString text; ~Fallback() noexcept(false) {} };
-namespace boost::typelayout::v1 {
+XOFFSET_RECORD_DERIVED(Fallback, (), text)
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<Fallback> : std::true_type {};
 }
 static_assert(fd::can_relocate_without_allocation<ResizeAttr>());
+#if XOFFSET_SCHEMA_REFLECTION
 static_assert(fd::can_relocate_without_allocation<LateTail>());
 static_assert(fd::can_relocate_without_allocation<HostTail>());
+#endif
 static_assert(!fd::can_relocate_without_allocation<Fallback>());
 
 namespace {
@@ -128,8 +141,10 @@ std::string logical_contents(const ResizeRoot& r) {
     attrs(r.attrs); number(r.records.size()); for (const auto& row : r.records) attrs(row.attrs);
     number(r.words.size()); for (const auto& word : r.words) bytes(word.data(), word.size());
     number(r.numbers.size()); for (const auto value : r.numbers) number(value);
+#if XOFFSET_SCHEMA_REFLECTION
     number(r.late.size()); for (const auto& value : r.late) number(value.value);
     number(r.host.size()); for (const auto& value : r.host) number(value.value);
+#endif
     return result;
 }
 void roundtrip(xo::XBuffer& b) {
@@ -245,6 +260,7 @@ void late_fill_and_default_failure() {
     catch (const std::runtime_error& e) { caught = std::string_view(e.what()) == "late-fill"; }
     need(caught && calls == 3 && descriptor(root.words) == reserved && root.words[0].data() == child,
          "in-capacity late failure changed original state");
+#if XOFFSET_SCHEMA_REFLECTION
     root.late.resize(2); root.late[0].value = 12; root.late[1].value = 13;
     const auto ld = descriptor(root.late); LateTail::before_failure = 2; LateTail::attempts = 0; caught = false;
     try { root.late.resize(7); } catch (const std::runtime_error& e) { caught = std::string_view(e.what()) == "late-tail"; }
@@ -252,9 +268,11 @@ void late_fill_and_default_failure() {
     need(caught && LateTail::attempts == 3 && descriptor(root.late) == ld && root.late[0].value == 12 && root.late[1].value == 13,
          "late default failure changed original state");
     root.late.resize(7); need(root.late[6].value == 77, "default recovery failed");
+#endif
     roundtrip(b); ++cases;
 }
 
+#if XOFFSET_SCHEMA_REFLECTION
 void host_bad_alloc_tail_sweep() {
     for (int point = 0; point < 5; ++point) {
         auto b = make_buffer(); auto& v = b.root<ResizeRoot>().host;
@@ -269,6 +287,7 @@ void host_bad_alloc_tail_sweep() {
     }
     ++cases;
 }
+#endif
 
 void arena_bad_alloc_and_vm_failure() {
     auto b = xo::XBuffer::create<ResizeRoot>(32768, xo::XBuffer::maximum_capacity(32768));
@@ -381,7 +400,10 @@ int main(int argc, char** argv) {
         }
         if (argc != 1) throw std::runtime_error("expected no arguments or --write-wire/--read-wire PATH");
         default_growth_preserves_prefix_storage(); same_arena_fill_alias(); subobject_and_cross_arena_fill();
-        zero_shrink_and_in_capacity(); late_fill_and_default_failure(); host_bad_alloc_tail_sweep();
+        zero_shrink_and_in_capacity(); late_fill_and_default_failure();
+#if XOFFSET_SCHEMA_REFLECTION
+        host_bad_alloc_tail_sweep();
+#endif
         arena_bad_alloc_and_vm_failure(); nonrelocatable_fallback(); stage6_mechanism_gate();
         std::cout << "P2 resize growth cases=" << cases << " passed (no timing)\n";
         return 0;

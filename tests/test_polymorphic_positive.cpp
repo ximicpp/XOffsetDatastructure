@@ -5,6 +5,7 @@
 struct NonPolymorphicRoot {
     int value = 7;
 };
+XOFFSET_RECORD_DERIVED(NonPolymorphicRoot, (), value)
 
 int main() {
     XOffsetDatastructure::XBuffer buffer;

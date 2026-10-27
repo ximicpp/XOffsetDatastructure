@@ -7,6 +7,8 @@
 namespace xo = XOffsetDatastructure;
 struct HeaderOnlyCell { xo::XString value; };
 struct HeaderOnlyRoot { xo::XVector<HeaderOnlyCell> cells; };
+XOFFSET_RECORD_DERIVED(HeaderOnlyCell, (), value)
+XOFFSET_RECORD_DERIVED(HeaderOnlyRoot, (), cells)
 XOFFSET_REGISTER_SCHEMA_NAME(HeaderOnlyRoot,"four-paths.snapshot-index-header-only.v1")
 int main(){try{
     auto source=xo::TypedXBuffer<HeaderOnlyRoot>::create(65536);

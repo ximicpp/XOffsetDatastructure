@@ -37,6 +37,45 @@ XOFFSET_REGISTER_SCHEMA_NAME(Profile, "example.Profile")
   `std::string`/`std::vector` 等都会在编译期被拒绝。
 - 每种根类型用 `XOFFSET_REGISTER_SCHEMA_NAME` 注册一个唯一且稳定的名称。
 
+### 2.1 字段表：`XOFFSET_RECORD`
+
+没有反射的构建（C++20/C++23，或 `XOFFSET_SCHEMA_BACKEND_DESCRIBE=1`）里，库从一行字段表
+知道记录的形状。C++26 构建可以不写；写了，宏会和反射逐条核对（成员、顺序、偏移、类型、基类），
+不一致就编译失败，所以同一份源码在两种构建下描述的是同一个 schema，wire 字节相同。
+
+```cpp
+struct Troop { std::int32_t type{}; std::int32_t count{}; };
+struct March { std::int64_t id{}; std::int32_t eta{}; XVector<Troop> troops; };
+struct Entity { std::int64_t id{}; };
+struct Player : Entity { std::int32_t level{}; XVector<std::int32_t> items; };
+
+// 全局作用域，放在类型定义之后、第一次使用之前；被包含的记录写在前面。
+XOFFSET_RECORD(Troop, type, count)
+XOFFSET_RECORD(March, id, eta, troops)
+XOFFSET_RECORD(Entity, id)
+XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺序写在括号里
+```
+
+- 按声明顺序列出**全部**非静态数据成员。写错名字编译不过；漏写、重复、顺序错由编译期
+  完整性证明拦下：偏移严格递增且不重叠，加上聚合体初始化计数（`T{x1..xE}` 合法而
+  `T{x1..xE+1}` 不合法）。只看 `sizeof` 不够：漏掉一个看起来像补齐的 1 字节成员，大小不变。
+- 因此记录必须是聚合体（没有用户声明的构造函数、私有或受保护成员、虚函数）。类型名带逗号时用别名。
+- `XOFFSET_RECORD` 同时就是 `XOFFSET_ORDINARY_RECORDS` 的声明（第 3.1 节），两者不要对同一个
+  类型都写。没有反射时，「普通记录」的声明（不论用哪个宏，还是手写 `wire_record_layout`
+  特化）还承诺记录没有用户声明的析构、拷贝/移动构造或赋值。没有反射时库只能部分检查：
+  所有基类和成员的析构（或赋值）都平凡、记录本身却不平凡，就是用户提供的，判为不普通；有成员
+  本身不平凡（例如 `XString`）时查不出来，仍是承诺。C++26 构建会完整检查。
+  不能作这个承诺的记录用 `XOFFSET_RECORD_DERIVED(T, (), 成员...)`：只给字段表，不声明普通记录。
+- 没有反射时，直接接收（raw receive）用到的枚举必须有固定底层类型（`enum class`，或
+  `enum E : std::uint8_t {...}`），否则编译报错并给出改法。
+- `XString`、`XVector`、`XSet`、`XMap`、`XKeyValue` 和 `std::array` 由库自带字段表。
+- 联合体和非聚合体类（`std::string`、带虚函数或构造函数的类）写不了字段表。没有反射时库把它们
+  当作不透明类型：不准入（`is_byte_copy_safe_v` 为 false），也不报“缺字段表”。
+- 迁移助手 `tools/describe_dump`：在 GCC 16 或 P2996 上编译，传入根类型，用反射按依赖顺序印出
+  所有可达记录的这几行（`bench/slg` 的 13 行就是它的输出，`describe_dump_slg` 测试保持一致）。
+  写不了的类型（非聚合体、重叠的 `[[no_unique_address]]` 成员等）印成一行注释说明原因。
+- 发布前至少用一个 C++26 编译器把 schema 编一次，让反射核对字段表和承诺。
+
 ## 3. 构建与修改
 
 ```cpp
@@ -370,6 +409,7 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 | 同一可执行文件内所有翻译单元使用相同的头文件版本、编译选项和工具链 | 布局或 schema 身份不一致 |
 | 接收不可信输入前限制 wire 长度、`maximum_capacity` 和并发 buffer 数 | 单个合法 wire 也可能占用大量内存 |
 | 只用于 64 位小端平台（不支持 32 位安卓渠道包） | 其他平台编译期 `#error` |
+| 苹果平台部署目标不低于 macOS 14、iOS 17（tvOS 17、watchOS 10）：校验载入等接口用系统 libc++ 的 `std::pmr`，苹果从这些版本起才提供，且 SDK 不做可用性标注 | 部署目标更低时编译期 `#error`（否则会在旧系统上启动失败） |
 
 ## 6. 错误处理
 
@@ -402,7 +442,7 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 
 | # | 承诺 | 接口 / 机制 |
 | --- | --- | --- |
-| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（typelayout：布局签名里带指针记号的类型一律拒绝，含裸指针、成员指针和虚表）；容器头只存相对偏移，根用基址偏移 |
+| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（`is_byte_copy_safe_v`：沿用 TypeLayout 的规则，按字段接口递归，凡含裸指针、成员指针、引用和虚表的类型一律拒绝）；容器头只存相对偏移，根用基址偏移 |
 | K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |

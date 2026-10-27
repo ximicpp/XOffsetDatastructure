@@ -5,15 +5,17 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 // Test data structure
 struct ModifyTestData {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     ModifyTestData(Allocator allocator) 
         : numbers(allocator), names(allocator), scores(allocator), tags(allocator) {}
+#endif
     
     // Basic types
     int counter;
@@ -26,6 +28,9 @@ struct ModifyTestData {
     XMap<XString, int> scores;
     XSet<int> tags;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(ModifyTestData, (), counter, ratio, active, numbers, names, scores, tags)
+#endif
 
 bool test_modify_basic_types() {
     std::cout << "\n[TEST] Modify Basic Types\n";

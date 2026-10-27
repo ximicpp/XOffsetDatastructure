@@ -8,19 +8,24 @@
 #include <iostream>
 #include <cassert>
 #include <string>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct TestData {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     TestData(Allocator alloc) : name(alloc), items(alloc) {}
+#endif
     
     int32_t id = 0;
     int32_t score = 0;
     XString name;
     XVector<int32_t> items;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(TestData, (), id, score, name, items)
+#endif
 
 XOFFSET_REGISTER_SCHEMA_NAME(TestData, "test.TestData")
 

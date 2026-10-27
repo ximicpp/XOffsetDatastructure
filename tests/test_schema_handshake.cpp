@@ -28,6 +28,9 @@ struct Chat { XString text; std::int64_t at; };
 namespace game_swapped {
 struct Player { XString name; std::int32_t mp; std::int32_t hp; XVector<std::int32_t> bag; };
 } // namespace game_swapped
+XOFFSET_RECORD_DERIVED(game::Player, (), name, hp, mp, bag)
+XOFFSET_RECORD_DERIVED(game::Chat, (), text, at)
+XOFFSET_RECORD_DERIVED(game_swapped::Player, (), name, mp, hp, bag)
 XOFFSET_REGISTER_SCHEMA_NAME(game::Player, "test.handshake.Player")
 XOFFSET_REGISTER_SCHEMA_NAME(game::Chat, "test.handshake.Chat")
 XOFFSET_REGISTER_SCHEMA_NAME(game_swapped::Player, "test.handshake.Player")

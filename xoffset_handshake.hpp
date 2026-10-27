@@ -138,6 +138,14 @@ namespace XOffsetDatastructure {
         XVector<XSchemaAckEntry> entries;   // one per working entry of the hello
         XString label;
     };
+} // namespace XOffsetDatastructure
+
+XOFFSET_RECORD(XOffsetDatastructure::XSchemaEntry, root_type_id, schema_hash, name_digest, kind, reserved)
+XOFFSET_RECORD(XOffsetDatastructure::XSchemaHello, wire_format, role, entries, label)
+XOFFSET_RECORD(XOffsetDatastructure::XSchemaAckEntry, root_type_id, schema_hash, verdict, reserved)
+XOFFSET_RECORD(XOffsetDatastructure::XSchemaHelloAck, wire_format, role, entries, label)
+
+namespace XOffsetDatastructure {
 
     inline const char* to_string(XSchemaVerdict v) noexcept {
         switch (v) {
