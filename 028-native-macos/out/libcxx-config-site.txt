@@ -1,0 +1,6 @@
+## /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site
+25:#define _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS 1
+## /Volumes/XOffsetCS/toolchain/p2996-d77eff1/include/c++/v1/__config_site
+25:#define _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS 0
+## Apple clang default include of __config_site
+... /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site

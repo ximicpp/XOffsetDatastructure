@@ -1,0 +1,241 @@
+[1/154] Building CXX object tools/CMakeFiles/check_signature_matrix.dir/check_signature_matrix.cpp.o
+[2/154] Building CXX object tests/CMakeFiles/test_vm_pool.dir/test_vm_pool.cpp.o
+[3/154] Building CXX object tests/CMakeFiles/test_virtual_memory_storage.dir/test_virtual_memory_storage.cpp.o
+[4/154] Building CXX object tests/CMakeFiles/test_basic_types.dir/test_basic_types.cpp.o
+[5/154] Building CXX object tests/CMakeFiles/test_vector.dir/test_vector.cpp.o
+[6/154] Building CXX object examples/CMakeFiles/helloworld.dir/helloworld.cpp.o
+[7/154] Building CXX object examples/CMakeFiles/stable_storage.dir/stable_storage.cpp.o
+[8/154] Building CXX object tools/CMakeFiles/bench_compare.dir/bench_compare.cpp.o
+[9/154] Building CXX object tests/CMakeFiles/test_map_set.dir/test_map_set.cpp.o
+[10/154] Building CXX object tests/CMakeFiles/test_nested.dir/test_nested.cpp.o
+[11/154] Building CXX object tests/CMakeFiles/test_compaction.dir/test_compaction.cpp.o
+[12/154] Building CXX object tests/CMakeFiles/test_modify.dir/test_modify.cpp.o
+[13/154] Building CXX object tests/CMakeFiles/test_xbuffer_api.dir/test_xbuffer_api.cpp.o
+[14/154] Building CXX object tests/CMakeFiles/test_scalar_resize.dir/test_scalar_resize.cpp.o
+[15/154] Building CXX object tests/CMakeFiles/test_assign_range.dir/test_assign_range.cpp.o
+[16/154] Building CXX object tests/CMakeFiles/test_hot_path_constants.dir/test_hot_path_constants.cpp.o
+[17/154] Building CXX object tests/CMakeFiles/test_string_replace.dir/test_string_replace.cpp.o
+[18/154] Building CXX object tests/CMakeFiles/test_validation_granules.dir/test_validation_granules.cpp.o
+[19/154] Building CXX object tests/CMakeFiles/test_xstring_direct_assign.dir/test_xstring_direct_assign.cpp.o
+[20/154] Building CXX object tests/CMakeFiles/test_wire_admission.dir/test_wire_admission.cpp.o
+[21/154] Building CXX object tests/CMakeFiles/test_resize_growth.dir/test_resize_growth.cpp.o
+[22/154] Building CXX object tests/CMakeFiles/test_xhandle.dir/test_xhandle.cpp.o
+[23/154] Building CXX object tests/CMakeFiles/test_string_append.dir/test_string_append.cpp.o
+[24/154] Building CXX object tests/CMakeFiles/test_error_paths.dir/test_error_paths.cpp.o
+[25/154] Building CXX object tests/CMakeFiles/test_schema_envelope.dir/test_schema_envelope.cpp.o
+[26/154] Building CXX object tests/CMakeFiles/test_inheritance.dir/test_inheritance.cpp.o
+[27/154] Building CXX object tests/CMakeFiles/test_memory_efficiency.dir/test_memory_efficiency.cpp.o
+[28/154] Building CXX object tests/CMakeFiles/test_adaptive_reservation.dir/test_adaptive_reservation.cpp.o
+[29/154] Building CXX object tests/CMakeFiles/test_fixed_layout_containers.dir/test_fixed_layout_containers.cpp.o
+[30/154] Building CXX object tests/CMakeFiles/test_complex_nesting.dir/test_complex_nesting.cpp.o
+[31/154] Building CXX object tests/CMakeFiles/test_runtime_regressions.dir/test_runtime_regressions.cpp.o
+[32/154] Building CXX object tests/CMakeFiles/test_mutation_failures.dir/test_mutation_failures.cpp.o
+[33/154] Building CXX object tests/CMakeFiles/test_main_containers.dir/test_main_containers.cpp.o
+[34/154] Building CXX object tests/CMakeFiles/test_same_arena_move.dir/test_same_arena_move.cpp.o
+[35/154] Building CXX object tests/CMakeFiles/test_free_table_policy.dir/test_free_table_policy.cpp.o
+[36/154] Building CXX object tests/CMakeFiles/test_append_grow.dir/test_append_grow.cpp.o
+[37/154] Building CXX object tests/CMakeFiles/test_wire_validation.dir/test_wire_validation.cpp.o
+[38/154] Building CXX object tests/CMakeFiles/test_shift_relocate.dir/test_shift_relocate.cpp.o
+[39/154] Building CXX object tests/CMakeFiles/test_slot_storage.dir/test_slot_storage.cpp.o
+[40/154] Building CXX object tests/CMakeFiles/test_stable_storage.dir/test_stable_storage.cpp.o
+[41/154] Building CXX object tests/CMakeFiles/test_vm_lifecycle.dir/test_vm_lifecycle.cpp.o
+[42/154] Building CXX object tests/CMakeFiles/test_lower_bound_index.dir/test_lower_bound_index.cpp.o
+[43/154] Building CXX object tests/CMakeFiles/test_schema_describe.dir/test_schema_describe.cpp.o
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_describe.cpp:62:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   62 | XOFFSET_PIN_SCHEMA(sd::Vec3, "record[s:12,a:4]{@0:f32,@4:f32,@8:f32}");
+      | ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_describe.cpp:63:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   63 | XOFFSET_PIN_SCHEMA(sd::Item,
+      | ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_describe.cpp:67:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   67 | XOFFSET_PIN_SCHEMA(sd::Bag,
+      | ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[44/154] Building CXX object tests/CMakeFiles/test_vm_transport.dir/test_vm_transport.cpp.o
+[45/154] Building CXX object tests/CMakeFiles/test_ordinary_records.dir/test_ordinary_records.cpp.o
+In file included from /Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:6:
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::Hero' [-Wnontrivial-memcall]
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:3416:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::Hero>' requested here
+ 3416 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XFixedVector<orec::Hero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:162:27: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::Root>' requested here
+  162 |     const auto declared = run<orec::Root>();
+      |                           ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: note: explicitly cast the pointer to silence this warning
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::PlainHero' [-Wnontrivial-memcall]
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:3416:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::PlainHero>' requested here
+ 3416 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XFixedVector<orec::PlainHero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_ordinary_records.cpp:163:24: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::PlainRoot>' requested here
+  163 |     const auto plain = run<orec::PlainRoot>();
+      |                        ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: note: explicitly cast the pointer to silence this warning
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+2 warnings generated.
+[46/154] Building CXX object tests/CMakeFiles/test_owner_identity.dir/test_owner_identity.cpp.o
+[47/154] Building CXX object tests/CMakeFiles/test_regrow_used_range.dir/test_regrow_used_range.cpp.o
+[48/154] Building CXX object tests/CMakeFiles/test_owner_registry.dir/test_owner_registry.cpp.o
+[49/154] Building CXX object tests/CMakeFiles/test_tail_expansion.dir/test_tail_expansion.cpp.o
+[50/154] Building CXX object tests/CMakeFiles/test_storage_policies.dir/test_storage_policies.cpp.o
+[51/154] Building CXX object tests/CMakeFiles/test_allocator_failures.dir/test_allocator_failures.cpp.o
+[52/154] Building CXX object tests/CMakeFiles/test_allocator_model.dir/test_allocator_model.cpp.o
+[53/154] Building CXX object tests/CMakeFiles/test_v2_golden.dir/test_v2_golden.cpp.o
+[54/154] Building CXX object tests/CMakeFiles/test_schema_pin.dir/test_schema_pin.cpp.o
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_pin.cpp:16:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   16 | XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_pin.cpp:17:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   17 | XOFFSET_PIN_SCHEMA(pin::Root,
+      | ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_schema_pin.cpp:29:5: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   29 |     XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
+      |     ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:7833:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+ 7833 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[55/154] Building CXX object tests/CMakeFiles/test_stability_contract.dir/test_stability_contract.cpp.o
+[56/154] Building CXX object tests/CMakeFiles/test_cross_compiler_wire.dir/test_cross_compiler_wire.cpp.o
+[57/154] Building CXX object tests/CMakeFiles/test_implicit_padding.dir/test_implicit_padding.cpp.o
+[58/154] Building CXX object tests/CMakeFiles/test_wire_hole_zeroing.dir/test_wire_hole_zeroing.cpp.o
+[59/154] Building CXX object tests/CMakeFiles/test_wire_populate.dir/test_wire_populate.cpp.o
+[60/154] Building CXX object tests/CMakeFiles/test_free_run_emission.dir/test_free_run_emission.cpp.o
+[61/154] Building CXX object tests/CMakeFiles/test_reload_reset.dir/test_reload_reset.cpp.o
+[62/154] Building CXX object tests/CMakeFiles/test_reset_used_range.dir/test_reset_used_range.cpp.o
+[63/154] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay.dir/fuzz/replay_main.cpp.o
+[64/154] Building CXX object tests/CMakeFiles/test_save_compact.dir/test_save_compact.cpp.o
+[65/154] Building CXX object tests/CMakeFiles/test_clone.dir/test_clone.cpp.o
+[66/154] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay.dir/fuzz/replay_main.cpp.o
+[67/154] Building CXX object tests/CMakeFiles/test_v2_fuzz.dir/test_v2_fuzz.cpp.o
+[68/154] Building CXX object tests/CMakeFiles/test_locator_soundness.dir/test_locator_soundness.cpp.o
+[69/154] Building CXX object tests/CMakeFiles/test_save_composed.dir/test_save_composed.cpp.o
+[70/154] Building CXX object tests/CMakeFiles/test_verified_paths.dir/test_verified_paths.cpp.o
+[71/154] Building CXX object tests/CMakeFiles/test_snapshot_index_header_only.dir/test_snapshot_index_header_only.cpp.o
+[72/154] Linking CXX executable bin/Release/helloworld
+[73/154] Linking CXX executable bin/Release/stable_storage
+[74/154] Linking CXX executable bin/Release/bench_compare
+[75/154] Linking CXX executable bin/Release/check_signature_matrix
+[76/154] Linking CXX executable bin/Release/test_virtual_memory_storage
+[77/154] Linking CXX executable bin/Release/test_vm_pool
+[78/154] Linking CXX executable bin/Release/test_basic_types
+[79/154] Building CXX object tests/CMakeFiles/test_stable_erase_if.dir/test_stable_erase_if.cpp.o
+In file included from /Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_stable_erase_if.cpp:2:
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'ImplicitRecord' [-Wnontrivial-memcall]
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:3416:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<ImplicitRecord>' requested here
+ 3416 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_stable_erase_if.cpp:310:17: note: in instantiation of function template specialization 'XOffsetDatastructure::XFixedVector<ImplicitRecord>::stable_erase_if<(lambda at /Volumes/XOffsetCS/native-c/src-dcb1dfd/tests/test_stable_erase_if.cpp:310:33)>' requested here
+  310 |     need(values.stable_erase_if([](const ImplicitRecord& r){return r.id%3==0;})==4,"implicit aggregate erase count");
+      |                 ^
+/Volumes/XOffsetCS/native-c/src-dcb1dfd/xoffsetdatastructure.hpp:5608:29: note: explicitly cast the pointer to silence this warning
+ 5608 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+1 warning generated.
+[80/154] Linking CXX executable bin/Release/test_vector
+[81/154] Linking CXX executable bin/Release/test_nested
+[82/154] Linking CXX executable bin/Release/test_map_set
+[83/154] Linking CXX executable bin/Release/test_compaction
+[84/154] Linking CXX executable bin/Release/test_modify
+[85/154] Linking CXX executable bin/Release/test_xbuffer_api
+[86/154] Linking CXX executable bin/Release/test_assign_range
+[87/154] Linking CXX executable bin/Release/test_scalar_resize
+[88/154] Linking CXX executable bin/Release/test_validation_granules
+[89/154] Linking CXX executable bin/Release/test_hot_path_constants
+[90/154] Linking CXX executable bin/Release/test_string_replace
+[91/154] Linking CXX executable bin/Release/test_wire_admission
+[92/154] Linking CXX executable bin/Release/test_resize_growth
+[93/154] Linking CXX executable bin/Release/test_xstring_direct_assign
+[94/154] Linking CXX executable bin/Release/test_string_append
+[95/154] Linking CXX executable bin/Release/test_xhandle
+[96/154] Linking CXX executable bin/Release/test_schema_envelope
+[97/154] Linking CXX executable bin/Release/test_fixed_layout_containers
+[98/154] Linking CXX executable bin/Release/test_error_paths
+[99/154] Linking CXX executable bin/Release/test_memory_efficiency
+[100/154] Linking CXX executable bin/Release/test_complex_nesting
+[101/154] Linking CXX executable bin/Release/test_inheritance
+[102/154] Linking CXX executable bin/Release/test_adaptive_reservation
+[103/154] Linking CXX executable bin/Release/test_main_containers
+[104/154] Linking CXX executable bin/Release/test_runtime_regressions
+[105/154] Linking CXX executable bin/Release/test_wire_validation
+[106/154] Linking CXX executable bin/Release/test_mutation_failures
+[107/154] Linking CXX executable bin/Release/test_same_arena_move
+[108/154] Linking CXX executable bin/Release/test_shift_relocate
+[109/154] Linking CXX executable bin/Release/test_append_grow
+[110/154] Linking CXX executable bin/Release/test_free_table_policy
+[111/154] Linking CXX executable bin/Release/test_lower_bound_index
+[112/154] Linking CXX executable bin/Release/test_stable_storage
+[113/154] Linking CXX executable bin/Release/test_ordinary_records
+[114/154] Linking CXX executable bin/Release/test_slot_storage
+[115/154] Linking CXX executable bin/Release/test_schema_describe
+[116/154] Linking CXX executable bin/Release/test_vm_lifecycle
+[117/154] Linking CXX executable bin/Release/test_vm_transport
+[118/154] Linking CXX executable bin/Release/test_owner_identity
+[119/154] Building CXX object tests/CMakeFiles/test_core_lifetime.dir/test_core_lifetime.cpp.o
+[120/154] Linking CXX executable bin/Release/test_owner_registry
+[121/154] Linking CXX executable bin/Release/test_tail_expansion
+[122/154] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay.dir/fuzz/fuzz_v2_wire.cpp.o
+[123/154] Linking CXX executable bin/Release/test_regrow_used_range
+[124/154] Linking CXX executable bin/Release/test_storage_policies
+[125/154] Linking CXX executable bin/Release/test_allocator_model
+[126/154] Linking CXX executable bin/Release/test_allocator_failures
+[127/154] Building CXX object tests/CMakeFiles/test_canonical_registry_v2.dir/test_canonical_registry_v2.cpp.o
+[128/154] Linking CXX executable bin/Release/test_v2_golden
+[129/154] Linking CXX executable bin/Release/test_cross_compiler_wire
+[130/154] Linking CXX executable bin/Release/test_schema_pin
+[131/154] Linking CXX executable bin/Release/test_stability_contract
+[132/154] Linking CXX executable bin/Release/test_implicit_padding
+[133/154] Linking CXX executable bin/Release/test_wire_hole_zeroing
+[134/154] Linking CXX executable bin/Release/test_v2_fuzz
+[135/154] Linking CXX executable bin/Release/test_save_compact
+[136/154] Linking CXX executable bin/Release/test_save_composed
+[137/154] Linking CXX executable bin/Release/test_free_run_emission
+[138/154] Linking CXX executable bin/Release/test_wire_populate
+[139/154] Linking CXX executable bin/Release/test_reload_reset
+[140/154] Linking CXX executable bin/Release/test_reset_used_range
+[141/154] Linking CXX executable bin/Release/test_clone
+[142/154] Linking CXX executable bin/Release/fuzz_v2_wire_replay
+[143/154] Linking CXX executable bin/Release/test_verified_paths
+[144/154] Linking CXX executable bin/Release/test_stable_erase_if
+[145/154] Linking CXX executable bin/Release/test_locator_soundness
+[146/154] Linking CXX executable bin/Release/test_snapshot_index_header_only
+[147/154] Linking CXX executable bin/Release/test_core_lifetime
+[148/154] Linking CXX executable bin/Release/test_canonical_registry_v2
+[149/154] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay.dir/fuzz/fuzz_wire_schemas.cpp.o
+[150/154] Linking CXX executable bin/Release/fuzz_wire_schemas_replay
+[151/154] Building CXX object tests/CMakeFiles/test_verified_receive.dir/test_verified_receive.cpp.o
+[152/154] Linking CXX executable bin/Release/test_verified_receive
+[153/154] Building CXX object tests/CMakeFiles/test_receive_raw.dir/test_receive_raw.cpp.o
+[154/154] Linking CXX executable bin/Release/test_receive_raw

@@ -1,0 +1,8 @@
+== 2026-10-27T02:29:35Z 0. sources dcb1dfdb9e6e2a3a2ab00bad390881a4e38e8ea5
+== 2026-10-27T02:29:42Z 1. macos c++20
+== 2026-10-27T02:30:40Z 2. pmr checks c++20
+== 2026-10-27T02:30:40Z 1. macos c++23
+== 2026-10-27T02:31:13Z 2. pmr checks c++23
+== 2026-10-27T02:31:13Z 3. C++26 clang-p2996 at the default deployment target (pmr #error must not fire)
+== 2026-10-27T02:31:18Z 4. summary
+== 2026-10-27T02:31:18Z finish rc=0

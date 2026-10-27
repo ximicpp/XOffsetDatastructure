@@ -1,0 +1,35 @@
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++26 with reflection (schema backend: auto)
+-- Full-library reflection compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 97 test programs + 13 subprocess scenarios + 5 tooling checks = 115; 3 configure checks listed separately
+-- Test inventory: /Volumes/XOffsetCS/native-c/build-c++26/test-inventory.json
+-- Configuring done (2.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Volumes/XOffsetCS/native-c/build-c++26
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=
+[0/2] Re-checking globbed directories...
+[1/5] Building CXX object tests/CMakeFiles/test_basic_types.dir/test_basic_types.cpp.o
+[2/5] Linking CXX executable bin/Release/test_basic_types
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[3/5] Building CXX object tests/CMakeFiles/test_cross_compiler_wire.dir/test_cross_compiler_wire.cpp.o
+[4/5] Linking CXX executable bin/Release/test_cross_compiler_wire
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+
+[TEST] Basic Types
+--------------------------------------------------
+[PASS] All basic type tests passed!
+empty accepted and byte-identical
+small accepted and byte-identical
+medium_holes accepted and byte-identical
+reloaded_mutated accepted and byte-identical
+sparse accepted and byte-identical
+elided accepted and byte-identical

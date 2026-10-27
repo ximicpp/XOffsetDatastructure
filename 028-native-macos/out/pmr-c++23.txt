@@ -1,0 +1,24 @@
+# std::pmr on the built programs (C++23)
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=
+## test_cross_compiler_wire
+    minos 26.0
+      sdk 26.5
+std::__1::pmr::new_delete_resource()
+/Volumes/XOffsetCS/native-c/build-c++23/bin/Release/test_cross_compiler_wire:
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)
+## test_verified_receive
+    minos 26.0
+      sdk 26.5
+std::__1::pmr::memory_resource::~memory_resource()
+std::__1::pmr::new_delete_resource()
+typeinfo for std::__1::pmr::memory_resource
+/Volumes/XOffsetCS/native-c/build-c++23/bin/Release/test_verified_receive:
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)
+## test_receive_raw
+    minos 26.0
+      sdk 26.5
+std::__1::pmr::memory_resource::~memory_resource()
+std::__1::pmr::new_delete_resource()
+typeinfo for std::__1::pmr::memory_resource
+/Volumes/XOffsetCS/native-c/build-c++23/bin/Release/test_receive_raw:
+	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)
