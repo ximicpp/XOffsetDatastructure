@@ -23,9 +23,12 @@
 # MAPDEMO_STEPS, MAPDEMO_MODES (default "reuse"), MAPDEMO_PORT_BASE (47800;
 # each target gets its own range of 100 ports), MAPDEMO_LABEL (prefix of
 # every target's label), MAPDEMO_ENCODING (client --encoding, default
-# cycle), MAPDEMO_A_HOST (see run_tier.sh), MAPDEMO_COMPARE (an OUT_ROOT of run_all_tiers.sh: every target's
-# step wires must equal it; default: targets after the first compare with
-# the first). The server self-test runs once, with the first target.
+# cycle), MAPDEMO_A_HOST (see run_tier.sh), MAPDEMO_COMPARE (an OUT_ROOT
+# of run_all_tiers.sh: every target's step wires must equal it; default:
+# targets after the first compare with the first), MAPDEMO_RUNS_UNDER
+# ("NAME=TEXT;NAME=TEXT": what each client runs on, for the report, e.g.
+# "android-emu=Android emulator (Mac M4)"; default: native, wine or qemu
+# from the command). The server self-test runs once, with the first target.
 #
 # Exit 0 only when every target passed. Portable to macOS bash 3.2.
 set -u
@@ -54,6 +57,17 @@ mkdir -p "$OUT_ROOT"
 OUT_ROOT=$(cd "$OUT_ROOT" && pwd)
 FAILED=0
 
+# runs_under NAME: this target's entry of MAPDEMO_RUNS_UNDER, or nothing.
+runs_under() {
+    local entry rest=${MAPDEMO_RUNS_UNDER:-}
+    while [ -n "$rest" ]; do
+        entry=${rest%%;*}
+        [ "${entry%%=*}" = "$1" ] && { echo "${entry#*=}"; return; }
+        [ "$rest" = "$entry" ] && break
+        rest=${rest#*;}
+    done
+}
+
 # client_offline NAME CMD MODE_ARGS OUT_DIR: one offline client run.
 client_offline() {
     local name=$1 cmd=$2 args=$3 out=$4 rc
@@ -61,6 +75,7 @@ client_offline() {
     rm -f "$out"/*.csv "$out"/*.log "$out"/*.txt
     echo "client_cmd=$cmd" > "$out/meta.txt"
     echo "client_args=$args" >> "$out/meta.txt"
+    echo "runs_under=$(runs_under "$name")" >> "$out/meta.txt"
     # shellcheck disable=SC2086 # cmd and args are word lists on purpose
     $cmd $args --csv-dir "$out" > "$out/client.log" 2>&1
     rc=$?

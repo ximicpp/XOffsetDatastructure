@@ -102,7 +102,7 @@ def target_summary(out_root, name, corpus_rows):
     t["build"] = (read_text(os.path.join(root, "selfcheck", "client_build.txt"))
                   or read_text(os.path.join(root, "replay", "client_build.txt")) or "-")
     t["client_cmd"] = t["selfcheck"]["meta"].get("client_cmd", "-")
-    t["runner"] = runner(t["client_cmd"])
+    t["runner"] = t["selfcheck"]["meta"].get("runs_under") or runner(t["client_cmd"])
 
     # Replay: the same digests as A wrote, row by row.
     replay = read_csv(os.path.join(root, "replay", "client_replay.csv")) or []
