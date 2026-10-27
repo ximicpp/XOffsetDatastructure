@@ -376,12 +376,15 @@ void actual_addresses_honor_large_alignment() {
         assert(std::memcmp(limited.arena(), &before, sizeof(before)) == 0);
         assert(limited.get_size() == 512 && !limited.grow(1));
     }
+#if !defined(_MSC_VER)
     // sizeof(T) must be checked before conversion to the arena's uint32_t byte
     // count. This type is never instantiated and requires no large reservation.
+    // (MSVC caps a type at 0x7fffffff bytes, so there it cannot be declared.)
     struct OversizedRoot { char bytes[std::size_t{1} << 32]; };
     require_rejection([&] { limited.construct_root_storage<OversizedRoot>(); });
     assert(std::memcmp(limited.arena(), &before, sizeof(before)) == 0);
     assert(limited.arena()->root_offset == 0);
+#endif
 }
 
 void objects_and_relative_references_survive_growth() {

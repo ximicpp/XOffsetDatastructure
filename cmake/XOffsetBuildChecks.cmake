@@ -166,7 +166,7 @@ function(xoffset_check_polymorphic_rejection)
             "Polymorphic rejection unexpectedly compiled and linked; "
             "the byte-copy safety guard is no longer enforced.")
     endif()
-    if(NOT negative_output MATCHES "static assertion failed[^\n]*Type is not byte-copy safe")
+    if(NOT negative_output MATCHES "static(_assert| assertion) failed[^\n]*Type is not byte-copy safe")
         message(FATAL_ERROR
             "Polymorphic rejection failed for an unexpected reason; required diagnostic "
             "'Type is not byte-copy safe' was not emitted by a static assertion.\n"

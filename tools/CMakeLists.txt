@@ -3,7 +3,7 @@ configure_xoffset_target(bench_compare)
 
 # Exact target-matrix inventory verifier.
 add_executable(check_signature_matrix check_signature_matrix.cpp)
-target_compile_features(check_signature_matrix PRIVATE cxx_std_17)
+target_compile_features(check_signature_matrix PRIVATE cxx_std_20) # designated initializers (MSVC rejects them in C++17)
 target_include_directories(check_signature_matrix PRIVATE
     "${PROJECT_SOURCE_DIR}")
 set_target_properties(check_signature_matrix PROPERTIES
