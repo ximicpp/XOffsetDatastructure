@@ -1,0 +1,5 @@
+CKPT2 10
+anchor f8eebf4 (CKPT1_R2 with formal-3: pass)
+#116 sc_xoffset __text same; slg_bench __text same; -> not listed (inside the #117 range)
+map.insert done
+ctest 100% tests passed out of 103 (rc 0)

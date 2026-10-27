@@ -1,0 +1,199 @@
+{
+ "checkpoint": "2026-10-27-ckpt2-b50fc8a",
+ "failed_metrics": {
+  "slg:C": 1.0001239553851506
+ },
+ "points": [
+  {
+   "commit": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "label": "anchor",
+   "role": "anchor"
+  },
+  {
+   "commit": "55c06b5121d89b74338dede714ffa355c5a29426",
+   "label": "#91 S POD assign fast path",
+   "role": "commit"
+  },
+  {
+   "commit": "33b198268257005976f73c2f8f0add28e58a68de",
+   "label": "#95 S expand tail precheck (+ #92 #94, class 0)",
+   "role": "commit"
+  },
+  {
+   "commit": "e46cf38190e119d27b6e3043d518d7c135bfefe8",
+   "label": "#104 S shift rebase inline (+ #96 #97 #98 #100 #101 #102 #105, class 0)",
+   "role": "commit"
+  },
+  {
+   "commit": "12866015d8d8577e9e065db0dc4bdf08fee34e6f",
+   "label": "#114 S Z2 indeterminate validation context",
+   "role": "commit"
+  },
+  {
+   "commit": "b50fc8abbbe05c2d152a8a473313975498f465b1",
+   "label": "head",
+   "role": "head"
+  }
+ ],
+ "steps": [
+  {
+   "step": 1,
+   "dir": "bisect-1",
+   "point": "33b198268257005976f73c2f8f0add28e58a68de",
+   "label": "#95 S expand tail precheck (+ #92 #94, class 0)",
+   "lo": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "hi": "b50fc8abbbe05c2d152a8a473313975498f465b1",
+   "f": 92.56613260409517,
+   "own": {
+    "slg:C": 92.56613260409517
+   },
+   "spread": [],
+   "side": "lo-mid",
+   "timed": true,
+   "non_monotone": {
+    "slg:C": "lo-mid"
+   },
+   "_slg": {
+    "groups": [
+     "slg"
+    ],
+    "new": {
+     "A": {
+      "geo": 0.998047060699343,
+      "low": 0.9846203037860823,
+      "high": 1.0116569113397131,
+      "df": 9.976408914586289,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "B": {
+      "geo": 1.005682151479308,
+      "low": 0.9902665609477864,
+      "high": 1.021337718236229,
+      "df": 8.89970502011913,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "C": {
+      "geo": 1.0115394309760932,
+      "low": 0.9883108167386617,
+      "high": 1.0353139954452262,
+      "df": 8.724874441736445,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "D": {
+      "geo": 1.0107009675981504,
+      "low": 0.9954869403903013,
+      "high": 1.0261475107883695,
+      "df": 9.097813534861576,
+      "n": [
+       6,
+       6
+      ]
+     }
+    }
+   }
+  },
+  {
+   "step": 2,
+   "dir": "bisect-2",
+   "point": "55c06b5121d89b74338dede714ffa355c5a29426",
+   "label": "#91 S POD assign fast path",
+   "lo": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "hi": "33b198268257005976f73c2f8f0add28e58a68de",
+   "f": 68.03544203373269,
+   "own": {
+    "slg:C": 68.03544203373269
+   },
+   "spread": [],
+   "side": "lo-mid",
+   "timed": true,
+   "non_monotone": {
+    "slg:C": "lo-mid"
+   },
+   "_slg": {
+    "groups": [
+     "slg"
+    ],
+    "new": {
+     "A": {
+      "geo": 0.9822026625966158,
+      "low": 0.9598124878723683,
+      "high": 1.0051151475955438,
+      "df": 6.809085772939499,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "B": {
+      "geo": 1.0061034065432608,
+      "low": 0.9899410573334463,
+      "high": 1.022529631597041,
+      "df": 9.190973315201374,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "C": {
+      "geo": 1.0084684933104127,
+      "low": 0.9881958349664468,
+      "high": 1.0291570415638367,
+      "df": 8.639787318960334,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "D": {
+      "geo": 1.0159126376898595,
+      "low": 0.9828884652457942,
+      "high": 1.0500463927612298,
+      "df": 8.45097930838257,
+      "n": [
+       6,
+       6
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "range": {
+  "lo": "f8eebf46565c746a69ed64dbe9e406546032f892",
+  "hi": "55c06b5121d89b74338dede714ffa355c5a29426",
+  "lo_label": "anchor",
+  "hi_label": "#91 S POD assign fast path"
+ },
+ "status": "non_monotone",
+ "rules": {
+  "rule": "merge rules v2 (\u6027\u80fd\u4f18\u5316 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze the binaries of every first-parent commit between them are built and stored (--bisect), so a failing checkpoint is bisected in the same session",
+  "points": "anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are identical collapse into the earliest one (a point identical to the anchor or the head takes its value without timing)",
+  "step": "the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> (head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch and/or one SLG group, under the same start, environment and replacement rules",
+  "decision": "failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]",
+  "spread": "a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges",
+  "deferred": "\u6027\u80fd\u4f18\u5316 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head still give its value without timing, so a build costs no timed step",
+  "max_steps": 3,
+  "result": "hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported",
+  "non_monotone": "\u6027\u80fd\u4f18\u5316 2026-10-26 19:31Z (INT2: D5 regressed B, P4 recovered B and added C; f followed C and named P4): a step is non-monotone when a failed metric has its own m/r above 1.5 or below -0.5, or when the failed metrics fall on both sides of 0.5 and their m/r differ by 1 or more. The bisection still follows f, but a bisection with a non-monotone step names no single culprit: status non_monotone, every failed metric with its own side at the first such step, and the point f ends at; \u6027\u80fd\u4f18\u5316 decides"
+ },
+ "f_end": {
+  "commit": "55c06b5121d89b74338dede714ffa355c5a29426",
+  "label": "#91 S POD assign fast path"
+ },
+ "per_metric": {
+  "slg:C": {
+   "own": 92.56613260409517,
+   "lo": "f8eebf46565c746a69ed64dbe9e406546032f892",
+   "hi": "33b198268257005976f73c2f8f0add28e58a68de"
+  }
+ }
+}
