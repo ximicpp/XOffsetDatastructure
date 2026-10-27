@@ -19,7 +19,7 @@
 | Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20、C++23 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | 两种标准都是 101/101；语料全部接受，逐字节一致 |
 | Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | 101/101；语料全部接受，逐字节一致 |
 | Windows x64 | MinGW-w64 GCC 13.2（posix 线程） | C++20、C++23 | `-static`，云端用 wine 9.0 跑 CTest | 两种标准都是 101/101（需要 #119，见下）；语料全部接受，逐字节一致 |
-| macOS arm64 | Apple clang（Command Line Tools，系统 libc++） | C++20、C++23 | 待 Mac 队列非计时槽位（`run_native_macos.sh`） | 未运行 |
+| macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行 | 两种标准都是 101/101；语料全部接受，逐字节一致 |
 | iOS 模拟器 | Apple clang + iOS SDK | C++20 | 工具链文件已写（`ios-simulator.cmake`，经 `simctl spawn` 跑） | **阻塞：需要 Xcode**，Mac 上只有 Command Line Tools，没有 iOS SDK 和 simctl |
 | Windows x64 | MSVC | C++20 | 没有环境 | **未验证**，风险见下 |
 
