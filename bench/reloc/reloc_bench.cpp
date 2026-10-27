@@ -574,8 +574,9 @@ void string_cases() {
     for (int i = 0; i < S; ++i) xs.emplace_back();
     auto dig = [](const auto& v) { uint64_t g = 0; for (const auto& s : v) g = mix(g, hash_name(std::string_view(s))); return g; };
     // P passes per round, each assigning every string a source picked by (round, pass).
-    auto assign_case = [&](const char* n, const std::vector<std::string>& src) {
-        run_case(n, double(P) * S, "std::string", {
+    // primary is nullptr for a reported case.
+    auto assign_case = [&](const char* n, const std::vector<std::string>& src, const char* primary) {
+        run_case(n, double(P) * S, primary, {
             {"xoffset", [&](int r, uint64_t& d) {
                 const double t = timed(n, [&] {
                     for (int p = 0; p < P; ++p) {
@@ -596,13 +597,14 @@ void string_cases() {
                 d = dig(ss); return t; }},
         });
     };
-    assign_case("str.assign_short", shorts);
-    assign_case("str.assign_long", longs);
-    // Reported: the short values assigned like for like, into fresh strings
-    // (after str.assign_long, xs and ss hold heap strings). ".view": both sides
-    // assign from a std::string_view, the XOffset side as in assign_short.
-    // ".copy": both sides copy a string of their own type (std::string, or an
-    // XString in the same buffer).
+    // str.assign_short is reported: the XOffset side assigns a std::string_view,
+    // the std side copies a std::string (libc++ copies its 24-byte short form).
+    assign_case("str.assign_short", shorts, nullptr);
+    assign_case("str.assign_long", longs, "std::string");
+    // The short values assigned like for like, into fresh strings (after
+    // str.assign_long, xs and ss hold heap strings). ".view" (judged): both sides
+    // assign from a std::string_view. ".copy" (reported): both sides copy a string
+    // of their own type (std::string, or an XString in the same buffer).
     {
         std::vector<std::string> ss2(S);
         XBuffer xb2 = XBuffer::create<xm::StrVec2>(256 * 1024, cap());
@@ -610,7 +612,7 @@ void string_cases() {
         for (int i = 0; i < S; ++i) { xr.s.emplace_back(); xr.src.emplace_back(); }
         for (int i = 0; i < S; ++i) xr.src[i] = std::string_view(shorts[std::size_t(i)]);
         auto like_case = [&](const char* n, bool view) {
-            run_case(n, double(P) * S, nullptr, {
+            run_case(n, double(P) * S, view ? "std::string" : nullptr, {
                 {"xoffset", [&, n, view](int r, uint64_t& d) {
                     const double t = timed(n, [&] {
                         for (int p = 0; p < P; ++p) {
