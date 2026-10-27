@@ -1,7 +1,7 @@
 # 客户端目标可行性（K8，3.1.0）
 
 结论：服务端与客户端之间使用 XOffset，在 **Linux arm64** 和 **Windows x64（MinGW-w64 GCC 16）**
-上已验证（2026-10-21 GitHub CI；CI 停用后改为本地矩阵，见下一节）；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
+上已验证（2026-10-21 GitHub CI；CI 停用后改为本地矩阵，3.1.0 RC 五列全过，见下一节）；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
 服务端与客户端必须用同一 schema、同时发布（见产品定位）。
 
 ## 已验证（`.github/workflows/client-targets.yml`）
@@ -28,9 +28,9 @@ Windows 上需要注意的三点（都已在仓库里处理）：
 
 | 目标 | 在哪跑 | 编译器 | 最近结果 |
 | --- | --- | --- | --- |
-| Windows x64 | 云端 Linux，CTest 经 wine 运行 | 自建 MinGW-w64 GCC 16.2.0（`tools/build_mingw_toolchain.sh`，`cmake/toolchains/mingw-w64-x86_64.cmake`） | 2026-10-27：106 项 104 过、2 项跳过，语料逐字节一致 |
-| Linux arm64 | Mac M4 的 colima Linux 虚拟机，随 RC 检查点批次 | GCC 16（gcc:16 arm64 镜像按 digest 固定），有 arm64 包时加 P2996 | 待 RC 批次 |
-| Linux x86-64 | 云端 | GCC 16、P2996 | 2026-10-27：两者都 106/106，P2996 语料与参照逐字节一致 |
+| Windows x64 | 云端 Linux，CTest 经 wine 运行 | 自建 MinGW-w64 GCC 16.2.0（`tools/build_mingw_toolchain.sh`，`cmake/toolchains/mingw-w64-x86_64.cmake`） | 3.1.0 RC（e913d22）：107 项 105 过、2 项跳过，V2.1 语料逐字节一致 |
+| Linux arm64 | Mac M4 的 colima Linux 虚拟机（Linux 6.8 aarch64，4 KiB 页），随 Mac 检查点批次 | GCC 16（gcc:16 arm64 镜像按 digest 固定）、P2996 d77eff1 | 3.1.0 RC（e913d22）：两者都 107/107，V2.1 语料逐字节一致 |
+| Linux x86-64 | 云端 | GCC 16（写参照语料）、P2996 | 3.1.0 RC（e913d22）：两者都 107/107，P2996 语料与参照逐字节一致 |
 
 Windows 上跳过的两项是 `test_canonical_cold_no_callback` 和 `test_canonical_zero_target`：它们测的是
 每线程 owner 缓存，而 GCC 在 MinGW 上用 emutls，线程退出时访问 `thread_local` 会拿到新块，所以这类
