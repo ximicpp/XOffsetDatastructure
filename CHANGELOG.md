@@ -2,19 +2,21 @@
 
 ## Unreleased
 
-## 1.0.0: first release
+## 3.0.0: first release of the C++26 line
 
-`next_cpp26` at the G8 checkpoint plus the G9 fixes merged after it; the
-changes since 0.3.0-beta.1 are listed below. Same V2 wire format as
-0.3.0-beta.1 (its receivers accept the default `save_verified` emission;
-`zero_runs` wires need 1.0.0 receivers), same toolchains (P2996 Clang with
-libc++, or GCC 16 with libstdc++). Mac M4 at the G8 checkpoint (SLG M scale,
-six formats in one process, upper bound of the geometric mean, XOffset ÷
-zpp_bits): A 0.778, B 0.261, C 0.365; D (read-only report, tracked, not a
-goal) 1.589, and 1.383 against FlatBuffers. Known gaps: the G9 relocation
-tax is not closed, the D scenario is slower than zpp_bits and FlatBuffers,
-schema evolution is not supported, and iOS, Android and MSVC full builds are
-not verified (`docs/CLIENT_TARGETS.md`).
+The tags `v1.0.0` (2024) and `v2.0-*` belong to the two earlier
+implementations. This release is `next_cpp26` at the G8 checkpoint plus the
+G9 fixes merged after it; the changes since 0.3.0-beta.1 are listed below.
+Same V2 wire format as 0.3.0-beta.1 (its receivers accept the default
+`save_verified` emission; `zero_runs` wires need 3.0.0 receivers), same
+toolchains (P2996 Clang with libc++, or GCC 16 with libstdc++). Mac M4 at
+the G8 checkpoint (SLG M scale, six formats in one process, upper bound of
+the geometric mean, XOffset ÷ zpp_bits): A 0.778, B 0.261, C 0.365; D
+(read-only report, tracked, not a goal) 1.589, and 1.383 against
+FlatBuffers. Known gaps: the G9 relocation tax is not closed, the D scenario
+is slower than zpp_bits and FlatBuffers, schema evolution is not supported,
+and iOS, Android and MSVC full builds are not verified
+(`docs/CLIENT_TARGETS.md`).
 
 - Performance (G9 relocation tax; same wire bytes, same behavior):
   `XVector::push_back` restates `size_` after the general path; under Clang,
