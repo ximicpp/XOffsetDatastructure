@@ -211,6 +211,9 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 - 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
 - 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
   `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
+- 槽位空闲表、宿主空闲表和 owner 查找各有一份每线程缓存。GCC 编 MinGW/Cygwin 时 TLS 是
+  模拟的（emutls），线程退出时缓存可能先于析构被释放，所以这些目标上缓存关闭，全部走全局
+  结构（`XOFFSET_THREAD_CACHES` 默认 0，其他目标默认 1；Clang 编 MinGW 用原生 TLS，保留缓存）。
 - 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
   `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
 
