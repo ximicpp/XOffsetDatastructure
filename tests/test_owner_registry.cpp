@@ -186,6 +186,72 @@ void transfer_matrix() {
     check_registry_identity(first, 11); // last: save normalizes the explicit-growth buffer
 }
 
+// std::swap of two loaded buffers (the SLG writeback) is three moves into an
+// owner that holds nothing. It must leave the same owners, bytes, epochs and
+// registry identities as the member swap, and no host allocation.
+void std_swap_matches_member_swap() {
+    auto load = [](std::int64_t value) {
+        auto source = make_buffer(value);
+        return XBuffer::load_verified<RegistryRoot>(source.save_verified<RegistryRoot>(),
+            XBuffer::maximum_capacity(65536).with_growth(XGrowPolicy::Automatic));
+    };
+    auto a = load(31), b = load(32), c = load(31), d = load(32);
+    auto* base_a = a.get_address();
+    auto* base_b = b.get_address();
+    auto handle_a = a.handle<RegistryRoot>();
+    auto handle_b = b.handle<RegistryRoot>();
+    auto handle_c = c.handle<RegistryRoot>();
+    auto handle_d = d.handle<RegistryRoot>();
+    auto allocator_a = a.allocator<std::int64_t>();
+    auto allocator_b = b.allocator<std::int64_t>();
+    const auto epoch_a = a.epoch(), epoch_b = b.epoch();
+    const auto before = host_allocations.load(std::memory_order_relaxed);
+    std::swap(a, b);
+    c.swap(d);
+    assert(host_allocations.load(std::memory_order_relaxed) == before);
+    assert(a.get_address() == base_b && b.get_address() == base_a);
+    assert(a.root<RegistryRoot>().value == 32 && b.root<RegistryRoot>().value == 31);
+    // One invalidation per move: a and b each took part in two of the three.
+    assert(a.epoch() == epoch_a + 2 && b.epoch() == epoch_b + 2);
+    assert(bool(handle_a) == bool(handle_c) && bool(handle_b) == bool(handle_d));
+    assert(XBufferCore::owner_from_arena_noexcept(allocator_b.arena()) == &a);
+    assert(XBufferCore::owner_from_arena_noexcept(allocator_a.arena()) == &b);
+    assert(a.copy_bytes() == c.copy_bytes() && b.copy_bytes() == d.copy_bytes());
+    assert(a.growth_policy() == c.growth_policy() && b.growth_policy() == d.growth_policy());
+    assert(a.storage_kind() == c.storage_kind() && b.storage_kind() == d.storage_kind());
+    auto* p = a.allocator<std::int64_t>().allocate(1);
+    *p = 7;
+    a.allocator<std::int64_t>().deallocate(p, 1);
+    check_registry_identity(a, 32);
+    check_registry_identity(b, 31);
+
+    // A moved-from owner is empty, has the default state, and takes a new buffer.
+    XBuffer taken(std::move(a));
+    assert(taken.root<RegistryRoot>().value == 32);
+    assert(a.get_address() == nullptr && a.get_size() == 0);
+    assert(a.growth_policy() == XGrowPolicy::Explicit);
+    a = make_buffer(41);
+    assert(a.root<RegistryRoot>().value == 41);
+    check_registry_identity(a, 41);
+    check_registry_identity(taken, 32);
+
+    // The moved-from source never inherits the empty target's own state.
+    XBuffer target;
+    target.set_growth_policy(XGrowPolicy::Automatic);
+    auto source = load(51);
+    source.set_growth_policy(XGrowPolicy::Explicit);
+    target = std::move(source);
+    assert(target.root<RegistryRoot>().value == 51 && target.growth_policy() == XGrowPolicy::Explicit);
+    source.set_growth_policy(XGrowPolicy::Explicit);
+    source = std::move(target);
+    assert(target.growth_policy() == XGrowPolicy::Explicit && target.get_address() == nullptr);
+    XBuffer automatic;
+    automatic.set_growth_policy(XGrowPolicy::Automatic);
+    XBuffer plain(std::move(automatic));
+    assert(plain.growth_policy() == XGrowPolicy::Automatic);
+    assert(automatic.growth_policy() == XGrowPolicy::Explicit);
+}
+
 void many_owners_and_reused_addresses() {
     std::vector<XBuffer> buffers;
     buffers.reserve(1000);
@@ -248,6 +314,7 @@ int main(int argc, char** argv) {
     assert(argc == 1);
     registration_failure_preserves_owners();
     transfer_matrix();
+    std_swap_matches_member_swap();
     many_owners_and_reused_addresses();
     independent_threads();
 }

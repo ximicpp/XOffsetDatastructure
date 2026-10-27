@@ -487,6 +487,24 @@ int main() {
         p = base; // clearing the inline flag reinterprets the chars as a heap head
         p.payload[label1 + 15] = static_cast<char>(9);
         reject(build(p));
+        // Every length 0..10 against every byte position 0..10: a nonzero
+        // byte at or past the length is padding (rejected), one before it a
+        // character (accepted).
+        for (unsigned length = 0; length <= 10; ++length) {
+            for (unsigned at = 0; at < 11; ++at) {
+                p = base;
+                for (unsigned i = 0; i < 11; ++i) p.payload[label1 + 4 + i] = i < length ? 'a' : 0;
+                p.payload[label1 + 15] = static_cast<char>(0x80 | length);
+                p.payload[label1 + 4 + at] = 1;
+                if (at >= length) {
+                    reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+                } else {
+                    auto b = XBuffer::load_verified<CheckedRoot>(build(p));
+                    const auto& label = b.root<CheckedRoot>().labels[1];
+                    need(label.size() == length && label.c_str()[at] == 1, "inline character position rejected");
+                }
+            }
+        }
     }
 
     // ---- Sparse wire (extent_count != 0) -----------------------------------

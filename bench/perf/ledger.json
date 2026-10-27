@@ -261,6 +261,48 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：SR，SHIFT 搬动后重启内联容器头的两处改动，只动 xoffset_core_lifetime.hpp（+47/−15）。shift_rel32 改用 __builtin_add_overflow 加无分支的空值步长，溢出仍 std::terminate，结果与原 int64 检查逐位相同（MSVC 保留原写法）；逐成员重启改为 index_sequence 折叠并用文件内的 XOFFSET_DETAIL_SHIFT_INLINE 强制内联。不改 wire、布局签名、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 与 P2996 d77eff1 + libc++ 全部 65 个指标 head÷base 最大都是 1.0000（max_ratio 字段要求 > 1，取 1.0001）。声称的阶段：slg.B.season_edits GCC 16 0.9632、P2996 0.8413；slg.S.ticks_middle GCC 16 0.8374、P2996 0.8937；slg.B 合计 0.9857 / 0.9326。首轮门禁（base d924f24，head ac4ca46）时 bench/reloc 的 hero.*.ord 还不走 SHIFT，reloc 全为 1.0000；合入 #102 后在 base 7c8c6a1、head 374a0b7 上两种 Ir 门禁重跑，仍 pass 无警告，SLG 与 formal 各值不变，reloc 下降：hero.mid_erase.ord GCC 16 0.8997 / P2996 0.6139，hero.mid_insert.ord 0.9062 / 0.6295，hero.push_back_grow.ord 0.9934 / 0.9658，nested.build.ord 0.9966 / 0.9833；最大值 GCC 16 reloc.vec.push_back_grow 1.00002，P2996 1.0000。",
       "evidence": "PR #104 描述（两种 Ir 表与本地验证）；/mnt/project-files/pareto-rivals-20261024/round2/sr_validate/（sr_ac4ca46_REPORT.md、sr_ac4ca46_p2996_ctest_REPORT.md、sr_ac4ca46_gate_{gcc16,p2996}.json，新 base 重跑 on_7c8c6a1/）；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「SR」节",
       "approved_by": "「性能优化」19:58Z 10-26 判 S 类（susu 16:54Z 授权），414dea4 以来第 4 个 S 类（#59、#91、#95、#104）；逐成员强制内联在 Mac 上可能有摆放效应，列为下一次阶段复核的二分点"
+    },
+    {
+      "id": "s-class-pr114",
+      "pr": 114,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "class": "S",
+      "head": "7df534dc7b0f",
+      "base": "e46cf38190e1",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：Z2，verify_structural_wire_graph 的 WireValidationContext 改为默认初始化加 XOFFSET_INDETERMINATE（[[indeterminate]]，有 __has_cpp_attribute 时）再逐个赋值，去掉 GCC 16 对 1,136 字节上下文的整块清零（聚合初始化不管加不加属性都清零）。只改 xoffsetdatastructure.hpp（+20/−7）。不改 wire、校验和拒绝集合、分配位置、库的清零约定，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 slg.D.read 0.9240、A.req_decode 0.9701、A.res_decode 0.9817、slg.A 0.9904、slg.D 0.9240，其余 ≤ 1.0000；P2996 d77eff1 全部 1.0000（A.res_decode 0.9998）。valgrind memcheck（GCC 16 构建）test_wire_validation、test_error_paths、test_v2_fuzz 1 万例（含 10,212 个拒绝）0 错误；反向对照（prepare 不清内联位图）报 3 处，证明能看到。",
+      "evidence": "PR #114 描述；/mnt/project-files/zpp-parity-20261026/impl/z2/（LOCAL_VALIDATE_7df534d.md、gate_{gcc16,p2996}_7df534d.json、memcheck 日志、probe/p4.cpp）；方案文档 https://claude.ai/artifact/P77mo29Lr9HEH2ebUGSazS Z2 节",
+      "approved_by": "「实现 zpp_bits 对标优化 Z1–Z3」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；「性能优化」20:41Z 同意 Z1–Z3 分级并加 memcheck 条件）；414dea4 以来第 5 个 S 类（#59、#91、#95、#104、#114），触发阶段复核，CKPT2 单列二分点"
+    },
+    {
+      "id": "s-class-pr117",
+      "pr": 117,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0003,
+      "record_only": true,
+      "class": "S",
+      "head": "e26f0dfad64a",
+      "base": "e46cf38190e1",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：Z3，XBufferCore::move_from 在目标什么都不持有（无数据、无槽位、无池、无 owner 记录、无空闲表）时直接接管源的成员，源回到默认标量，不再经过 retire/重登记；move_from 改为 out of line（内联短路径会改变 GCC 16 reloc.map.find 等无关调用点的寄存器分配）。std::swap(XBuffer) P2996 1,080 -> 448 Ir。只改 xoffsetdatastructure.hpp（+32/−1）和 tests/test_owner_registry.cpp（std::swap 与成员 swap 等价测试）。不改 wire、epoch 语义、owner 登记、宿主 owner 发布、公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 formal.load 0.9366、formal.reload 0.9598、reloc.hero.push_back_grow 0.924/0.926、reloc.nested.build 0.932/0.933、slg.B 0.9973，最高 slg.A.simulate 1.0003；P2996 slg.B 0.9931、slg.C 0.9994，其余 1.0000。local_validate 在 e26f0df 上 8/8（gcc/asan/p2996 103/103，fuzz 42 万例 0 不一致，diff 40 万例一致）。",
+      "evidence": "PR #117 描述；/mnt/project-files/zpp-parity-20261026/impl/z3/（LOCAL_VALIDATE_e26f0df.md、gate_{gcc16,p2996}_e26f0df.json、swp.cpp）；方案文档 https://claude.ai/artifact/P77mo29Lr9HEH2ebUGSazS Z3 节",
+      "approved_by": "「实现 zpp_bits 对标优化 Z1–Z3」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；「性能优化」20:41Z 同意 Z1–Z3 分级）；414dea4 以来第 6 个 S 类（#59、#91、#95、#104、#114、#117），CKPT2 单列二分点"
+    },
+    {
+      "id": "int3-pr113",
+      "pr": 113,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0172,
+      "record_only": true,
+      "class": "L",
+      "head": "235dcda2e427",
+      "base": "e46cf38190e1",
+      "reason": "L 类合并（校验代码）：P4m，内联 XFixedString 的填充检查改为按长度查 11 项 constexpr 掩码表、两次掩码读取，去掉随长度变化的逐字节循环；接受和拒绝的 wire、错误信息、检查顺序不变；tests/test_wire_validation.cpp 加长度 0..10 × 位置 0..10 的穷举测试。只作记录，不放行任何指标。INT3 的独立 L2 点 G-P4m（235dcda 对 anchor e46cf38）判 pass：SLG A 0.944、B 0.972、C 0.992、D 0.994，最大上界 1.0049，formal 最大上界 1.0117；分阶段 A.req_decode 0.790、A.res_decode 0.860、B.in_decode 0.900、B.back_decode 0.974，B.back_encode 1.019 [1.010, 1.029]（Ir 持平，按代码布局只记录）。合在 b50fc8a（Z1–Z3 之后）上，试合点 0847879 的库 diff 与门禁时逐行相同；0847879 ÷ b50fc8a 两种 Ir 的最大 head÷base 是 1.0000；max_ratio 记的是下面 GCC 16 formal.load 的组合偏离 1.0172。两种 Ir 组合检查（新主线比值 ÷ 旧锚点比值）：P2996 全部在 0.0001 以内，P4m 省下的 Ir 两边相同，Mac 判定直接适用；GCC 16 formal.load 1.0172（0.8402 → 0.8547）、formal.reload 1.0149（0.9060 → 0.9195），超过 1.003，原因是 Z1–Z3 之后 GCC 把 validate_wire_value(XFixedString) 内联进 Attr 和 Record 两个向量校验，加 P4m 后只内联进 Attr，Record 路径比 b50fc8a 多约 15.5 万 Ir，P4m 在 GCC formal.load 上省 179 万而不是 211 万；对新主线仍无回退、无警告。GCC 的 Record 内联另开 S 类小项追。",
+      "evidence": "Mac INT3 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int3-e46cf38/VERDICT.md（sha 46d3c449，分阶段表 stages/p4m.md，P2996 ctest 103/103）；组合检查 /mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/int3-merge/IR_COMPOSE.md（sha a3e7b09b，函数级表）与同目录 p4m_0847879_*（local_validate 8/8、扩展差分 3×100 万 + ASan 20 万、两种门禁 json）；门禁点验证 validate/p4m_235dcda_*",
+      "approved_by": "「性能优化」（2026-10-27 00:20Z 交办先合 #113，00:58Z 同意 GCC 组合偏离后合并；L2 由「Mac 门禁批次」00:20Z 判 pass）"
     }
   ]
 }
