@@ -17,7 +17,7 @@ reader or migration path. Start with the [user guide](docs/USER_GUIDE.md) and
 the [deployment guide](docs/DEPLOYMENT.md), then read the
 [compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
 persisting or accepting wire data. [CHANGELOG.md](CHANGELOG.md) records each
-prerelease.
+release; [RELEASING.md](docs/RELEASING.md) is how one is made.
 
 ## Requirements
 

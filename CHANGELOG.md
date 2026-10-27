@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Documentation: `docs/RELEASING.md` is the fixed release procedure (Mac
+  checkpoint, local validation with TSan, the release PR, the three tag
+  commands); `docs/USER_GUIDE.md` 4.3 explains the two conventions behind the
+  A.apply / A.simulate gaps (one arena and free table per buffer; capacity
+  ships in the wire and is allocated exactly) and what callers can do about
+  them. `tools/local_validate.sh` gains a `tsan` step (GCC 16
+  RelWithDebInfo, `-fsanitize=thread`, full CTest), run by `--release` and
+  not by default.
 - Repository: the V1/VM-era documents (`docs/VM_*`, `docs/V1_*`,
   `docs/BOOST_*`, 32 files), `experiments/` (126 files) and the root
   `HANDOFF*.md` / `PROMPT_MAC_20261020.md` left the tree;
