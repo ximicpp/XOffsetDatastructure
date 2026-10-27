@@ -112,7 +112,7 @@ void compare_small_reload_off(const std::string& w, const std::string& id) {
     if (on != off) fail("case " + id + ": small reload path on and off differ");
     std::uint64_t used = 0, extents = 0;
     if (w.size() >= 96) { std::memcpy(&used, w.data() + 16, 8); std::memcpy(&extents, w.data() + 88, 8); }
-    small_reload_eligible += w.size() >= 96 && used <= 4096 && extents == 0;
+    small_reload_eligible += w.size() >= 96 && used <= 32768 && extents == 0;
     ++small_reload_compared;
 }
 
