@@ -130,8 +130,9 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 
 Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
 same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
-`XOffset::storage`, and use CMake 3.13+. Prerelease packages reject numeric, `EXACT`
-and range version requests; check the complete version string as above.
+`XOffset::storage`, and use CMake 3.13+. Packages reject numeric, `EXACT` and
+range version requests (no release promises compatibility with another one);
+check the complete version string as above.
 
 For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
 and link the same target. Subprojects default tests, tools, examples and install
