@@ -1,0 +1,21 @@
+== 2026-10-27T09:45:20Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: e383aef (v3.0.0; library identical to 30af216, CKPT3 pass)
+== 2026-10-27T09:45:38Z 1. export
+head e913d220d1f42bf90883396e63286651ba50a352 tree 71354565c4268712a16b8dcdc2a30214b3993f93 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc e383aef51d6983a753d86f6840308c01c45b5a2e tree fca89ecb77a98211402c702e1c4a82561f79ef4e typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+/Volumes/XOffsetCS/perf-gate/src/int4/head-e913d22/bench/slg/MANIFEST: 23 files match
+== 2026-10-27T09:45:43Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+sc anc: bincache sc-fca89ecb77a9-metar3-p2996-d77eff1-8ba92475
+slg anc: bincache slg-fca89ecb77a9-0dd0a31ed104-p2996-d77eff1-5afc2985
+== 2026-10-27T09:46:12Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	e913d220d1f42bf90883396e63286651ba50a352	a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3	671c18b27b019d73230be58c83abdcfc8ae194195eba047e4ecfc63bf3efa66d	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	e383aef51d6983a753d86f6840308c01c45b5a2e	328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9	8de2ed6446045d50dfebcfff9030df73a86be894780c7508c019792085118e76	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+STOP: gate_sml head exit 1
+== 2026-10-27T09:46:26Z finish rc=2
