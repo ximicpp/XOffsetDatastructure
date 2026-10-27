@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-SPEC = importlib.util.spec_from_file_location("alpha_release", Path(__file__).resolve().parents[1] / "prepare_alpha_release.py")
+SPEC = importlib.util.spec_from_file_location("release", Path(__file__).resolve().parents[1] / "prepare_release.py")
 A = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(A)
 
@@ -82,9 +82,9 @@ class ReleaseArchiveTests(unittest.TestCase):
         payload["share/XOffsetDatastructure/VERSION"] = (A.VERSION + "\n").encode()
         config = {
             "XOffsetDatastructure_VERSION": '"' + A.VERSION + '"',
-            "XOffsetDatastructure_VERSION_NUMERIC": '"0.2.0"',
-            "XOffsetDatastructure_VERSION_PRERELEASE": '"alpha.1"',
-            "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
+            "XOffsetDatastructure_VERSION_NUMERIC": '"' + A.VERSION_NUMERIC + '"',
+            "XOffsetDatastructure_VERSION_PRERELEASE": '"' + A.VERSION_PRERELEASE + '"',
+            "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if A.VERSION_PRERELEASE else "FALSE",
             "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
             "XOffsetDatastructure_full_FOUND": "ON" if component == "full" else "OFF",
             "XOffsetDatastructure_storage_FOUND": "TRUE",

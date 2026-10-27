@@ -1,4 +1,5 @@
-# Numeric requests, including EXACT and ranges, cannot select a prerelease identity.
+# Numeric requests, including EXACT and ranges, are refused: they cannot select a
+# prerelease identity, and no release promises compatibility with another one.
 # Use an unversioned find_package(... CONFIG REQUIRED), then compare
 # XOffsetDatastructure_VERSION with the complete VERSION string using STREQUAL.
 # No cross-release API, ABI or wire compatibility is implied.
