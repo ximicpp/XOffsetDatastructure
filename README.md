@@ -24,17 +24,24 @@ release; [RELEASING.md](docs/RELEASING.md) is how one is made.
 | Use | Requirements |
 | --- | --- |
 | Full library, `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
+| Client build, field-list backend (3.2, unreleased) | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC; Apple clang pending); one `XOFFSET_RECORD` line per record; CMake 3.30+; 64-bit little-endian target |
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
-Ordinary C++26 support does not imply P2996 support. The full API has no
-non-reflection fallback. The supported compilers are the Bloomberg clang-p2996
+Ordinary C++26 support does not imply P2996 support. In 3.1.0 the full API has
+no non-reflection fallback. Since the field-list backend was merged (3.2,
+unreleased), clients (Windows, Android, iOS) build the same library with
+C++20/C++23 and a one-line field list per record
+([user guide 2.1](docs/USER_GUIDE.md#21-字段表xoffset_record)); servers keep
+C++26 reflection, which also checks each field list, and both builds write the
+same wire bytes ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)). The supported
+reflection compilers are the Bloomberg clang-p2996
 fork pinned in [toolchains/README.md](toolchains/README.md) and GCC 16 (CI uses
 the official `gcc:16` image, GCC 16.2.0, pinned by digest). CI checks that both
 compilers produce byte-identical wires from the same source and accept each
 other's wires.
-Native Windows full-library support is not established; the tested Windows
-target is storage only.
+Native Windows (MSVC, clang-cl) runs the full library only through the
+field-list backend; the reflection builds do not support it.
 
 The source archive includes the locked TypeLayout and ten Boost header modules.
 Full installed packages include the same dependency headers. Neither package
@@ -149,14 +156,15 @@ validation (`tools/local_validate.sh`) and the local platform matrix
 
 | Environment | V2 result | Boundary |
 | --- | --- | --- |
-| 3.1.0 RC `e913d22` (format 2.1), local platform matrix: Linux x86_64 GCC 16 and P2996, Linux arm64 GCC 16 and P2996 (colima on Apple M4), Windows x64 MinGW-w64 GCC 16.2 (wine) | Full CTest 107/107 on each Linux column; Windows 105 pass, 2 skipped by design; 2.1 wire corpus byte-identical across all five | Functional only, no timing; MSVC, clang-cl, Android and iOS cannot build the library ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
+| 3.1.0 RC `e913d22` (format 2.1), local platform matrix: Linux x86_64 GCC 16 and P2996, Linux arm64 GCC 16 and P2996 (colima on Apple M4), Windows x64 MinGW-w64 GCC 16.2 (wine) | Full CTest 107/107 on each Linux column; Windows 105 pass, 2 skipped by design; 2.1 wire corpus byte-identical across all five | Functional only, no timing; MSVC, clang-cl, Android and iOS cannot build 3.1.0 (see the field-list row) |
+| Field-list backend, `next_cpp26` after #149 (3.2, unreleased), `tools/native_targets.sh`: Android arm64 NDK r29/r30 (qemu), Windows x64 MSVC 19.44 C++20/C++23, clang-cl 19 and MinGW GCC 13.2 (wine) | Release CTest 106/106 on each; all 6 reference wires from the GCC 16 C++26 reflection build accepted, written corpus byte-identical | Functional only; iOS waits for Xcode; not yet a core guarantee (K8, [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
 | macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
 | Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
 | Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No x86_64 performance comparison with P2996 Clang (cloud GCC timing is reference only) |
 | Linux arm64 VM on Apple M4 (colima vz), GCC 16.2.0 vs clang-p2996 `d77eff1` | Release CTest 98/98 with both; per-cycle state and wire bytes identical across the two compilers; SLG A–C xoffset÷baseline ≤ 0.50 under GCC in both batches (reference only) | GCC÷Clang wall-clock has no verdict: both allowed batches were invalid by their A/A and bridge rules; directions in [docs/perf/gcc16-20261026](docs/perf/gcc16-20261026/README.md) (2026-10-26) |
 | Linux arm64 (native runner), GCC 16 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | CI is the record ([client-targets.yml](.github/workflows/client-targets.yml)) |
-| Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | MSVC full P2996 unverified; Android and iOS not feasible yet ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
-| Native Windows x64, MSVC | storage only (V1-era record) | MSVC full P2996 unverified |
+| Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | No reflection compiler for MSVC, Android or iOS; those clients use the field-list backend (row above) |
+| Native Windows x64, MSVC | storage only (V1-era record) | Full library through the field-list backend only (row above) |
 
 V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
 ASan+UBSan) with zero disagreements. Earlier V1-era platform records
@@ -223,4 +231,6 @@ A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
 core guarantees (K0–K7, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to
-another address, process or machine) and which interfaces they cover.
+another address, process or machine) and which interfaces they cover. K8,
+native client builds sharing one library and one wire with the servers, is a
+target that is being implemented, not yet a guarantee.
