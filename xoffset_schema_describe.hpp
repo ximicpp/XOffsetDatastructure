@@ -1,6 +1,13 @@
 #ifndef X_OFFSET_SCHEMA_DESCRIBE_HPP
 #define X_OFFSET_SCHEMA_DESCRIBE_HPP
 
+// XOFFSET_RECORD's __VA_ARGS__ walk needs the conforming preprocessor; MSVC's
+// traditional one passes the list as one argument (the CMake targets add
+// /Zc:preprocessor themselves).
+#if defined(_MSC_VER) && !defined(__clang__) && (!defined(_MSVC_TRADITIONAL) || _MSVC_TRADITIONAL)
+#error "XOffset field lists need MSVC's conforming preprocessor: compile with /Zc:preprocessor"
+#endif
+
 // Field-list backend of the schema field interface (see xoffset_schema.hpp),
 // and the XOFFSET_RECORD macros that write the field lists.
 //

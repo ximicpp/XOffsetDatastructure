@@ -4831,49 +4831,53 @@ namespace XOffsetDatastructure {
             return reflected_members_wire_admitted_impl<T>();
         }
 
+        // A function template rather than a lambda in the static member's
+        // initializer: MSVC instantiates the discarded if-constexpr branches of
+        // a non-generic lambda (C2825 on CleanT::key_type for CleanT = char).
+        template <typename CleanT>
+        consteval bool compute_v1_wire_admitted() {
+            if constexpr (!is_byte_copy_safe_v<CleanT>) {
+                return false;
+            } else if constexpr (std::is_reference_v<CleanT> ||
+                                 std::is_pointer_v<CleanT> ||
+                                 std::is_member_pointer_v<CleanT> ||
+                                 std::is_union_v<CleanT>) {
+                return false;
+            } else if constexpr (std::is_array_v<CleanT>) {
+                return is_v1_wire_admitted_impl<std::remove_extent_t<CleanT>>::value;
+            } else if constexpr (fixed_size_scalar<CleanT>) {
+                return true;
+            } else if constexpr (std::is_enum_v<CleanT>) {
+                return fixed_size_scalar<std::underlying_type_t<CleanT>>;
+            } else if constexpr (is_fixed_string_v<CleanT>) {
+                return std::is_same_v<CleanT, XFixedString> || std::is_same_v<CleanT, XString>;
+            } else if constexpr (is_fixed_flat_map_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedFlatMap<typename CleanT::key_type, typename CleanT::mapped_type>> ||
+                        std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::key_type>::value &&
+                    is_v1_wire_admitted_impl<typename CleanT::mapped_type>::value;
+            } else if constexpr (is_fixed_flat_set_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedFlatSet<typename CleanT::value_type>> ||
+                        std::is_same_v<CleanT, XSet<typename CleanT::value_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
+            } else if constexpr (is_fixed_vector_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedVector<typename CleanT::value_type>> ||
+                        std::is_same_v<CleanT, XVector<typename CleanT::value_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
+            } else if constexpr (std::is_class_v<CleanT>) {
+                return alignof(CleanT) <= 8 &&
+                    std::is_standard_layout_v<CleanT> &&
+                    !std::is_polymorphic_v<CleanT> &&
+                    schema::base_count_v<CleanT> == 0 &&
+                    reflected_members_wire_admitted<CleanT>();
+            } else {
+                return false;
+            }
+        }
+
         template <typename T>
         struct is_v1_wire_admitted_impl {
-            using CleanT = std::remove_cv_t<T>;
-
-            static constexpr bool value = []() consteval {
-                if constexpr (!is_byte_copy_safe_v<CleanT>) {
-                    return false;
-                } else if constexpr (std::is_reference_v<CleanT> ||
-                                     std::is_pointer_v<CleanT> ||
-                                     std::is_member_pointer_v<CleanT> ||
-                                     std::is_union_v<CleanT>) {
-                    return false;
-                } else if constexpr (std::is_array_v<CleanT>) {
-                    return is_v1_wire_admitted_impl<std::remove_extent_t<CleanT>>::value;
-                } else if constexpr (fixed_size_scalar<CleanT>) {
-                    return true;
-                } else if constexpr (std::is_enum_v<CleanT>) {
-                    return fixed_size_scalar<std::underlying_type_t<CleanT>>;
-                } else if constexpr (is_fixed_string_v<CleanT>) {
-                    return std::is_same_v<CleanT, XFixedString> || std::is_same_v<CleanT, XString>;
-                } else if constexpr (is_fixed_flat_map_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedFlatMap<typename CleanT::key_type, typename CleanT::mapped_type>> ||
-                            std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::key_type>::value &&
-                        is_v1_wire_admitted_impl<typename CleanT::mapped_type>::value;
-                } else if constexpr (is_fixed_flat_set_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedFlatSet<typename CleanT::value_type>> ||
-                            std::is_same_v<CleanT, XSet<typename CleanT::value_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
-                } else if constexpr (is_fixed_vector_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedVector<typename CleanT::value_type>> ||
-                            std::is_same_v<CleanT, XVector<typename CleanT::value_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
-                } else if constexpr (std::is_class_v<CleanT>) {
-                    return alignof(CleanT) <= 8 &&
-                        std::is_standard_layout_v<CleanT> &&
-                        !std::is_polymorphic_v<CleanT> &&
-                        schema::base_count_v<CleanT> == 0 &&
-                        reflected_members_wire_admitted<CleanT>();
-                } else {
-                    return false;
-                }
-            }();
+            static constexpr bool value = compute_v1_wire_admitted<std::remove_cv_t<T>>();
         };
 
         template <typename T>
@@ -5340,29 +5344,31 @@ namespace XOffsetDatastructure {
                     reflected_member_needs_validation<T, N + 1>();
             }
         }
+        // See compute_v1_wire_admitted.
+        template <typename CleanT>
+        consteval bool compute_wire_value_needs_validation() {
+            if constexpr (!v1_wire_admitted<CleanT>()) {
+                return true; // conservative for non-admitted/detail callers
+            } else if constexpr (std::is_same_v<CleanT, bool>) {
+                return true; // representation bytes must still be checked
+            } else if constexpr (std::is_array_v<CleanT>) {
+                return wire_value_needs_validation<std::remove_extent_t<CleanT>>::value;
+            } else if constexpr (fixed_size_scalar<CleanT> || std::is_enum_v<CleanT>) {
+                return false; // enum values were not range-checked by V1
+            } else if constexpr (is_fixed_string_v<CleanT> || is_fixed_vector_v<CleanT> ||
+                                 is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT>) {
+                return true; // also covers sorted-key checks and empty bindings
+            } else if constexpr (std::is_class_v<CleanT>) {
+                // Admitted classes have no bases. Non-admitted classes took
+                // the conservative branch above, retaining their old walk.
+                return reflected_member_needs_validation<CleanT>();
+            } else {
+                return true;
+            }
+        }
         template <typename T>
         struct wire_value_needs_validation {
-            using CleanT = std::remove_cv_t<T>;
-            static constexpr bool value = []() consteval {
-                if constexpr (!v1_wire_admitted<CleanT>()) {
-                    return true; // conservative for non-admitted/detail callers
-                } else if constexpr (std::is_same_v<CleanT, bool>) {
-                    return true; // representation bytes must still be checked
-                } else if constexpr (std::is_array_v<CleanT>) {
-                    return wire_value_needs_validation<std::remove_extent_t<CleanT>>::value;
-                } else if constexpr (fixed_size_scalar<CleanT> || std::is_enum_v<CleanT>) {
-                    return false; // enum values were not range-checked by V1
-                } else if constexpr (is_fixed_string_v<CleanT> || is_fixed_vector_v<CleanT> ||
-                                     is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT>) {
-                    return true; // also covers sorted-key checks and empty bindings
-                } else if constexpr (std::is_class_v<CleanT>) {
-                    // Admitted classes have no bases. Non-admitted classes took
-                    // the conservative branch above, retaining their old walk.
-                    return reflected_member_needs_validation<CleanT>();
-                } else {
-                    return true;
-                }
-            }();
+            static constexpr bool value = compute_wire_value_needs_validation<std::remove_cv_t<T>>();
         };
         template <typename T>
         inline constexpr bool wire_value_needs_validation_v = wire_value_needs_validation<T>::value;

@@ -292,6 +292,12 @@ foreach(entry IN LISTS XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS)
     set_tests_properties(schema_describe_${variant}_fail PROPERTIES
         LABELS "schema" PASS_REGULAR_EXPRESSION "${diagnostic}")
 endforeach()
+# MSVC stops at the duplicate's redefinition of the generated field type,
+# before the static assertion; that error names the duplicated member.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set_tests_properties(schema_describe_duplicate_fail PROPERTIES PASS_REGULAR_EXPRESSION
+        "list every member once, in declaration order;fields<sdf::Neg>::field_a': 'struct' type redefinition")
+endif()
 
 # Without reflection, raw receive of an enum without a fixed underlying type
 # must fail the build clearly (test_receive_raw runs these enums only in C++26).
