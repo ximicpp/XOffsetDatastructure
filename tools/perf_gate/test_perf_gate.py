@@ -129,6 +129,7 @@ def main():
     expect("a record-only scenario entry above 2% needs no susu", rc == 0)
 
     expect("callgrind runs with glibc's rep-movsb path off", "x86_rep_movsb_threshold" in pg.IR_ENV["GLIBC_TUNABLES"])
+    expect("callgrind runs with glibc's rep-stosb path off", "x86_rep_stosb_threshold" in pg.IR_ENV["GLIBC_TUNABLES"])
 
     rc, out = run_case(tree(), ledger_head=[entry(max_ratio=1.03)])
     expect("scenario-level entry above 2% without susu fails", rc == 1 and any("susu" in x for x in out["failures"]))

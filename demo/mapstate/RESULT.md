@@ -20,8 +20,8 @@ it. Both run the same validator and send the same bytes.
 | Same bytes as before the iteration | self-test chain, 100 units x 300 ticks and 10000 x 200, against the same chain built from d58781e's schema | last result digests `ad708058dafcb733` and `6b38b6eb73627adc` in both |
 | Library, local validation (the project does not use GitHub CI) | GCC 16.2 Docker: full CTest Debug, full CTest ASan+UBSan, validation differential d58781e vs `7dc7f58` (200,000 cases, seeds 1 and 2) | Debug 88 / 88, ASan+UBSan 88 / 88, differential identical outcomes (no library file changes) |
 | Window client, headless display | cloud Xvfb, GCC 16, 10000 units, `--auto-drag --check` (commit `d8328f1`, before the iteration) | screenshots at frames 60 / 180 / 420 show units moving, the event-driven name changes and another area after the drag; `direct_read` 69 / 69 snapshots (32,441 records and names in the live buffer). The reuse-mode window client is only syntax-checked in the cloud (no X11 / GL headers); it is built and run on the Mac |
-| Same bytes across compiler and platform | Apple M4 Mac, clang-p2996 d77eff1, arm64, against the cloud GCC 16 x86-64 run (`MAPDEMO_COMPARE`) | pending: Mac step file `slg-demo-20261022/review-20261024/MAC_STEPS_DEMO_REVIEW.md` |
-| Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | pending: same Mac step file |
+| Same bytes across compiler and platform | Apple M4 Mac, clang-p2996 d77eff1, arm64, against the cloud GCC 16 x86-64 run (`MAPDEMO_COMPARE`) | deferred (Mac queue, 10-26): Mac step file `slg-demo-20261022/review-20261024/MAC_STEPS_DEMO_REVIEW.md`, not yet queued |
+| Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | deferred (Mac queue, 10-26): same Mac step file |
 | Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
 
 Cloud numbers are smoke numbers on a shared VM: they show the shape of the
@@ -132,7 +132,7 @@ Observations (cloud, smoke):
   `fresh`. The requests after it are cheap again.
 - A's checks (reference model, `a.check_us`) run outside every timed path.
 
-Formal Mac timing (Apple M4, clang-p2996 d77eff1): pending, see the status table above.
+Formal Mac timing (Apple M4, clang-p2996 d77eff1): deferred (Mac queue), see the status table above.
 
 ## 4. Client direct read and buffer lifetime
 

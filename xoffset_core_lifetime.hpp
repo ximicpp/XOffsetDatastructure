@@ -9,6 +9,14 @@
 #include <exception>
 #include <new>
 
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_SHIFT_INLINE __forceinline
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_SHIFT_INLINE inline __attribute__((always_inline))
+#else
+#define XOFFSET_DETAIL_SHIFT_INLINE inline
+#endif
+
 namespace XOffsetDatastructure::detail {
 
 // The receive future gate checks the COMPLETE surface, real reflected fields
@@ -178,17 +186,30 @@ consteval bool shift_relocate_supported() {
 
 // Heads live in one bounded arena, so a rebased delta stays in rel32 range;
 // an impossible overflow ends the program as set_rel32 in a noexcept relocation does.
+// A null delta stays null; otherwise the exact int32 sum, without a branch on
+// null (heads mix bound and empty containers).
 inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept {
-    if (delta == 0) return 0;
-    const std::int64_t moved = std::int64_t(delta) + shift;
-    if (moved < (std::numeric_limits<std::int32_t>::min)() ||
-        moved > (std::numeric_limits<std::int32_t>::max)()) [[unlikely]] std::terminate();
-    return static_cast<std::int32_t>(moved);
+    const std::int32_t step = delta != 0 ? shift : 0;
+    std::int32_t moved;
+#if defined(__GNUC__) || defined(__clang__)
+    if (__builtin_add_overflow(delta, step, &moved)) [[unlikely]] std::terminate();
+#else
+    const std::int64_t wide = std::int64_t(delta) + step;
+    if (wide < (std::numeric_limits<std::int32_t>::min)() ||
+        wide > (std::numeric_limits<std::int32_t>::max)()) [[unlikely]] std::terminate();
+    moved = static_cast<std::int32_t>(wide);
+#endif
+    return moved;
 }
 
-// `shift` = old address - new address, so each delta grows by it.
+template<class T, std::size_t... I>
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+                                                    std::index_sequence<I...>) noexcept;
+
+// `shift` = old address - new address, so each delta grows by it. Forced
+// inline down to the heads: one moved element is a few loads and stores.
 template<class T>
-void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
         // Descriptor layout {arena_delta, data_delta, size_, capacity_} is
         // checked by raw_descriptor_layout<T>() in shift_rebase_domain.
@@ -202,7 +223,7 @@ void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
         bool inline_bytes = false;
         if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XFixedString::inline_flag) != 0;
         object->arena_delta = shift_rel32(arena_delta, shift);
-        object->data_delta = inline_bytes ? data_delta : shift_rel32(data_delta, shift);
+        object->data_delta = shift_rel32(data_delta, inline_bytes ? 0 : shift);
         object->size_ = size;
         object->capacity_ = capacity;
     } else if constexpr (std::is_array_v<T>) {
@@ -211,13 +232,22 @@ void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 shift_rebase_inline_value<E>(address + i * sizeof(E), shift);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        static_for<schema::member_count_v<T>>([&](auto index) {
-            using member = schema::member_t<T, decltype(index)::value>;
-            using M = typename member::type;
-            if constexpr (raw_needs_activation<M>())
-                shift_rebase_inline_value<M>(address + member::offset, shift);
-        });
+        shift_rebase_members<T>(address, shift, std::make_index_sequence<schema::member_count_v<T>>{});
     }
+}
+
+template<class T, std::size_t I>
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, std::int32_t shift) noexcept {
+    using member = schema::member_t<T, I>;
+    using M = typename member::type;
+    if constexpr (raw_needs_activation<M>())
+        shift_rebase_inline_value<M>(address + member::offset, shift);
+}
+
+template<class T, std::size_t... I>
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+                                                    std::index_sequence<I...>) noexcept {
+    (shift_rebase_member<T, I>(address, shift), ...);
 }
 
 template<class T>
@@ -596,3 +626,5 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
 }
 
 } // namespace XOffsetDatastructure::detail
+
+#undef XOFFSET_DETAIL_SHIFT_INLINE
