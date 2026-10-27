@@ -2,7 +2,7 @@ function(add_xoffset_test test_name test_label)
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
     xoffset_enable_test_assertions(${test_name})
-    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
+    add_test(NAME ${test_name} COMMAND ${test_name})
     set_tests_properties(${test_name} PROPERTIES LABELS "${test_label}")
 endfunction()
 
@@ -18,7 +18,7 @@ foreach(test_name ${STORAGE_TESTS})
         RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
     target_link_libraries(${test_name} PRIVATE XOffset::storage)
     xoffset_enable_test_assertions(${test_name})
-    add_test(NAME ${test_name} COMMAND $<TARGET_FILE:${test_name}>)
+    add_test(NAME ${test_name} COMMAND ${test_name})
     set_tests_properties(${test_name} PROPERTIES LABELS "storage")
 endforeach()
 
@@ -130,18 +130,18 @@ foreach(fuzz_target v2_wire wire_schemas)
         target_compile_definitions(${replay} PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
     endif()
     add_test(NAME ${replay}
-        COMMAND $<TARGET_FILE:${replay}> "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/${fuzz_target}")
+        COMMAND ${replay} "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/${fuzz_target}")
     set(replay_seeds "${CMAKE_CURRENT_BINARY_DIR}/replay-seeds/${fuzz_target}")
-    add_test(NAME ${replay}_seeds COMMAND $<TARGET_FILE:${replay}> --write-seeds "${replay_seeds}")
-    add_test(NAME ${replay}_corpus COMMAND $<TARGET_FILE:${replay}> "${replay_seeds}")
+    add_test(NAME ${replay}_seeds COMMAND ${replay} --write-seeds "${replay_seeds}")
+    add_test(NAME ${replay}_corpus COMMAND ${replay} "${replay_seeds}")
     set_tests_properties(${replay} ${replay}_seeds ${replay}_corpus PROPERTIES LABELS "reflection;replay")
     set_tests_properties(${replay}_seeds PROPERTIES FIXTURES_SETUP ${replay}_seeds)
     set_tests_properties(${replay}_corpus PROPERTIES FIXTURES_REQUIRED ${replay}_seeds)
 endforeach()
 
 # test_v2_fuzz --replay reruns one case alone; it must match the full run.
-add_test(NAME test_v2_fuzz_replay COMMAND $<TARGET_FILE:test_v2_fuzz> --replay 20261021 17)
-add_test(NAME test_v2_fuzz_replay_boundary COMMAND $<TARGET_FILE:test_v2_fuzz> --replay 20261021 b302)
+add_test(NAME test_v2_fuzz_replay COMMAND test_v2_fuzz --replay 20261021 17)
+add_test(NAME test_v2_fuzz_replay_boundary COMMAND test_v2_fuzz --replay 20261021 b302)
 set_tests_properties(test_v2_fuzz_replay test_v2_fuzz_replay_boundary PROPERTIES LABELS "reflection")
 
 # Observe process exit after main() returns: these exercise global/static
@@ -155,7 +155,7 @@ set(VM_EXIT_MODES
 )
 foreach(exit_mode ${VM_EXIT_MODES})
     add_test(NAME test_vm_lifecycle_${exit_mode}
-        COMMAND $<TARGET_FILE:test_vm_lifecycle> --exit-${exit_mode})
+        COMMAND test_vm_lifecycle --exit-${exit_mode})
     set_tests_properties(test_vm_lifecycle_${exit_mode} PROPERTIES LABELS "reflection;lifecycle")
 endforeach()
 
@@ -167,7 +167,7 @@ set(SHIFT_OVERFLOW_MODES
 )
 foreach(overflow_mode ${SHIFT_OVERFLOW_MODES})
     add_test(NAME test_shift_relocate_overflow-${overflow_mode}
-        COMMAND $<TARGET_FILE:test_shift_relocate> --overflow-${overflow_mode})
+        COMMAND test_shift_relocate --overflow-${overflow_mode})
     set_tests_properties(test_shift_relocate_overflow-${overflow_mode} PROPERTIES LABELS "reflection")
 endforeach()
 
@@ -180,7 +180,7 @@ set(REGISTRY_FAILURE_MODES
 )
 foreach(failure_mode ${REGISTRY_FAILURE_MODES})
     add_test(NAME test_owner_registry_${failure_mode}
-        COMMAND $<TARGET_FILE:test_owner_registry> --${failure_mode})
+        COMMAND test_owner_registry --${failure_mode})
     set_tests_properties(test_owner_registry_${failure_mode} PROPERTIES LABELS "reflection;registry")
 endforeach()
 

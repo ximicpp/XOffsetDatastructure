@@ -60,11 +60,11 @@ void outputs_agree(const std::string& want, Compose&& compose, const std::string
     need(stale == want, where + ": composed wire differs (stale output)");
     compose(stale);                                       // reused capacity
     need(stale == want, where + ": composed wire differs (reused output)");
-    std::string near;                                     // runs out at the end
-    near.reserve(want.size() - 1);
-    near.assign(near.capacity(), char(0x5A));
-    compose(near);
-    need(near == want, where + ": composed wire differs (near-miss output)");
+    std::string near_miss;                                // runs out at the end
+    near_miss.reserve(want.size() - 1);
+    near_miss.assign(near_miss.capacity(), char(0x5A));
+    compose(near_miss);
+    need(near_miss == want, where + ": composed wire differs (near-miss output)");
 }
 
 template <class F>
