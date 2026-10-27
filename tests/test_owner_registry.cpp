@@ -118,6 +118,9 @@ void ordinary_registration_allocates_only_its_record() {
     // owners are live.
     std::vector<XBuffer> owners;
     owners.reserve(128);
+    // The thread's first owner registers its thread_local caches; bionic's
+    // __cxa_thread_atexit_impl allocates that node with operator new.
+    { auto warm = make_buffer(-1); }
     for (unsigned i = 0; i < 128; ++i) {
         fail_host_allocation_after = 1;
         owners.push_back(make_buffer(i));
