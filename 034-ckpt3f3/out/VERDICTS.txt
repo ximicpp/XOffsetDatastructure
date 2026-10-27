@@ -1,0 +1,2 @@
+CKPT3 with formal-3 pass
+screen watcher: 13 calls (dark.log)

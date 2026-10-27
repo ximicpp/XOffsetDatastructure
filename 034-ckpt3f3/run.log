@@ -1,0 +1,8 @@
+== 2026-10-27T06:45:34Z 0. checks
+== 2026-10-27T06:45:34Z 1. formal-3
+== formal-3 start 2026-10-27T06:45:34+00:00 {'waited_s': 241.0, 'load1': 2.36, 'quiet_s': 240.9, 'screen': {'WindowServer': 3.8, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-3: this batch alone: max UB head/anchor 1.0110, A/A ok True, old 11/12, cpu {'samples': 256, 'other_busy_samples': 3, 'compile_samples': 0, 'other_busy_top': {'Claude Helper (Renderer)': 3}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 3.33}  (the gate verdict needs the pooled batches: run analyze)
+== 2026-10-27T06:58:14Z 2. analyze, formal-1 excluded
+RESULT.json / RESULT.md written: verdict pass
+CKPT3 (formal-2 + formal-3, SLG group 1): pass
+== 2026-10-27T06:58:15Z finish rc=0
