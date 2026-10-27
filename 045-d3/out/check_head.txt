@@ -1,0 +1,27 @@
+d3_probe check-head: 2048 reads per cell and round, 3 rounds (+1 warm-up)
+  cycle 1: 512 reports, bytes per report xoffset 712 flatbuffers 587, max used 2032 B, wires with holes 0
+  cycle 10: 512 reports, bytes per report xoffset 207 flatbuffers 167, max used 1288 B, wires with holes 0
+  cycle 20: 512 reports, bytes per report xoffset 197 flatbuffers 158, max used 496 B, wires with holes 0
+  cycle 40: 512 reports, bytes per report xoffset 186 flatbuffers 149, max used 352 B, wires with holes 0
+median ns per read
+variant           cycle 1      cycle 10     cycle 20     cycle 40 
+xo.reload             34.75        24.17        24.68        22.46
+xo.root               34.00        25.96        25.86        23.99
+xo.first              32.98        25.43        25.37        25.68
+xo.read               54.26        31.49        31.11        33.33
+xo.read.span          43.76        26.59        26.49        28.93
+fb.verify              8.48         7.71         7.43         8.34
+fb.unpack             54.65        34.32        27.16        24.23
+fb.read               63.13        37.80        30.42        31.13
+t.empty               36.44        35.91        37.72        35.87
+xo.reload.t           62.26        55.07        54.42        49.03
+xo.root.t             62.89        52.25        55.60        55.89
+xo.first.t            63.09        53.57        53.71        56.17
+xo.read.t             87.12        71.23        65.69        69.64
+xo.read.span.t        72.25        61.48        59.65        55.32
+fb.verify.t           41.22        39.37        40.43        37.31
+fb.unpack.t           86.71        63.66        62.85        58.19
+fb.read.t             90.33        71.17        62.05        60.32
+xo.query.after.t        95.89        75.85        72.06        70.21
+xo.query.span.after.t        77.45        63.15        65.67        61.79
+fb.query.after.t        94.36        70.88        67.69        65.29
