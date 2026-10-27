@@ -37,12 +37,20 @@ Release goals (roadmap O1-O7) and where this release stands:
   than 3.0.0, each open item with a measured root cause): floor met, 17/19
   (3.0.0 in the same batch: 15/19). No item is slower than 3.0.0 by code;
   `vec.mid_insert` (1.092 -> 0.954) and `set.insert.fresh` (1.111 -> 0.995)
-  now pass. Still open: `vec.push_back` 1.128, upper bound 1.136 (3.0.0:
-  1.287), from store forwarding on the M4 (a store read back by anything
-  but a same-width single load costs about 7 cycles); R4 brought it down, the L6 change was
-  rejected. `set.erase.fresh` 1.092, upper bound 1.102 (3.0.0: 1.130): the
-  head is read again after the `memmove`; L12 was rejected. 19/19 moves to
-  3.2.
+  now pass. Still open, with the cause measured on the Mac:
+  `vec.push_back` 1.128, upper bound 1.136 (3.0.0: 1.287): `capacity_` now
+  stays in a register, but the loop re-derives the data pointer from
+  `data_delta` after every element store, because `data_delta` is an
+  `int32_t` that an int store may alias (two more instructions per element
+  than `std::vector`, 0.28 against 0.24 ns). `set.erase.fresh` 1.092, upper
+  bound 1.102 (3.0.0: 1.130): keeping the head in registers across the move
+  took 1.0 ns off each erase; the remaining 2.4 ns is in the erase step
+  (bounds re-check, `begin()`/`end()` null checks, zeroing the vacated slot),
+  not the lookup (`set.find.fresh` 0.755). Rejected levers: writing the
+  whole head back or at one width (a narrow load after a 16-byte store
+  forwards in 18.4 cycles on the M4), aligning large data blocks (at most
+  1.5%), fusing the SHIFT `memmove` with the relocation pass, dropping the
+  SHIFT overflow check. 19/19 moves to 3.2.
 - O4 D against FlatBuffers (target UB <= 1.0, no API change, full validation
   kept): not met. D against FlatBuffers is 1.117, upper bound 1.156 (3.0.0:
   1.355 / 1.383), and D is 0.846 of 3.0.0. As decided by susu (2026-10-27),
