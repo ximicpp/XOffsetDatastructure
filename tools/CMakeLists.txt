@@ -58,6 +58,7 @@ add_test(
     NAME check_signature_regeneration
     COMMAND ${CMAKE_COMMAND}
         -DEXPORTER=$<TARGET_FILE:export_signatures>
+        "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}"
         -DSOURCE_SIG_DIR=${PROJECT_SOURCE_DIR}/tools/sigs
         -DGENERATED_SIG_DIR=${PROJECT_BINARY_DIR}/generated_sigs
         -P ${CMAKE_CURRENT_SOURCE_DIR}/check_signature_regeneration.cmake)
@@ -74,7 +75,7 @@ set_target_properties(check_signature_matrix PROPERTIES
 if(XOFFSET_BUILD_TESTS)
 add_test(
     NAME check_signature_matrix
-    COMMAND $<TARGET_FILE:check_signature_matrix> "${PROJECT_SOURCE_DIR}/tools/sigs")
+    COMMAND check_signature_matrix "${PROJECT_SOURCE_DIR}/tools/sigs")
 set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
 endif()
 
@@ -89,6 +90,6 @@ target_include_directories(check_compat SYSTEM PRIVATE
 set_target_properties(check_compat PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
 if(XOFFSET_BUILD_TESTS)
-add_test(NAME check_compat COMMAND $<TARGET_FILE:check_compat>)
+add_test(NAME check_compat COMMAND check_compat)
 set_tests_properties(check_compat PROPERTIES LABELS "tooling")
 endif()
