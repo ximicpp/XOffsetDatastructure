@@ -114,6 +114,15 @@ endforeach()
 find_package(Threads REQUIRED)
 target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
 
+# Schema handshake (xoffset_handshake.hpp) and schema evolution
+# (xoffset_evolution.hpp, server side).
+set(EVOLUTION_TESTS
+    test_schema_handshake
+)
+foreach(test_name ${EVOLUTION_TESTS})
+    add_xoffset_test(${test_name} "reflection;evolution")
+endforeach()
+
 # G5/F4: the two libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
 #   fuzz_<target>_replay          replays fuzz/regressions/<target>/: crash
