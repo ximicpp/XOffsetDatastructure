@@ -21,8 +21,28 @@
 #include "raylib.h"
 #include "rlgl.h"
 
+// GLFW as bundled in the desktop raylib library. raylib 5.5's InitWindow goes on
+// to set up OpenGL even when GLFW found no display or monitor, and crashes there,
+// so the window client asks GLFW itself first.
+extern "C" {
+struct GLFWmonitor;
+int glfwInit(void);
+void glfwTerminate(void);
+GLFWmonitor** glfwGetMonitors(int* count);
+}
+
 namespace mapdemo::client {
 namespace {
+
+// Empty when a window can be opened; otherwise why not.
+std::string window_unavailable() {
+    if (glfwInit() == 0) return "GLFW cannot start (no display)";
+    int monitors = 0;
+    glfwGetMonitors(&monitors);
+    glfwTerminate();
+    if (monitors == 0) return "no monitor (screen asleep or locked?)";
+    return {};
+}
 
 constexpr int kWinW = int(kViewWidth);
 constexpr int kWinH = int(kViewHeight);
@@ -95,7 +115,16 @@ int run_gui(const Options& opt) {
     s.connect();
 
     SetTraceLogLevel(LOG_WARNING);
+    const std::string no_window = window_unavailable();
+    if (!no_window.empty()) {
+        std::fprintf(stderr, "error: cannot open a window: %s; use --headless\n", no_window.c_str());
+        return 2;
+    }
     InitWindow(kWinW, kWinH, "XOffset map state demo");
+    if (!IsWindowReady()) {
+        std::fprintf(stderr, "error: cannot open a window: raylib InitWindow failed; use --headless\n");
+        return 2;
+    }
     SetTargetFPS(60);
 
     const Rect scene = s.scene();
