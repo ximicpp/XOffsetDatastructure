@@ -1,0 +1,19 @@
+== 2026-10-27T08:53:05Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: e383aef (v3.0.0; library identical to 30af216, CKPT3 pass)
+== 2026-10-27T08:53:23Z 1. export
+head 923a610923f4f87d62f6fc64697fc529d6dde870 tree 9766694b765c9147384d16b348cca4c13aecc49a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc e383aef51d6983a753d86f6840308c01c45b5a2e tree fca89ecb77a98211402c702e1c4a82561f79ef4e typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+/Volumes/XOffsetCS/perf-gate/src/int4pre/head-923a610/bench/slg/MANIFEST: 23 files match
+== 2026-10-27T08:53:30Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+c1321b32 1321b320306f6e1379416b7b6fb4039b46951b6a tree dd41ba1f34018e3044cd2c84d50ca5f2ed43ea20 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+slg c1321b320306f6e1379416b7b6fb4039b46951b6a: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+c6de6286 6de6286a7f6e485bd88e831f929c99c8d7826df7 tree 706cb91a19f6a1a2ec763daaca8285e9efd85cec typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+slg c6de6286a7f6e485bd88e831f929c99c8d7826df7: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-10-27T08:54:57Z prebuild done: the anchor and the bisection points are in the bincache
+== 2026-10-27T08:54:57Z finish rc=0
