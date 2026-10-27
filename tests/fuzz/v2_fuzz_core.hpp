@@ -61,8 +61,12 @@ struct Root {
     xo::XMap<xo::XString, std::uint64_t> attrs;
 };
 } // namespace fz
+// tools/validation_differential.sh also builds this harness against releases
+// that predate field lists (reflection only).
+#ifdef XOFFSET_RECORD_DERIVED
 XOFFSET_RECORD_DERIVED(fz::Item, (), id, flag, name, vals)
 XOFFSET_RECORD_DERIVED(fz::Root, (), epoch, title, items, tags, keys, attrs)
+#endif
 
 XOFFSET_REGISTER_SCHEMA_NAME(fz::Root, "fuzz.v2.root")
 
