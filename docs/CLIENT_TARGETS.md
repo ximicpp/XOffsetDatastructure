@@ -91,6 +91,14 @@ CI 停用前 `.github/workflows/client-targets.yml` 的结果，格式是 2.0，
 | Linux arm64（GitHub `ubuntu-24.04-arm` 原生） | GCC 16（arm64 平台 manifest digest 固定） | Debug 全量 CTest；读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过，wire 逐字节一致 |
 | Windows x64（`windows-latest` + MSYS2 UCRT64） | MinGW-w64 GCC 16.2（要求 ≥ 16） | Debug 全量 CTest 87/87（Ninja）；Release 构建读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过；5 个语料（empty、small、medium_holes、reloaded_mutated、sparse）逐字节一致 |
 
+## 握手（3.2，未发布）
+
+客户端与服务端的 schema 版本不同时，3.2 的服务端负责转换（[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）。
+客户端只多一次握手，用 `xoffset_handshake.hpp`：连接建立后发
+`make_schema_hello<...>()`，收到服务端的 ack 后用 `read_schema_ack<...>()` 读出结果，
+被拒绝时提示更新。这两个函数不抛异常；关异常的客户端构建要等 SC-8 的
+`try_load_verified` 合入。客户端不包含 `xoffset_evolution.hpp`，没有转换代码。
+
 ## 范围
 
 只支持 64 位小端目标。32 位客户端、大端平台不在范围内。
