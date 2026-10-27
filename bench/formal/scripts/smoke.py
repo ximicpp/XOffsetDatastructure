@@ -6,9 +6,9 @@ usage: smoke.py --driver build/bin/sc_xoffset --fixtures DIR [--scale S --scale 
 
 Per scale: encode the input canonical into the XOffset input wire, validate the
 wire against the trace (every stage digest, queries, emit and reload), and run
-the timed command once. For M the input wire sha256 must equal the formal
-candidate wire (default: the R3/W9a value recorded in the Mac FREEZE.json);
-a library change that alters the wire format fails here and must be stated.
+the timed command once. For M the input wire sha256 must equal the pinned
+formal input wire (default: M_INPUT_WIRE below); a library change that alters
+the wire format fails here and must be stated.
 """
 import argparse
 import hashlib
@@ -18,7 +18,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-R3_M_INPUT_WIRE = "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4"
+# The formal M input wire. R3/W9a (Mac FREEZE.json, wire format 2.0):
+# 2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4.
+# 2026-10-27, wire format 2.1 (12-byte heads, 40-byte header, no payload header
+# on the wire): 8,649,368 bytes.
+M_INPUT_WIRE = "89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc"
 
 
 def sha256(path):
@@ -36,7 +40,7 @@ def main():
     p.add_argument("--driver", required=True, type=Path)
     p.add_argument("--fixtures", required=True, type=Path)
     p.add_argument("--scale", action="append", choices=["S", "M", "L"])
-    p.add_argument("--expect-m-wire", default=R3_M_INPUT_WIRE)
+    p.add_argument("--expect-m-wire", default=M_INPUT_WIRE)
     p.add_argument("--no-expect-m-wire", action="store_true")
     args = p.parse_args()
     failed = False
@@ -60,13 +64,13 @@ def main():
             line = f"{scale}: encode, validate, run passed; input wire {wire.stat().st_size} bytes sha256 {wire_sha}"
             if scale == "M" and not args.no_expect_m_wire:
                 if wire_sha == args.expect_m_wire:
-                    line += " (= formal candidate wire)"
+                    line += " (= pinned formal input wire)"
                 else:
-                    line += f" != formal candidate wire {args.expect_m_wire}"
+                    line += f" != pinned formal input wire {args.expect_m_wire}"
                     failed = True
             print(line)
     if failed:
-        sys.exit("M input wire changed: the formal input wire is no longer the R3/W9a one")
+        sys.exit("M input wire changed: the formal input wire is no longer the pinned one")
 
 
 if __name__ == "__main__":
