@@ -7252,6 +7252,9 @@ namespace XOffsetDatastructure {
 
     // XBuffer::begin_verified_reload / VerifiedReloadToken are available.
 #define XOFFSET_VERIFIED_RELOAD_API 1
+    // The non-throwing receive entries (try_load_verified, try_reload_verified,
+    // try_begin_verified_reload, VerifiedReloadToken::try_finish) are available.
+#define XOFFSET_TRY_ENTRIES_API 1
     template <typename T> class VerifiedReloadToken;
 
     class XBuffer : public XBufferCore {
