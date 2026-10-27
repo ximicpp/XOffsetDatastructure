@@ -33,9 +33,11 @@ each file's sha256). M takes about 30 seconds.
 
 `smoke.py` encodes each scale's input wire, runs `validate` (every stage digest,
 both query sets, emit and reload) and one `run`. For M the input wire must be
-the formal candidate wire `2bf0c071…a25c2a4` from the R3 FREEZE.json. A
-library change that alters the wire fails here; whether that is acceptable is
-susu's call, the smoke test only makes it explicit.
+the pinned formal input wire: `89fd02d2…49d2edcc` (8,649,368 bytes) since wire
+format 2.1 (2026-10-27); it was the formal candidate wire `2bf0c071…a25c2a4`
+from the R3 FREEZE.json under format 2.0. A library change that alters the
+wire fails here; whether that is acceptable is susu's call, the smoke test only
+makes it explicit.
 
 ## Instruction counts (CI performance gate)
 
