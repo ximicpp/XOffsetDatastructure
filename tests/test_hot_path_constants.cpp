@@ -21,16 +21,16 @@ XOFFSET_REGISTER_SCHEMA_NAME(HotRoot, "test.HotPathConstants")
 
 namespace {
 
-// I1 head bytes 4..15: characters, zero padding, then 0x80 | length.
+// I1 head bytes 0..11: characters, zero padding, then 0x80 | length.
 void check_inline(const XFixedString& s, std::string_view expected) {
     assert(s.is_inline());
     assert(s.view() == expected);
     const auto* head = reinterpret_cast<const unsigned char*>(&s);
     for (std::size_t i = 0; i < 11; ++i) {
         const unsigned char want = i < expected.size() ? static_cast<unsigned char>(expected[i]) : 0;
-        assert(head[4 + i] == want);
+        assert(head[i] == want);
     }
-    assert(head[15] == (0x80u | expected.size()));
+    assert(head[11] == (0x80u | expected.size()));
 }
 
 std::string pattern(std::size_t length, unsigned seed) {

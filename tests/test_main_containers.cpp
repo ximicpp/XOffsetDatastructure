@@ -46,10 +46,10 @@ struct BridgeAssocRoot {
 XOFFSET_REGISTER_SCHEMA_NAME(BridgeRoot, "test.BridgeRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(BridgeAssocRoot, "test.BridgeAssocRoot")
 
-static_assert(sizeof(XString) == 16);
-static_assert(sizeof(XVector<int32_t>) == 16);
-static_assert(sizeof(XSet<int32_t>) == 16);
-static_assert(sizeof(XMap<int32_t, int32_t>) == 16);
+static_assert(sizeof(XString) == 12);
+static_assert(sizeof(XVector<int32_t>) == 12);
+static_assert(sizeof(XSet<int32_t>) == 12);
+static_assert(sizeof(XMap<int32_t, int32_t>) == 12);
 static_assert(is_byte_copy_safe_v<BridgeItem>);
 static_assert(is_byte_copy_safe_v<BridgeRoot>);
 static_assert(is_byte_copy_safe_v<BridgeAssocRoot>);
@@ -284,7 +284,7 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
         auto inline_data = xbuf.save_verified<BridgeAssocRoot>();
         const auto& value = root->by_id.begin()[0].second;
         assert(value.is_inline() && dense_wire(inline_data));
-        inline_data[sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) + 15] =
+        inline_data[sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) + 11] =
             static_cast<char>(0x80 | (XFixedString::inline_max + 1));
         bool inline_threw = false;
         try {
