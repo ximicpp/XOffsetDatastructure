@@ -10,7 +10,7 @@ toolchains as 3.0.0. Mac M4 at the INT4 checkpoint against `v3.0.0`
 (`docs/PERFORMANCE.md` section 3): SLG A 0.991, B 0.951, C 0.950, D 0.846;
 formal read_sum 0.950, mutate 0.970, emit_after 0.869 (largest upper bound
 0.981). Known gaps: D is still slower than FlatBuffers (1.117, upper bound
-1.156), TBD-G9, schema
+1.156), two G9 items are still over 1.05 (`vec.push_back`, `set.erase.fresh`), schema
 evolution is not supported, and iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
 
 Release goals (roadmap O1-O7) and where this release stands:
@@ -34,7 +34,15 @@ Release goals (roadmap O1-O7) and where this release stands:
   FlatBuffers 0.318). G8 (zpp_bits, cista) was not measured in INT4; it is
   inferred from 3.0.0 (met) and the A/B/C ratios above, not measured.
 - O3 G9 relocation tax (target 19/19 items UB <= 1.05; floor: no item worse
-  than 3.0.0, each open item with a measured root cause): TBD-G9.
+  than 3.0.0, each open item with a measured root cause): floor met, 17/19
+  (3.0.0 in the same batch: 15/19). No item is slower than 3.0.0 by code;
+  `vec.mid_insert` (1.092 -> 0.954) and `set.insert.fresh` (1.111 -> 0.995)
+  now pass. Still open: `vec.push_back` 1.128, upper bound 1.136 (3.0.0:
+  1.287), from store forwarding on the M4 (a store read back by anything
+  but a same-width single load costs about 7 cycles); R4 brought it down, the L6 change was
+  rejected. `set.erase.fresh` 1.092, upper bound 1.102 (3.0.0: 1.130): the
+  head is read again after the `memmove`; L12 was rejected. 19/19 moves to
+  3.2.
 - O4 D against FlatBuffers (target UB <= 1.0, no API change, full validation
   kept): not met. D against FlatBuffers is 1.117, upper bound 1.156 (3.0.0:
   1.355 / 1.383), and D is 0.846 of 3.0.0. As decided by susu (2026-10-27),
@@ -62,7 +70,7 @@ Release goals (roadmap O1-O7) and where this release stands:
   (`e913d22`): met. Linux x86-64 GCC 16 and P2996 107/107, Linux arm64 GCC
   16 and P2996 107/107, Windows x64 MinGW-w64 GCC 16 105 pass and the same 2
   skipped, and the six 2.1 corpus files are byte-identical across all five.
-  macOS arm64 (P2996): TBD-MAC-CTEST. iOS was not done.
+  macOS arm64 (P2996) 107/107 at INT4. iOS was not done.
 
 Changes:
 
