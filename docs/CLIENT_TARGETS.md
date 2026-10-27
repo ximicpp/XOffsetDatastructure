@@ -1,7 +1,7 @@
-# 客户端目标可行性（K8，0.3.0-beta.1）
+# 客户端目标可行性（K8，3.0.0）
 
 结论：服务端与客户端之间使用 XOffset，在 **Linux arm64** 和 **Windows x64（MinGW-w64 GCC 16）**
-上已由 CI 验证；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
+上已验证（2026-10-21 GitHub CI；CI 停用后改为本地矩阵，见下一节）；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
 服务端与客户端必须用同一 schema、同时发布（见产品定位）。
 
 ## 已验证（`.github/workflows/client-targets.yml`）
@@ -21,6 +21,21 @@ Windows 上需要注意的三点（都已在仓库里处理）：
   测试和工具，不进入导出的接口。
 - 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
 
+## 本地平台矩阵（v1.1 起，代替 GitHub CI）
+
+`tools/platform_matrix.sh TARGET` 构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
+`--read` 和 `diff -r`，结果写进构建目录的 `PLATFORM_RESULT.md`。
+
+| 目标 | 在哪跑 | 编译器 | 最近结果 |
+| --- | --- | --- | --- |
+| Windows x64 | 云端 Linux，CTest 经 wine 运行 | 自建 MinGW-w64 GCC 16.2.0（`tools/build_mingw_toolchain.sh`，`cmake/toolchains/mingw-w64-x86_64.cmake`） | 2026-10-27：106 项 104 过、2 项跳过，语料逐字节一致 |
+| Linux arm64 | Mac M4 的 colima Linux 虚拟机，随 RC 检查点批次 | GCC 16（gcc:16 arm64 镜像按 digest 固定），有 arm64 包时加 P2996 | 待 RC 批次 |
+| Linux x86-64 | 云端 | GCC 16、P2996 | 2026-10-27：两者都 106/106，P2996 语料与参照逐字节一致 |
+
+Windows 上跳过的两项是 `test_canonical_cold_no_callback` 和 `test_canonical_zero_target`：它们测的是
+每线程 owner 缓存，而 GCC 在 MinGW 上用 emutls，线程退出时访问 `thread_local` 会拿到新块，所以这类
+缓存在 MinGW GCC 上整体关闭（`XOFFSET_THREAD_CACHES=0`），这两项以退出码 77 报跳过。
+
 ## 目前不可行
 
 **Android（arm64-v8a）**：NDK 自带的 Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC，
@@ -39,4 +54,4 @@ AArch64 对齐规则）下 wire 一致，但这只是旁证，不等于 Android 
 
 ## 范围
 
-只支持 64 位目标。32 位客户端、大端平台不在 0.3.0-beta.1 范围内。
+只支持 64 位目标。32 位客户端、大端平台不在 3.0.0 范围内。
