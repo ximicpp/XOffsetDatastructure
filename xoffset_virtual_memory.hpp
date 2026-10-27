@@ -345,6 +345,20 @@ public:
         if (zero_from_ < length) zero_from_ = length;
     }
 
+    // assign_bytes for a length that the accessible prefix already holds
+    // (can_assign_in_place): no permission change, so the only failure left
+    // is the injected Prepare failure, reported as false with nothing changed.
+    bool can_assign_in_place(std::size_t length) const noexcept {
+        return base_ != nullptr && length != 0 && length <= accessible_bytes_ && length <= maximum_capacity_;
+    }
+    bool assign_in_place(const char* bytes, std::size_t length) noexcept {
+        if (consume_vm_failure(VmOperation::Prepare)) return false;
+        std::memcpy(base_, bytes, length);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+        return true;
+    }
+
     // In-place form of from_extents (same extent contract). Gap bytes are
     // cleared wherever the old content may have left them dirty.
     void assign_extents(const char* stored, const void* extents, std::size_t count,
