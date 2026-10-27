@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-27T18:25:55Z after 046-gated3: running 2026-10-27T18:25:52Z
+Updated 2026-10-27T19:06:23Z after 046-gated3: done 0 2026-10-27T19:06:20Z
 
 ```
 runner: pid 45762 (version 2)
@@ -50,5 +50,5 @@ free: 15 GB on /Volumes/XOffsetCS, 15 GB on /Users/ximi
 043-d2b                                  cancelled
 044-gated2                               done 0 2026-10-27T17:50:48Z
 045-d3                                   done 0 2026-10-27T18:00:37Z
-046-gated3                               running 2026-10-27T18:25:52Z
+046-gated3                               done 0 2026-10-27T19:06:20Z
 ```

@@ -1,0 +1,31 @@
+cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+cycle 0 cereal       state=ddb6224bbbcecad3 reports=37196452043336
+cycle 0 protobuf     state=ddb6224bbbcecad3 reports=37196452043336
+cycle 0 flatbuffers  state=ddb6224bbbcecad3 reports=37196452043336
+cycle 0 zpp_bits     state=ddb6224bbbcecad3 reports=37196452043336
+cycle 0 cista        state=ddb6224bbbcecad3 reports=37196452043336
+cycle 1 xoffset      state=acc464551a268253 reports=21099883594160
+cycle 1 cereal       state=acc464551a268253 reports=21099883594160
+cycle 1 protobuf     state=acc464551a268253 reports=21099883594160
+cycle 1 flatbuffers  state=acc464551a268253 reports=21099883594160
+cycle 1 zpp_bits     state=acc464551a268253 reports=21099883594160
+cycle 1 cista        state=acc464551a268253 reports=21099883594160
+
+wire bytes per message (average over the last cycle)
+format              A.req        A.res     B.player      C.shard     D.report
+xoffset              1166         2358        12964       842240          712
+cereal                995         1513         7290       665848          560
+protobuf              557          918         4476       329934          365
+flatbuffers          1197         1721         8452       705824          588
+zpp_bits              867         1386         6539       653836          552
+cista                1402         1922         9943       735904          586
+
+compressed size of one sample message (zstd -3 / lz4), bytes
+format                       A.res              B.player               C.shard              D.report
+xoffset             464/       605       2241/      3453     183842/    300626        136/       145
+cereal              377/       525       1824/      2784     165156/    278420         91/        98
+protobuf            389/       415       1917/      2431     168288/    241990         76/        69
+flatbuffers         497/       678       2185/      3292     186239/    301446        106/       117
+zpp_bits            361/       479       1775/      2662     163801/    276771         92/       101
+cista               446/       627       2083/      3457     174829/    294891        106/       106
+verify: all formats agree

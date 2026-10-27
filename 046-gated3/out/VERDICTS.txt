@@ -1,0 +1,5 @@
+ABC: pass (max upper bound 1.0107; A 1.0042, B 1.0060, C 1.0107; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.898 / 0.912 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.058 / 1.071, D.read 67.0 µs; ctl D÷flatbuffers 1.125 / 1.138, D÷zpp_bits 1.318 / 1.330, D.read 82.2 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh; XOffset slower at t1 than t0 (worse by the rule): reset 1.022; set.erase.reused 1.004; str.assign_short 1.014; str.assign_short.view 1.008
+ctest 100% tests passed out of 108 (rc 0)

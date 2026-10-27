@@ -1,0 +1,11 @@
+t0 f0308ee75b002ee5663ec0da9104c0c2eb57a279 tree ea50d00c5f7e3530c0a2e32917a1fe5d9aaf0706 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 f0308ee7 (#147 merge; tree of GATE_D2 head 5119a4f))
+t1 7ddeab53d2e6fa872892b2d0e2e6c5a04fbf2a24 tree 5601009df9ebe5ff5213785c7feba5dd2036285e typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (GATE_D3 head (XFixedVector iterator class))
+t1: diff over t0 sha256 20c6ce2c27df3d3a25cf84bdc6e44f37c06e25ea70bb6d4a9e8fa202947195a2 ( 1 file changed, 53 insertions(+), 4 deletions(-))
+t1: library header diff over t0:  1 file changed, 53 insertions(+), 4 deletions(-)
+t1: first-parent commits over t0:
+  7ddeab53 proto: class iterator for XFixedVector (measurement only, not for merge)
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 95a74c73d8cfe9b0995cbf6a0b121b4e0672909a8fa409a51e4e11b68c5a21de
+reloc_bench t1 sha256 59d8ea978ae7e85bb159596c47a1e88a9b4f878a5dc2a8e250ee133c1c0ca011
+reloc_bench t0a sha256 78784a875e87e0f16f975861882a15566984401237f956b887b78a4281af2f0c
+reloc_bench t1a sha256 92c303ba2d82a46ad6067a567f6a84cf38c0e60a42478df5e1956d044c7d697c
