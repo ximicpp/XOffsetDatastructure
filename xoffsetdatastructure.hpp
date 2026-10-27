@@ -652,14 +652,21 @@ namespace XOffsetDatastructure {
         };
         static_assert(sizeof(WireHole) == 8);
 
-        // The payload header of a received wire, which does not carry it.
+        // The payload header of a received wire, which does not carry it:
+        // six 8-byte stores (magic, header_size with flags 0, root_offset,
+        // used_end, the two reserved words).
         static void write_payload_header(char* base, std::uint64_t root_offset, std::uint64_t used_end) noexcept {
-            arena_header h{};
-            std::memcpy(h.magic, payload_magic_, sizeof(h.magic));
-            h.header_size = static_cast<std::uint32_t>(sizeof(arena_header));
-            h.root_offset = root_offset;
-            h.used_end = used_end;
-            std::memcpy(base, &h, sizeof(h));
+            static_assert(offsetof(arena_header, header_size) == 8 && offsetof(arena_header, flags) == 12 &&
+                          offsetof(arena_header, root_offset) == 16 && offsetof(arena_header, used_end) == 24 &&
+                          offsetof(arena_header, reserved0) == 32 && sizeof(arena_header) == 48);
+            const std::uint64_t size_and_flags = sizeof(arena_header); // little-endian: flags (high half) 0
+            const std::uint64_t zero = 0;
+            std::memcpy(base, payload_magic_, 8);
+            std::memcpy(base + 8, &size_and_flags, 8);
+            std::memcpy(base + 16, &root_offset, 8);
+            std::memcpy(base + 24, &used_end, 8);
+            std::memcpy(base + 32, &zero, 8);
+            std::memcpy(base + 40, &zero, 8);
         }
 
         // Host owner of a payload base (the arena header address). V2 keeps it
