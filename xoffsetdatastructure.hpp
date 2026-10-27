@@ -3587,6 +3587,41 @@ namespace XOffsetDatastructure {
                 ++size_;
                 return slot;
             }
+#if defined(__clang__)
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                const size_type n = size_;
+                if (index < n && n < capacity_) [[likely]] {
+                    // Insert into spare capacity, inline. As on the append
+                    // path the checks of insert_general are implied, and the
+                    // head stays in registers across the move.
+                    alignas(T) std::byte storage[sizeof(T)];
+                    auto* staged = reinterpret_cast<T*>(storage);
+                    construct(staged);
+                    T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                    // Nothing below throws, so size_ is published before the
+                    // move: the next operation's head load then does not wait
+                    // on a store still in flight behind the move.
+                    size_ = n + 1u;
+                    std::memmove(items + index + 1, items + index, std::size_t(n - index) * sizeof(T));
+                    std::memcpy(items + index, staged, sizeof(T));
+                    return items + index;
+                }
+            }
+#endif
+            return insert_general<GrowOutOfLine>(index, construct);
+        }
+
+        // insert_construct off its fast paths. Clang inlines the fast paths
+        // at the caller only with this part separate. GCC and MSVC get back
+        // the one function they had before the split, without the insert
+        // fast path: with it GCC 16 keeps ensure_bound() out of line in
+        // push_back_general.
+        template <bool GrowOutOfLine, typename Construct>
+#if defined(__clang__)
+        iterator insert_general(size_type index, Construct& construct) {
+#else
+        XOFFSET_DETAIL_MOVE_INLINE iterator insert_general(size_type index, Construct& construct) {
+#endif
             ensure_bound();
             if (index > size_ || size_ == max_size()) throw XBadAlloc();
             if (index == size_ && append_grow(construct)) {
@@ -3639,9 +3674,21 @@ namespace XOffsetDatastructure {
             if (index >= size_) return;
             if (index + 1 == size_) { pop_back(); return; }
             if constexpr (std::is_trivially_copyable_v<T>) {
+#if defined(__clang__)
+                // size_ > 1 names a live block. The head stays in registers
+                // across the move (Clang reloads it after the memmove
+                // otherwise); the vacated slot is zeroed as by scrub(n - 1, n).
+                // GCC and MSVC keep the code they had.
+                const size_type n = size_;
+                T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                std::memmove(items + index, items + index + 1, std::size_t(n - index - 1) * sizeof(T));
+                size_ = n - 1u;
+                std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
+#else
                 std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
                 --size_;
                 scrub(size_, size_ + 1);
+#endif
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // SHIFT: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
