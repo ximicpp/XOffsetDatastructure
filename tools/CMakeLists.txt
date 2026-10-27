@@ -81,6 +81,7 @@ add_test(
     NAME check_signature_regeneration
     COMMAND ${CMAKE_COMMAND}
         -DEXPORTER=$<TARGET_FILE:export_signatures>
+        "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}"
         -DSOURCE_SIG_DIR=${PROJECT_SOURCE_DIR}/tools/sigs
         -DGENERATED_SIG_DIR=${PROJECT_BINARY_DIR}/generated_sigs
         -P ${CMAKE_CURRENT_SOURCE_DIR}/check_signature_regeneration.cmake)

@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（0.3.0-beta.1，V2 格式）
+# XOffsetDatastructure 用户指南（3.1.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -22,7 +22,7 @@ using namespace XOffsetDatastructure;
 
 struct Profile {
     std::int32_t           id{0};
-    XString                name;     // ≤10 字节的字符串内联在 16 字节头里
+    XString                name;     // ≤10 字节的字符串内联在 12 字节头里
     XString                bio;      // 更长的字符串占一个 arena 块
     XVector<std::int32_t>  scores;
     XSet<std::int32_t>     tags;
@@ -250,6 +250,9 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 - 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
 - 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
   `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
+- 槽位空闲表、宿主空闲表和 owner 查找各有一份每线程缓存。GCC 编 MinGW/Cygwin 时 TLS 是
+  模拟的（emutls），线程退出时缓存可能先于析构被释放，所以这些目标上缓存关闭，全部走全局
+  结构（`XOFFSET_THREAD_CACHES` 默认 0，其他目标默认 1；Clang 编 MinGW 用原生 TLS，保留缓存）。
 - 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
   `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
 
@@ -357,6 +360,39 @@ buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 r
   `clone()` 失败不会改动源。
 - 详细语义见 [BUFFER_REUSE.md](BUFFER_REUSE.md)。
 
+### 4.3 设计约定：哪些开销是契约带来的
+
+有两条约定是整块可搬（K0）和「发出去的就是 arena 字节」（K3、K5）的前提，它们的代价
+落在固定的几类操作上，库不打算靠改契约把它们压掉。v1.0 检查点（Apple M4，SLG 原型 M 规模，
+对 zpp_bits）上最明显的两处是战斗服往返里的 A.apply（约 2.0 倍）和 A.simulate（约 1.3 倍）；
+A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方能做的事。
+
+**约定一：每个 buffer 一个 arena，带自己的空闲表。** 空闲空间记在这个 buffer 自己的表里，
+随空洞表一起发出、装载，所以整块搬走或发出之后，接着改不退化（K5），也不依赖进程全局的
+分配器状态。代价是元数据按 buffer 分散：一个 buffer 第一次用到某个大小档时，那一档的
+元数据是冷的。很多 buffer 各改一两次的负载（例如 SLG 原型里的 512 个玩家 buffer）几乎每次都碰到
+冷元数据，这就是 A.apply 的差距。
+
+- 对策：长期持有、逐条复用 buffer（`reload_verified` / `reset<T>()`，见
+  [BUFFER_REUSE.md](BUFFER_REUSE.md)），空闲表和映射都留在原处；能合并的修改集中到少数
+  buffer 上做。
+
+**约定二：容器余量是 payload 的一部分。** 容器的余量和其他字节一样随 wire 发出，扩容新露出
+的字节必须先清零（不能把未初始化的字节发出去）。所以库不替你多留：一个空容器第一次
+`assign`、拷贝赋值都只分配到长度（之后的扩容才翻倍），`save_compact` 的
+`slack_div = 0` 也让容量等于长度。代价是收到的消息在接收方被编辑时，容器第一次增长就要
+扩容、搬元素并清零新露出的部分；每条新消息都会重来一次，这就是 A.simulate 的差距。
+
+- 已知终态大小时先调 `XVector` / `XString` 的 `reserve`，一次分配到位，不走多次翻倍。
+- 发给会编辑的接收方时用 `save_compact` 的默认余量（`slack_div = 8`：不少于 8 个元素的容器
+  （字符串除外）留 size/8+1 个），接收方第一次插入不搬家；只读或归档的接收方用 `slack_div = 0`，wire 最小。
+- 跨机器发送带余量的状态时用 `XWireEmission::zero_runs`（第 4 节），余量里不短于 64 字节的零段
+  不占线路字节，接收方装载后余量照样在。
+- 接收方复用 buffer 时，`reload_verified` 之后在以前用过的范围内每次只增长 4 KiB（第 3 节），
+  清零按需进行。
+
+两条约定都不影响正确性和 wire 格式；上面的对策也只改性能，不改语义和 wire 的接受集合。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
@@ -392,7 +428,7 @@ buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 r
 
 ## 8. 核心承诺与 API 稳定性
 
-alpha 之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺，后续版本不得回退；
+版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺，后续版本不得回退；
 相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
 | # | 承诺 | 接口 / 机制 |
@@ -429,7 +465,7 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 Windows、Android、iOS，能接收、读写、校验、再发。三个客户端目标都交叉编译跑通、
 跨目标 wire 一致之后，再加入核心承诺。
 
-以下接口提供但属于可选或实验性质，可能在后续 alpha 中改变：
+以下接口提供但属于可选或实验性质，可能在后续版本中改变：
 
 | # | 接口 | 说明 |
 | --- | --- | --- |
@@ -443,8 +479,8 @@ Windows、Android、iOS，能接收、读写、校验、再发。三个客户端
 
 ## 9. 性能数据的口径
 
-唯一的正式测量来自一台 Apple M4、一个 demo 负载，对比 cista、FlatBuffers、
-Cap'n Proto、cereal，见 [docs/perf/round3-20261021/REPORT.md](perf/round3-20261021/REPORT.md)。
-引用时请同时说明机器、负载和竞品用法（例如 FlatBuffers 走 Object API）；
-没有 Linux 或 Windows 的性能数据。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
+正式计时只来自一台 Apple M4、一个游戏服务器负载（`bench/slg`），六家在同一进程里对比
+zpp_bits、cista、cereal、protobuf、FlatBuffers；每个版本的数字、测法和局限见
+[PERFORMANCE.md](PERFORMANCE.md)。引用时请同时说明机器、负载和适配写法；
+没有 Linux 或 Windows 的计时结论。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
 说明声明普通记录的量级，不是正式测量。

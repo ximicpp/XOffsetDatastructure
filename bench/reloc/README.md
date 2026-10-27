@@ -21,7 +21,7 @@ The origin and every file's sha256 are listed in `MANIFEST`, and `python3 bench/
 | `vec.iterate` | sum over 4096 int32, 32 passes | `std::vector` |
 | `vec.mid_insert` / `vec.mid_erase` | 512 inserts / erases at the middle of about 2048 elements | `std::vector` |
 | `hero.mid_erase` / `hero.mid_insert` / `hero.push_back_grow` `.ord` | 64 erases / inserts at the middle of 256 heroes; 4 × 256 emplace_back with growth. A hero is 3 ints, a string and two vectors | `std::vector` |
-| `str.assign_short` / `str.assign_long` | 32 passes assigning 256 strings: 8 B (inline on both sides), or 40 B | `std::string` |
+| `str.assign_short.view` / `str.assign_long` | 32 passes assigning 256 strings from a `std::string_view` on both sides: 8 B (inline on both sides), or 40 B | `std::string` |
 | `str.append` | 32 × 256 × 6 appends. **Skipped:** XString has no `append()` today. The case turns on when the library has one | `std::string` |
 | `map.{insert,find,erase}.fresh`, `set.{…}.fresh` | 512 inserts; 4096 lookups among 512 keys; 512 erases. Keys, lookups and erase order are new every round | `std::flat_map` / `std::flat_set` |
 | `nested.build.ord` | build 32 armies (8 heroes, 6 troops) into empty roots | `std` (construct + fill) |
@@ -31,6 +31,7 @@ Reported only:
 
 - **Node containers.** `std::map` / `std::set`, beside the flat containers.
 - **`*.reused`.** This is X1's protocol: the same keys every round, and lookups that walk the keys in insertion order. The branch predictor can learn this sequence: "容器操作提速" found that it makes std::flat_map lookups look fast. The fresh-key cases are the ones judged.
+- **`str.assign_short` / `str.assign_short.copy`.** `str.assign_short` assigns a `std::string_view` on the XOffset side and copies a `std::string` on the std side: libc++ copies a short string as its 24-byte representation, while the view has to be measured and copied byte by byte. Since 2026-10-27 G9 judges `str.assign_short.view` instead, where both sides assign from a view (ledger `g9-assign-protocol`). `.copy` has both sides copy a string of their own type, an XString from the same buffer on the XOffset side. G9 still has 19 comparisons.
 - **`.plain`.** The same hero and army records, not declared ordinary. The `.ord` records are declared with `XOFFSET_ORDINARY_RECORDS`, as a user following the guide would write them: together with the records they hold as container elements (`Skill`, `Buff`, `Troop`; user guide section 3.1). Before 2026-10-26 those three were not declared, so the `.ord` heroes took the element-by-element path of the `.plain` ones. On a library without the macro, the two specializations are written out. `static_assert`s check that each declaration took effect and, on a library with the macro, that `.ord` heroes move by SHIFT and `.plain` heroes do not.
 
 Choices worth knowing:

@@ -174,8 +174,112 @@ void reload_scratch_survives_release_and_swap() {
     in.reload_verified<ReloadRoot>(good);
     need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
 }
-// Transport stand-in: header, extent table, each extent at its offset (or the
-// dense payload), hole table; `payload_limit` stops the payload early.
+// The small dense path (payload <= 32 KiB, no extent table) is a shortcut of
+// the general reload: with it off, every outcome, first error and resulting
+// state must be the same, for every kind of target storage.
+struct SmallReloadOutcome {
+    std::string error;
+    std::string payload, save;
+    std::size_t free_count = 0, free_bytes = 0;
+};
+SmallReloadOutcome small_reload(XBuffer& in, const std::string& w, bool fast) {
+    detail::small_reload_fast_path = fast;
+    SmallReloadOutcome o;
+    const auto epoch = in.epoch();
+    try {
+        in.reload_verified<ReloadRoot>(w);
+        need(in.epoch() != epoch, "reload did not advance the epoch");
+        o.payload.assign(reinterpret_cast<const char*>(in.data()), in.get_size());
+        o.save = in.save_verified<ReloadRoot>();
+        o.free_count = in.free_block_count();
+        o.free_bytes = in.free_block_bytes();
+    } catch (const XBadAlloc& e) {
+        o.error = std::string("XBadAlloc: ") + e.what();
+    } catch (const XException& e) {
+        o.error = e.what();
+    }
+    detail::small_reload_fast_path = true;
+    if (!o.error.empty()) need(root_refused(in), "root<T>() allowed after a failed small reload");
+    return o;
+}
+bool same(const SmallReloadOutcome& a, const SmallReloadOutcome& b) {
+    return a.error == b.error && a.payload == b.payload && a.save == b.save &&
+           a.free_count == b.free_count && a.free_bytes == b.free_bytes;
+}
+
+void small_reload_matches_general_path() {
+    using Make = XBuffer (*)();
+    const Make targets[] = {
+        [] { return XBuffer::create<ReloadRoot>(4096, cap()); },                      // VM
+        [] { return XBuffer(); },                                                     // no storage yet
+        [] { return XBuffer::create<ReloadRoot>(256, XBuffer::maximum_capacity(1u << 16)); }, // movable slot
+        [] { return XBuffer::create<ReloadRoot>(4096, XBuffer::maximum_capacity(8192)); },    // pinned slot
+        [] { return XBuffer::create<ReloadRoot>(512, XBuffer::maximum_capacity(1024)); },     // maximum below some wires
+    };
+    const std::string wires[] = {make_wire(5, 3), make_wire(6, 3, 2), make_wire(7, 400, 1), make_wire(8, 2000),
+                                 make_wire(9, 9000)};
+    std::size_t fast_eligible = 0;
+    for (const auto& w : wires) {
+        std::uint32_t used = 0;
+        std::memcpy(&used, w.data() + 8, sizeof(used));
+        fast_eligible += used <= 32768;
+        // Every target kind, fresh and after a larger and a smaller content.
+        for (const auto make : targets) {
+            auto on = make(), off = make();
+            for (const auto* prior : {&w, &wires[3], &wires[0], &w}) {
+                const auto a = small_reload(on, *prior, true), b = small_reload(off, *prior, false);
+                need(same(a, b), "small reload differs from the general path");
+                if (a.error.empty()) {
+                    auto fresh = XBuffer::load_verified<ReloadRoot>(*prior, cap());
+                    need(a.save == fresh.save_verified<ReloadRoot>(), "small reload re-save differs from load");
+                }
+            }
+        }
+        // Every header byte changed, and every truncation and extension: the
+        // same outcome and first error with the fast path on and off.
+        auto on = XBuffer::create<ReloadRoot>(4096, cap()), off = XBuffer::create<ReloadRoot>(4096, cap());
+        for (std::size_t i = 0; i < sizeof(XWireHeaderV2); ++i)
+            for (const unsigned char x : {0x01, 0x80, 0xff}) {
+                auto m = w;
+                m[i] = char(m[i] ^ x);
+                need(same(small_reload(on, m, true), small_reload(off, m, false)), "mutated header outcome differs");
+            }
+        // Each size field at its bounds: used_bytes, root_offset, hole_count, extent_count.
+        for (const std::size_t field : {8u, 12u, 16u, 20u})
+            for (const std::uint32_t v : {0u, 8u, 40u, 47u, 48u, used - 8u, used, used + 8u, 32768u, 32776u, ~0u}) {
+                auto m = w;
+                std::memcpy(m.data() + field, &v, sizeof(v));
+                need(same(small_reload(on, m, true), small_reload(off, m, false)), "header field outcome differs");
+            }
+        // A used_bytes off the word grid, with the wire extended to match.
+        for (const std::uint32_t d : {1u, 4u, 7u}) {
+            auto m = w + std::string(d, '\0');
+            const std::uint32_t v = used + d;
+            std::memcpy(m.data() + 8, &v, sizeof(v));
+            need(same(small_reload(on, m, true), small_reload(off, m, false)), "unaligned used outcome differs");
+        }
+        for (const std::size_t cut : {std::size_t(0), sizeof(XWireHeaderV2) - 1, sizeof(XWireHeaderV2), w.size() - 8, w.size() - 1})
+            need(same(small_reload(on, w.substr(0, cut), true), small_reload(off, w.substr(0, cut), false)),
+                 "truncated wire outcome differs");
+        for (const std::size_t extra : {1, 8, 16})
+            need(same(small_reload(on, w + std::string(extra, '\0'), true), small_reload(off, w + std::string(extra, '\0'), false)),
+                 "extended wire outcome differs");
+    }
+    need(fast_eligible >= 3 && fast_eligible < std::size(wires), "need small wires and one above the limit");
+    // An injected preparation failure on the in-place copy: XBadAlloc, rootless.
+    for (const bool fast : {true, false}) {
+        auto in = XBuffer::create<ReloadRoot>(4096, cap());
+        detail::fail_next_vm_operation(detail::VmOperation::Prepare);
+        const auto o = small_reload(in, wires[0], fast);
+        detail::clear_vm_failures();
+        need(o.error.rfind("XBadAlloc", 0) == 0, "injected copy failure not reported as XBadAlloc");
+        need(small_reload(in, wires[0], fast).error.empty(), "reload after an injected failure");
+    }
+}
+
+// Transport stand-in: header, extent table, each extent at its payload offset
+// - 48 (or the dense payload bytes), hole table; `payload_limit` stops the
+// payload bytes early.
 template <class Token>
 void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MAX) {
     std::size_t at = 0;
@@ -189,7 +293,7 @@ void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MA
         for (std::size_t i = 0; i < table.size() / 8; ++i) {
             std::uint32_t e[2];
             std::memcpy(e, table.data() + i * 8, 8);
-            take(t.payload_bytes().data() + e[0], e[1]);
+            take(t.payload_bytes().data() + e[0] - XWIRE_PAYLOAD_BEGIN, e[1]);
         }
     }
     if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
@@ -319,7 +423,7 @@ void direct_reload_rejects_interrupted_input() {
     }, "hole_count mismatch accepted");
     rejects([&] {
         auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes + 8, h.hole_count, h.extent_count);
-        deliver(t, good, h.used_bytes);
+        deliver(t, good, h.used_bytes - XWIRE_PAYLOAD_BEGIN);
         t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
         t.finish();
     }, "used_bytes mismatch accepted");
@@ -356,6 +460,7 @@ int main() {
         reset_equals_create();
         save_into_is_an_independent_copy();
         reload_scratch_survives_release_and_swap();
+        small_reload_matches_general_path();
         direct_reload_equals_reload();
         direct_reload_rejects_interrupted_input();
         direct_reload_keeps_n2();

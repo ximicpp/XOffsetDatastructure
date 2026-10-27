@@ -80,7 +80,7 @@ template<class Root, class Parent>
 class VerifiedSnapshotArrayIndex {
     using P = std::remove_cv_t<Parent>;
     static_assert(fixed_detail::is_owning_head<P>::value && !detail::is_fixed_string_v<P>);
-    static_assert(sizeof(P) == 16);
+    static_assert(sizeof(P) == 12);
     using Element = typename P::value_type;
     struct Entry { std::uint32_t offset{}; const void* type{}; };
     struct Control {
@@ -88,7 +88,7 @@ class VerifiedSnapshotArrayIndex {
         const void* owner_key{};
         std::size_t charge{}, count{};
         const P* parent{};
-        std::array<std::byte, 16> descriptor{};
+        std::array<std::byte, sizeof(P)> descriptor{};
         const Element* data{};
         std::size_t live_count{};
     };
@@ -169,7 +169,7 @@ public:
             auto* c = std::construct_at(static_cast<Control*>(block));
             constructed = c;
             c->owner_key = key; c->charge = charge; c->count = count; c->parent = &parent;
-            std::memcpy(c->descriptor.data(), &parent, 16);
+            std::memcpy(c->descriptor.data(), &parent, sizeof(P));
             c->data = parent.data(); c->live_count = parent.size();
             const auto first = reinterpret_cast<std::uintptr_t>(c->data);
             std::size_t position = 0;
@@ -201,7 +201,7 @@ public:
         else {
             const auto* c = control_;
             if (!c || !address ||
-                std::memcmp(c->descriptor.data(), c->parent, 16) != 0)
+                std::memcmp(c->descriptor.data(), c->parent, sizeof(P)) != 0)
                 return SnapshotIndexEvidence::unknown;
             const auto from = element_at(&value, &snapshot_index_detail::type_tag<H>);
             const auto to = element_at(address, nullptr);

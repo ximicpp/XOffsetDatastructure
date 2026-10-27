@@ -123,6 +123,7 @@ set(REFLECTION_TESTS
     test_vm_transport
     test_owner_identity
     test_owner_registry
+    test_owner_map
     test_tail_expansion
     test_regrow_used_range
     test_storage_policies
@@ -194,6 +195,18 @@ foreach(exit_mode ${VM_EXIT_MODES})
     add_test(NAME test_vm_lifecycle_${exit_mode}
         COMMAND test_vm_lifecycle --exit-${exit_mode})
     set_tests_properties(test_vm_lifecycle_${exit_mode} PROPERTIES LABELS "reflection;lifecycle")
+endforeach()
+
+# A SHIFT rebase that would overflow a rel32 delta ends the program. Fresh processes.
+set(SHIFT_OVERFLOW_MODES
+    up
+    down
+    mid
+)
+foreach(overflow_mode ${SHIFT_OVERFLOW_MODES})
+    add_test(NAME test_shift_relocate_overflow-${overflow_mode}
+        COMMAND test_shift_relocate --overflow-${overflow_mode})
+    set_tests_properties(test_shift_relocate_overflow-${overflow_mode} PROPERTIES LABELS "reflection")
 endforeach()
 
 # Real host allocation failure of an ordinary owner's identity record,

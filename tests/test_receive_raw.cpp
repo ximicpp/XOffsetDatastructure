@@ -269,16 +269,21 @@ void need(bool ok, const char* text) {
 auto capacity() {
     return xo::XBuffer::maximum_capacity(4u << 20).with_growth(xo::XGrowPolicy::Automatic);
 }
-// V2 wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
+// V2.1 dense wire: [XWireHeaderV2][payload bytes 48..used_bytes][hole table:
+// hole_count x 8]. `image` is the payload a receiver builds from it: the
+// payload header it writes itself, then the wire's payload bytes.
 struct Wire {
     std::string bytes;
+    std::string image;
     xo::XWireHeaderV2 header() const {
         return rd::raw_wire_pod<xo::XWireHeaderV2>(bytes.data());
     }
-    const char* payload() const { return bytes.data() + sizeof(xo::XWireHeaderV2); }
-    char* payload() { return bytes.data() + sizeof(xo::XWireHeaderV2); }
+    const char* payload() const { return image.data(); }
+    char* payload() { return image.data(); }
     std::size_t extent() const { return std::size_t(header().used_bytes); }
-    const char* holes() const { return payload() + extent(); }
+    const char* holes() const {
+        return bytes.data() + sizeof(xo::XWireHeaderV2) + extent() - xo::XWIRE_PAYLOAD_BEGIN;
+    }
     std::size_t hole_count() const { return std::size_t(header().hole_count); }
     xo::XBufferCore::WireHole hole(std::size_t i) const {
         need(i < hole_count(), "test hole index");
@@ -294,7 +299,7 @@ struct Wire {
     }
     std::size_t target(std::size_t head) const {
         const auto d = at<rd::RawOwningDescriptor>(head);
-        const auto value = std::int64_t(head + 4) + d.data_delta;
+        const auto value = std::int64_t(head) + d.data_delta;
         need(value >= 0 && std::uint64_t(value) < extent(), "test relative geometry");
         return std::size_t(value);
     }
@@ -309,10 +314,15 @@ struct Wire {
     }
 };
 template<class T> Wire wire_of(xo::XBuffer& source) {
-    Wire wire{source.save_verified<T>()};
+    Wire wire{source.save_verified<T>(), {}};
     const auto h = wire.header();
-    need(wire.bytes.size() == sizeof(xo::XWireHeaderV2) + h.used_bytes +
-         h.hole_count * sizeof(xo::XBufferCore::WireHole), "V2 wire size differs from header");
+    need(h.extent_count == 0 && wire.bytes.size() == sizeof(xo::XWireHeaderV2) + h.used_bytes -
+         xo::XWIRE_PAYLOAD_BEGIN + h.hole_count * sizeof(xo::XBufferCore::WireHole),
+         "V2.1 wire size differs from header");
+    wire.image.assign(std::size_t(h.used_bytes), '\0');
+    xo::XBufferCore::write_payload_header(wire.image.data(), h.root_offset, h.used_bytes);
+    std::memcpy(wire.image.data() + xo::XWIRE_PAYLOAD_BEGIN, wire.bytes.data() + sizeof(xo::XWireHeaderV2),
+                std::size_t(h.used_bytes) - xo::XWIRE_PAYLOAD_BEGIN);
     return wire;
 }
 template<class T>
@@ -343,7 +353,7 @@ Wire demo(bool large = false) {
     // Above 32 KiB the validator takes its bitmaps from the scratch resource.
     if (large) snapshot.records[1].payload.reserve(40000);
     auto wire = wire_of<model::Snapshot>(source);
-    need(wire.hole_count() != 0 && wire.header().hole_bytes != 0, "demo wire has no hole table entry");
+    need(wire.hole_count() != 0, "demo wire has no hole table entry");
     return wire;
 }
 class CountingResource : public std::pmr::memory_resource {
@@ -372,10 +382,13 @@ template<class T> void rejects(const Wire& wire, const char* expected) {
     auto owner = wire.owner();
     const auto before = owner.copy_bytes();
     bool caught = false;
+    std::string actual = "(accepted)";
     try { (void)admit<T>(owner, wire); }
     catch (const xo::XException& error) {
-        caught = std::string_view(error.what()) == expected;
+        actual = error.what();
+        caught = actual == expected;
     }
+    if (!caught) std::cerr << "expected: " << expected << "\nactual:   " << actual << "\n";
     need(caught, "raw first error differs");
     need(owner.copy_bytes() == before, "rejected raw graph changed payload");
 }
@@ -513,15 +526,12 @@ void hole_table_exact_coverage() {
     const auto wire = demo();
     using Hole = xo::XBufferCore::WireHole;
     const std::string table(wire.holes(), wire.hole_count() * sizeof(Hole));
-    std::uint64_t sum = 0;
     for (std::size_t i = 0; i < wire.hole_count(); ++i) {
         const auto hole = wire.hole(i);
         need(hole.offset % 8 == 0 && hole.bytes % 8 == 0 && hole.bytes != 0 &&
              hole.offset >= sizeof(rd::RawPayloadHeader) && hole.offset + hole.bytes <= wire.extent(),
              "writer emitted an unaligned/out-of-range hole");
-        sum += hole.bytes;
     }
-    need(sum == wire.header().hole_bytes, "writer hole_bytes differs from the table");
     // A dropped hole leaves an uncovered dead range.
     rejects_holes<model::Snapshot>(wire, table.substr(sizeof(Hole)),
         "wire validation failed: payload is not exactly covered by live blocks and holes");
@@ -565,20 +575,18 @@ void bad_bool_and_terminator() {
     source.root<model::Flag>().flag = true;
     source.root<model::Flag>().label = "valid";
     auto flag = wire_of<model::Flag>(source);
-    // I1: "valid" is an inline string (head bytes 4..14, byte 15 = 0x80|len).
+    // I1: "valid" is an inline string (head bytes 0..10, byte 11 = 0x80|len).
     const auto label = std::size_t(flag.header().root_offset) + offsetof(model::Flag, label);
     need(rd::raw_inline_string(flag.at<rd::RawOwningDescriptor>(label)) &&
          rd::raw_inline_string_size(flag.at<rd::RawOwningDescriptor>(label)) == 5,
          "short label fixture is not inline");
     {
-        auto padding = flag; padding.put<char>(label + 4 + 7, 'p');
+        auto padding = flag; padding.put<char>(label + 7, 'p');
         rejects<model::Flag>(padding, "wire validation failed: inline XFixedString has nonzero padding");
-        auto terminator = flag; terminator.put<char>(label + 4 + 5, 'X');
+        auto terminator = flag; terminator.put<char>(label + 5, 'X');
         rejects<model::Flag>(terminator, "wire validation failed: inline XFixedString has nonzero padding");
-        auto length = flag; length.put<unsigned char>(label + 15, 0x80u | 11u);
+        auto length = flag; length.put<unsigned char>(label + 11, 0x80u | 11u);
         rejects<model::Flag>(length, "wire validation failed: inline XFixedString length exceeds 10");
-        auto binding = flag; binding.put<std::int32_t>(label, 0);
-        rejects<model::Flag>(binding, "wire validation: invalid allocator binding");
     }
     flag.put<unsigned char>(std::size_t(flag.header().root_offset) + offsetof(model::Flag, flag), 2);
     rejects<model::Flag>(flag, "wire validation: invalid bool representation");
@@ -636,7 +644,7 @@ void full_elements_before_ordering() {
     need(!rd::raw_inline_string(set.at<rd::RawOwningDescriptor>(set.target(set_head))), "long key fixture is inline");
     set.put<char>(set.target(set.target(set_head)), 'z');
     rejects<model::Sets>(set, "wire validation: set keys not strictly ordered");
-    // I1 inline keys: the first key's characters live in its head bytes 4..14.
+    // I1 inline keys: the first key's characters live in its head bytes 0..10.
     auto short_strings = xo::XBuffer::create<model::Sets>(65536, capacity());
     short_strings.root<model::Sets>().names.insert("a");
     short_strings.root<model::Sets>().names.insert("b");
@@ -648,7 +656,7 @@ void full_elements_before_ordering() {
         auto owner = short_set.owner();
         (void)admit<model::Sets>(owner, short_set); // inline keys are admitted
     }
-    short_set.put<char>(first_key + 4, 'z');
+    short_set.put<char>(first_key, 'z');
     rejects<model::Sets>(short_set, "wire validation: set keys not strictly ordered");
 }
 void explicit_enum_policy() {

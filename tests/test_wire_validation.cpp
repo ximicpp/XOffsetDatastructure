@@ -1,6 +1,7 @@
 // Purpose: Reject hostile offsets, container heads, hole tables and payload
-// metadata before dereferencing or mutation (V2 wire: header + payload + hole
-// table; live blocks plus holes must tile [0, used_end) exactly).
+// metadata before dereferencing or mutation (V2.1 wire: header + payload
+// bytes [48, used_bytes) + hole table; the receiver writes the payload header;
+// live blocks plus holes must tile the payload exactly).
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -32,7 +33,6 @@ constexpr const char* kHoleEntry = "wire validation failed: invalid hole table e
 constexpr const char* kLiveFree = "wire validation detected live/free overlap";
 constexpr const char* kLiveLive = "wire validation detected overlapping dynamic ranges";
 constexpr const char* kFreeFree = "wire validation detected overlapping free-list ranges";
-constexpr const char* kBinding = "wire validation: invalid allocator binding";
 constexpr const char* kRelative = "wire validation: relative pointer out of bounds";
 
 std::size_t precise_rejections = 0;
@@ -51,8 +51,12 @@ template <typename T> void write(std::string& bytes, std::size_t pos, const T& v
     std::memcpy(bytes.data() + pos, &value, sizeof(T));
 }
 
-// A V2 wire split into its three segments. build() recomputes used_bytes,
-// hole_count and hole_bytes unless asked to keep a deliberately bad header.
+// A dense V2.1 wire split into its three segments. Parts::payload is the
+// payload image [0, used_bytes), indexed by payload offset; its first 48
+// bytes (the payload header) are not on the wire and stay zero here. build()
+// recomputes used_bytes and hole_count unless asked to keep a deliberately
+// bad header.
+constexpr std::size_t kBegin = XWIRE_PAYLOAD_BEGIN;
 struct Parts {
     XWireHeaderV2 header{};
     std::string payload;
@@ -62,23 +66,21 @@ Parts parse(const std::string& wire) {
     Parts p;
     p.header = read<XWireHeaderV2>(wire, 0);
     need(p.header.extent_count == 0, "fixture wire is sparse; Parts handles dense wires only");
-    need(wire.size() == sizeof(XWireHeaderV2) + p.header.used_bytes + p.header.hole_count * sizeof(Hole),
-         "fixture wire is not header + payload + hole table");
-    p.payload = wire.substr(sizeof(XWireHeaderV2), p.header.used_bytes);
+    const auto holes_at = sizeof(XWireHeaderV2) + p.header.used_bytes - kBegin;
+    need(wire.size() == holes_at + p.header.hole_count * sizeof(Hole),
+         "fixture wire is not header + payload bytes + hole table");
+    p.payload = std::string(kBegin, '\0') + wire.substr(sizeof(XWireHeaderV2), p.header.used_bytes - kBegin);
     for (std::size_t i = 0; i < p.header.hole_count; ++i)
-        p.holes.push_back(read<Hole>(wire, sizeof(XWireHeaderV2) + p.header.used_bytes + i * sizeof(Hole)));
+        p.holes.push_back(read<Hole>(wire, holes_at + i * sizeof(Hole)));
     return p;
 }
 std::string build(Parts p, bool fix_counts = true) {
     if (fix_counts) {
-        p.header.used_bytes = p.payload.size();
-        p.header.hole_count = p.holes.size();
-        std::uint64_t sum = 0;
-        for (auto h : p.holes) sum += h.bytes;
-        p.header.hole_bytes = sum;
+        p.header.used_bytes = static_cast<std::uint32_t>(p.payload.size());
+        p.header.hole_count = static_cast<std::uint32_t>(p.holes.size());
     }
     std::string out(reinterpret_cast<const char*>(&p.header), sizeof(p.header));
-    out += p.payload;
+    out.append(p.payload, kBegin, std::string::npos);
     for (auto h : p.holes) out.append(reinterpret_cast<const char*>(&h), sizeof(h));
     return out;
 }
@@ -163,9 +165,9 @@ int main() {
     const auto original = buf.save_verified<CheckedRoot>();
     const auto base = parse(original);
     const auto& h = base.header;
-    need(h.hole_count == 1 && base.holes[0].bytes == 16 && h.hole_bytes == 16, "fixture must have one 16-byte hole");
+    need(h.hole_count == 1 && base.holes[0].bytes == 16, "fixture must have one 16-byte hole");
     need(build(base) == original, "fixture split/rebuild is not byte-identical");
-    const std::size_t payload = sizeof(h), root = payload + h.root_offset;
+    const std::size_t root = sizeof(h) + h.root_offset - kBegin; // wire offset of the root
     const std::size_t proot = h.root_offset; // root offset inside Parts::payload
     const Hole hole = base.holes[0];
     auto loaded = XBuffer::load_verified<CheckedRoot>(original);
@@ -173,107 +175,106 @@ int main() {
     assert(loaded.root<CheckedRoot>().labels[2].view() == "array-two-heap-label");
 
     // ---- Wire header -------------------------------------------------------
-    {   // V1 input (XOFFV1 magic) is rejected explicitly, not as a bad magic.
+    {   // V1 and V2.0 input are rejected by version, not as a bad magic.
         auto bytes = original;
-        std::memcpy(bytes.data(), XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
-        reject(bytes, "unsupported wire format version 1");
+        std::memcpy(bytes.data(), "XOFFV1\0\0", 8);
+        reject(bytes, "wire format 1 is not supported; this build reads 2.1");
         // A complete V1-shaped wire (88-byte V1 header + XBUFV1 payload).
         LegacyWireHeaderV1 v1{};
-        std::memcpy(v1.magic, XWIRE_MAGIC_V1, sizeof(v1.magic));
+        std::memcpy(v1.magic, "XOFFV1\0\0", sizeof(v1.magic));
         v1.format_major = 1;
         v1.header_size = sizeof(v1);
         v1.used_bytes = base.payload.size();
         v1.root_offset = h.root_offset;
         v1.root_type_id = h.root_type_id;
-        v1.schema_hash_lo = h.schema_hash_lo;
-        v1.endian_tag = XWIRE_ENDIAN_TAG_V2;
-        std::string legacy(reinterpret_cast<const char*>(&v1), sizeof(v1));
+        v1.schema_hash_lo = h.schema_hash;
+        v1.endian_tag = 0x01020304u;
         auto legacy_payload = base.payload;
-        legacy_payload[5] = '1'; // XBUFV1
-        legacy += legacy_payload;
-        reject(legacy, "unsupported wire format version 1");
+        std::memcpy(legacy_payload.data(), "XBUFV1\0\0", 8);
+        const auto legacy = std::string(reinterpret_cast<const char*>(&v1), sizeof(v1)) + legacy_payload;
+        reject(legacy, "wire format 1 is not supported; this build reads 2.1");
+        // A V2.0 wire: 96-byte header (magic XOFFV2, format 2.0) + the whole payload.
+        std::string v20(96, '\0');
+        std::memcpy(v20.data(), "XOFFV2\0\0", 8);
+        write(v20, 8, std::uint16_t(2));
+        write(v20, 12, std::uint32_t(96));
+        reject(v20 + base.payload, "wire format 2.0 is not supported; this build reads 2.1 "
+                                   "(sender and receiver must upgrade together)");
     }
-    {
+    {   // Bytes 0-1 are 'X' 'O', bytes 2-3 the major and minor version.
         auto p = base;
-        p.header.format_major = 1; // V2 magic with a V1 major
-        reject(build(p), "unsupported format version");
+        p.header.magic = XWIRE_MAGIC + (1u << 24);
+        reject(build(p), "wire format 2.2 is not supported; this build reads 2.1");
         p = base;
-        p.header.format_minor = 1;
-        reject(build(p), "unsupported format version");
+        p.header.magic = XWIRE_MAGIC - (1u << 16);
+        reject(build(p), "wire format 1.1 is not supported; this build reads 2.1");
         p = base;
-        p.header.magic[5] = '3';
-        reject(build(p), "bad magic");
-        p = base;
-        p.header.header_size = 88;
-        reject(build(p), "header size mismatch");
+        p.header.magic ^= 0x20u; // 'x' 'O'
+        reject(build(p), "not an XOffset wire (bad magic)");
+        reject(std::string(), "not an XOffset wire (bad magic)");
+        reject(original.substr(0, 3), "not an XOffset wire (bad magic)");
+        reject(original.substr(0, sizeof(XWireHeaderV2) - 1), "truncated wire header");
     }
-    for (int field = 0; field < 2; ++field) {
+    for (std::uint32_t flags : {1u, 0x80u, 0x80000000u}) {
+        // Every flag bit is reserved (bit 31 for a later schema evolution extension).
         auto p = base;
-        if (field == 0) p.header.crc32c = 1;
-        if (field == 1) p.header.reserved0 = 1;
-        reject(build(p), "unsupported reserved header fields");
+        p.header.flags = flags;
+        const auto expected = flags == 1u ? "unsupported wire flags 0x00000001"
+                            : flags == 0x80u ? "unsupported wire flags 0x00000080"
+                                             : "unsupported wire flags 0x80000000";
+        reject(build(p), expected);
+    }
+    {   // The fingerprint: root type id (type name) and schema hash (name and ABI).
+        auto p = base;
+        p.header.root_type_id ^= 1;
+        reject(build(p), "root type id mismatch");
+        p = base;
+        p.header.schema_hash ^= 1;
+        reject(build(p), "schema hash mismatch");
     }
     {   // A dense wire relabelled as sparse: the payload bytes are not an extent table.
         auto p = base;
         p.header.extent_count = 1;
         reject(build(p, false), "invalid extent table");
-        p.header.extent_count = UINT64_MAX;
+        p.header.extent_count = UINT32_MAX;
         reject(build(p, false), "used size mismatch");
     }
-    {
+    {   // used_bytes, root_offset and the total length.
         auto p = base;
-        p.header.flags = 1;
-        reject(build(p), "unsupported flags");
-    }
-    {   // hole_bytes must equal the sum of the table entries.
-        auto p = base;
-        p.header.hole_bytes += 8;
-        reject(build(p, false), "hole byte count mismatch");
-        p = base;
         p.header.hole_count = 0; // table bytes become unexplained trailing bytes
         reject(build(p, false), "used size mismatch");
         p = base;
         p.header.used_bytes += 8;
         reject(build(p, false), "used size mismatch");
         p = base;
+        p.header.used_bytes -= 4; // not a multiple of 8
+        reject(build(p, false), "used size mismatch");
+        p = base;
+        p.header.used_bytes = 40; // less than the payload header
+        reject(build(p, false), "used size mismatch");
+        for (std::uint32_t at : {std::uint32_t(0), std::uint32_t(40), std::uint32_t(h.used_bytes),
+                                 std::uint32_t(h.used_bytes + 8), UINT32_MAX}) {
+            p = base;
+            p.header.root_offset = at;
+            reject(build(p), "root offset out of bounds");
+        }
+        p = base; // the root moved inside the payload is not a valid root
         p.header.root_offset += 8;
-        reject(build(p), "root offset mismatch");
+        reject(build(p));
+        p = base;
+        p.header.root_offset += 4;
+        reject(build(p));
         auto bytes = original;
         bytes.push_back('\0');
         reject(bytes, "used size mismatch");
     }
 
-    // ---- Payload header ----------------------------------------------------
+    // ---- Payload header: not on the wire, written by the receiver ---------
     {
-        auto bytes = original;
-        write(bytes, payload + offsetof(XBufferCore::arena_header, used_end), uint64_t(48));
-        reject(bytes, "non-normalized payload extent");
-        bytes = original;
-        write(bytes, payload + offsetof(XBufferCore::arena_header, used_end), uint64_t(h.used_bytes - 8));
-        reject(bytes, "non-normalized payload extent");
-        bytes = original;
-        write(bytes, payload + offsetof(XBufferCore::arena_header, used_end), uint64_t(h.used_bytes + 8));
-        reject(bytes, "used_end out of range");
-    }
-    {
-        auto bytes = original;
-        write(bytes, payload + offsetof(XBufferCore::arena_header, root_offset), UINT64_MAX);
-        reject(bytes, "root not found");
-        bytes = original;
-        bytes[payload + 5] = '1'; // XBUFV1 payload magic
-        reject(bytes, "payload header mismatch");
-        bytes = original;
-        write(bytes, payload + offsetof(XBufferCore::arena_header, header_size), uint32_t(64));
-        reject(bytes, "payload header mismatch");
-    }
-    // Replaces the V1 "root block header" mutation: the bytes immediately
-    // before the root are now the payload header's own fields.
-    for (std::size_t field : {offsetof(XBufferCore::arena_header, flags),
-                              offsetof(XBufferCore::arena_header, reserved0),
-                              offsetof(XBufferCore::arena_header, reserved1)}) {
-        auto bytes = original;
-        write(bytes, payload + field, uint32_t(1));
-        reject(bytes, "wire validation: unsupported arena header flags");
+        const auto* a = loaded.arena();
+        need(std::memcmp(a->magic, "XBUFV2\0\0", 8) == 0 && a->header_size == kBegin && a->flags == 0 &&
+             a->root_offset == h.root_offset && a->used_end == h.used_bytes && a->reserved0 == 0 &&
+             a->reserved1 == 0, "the receiver did not write the payload header");
     }
 
     // ---- Hole table entries (replace V1 free-list head/cycle mutations) ----
@@ -333,7 +334,6 @@ int main() {
         // accepted once the hole table covers it exactly.
         auto p = base;
         p.payload.append(16, '\0');
-        write(p.payload, offsetof(XBufferCore::arena_header, used_end), uint64_t(p.payload.size()));
         reject(build(p), kCoverage);
         auto covered = p;
         covered.holes.push_back({static_cast<uint32_t>(h.used_bytes), 16});
@@ -355,25 +355,6 @@ int main() {
         const auto data = origin + read<int32_t>(bytes, origin);
         write(bytes, data + sizeof(XKeyValue<int32_t, int32_t>), int32_t(1));
         reject(bytes, "wire validation: map keys not strictly ordered");
-    }
-
-    // ---- Container heads: arena_delta -------------------------------------
-    {
-        auto bytes = original;
-        write(bytes, root + offsetof(CheckedRoot, labels) + offsetof(XFixedString, arena_delta), INT32_MAX);
-        reject(bytes, kRelative);
-        const auto at = proot + offsetof(CheckedRoot, values) + offsetof(XFixedVector<int32_t>, arena_delta);
-        for (std::int32_t delta : {0, 8, 48, -8}) {
-            auto p = base;
-            write(p.payload, at, delta == 0 ? 0 : read<std::int32_t>(p.payload, at) + delta);
-            // Must resolve exactly to the payload base; below the base is out of bounds.
-            reject(build(p), delta < 0 ? kRelative : kBinding);
-        }
-        auto p = base; // an inline string's binding is checked too
-        const auto label0 = head_target(base.payload, proot + offsetof(CheckedRoot, labels));
-        const auto label_at = label0 + offsetof(XFixedString, arena_delta);
-        write(p.payload, label_at, read<std::int32_t>(p.payload, label_at) + 16);
-        reject(build(p), kBinding);
     }
 
     // ---- Container heads: data_delta --------------------------------------
@@ -462,32 +443,50 @@ int main() {
         const auto label0 = head_target(base.payload, proot + offsetof(CheckedRoot, labels));
         const auto label1 = label0 + sizeof(XString);
         auto p = base; // length byte 11 > inline_max
-        p.payload[label1 + 15] = static_cast<char>(0x80 | 11);
+        p.payload[label1 + 11] = static_cast<char>(0x80 | 11);
         reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
         p = base;
-        p.payload[label1 + 15] = static_cast<char>(0xff);
+        p.payload[label1 + 11] = static_cast<char>(0xff);
         reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
         p = base; // terminator (data[len]) must be zero: "array-one" has len 9
-        p.payload[label1 + 4 + 9] = 'x';
+        p.payload[label1 + 9] = 'x';
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
-        p = base; // last padding byte (head byte 14)
-        p.payload[label1 + 14] = 1;
+        p = base; // last padding byte (head byte 10)
+        p.payload[label1 + 10] = 1;
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // a 10-byte inline string still needs data[10] == 0
-        p.payload[label0 + 14] = 1;
+        p.payload[label0 + 10] = 1;
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // shorter length: the cut-off characters become nonzero padding
-        p.payload[label0 + 15] = static_cast<char>(0x80 | 5);
+        p.payload[label0 + 11] = static_cast<char>(0x80 | 5);
         reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
         p = base; // longer length over zero padding is a well-formed (different) value
-        p.payload[label1 + 15] = static_cast<char>(0x80 | 10);
+        p.payload[label1 + 11] = static_cast<char>(0x80 | 10);
         {
             auto b = XBuffer::load_verified<CheckedRoot>(build(p));
             need(b.root<CheckedRoot>().labels[1].size() == 10, "inline length change not observed");
         }
         p = base; // clearing the inline flag reinterprets the chars as a heap head
-        p.payload[label1 + 15] = static_cast<char>(9);
+        p.payload[label1 + 11] = static_cast<char>(9);
         reject(build(p));
+        // Every length 0..10 against every byte position 0..10: a nonzero
+        // byte at or past the length is padding (rejected), one before it a
+        // character (accepted).
+        for (unsigned length = 0; length <= 10; ++length) {
+            for (unsigned at = 0; at < 11; ++at) {
+                p = base;
+                for (unsigned i = 0; i < 11; ++i) p.payload[label1 + i] = i < length ? 'a' : 0;
+                p.payload[label1 + 11] = static_cast<char>(0x80 | length);
+                p.payload[label1 + at] = 1;
+                if (at >= length) {
+                    reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+                } else {
+                    auto b = XBuffer::load_verified<CheckedRoot>(build(p));
+                    const auto& label = b.root<CheckedRoot>().labels[1];
+                    need(label.size() == length && label.c_str()[at] == 1, "inline character position rejected");
+                }
+            }
+        }
     }
 
     // ---- Sparse wire (extent_count != 0) -----------------------------------
@@ -513,9 +512,11 @@ int main() {
         const auto wire = sbuf.save_verified<CheckedRoot>(elide);
         const auto sh = read<XWireHeaderV2>(dense, 0);
         const auto wh = read<XWireHeaderV2>(wire, 0);
-        need(sh.extent_count == 0 && sh.hole_count == 1 && sh.hole_bytes == 8192, "dense fixture layout");
+        need(sh.extent_count == 0 && sh.hole_count == 1 && read<Hole>(dense, dense.size() - 8).bytes == 8192,
+             "dense fixture layout");
         need(wh.extent_count >= 2 && wh.used_bytes == sh.used_bytes && wh.hole_count == 1 &&
-             wh.hole_bytes == 8192 && wire.size() + 8192 < dense.size(), "sparse fixture layout");
+             read<Hole>(wire, wire.size() - 8).bytes == 8192 && wire.size() + 8192 < dense.size(),
+             "sparse fixture layout");
         const std::size_t table = sizeof(XWireHeaderV2);
         const std::size_t count = static_cast<std::size_t>(wh.extent_count);
         std::vector<Hole> ext;
@@ -523,7 +524,7 @@ int main() {
         for (std::size_t i = 0; i < count; ++i) {
             ext.push_back(read<Hole>(wire, table + i * 8));
             stored += ext.back().bytes;
-            need(i == 0 ? ext[i].offset == 0 : ext[i].offset > ext[i - 1].offset + ext[i - 1].bytes,
+            need(i == 0 ? ext[i].offset == kBegin : ext[i].offset > ext[i - 1].offset + ext[i - 1].bytes,
                  "sparse fixture extents");
         }
         need(wire.size() == table + count * 8 + stored + sizeof(Hole), "sparse fixture size");
@@ -577,11 +578,12 @@ int main() {
             return bytes;
         };
         const auto last = ext.back();
-        reject(with_extent(0, {8, ext[0].bytes - 8}), "invalid extent table");            // first extent not at 0
-        reject(with_extent(0, {0, ext[0].bytes - 4}), "invalid extent table");            // not a multiple of 8
+        reject(with_extent(0, {56, ext[0].bytes - 8}), "invalid extent table");           // first extent not at 48
+        reject(with_extent(0, {40, ext[0].bytes + 8}), "invalid extent table");           // inside the payload header
+        reject(with_extent(0, {48, ext[0].bytes - 4}), "invalid extent table");           // not a multiple of 8
         reject(with_extent(count - 1, {last.offset, std::uint32_t(sh.used_bytes - last.offset + 8)}),
                "invalid extent table");                                                    // past used_bytes
-        reject(with_extent(1, {ext[0].bytes - 8, ext[1].bytes}), "invalid extent table");  // overlaps extent 0
+        reject(with_extent(1, {ext[0].offset + ext[0].bytes - 8, ext[1].bytes}), "invalid extent table"); // overlaps extent 0
         reject(with_extent(1, {ext[1].offset, 0}), "invalid extent table");
         {
             auto bytes = wire;
@@ -614,10 +616,11 @@ int main() {
         };
         for (std::size_t i = 0; i < count; ++i) { shrink(i, true); shrink(i, false); }
         for (std::size_t word = 8; word + 8 < ext[0].bytes; word += 8) {
-            // Split extent 0 around one word: {0, word} gap {word + 8, rest}.
+            // Split extent 0 around one word: {48, word} gap {48 + word + 8, rest}.
             auto bytes = wire;
             std::string t;
-            const Hole a{0, std::uint32_t(word)}, b{std::uint32_t(word + 8), ext[0].bytes - std::uint32_t(word + 8)};
+            const Hole a{std::uint32_t(kBegin), std::uint32_t(word)},
+                b{std::uint32_t(kBegin + word + 8), ext[0].bytes - std::uint32_t(word + 8)};
             t.append(reinterpret_cast<const char*>(&a), 8);
             t.append(reinterpret_cast<const char*>(&b), 8);
             bytes.replace(table, 8, t);
@@ -633,15 +636,13 @@ int main() {
             ++gap_cases;
             gap_accepted += got == "accepted";
         }
-        need(gap_cases > 8 && gap_accepted > 0 && gap_accepted < gap_cases,
+        // Extent 0 is the 48-byte root: 3 shrinks + 4 word splits.
+        need(gap_cases >= 7 && gap_accepted > 0 && gap_accepted < gap_cases,
              "sparse gap cases must include accepted and rejected payloads");
         {   // The hole shrinks: coverage fails first, sparse or dense.
             auto bytes = wire;
             const auto shole = read<Hole>(wire, wire.size() - sizeof(Hole));
             write(bytes, wire.size() - sizeof(Hole), Hole{shole.offset + 8, shole.bytes - 8});
-            auto h2 = wh;
-            h2.hole_bytes -= 8;
-            write(bytes, 0, h2);
             reject(bytes, kCoverage);
         }
     }
@@ -671,7 +672,7 @@ int main() {
     }
     assert(rejected > 0 && accepted > 0);
     std::cout << "Wire mutation sweep: " << rejected << " rejected, " << accepted << " mutable; "
-              << precise_rejections << " targeted V2 rejections\n";
+              << precise_rejections << " targeted V2.1 rejections\n";
     return 0;
     } catch (const std::exception& e) {
         std::cerr << "FAILED: " << e.what() << '\n';

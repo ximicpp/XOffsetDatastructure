@@ -3,13 +3,15 @@
 # for good (susu 2026-10-23), so this is the merge evidence: it validates the checked-out
 # working tree (HEAD) against a base commit and writes REPORT.md for the PR description.
 #
-#   tools/local_validate.sh [--base REV] [--steps LIST] [--work DIR] [-j N] [--columns K] [--fail-fast]
+#   tools/local_validate.sh [--base REV] [--steps LIST | --release] [--work DIR] [-j N] [--columns K] [--fail-fast]
 #
-# Steps, in this order (default: every step the host can run; LIST may also name the
-# groups "classic" = the first nine and "matrix" = the C++20/C++23 columns):
+# Steps, in this order (default: every step the host can run except tsan; --release adds it;
+# LIST may also name the groups "classic" = the steps up to asm and "matrix" = the
+# C++20/C++23 columns):
 #   gcc       GCC 16 Release: build + full CTest
 #   asan      GCC 16 Debug, -fsanitize=address,undefined -fno-sanitize-recover=undefined
 #             (no exclusions): build + full CTest
+#   tsan      GCC 16 RelWithDebInfo, -fsanitize=thread: build + full CTest (release candidates)
 #   fuzz      test_v2_fuzz 200k cases x seeds 1, 2 (Release) and 20k x seed 7 (ASan+UBSan)
 #   diff      tools/validation_differential.sh base vs head, 200000 cases, seeds 1 2
 #   smoke     bench/ci_smoke.sh with g++ 16 (frozen benchmark trees, formal M wire)
@@ -60,22 +62,24 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-CLASSIC_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir asm"
+CLASSIC_STEPS="gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm"
 ASM_STRICT=0
 MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 gcc16-c++26d p2996-c++20 diff-c++20 wire-matrix"
 ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS"
+DEFAULT_STEPS="${ALL_STEPS/ tsan / }"
 COLUMNS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base) BASE_REV=$2; shift 2 ;;
         --steps) STEPS=${2//,/ }; shift 2 ;;
+        --release) STEPS=$ALL_STEPS; shift ;;
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
         --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
         --asm-strict) ASM_STRICT=1; shift ;;
-        -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -89,7 +93,7 @@ BASE_SHA=$(git rev-parse "$BASE_REV^{commit}") || exit 2
 WORK=${WORK:-$HOME/xo-validate-${HEAD_SHA:0:7}}
 mkdir -p "$WORK/logs" "$CACHE"
 WORK=$(cd "$WORK" && pwd)
-STEPS=${STEPS:-$ALL_STEPS}
+STEPS=${STEPS:-$DEFAULT_STEPS}
 STEPS=" $STEPS "
 STEPS=${STEPS// classic / $CLASSIC_STEPS }
 STEPS=${STEPS// matrix / $MATRIX_STEPS }
@@ -173,6 +177,14 @@ step_asan() {
             '-DCMAKE_CXX_FLAGS=$SANITIZE' -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined &&
         cmake --build '$WORK/asan' --parallel $JOBS &&
         ctest --test-dir '$WORK/asan' --output-on-failure --parallel $JOBS --timeout 1800"
+}
+
+step_tsan() {
+    in_gcc "cmake -S . -B '$WORK/tsan' -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread &&
+        cmake --build '$WORK/tsan' --parallel $JOBS &&
+        TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
+            ctest --test-dir '$WORK/tsan' --output-on-failure --parallel $JOBS --timeout 1800"
 }
 
 step_fuzz() {
@@ -360,7 +372,7 @@ step_wire_matrix() {
 detail_of() {
     local s=$1 f="$WORK/logs/$1.log" w
     case $s in
-        gcc|asan) ctest_line "$f" ;;
+        gcc|asan|tsan) ctest_line "$f" ;;
         diff-c++20) grep -E '^seed [0-9]+:' "$f" | sed 's/^/C++26 vs C++20 /' | paste -sd ';' ;;
         wire-matrix) grep -E '^wire matrix:' "$f" | tail -n 1 ;;
         gcc13-*|clang18-*|gcc16-c++*|p2996-c++*)

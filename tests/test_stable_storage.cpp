@@ -123,15 +123,17 @@ bool has_hole(const XBufferCore& buffer, const void* ptr, std::uint32_t bytes) {
     buffer.for_each_free_block([&](XBufferCore::WireHole hole) { found |= hole.offset == offset && hole.bytes == bytes; });
     return found;
 }
-// V2 verified frame: header + payload + hole table (dense unless a free run of
-// at least 4 KiB makes it sparse; these fixtures never have one).
+// V2.1 verified frame: header + payload bytes [48, used) + hole table (dense
+// unless a free run of at least 4 KiB makes it sparse; these fixtures never
+// have one).
 XWireHeaderV2 check_verified_frame(const std::string& frame, const XBufferCore& buffer) {
     XWireHeaderV2 header{};
     std::memcpy(&header, frame.data(), sizeof(header));
     assert(header.extent_count == 0);
     assert(header.used_bytes == buffer.segment_size());
-    assert(header.hole_count == buffer.free_block_count() && header.hole_bytes == buffer.free_block_bytes());
-    assert(frame.size() == sizeof(header) + header.used_bytes + header.hole_count * sizeof(XBufferCore::WireHole));
+    assert(header.hole_count == buffer.free_block_count());
+    assert(frame.size() == sizeof(header) + header.used_bytes - XWIRE_PAYLOAD_BEGIN +
+                               header.hole_count * sizeof(XBufferCore::WireHole));
     return header;
 }
 
@@ -579,19 +581,19 @@ void shrink_regrow_and_transport() {
             stable_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
     });
 
-    // V1 frames carried a historic reservation hint (reserved_bytes). V2 has no
-    // such field: V1 input is rejected outright and reserved fields must be 0.
+    // V1 frames carried a historic reservation hint (reserved_bytes). V2.1 has
+    // no such field: V1 input is rejected outright and flag bits must be 0.
     auto v1_frame = verified;
-    std::memcpy(v1_frame.data(), XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
+    std::memcpy(v1_frame.data(), "XOFFV1\0\0", 8);
     bool v1_rejected = false;
     try { (void)XBuffer::load_verified<StableRoot>(v1_frame); }
     catch (const XException& error) {
-        v1_rejected = std::string(error.what()).find("unsupported wire format version 1") != std::string::npos;
+        v1_rejected = std::string(error.what()).find("wire format 1 is not supported") != std::string::npos;
     }
     assert(v1_rejected);
     auto reserved_frame = verified;
     auto reserved_header = header;
-    reserved_header.reserved0 = static_cast<std::uint32_t>(page * 32);
+    reserved_header.flags = static_cast<std::uint32_t>(page * 32);
     std::memcpy(reserved_frame.data(), &reserved_header, sizeof(reserved_header));
     require_rejection([&] { (void)XBuffer::load_verified<StableRoot>(reserved_frame); });
     auto plain_frame = XBuffer::load_verified<StableRoot>(verified);

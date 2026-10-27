@@ -358,7 +358,7 @@ void failure_inputs(const char* point, const std::string& good, const std::strin
     detail += expect_reject<T>(ex, "over_cap", good, small_cap(std::size_t(h.used_bytes) - 1)) + " ";
     // A header that claims a huge used size.
     std::string forged = good;
-    h.used_bytes = std::uint64_t(1) << 40;
+    h.used_bytes = 0xfffffff8u;
     std::memcpy(forged.data(), &h, sizeof h);
     detail += expect_reject<T>(ex, "forged_used_bytes", forged, real_cap);
     record(std::string("failure_inputs_") + point, ex.ok(), ex.ok() ? detail : ex.first + " | " + detail);

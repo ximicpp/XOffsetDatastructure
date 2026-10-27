@@ -1,8 +1,0 @@
-version	benchmark	work_items	runs	median_ms	mean_ms	min_ms	max_ms	median_ns_per_item	checksum	used_bytes	wire_bytes
-unknown	vector_int_append_prealloc	100000	9	0.476	0.474	0.460	0.483	4.8	4999950000	1049000	0
-unknown	vector_item_append_prealloc	20000	7	2.264	2.273	2.249	2.300	113.2	200470000	2532592	0
-unknown	map_insert_find_prealloc	24000	7	2.774	2.856	2.728	3.185	115.6	72282000	1362192	0
-unknown	string_assign_churn	120000	9	1.326	1.327	1.310	1.348	11.1	7293247	728	0
-unknown	build_and_save_snapshot	22000	5	6.387	6.436	6.359	6.626	290.3	5408111373280868340	2666376	2666376
-unknown	load_snapshot_batch	40	9	2.923	2.899	2.715	3.127	73081.2	106655040	2666376	2666376
-unknown	fragment_and_compact_snapshot	12000	5	22.215	24.046	22.183	31.344	1851.3	11929906195943918802	1524312	1524312

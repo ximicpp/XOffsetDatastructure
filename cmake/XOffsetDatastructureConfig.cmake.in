@@ -2,7 +2,7 @@
 set(XOffsetDatastructure_VERSION "@XOFFSET_VERSION_FULL@")
 set(XOffsetDatastructure_VERSION_NUMERIC "@XOFFSET_VERSION_NUMERIC@")
 set(XOffsetDatastructure_VERSION_PRERELEASE "@XOFFSET_VERSION_PRERELEASE@")
-set(XOffsetDatastructure_IS_PRERELEASE TRUE)
+set(XOffsetDatastructure_IS_PRERELEASE @XOFFSET_IS_PRERELEASE@)
 set(XOffsetDatastructure_VERSION_COMPATIBILITY "exact-full-version-only")
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)

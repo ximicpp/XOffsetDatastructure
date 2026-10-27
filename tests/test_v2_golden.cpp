@@ -50,14 +50,20 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // model its bytes equal the N10 pin of build(true). XWireEmission::dense and
 // ::zero_runs have their own pins (after G1: large dense 10032 -> 9984,
 // zero-run elided 1688 -> 1632).
-#define GOLDEN_DENSE_SIZE 1792u
-#define GOLDEN_DENSE_FNV 0xf9823cefa179f71aull
-#define GOLDEN_LARGE_DENSE_SIZE 9984u
-#define GOLDEN_LARGE_DENSE_FNV 0xa9da533ef207708full
-#define GOLDEN_ELIDED_SIZE 1632u
-#define GOLDEN_ELIDED_FNV 0xb08a663f2c0d7ae1ull
-#define GOLDEN_N10_SIZE 1800u
-#define GOLDEN_N10_FNV 0xbe289a9e7e47e1fcull
+// 2026-10-27 (V2.1 R4): 12-byte container heads without arena_delta: dense
+// 1792 -> 1648, large dense 9984 -> 9840, zero-run elided 1632 -> 1520,
+// free runs 1800 -> 1656.
+// 2026-10-27 (V2.1 R7): 40-byte wire header and the 48-byte payload header is
+// no longer on the wire (104 bytes less): dense 1648 -> 1544, large dense
+// 9840 -> 9736, zero-run elided 1520 -> 1416, free runs 1656 -> 1552.
+#define GOLDEN_DENSE_SIZE 1544u
+#define GOLDEN_DENSE_FNV 0x2ead9bf530e5c143ull
+#define GOLDEN_LARGE_DENSE_SIZE 9736u
+#define GOLDEN_LARGE_DENSE_FNV 0x7dedb7e5dc8be9caull
+#define GOLDEN_ELIDED_SIZE 1416u
+#define GOLDEN_ELIDED_FNV 0x7950b2e24c2be667ull
+#define GOLDEN_N10_SIZE 1552u
+#define GOLDEN_N10_FNV 0xa8c268362947aaacull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;
@@ -139,7 +145,8 @@ struct Hole { std::uint32_t offset, bytes; };
 std::string n10_wire(const std::string& dense) {
     xo::XWireHeaderV2 h;
     std::memcpy(&h, dense.data(), sizeof(h));
-    const std::size_t used = std::size_t(h.used_bytes), at_holes = sizeof(h) + used;
+    // Dense V2.1: payload offset p is wire byte sizeof(h) + p - 48.
+    const std::size_t used = std::size_t(h.used_bytes), at_holes = sizeof(h) + used - xo::XWIRE_PAYLOAD_BEGIN;
     std::vector<Hole> holes(std::size_t(h.hole_count));
     std::memcpy(holes.data(), dense.data() + at_holes, holes.size() * sizeof(Hole));
     auto sorted = holes;
@@ -152,15 +159,15 @@ std::string n10_wire(const std::string& dense) {
         i = j;
     }
     std::string table, data;
-    std::size_t begin = 0;
+    std::size_t begin = xo::XWIRE_PAYLOAD_BEGIN;
     auto extent = [&](std::size_t from, std::size_t to) {
         const Hole e{std::uint32_t(from), std::uint32_t(to - from)};
         table.append(reinterpret_cast<const char*>(&e), sizeof(e));
-        data.append(dense, sizeof(h) + from, to - from);
+        data.append(dense, sizeof(h) + from - xo::XWIRE_PAYLOAD_BEGIN, to - from);
     };
     for (auto g : gaps) { extent(begin, g.offset); begin = g.offset + std::size_t(g.bytes); }
     if (begin < used) extent(begin, used);
-    h.extent_count = table.size() / 8;
+    h.extent_count = std::uint32_t(table.size() / 8);
     std::string out(reinterpret_cast<const char*>(&h), sizeof(h));
     return out + table + data + dense.substr(at_holes);
 }
@@ -189,16 +196,18 @@ int main() {
         }
     }
 
-    // V1 rejection: a V1 header in front of the same bytes.
-    auto v1 = dense;
-    std::memcpy(v1.data(), xo::XWIRE_MAGIC_V1, 8);
-    v1[8] = 1; v1[9] = 0; // format_major = 1
-    try {
-        (void)xo::XBuffer::load_verified<golden::Model>(v1);
-        fail("V1 wire accepted");
-    } catch (const xo::XException& e) {
-        if (std::string(e.what()).find("format version 1") == std::string::npos)
-            fail(std::string("V1 wire rejected with an unclear error: ") + e.what());
+    // V1 and V2.0 rejection: their magic in front of the same bytes.
+    for (const char* magic : {"XOFFV1\0\0", "XOFFV2\0\0"}) {
+        auto old = dense;
+        std::memcpy(old.data(), magic, 8);
+        const char* expected = magic[5] == '1' ? "wire format 1 is not supported" : "wire format 2.0 is not supported";
+        try {
+            (void)xo::XBuffer::load_verified<golden::Model>(old);
+            fail("V1 / V2.0 wire accepted");
+        } catch (const xo::XException& e) {
+            if (std::string(e.what()).find(expected) == std::string::npos)
+                fail(std::string("V1 / V2.0 wire rejected with an unclear error: ") + e.what());
+        }
     }
     std::cout << "test_v2_golden: dense=" << dense.size() << " large=" << large.size()
               << " large dense=" << large_dense.size() << " elided=" << sparse.size() << " ok\n";

@@ -86,8 +86,13 @@ Parsed parse(const std::string& w) {
         p.extents.push_back(e);
         stored += e.bytes;
     }
-    if (p.extents.empty()) { p.extents.push_back({0, std::uint32_t(p.h.used_bytes)}); stored = p.h.used_bytes; }
-    std::uint64_t prev = 0;
+    // The wire carries payload bytes from offset 48 (the payload header is the
+    // receiver's); a dense wire is one implicit extent.
+    if (p.extents.empty()) {
+        p.extents.push_back({std::uint32_t(xo::XWIRE_PAYLOAD_BEGIN), std::uint32_t(p.h.used_bytes - xo::XWIRE_PAYLOAD_BEGIN)});
+        stored = p.h.used_bytes - xo::XWIRE_PAYLOAD_BEGIN;
+    }
+    std::uint64_t prev = xo::XWIRE_PAYLOAD_BEGIN;
     for (auto e : p.extents) {
         if (e.offset > prev) p.gaps.push_back({std::uint32_t(prev), std::uint32_t(e.offset - prev)});
         prev = std::uint64_t(e.offset) + e.bytes;

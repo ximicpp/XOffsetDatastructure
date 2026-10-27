@@ -1,4 +1,4 @@
-# 0.3.0-beta.1 兼容与输入边界
+# 3.1.0 兼容与输入边界
 
 （文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
 但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K7，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
@@ -7,13 +7,13 @@
 
 ## 版本和工具链
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `0.3.0-beta.1` 的唯一文本来源；CMake project 数字版本是
-`0.3.0`。安装消费采用无版本查找，再检查完整字符串：
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `3.1.0` 的唯一文本来源；CMake project 数字版本是
+`3.1.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.3.0-beta.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.3.0-beta.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.1.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.1.0")
 endif()
 ```
 
@@ -22,7 +22,7 @@ storage 消费改用 `COMPONENTS storage` 和 `XOffset::storage`。
 源码构建中的完整版本变量是 `XOFFSET_VERSION_FULL`。
 
 完整库要求 64-bit little-endian、P2996 Clang 与匹配 libc++；普通 C++26 不是替代品。
-固定配方与依赖来源见源码分发中的 `docs/VM_PACKAGING.md`、`toolchains/README.md`
+固定配方与依赖来源见源码分发中的 `docs/PACKAGING.md`、`toolchains/README.md`
 及 `toolchains/vm-validation.json`；这些配方不随安装 prefix 复制。
 支持结论按具体 profile 给出，不能从 OS API 存在推导完整编译器支持。Windows 上 MSVC 只验
 storage；MinGW-w64 GCC 16 的完整库由 CI 验证（`docs/CLIENT_TARGETS.md`）。WSL、Docker 的结果必须保留实际虚拟化/仿真类别。
@@ -34,8 +34,10 @@ storage；MinGW-w64 GCC 16 的完整库由 CI 验证（`docs/CLIENT_TARGETS.md`�
 
 ## V2 wire 的准入和兼容
 
-V2 是当前固定格式（magic `XOFFV2`，format_major 2）。V1 wire 一律以
-`unsupported wire format version 1` 拒绝，库内没有 V1 读取或迁移路径。
+V2 是当前固定格式，wire 格式版本 2.1（magic 字节 `'X' 'O' 2 1`，40 字节 wire 头）。
+V1 wire 一律以 `wire format 1 is not supported` 拒绝，2.0 wire（3.0.0 及更早）以
+`wire format 2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade together)`
+拒绝；库内没有 V1 或 2.0 的读取或迁移路径，收发两端要一起升级。
 不提供 schema 演进、通用 schema migration 或任意 ABI 转换：加载要求匹配的
 root/schema/type/layout 身份及有效的对象图（活块与空洞表恰好铺满已用区）；注册相同 schema 名称
 并不能让不同布局兼容。需要持久化跨版本读取时，应保留能够读取原格式的工具链、
@@ -68,8 +70,8 @@ root/schema/allocator 并规范化输出，但不应被描述为完整对象图�
 `load_unverified()` 仅适合调用方已经信任的 raw payload。
 
 格式中的 signature、FNV 和文件 SHA-256 清单用于身份/完整性核对，不提供发送者认证、
-机密性、MAC 或数字签名。当前 V2 头的 `crc32c` 字段写入并要求为 0，不能宣称它已经
-提供 CRC 检验。若业务需要来源真实性或防篡改，应在外部协议中进行认证并保护对应
+机密性、MAC 或数字签名。格式 2.1 的 wire 头没有校验和字段（2.0 头里固定为 0 的
+`crc32c` 已删除），不提供 CRC 检验。若业务需要来源真实性或防篡改，应在外部协议中进行认证并保护对应
 版本/schema/长度信息；库的 verified 标记不替代该协议。
 
 接受不可信输入时，调用方须在分配/加载前限制总 wire 长度，并设置合理的
