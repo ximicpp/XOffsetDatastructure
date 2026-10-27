@@ -28,23 +28,23 @@ DEPENDENCY_LICENSES = ["external/boost/LICENSE_1_0.txt", "external/typelayout/LI
 # Source path -> installed name under share/XOffsetDatastructure.
 RELEASE_FILES = {"XOFFSET_VERSION": "VERSION", "CHANGELOG.md": "CHANGELOG.md",
                  "docs/ALPHA_COMPATIBILITY.md": "ALPHA_COMPATIBILITY.md"}
-VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc)\.(0|[1-9][0-9]*)")
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.(0|[1-9][0-9]*))?")
 
 
 def read_version(source: Path) -> dict[str, str]:
     full = (source / "XOFFSET_VERSION").read_text(encoding="utf-8").strip()
     match = VERSION_PATTERN.fullmatch(full)
     if not match:
-        raise ValueError("XOFFSET_VERSION must contain one prerelease identifier without leading zeros")
+        raise ValueError("XOFFSET_VERSION must be MAJOR.MINOR.PATCH with at most one prerelease identifier, without leading zeros")
     return {"full": full, "numeric": ".".join(match.group(1, 2, 3)),
-            "prerelease": ".".join(match.group(4, 5))}
+            "prerelease": ".".join(match.group(4, 5)) if match.group(4) else ""}
 
 
 def version_config_assertions(version: dict[str, str]) -> dict[str, str]:
     return {"XOffsetDatastructure_VERSION": '"' + version["full"] + '"',
             "XOffsetDatastructure_VERSION_NUMERIC": '"' + version["numeric"] + '"',
             "XOffsetDatastructure_VERSION_PRERELEASE": '"' + version["prerelease"] + '"',
-            "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
+            "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if version["prerelease"] else "FALSE",
             "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"'}
 
 
@@ -79,6 +79,7 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
     """Check the exact distributed header/license surface and exported interfaces."""
     version = read_version(source)
     expected = {"include/xoffset_virtual_memory.hpp": digest(source / "xoffset_virtual_memory.hpp"),
+                "include/xoffset_slot_storage.hpp": digest(source / "xoffset_slot_storage.hpp"),
                 "share/XOffsetDatastructure/licenses/LICENSE": digest(source / "LICENSE")}
     for path, installed in RELEASE_FILES.items():
         expected["share/XOffsetDatastructure/" + installed] = digest(source / path)

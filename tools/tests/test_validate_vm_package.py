@@ -34,6 +34,7 @@ class PackageAuditTests(unittest.TestCase):
             shutil.copy2(self.project / "cmake" / name, self.source / "cmake" / name)
         (self.source / "LICENSE").write_text("test license")
         (self.source / "xoffset_virtual_memory.hpp").write_text("test header")
+        (self.source / "xoffset_slot_storage.hpp").write_text("test slot header")
         self.version = MODULE.read_version(self.source)
         config = "\n".join("set(" + name + " " + value + ")" for name, value in
                            MODULE.version_config_assertions(self.version).items()) + "\n"
@@ -41,6 +42,7 @@ class PackageAuditTests(unittest.TestCase):
         producer.mkdir()
         (producer / "XOffsetDatastructureConfig.cmake").write_text(config, encoding="utf-8", newline="\n")
         files = {"include/xoffset_virtual_memory.hpp": "test header",
+                 "include/xoffset_slot_storage.hpp": "test slot header",
                  "share/XOffsetDatastructure/licenses/LICENSE": "test license",
                  "share/XOffsetDatastructure/VERSION": (self.source / "XOFFSET_VERSION").read_text(encoding="utf-8"),
                  "share/XOffsetDatastructure/CHANGELOG.md": (self.source / "CHANGELOG.md").read_text(encoding="utf-8"),
@@ -59,7 +61,7 @@ class PackageAuditTests(unittest.TestCase):
 
     def test_complete_storage_package(self):
         audit = self.audit()
-        self.assertEqual(audit["file_count"], 8)
+        self.assertEqual(audit["file_count"], 9)
         self.assertEqual(audit["version"], self.version)
 
     def test_required_release_metadata_is_exact(self):
@@ -138,14 +140,20 @@ class PackageAuditTests(unittest.TestCase):
         valid = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
         self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
         self.assertIn("0.1.0-alpha.1|0.1.0|alpha.1", valid.stdout)
-        for version in ("0.1.0", "0.1.0-alpha", "00.1.0-alpha.1", "0.1.0-alpha.01", "0.1.0-alpha.1\n0.1.0-alpha.2"):
+        (self.source / "XOFFSET_VERSION").write_text("1.0.0\n", encoding="utf-8")
+        self.assertEqual(MODULE.read_version(self.source), {"full": "1.0.0", "numeric": "1.0.0", "prerelease": ""})
+        release = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
+        self.assertEqual(release.returncode, 0, release.stdout + release.stderr)
+        self.assertIn("1.0.0|1.0.0|\n", release.stdout + "\n")
+        for version in ("1.0", "1.0.0-", "1.0.0-gamma.1", "0.1.0-alpha", "00.1.0-alpha.1", "0.1.0-alpha.01",
+                        "0.1.0-alpha.1\n0.1.0-alpha.2"):
             with self.subTest(version=version):
                 (self.source / "XOFFSET_VERSION").write_text(version, encoding="utf-8")
-                with self.assertRaisesRegex(ValueError, "prerelease identifier"):
+                with self.assertRaisesRegex(ValueError, "at most one prerelease identifier"):
                     MODULE.read_version(self.source)
                 invalid = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
                 self.assertNotEqual(invalid.returncode, 0)
-                self.assertIn("VERSION must contain", invalid.stdout + invalid.stderr)
+                self.assertIn("VERSION must be", invalid.stdout + invalid.stderr)
 
     def test_missing_license_rejected(self):
         (self.prefix / "share/XOffsetDatastructure/licenses/LICENSE").unlink()

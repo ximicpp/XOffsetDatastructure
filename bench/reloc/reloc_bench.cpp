@@ -87,6 +87,7 @@ struct alignas(8) HeroVecOrd   { XVector<HeroOrd> v;   HeroOrd proto; };
 struct alignas(8) HeroVecPlain { XVector<HeroPlain> v; HeroPlain proto; };
 struct alignas(8) IntVec { XVector<int32_t> v; };
 struct alignas(8) StrVec { XVector<XString> s; };
+struct alignas(8) StrVec2 { XVector<XString> s; XVector<XString> src; };
 struct alignas(8) IntMap { XMap<int32_t, int32_t> m; };
 struct alignas(8) IntSet { XSet<int32_t> s; };
 } // namespace xm
@@ -573,8 +574,9 @@ void string_cases() {
     for (int i = 0; i < S; ++i) xs.emplace_back();
     auto dig = [](const auto& v) { uint64_t g = 0; for (const auto& s : v) g = mix(g, hash_name(std::string_view(s))); return g; };
     // P passes per round, each assigning every string a source picked by (round, pass).
-    auto assign_case = [&](const char* n, const std::vector<std::string>& src) {
-        run_case(n, double(P) * S, "std::string", {
+    // primary is nullptr for a reported case.
+    auto assign_case = [&](const char* n, const std::vector<std::string>& src, const char* primary) {
+        run_case(n, double(P) * S, primary, {
             {"xoffset", [&](int r, uint64_t& d) {
                 const double t = timed(n, [&] {
                     for (int p = 0; p < P; ++p) {
@@ -595,8 +597,51 @@ void string_cases() {
                 d = dig(ss); return t; }},
         });
     };
-    assign_case("str.assign_short", shorts);
-    assign_case("str.assign_long", longs);
+    // str.assign_short is reported: the XOffset side assigns a std::string_view,
+    // the std side copies a std::string (libc++ copies its 24-byte short form).
+    assign_case("str.assign_short", shorts, nullptr);
+    assign_case("str.assign_long", longs, "std::string");
+    // The short values assigned like for like, into fresh strings (after
+    // str.assign_long, xs and ss hold heap strings). ".view" (judged): both sides
+    // assign from a std::string_view. ".copy" (reported): both sides copy a string
+    // of their own type (std::string, or an XString in the same buffer).
+    {
+        std::vector<std::string> ss2(S);
+        XBuffer xb2 = XBuffer::create<xm::StrVec2>(256 * 1024, cap());
+        auto& xr = xb2.root<xm::StrVec2>();
+        for (int i = 0; i < S; ++i) { xr.s.emplace_back(); xr.src.emplace_back(); }
+        for (int i = 0; i < S; ++i) xr.src[i] = std::string_view(shorts[std::size_t(i)]);
+        auto like_case = [&](const char* n, bool view) {
+            run_case(n, double(P) * S, view ? "std::string" : nullptr, {
+                {"xoffset", [&, n, view](int r, uint64_t& d) {
+                    const double t = timed(n, [&] {
+                        for (int p = 0; p < P; ++p) {
+                            const int off = (r & 0xffff) * P + p;
+                            if (view)
+                                for (int i = 0; i < S; ++i) xr.s[i] = std::string_view(shorts[std::size_t(i + off) % S]);
+                            else
+                                for (int i = 0; i < S; ++i) xr.s[i] = xr.src[std::size_t(i + off) % S];
+                            keep(xr.s.data());
+                        }
+                    });
+                    d = dig(xr.s); return t; }},
+                {"std::string", [&, view](int r, uint64_t& d) {
+                    const double t = timed(nullptr, [&] {
+                        for (int p = 0; p < P; ++p) {
+                            const int off = (r & 0xffff) * P + p;
+                            if (view)
+                                for (int i = 0; i < S; ++i) ss2[i] = std::string_view(shorts[std::size_t(i + off) % S]);
+                            else
+                                for (int i = 0; i < S; ++i) ss2[i] = shorts[std::size_t(i + off) % S];
+                            keep(ss2.data());
+                        }
+                    });
+                    d = dig(ss2); return t; }},
+            });
+        };
+        like_case("str.assign_short.view", true);
+        like_case("str.assign_short.copy", false);
+    }
     if constexpr (HasAppend<XString>) {
         append_case(xs, ss, S, P);
     } else {
