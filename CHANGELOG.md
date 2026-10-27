@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Nightly fuzz covers schema evolution: `tools/fuzz_libfuzzer.sh` runs
+  `fuzz_schema_evolution` by default (targets v2_wire, wire_schemas,
+  schema_evolution), and the GCC 16 replay in `tools/fuzz_nightly.sh` replays
+  `tests/fuzz/regressions/schema_evolution/` and its seed corpus through
+  `fuzz_schema_evolution_replay`.
+
 ## 3.1.0: wire format 2.1
 
 Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade
