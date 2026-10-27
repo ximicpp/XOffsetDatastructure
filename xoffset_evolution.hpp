@@ -52,6 +52,10 @@
 #include "xoffset_schema_names.hpp"
 #include "xoffset_handshake.hpp"
 
+#if !XOFFSET_SCHEMA_REFLECTION
+#error "xoffset_evolution.hpp is server-side and needs the reflection backend (C++26 reflection; clients only need xoffset_handshake.hpp)"
+#endif
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -207,29 +211,24 @@ namespace XOffsetDatastructure {
 
         inline constexpr std::size_t npos = static_cast<std::size_t>(-1);
 
-        // ---- record fields (reflection backend) ----------------------------
-        // The schema field interface (member_t<T, I>::name) replaces these once
-        // the field-table backend is on this branch.
+        // ---- record fields (schema field interface) ----------------------------
 
         template <typename T>
-        consteval std::size_t field_count() { return reflected_member_count<T>(); }
+        consteval std::size_t field_count() { return schema::member_count_v<T>; }
 
         template <typename T, std::size_t I>
-        consteval std::meta::info field() {
-            return nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[I];
-        }
+        using field_t = schema::member_type_t<T, I>;
 
         template <typename T, std::size_t I>
-        using field_t = [:type_of(field<T, I>()):];
+        inline constexpr std::string_view field_name_v = schema::member_t<T, I>::name;
 
         template <typename T, std::size_t I>
-        consteval std::string_view field_name() { return identifier_of(field<T, I>()); }
-
-        template <typename T, std::size_t I>
-        inline constexpr std::string_view field_name_v = field_name<T, I>();
+        consteval std::string_view field_name() { return field_name_v<T, I>; }
 
         template <std::size_t I, typename T>
-        constexpr decltype(auto) get(T& object) noexcept { return (object.[:field<std::remove_const_t<T>, I>():]); }
+        constexpr decltype(auto) get(T& object) noexcept {
+            return schema::member_t<std::remove_const_t<T>, I>::get(object);
+        }
 
         template <typename T>
         consteval std::size_t find_field(std::string_view name) {
@@ -242,35 +241,7 @@ namespace XOffsetDatastructure {
 
         // "v1::Player" for a named class or enum, the compiler's spelling otherwise.
         template <typename T>
-        consteval std::string type_name_text() {
-            using namespace std::meta;
-            constexpr info type = dealias(^^T);
-            if constexpr ((is_class_type(type) || is_enum_type(type)) && has_identifier(type) &&
-                          !has_template_arguments(type)) {
-                std::string text(identifier_of(type));
-                for (info scope = parent_of(type); scope != ^^::; scope = parent_of(scope)) {
-                    if (!is_namespace(scope) && !is_type(scope)) break;
-                    text = (has_identifier(scope) ? std::string(identifier_of(scope)) : std::string("(anonymous)")) +
-                           "::" + text;
-                }
-                return text;
-            } else {
-                return std::string(display_string_of(type));
-            }
-        }
-
-        template <typename T>
-        inline constexpr auto type_name_storage = [] {
-            std::array<char, type_name_text<T>().size()> text{};
-            const std::string s = type_name_text<T>();
-            for (std::size_t i = 0; i < text.size(); ++i) text[i] = s[i];
-            return text;
-        }();
-
-        template <typename T>
-        consteval std::string_view type_name() {
-            return std::string_view(type_name_storage<T>.data(), type_name_storage<T>.size());
-        }
+        consteval std::string_view type_name() { return schema::qualified_name_v<T>; }
 
         // ---- hooks -----------------------------------------------------------
 
@@ -437,8 +408,8 @@ namespace XOffsetDatastructure {
         template <typename E>
         inline constexpr auto enumerator_values = []<std::size_t... Is>(std::index_sequence<Is...>) {
             return std::array<std::underlying_type_t<E>, sizeof...(Is)>{
-                static_cast<std::underlying_type_t<E>>([:enumerators_of(^^E)[Is]:])...};
-        }(std::make_index_sequence<enumerators_of(^^E).size()>{});
+                static_cast<std::underlying_type_t<E>>(schema::enumerator_t<E, Is>::value)...};
+        }(std::make_index_sequence<schema::enumerator_count_v<E>>{});
 
         template <typename To, typename From>
         To convert_enum(From value, XEvolveContext& ctx) {
@@ -584,7 +555,7 @@ namespace XOffsetDatastructure {
 
         template <typename From, typename To>
         void convert_record(const From& from, To& to, XEvolveContext& ctx) {
-            static_assert(reflected_base_count<From>() == 0 && reflected_base_count<To>() == 0,
+            static_assert(schema::base_count_v<From> == 0 && schema::base_count_v<To> == 0,
                 "XOffset schema evolution: wire records have no base classes");
             static_assert(check_hook_names<From, To>(), hook_names_message<From, To>());
             [&]<std::size_t... Is>(std::index_sequence<Is...>) {
