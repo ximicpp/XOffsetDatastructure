@@ -4886,7 +4886,7 @@ namespace XOffsetDatastructure {
         }
 
         // Validation errors leave the hot path through one out-of-line call.
-        [[noreturn, gnu::cold, gnu::noinline]] inline void wire_reject(const char* what) {
+        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void wire_reject(const char* what) {
             throw XException(what);
         }
 

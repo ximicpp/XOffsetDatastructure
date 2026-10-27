@@ -63,9 +63,12 @@ function(xoffset_configure_full_interface target_name)
         # No reflection flags, no <meta> and no TypeLayout include path: a
         # header that still reaches for either fails to compile here.
         target_compile_features(${target_name} INTERFACE cxx_std_${XOFFSET_CXX_STANDARD})
-        if(MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             # __VA_OPT__ in XOFFSET_RECORD needs the conforming preprocessor.
             target_compile_options(${target_name} INTERFACE /Zc:preprocessor /Zc:__cplusplus /permissive-)
+        elseif(CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+            # clang-cl: its preprocessor already conforms (/Zc:preprocessor is unused).
+            target_compile_options(${target_name} INTERFACE /Zc:__cplusplus /permissive-)
         else()
             target_compile_options(${target_name} INTERFACE -std=c++${XOFFSET_CXX_STANDARD})
         endif()
