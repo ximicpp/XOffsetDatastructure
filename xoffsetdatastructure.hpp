@@ -2223,6 +2223,14 @@ namespace XOffsetDatastructure {
                 "relative offset exceeds rel32 range");
         }
 
+        // True when target is within rel32 range of origin.
+        XOFFSET_DETAIL_MOVE_INLINE bool rel32_reaches(const void* origin, const void* target) noexcept {
+            const auto delta = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(target)) -
+                               static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(origin));
+            return delta >= std::numeric_limits<std::int32_t>::min() &&
+                   delta <= std::numeric_limits<std::int32_t>::max();
+        }
+
         // MV: identical checks and store; only the throw is out of line, so
         // the range test inlines at every call site.
         XOFFSET_DETAIL_MOVE_INLINE void set_rel32(std::int32_t& field, const void* origin, const void* target) {
@@ -2293,6 +2301,30 @@ namespace XOffsetDatastructure {
             if (!ptr || bytes == 0) return;
             if (auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment))
                 owner->retire_block(ptr, block_bytes_of(bytes));
+        }
+
+        // Fused regrowth (A_ZPP_LEVERS 2.2 item 1): a fresh block of
+        // new_bytes, `fill` (moves the live run in, publishes the block and
+        // returns the old one; must not throw), then the old block retired.
+        // The binding and size checks run once; the owner is read again for
+        // the retirement, since allocation may run new_handler, which may move
+        // the owning Core. Placement equals allocate, then retire.
+        template <typename Fill>
+        XOFFSET_DETAIL_MOVE_INLINE void regrow_dynamic_bytes(const allocator_ref& alloc_ref,
+                                                             std::uint32_t old_bytes, std::uint32_t new_bytes,
+                                                             std::size_t alignment, Fill&& fill) {
+            auto* arena = alloc_ref.segment;
+            auto* owner = XBufferCore::owner_from_arena_noexcept(arena);
+            if (!owner || alignment == 0 || (alignment & (alignment - 1)) != 0 ||
+                alignment > XBufferCore::MAX_PAYLOAD ||
+                new_bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u)) [[unlikely]] {
+                (void)allocate_dynamic_bytes(alloc_ref, new_bytes, alignment); // throws the usual error
+            }
+            void* fresh = owner->allocate_block(block_bytes_of(new_bytes), alignment);
+            void* old = fill(fresh);
+            if (old && old_bytes != 0)
+                if (auto* now = XBufferCore::owner_from_arena_noexcept(arena))
+                    now->retire_block(old, block_bytes_of(old_bytes));
         }
 
         template <typename T>
@@ -3267,6 +3299,13 @@ namespace XOffsetDatastructure {
                 scrub(count, old_size);
                 return;
             }
+            assign_range_regrow(values, count, bytes);
+        }
+
+        // assign_range into a fresh block; out of line, so the in-capacity
+        // path above stays small enough to inline at the caller.
+        XOFFSET_DETAIL_NOINLINE void assign_range_regrow(std::span<const T> values, size_type count,
+                                                         std::uint32_t bytes) {
             auto alloc = binding();
             // D8a: a container that already has capacity regrows to
             // max(count, 2 * capacity), like libc++ assign; the first block
@@ -3275,26 +3314,24 @@ namespace XOffsetDatastructure {
                 : std::max(count, static_cast<size_type>(
                       std::min<std::uint64_t>(max_size(), std::uint64_t(capacity_) * 2u)));
             const auto cap_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
-            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
-                alloc, cap_bytes, alignof(T)), new_cap);
-            std::int32_t delta = 0;
-            try {
-                fixed_detail::set_rel32(delta, &data_delta, fresh);
-            } catch (...) {
-                fixed_detail::retire_dynamic_bytes(alloc, fresh, cap_bytes);
-                throw;
-            }
             // Read the complete source before publishing/retiring old storage.
             // Retirement is allowed to overwrite its first bytes as free-list
             // metadata. memmove also covers overlapping live-element ranges.
-            std::memmove(fresh, values.data(), bytes);
-            auto* old = data();
-            const auto old_cap = capacity_;
-            data_delta = delta;
-            size_ = count;
-            capacity_ = new_cap;
-            fixed_detail::retire_dynamic_bytes(
-                alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+            bool published = false;
+            fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
+                                               cap_bytes, alignof(T), [&](void* block) -> void* {
+                auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
+                // An unreachable block is never published and is retired as "old".
+                if (!fixed_detail::rel32_reaches(&data_delta, fresh)) [[unlikely]] return block;
+                std::memmove(fresh, values.data(), bytes);
+                void* old = data();
+                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                size_ = count;
+                capacity_ = new_cap;
+                published = true;
+                return old;
+            });
+            if (!published) [[unlikely]] fixed_detail::throw_rel32_range();
         }
 
         // N7: replaces all elements with [first, last). A contiguous range of
