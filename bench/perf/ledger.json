@@ -345,6 +345,48 @@
       "reason": "0 类合并（「性能优化」2026-10-27 01:47Z 定的口径：改的是校验代码，按字面不是 S 类；macOS 上基准程序的机器码与 base 相同即 0 类）。只作记录，不放行任何指标。validate_inline_string_bytes 改为直接从字符串头读两次（字节 4..11、12..15），不先拷到局部数组；掩码表、检查顺序和错误信息不变。依据：Mac 在 CKPT2b 编译阶段从 c55a6ef 的导出重新编译 sc_xoffset、slg_bench、reloc_bench，与 base 3549272 不只 __text 相同，整个二进制逐字节相同；云端 P2996 x86 三个程序的 .text 也逐字节相同。只有 GCC 16 的代码变了：P4m（#113）之后 formal 基准这个编译单元的 inline-unit-growth 预算不够，validate_wire_value(XFixedString) 没有内联进 Record 的校验循环，改后体积 142 → 139，两个调用点都内联。GCC 16 Ir 对 3549272：formal.load 0.9936、formal.reload 0.9966、slg.A 0.9987、slg.B 0.9989、decode 各阶段 0.996–0.998，其余 1.0000；P2996 全部 1.0000。两种门禁的最大 head÷base 都是 1.0000，max_ratio 记 1.0001 只是因为 ledger 要求大于 1。local_validate 在 c55a6ef 上 8/8，扩展差分 3×100 万 + ASan 20 万一致。",
       "evidence": "Mac 判定 /mnt/project-files/perf-gate/mac/2026-10-27-ckpt2b-3549272/VERDICT.md（sha d12665d3，#120 一行与 pr120/、prep-ckpt2b.tar.gz 编译日志）；云端 /mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/gcc-record-inline/（c55a6ef_REPORT.md、c55a6ef_p2996_text_sha256.txt、两种门禁 json、内联报告 inl_4434448/inl_b7a3ede）",
       "approved_by": "「性能优化」（2026-10-27 01:47Z 定 0 类条件，02:30Z 确认按 0 类合并；__text 比对由「Mac 门禁批次」02:30Z 判 0 类）"
+    },
+    {
+      "id": "s-class-pr126",
+      "pr": 126,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0031,
+      "record_only": true,
+      "class": "S",
+      "head": "5d37624b68b7",
+      "base": "87a0514b6fd7",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L1，XVector push_back(const T&) 在一般路径之后重述 size_ = n + 1，调用方的 push_back 循环把 size_ 留在寄存器里；arm64 上原来 4 字节写后紧跟 8 字节 ldp 读回，部分重叠转发失败（Mac vec.push_back 6.45×、push_back_grow 4.53×）。只改 xoffsetdatastructure.hpp 4 行；不改 wire、API。试合点 2（5d37624b，对点 1 bc458310）local_validate 8/8（gcc/asan/p2996 103/103，fuzz 42 万例 0 不一致，diff 40 万例一致），两种 Ir 无警告：GCC 16 reloc.vec.push_back 0.9298、push_back_grow 0.9205，其余 1.0000；P2996 无下降，最高 reloc.hero.push_back_grow.ord 1.0031（max_ratio；收益在 arm64 转发，不在 Ir 里）。",
+      "evidence": "PR #126 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p2_*.md、ir_{gcc16,p2996}_p2.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
+      "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 1 个 S 类，CKPT3（对 3549272）单列二分点"
+    },
+    {
+      "id": "s-class-pr127",
+      "pr": 127,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0045,
+      "record_only": true,
+      "class": "S",
+      "head": "559624bc3e11",
+      "base": "87a0514b6fd7",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L2，SHIFT 重定位：一段搬动共用一个 shift（ShiftRun）；Clang 下溢出检查改为与固定上下界比较、整段收集后在段尾检查一次（越界的和不会被使用），搬动循环强制内联，单元素 insert/erase 可向量化；GCC/MSVC 保持逐个 checked add；先算和再 placement new，默认成员初始化的零写成为死存储。溢出仍然 terminate（Clang 下推迟到段尾）。只改 xoffset_core_lifetime.hpp；tests/test_shift_relocate.cpp 加 int32 边界重定位与 3 个必须 terminate 的独立进程 CTest（overflow-up/down/mid，新旧库都通过）。试合点 3（559624bc，对点 2）local_validate 8/8（106/106），两种 Ir 无警告：P2996 hero.mid_erase.ord 0.7374、mid_insert.ord 0.7653、slg.S.ticks_middle 0.8132、slg.B.season_edits 0.9345、slg.B 0.9744；GCC 16 hero.mid_erase.ord 0.8131、mid_insert.ord 0.8174、slg.S.ticks_middle 0.8729、slg.B 0.9809，最高 hero.push_back_grow.plain 1.0045（max_ratio）。",
+      "evidence": "PR #127 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p3_*.md、ir_{gcc16,p2996}_p3.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
+      "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 2 个 S 类，CKPT3（对 3549272）单列二分点"
+    },
+    {
+      "id": "s-class-pr128",
+      "pr": 128,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.002,
+      "record_only": true,
+      "class": "S",
+      "head": "ab92e590c0b0",
+      "base": "87a0514b6fd7",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L3，XString assign(string_view) 保留两条快路径（短值写入已绑定的 inline 头、放得进堆块的值），其余移到 assign_general：Clang 下 noinline，使 Clang 在调用点内联 assign()；GCC/MSVC 下强制内联回去，与拆分前同一个函数（GCC Ir 全部 1.0000）。只改 xoffsetdatastructure.hpp；tests/test_xstring_direct_assign.cpp 加空串/短串/长串从 inline 与堆头赋值并 save/load 往返（旧库也通过）。试合点 4（ab92e590，对点 3）local_validate 8/8（106/106），两种 Ir 无警告：P2996 str.assign_short.view 0.7246、assign_short 0.7506、assign_long 0.8338、.copy 0.8809；GCC 16 全部 1.0000；最高 P2996 reloc.hero.push_back_grow.ord 1.0020（max_ratio）。",
+      "evidence": "PR #128 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p4_*.md、ir_{gcc16,p2996}_p4.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
+      "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 3 个 S 类，CKPT3（对 3549272）单列二分点"
     }
   ]
 }
