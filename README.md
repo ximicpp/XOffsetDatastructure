@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**0.3.0-beta.1** is an experimental C++26/P2996 library for reflected objects
+**3.0.0** is a C++26/P2996 library for reflected objects
 and offset containers stored in one contiguous, position-independent arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
@@ -121,8 +121,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.3.0-beta.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.3.0-beta.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.0.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.0.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -212,7 +212,7 @@ workload and adapter set. No Linux or Windows performance figures are claimed.
 
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
-The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
+A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
 core guarantees (K0–K7, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to
