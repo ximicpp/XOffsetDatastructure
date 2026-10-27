@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Repository: the V1/VM-era documents (`docs/VM_*`, `docs/V1_*`,
+  `docs/BOOST_*`, 32 files), `experiments/` (126 files) and the root
+  `HANDOFF*.md` / `PROMPT_MAC_20261020.md` left the tree;
+  `docs/ARCHIVED_EVIDENCE.md` names the commit that still has them and the
+  command that restores them. `docs/VM_PACKAGING.md` and
+  `docs/VM_VALIDATION_RUNNER.md` are still current and became
+  `docs/PACKAGING.md` and `docs/VALIDATION_RUNNER.md`.
 - Release tooling: `XOFFSET_VERSION` may now hold a final version
   (`MAJOR.MINOR.PATCH`) as well as a prerelease (`-alpha|beta|rc.N`); the
   package config sets `XOffsetDatastructure_IS_PRERELEASE` to match and still
