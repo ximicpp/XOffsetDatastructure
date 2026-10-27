@@ -3,12 +3,13 @@
 # for good (susu 2026-10-23), so this is the merge evidence: it validates the checked-out
 # working tree (HEAD) against a base commit and writes REPORT.md for the PR description.
 #
-#   tools/local_validate.sh [--base REV] [--steps LIST] [--work DIR] [-j N] [--fail-fast]
+#   tools/local_validate.sh [--base REV] [--steps LIST | --release] [--work DIR] [-j N] [--fail-fast]
 #
-# Steps, in this order (default: every step the host can run):
+# Steps, in this order (default: every step the host can run except tsan; --release adds it):
 #   gcc       GCC 16 Release: build + full CTest
 #   asan      GCC 16 Debug, -fsanitize=address,undefined -fno-sanitize-recover=undefined
 #             (no exclusions): build + full CTest
+#   tsan      GCC 16 RelWithDebInfo, -fsanitize=thread: build + full CTest (release candidates)
 #   fuzz      test_v2_fuzz 200k cases x seeds 1, 2 (Release) and 20k x seed 7 (ASan+UBSan)
 #   diff      tools/validation_differential.sh base vs head, 200000 cases, seeds 1 2
 #   smoke     bench/ci_smoke.sh with g++ 16 (frozen benchmark trees, formal M wire)
@@ -38,16 +39,18 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-ALL_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir"
+ALL_STEPS="gcc asan tsan fuzz diff smoke ir p2996 p2996-ir"
+DEFAULT_STEPS="gcc asan fuzz diff smoke ir p2996 p2996-ir"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base) BASE_REV=$2; shift 2 ;;
         --steps) STEPS=${2//,/ }; shift 2 ;;
+        --release) STEPS=$ALL_STEPS; shift ;;
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
-        -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -61,7 +64,7 @@ BASE_SHA=$(git rev-parse "$BASE_REV^{commit}") || exit 2
 WORK=${WORK:-$HOME/xo-validate-${HEAD_SHA:0:7}}
 mkdir -p "$WORK/logs" "$CACHE"
 WORK=$(cd "$WORK" && pwd)
-STEPS=${STEPS:-$ALL_STEPS}
+STEPS=${STEPS:-$DEFAULT_STEPS}
 DIRTY=$(git status --porcelain --untracked-files=no | wc -l)
 RESULTS="$WORK/results.tsv"
 : > "$RESULTS"
@@ -137,6 +140,14 @@ step_asan() {
             '-DCMAKE_CXX_FLAGS=$SANITIZE' -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined &&
         cmake --build '$WORK/asan' --parallel $JOBS &&
         ctest --test-dir '$WORK/asan' --output-on-failure --parallel $JOBS --timeout 1800"
+}
+
+step_tsan() {
+    in_gcc "cmake -S . -B '$WORK/tsan' -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_CXX_FLAGS=-fsanitize=thread -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread &&
+        cmake --build '$WORK/tsan' --parallel $JOBS &&
+        TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
+            ctest --test-dir '$WORK/tsan' --output-on-failure --parallel $JOBS --timeout 1800"
 }
 
 step_fuzz() {
@@ -218,7 +229,7 @@ step_p2996_ir() { perf_gate p2996; }
 detail_of() {
     local s=$1 f="$WORK/logs/$1.log" w
     case $s in
-        gcc|asan) ctest_line "$f" ;;
+        gcc|asan|tsan) ctest_line "$f" ;;
         p2996) { ctest_line "$f"; grep -m1 -E 'type signatures changed|completed successfully' "$f"; } | paste -sd ';' ;;
         fuzz) grep -E '^test_v2_fuzz: seed=' "$f" | sed -E 's/.*seed=([0-9]+).* cases=([0-9]+).*inconsistencies=([0-9]+).*/seed \1: \2 cases, \3 inconsistencies/' | paste -sd ';' ;;
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
