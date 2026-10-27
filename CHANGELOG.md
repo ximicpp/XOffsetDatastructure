@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Release tooling: `XOFFSET_VERSION` may now hold a final version
+  (`MAJOR.MINOR.PATCH`) as well as a prerelease (`-alpha|beta|rc.N`); the
+  package config sets `XOffsetDatastructure_IS_PRERELEASE` to match and still
+  refuses numeric, `EXACT` and range requests. `tools/prepare_alpha_release.py`
+  is now `tools/prepare_release.py` and reads the version from the
+  `XOFFSET_VERSION` of its own tree instead of a fixed `0.2.0-alpha.1`; its
+  manifests use the schemas `xoffset-source/v1` and `xoffset-install/v1`. The
+  source and install inventories (also in `tools/validate_vm_package.py`) now
+  include `xoffset_slot_storage.hpp`, and the source closure no longer requires
+  the off-by-default `demo/mapstate` subdirectory, so both tools work on the
+  current tree again.
 - GCC on MinGW and Cygwin (emulated TLS): the per-thread caches (slot free
   lists, free-table cache, owner cache) are off, because emutls can free a
   thread's TLS before its `thread_local` destructors run; threads that
