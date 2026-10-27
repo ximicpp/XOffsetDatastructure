@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-27T01:57:05Z after 022-g8: done 0 2026-10-27T01:57:03Z
+Updated 2026-10-27T01:57:17Z after 026-ckpt2b: running 2026-10-27T01:57:14Z
 
 ```
 runner: pid 45762 (version 2)
@@ -30,6 +30,6 @@ free: 26 GB on /Volumes/XOffsetCS, 26 GB on /Users/ximi
 023-XMODES                               cancelled
 024-ckpt2b                               cancelled
 025-XMODES                               cancelled
-026-ckpt2b                               queued
+026-ckpt2b                               running 2026-10-27T01:57:14Z
 027-XMODES                               queued
 ```
