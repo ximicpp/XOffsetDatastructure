@@ -2792,9 +2792,7 @@ namespace XOffsetDatastructure {
             capacity_ = new_cap;
         }
 
-        // Forced inline: GCC otherwise keeps assign() out of line even with
-        // the general path split off, and pays two calls.
-        XOFFSET_DETAIL_MOVE_INLINE void assign(std::string_view rhs) {
+        void assign(std::string_view rhs) {
             if (is_inline()) {
                 // A nonempty short value into a bound inline head stays
                 // inline: the general path below would do the same after
@@ -2823,9 +2821,13 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        // assign() off its two fast paths; out of line, so that assign()
-        // itself stays small enough to inline at the caller.
-        XOFFSET_DETAIL_NOINLINE void assign_general(std::string_view rhs) {
+        // assign() off its two fast paths. Clang inlines assign() at the
+        // caller only with this part out of line; GCC already inlines the
+        // whole of assign(), and keeps doing so.
+#if defined(__clang__)
+        XOFFSET_DETAIL_NOINLINE
+#endif
+        void assign_general(std::string_view rhs) {
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
