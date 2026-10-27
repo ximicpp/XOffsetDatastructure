@@ -13,7 +13,10 @@ toolchains (P2996 Clang with libc++, or GCC 16 with libstdc++). Mac M4 at
 the G8 checkpoint (SLG M scale, six formats in one process, upper bound of
 the geometric mean, XOffset ÷ zpp_bits): A 0.778, B 0.261, C 0.365; D
 (read-only report, tracked, not a goal) 1.589, and 1.383 against
-FlatBuffers. Known gaps: the G9 relocation tax is not closed, the D scenario
+FlatBuffers. The Mac checkpoint after the G9 fixes (CKPT3, 30af216 against
+the G8 checkpoint 3549272) found no regression: formal upper bound 1.0074,
+SLG A 0.979, B 0.970, C 0.990 (upper bound 1.009), P2996 CTest 106/106 on
+macOS. Known gaps: the G9 relocation tax is not closed, the D scenario
 is slower than zpp_bits and FlatBuffers, schema evolution is not supported,
 and iOS, Android and MSVC full builds are not verified
 (`docs/CLIENT_TARGETS.md`).
