@@ -12,6 +12,7 @@
 #include <experimental/meta>
 #endif
 #include <cstddef>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -37,6 +38,8 @@ namespace XOffsetDatastructure::schema {
         using type = typename [:std::meta::type_of(info):];
         static constexpr bool is_bit_field = std::meta::is_bit_field(info);
         static constexpr std::size_t offset = std::meta::offset_of(info).bytes;
+        static constexpr std::string_view name =
+            std::meta::has_identifier(info) ? std::meta::identifier_of(info) : std::string_view{};
 
         template <class Obj>
         XOFFSET_SCHEMA_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept {
@@ -117,7 +120,8 @@ namespace XOffsetDatastructure::schema {
             else return []<std::size_t... I>(std::index_sequence<I...>) {
                 return ((!member_t<T, I>::is_bit_field &&
                          std::is_same_v<typename D::template member<I>::type, member_type_t<T, I>> &&
-                         D::template member<I>::offset == member_t<T, I>::offset) && ...);
+                         D::template member<I>::offset == member_t<T, I>::offset &&
+                         D::template member<I>::name == member_t<T, I>::name) && ...);
             }(std::make_index_sequence<D::member_count>{});
         }
 

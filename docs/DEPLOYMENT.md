@@ -10,8 +10,14 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，尚未验证：客户端交叉编译（Windows、Android、
-iOS）还没有跑通，客户端上没有性能数据。
+服务端与客户端之间的用法目前是目标，对外不宣传。3.1.0 的现状（详见
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
+
+- Windows x64 客户端用 MinGW-w64 GCC 16 编译，全量测试通过，wire 与 Linux 服务端逐字节
+  一致；MSVC 和 clang-cl 编不了。
+- Android、iOS 客户端编译不了：NDK 和 Xcode 自带的 Clang 都没有反射。客户端的构建
+  方式在 3.2 里补。
+- 客户端上没有任何性能数据，现有计时都来自 Apple M4。
 
 ## 2. 同版本发布
 
@@ -29,13 +35,25 @@ iOS）还没有跑通，客户端上没有性能数据。
 
 ## 3. 构建一致性
 
-- 所有平台使用固定的 clang-p2996 工具链（见 `toolchains/README.md`）。客户端计划
-  同样用它交叉编译，这一路径还在验证中。
+3.1.0 已验证的工具链（本地平台矩阵，3.1.0 RC e913d22，GitHub CI 自 2026-10-23 停用）：
+
+| 用途 | 平台 | 编译器与标准库 |
+| --- | --- | --- |
+| 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
+| 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
+| 客户端 | Android、iOS | 3.1.0 无可用工具链 |
+
+- 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
+  `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
+  MSVC、clang-cl 不支持。
+- MinGW 和 MSVC 的 C++ ABI 不同：MinGW 编的 XOffset 模块只能通过 C 接口给 MSVC 编的
+  引擎使用。
 - 同一可执行文件内，所有翻译单元的头文件版本、编译选项和依赖必须一致。
-- 类型签名（K7）的现状：四个目标（x86-64 Linux/Windows、arm64 iOS/Android）上，
-  库自带测试类型的签名在 CTest 里核对，**不会**检查你自己的 schema。为用户 schema
-  导出签名、不一致时构建失败是目标，尚未实现。在那之前，修改 schema 后应在各目标
-  上跑一次收发测试。
+- 类型签名（K7）：用 `XOFFSET_PIN_SCHEMA` 固定每个收发的根类型
+  （[SCHEMA_PINS.md](SCHEMA_PINS.md)），把固定文件放进服务端和每个客户端的构建。任何
+  一个构建算出的布局不一致，编译直接失败，不必等到运行时被 `load_verified` 拒绝。
+  有意改 schema 时重新生成固定文件，评审时看它的 diff。固定只发现布局变化，版本错位
+  仍然按第 2 节处理。
 - 只支持 64 位小端平台；32 位安卓渠道包不支持。
 
 ## 4. 不可信输入
@@ -66,7 +84,7 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 
 | 来源 | 本版本的行为 | 你需要做的 |
 | --- | --- | --- |
-| P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | 块在释放时清零，arena 里的空洞本身就是 0，所有输出路径照常整段复制 | 转发收到的 wire 时，发送方 wire 空洞里的字节会原样再发出（那是发送方的字节，不是本端内存）。如果下游不应看到上游夹带的字节，转发前重新构建 buffer，不要直接 load 后 save |
+| P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | 块在释放时清零，arena 里的空洞本身就是 0，所有输出路径照常整段复制 | 转发收到的数据时，发送方 wire 空洞里的字节会原样再发出（那是发送方的字节，不是本端内存）。转发前用 `save_compact` 重建，见 4.2 节 |
 | P2 容器的空余容量：`clear()`、`resize()` 变小、`erase`、`pop_back` 之后 `[size, capacity)` 里的旧元素；字符串变短后的旧尾部 | 腾出的字节在缩小时清零（`clear()` 因此是 O(n)） | 无 |
 | P3 结构体的隐式填充字节 | 库构造或搬移的容器元素（含 `XMap` 的键值对）在构造时把填充清零，同样内容总是得到同样的 wire | 直接给根对象或其成员赋值的结构体，库碰不到它的填充。发给客户端的 schema 建议加 `XOFFSET_REQUIRE_NO_PADDING(T)`，或全局定义 `XOFFSET_REJECT_IMPLICIT_PADDING`，有隐式填充就编译失败，按报错补显式字段 |
 
@@ -75,6 +93,39 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 - 同一个 buffer 里**当前还活着**的数据都会发出。服务端内部字段、其他玩家的数据
   不要和下发内容放在同一个 buffer 里，下发前单独构建一个只含可见数据的 buffer。
 - 校验只保证结构安全，不检查内容；见上文「校验不保证什么」。
+
+### 4.2 转发客户端上行数据：用 `save_compact` 重建
+
+服务端把客户端 A 的上行数据转给客户端 B（聊天、组队、交易、观战）时，**不要**
+`load_verified` 之后直接 `save_verified` 或 `freeze_verified`。校验只检查结构，不检查
+空洞和容器余量里的字节是不是 0，所以 A 可以在这些字节里写任意内容，`load_verified`
+照样接受，`save_verified` 再把它们原样发给 B。这不是内存安全问题，是一条绕过业务
+检查的夹带通道。
+
+转发前用 `save_compact` 重建：
+
+```cpp
+XBuffer in = XBuffer::load_verified<ChatMsg>(wire_from_a, XBuffer::maximum_capacity(1u << 20));
+// ……业务检查……
+std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<ChatMsg>()
+```
+
+`save_compact` 按对象图重新写出 wire，A 能写的位置里它会清掉这些：
+
+- 空洞：不写出；
+- 容器余量（`[size, capacity)`）：按新的容量重新分配，余量写成 0；
+- 字符串长度之后的字节：清零（内联字符串的这部分，校验本来就要求是 0）。
+
+它**管不到**两处，要另外处理：
+
+- **结构体的隐式填充**：根对象和容器元素按字节整体复制，填充里的字节会原样带过去，
+  而校验不检查填充。转发的类型要没有隐式填充：给转发的根类型加
+  `XOFFSET_REQUIRE_NO_PADDING(T)`（连同它包含的记录和容器元素一起检查），或全局定义
+  `XOFFSET_REJECT_IMPLICIT_PADDING`，有填充就编译失败，按报错补显式字段。
+- **字段值本身**：标量、字符串内容都是 A 发的内容，`save_compact` 照原样转发。按
+  普通业务输入检查（长度、范围、敏感词等）。
+
+只读的转发可以传 `XCompactOptions{.slack_div = 0}`，wire 最小；B 会接着修改时用默认余量。
 
 ## 5. 容量与资源上限
 
@@ -98,8 +149,10 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 
 ## 6. 网络传输
 
-- wire 是原始内存布局，比 varint 类格式大（实测一个玩家迁移样例：XOffset 15.2 KB，
-  FlatBuffers 8.5 KB，cereal 7.3 KB，protobuf 4.5 KB）。
+- wire 是原始内存布局，比 varint 类格式大。SLG M 规模第 20 周期的玩家状态消息：
+  3.1.0 稠密 wire 13,667 B，FlatBuffers 8,423 B；protobuf 约 4.5 KB（2026-10-21 原型）。
+  大出来的主要是容器余量和空洞；只读下发用 `save_compact` 加
+  `XCompactOptions{.slack_div = 0}` 可以去掉，估算与 FlatBuffers 持平（3.1.0 上没有实测）。
 - 服务端机房内的链路通常不需要压缩。
 - **客户端链路（尤其移动网络）建议在外层加 zstd 压缩**，或 lz4（更快、压缩率较低）。
   压缩在 `save_verified` 之后、`load_verified` 之前做，不影响库的校验。解压时同样
@@ -111,10 +164,12 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 
 - [ ] 所有收发端使用同一份 schema；改 schema 时服务端和客户端同时发版
 - [ ] 握手阶段比较版本或 schema 指纹
-- [ ] 所有平台使用固定的 clang-p2996 工具链构建，且只面向 64 位平台
+- [ ] 每个平台使用第 3 节表里已验证的工具链构建，且只面向 64 位小端平台
+- [ ] 收发的根类型都用 `XOFFSET_PIN_SCHEMA` 固定，固定文件进了服务端和每个客户端的构建
 - [ ] 网络输入只走 `load_verified` 路径，并设置了 `maximum_capacity`
 - [ ] 下发给客户端的 schema 没有隐式填充（`XOFFSET_REQUIRE_NO_PADDING` 或 `XOFFSET_REJECT_IMPLICIT_PADDING`），下发 buffer 只含客户端可见的数据
 - [ ] 服务端接收客户端数据时有 wire 长度上限（建议起点 1 MiB）
+- [ ] 转发客户端上行数据前用 `save_compact` 重建，转发的类型没有隐式填充（4.2 节）
 - [ ] 客户端用较小的 `maximum_capacity` 或 `XBufferPool`
 - [ ] 外层有认证（TLS 或签名）和业务字段检查
 - [ ] 限制了并发 buffer 数和总内存预算

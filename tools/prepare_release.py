@@ -51,7 +51,7 @@ DEPENDENCY_LICENSES = ("external/boost/LICENSE_1_0.txt", "external/typelayout/LI
                        "external/typelayout/LICENSE_1_0.txt")
 EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
                       "typelayout": "fe295929d0a5bfa7809fb737a6eb3db279599346"}
-FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp')
+FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp')
 OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",

@@ -15,4 +15,6 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_validation_scratch.hpp
     xoffset_verified_paths.hpp
     xoffset_verified_receive.hpp
+    xoffset_schema_names.hpp
+    xoffset_handshake.hpp
 )

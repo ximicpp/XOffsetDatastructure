@@ -50,6 +50,7 @@
 // (enum class, or enum E : std::uint8_t {...}).
 
 #include <cstddef>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -201,6 +202,10 @@ namespace XOffsetDatastructure::schema {
 #define XOFFSET_SCHEMA_DETAIL_OFFSETOF_END
 #endif
 
+// The member's name after macro expansion (std::array's member is named
+// through a macro).
+#define XOFFSET_SCHEMA_DETAIL_STR(m) #m
+
 // One described member of class C: its type (from &C::m, so a misspelt name
 // does not compile), offsetof, and access by name. obj.m is the access
 // reflection's obj.[:m:] is; a member pointer (obj.*p) does not always
@@ -213,6 +218,7 @@ namespace XOffsetDatastructure::schema {
             member_pointer_traits<decltype(&C::m)>::type;                      \
         static constexpr bool is_bit_field = false;                            \
         static constexpr ::std::size_t offset = XOFFSET_SCHEMA_DETAIL_OFFSETOF(C, m); \
+        static constexpr ::std::string_view name = XOFFSET_SCHEMA_DETAIL_STR(m); \
         template <class Obj>                                                   \
         XOFFSET_SCHEMA_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept { \
             return (static_cast<Obj&&>(obj).m);                                \
