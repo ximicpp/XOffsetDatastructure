@@ -18,6 +18,8 @@ target_include_directories(mapdemo_common PUBLIC include)
 target_link_libraries(mapdemo_common PUBLIC xoffset_common)
 if(WIN32)
     target_link_libraries(mapdemo_common PUBLIC ws2_32)
+    # std::fopen is standard C++; the MSVC CRT deprecation warning does not apply.
+    target_compile_definitions(mapdemo_common PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
 
 # Bitwise-identical floats between B (real state) and A's reference model.

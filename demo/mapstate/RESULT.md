@@ -23,10 +23,9 @@ it. Both run the same validator and send the same bytes.
 | Same bytes across compiler and platform | Apple M4 Mac, clang-p2996 d77eff1, arm64, against the cloud GCC 16 x86-64 run (`MAPDEMO_COMPARE`) | deferred (Mac queue, 10-26): Mac step file `slg-demo-20261022/review-20261024/MAC_STEPS_DEMO_REVIEW.md`, not yet queued |
 | Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | deferred (Mac queue, 10-26): same Mac step file |
 | Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
-| End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all four targets PASS (section 5) |
+| End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all six targets PASS (section 5) |
 | End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 145 / 145 verdicts, no sanitizer report |
 | End to end, emulators (10-27) | Android emulator (arm64) and iOS Simulator on the Mac, A/B in a Linux VM there | pending (emulator thread, Mac queue) |
-| End to end, MSVC (10-27) | Windows MSVC / clang-cl client | pending (MSVC toolchain blocked by the network policy) |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -166,19 +165,24 @@ Formal Mac timing (Apple M4, clang-p2996 d77eff1): deferred (Mac queue), see the
 
 ## 5. End to end: Linux servers, clients on other platforms (10-27)
 
-Commit `5f461f5` (branch `claude/mapdemo-e2e-20261027`), `tools/run_e2e.sh`.
-A and B: GCC 16.2, C++26 reflection, statically linked so they run on the
-VM next to the clients. Each client target ran `--self-check`, `--replay` of
-one corpus, the three tiers with `--encoding cycle` (`reuse`) and `--evil`.
-The full output is in the project folder
-`slg-demo-20261022/e2e-20261027/` (`mapdemo_e2e_cloud_full1.tgz`,
-`E2E_RESULT_cloud_full1.md`).
+Branch `claude/mapdemo-e2e-20261027`, `tools/run_e2e.sh`. A and B: GCC
+16.2, C++26 reflection, statically linked so they run on the VM next to the
+clients. Each client target ran `--self-check`, `--replay` of one corpus,
+the three tiers with `--encoding cycle` (`reuse`) and `--evil`. Two runs:
+`full1` (four targets, on the field-list branch 83c21b9) wrote the corpus;
+`full2` (six targets, rebased on c8fc851 with the MSVC toolchains and
+next_cpp26 431a7ee) replayed that corpus and compared its step wires with
+`full1`: 500 / 500 ticks equal in every tier, so the rebase changed no byte.
+Output in the project folder `slg-demo-20261022/e2e-20261027/`
+(`mapdemo_e2e_cloud_full{1,2}.tgz`, `E2E_RESULT_cloud_full{1,2}.md`).
 
-| Client target | Runs under | Client build | Self-check | Replay (60 snapshots) | Tiers + evil | Step wires vs first target |
+| Client target (`full2`) | Runs under | Client build | Self-check | Replay (60 snapshots) | Tiers + evil | Step wires vs first target |
 | --- | --- | --- | --- | --- | --- | --- |
-| linux-gcc16-cxx26 | native | GCC 16.2, C++26, reflection | 23 / 23 | 60 / 60 same digests | 74 / 74 verdicts | (reference) |
+| linux-gcc16-cxx26 | native | GCC 16.2, C++26, reflection | 23 / 23 | 60 / 60 same digests | 77 / 77 verdicts (with server self-test) | 3 / 3 equal to `full1` |
 | linux-gcc13-cxx20 | native | GCC 13.3, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 tiers equal |
 | windows-mingw | wine | MinGW GCC 16.2, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| windows-msvc | wine | MSVC 19.44, `/MT`, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| windows-clang-cl | wine | clang-cl 19.1, MSVC STL, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | android-arm64 | qemu-aarch64 user mode | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 
 What this shows:
@@ -210,8 +214,8 @@ modes + evil x two, 145 / 145 verdicts, no sanitizer report
 (`mapdemo_e2e_cloud_asan1.tgz`).
 
 Still open for this section: the Android emulator and iOS Simulator runs on
-the Mac (wrapper scripts by the emulator thread), the MSVC client, and the
-macOS window client with screenshots.
+the Mac (wrapper scripts by the emulator thread) and the macOS window client
+with screenshots.
 
 ## 6. Scope
 
