@@ -630,6 +630,13 @@ namespace XOffsetDatastructure {
             return arena() ? object_at_offset_const<T>(root_offset_value()) : nullptr;
         }
 
+        // find_root_storage for a root offset the caller already holds (it
+        // wrote root_offset_value() from it).
+        template <typename T>
+        T* find_root_storage_at(std::uint64_t root_offset) noexcept {
+            return object_at_offset<T>(root_offset);
+        }
+
         template <typename T, typename... Args>
         T* construct_root_storage(Args&&... args) {
             T* result = construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
@@ -1905,8 +1912,10 @@ namespace XOffsetDatastructure {
             begin_reinit();
             free_table_lost_ = true;
             if (!buffer_.assign_in_place(stored, size, sizeof(arena_header))) throw XBadAlloc();
+            // check_reinit_payload() holds by construction: the header was
+            // just written with used_end == size == the logical size, so its
+            // checks pass and nothing lies past used_end to zero.
             write_payload_header(buffer_.data(), root_offset, size);
-            check_reinit_payload();
         }
 
         // In-place direct receive (XBuffer::begin_verified_reload): the
@@ -2028,6 +2037,26 @@ namespace XOffsetDatastructure {
         std::uint64_t bound_root_type_id_ = 0;
         std::uint64_t bound_schema_hash_ = 0;
 
+        // The root that make<T>() or a verified load of T admitted, valid
+        // while the epoch it was admitted at is current. Typed access, the
+        // schema binding and the root offset change only with the epoch
+        // (reinit, reset, move, swap, storage move) or on a fresh owner, so
+        // a hit in root<T>() returns what its checked path would. Set only
+        // by those mutating calls, so root<T>() itself stays read-only. Not
+        // transferred: an owner whose epoch advanced misses.
+        template <typename T>
+        T* cached_root() const noexcept {
+            return root_cache_epoch_ == m_epoch && root_cache_type_ == type_identity<T>()
+                ? static_cast<T*>(root_cache_) : nullptr;
+        }
+
+        template <typename T>
+        void cache_root(T* root) noexcept {
+            root_cache_ = root;
+            root_cache_type_ = type_identity<T>();
+            root_cache_epoch_ = m_epoch;
+        }
+
     private:
         friend struct detail::VerifiedPathsAccess;
         friend struct detail::VerifiedReceiveAccess;
@@ -2039,6 +2068,9 @@ namespace XOffsetDatastructure {
         bool free_table_lost_ = false;
         const void* root_type_identity_ = nullptr;
         std::uint64_t m_epoch = 0;
+        void* root_cache_ = nullptr;
+        const void* root_cache_type_ = nullptr;
+        std::uint64_t root_cache_epoch_ = 0;
     };
 
     // ========================================================================
@@ -4955,6 +4987,13 @@ namespace XOffsetDatastructure {
         // Test switch for XBuffer's small dense reload path (differential on/off runs).
         inline constinit bool small_reload_fast_path = true;
 
+        // std::pmr::new_delete_resource(), looked up once: verified reloads
+        // name it on every read, and the lookup is an out-of-line call.
+        inline std::pmr::memory_resource* default_wire_upstream() noexcept {
+            static std::pmr::memory_resource* const resource = std::pmr::new_delete_resource();
+            return resource;
+        }
+
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
         // Diagnostic build only: layout classes, per root type, of the wires
         // that pass verified validation, printed to stderr at exit.
@@ -5006,7 +5045,7 @@ namespace XOffsetDatastructure {
             std::uint64_t free_bytes = 0;
             // Host-only scratch for bitmaps above the inline size: a reload
             // buffer's retained words when set, else one upstream block.
-            std::pmr::memory_resource* upstream = std::pmr::new_delete_resource();
+            std::pmr::memory_resource* upstream = default_wire_upstream();
             WireValidationScratch* retained = nullptr;
             // Cursor path: while no hole is registered and every live block
             // starts where the previous one ended (canonical preorder), the
@@ -6698,6 +6737,16 @@ namespace XOffsetDatastructure {
             }
         }
 
+        template <typename T>
+        T* find_root_at(XBufferCore& xbuf, std::uint64_t root_offset) {
+            if constexpr (has_wire_allocator_ctor<T>) {
+                return xbuf.template find_root_storage_at<T>(root_offset);
+            } else {
+                auto* wrapper = xbuf.template find_root_storage_at<ReflectRoot<T>>(root_offset);
+                return wrapper ? &wrapper->ref() : nullptr;
+            }
+        }
+
         // Wire header of a payload of `used` bytes with the root at
         // `root_offset` and `holes` hole table entries; the writer sets
         // extent_count. Sizes fit: used_bytes <= MAX_PAYLOAD < 2 GiB.
@@ -7099,11 +7148,13 @@ namespace XOffsetDatastructure {
             typed_root_access_allowed_ = true;
             this->template bind_root_type<T>();
             bind_schema_if_available<T>();
+            this->cache_root(result);
             return result;
         }
         
         template<typename T>
         T& root() {
+            if (T* cached = this->template cached_root<T>()) [[likely]] return *cached;
             require_typed_root_access(
                 "root<T>(): typed root access requires local construction or load_verified<T>(); "
                 "use unsafe_root<T>() only for trusted raw payloads");
@@ -7427,7 +7478,7 @@ namespace XOffsetDatastructure {
                     reinit_from_dense_wire_in_place(stored, header.root_offset, used);
                     finish_verified_load<T>(header, stored + (used - XWIRE_PAYLOAD_BEGIN),
                                             static_cast<std::size_t>(header.hole_count),
-                                            upstream ? upstream : std::pmr::new_delete_resource(), who, nullptr);
+                                            upstream ? upstream : detail::default_wire_upstream(), who, nullptr);
                 } catch (...) {
                     reset_arena(0);
                     throw;
@@ -7439,7 +7490,7 @@ namespace XOffsetDatastructure {
                 if (!upstream) {
                     if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::WireValidationScratch>();
                     retained = reload_scratch_.get();
-                    upstream = std::pmr::new_delete_resource();
+                    upstream = detail::default_wire_upstream();
                 }
                 header = XWireHeaderV2{};
                 const auto layout = admit_wire_header<T>(data, header, who);
@@ -7631,7 +7682,9 @@ namespace XOffsetDatastructure {
             if (this->arena()->used_end != header.used_bytes) {
                 throw XException(std::string(who) + ": non-normalized payload extent");
             }
-            auto* root_ptr = detail::find_root<T>(*this);
+            // Every caller wrote the payload header from `header`: its root
+            // offset is header.root_offset.
+            auto* root_ptr = detail::find_root_at<T>(*this, header.root_offset);
             if (!root_ptr) {
                 throw XException(std::string(who) + ": root not found");
             }
@@ -7646,6 +7699,7 @@ namespace XOffsetDatastructure {
             this->load_free_blocks(holes, hole_count);
             typed_root_access_allowed_ = true;
             bind_schema<T>();
+            this->cache_root(root_ptr);
         }
 
         void require_typed_root_access(const char* message) const {
