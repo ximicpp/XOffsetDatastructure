@@ -192,14 +192,14 @@ set_tests_properties(schema_evolution_lineage_same_hash_fail PROPERTIES
     LABELS "reflection;evolution"
     PASS_REGULAR_EXPRESSION "v1::Stats and v2::Stats have the same schema_hash")
 
-# G5/F4: the two libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
+# G5/F4: the libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
 #   fuzz_<target>_replay          replays fuzz/regressions/<target>/: crash
 #                                 inputs kept by fix PRs (see its README.md)
 #   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
 #                                 by fuzz_<target>_replay_seeds
 # Names start with the target name so tools/validate_vm.py --targets selects all three.
-foreach(fuzz_target v2_wire wire_schemas)
+foreach(fuzz_target v2_wire wire_schemas schema_evolution)
     set(replay fuzz_${fuzz_target}_replay)
     add_executable(${replay} fuzz/fuzz_${fuzz_target}.cpp fuzz/replay_main.cpp)
     configure_xoffset_target(${replay})
