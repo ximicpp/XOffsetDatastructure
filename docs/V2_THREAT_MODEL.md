@@ -29,7 +29,10 @@
 
 - `XBuffer::load_verified<T>`、`TypedXBuffer<T>::load`；
 - `begin_verified_receive<T>` / `finish_verified`；
-- `receive_raw::validate<T>`（内部接口）。
+- `receive_raw::validate<T>`（内部接口）；
+- 3.2 schema 演进：`XPeerSchemas::load_verified<W>`、`evolve_load_verified<W>`（按 wire
+  头选出链上的版本，再走上面的 `load_verified`）、`XPeerSchemas::accept` 和
+  `read_schema_ack`（握手消息，同样走 `load_verified`，另有 64 KiB 和条目数上限）。
 
 `load_unverified` 不校验，**不是**不可信输入的入口。
 
@@ -44,6 +47,7 @@
 | T5 | 已删除数据的旧字节随 wire 发出（A4） | **已防住，有两处调用方责任** | P1、P2 由 M3、M4 清零；P3 由 M6 处理库构造的元素。调用方直接赋值的带填充记录、以及 load 进来的空洞原样转发，见 3.2 |
 | T6 | 不同编译器对同一 wire 的理解不同 | 已发现一处并修复 | enum 键只定义 `operator<=>` 时，Clang 和 GCC 的集合顺序相反，两边互相拒收；修复和 CI 互读作业见 GCC 16 移植 PR |
 | T7 | 业务层非法值（负数金币等） | **不防** | 不属于结构校验，按普通业务输入检查 |
+| T8 | 用旧版本 wire 放大服务端开销（3.2 schema 演进） | **有界** | 攻击者可以选链上最旧的版本，让服务端多做一次完整校验加每级一次转换；转换后的对象可能比 wire 大（新增字段、更宽的类型）。转换目标 buffer 的上限默认等于传给 `load_verified` 的 `maximum_capacity`，超过即失败。按链长估算放大倍数，必要时缩短链。`fuzz_schema_evolution` 覆盖这条入口 |
 
 ### 3.1 资源耗尽（T4）
 

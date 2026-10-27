@@ -61,6 +61,14 @@ AArch64 对齐规则）下 wire 一致，但这只是旁证，不等于 Android 
 
 客户端（Android、iOS、MSVC）的构建方式是 3.2 的工作，进展以本文后续版本为准；3.1.0 不包含它。
 
+## 握手（3.2，未发布）
+
+客户端与服务端的 schema 版本不同时，3.2 的服务端负责转换（[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）。
+客户端只多一次握手，用 `xoffset_handshake.hpp`：连接建立后发
+`make_schema_hello<...>()`，收到服务端的 ack 后用 `read_schema_ack<...>()` 读出结果，
+被拒绝时提示更新。这两个函数不抛异常；关异常的客户端构建要等 SC-8 的
+`try_load_verified` 合入。客户端不包含 `xoffset_evolution.hpp`，没有转换代码。
+
 ## 范围
 
 只支持 64 位目标。32 位客户端、大端平台不在 3.1.0 范围内。
