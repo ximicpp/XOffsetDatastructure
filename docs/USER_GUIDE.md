@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（1.0.0，V2 格式）
+# XOffsetDatastructure 用户指南（3.0.0，V2 格式）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
