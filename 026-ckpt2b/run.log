@@ -1,0 +1,102 @@
+== 2026-10-27T01:57:21Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: f8eebf4 (CKPT1_R2 with formal-3: pass; fixed by 性能优化 01:42Z)
+== 2026-10-27T01:57:40Z 1. export
+head 35492720b5981d9672c8b8f00037dcb687aaf9fd tree 509b344339ea42adc60f8a66be3bd98d839219a8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+f8 f8eebf46565c746a69ed64dbe9e406546032f892 tree 40d4a6e1a594f1b062108e0bf1e8ec4420d6e68a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+/Volumes/XOffsetCS/perf-gate/src/ckpt2b/head-3549272/bench/slg/MANIFEST: 23 files match
+== 2026-10-27T01:57:41Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: bincache slg-509b344339ea-ffd88a1606b3-p2996-d77eff1-5afc2985
+sc f8: bincache sc-40d4a6e1a594-metar3-p2996-d77eff1-8ba92475
+slg f8: bincache slg-40d4a6e1a594-ffd88a1606b3-p2996-d77eff1-5afc2985
+== 2026-10-27T01:57:45Z 3. PR #120 __text
+sc_xoffset: __text base 3549272 c527248fb9bd84cf #120 c55a6ef c527248fb9bd84cf; file 3340584675ac4ab9 / 3340584675ac4ab9
+slg_bench: __text base 3549272 3f4c39e6ad8d9fdf #120 c55a6ef 3f4c39e6ad8d9fdf; file cd5eac056a30d4f0 / cd5eac056a30d4f0
+reloc_bench: __text base 3549272 96bf0afc4796c9da #120 c55a6ef 96bf0afc4796c9da; file fc70fe00199dc786 / fc70fe00199dc786
+#120: sc_xoffset same; slg_bench same; reloc_bench same; -> class 0
+== 2026-10-27T01:58:29Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	35492720b5981d9672c8b8f00037dcb687aaf9fd	3340584675ac4ab9ebe1605892742f8cb50715a97d7a75e298b6368c401975b3	cd5eac056a30d4f0ece77da06a24c514fb3b41ad1b372df0a75a44674528f111	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+f8	f8eebf46565c746a69ed64dbe9e406546032f892	13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c	8ee1d0a98cd94164c30f602c5ca143b035c4ec6871c6b3853fe0c96027a662f5	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1422 2614 15119 862360 824] anchor [1422 2614 15119 862360 824]
+default bytes head [1422 2614 15119 862360 824] anchor [1422 2614 15119 862360 824]
+== 2026-10-27T01:58:55Z 5. CKPT2b L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-ckpt2b-3549272-smoke
+  head         3340584675ac4ab9ebe1605892742f8cb50715a97d7a75e298b6368c401975b3
+  head_aa      3340584675ac4ab9ebe1605892742f8cb50715a97d7a75e298b6368c401975b3
+  anchor       13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+  bisect 55c06b5121d8 #91 S POD assign fast path: deferred (built when the bisection reaches it)
+  bisect 33b198268257 #95 S expand tail precheck (+ #92 #94, class 0): deferred (built when the bisection reaches it)
+  bisect e46cf38190e1 #104 S shift rebase inline (+ #96 #97 #98 #100 #101 #102 #105, class 0): deferred (built when the bisection reaches it)
+  bisect 12866015d8d8 #114 S Z2 indeterminate validation context: deferred (built when the bisection reaches it)
+  bisect b50fc8abbbe0 #117 S Z3 swap fast path (+ #116 0, macOS __text = #114): deferred (built when the bisection reaches it)
+  bisect 4434448c724b #113 L P4m validate claim: deferred (built when the bisection reaches it)
+  bisect 4492096a0080 #93 L fused regrow: deferred (built when the bisection reaches it)
+== formal-1 start 2026-10-27T01:58:56+00:00 {'waited_s': 10.1, 'load1': 2.05, 'quiet_s': 10.1, 'screen': {'WindowServer': 4.1, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.1572, A/A ok False, old 8/12, cpu {'samples': 22, 'other_busy_samples': 1, 'compile_samples': 0, 'other_busy_top': {'Claude Helper (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.2}  (the gate verdict needs the pooled batches: run analyze)
+== slg start 2026-10-27T01:59:51+00:00 {'waited_s': 10.1, 'load1': 1.87, 'quiet_s': 10.1, 'screen': {'WindowServer': 7.2, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 3.7 s rc=0
+run 2/12 anch: 0.6 s rc=0
+run 3/12 anch: 0.5 s rc=0
+run 4/12 head: 0.5 s rc=0
+run 5/12 head: 0.5 s rc=0
+run 6/12 anch: 0.5 s rc=0
+run 7/12 anch: 0.5 s rc=0
+run 8/12 head: 0.5 s rc=0
+run 9/12 head: 0.5 s rc=0
+run 10/12 anch: 0.5 s rc=0
+run 11/12 anch: 0.5 s rc=0
+run 12/12 head: 0.5 s rc=0
+slg: A 0.9740 [0.9367, 1.0129]  B 0.8611 [0.8364, 0.8866]  C 1.0030 [0.9434, 1.0664]  D 1.0050 [0.9589, 1.0534]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-ckpt2b-3549272
+  head         3340584675ac4ab9ebe1605892742f8cb50715a97d7a75e298b6368c401975b3
+  head_aa      3340584675ac4ab9ebe1605892742f8cb50715a97d7a75e298b6368c401975b3
+  anchor       13793b33f19ed14470970b9625baead575019e4f1e95ac8cff96f3fa6923f87c
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+  bisect 55c06b5121d8 #91 S POD assign fast path: deferred (built when the bisection reaches it)
+  bisect 33b198268257 #95 S expand tail precheck (+ #92 #94, class 0): deferred (built when the bisection reaches it)
+  bisect e46cf38190e1 #104 S shift rebase inline (+ #96 #97 #98 #100 #101 #102 #105, class 0): deferred (built when the bisection reaches it)
+  bisect 12866015d8d8 #114 S Z2 indeterminate validation context: deferred (built when the bisection reaches it)
+  bisect b50fc8abbbe0 #117 S Z3 swap fast path (+ #116 0, macOS __text = #114): deferred (built when the bisection reaches it)
+  bisect 4434448c724b #113 L P4m validate claim: deferred (built when the bisection reaches it)
+  bisect 4492096a0080 #93 L fused regrow: deferred (built when the bisection reaches it)
+== formal-1 start 2026-10-27T02:00:11+00:00 {'waited_s': 240.9, 'load1': 1.32, 'quiet_s': 240.9, 'screen': {'WindowServer': 4.1, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.0202, A/A ok True, old 11/12, cpu {'samples': 229, 'other_busy_samples': 3, 'compile_samples': 0, 'other_busy_top': {'XprotectService': 2, 'Claude Helper (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.48}  (the gate verdict needs the pooled batches: run analyze)
+== formal-2 start 2026-10-27T02:11:58+00:00 {'waited_s': 241.0, 'load1': 1.85, 'quiet_s': 240.9, 'screen': {'WindowServer': 3.8, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-2: this batch alone: max UB head/anchor 1.0114, A/A ok True, old 11/12, cpu {'samples': 212, 'other_busy_samples': 3, 'compile_samples': 0, 'other_busy_top': {'Claude Helper (Renderer)': 2, 'searchpartyd': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.26}  (the gate verdict needs the pooled batches: run analyze)
+RESULT.json / RESULT.md written: verdict incomplete
+== slg start 2026-10-27T02:23:10+00:00 {'waited_s': 241.0, 'load1': 1.29, 'quiet_s': 240.9, 'screen': {'WindowServer': 3.6, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 6.3 s rc=0
+run 2/12 anch: 5.1 s rc=0
+run 3/12 anch: 4.4 s rc=0
+run 4/12 head: 4.4 s rc=0
+run 5/12 head: 4.4 s rc=0
+run 6/12 anch: 4.4 s rc=0
+run 7/12 anch: 4.4 s rc=0
+run 8/12 head: 4.4 s rc=0
+run 9/12 head: 4.4 s rc=0
+run 10/12 anch: 4.4 s rc=0
+run 11/12 anch: 4.4 s rc=0
+run 12/12 head: 4.4 s rc=0
+slg: A 0.9468 [0.9265, 0.9674]  B 0.9113 [0.9052, 0.9175]  C 0.9983 [0.9826, 1.0143]  D 1.0142 [0.9945, 1.0342]  verdict pass (1 group(s) pooled)
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict pass
+AUTO /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-ckpt2b-3549272: verdict pass
+screen watcher: 28 calls (dark.log)
+CKPT2b L2 rc=0 (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, other = stopped)
+== 2026-10-27T02:28:08Z finish rc=0

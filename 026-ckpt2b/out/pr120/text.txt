@@ -1,0 +1,3 @@
+sc_xoffset: __text base 3549272 c527248fb9bd84cf #120 c55a6ef c527248fb9bd84cf; file 3340584675ac4ab9 / 3340584675ac4ab9
+slg_bench: __text base 3549272 3f4c39e6ad8d9fdf #120 c55a6ef 3f4c39e6ad8d9fdf; file cd5eac056a30d4f0 / cd5eac056a30d4f0
+reloc_bench: __text base 3549272 96bf0afc4796c9da #120 c55a6ef 96bf0afc4796c9da; file fc70fe00199dc786 / fc70fe00199dc786

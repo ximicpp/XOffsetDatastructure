@@ -1,0 +1,5 @@
+CKPT2b 0
+anchor f8eebf4 (CKPT1_R2 with formal-3: pass; fixed by 性能优化 01:42Z)
+screen watcher: 28 calls (dark.log)
+#120 sc_xoffset same; slg_bench same; reloc_bench same; -> class 0
+ctest not run here (G8 job 022: P2996 ctest on 3549272)
