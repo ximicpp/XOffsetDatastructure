@@ -3634,7 +3634,7 @@ namespace XOffsetDatastructure {
         }
 
         T& emplace_back() {
-            return *insert_construct(size_, [&](T* dst) {
+            return *append_construct([&](T* dst) {
                 fixed_detail::default_construct(dst, element_binding());
             });
         }
@@ -3642,7 +3642,7 @@ namespace XOffsetDatastructure {
         template <typename... Args>
             requires (sizeof...(Args) > 0)
         T& emplace_back(Args&&... args) {
-            return *insert_construct(size_, [&](T* dst) {
+            return *append_construct([&](T* dst) {
                 fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
             });
         }
@@ -3659,7 +3659,7 @@ namespace XOffsetDatastructure {
         // restate.
         template <typename V>
         XOFFSET_DETAIL_NOINLINE Grown push_back_general(V value) {
-            insert_construct(size_, [&](T* dst) {
+            append_construct([&](T* dst) {
                 fixed_detail::transfer_construct(dst, static_cast<const T&>(value), element_binding());
             });
             return {data_delta, capacity_};
@@ -3716,6 +3716,26 @@ namespace XOffsetDatastructure {
             fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
         }
 
+        // Appends (emplace_back, push_back_general) keep the general path in
+        // the same function: under Clang a call to it there costs more than
+        // it saves (slg.A). GCC and MSVC take insert_construct as before.
+        template <typename Construct>
+#if defined(__clang__)
+        iterator append_construct(Construct&& construct) {
+            if (size_ < capacity_) [[likely]] {
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + size_;
+                construct(slot);
+                ++size_;
+                return slot;
+            }
+            return insert_body<false>(size_, construct);
+        }
+#else
+        XOFFSET_DETAIL_MOVE_INLINE iterator append_construct(Construct&& construct) {
+            return insert_construct(size_, std::forward<Construct>(construct));
+        }
+#endif
+
         // GrowOutOfLine: an insert into a full vector grows through an
         // out-of-line reserve. Flat set/map inserts use it: with reserve
         // inlined there, GCC stops inlining their insert/try_emplace.
@@ -3730,6 +3750,45 @@ namespace XOffsetDatastructure {
                 ++size_;
                 return slot;
             }
+#if defined(__clang__)
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                const size_type n = size_;
+                if (index < n && n < capacity_) [[likely]] {
+                    // Insert into spare capacity, inline. As on the append
+                    // path the checks of insert_general are implied, and the
+                    // head stays in registers across the move.
+                    alignas(T) std::byte storage[sizeof(T)];
+                    auto* staged = reinterpret_cast<T*>(storage);
+                    construct(staged);
+                    T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                    // Nothing below throws, so size_ is published before the
+                    // move: the next operation's head load then does not wait
+                    // on a store still in flight behind the move.
+                    size_ = n + 1u;
+                    std::memmove(items + index + 1, items + index, std::size_t(n - index) * sizeof(T));
+                    std::memcpy(items + index, staged, sizeof(T));
+                    return items + index;
+                }
+            }
+            return insert_general<GrowOutOfLine>(index, construct);
+#else
+            // GCC and MSVC keep the one function they had: with the insert
+            // fast path, GCC 16 inlined less into push_back_general.
+            return insert_body<GrowOutOfLine>(index, construct);
+#endif
+        }
+
+#if defined(__clang__)
+        // insert_construct off its fast paths. Clang inlines the fast paths
+        // at the caller only with this part in a separate function.
+        template <bool GrowOutOfLine, typename Construct>
+        iterator insert_general(size_type index, Construct& construct) {
+            return insert_body<GrowOutOfLine>(index, construct);
+        }
+#endif
+
+        template <bool GrowOutOfLine, typename Construct>
+        XOFFSET_DETAIL_MOVE_INLINE iterator insert_body(size_type index, Construct& construct) {
             if (index > size_ || size_ == max_size()) throw XBadAlloc();
             if (index == size_ && append_grow(construct)) {
                 // Append into a full vector: built in place in the grown block.
@@ -3782,9 +3841,21 @@ namespace XOffsetDatastructure {
             if (index >= size_) return;
             if (index + 1 == size_) { pop_back(); return; }
             if constexpr (std::is_trivially_copyable_v<T>) {
+#if defined(__clang__)
+                // size_ > 1 names a live block. The head stays in registers
+                // across the move (Clang reloads it after the memmove
+                // otherwise); the vacated slot is zeroed as by scrub(n - 1, n).
+                // GCC and MSVC keep the code they had.
+                const size_type n = size_;
+                T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                std::memmove(items + index, items + index + 1, std::size_t(n - index - 1) * sizeof(T));
+                size_ = n - 1u;
+                std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
+#else
                 std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
                 --size_;
                 scrub(size_, size_ + 1);
+#endif
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // SHIFT: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
