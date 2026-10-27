@@ -11,7 +11,9 @@
 #else
 #include <experimental/meta>
 #endif
+#include <array>
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -100,6 +102,58 @@ namespace XOffsetDatastructure::schema {
                 return false;
         return true;
     }
+
+    // Reflection only, no field-list counterpart: the server-side schema
+    // evolution (xoffset_evolution.hpp) and freeze tool (xoffset_schema_freeze.hpp)
+    // need them and require this backend.
+    //   enumerator_count_v<E>, enumerator_t<E, I>   ::value, ::name, declaration order
+    //   identifier_v<T>        the class or enum's own name, aliases resolved
+    //   qualified_name_v<T>    "ns::Outer::Name" for a named class or enum, the
+    //                          compiler's spelling for anything else
+    template <class E>
+    inline constexpr std::size_t enumerator_count_v = std::meta::enumerators_of(^^E).size();
+
+    template <class E, std::size_t I>
+    struct enumerator_t {
+        static constexpr std::meta::info info = std::meta::enumerators_of(^^E)[I];
+        static constexpr E value = std::meta::extract<E>(info);
+        static constexpr std::string_view name = std::meta::identifier_of(info);
+    };
+
+    template <class T>
+    inline constexpr std::string_view identifier_v = std::meta::identifier_of(std::meta::dealias(^^T));
+
+    namespace reflect_detail {
+        template <class T>
+        consteval std::string qualified_name_text() {
+            using namespace std::meta;
+            constexpr info type = dealias(^^T);
+            if constexpr ((is_class_type(type) || is_enum_type(type)) && has_identifier(type) &&
+                          !has_template_arguments(type)) {
+                std::string text(identifier_of(type));
+                for (info scope = parent_of(type); scope != ^^::; scope = parent_of(scope)) {
+                    if (!is_namespace(scope) && !is_type(scope)) break;
+                    text = (has_identifier(scope) ? std::string(identifier_of(scope)) : std::string("(anonymous)")) +
+                           "::" + text;
+                }
+                return text;
+            } else {
+                return std::string(display_string_of(type));
+            }
+        }
+
+        template <class T>
+        inline constexpr auto qualified_name_storage = [] {
+            std::array<char, qualified_name_text<T>().size()> text{};
+            const std::string s = qualified_name_text<T>();
+            for (std::size_t i = 0; i < text.size(); ++i) text[i] = s[i];
+            return text;
+        }();
+    } // namespace reflect_detail
+
+    template <class T>
+    inline constexpr std::string_view qualified_name_v{reflect_detail::qualified_name_storage<T>.data(),
+                                                       reflect_detail::qualified_name_storage<T>.size()};
 
     // XOFFSET_RECORD under reflection: the field list must say what reflection
     // sees, and an XOFFSET_RECORD must keep its promise.
