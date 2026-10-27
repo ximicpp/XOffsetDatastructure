@@ -1,29 +1,14 @@
 # 客户端目标可行性（K8，3.1.0）
 
-结论：服务端与客户端之间使用 XOffset，在 **Linux arm64** 和 **Windows x64（MinGW-w64 GCC 16）**
-上已验证（2026-10-21 GitHub CI；CI 停用后改为本地矩阵，3.1.0 RC 五列全过，见下一节）；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
-服务端与客户端必须用同一 schema、同时发布（见产品定位）。
+结论：服务端与客户端之间使用 XOffset，在 **Windows x64（MinGW-w64 GCC 16）** 上已验证，
+**Linux arm64** 作为 Android 的旁证也已验证；记录是本地平台矩阵（3.1.0 RC 五列全过，见下一节）。
+**Android** 和 **iOS** 在 3.1.0 上不可行，缺的是工具链前提，不是库本身的问题。
+服务端与客户端必须用同一 schema、同时发布（见 [DEPLOYMENT.md](DEPLOYMENT.md) 第 2 节）。
 
-## 已验证（`.github/workflows/client-targets.yml`）
+## 已验证：本地平台矩阵（3.1.0 起的记录）
 
-| 目标 | 编译器 | 验证内容 | 结果 |
-| --- | --- | --- | --- |
-| Linux x86-64（参照） | GCC 16（gcc 镜像按 digest 固定） | 写出参照 wire 语料 | 作为其他目标的比对基准 |
-| Linux arm64（GitHub `ubuntu-24.04-arm` 原生） | GCC 16（arm64 平台 manifest digest 固定） | Debug 全量 CTest；读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过，wire 逐字节一致 |
-| Windows x64（`windows-latest` + MSYS2 UCRT64） | MinGW-w64 GCC 16.2（要求 ≥ 16） | Debug 全量 CTest 87/87（Ninja）；Release 构建读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过；5 个语料（empty、small、medium_holes、reloaded_mutated、sparse）逐字节一致 |
-
-Windows 上需要注意的三点（都已在仓库里处理）：
-
-- 依赖锁按子模块字节做哈希，checkout 前要 `core.autocrlf false`、`core.eol lf`，否则 Boost 的
-  `* text=auto` 会把文件转成 CRLF，锁校验失败。
-- 顶层构建在 MinGW 上静态链接运行时（`-static`）。动态 `libstdc++-6.dll` 里的 `std::pmr` 等
-  内部分配不经过测试替换的 `operator new`，分配失败注入类测试会测不到。这只影响本仓库自己的
-  测试和工具，不进入导出的接口。
-- 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
-
-## 本地平台矩阵（v1.1 起，代替 GitHub CI）
-
-`tools/platform_matrix.sh TARGET` 构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
+GitHub CI 自 2026-10-23 停用，`.github/workflows/` 里的文件不再运行。现在的记录是
+`tools/platform_matrix.sh TARGET`：它构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
 `--read` 和 `diff -r`，结果写进构建目录的 `PLATFORM_RESULT.md`。
 
 | 目标 | 在哪跑 | 编译器 | 最近结果 |
@@ -36,7 +21,26 @@ Windows 上跳过的两项是 `test_canonical_cold_no_callback` 和 `test_canoni
 每线程 owner 缓存，而 GCC 在 MinGW 上用 emutls，线程退出时访问 `thread_local` 会拿到新块，所以这类
 缓存在 MinGW GCC 上整体关闭（`XOFFSET_THREAD_CACHES=0`），这两项以退出码 77 报跳过。
 
-## 目前不可行
+Windows 上需要注意的三点（都已在仓库里处理）：
+
+- 依赖锁按子模块字节做哈希，checkout 前要 `core.autocrlf false`、`core.eol lf`，否则 Boost 的
+  `* text=auto` 会把文件转成 CRLF，锁校验失败。
+- 顶层构建在 MinGW 上静态链接运行时（`-static`）。动态 `libstdc++-6.dll` 里的 `std::pmr` 等
+  内部分配不经过测试替换的 `operator new`，分配失败注入类测试会测不到。这只影响本仓库自己的
+  测试和工具，不进入导出的接口。
+- 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
+
+## 历史记录：GitHub CI（2026-10-21，wire 格式 2.0）
+
+CI 停用前 `.github/workflows/client-targets.yml` 的结果，格式是 2.0，测试数也比现在少；只作历史参考。
+
+| 目标 | 编译器 | 验证内容 | 结果 |
+| --- | --- | --- | --- |
+| Linux x86-64（参照） | GCC 16（gcc 镜像按 digest 固定） | 写出参照 wire 语料 | 作为其他目标的比对基准 |
+| Linux arm64（GitHub `ubuntu-24.04-arm` 原生） | GCC 16（arm64 平台 manifest digest 固定） | Debug 全量 CTest；读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过，wire 逐字节一致 |
+| Windows x64（`windows-latest` + MSYS2 UCRT64） | MinGW-w64 GCC 16.2（要求 ≥ 16） | Debug 全量 CTest 87/87（Ninja）；Release 构建读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过；5 个语料（empty、small、medium_holes、reloaded_mutated、sparse）逐字节一致 |
+
+## 3.1.0 不可行
 
 **Android（arm64-v8a）**：NDK 自带的 Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC，
 所以现在没有能编译 XOffset 的 Android 工具链。Linux arm64 的结果说明同一 ABI（LP64、小端、
@@ -51,6 +55,11 @@ AArch64 对齐规则）下 wire 一致，但这只是旁证，不等于 Android 
 
 所以即使装上 Xcode 也只能走到编译，链接仍会失败。前提：Xcode + iOS SDK，并为 P2996 工具链
 单独构建 iOS 与 iOS 模拟器版的 libc++ 和 compiler-rt。
+
+**Windows x64，MSVC 或 clang-cl**：两者都没有反射，编不了完整库。MinGW 和 MSVC 的 C++ ABI
+不同，用 MSVC 的引擎只能通过 C 接口使用 MinGW 编的 XOffset 模块。
+
+客户端（Android、iOS、MSVC）的构建方式是 3.2 的工作，进展以本文后续版本为准；3.1.0 不包含它。
 
 ## 范围
 
