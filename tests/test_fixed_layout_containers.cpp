@@ -39,10 +39,10 @@ XOFFSET_REGISTER_SCHEMA_NAME(FixedRoot, "test.FixedRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(FixedNestedRoot, "test.FixedNestedRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(FixedAssocRoot, "test.FixedAssocRoot")
 
-static_assert(sizeof(XFixedString) == 12);
-static_assert(sizeof(XFixedVector<int32_t>) == 12);
-static_assert(sizeof(XFixedFlatSet<int32_t>) == 12);
-static_assert(sizeof(XFixedFlatMap<int32_t, int32_t>) == 12);
+static_assert(sizeof(XFixedString) == 16);
+static_assert(sizeof(XFixedVector<int32_t>) == 16);
+static_assert(sizeof(XFixedFlatSet<int32_t>) == 16);
+static_assert(sizeof(XFixedFlatMap<int32_t, int32_t>) == 16);
 static_assert(is_byte_copy_safe_v<FixedRoot>);
 static_assert(is_byte_copy_safe_v<FixedItem>);
 static_assert(is_byte_copy_safe_v<FixedNestedRoot>);
@@ -64,8 +64,8 @@ static bool dense_wire(const std::string& data) {
     return header.extent_count == 0;
 }
 
-// I1: strings of at most 10 bytes live inline in head bytes 0..10 and have
-// no size_/capacity_ fields. Corrupting their length byte (head byte 11,
+// I1: strings of at most 10 bytes live inline in head bytes 4..14 and have
+// no size_/capacity_ fields. Corrupting their length byte (head byte 15,
 // 0x80 | length) beyond 10 must be rejected.
 template <typename Root>
 bool verified_load_rejects(const std::string& data) {
@@ -80,7 +80,7 @@ bool verified_load_rejects(const std::string& data) {
 template <typename Root>
 bool rejects_inline_length(const XBuffer& xbuf, std::string data, const XFixedString& value) {
     assert(value.is_inline() && dense_wire(data));
-    const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 11;
+    const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 15;
     data[length_byte] = static_cast<char>(0x80 | (XFixedString::inline_max + 1));
     return verified_load_rejects<Root>(data);
 }

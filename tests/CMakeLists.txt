@@ -85,7 +85,6 @@ set(REFLECTION_TESTS
     test_vm_transport
     test_owner_identity
     test_owner_registry
-    test_owner_map
     test_tail_expansion
     test_regrow_used_range
     test_storage_policies

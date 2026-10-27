@@ -56,8 +56,8 @@ auto policy(std::size_t maximum = 16u << 20) {
 }
 auto make_buffer(std::size_t initial = 1u << 20) { return xo::XBuffer::create<ScalarRoot>(initial, policy()); }
 template<class T> auto descriptor(const T& value) {
-    static_assert(sizeof(T) == 12);
-    std::array<unsigned char, 12> bytes{}; std::memcpy(bytes.data(), &value, 12); return bytes;
+    static_assert(sizeof(T) == 16);
+    std::array<unsigned char, 16> bytes{}; std::memcpy(bytes.data(), &value, 16); return bytes;
 }
 template<class T> std::vector<T> values(const xo::XVector<T>& v) {
     return v.size() ? std::vector<T>(v.begin(), v.end()) : std::vector<T>{};

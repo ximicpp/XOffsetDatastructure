@@ -176,68 +176,28 @@ private:
             if (reserved > static_cast<std::size_t>(
                     (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
                 throw std::length_error("VM reservation page rounding overflows");
-            // V2.1 owner lookup: the payload starts at a 2^k boundary,
-            // k = max(22, ceil(log2 span)), and the mapping covers whole 4 MiB
-            // granules, so OwnerMap finds the payload from any address inside
-            // and no other mapping shares a granule with it. The host page sits
-            // just below the payload, in the granule before it.
-            const std::size_t span =
-                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-            if (span < reserved) throw std::length_error("VM reservation page rounding overflows");
-            std::size_t shift = slot_log2(span);
-            if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
-            if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) throw std::bad_alloc();
-            const std::size_t align = std::size_t(1) << shift;
 #if defined(_WIN32)
-            // A reservation starts on an allocation-granularity boundary, so
-            // the prefix is one granularity unit; only its last page (the host
-            // page) is committed. Find an aligned hole, release it and reserve
-            // exactly there; another thread may take the hole in between.
-            const std::size_t win_prefix = reservation_granularity_;
-            char* mapping = nullptr;
-            for (int attempt = 0; attempt < 8 && !mapping; ++attempt) {
-                auto* probe = static_cast<char*>(::VirtualAlloc(
-                    nullptr, win_prefix + span + align, MEM_RESERVE, PAGE_NOACCESS));
-                if (!probe) throw std::bad_alloc();
-                const auto payload = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
-                                     ~std::uintptr_t(align - 1);
-                ::VirtualFree(probe, 0, MEM_RELEASE);
-                auto* want = reinterpret_cast<char*>(payload - win_prefix);
-                mapping = static_cast<char*>(::VirtualAlloc(want, win_prefix + span, MEM_RESERVE, PAGE_NOACCESS));
-                if (mapping && mapping != want) {
-                    ::VirtualFree(mapping, 0, MEM_RELEASE);
-                    mapping = nullptr;
-                }
-            }
+            auto* mapping = static_cast<char*>(::VirtualAlloc(
+                nullptr, reserved + prefix, MEM_RESERVE, PAGE_NOACCESS));
             if (!mapping) throw std::bad_alloc();
-            if (!OwnerMap::reachable(mapping, win_prefix + span) ||
-                !::VirtualAlloc(mapping + win_prefix - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
+            if (!::VirtualAlloc(mapping, prefix, MEM_COMMIT, PAGE_READWRITE)) {
                 ::VirtualFree(mapping, 0, MEM_RELEASE);
                 throw std::bad_alloc();
             }
-            base_ = mapping + win_prefix;
+            base_ = mapping + prefix;
 #else
             if (full_copy && consume_vm_failure(VmOperation::Enable)) throw std::bad_alloc();
-            // Over-map PROT_NONE, then trim both ends.
-            const std::size_t total = span + prefix + align;
-            void* raw = ::mmap(nullptr, total, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-            if (raw == MAP_FAILED) throw std::bad_alloc();
-            const auto start = reinterpret_cast<std::uintptr_t>(raw);
-            const auto payload = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
-            if (payload - prefix != start) ::munmap(raw, payload - prefix - start);
-            if (start + total != payload + span)
-                ::munmap(reinterpret_cast<void*>(payload + span), start + total - (payload + span));
-            char* mapping = reinterpret_cast<char*>(payload - prefix);
-            if (!OwnerMap::reachable(mapping, span + prefix) ||
-                ::mprotect(mapping, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
-                ::munmap(mapping, span + prefix);
+            void* mapping = ::mmap(nullptr, reserved + prefix,
+                                   full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
+                                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (mapping == MAP_FAILED) throw std::bad_alloc();
+            if (!full_copy && ::mprotect(mapping, prefix, PROT_READ | PROT_WRITE) != 0) {
+                ::munmap(mapping, reserved + prefix);
                 throw std::bad_alloc();
             }
-            base_ = mapping + prefix;
+            base_ = static_cast<char*>(mapping) + prefix;
             if (full_copy) accessible_bytes_ = reserved;
 #endif
-            mapped_bytes_ = span;
-            OwnerMap::set(base_, span, static_cast<std::uint8_t>(shift));
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
@@ -591,7 +551,6 @@ private:
         swap(base_, other.base_);
         swap(canonical_byte_origin_, other.canonical_byte_origin_);
         swap(reserved_bytes_, other.reserved_bytes_);
-        swap(mapped_bytes_, other.mapped_bytes_);
         swap(maximum_capacity_, other.maximum_capacity_);
         swap(accessible_bytes_, other.accessible_bytes_);
         swap(logical_bytes_, other.logical_bytes_);
@@ -663,18 +622,15 @@ private:
 
     void release_mapping() noexcept {
         if (base_) {
-            // No head of this payload is live; clear its granules before the
-            // range can be mapped again.
-            OwnerMap::set(base_, mapped_bytes_, 0);
 #if defined(_WIN32)
-            ::VirtualFree(base_ - reservation_granularity_, 0, MEM_RELEASE);
+            ::VirtualFree(base_ - page_size_, 0, MEM_RELEASE);
 #else
-            ::munmap(base_ - page_size_, mapped_bytes_ + page_size_);
+            ::munmap(base_ - page_size_, reserved_bytes_ + page_size_);
 #endif
         }
         base_ = nullptr;
         canonical_byte_origin_ = nullptr;
-        reserved_bytes_ = mapped_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
+        reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         zero_from_ = 0;
         page_size_ = reservation_granularity_ = 0;
     }
@@ -682,9 +638,6 @@ private:
     char* base_{nullptr};
     std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
-    // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
-    // granules (4 MiB). 0 for a slot owner.
-    std::size_t mapped_bytes_{0};
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};
     std::size_t logical_bytes_{0};

@@ -48,7 +48,7 @@ struct Pad {             // trivially copyable, 4 padding bytes
     std::uint32_t a{};
     std::uint64_t b{};
 };
-struct Leaf {            // 2 padding bytes after k
+struct Leaf {            // 6 padding bytes after k
     std::uint16_t k{};
     xo::XString s;
     xo::XVector<std::uint32_t> v;
@@ -90,9 +90,6 @@ static_assert(xd::subtree_copy_supported<xo::XVector<std::uint32_t>>());
 static_assert(xd::subtree_copy_supported<xo::XKeyValue<xo::XString, xo::XString>>());
 static_assert(xd::subtree_copy_supported<xo::XKeyValue<std::uint32_t, xo::XString>>());
 static_assert(xo::has_implicit_padding_v<sc::Pad> && xo::has_implicit_padding_v<sc::Leaf>);
-// V2.1 heads are 4-aligned: a head right after a 4-byte field leaves no gap
-// (Mid::name, the tag pairs' value).
-static_assert(offsetof(sc::Mid, name) == 4 && !xo::has_implicit_padding_v<xo::XKeyValue<std::uint32_t, xo::XString>>);
 
 namespace {
 using Buffer = xo::TypedXBuffer<sc::Root>;
@@ -173,7 +170,7 @@ void hygiene(const T& value, const std::string& where, bool padding) {
         auto* bytes = reinterpret_cast<const unsigned char*>(&head);
         if (head.capacity_ & xo::XFixedString::inline_flag) {
             const auto len = (head.capacity_ >> 24) & 0x7fu;
-            if (!all_zero(bytes + len, 11 - len)) fail(where + ": inline string tail not zero");
+            if (!all_zero(bytes + 4 + len, 11 - len)) fail(where + ": inline string tail not zero");
         } else if (head.capacity_ != 0) {
             const auto* data = value.data();
             const auto block = xo::fixed_detail::block_bytes_of(head.capacity_ + 1u);
@@ -270,7 +267,7 @@ void fill_leaf(sc::Leaf& leaf, Rng& rng, bool slack, bool dirty) {
     if (slack) leaf.v.reserve(n + 16 + rng() % 32);
     else if (rng() % 8 == 0) leaf.v.reserve(1 + rng() % 4);  // capacity > size, possibly size 0
     for (std::size_t i = 0; i < n; ++i) leaf.v.push_back(static_cast<std::uint32_t>(rng()));
-    if (dirty) dirty_padding(&leaf, 2, 2);
+    if (dirty) dirty_padding(&leaf, 2, 6);
 }
 
 void fill_mid(sc::Mid& mid, Rng& rng, bool slack, bool dirty, std::size_t width) {
@@ -288,9 +285,13 @@ void fill_mid(sc::Mid& mid, Rng& rng, bool slack, bool dirty, std::size_t width)
     }
     const auto tags = rng() % 4;
     for (std::size_t i = 0; i < tags; ++i) mid.tags[static_cast<std::uint32_t>(rng() % 64)] = text(rng);
+    if (dirty) {
+        for (auto& entry : mid.tags) dirty_padding(&entry, 4, 4);
+    }
     const auto keys = rng() % 4;
     for (std::size_t i = 0; i < keys; ++i) mid.keys.insert(static_cast<std::uint32_t>(rng() % 64));
     for (auto& t : mid.tail) t = static_cast<std::uint32_t>(rng());
+    if (dirty) dirty_padding(&mid, 4, 4);
 }
 
 // Layout modes: 0 fresh (reserved, preorder bump), 1 grown by push_back

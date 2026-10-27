@@ -381,11 +381,20 @@ void typed_head_checks() {
         const auto origin = field(member, offsetof(xo::XFixedVector<std::uint32_t>, data_delta));
         write_at(w, origin, std::int32_t(payload_at + to - std::int64_t(origin)));
     };
-    {   // bool check precedes a later bad pointer.
+    {   // bool check precedes a later bad binding.
         auto bad = original;
         write_at(bad, rp + offsetof(GranuleRoot, flags) + 2, std::uint8_t{2});
-        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, data_delta)), INT32_MAX);
+        write_at(bad, field(name, offsetof(xo::XFixedString, arena_delta)), INT32_MAX);
         reject<GranuleRoot>(bad, "wire validation: invalid bool representation");
+    }
+    {
+        auto bad = original;
+        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), std::int32_t{0});
+        reject<GranuleRoot>(bad, "wire validation: invalid allocator binding");
+        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), INT32_MAX);
+        reject<GranuleRoot>(bad, "wire validation: relative pointer out of bounds");
+        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), std::int32_t{-8});
+        reject<GranuleRoot>(bad, "wire validation: invalid allocator binding");
     }
     {   // Data address outside the payload, at its end, payload past the end,
         // only the rounded block past the end, element and block misalignment.
