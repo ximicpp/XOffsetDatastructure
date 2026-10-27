@@ -97,8 +97,23 @@ struct alignas(8) IntSet { XSet<int32_t> s; };
 // ordinary: no bases, bit-fields, unions or [[no_unique_address]]), together
 // with the records they hold as container elements, as the user guide says
 // (section 3.1); without Skill, Buff and Troop the .ord heroes took the
-// per-element path of the .plain ones.
-#ifdef XOFFSET_ORDINARY_RECORDS
+// per-element path of the .plain ones. The other records get field lists
+// only (XOFFSET_RECORD_DERIVED without bases), for builds without reflection.
+#if defined(XOFFSET_RECORD)
+XOFFSET_RECORD(rb::Skill, id, level)
+XOFFSET_RECORD(rb::Buff, id, stacks, expire_ms)
+XOFFSET_RECORD(rb::Troop, type, count)
+XOFFSET_RECORD(rb::xm::HeroOrd, id, level, star, name, skills, buffs)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroPlain, (), id, level, star, name, skills, buffs)
+XOFFSET_RECORD(rb::xm::ArmyOrd, id, name, heroes, troops)
+XOFFSET_RECORD_DERIVED(rb::xm::ArmyPlain, (), id, name, heroes, troops)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroVecOrd, (), v, proto)
+XOFFSET_RECORD_DERIVED(rb::xm::HeroVecPlain, (), v, proto)
+XOFFSET_RECORD_DERIVED(rb::xm::IntVec, (), v)
+XOFFSET_RECORD_DERIVED(rb::xm::StrVec, (), s)
+XOFFSET_RECORD_DERIVED(rb::xm::IntMap, (), m)
+XOFFSET_RECORD_DERIVED(rb::xm::IntSet, (), s)
+#elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(rb::Skill, rb::Buff, rb::Troop, rb::xm::HeroOrd, rb::xm::ArmyOrd)
 #else
 // Libraries without the macro: its two specializations, written out.
@@ -456,7 +471,7 @@ void hero_cases(const char* variant, bool primary) {
         const std::string n = name("mid_erase");
         run_case(n, K, base, {
             {"xoffset", [&](int, uint64_t& d) {
-                auto& xv = xb.reset<XVec>().v;
+                auto& xv = xb.template reset<XVec>().v;
                 for (int i = 0; i < M; ++i) fill_hero(xv.emplace_back(), i);
                 const double t = timed(n.c_str(), [&] {
                     for (int k = 0; k < K; ++k) xv.erase(xv.begin() + xv.size() / 2);
@@ -481,7 +496,7 @@ void hero_cases(const char* variant, bool primary) {
         const std::string n = name("mid_insert");
         run_case(n, K, base, {
             {"xoffset", [&](int, uint64_t& d) {
-                auto& root = xb.reset<XVec>();
+                auto& root = xb.template reset<XVec>();
                 fill_hero(root.proto, 9999);
                 auto& xv = root.v;
                 xv.reserve(M + K);
@@ -511,7 +526,7 @@ void hero_cases(const char* variant, bool primary) {
         run_case(n, double(R) * M, base, {
             {"xoffset", [&](int, uint64_t& d) {
                 std::vector<decltype(XVec::v)*> v;
-                for (auto& b : xb) v.push_back(&b.reset<XVec>().v);
+                for (auto& b : xb) v.push_back(&b.template reset<XVec>().v);
                 const double t = timed(n.c_str(), [&] {
                     for (auto* p : v) { for (int i = 0; i < M; ++i) fill_hero(p->emplace_back(), i); keep(p->data()); }
                 });
@@ -882,7 +897,7 @@ void nested_cases(const char* variant, bool primary) {
         run_case(n, R, primary ? "std" : nullptr, {
             {"xoffset", [&](int r, uint64_t& d) {
                 std::vector<XArmy*> a;
-                for (auto& b : xb) a.push_back(&b.reset<XArmy>());
+                for (auto& b : xb) a.push_back(&b.template reset<XArmy>());
                 const double t = timed(n.c_str(), [&] {
                     for (int i = 0; i < R; ++i) { fill_army(*a[std::size_t(i)], (r & 0xffff) + i); keep(a[std::size_t(i)]); }
                 });
@@ -908,8 +923,8 @@ void nested_cases(const char* variant, bool primary) {
         run_case("reset", R, "std", {
             {"xoffset", [&](int r, uint64_t& d) {
                 for (int i = 0; i < R; ++i) fill_army(xb[std::size_t(i)].reset<XArmy>(), (r & 0xffff) + i);
-                const double t = timed("reset", [&] { for (auto& b : xb) keep(&b.reset<XArmy>()); });
-                d = 0; for (auto& b : xb) d = dig_army(d, b.root<XArmy>()); return t; }},
+                const double t = timed("reset", [&] { for (auto& b : xb) keep(&b.template reset<XArmy>()); });
+                d = 0; for (auto& b : xb) d = dig_army(d, b.template root<XArmy>()); return t; }},
             {"std", [&](int r, uint64_t& d) {
                 for (int i = 0; i < R; ++i) { sa[std::size_t(i)] = sm::Army{}; fill_army(sa[std::size_t(i)], (r & 0xffff) + i); }
                 const double t = timed(nullptr, [&] { for (auto& a : sa) { a = sm::Army{}; keep(&a); } });

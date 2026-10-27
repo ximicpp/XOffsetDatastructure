@@ -30,10 +30,26 @@
 #include <new>
 
 #if defined(_WIN32)
+// The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
+// shellapi.h behind a client's back. Both macros are set only for this include; a
+// client that needs more includes those headers itself (or <windows.h> first).
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#    define XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#  endif
 #  ifndef NOMINMAX
 #    define NOMINMAX
+#    define XOFFSET_DETAIL_UNDEF_NOMINMAX
 #  endif
 #  include <windows.h>
+#  ifdef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#    undef WIN32_LEAN_AND_MEAN
+#    undef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#  endif
+#  ifdef XOFFSET_DETAIL_UNDEF_NOMINMAX
+#    undef NOMINMAX
+#    undef XOFFSET_DETAIL_UNDEF_NOMINMAX
+#  endif
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>

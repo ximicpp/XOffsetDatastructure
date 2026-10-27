@@ -51,17 +51,26 @@ struct ReceiveRoot {
     xo::XVector<std::uint8_t> tail;
     xo::XVector<std::uint32_t> numbers;
 };
+XOFFSET_RECORD_DERIVED(ReceiveLeaf, (), key, value)
+XOFFSET_RECORD_DERIVED(ReceiveRoot, (), marker, counter, enabled, name, attrs, flags, tail, numbers)
 XOFFSET_REGISTER_SCHEMA_NAME(ReceiveRoot,"test.VerifiedReceiveRoot")
 #if defined(XOFFSET_VERIFIED_RECEIVE_API)
+// Word and Owned have user constructors (custom lifetimes): C++26 reflection only.
+#define XOFFSET_TEST_CUSTOM_LIFETIMES XOFFSET_SCHEMA_REFLECTION
+#if XOFFSET_TEST_CUSTOM_LIFETIMES
 struct CustomReceiveRoot {
     xo::XVector<receive_custom_v2_examples::Word> numbers;
     xo::XVector<receive_custom_v2_examples::Owned> attrs;
 };
+XOFFSET_RECORD_DERIVED(CustomReceiveRoot, (), numbers, attrs)
 XOFFSET_REGISTER_SCHEMA_NAME(CustomReceiveRoot,"test.VerifiedCustomReceiveRoot.v2")
+#endif
 namespace XOffsetDatastructure {
 template<> struct wire_record_layout<ReceiveLeaf>{static constexpr bool ordinary_members=true;};
 template<> struct wire_record_layout<ReceiveRoot>{static constexpr bool ordinary_members=true;};
+#if XOFFSET_TEST_CUSTOM_LIFETIMES
 template<> struct wire_record_layout<CustomReceiveRoot>{static constexpr bool ordinary_members=true;};
+#endif
 }
 #endif
 namespace {
@@ -92,6 +101,9 @@ template<class F>void rejects(F&& action){bool failed=false;try{action();}catch(
 #if defined(XOFFSET_VERIFIED_RECEIVE_API)
 using Token=xo::VerifiedReceiveToken<ReceiveRoot>;
 struct Unsound { xo::XString value;~Unsound(){} };
+} // namespace (unnamed)
+XOFFSET_RECORD_DERIVED(Unsound, (), value)
+namespace {
 template<class T>concept CanBegin=requires(std::size_t n){xo::begin_verified_receive<T>(n);};
 static_assert(CanBegin<ReceiveRoot>);
 static_assert(!CanBegin<Unsound>);
@@ -99,9 +111,11 @@ static_assert(xo::detail::receive_raw::future_supported_v<ReceiveRoot>);
 static_assert(xo::detail::receive_raw::future_supported_v<ReceiveLeaf>);
 static_assert(xo::detail::receive_raw::future_supported_v<xo::XString>);
 static_assert(!xo::detail::receive_raw::future_supported_v<Unsound>);
+#if XOFFSET_TEST_CUSTOM_LIFETIMES
 static_assert(xo::is_v1_wire_admitted_v<receive_custom_v2_examples::Word>);
 static_assert(xo::is_v1_wire_admitted_v<receive_custom_v2_examples::Owned>);
 static_assert(xo::detail::receive_raw::future_supported_v<CustomReceiveRoot>);
+#endif
 static_assert(!CanBegin<receive_custom_v2_examples::RawOnly>);
 static_assert(!CanBegin<receive_custom_v2_examples::HiddenRawOnly>);
 static_assert(!CanBegin<xo::XVector<receive_custom_v2_examples::RawOnly>>);
@@ -547,6 +561,7 @@ void canonical_external_heads_and_many_owners(){
     }
 }
 
+#if XOFFSET_TEST_CUSTOM_LIFETIMES
 void custom_future_lifetimes(){
     namespace ex=receive_custom_v2_examples;
     auto source=xo::TypedXBuffer<CustomReceiveRoot>::create(65536,
@@ -620,6 +635,7 @@ void custom_future_lifetimes(){
          "custom canonical malformed-child failure changed raw bytes before publication");
 }
 #endif
+#endif
 }
 #if !defined(_WIN32)
 // Fork policy (registry and VM pool have no atfork handlers): with no other
@@ -663,7 +679,9 @@ int main(int argc,char**argv){try{
     stage="direct-growth-lifetime";direct_growth_and_lifetime();stage="completion-cancel-owner";completion_cancel_and_owner_lifetime();
     stage="rollback-rejection";rollback_and_rejection();stage="sparse";sparse_wire_receive();stage="VM-newhandler";vm_failures_and_new_handler();
     stage="canonical-external-many";canonical_external_heads_and_many_owners();
+#if XOFFSET_TEST_CUSTOM_LIFETIMES
     stage="custom-future";custom_future_lifetimes();
+#endif
 #if !defined(_WIN32)
     stage="fork";fork_after_receive();
 #endif

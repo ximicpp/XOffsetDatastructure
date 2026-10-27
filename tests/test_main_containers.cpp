@@ -9,7 +9,7 @@
 #include <iostream>
 #include <string>
 
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
@@ -17,8 +17,10 @@ struct BridgeItem {
     int32_t id{0};
     XString label;
 
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Alloc>
     BridgeItem(Alloc alloc) : label(alloc) {}
+#endif
 };
 
 struct BridgeRoot {
@@ -27,9 +29,11 @@ struct BridgeRoot {
     XVector<XString> tags;
     XVector<BridgeItem> items;
 
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Alloc>
     BridgeRoot(Alloc alloc)
         : owner(alloc), scores(alloc), tags(alloc), items(alloc) {}
+#endif
 };
 
 struct BridgeAssocRoot {
@@ -38,10 +42,21 @@ struct BridgeAssocRoot {
     XMap<int32_t, XString> by_id;
     XMap<XString, int32_t> by_name;
 
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Alloc>
     BridgeAssocRoot(Alloc alloc)
         : ids(alloc), names(alloc), by_id(alloc), by_name(alloc) {}
+#endif
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(BridgeItem, (), id, label)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(BridgeRoot, (), owner, scores, tags, items)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(BridgeAssocRoot, (), ids, names, by_id, by_name)
+#endif
 
 XOFFSET_REGISTER_SCHEMA_NAME(BridgeRoot, "test.BridgeRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(BridgeAssocRoot, "test.BridgeAssocRoot")

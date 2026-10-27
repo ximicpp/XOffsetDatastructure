@@ -14,6 +14,8 @@ using namespace XOffsetDatastructure;
 // const view without changing registered schema/hash rules.
 struct LifecycleRoot { std::int64_t value{}; };
 struct DifferentLifecycleRoot { std::int64_t value{}; };
+XOFFSET_RECORD_DERIVED(LifecycleRoot, (), value)
+XOFFSET_RECORD_DERIVED(DifferentLifecycleRoot, (), value)
 
 namespace {
 

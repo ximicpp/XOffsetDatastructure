@@ -25,4 +25,9 @@ add_xoffset_test(test_canonical_registry_v2 reflection)
 add_xoffset_test(test_canonical_cold_no_callback reflection)
 add_xoffset_test(test_canonical_zero_target reflection)
 # Exit 77: built without per-thread caches (XOFFSET_THREAD_CACHES=0, GCC on MinGW).
-set_tests_properties(test_canonical_cold_no_callback test_canonical_zero_target PROPERTIES SKIP_RETURN_CODE 77)
+# Both are C++26-only (tests/CMakeLists.txt), so other builds do not have them.
+foreach(t test_canonical_cold_no_callback test_canonical_zero_target)
+    if(TEST ${t})
+        set_tests_properties(${t} PROPERTIES SKIP_RETURN_CODE 77)
+    endif()
+endforeach()

@@ -16,9 +16,11 @@ struct ReloadRoot {
     XString name;
     XVector<std::uint32_t> values;
 };
+XOFFSET_RECORD_DERIVED(ReloadRoot, (), id, name, values)
 XOFFSET_REGISTER_SCHEMA_NAME(ReloadRoot, "test.ReloadRoot")
 
 struct OtherRoot { std::uint32_t x{}; };
+XOFFSET_RECORD_DERIVED(OtherRoot, (), x)
 XOFFSET_REGISTER_SCHEMA_NAME(OtherRoot, "test.ReloadOtherRoot")
 
 namespace {

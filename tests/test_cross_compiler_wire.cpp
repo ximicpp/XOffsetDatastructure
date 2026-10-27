@@ -73,6 +73,10 @@ struct Root {
     xo::XSet<Rank> rank_set;
 };
 } // namespace cw
+XOFFSET_RECORD_DERIVED(cw::Vec3, (), x, y, z)
+XOFFSET_RECORD_DERIVED(cw::Item, (), id, equipped, kind, weight, name, stats)
+XOFFSET_RECORD_DERIVED(cw::Unit, (), hp, pos, slots, tag)
+XOFFSET_RECORD_DERIVED(cw::Root, (), epoch, title, items, units, labels, keys, attrs, ranks, rank_set)
 
 XOFFSET_REGISTER_SCHEMA_NAME(cw::Root, "cross_compiler.v2.root")
 

@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 #include <boost/typelayout/tools/safety_level.hpp>
 
 using namespace XOffsetDatastructure;
@@ -76,35 +77,35 @@ struct HasMemberFuncPointer { void (Foo::* mfp)(); int32_t data; };
 // ============================================================================
 
 // Safe
-static_assert( is_byte_copy_safe_v<int32_t>);
-static_assert( is_byte_copy_safe_v<double>);
-static_assert( is_byte_copy_safe_v<SafeRecord>);
-static_assert( is_byte_copy_safe_v<NestedSafe>);
-static_assert( is_byte_copy_safe_v<HasEnum>);
-static_assert( is_byte_copy_safe_v<HasArray>);
-static_assert( is_byte_copy_safe_v<ContainerTypes>);
-static_assert( is_byte_copy_safe_v<NestedContainers>);
-static_assert( is_byte_copy_safe_v<Point>);
-static_assert( is_byte_copy_safe_v<Player>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<int32_t>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<double>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<SafeRecord>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<NestedSafe>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasEnum>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasArray>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<ContainerTypes>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<NestedContainers>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<Point>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<Player>);
 
 // Unsafe
-static_assert(!is_byte_copy_safe_v<HasPointer>);
-static_assert(!is_byte_copy_safe_v<Polymorphic>);
-static_assert(!is_byte_copy_safe_v<WithStdString>);
-static_assert(!is_byte_copy_safe_v<WithStdVector>);
-static_assert(!is_byte_copy_safe_v<UnsafeNested>);
-static_assert(!is_byte_copy_safe_v<HasMemberPointer>);
-static_assert(!is_byte_copy_safe_v<HasMemberFuncPointer>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasPointer>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<Polymorphic>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<WithStdString>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<WithStdVector>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<UnsafeNested>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasMemberPointer>);
+static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasMemberFuncPointer>);
 
 // Platform variant — locally safe
-static_assert( is_byte_copy_safe_v<HasLong>);
-static_assert( is_byte_copy_safe_v<HasUnsignedLong>);
-static_assert( is_byte_copy_safe_v<HasWchar>);
-static_assert( is_byte_copy_safe_v<HasLongDouble>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasLong>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasUnsignedLong>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasWchar>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasLongDouble>);
 
 // Boundary
-static_assert( is_byte_copy_safe_v<HasNullptr>);
-static_assert( is_byte_copy_safe_v<HasByte>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasNullptr>);
+static_assert( XOffsetDatastructure::is_byte_copy_safe_v<HasByte>);
 
 // ============================================================================
 // Test 1: Signature comparison (strict check)
@@ -115,7 +116,7 @@ bool test_signature_comparison() {
     constexpr auto gold = get_layout_signature<SafeRecord>();
     static_assert(std::string_view(get_layout_signature<SafeRecord>()) == std::string_view(gold));
     static_assert(!(std::string_view(get_layout_signature<NestedSafe>()) == std::string_view(gold)));
-    static_assert(!is_byte_copy_safe_v<HasPointer>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<HasPointer>);
 
     std::cout << "  [OK]\n";
     return true;
@@ -165,25 +166,25 @@ bool test_nested_container_recursion() {
     std::cout << "\n[TEST] Nested container recursive safety\n";
 
     // Single-level
-    static_assert( is_byte_copy_safe_v<XVector<int32_t>>);
-    static_assert( is_byte_copy_safe_v<XVector<SafeFlat>>);
-    static_assert(!is_byte_copy_safe_v<XVector<HasPointer>>);
+    static_assert( XOffsetDatastructure::is_byte_copy_safe_v<XVector<int32_t>>);
+    static_assert( XOffsetDatastructure::is_byte_copy_safe_v<XVector<SafeFlat>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XVector<HasPointer>>);
 
     // Double-nested
-    static_assert( is_byte_copy_safe_v<XVector<XVector<int32_t>>>);
-    static_assert(!is_byte_copy_safe_v<XVector<XVector<HasPointer>>>);
+    static_assert( XOffsetDatastructure::is_byte_copy_safe_v<XVector<XVector<int32_t>>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XVector<XVector<HasPointer>>>);
 
     // Triple-nested
-    static_assert( is_byte_copy_safe_v<XVector<XVector<XVector<int32_t>>>>);
-    static_assert(!is_byte_copy_safe_v<XVector<XVector<XVector<HasPointer>>>>);
+    static_assert( XOffsetDatastructure::is_byte_copy_safe_v<XVector<XVector<XVector<int32_t>>>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XVector<XVector<XVector<HasPointer>>>>);
 
     // Map containers
-    static_assert( is_byte_copy_safe_v<XMap<int32_t, SafeFlat>>);
-    static_assert(!is_byte_copy_safe_v<XMap<int32_t, HasPointer>>);
-    static_assert(!is_byte_copy_safe_v<XMap<HasPointer, int32_t>>);
+    static_assert( XOffsetDatastructure::is_byte_copy_safe_v<XMap<int32_t, SafeFlat>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XMap<int32_t, HasPointer>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XMap<HasPointer, int32_t>>);
 
     // Polymorphic in container
-    static_assert(!is_byte_copy_safe_v<XVector<Polymorphic>>);
+    static_assert(!XOffsetDatastructure::is_byte_copy_safe_v<XVector<Polymorphic>>);
 
     std::cout << "  [OK]\n";
     return true;

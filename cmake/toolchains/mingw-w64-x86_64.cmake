@@ -1,8 +1,10 @@
-# Windows x64 cross build on Linux with MinGW-w64 GCC 16 (posix threads, libstdc++),
-# the C++26 reflection library included. The top-level build links programs
-# statically on MinGW, so CTest runs them through wine when it is installed.
+# Windows x64 cross build on Linux with MinGW-w64 GCC (posix threads, libstdc++).
+# GCC 16 builds the C++26 reflection library; older MinGW GCC (12 and newer)
+# builds it with XOFFSET_CXX_STANDARD=20 or 23 (the XOFFSET_RECORD field lists).
+# The top-level build links programs statically on MinGW, so CTest runs them
+# through wine when it is installed.
 #
-#   cmake -S . -B build/mingw -G Ninja \
+#   cmake -S . -B build/mingw -G Ninja [-DXOFFSET_CXX_STANDARD=20] \
 #         -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-x86_64.cmake
 #
 # The compiler is searched in $XOFFSET_MINGW_ROOT/bin, then /opt/mingw-gcc16/bin

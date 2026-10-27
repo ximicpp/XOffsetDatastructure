@@ -10,17 +10,22 @@
 #include <iostream>
 #include <cassert>
 #include <string>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct SimpleData {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     SimpleData(Allocator alloc) : name(alloc) {}
+#endif
 
     int32_t id = 0;
     XString name;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(SimpleData, (), id, name)
+#endif
 
 // ============================================================================
 // Test 1: make<T>() throws on duplicate call

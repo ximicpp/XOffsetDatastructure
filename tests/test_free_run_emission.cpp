@@ -28,6 +28,8 @@ struct Root {
     xo::XVector<Blob> blobs;
 };
 } // namespace fr
+XOFFSET_RECORD_DERIVED(fr::Blob, (), data)
+XOFFSET_RECORD_DERIVED(fr::Root, (), blobs)
 
 XOFFSET_REGISTER_SCHEMA_NAME(fr::Root, "test.free_run_emission.root")
 namespace XOffsetDatastructure {

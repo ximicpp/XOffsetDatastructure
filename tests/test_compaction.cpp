@@ -5,19 +5,24 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct CompactTestType {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     CompactTestType(Allocator allocator) 
         : data(allocator), strings(allocator) {}
+#endif
     
     int value;
     XVector<int> data;
     XVector<XString> strings;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(CompactTestType, (), value, data, strings)
+#endif
 
 bool test_memory_compaction() {
     std::cout << "\n[TEST] Memory Compaction\n";

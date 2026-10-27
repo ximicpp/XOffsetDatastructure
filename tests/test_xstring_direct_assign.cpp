@@ -20,20 +20,25 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 #include "../examples/player.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct StringTestData {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     StringTestData(Allocator allocator)
         : name(allocator), title(allocator), names(allocator) {}
+#endif
 
     XString name;
     XString title;
     XVector<XString> names;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(StringTestData, (), name, title, names)
+#endif
 
 bool test_basic_assign() {
     std::cout << "\n[TEST] XString operator=(const char*)\n";
