@@ -13,8 +13,9 @@ endif()
 file(REMOVE_RECURSE "${GENERATED_SIG_DIR}")
 file(MAKE_DIRECTORY "${GENERATED_SIG_DIR}")
 
+# EMULATOR: CMAKE_CROSSCOMPILING_EMULATOR of a cross build (wine, qemu), empty otherwise.
 execute_process(
-    COMMAND "${EXPORTER}" "${GENERATED_SIG_DIR}"
+    COMMAND ${EMULATOR} "${EXPORTER}" "${GENERATED_SIG_DIR}"
     RESULT_VARIABLE export_status)
 
 if(NOT export_status EQUAL 0)
