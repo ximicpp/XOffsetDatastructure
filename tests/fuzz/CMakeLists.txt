@@ -58,3 +58,31 @@ add_test(NAME fuzz_wire_schemas_smoke
             -rss_limit_mb=2048 -timeout=30 "${XOFFSET_FUZZ_SCHEMA_SEEDS}")
 set_tests_properties(fuzz_wire_schemas_smoke PROPERTIES
     LABELS "fuzz" FIXTURES_REQUIRED fuzz_wire_schemas_seeds)
+
+# Schema evolution (xoffset_evolution.hpp): receive of every lineage version,
+# send to every version, handshake; the first input byte picks the mode.
+add_executable(fuzz_schema_evolution fuzz_schema_evolution.cpp)
+configure_xoffset_target(fuzz_schema_evolution)
+xoffset_enable_test_assertions(fuzz_schema_evolution)
+target_compile_options(fuzz_schema_evolution PRIVATE -fsanitize=fuzzer)
+target_link_options(fuzz_schema_evolution PRIVATE -fsanitize=fuzzer)
+target_link_libraries(fuzz_schema_evolution PRIVATE ${XOFFSET_FUZZER_LINK_LIBS})
+if(XOFFSET_FUZZ_INJECT_CRASH)
+    target_compile_definitions(fuzz_schema_evolution PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
+endif()
+
+add_executable(fuzz_schema_evolution_seeds fuzz_schema_evolution.cpp)
+configure_xoffset_target(fuzz_schema_evolution_seeds)
+xoffset_enable_test_assertions(fuzz_schema_evolution_seeds)
+target_compile_definitions(fuzz_schema_evolution_seeds PRIVATE XOFFSET_FUZZ_SEED_MAIN)
+
+set(XOFFSET_FUZZ_EVOLUTION_SEEDS "${CMAKE_CURRENT_BINARY_DIR}/seeds/schema_evolution")
+add_test(NAME fuzz_schema_evolution_seeds
+    COMMAND $<TARGET_FILE:fuzz_schema_evolution_seeds> "${XOFFSET_FUZZ_EVOLUTION_SEEDS}")
+set_tests_properties(fuzz_schema_evolution_seeds PROPERTIES
+    LABELS "fuzz" FIXTURES_SETUP fuzz_schema_evolution_seeds)
+add_test(NAME fuzz_schema_evolution_smoke
+    COMMAND $<TARGET_FILE:fuzz_schema_evolution> -seed=1 -runs=20000 -max_len=65536
+            -rss_limit_mb=2048 -timeout=30 "${XOFFSET_FUZZ_EVOLUTION_SEEDS}")
+set_tests_properties(fuzz_schema_evolution_smoke PROPERTIES
+    LABELS "fuzz" FIXTURES_REQUIRED fuzz_schema_evolution_seeds)
