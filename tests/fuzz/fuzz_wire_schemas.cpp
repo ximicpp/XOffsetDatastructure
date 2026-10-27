@@ -60,31 +60,31 @@ template<> struct wire_record_layout<ms::Deep> { static constexpr bool ordinary_
 }
 
 namespace {
-// Header and framing rules of the V2 format, independent of the schema: the
+// Header and framing rules of the V2.1 format, independent of the schema: the
 // same checks as the oracle's header stage in v2_fuzz_core.hpp.
 template <class Root>
 bool framing_valid(const std::string& wire) {
+    constexpr std::uint64_t begin = xo::XWIRE_PAYLOAD_BEGIN;
     if (wire.size() < kHeader) return false;
     xo::XWireHeaderV2 h;
     std::memcpy(&h, wire.data(), kHeader);
-    if (std::memcmp(h.magic, xo::XWIRE_MAGIC_V2, 8) != 0) return false;
-    if (h.format_major != 2 || h.format_minor != 0 || h.header_size != kHeader ||
-        h.endian_tag != 0x01020304u || h.flags != 0 || h.crc32c != 0 || h.reserved0 != 0)
-        return false;
+    if (h.magic != xo::XWIRE_MAGIC || h.flags != 0) return false;
     if (h.root_type_id != xo::detail::wire_root_type_id<Root>() ||
-        h.schema_hash_lo != xo::detail::wire_schema_hash<Root>() || h.schema_hash_hi != 0)
+        h.schema_hash != xo::detail::wire_schema_hash<Root>())
         return false;
+    if (h.used_bytes < begin || h.used_bytes > kMaxPayload || h.used_bytes % 8) return false;
+    if (h.root_offset < begin || h.root_offset >= h.used_bytes) return false;
     const std::uint64_t body = wire.size() - kHeader;
-    if (h.used_bytes > kMaxPayload || h.extent_count > body / 8) return false;
+    if (h.extent_count > body / 8) return false;
     if (h.used_bytes > kLimit) return false;
     const auto* table = reinterpret_cast<const unsigned char*>(wire.data()) + kHeader;
-    std::uint64_t stored = h.used_bytes, end = 0;
+    std::uint64_t stored = h.used_bytes - begin, end = 0;
     if (h.extent_count) {
         stored = 0;
         bool gap = false;
         for (std::uint64_t i = 0; i < h.extent_count; ++i) {
             std::uint32_t off, b; std::memcpy(&off, table + i * 8, 4); std::memcpy(&b, table + i * 8 + 4, 4);
-            if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != 0 : off <= end) || std::uint64_t(off) + b > h.used_bytes)
+            if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != begin : off <= end) || std::uint64_t(off) + b > h.used_bytes)
                 return false;
             gap |= i != 0;
             end = std::uint64_t(off) + b; stored += b;
@@ -92,17 +92,10 @@ bool framing_valid(const std::string& wire) {
         if (end < h.used_bytes) gap = true;
         if (!gap) return false;
     }
-    const auto tbytes = h.extent_count * 8;
+    const std::uint64_t tbytes = std::uint64_t(h.extent_count) * 8;
     if (stored > body - tbytes) return false;
     const auto rest = body - tbytes - stored;
-    if (h.hole_count > rest / 8 || h.hole_count * 8 != rest) return false;
-    if (h.root_offset >= h.used_bytes) return false;
-    std::uint64_t hole_sum = 0;
-    const auto* holes = table + tbytes + stored;
-    for (std::uint64_t i = 0; i < h.hole_count; ++i) {
-        std::uint32_t b; std::memcpy(&b, holes + i * 8 + 4, 4); hole_sum += b;
-    }
-    return hole_sum == h.hole_bytes;
+    return h.hole_count <= rest / 8 && std::uint64_t(h.hole_count) * 8 == rest;
 }
 
 std::string text(std::mt19937_64& rng) { return random_text(rng, 40); }

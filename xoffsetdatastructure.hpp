@@ -530,15 +530,17 @@ namespace XOffsetDatastructure {
             init_from_bytes(data, size, cap.value, cap.pool, cap.storage);
         }
 
-        // V2 sparse wire payload (see XWireHeaderV2::extent_count).
-        struct SparsePayload {
+        // The payload of an admitted wire (see XWireHeaderV2): the payload
+        // bytes from offset 48, dense (extent_count 0) or as extents. The
+        // payload header is written from root_offset and the size.
+        struct WirePayload {
+            std::uint64_t root_offset;
             const char* stored;
             const void* extents;
             std::size_t extent_count;
         };
-        XBufferCore(SparsePayload sparse, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_from_extents(sparse.stored, sparse.extents, sparse.extent_count, size, cap.value, cap.pool,
-                              cap.storage);
+        XBufferCore(WirePayload wire, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+            init_from_wire(wire, size, cap.value, cap.pool, cap.storage);
         }
 
         uint64_t epoch() const noexcept { return m_epoch; }
@@ -649,6 +651,16 @@ namespace XOffsetDatastructure {
             std::uint32_t bytes = 0;
         };
         static_assert(sizeof(WireHole) == 8);
+
+        // The payload header of a received wire, which does not carry it.
+        static void write_payload_header(char* base, std::uint64_t root_offset, std::uint64_t used_end) noexcept {
+            arena_header h{};
+            std::memcpy(h.magic, payload_magic_, sizeof(h.magic));
+            h.header_size = static_cast<std::uint32_t>(sizeof(arena_header));
+            h.root_offset = root_offset;
+            h.used_end = used_end;
+            std::memcpy(base, &h, sizeof(h));
+        }
 
         // Host owner of a payload base (the arena header address). V2 keeps it
         // in the host page preceding the payload; no registry or TLS lookup.
@@ -1456,17 +1468,24 @@ namespace XOffsetDatastructure {
             });
         }
 
-        // V2 sparse payload: extents (validated by the caller) of `stored`.
-        void init_from_extents(const char* stored, const void* extents, std::size_t count,
-                               size_type size, size_type max_reserved, const XBufferPool& pool = {},
-                               XStorage request = XStorage::Auto) {
+        // Wire payload: extents and sizes validated by the caller.
+        void init_from_wire(const WirePayload& wire, size_type size, size_type max_reserved,
+                            const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
             const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
-            init_from_storage(stored, size, max_reserved, [&] {
-                if (!plans_slot(plan) || size > max_reserved)
-                    return detail::VirtualMemoryStorage::from_extents(stored, extents, count, size,
-                                                                      max_reserved, pool);
-                auto owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
-                owner.assign_extents(stored, extents, count, size);
+            init_from_storage(wire.stored, size, max_reserved, [&] {
+                detail::VirtualMemoryStorage owner;
+                if (!plans_slot(plan) || size > max_reserved) {
+                    owner = wire.extent_count == 0
+                        ? detail::VirtualMemoryStorage::from_bytes(wire.stored, size, max_reserved, pool,
+                                                                   sizeof(arena_header))
+                        : detail::VirtualMemoryStorage::from_extents(wire.stored, wire.extents, wire.extent_count,
+                                                                     size, max_reserved, pool);
+                } else {
+                    owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
+                    if (wire.extent_count == 0) owner.assign_bytes(wire.stored, size, sizeof(arena_header));
+                    else owner.assign_extents(wire.stored, wire.extents, wire.extent_count, size);
+                }
+                write_payload_header(owner.data(), wire.root_offset, size);
                 return owner;
             });
         }
@@ -1847,8 +1866,12 @@ namespace XOffsetDatastructure {
             reinit_from_storage(data, size, [&] { buffer_.assign_bytes(data, size); });
         }
 
-        void reinit_from_extents(const char* stored, const void* extents, std::size_t count, size_type size) {
-            reinit_from_storage(stored, size, [&] { buffer_.assign_extents(stored, extents, count, size); });
+        void reinit_from_wire(const WirePayload& wire, size_type size) {
+            reinit_from_storage(wire.stored, size, [&] {
+                if (wire.extent_count == 0) buffer_.assign_bytes(wire.stored, size, sizeof(arena_header));
+                else buffer_.assign_extents(wire.stored, wire.extents, wire.extent_count, size);
+                write_payload_header(buffer_.data(), wire.root_offset, size);
+            });
         }
 
         // In-place direct receive (XBuffer::begin_verified_reload): the
@@ -5706,33 +5729,31 @@ namespace XOffsetDatastructure {
         return { xbuf.get_size(), xbuf.get_free_memory(), xbuf.get_size() - xbuf.get_free_memory() };
     }
 
-    // V2 wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count
-    // x {u32 offset, u32 bytes}]. Blocks have no headers; live blocks plus
+    // V2.1 wire: [XWireHeaderV2][extent table: extent_count x {u32 offset,
+    // u32 bytes}][payload bytes][hole table: hole_count x {u32 offset,
+    // u32 bytes}]. The 48-byte payload header is not on the wire: the
+    // receiver writes it from used_bytes and root_offset, so the payload
+    // bytes start at payload offset XWIRE_PAYLOAD_BEGIN. extent_count 0: the
+    // payload bytes are [48, used_bytes), contiguous. Otherwise they are the
+    // concatenated extents (ascending, disjoint, 8-byte multiples, the first
+    // at offset 48); the gaps between extents load as zero bytes (sparse
+    // wire). A gap may cover any payload bytes: the loaded payload is
+    // validated exactly like a dense one. Every offset (root, extents,
+    // holes) is a payload offset. Blocks have no headers; live blocks plus
     // holes tile the payload exactly (see detail::require_exact_coverage).
+    // Little-endian; the length is exactly 40 + 8 * extent_count + payload
+    // bytes + 8 * hole_count.
     struct alignas(8) XWireHeaderV2 {
-        char magic[8];
-        std::uint16_t format_major;
-        std::uint16_t format_minor;
-        std::uint32_t header_size;
-        std::uint64_t used_bytes;
-        std::uint64_t root_offset;
-        std::uint64_t hole_count;
-        std::uint64_t hole_bytes;
-        std::uint64_t root_type_id;
-        std::uint64_t schema_hash_lo;
-        std::uint64_t schema_hash_hi;
-        std::uint32_t flags;
-        std::uint32_t endian_tag;
-        std::uint32_t crc32c;
-        std::uint32_t reserved0;
-        // 0: the payload follows as used_bytes contiguous bytes. Otherwise an
-        // extent table (extent_count x {u32 offset, u32 bytes}) precedes the
-        // concatenated extents; the gaps between extents load as zero bytes
-        // (sparse wire). A gap may cover any payload bytes: the loaded
-        // payload is validated exactly like a dense one.
-        std::uint64_t extent_count;
+        std::uint32_t magic;        // 'X' 'O' major minor (XWIRE_MAGIC)
+        std::uint32_t flags;        // 0
+        std::uint32_t used_bytes;   // payload used_end, payload header included
+        std::uint32_t root_offset;  // payload offset of the root, >= 48
+        std::uint32_t hole_count;
+        std::uint32_t extent_count;
+        std::uint64_t schema_hash;  // fingerprint: type name and ABI signature
+        std::uint64_t root_type_id; // fingerprint: type name
     };
-    static_assert(sizeof(XWireHeaderV2) == 96 && alignof(XWireHeaderV2) == 8);
+    static_assert(sizeof(XWireHeaderV2) == 40 && alignof(XWireHeaderV2) == 8);
 
     // Emission forms of save_verified / save_verified_into. Receivers
     // accept every form; the loaded payload is byte-identical.
@@ -5780,37 +5801,60 @@ namespace XOffsetDatastructure {
     XAssign<M> xassign(M& target, const M& source) noexcept { return {&target, &source}; }
 #define XOFFSET_SAVE_COMPOSED_API 1
 
-    inline constexpr char XWIRE_MAGIC_V1[8] = {'X', 'O', 'F', 'F', 'V', '1', '\0', '\0'};
-    inline constexpr char XWIRE_MAGIC_V2[8] = {'X', 'O', 'F', 'F', 'V', '2', '\0', '\0'};
-    inline constexpr std::uint16_t XWIRE_FORMAT_MAJOR_V2 = 2;
-    inline constexpr std::uint16_t XWIRE_FORMAT_MINOR_V2 = 0;
-    inline constexpr std::uint32_t XWIRE_ENDIAN_TAG_V2 = 0x01020304u;
-    inline constexpr std::uint32_t XWIRE_FLAGS_V2 = 0;
-
-    inline bool wire_magic_matches_v2(const char (&magic)[8]) noexcept {
-        return std::memcmp(magic, XWIRE_MAGIC_V2, sizeof(XWIRE_MAGIC_V2)) == 0;
-    }
+    inline constexpr std::uint8_t XWIRE_FORMAT_MAJOR = 2;
+    inline constexpr std::uint8_t XWIRE_FORMAT_MINOR = 1;
+    inline constexpr std::uint32_t XWIRE_MAGIC = 0x4F58u | (std::uint32_t(XWIRE_FORMAT_MAJOR) << 16) |
+                                                 (std::uint32_t(XWIRE_FORMAT_MINOR) << 24);
+    static_assert(XWIRE_MAGIC == 0x01024F58u);
+    inline constexpr std::uint32_t XWIRE_FLAGS = 0;
+    // Payload offset of the first payload byte on the wire (the payload
+    // header's size).
+    inline constexpr std::size_t XWIRE_PAYLOAD_BEGIN = 48;
+    static_assert(sizeof(XBufferCore::arena_header) == XWIRE_PAYLOAD_BEGIN);
 
     namespace detail {
-        // N3: format 1 is rejected explicitly; any other major is unsupported.
-        inline void check_wire_format(const XWireHeaderV2& header, const char* who) {
-            if (std::memcmp(header.magic, XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1)) == 0)
-                throw XException(std::string(who) +
-                    ": unsupported wire format version 1 (V1 input is not accepted; this library reads format 2)");
-            if (!wire_magic_matches_v2(header.magic))
-                throw XException(std::string(who) + ": bad magic");
-            if (header.format_major != XWIRE_FORMAT_MAJOR_V2 ||
-                header.format_minor != XWIRE_FORMAT_MINOR_V2)
-                throw XException(std::string(who) + ": unsupported format version");
-            if (header.header_size != sizeof(XWireHeaderV2))
-                throw XException(std::string(who) + ": header size mismatch");
-            if (header.endian_tag != XWIRE_ENDIAN_TAG_V2)
-                throw XException(std::string(who) + ": endian tag mismatch");
-            if (header.flags != XWIRE_FLAGS_V2)
-                throw XException(std::string(who) + ": unsupported flags");
-            if (header.crc32c != 0 || header.reserved0 != 0)
-                throw XException(std::string(who) + ": unsupported reserved header fields");
+        [[noreturn]] inline void wire_reject(const char* who, const char* what) {
+            throw XException(std::string(who) + what);
         }
+
+        // Reads the header at the front of a wire of `size` bytes and checks
+        // its version and flags. The version is told apart first, so a short
+        // or older wire gets the message that names it. V1 and V2.0 wires
+        // begin "XOFFV1" / "XOFFV2"; 'F' is no 2.x version byte.
+        inline XWireHeaderV2 read_wire_header(const void* data, std::size_t size, const char* who) {
+            const auto* b = static_cast<const unsigned char*>(data);
+            if (size < 4 || b[0] != 'X' || b[1] != 'O') wire_reject(who, ": not an XOffset wire (bad magic)");
+            if (b[2] != XWIRE_FORMAT_MAJOR || b[3] != XWIRE_FORMAT_MINOR) {
+                if (size >= 6 && std::memcmp(b, "XOFFV1", 6) == 0)
+                    wire_reject(who, ": wire format 1 is not supported; this build reads 2.1");
+                if (size >= 6 && std::memcmp(b, "XOFFV2", 6) == 0)
+                    wire_reject(who, ": wire format 2.0 is not supported; this build reads 2.1 "
+                                     "(sender and receiver must upgrade together)");
+                throw XException(std::string(who) + ": wire format " + std::to_string(b[2]) + "." +
+                                 std::to_string(b[3]) + " is not supported; this build reads 2.1");
+            }
+            if (size < sizeof(XWireHeaderV2)) wire_reject(who, ": truncated wire header");
+            XWireHeaderV2 header;
+            std::memcpy(&header, data, sizeof(header));
+            if (header.flags != XWIRE_FLAGS) {
+                std::string hex = "0x";
+                for (int shift = 28; shift >= 0; shift -= 4) hex += "0123456789abcdef"[(header.flags >> shift) & 15u];
+                throw XException(std::string(who) + ": unsupported wire flags " + hex);
+            }
+            return header;
+        }
+
+        // used_bytes and root_offset: the payload holds at least its header,
+        // ends on a word, and the root starts past the header inside it.
+        inline void check_wire_extent(const XWireHeaderV2& header, const char* who) {
+            if (header.used_bytes < XWIRE_PAYLOAD_BEGIN || header.used_bytes > XBufferCore::MAX_PAYLOAD ||
+                header.used_bytes % 8u != 0)
+                wire_reject(who, ": used size mismatch");
+            if (header.root_offset < XWIRE_PAYLOAD_BEGIN || header.root_offset >= header.used_bytes)
+                wire_reject(who, ": root offset out of bounds");
+        }
+
+        static_assert(sizeof(XBufferCore::arena_header) == XWIRE_PAYLOAD_BEGIN);
 
         // ---- V2 wire layout (dense or sparse) -----------------------------
 
@@ -5824,17 +5868,18 @@ namespace XOffsetDatastructure {
         };
 
         // Validates an extent table (count entries at `table`, unaligned) for
-        // a payload of `used` bytes; appends the gaps and returns stored bytes.
+        // a payload of `used` bytes; appends the gaps and returns the payload
+        // bytes on the wire.
         inline std::uint64_t parse_extent_table(const char* table, std::size_t count,
                                                 std::uint64_t used, const char* who,
                                                 std::vector<XBufferCore::WireHole>& gaps) {
-            if (count == 0) return used;
+            if (count == 0) return used - XWIRE_PAYLOAD_BEGIN;
             std::uint64_t stored = 0, end = 0;
             for (std::size_t i = 0; i < count; ++i) {
                 std::uint32_t e[2];
                 std::memcpy(e, table + i * 8u, sizeof(e));
                 if (e[1] == 0 || (e[0] & 7u) != 0 || (e[1] & 7u) != 0 ||
-                    (i == 0 ? e[0] != 0 : e[0] <= end) ||
+                    (i == 0 ? e[0] != XWIRE_PAYLOAD_BEGIN : e[0] <= end) ||
                     std::uint64_t(e[0]) + e[1] > used)
                     throw XException(std::string(who) + ": invalid extent table");
                 if (i != 0) gaps.push_back({static_cast<std::uint32_t>(end),
@@ -5848,18 +5893,6 @@ namespace XOffsetDatastructure {
             return stored;
         }
 
-        inline void check_hole_byte_sum(const XWireHeaderV2& header, const char* holes,
-                                        std::size_t count, const char* who) {
-            std::uint64_t hole_bytes = 0;
-            for (std::size_t i = 0; i < count; ++i) {
-                XBufferCore::WireHole hole;
-                std::memcpy(&hole, holes + i * sizeof(hole), sizeof(hole));
-                hole_bytes += hole.bytes;
-            }
-            if (hole_bytes != header.hole_bytes)
-                throw XException(std::string(who) + ": hole byte count mismatch");
-        }
-
         // M2: names the limit a wire exceeds, before any reservation.
         inline void require_wire_within_capacity(std::size_t used, std::size_t limit,
                                                  bool explicit_limit, const char* who) {
@@ -5871,29 +5904,26 @@ namespace XOffsetDatastructure {
                             (explicit_limit ? "" : "; pass XBuffer::maximum_capacity() for larger wires"));
         }
 
-        // Validates sizes, the extent table and the hole byte sum of a wire
-        // whose header passed check_wire_format. Does not touch the payload.
+        // Validates used_bytes, root_offset, the extent table and the length
+        // of a wire whose header passed read_wire_header and the fingerprint
+        // check. `body` follows the header. Does not touch the payload.
         inline WireLayout parse_wire_layout(const XWireHeaderV2& header,
                                             const char* body, std::size_t body_size,
                                             const char* who) {
-            auto fail = [&](const char* what) { throw XException(std::string(who) + what); };
+            check_wire_extent(header, who);
             WireLayout layout;
-            const auto used = header.used_bytes;
-            if (used > XBufferCore::MAX_PAYLOAD || header.extent_count > body_size / 8u)
-                fail(": used size mismatch");
+            if (header.extent_count > body_size / 8u) wire_reject(who, ": used size mismatch");
             const auto table = std::size_t(header.extent_count) * 8u;
             layout.extent_count = std::size_t(header.extent_count);
             if (layout.extent_count) layout.extents = body;
-            const auto stored = parse_extent_table(body, layout.extent_count, used, who, layout.gaps);
-            if (stored > body_size - table) fail(": used size mismatch");
+            const auto stored = parse_extent_table(body, layout.extent_count, header.used_bytes, who, layout.gaps);
+            if (stored > body_size - table) wire_reject(who, ": used size mismatch");
             const auto rest = body_size - table - std::size_t(stored);
-            if (header.hole_count > rest / 8u || header.hole_count * 8u != rest)
-                fail(": used size mismatch");
-            if (header.root_offset >= used) fail(": root offset out of bounds");
+            if (header.hole_count > rest / 8u || std::size_t(header.hole_count) * 8u != rest)
+                wire_reject(who, ": used size mismatch");
             layout.stored = body + table;
             layout.holes = body + table + stored;
             layout.hole_count = std::size_t(header.hole_count);
-            check_hole_byte_sum(header, layout.holes, layout.hole_count, who);
             return layout;
         }
 
@@ -5980,11 +6010,11 @@ namespace XOffsetDatastructure {
             return copier;
         }
 
-        // Dense wire size: header, used_bytes of payload, hole table. Every
-        // other emission is smaller (see write_wire).
+        // Dense wire size: header, payload bytes [48, used_bytes), hole table.
+        // Every other emission is smaller (see write_wire).
         inline std::size_t wire_dense_size(const XWireHeaderV2& header, const char* who) {
-            const std::uint64_t total = sizeof(XWireHeaderV2) + header.used_bytes +
-                header.hole_count * sizeof(XBufferCore::WireHole);
+            const std::uint64_t total = sizeof(XWireHeaderV2) + (header.used_bytes - XWIRE_PAYLOAD_BEGIN) +
+                std::uint64_t(header.hole_count) * sizeof(XBufferCore::WireHole);
             if (total > (std::numeric_limits<std::size_t>::max)())
                 throw std::length_error(std::string(who) + ": output size exceeds string limit");
             return static_cast<std::size_t>(total);
@@ -6026,6 +6056,9 @@ namespace XOffsetDatastructure {
             }
             std::uint64_t start = 0, end = 0;
             auto close = [&] {
+                // The first extent starts at 48 and is not empty: a run there
+                // (free bytes before the root) keeps its first word.
+                if (start == XWIRE_PAYLOAD_BEGIN) start += 8u;
                 if (end - start >= wire_free_run_min_gap) {
                     gaps.runs.push_back({static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(end - start)});
                     gaps.skipped += end - start;
@@ -6039,7 +6072,7 @@ namespace XOffsetDatastructure {
             }
             close();
             if (!gaps.runs.empty()) {
-                // The arena header is live, so no run starts at 0.
+                // No run starts at or before 48: one extent precedes each run.
                 const auto& last = gaps.runs.back();
                 gaps.extent_count = gaps.runs.size() + (std::uint64_t(last.offset) + last.bytes < used ? 1u : 0u);
             }
@@ -6065,9 +6098,11 @@ namespace XOffsetDatastructure {
 
         // Writes the extent table of `payload` (8-aligned, `used` a multiple
         // of 8) at `table` and returns the extent count, or 0 when no run is
-        // skipped. The table never exceeds `used` bytes: every extent holds
-        // at least one nonzero word. The first extent starts at 0 and holds
-        // the arena header (whose magic is never zero).
+        // skipped. The table never exceeds `used` - 48 bytes: every extent
+        // but the first holds at least one nonzero word, and every skipped
+        // run is at least 64 bytes. The first extent starts at 48 and holds
+        // at least the word there. Block 0 holds the payload header (whose
+        // magic is never zero), so no run starts in it.
         inline std::size_t wire_zero_run_extents(const char* payload, std::size_t used,
                                                  char* table, std::uint64_t& skipped) noexcept {
             auto word = [&](std::size_t at) noexcept {
@@ -6080,7 +6115,7 @@ namespace XOffsetDatastructure {
                 std::memcpy(w, payload + block * 64u, sizeof(w));
                 return ((w[0] | w[1]) | (w[2] | w[3]) | (w[4] | w[5]) | (w[6] | w[7])) == 0;
             };
-            std::size_t count = 0, cursor = 0;
+            std::size_t count = 0, cursor = XWIRE_PAYLOAD_BEGIN;
             auto emit = [&](std::size_t begin, std::size_t end) noexcept {
                 const std::uint32_t entry[2] = {static_cast<std::uint32_t>(begin),
                                                 static_cast<std::uint32_t>(end - begin)};
@@ -6097,7 +6132,7 @@ namespace XOffsetDatastructure {
                 while (e < blocks && block_zero(e)) ++e;
                 std::size_t stop = e * 64u;
                 while (stop < used && word(stop) == 0) stop += 8u;
-                if (start < 8u) start = 8u;
+                if (start < XWIRE_PAYLOAD_BEGIN + 8u) start = XWIRE_PAYLOAD_BEGIN + 8u;
                 if (stop - start >= wire_zero_run_min) {
                     emit(cursor, start);
                     skipped += stop - start;
@@ -6124,7 +6159,7 @@ namespace XOffsetDatastructure {
             std::size_t extents = 0;
             if (emission == XWireEmission::free_runs && gaps.extent_count) {
                 extents = gaps.extent_count;
-                std::uint32_t begin = 0;
+                std::uint32_t begin = XWIRE_PAYLOAD_BEGIN;
                 for (const auto& gap : gaps.runs) {
                     const std::uint32_t entry[2] = {begin, gap.offset - begin};
                     std::memcpy(at, entry, sizeof(entry));
@@ -6143,12 +6178,12 @@ namespace XOffsetDatastructure {
                                                                     std::uint64_t(used / 16u)))
                     extents = 0;
             }
-            header.extent_count = extents;
+            header.extent_count = static_cast<std::uint32_t>(extents);
             std::memcpy(out, &header, sizeof(header));
-            const auto copier = wire_copier(sizeof(XWireHeaderV2) + used);
+            const auto copier = wire_copier(sizeof(XWireHeaderV2) + used - XWIRE_PAYLOAD_BEGIN);
             if (extents == 0) {
-                copier.copy(at, payload, used);
-                at += used;
+                copier.copy(at, payload + XWIRE_PAYLOAD_BEGIN, used - XWIRE_PAYLOAD_BEGIN);
+                at += used - XWIRE_PAYLOAD_BEGIN;
             } else {
                 const char* table = at;
                 at += extents * 8u;
@@ -6559,6 +6594,23 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // Wire header of a payload of `used` bytes with the root at
+        // `root_offset` and `holes` hole table entries; the writer sets
+        // extent_count. Sizes fit: used_bytes <= MAX_PAYLOAD < 2 GiB.
+        template <typename T>
+        XWireHeaderV2 make_wire_header(std::uint64_t used, std::uint64_t root_offset,
+                                       std::uint64_t holes) noexcept {
+            XWireHeaderV2 header{};
+            header.magic = XWIRE_MAGIC;
+            header.flags = XWIRE_FLAGS;
+            header.used_bytes = static_cast<std::uint32_t>(used);
+            header.root_offset = static_cast<std::uint32_t>(root_offset);
+            header.hole_count = static_cast<std::uint32_t>(holes);
+            header.schema_hash = wire_schema_hash<T>();
+            header.root_type_id = wire_root_type_id<T>();
+            return header;
+        }
+
     } // namespace detail (reflection)
 
     template <typename T>
@@ -6852,7 +6904,6 @@ namespace XOffsetDatastructure {
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
                                                                          const XAssign<M>&...);
             static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
-            static void check_received_payload(XBufferCore&, const XWireHeaderV2&);
             static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
             static void attach_owner(XBufferCore&);
             static void rollback_storage(XBufferCore&, VirtualMemoryStorage&) noexcept;
@@ -6888,8 +6939,8 @@ namespace XOffsetDatastructure {
             typed_root_access_allowed_ = false;
         }
 
-        XBuffer(SparsePayload sparse, std::size_t size, MaximumCapacity cap)
-            : XBufferCore(sparse, size, cap) {
+        XBuffer(WirePayload wire, std::size_t size, MaximumCapacity cap)
+            : XBufferCore(wire, size, cap) {
             typed_root_access_allowed_ = false;
         }
 
@@ -7108,26 +7159,9 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         XWireHeaderV2 wire_header_v2(const T& root) const {
-            XWireHeaderV2 header{};
-            std::memcpy(header.magic, XWIRE_MAGIC_V2, sizeof(XWIRE_MAGIC_V2));
-            header.format_major = XWIRE_FORMAT_MAJOR_V2;
-            header.format_minor = XWIRE_FORMAT_MINOR_V2;
-            header.header_size = static_cast<std::uint32_t>(sizeof(XWireHeaderV2));
-            header.used_bytes = static_cast<std::uint64_t>(this->segment_size());
-            header.root_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<std::uintptr_t>(&root) -
-                reinterpret_cast<std::uintptr_t>(this->get_address()));
-            header.hole_count = this->free_block_count();
-            header.hole_bytes = this->free_block_bytes();
-            header.root_type_id = detail::wire_root_type_id<T>();
-            header.schema_hash_lo = detail::wire_schema_hash<T>();
-            header.schema_hash_hi = 0;
-            header.flags = XWIRE_FLAGS_V2;
-            header.endian_tag = XWIRE_ENDIAN_TAG_V2;
-            header.crc32c = 0;
-            header.reserved0 = 0;
-            header.extent_count = 0;
-            return header;
+            return detail::make_wire_header<T>(this->segment_size(),
+                reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
+                this->free_block_count());
         }
 
         template <typename T>
@@ -7230,9 +7264,8 @@ namespace XOffsetDatastructure {
             const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
             detail::require_wire_within_capacity(used, capacity.value, cap.has_value(),
                                                  "load_verified<T>()");
-            XBuffer xbuf = layout.extent_count == 0
-                ? XBuffer(layout.stored, used, capacity)
-                : XBuffer(SparsePayload{layout.stored, layout.extents, layout.extent_count}, used, capacity);
+            XBuffer xbuf(WirePayload{header.root_offset, layout.stored, layout.extents, layout.extent_count},
+                         used, capacity);
             xbuf.finish_verified_load<T>(header, layout, upstream, who);
             return xbuf;
         }
@@ -7289,9 +7322,8 @@ namespace XOffsetDatastructure {
                 }
                 XWireHeaderV2 header{};
                 const auto layout = admit_wire_header<T>(data, header, who);
-                const auto used = static_cast<std::size_t>(header.used_bytes);
-                if (layout.extent_count == 0) reinit_from_bytes(layout.stored, used);
-                else reinit_from_extents(layout.stored, layout.extents, layout.extent_count, used);
+                reinit_from_wire({header.root_offset, layout.stored, layout.extents, layout.extent_count},
+                                 header.used_bytes);
                 finish_verified_load<T>(header, layout, upstream, who, retained);
             } catch (...) {
                 reset_arena(0);
@@ -7311,9 +7343,10 @@ namespace XOffsetDatastructure {
     public:
         /// Direct receive into this buffer: reload_verified<T>() without the
         /// library copy. The transport writes the wire's sections into the
-        /// token's spans (header; extent table; the payload, densely or each
-        /// extent at its offset with gaps untouched; hole table), calls
-        /// complete() with the byte counts it wrote, then finish().
+        /// token's spans (header; extent table; the payload bytes, densely or
+        /// each extent at its payload offset - XWIRE_PAYLOAD_BEGIN with gaps
+        /// untouched; hole table), calls complete() with the byte counts it
+        /// wrote, then finish().
         /// `payload_bytes`, `holes` and `extents` are the header's used_bytes,
         /// hole_count and extent_count. Admission, verification, rejection
         /// and the result are exactly those of reload_verified<T>() on the
@@ -7410,16 +7443,11 @@ namespace XOffsetDatastructure {
                                                     XWireHeaderV2& header, const char* who) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "load_verified<T>() requires an admitted fixed-schema wire type.");
-            if (data.size_bytes() < sizeof(XWireHeaderV2)) {
-                throw XException(std::string(who) + ": wire header too small");
-            }
-            std::memcpy(&header, data.data(), sizeof(header));
-            detail::check_wire_format(header, who);
+            header = detail::read_wire_header(data.data(), data.size_bytes(), who);
             if (header.root_type_id != detail::wire_root_type_id<T>()) {
                 throw XException(std::string(who) + ": root type id mismatch");
             }
-            if (header.schema_hash_lo != detail::wire_schema_hash<T>() ||
-                header.schema_hash_hi != 0) {
+            if (header.schema_hash != detail::wire_schema_hash<T>()) {
                 throw XException(std::string(who) + ": schema hash mismatch");
             }
             return detail::parse_wire_layout(
@@ -7505,8 +7533,10 @@ namespace XOffsetDatastructure {
             return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2), extents_ * 8u)
                            : std::span<std::byte>{};
         }
+        // The payload bytes of the wire: payload [48, used_bytes).
         std::span<std::byte> payload_bytes() const noexcept {
-            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()), payload_)
+            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()) + XWIRE_PAYLOAD_BEGIN,
+                                                  payload_ - XWIRE_PAYLOAD_BEGIN)
                            : std::span<std::byte>{};
         }
         std::span<std::byte> hole_bytes() const noexcept {
@@ -7514,7 +7544,8 @@ namespace XOffsetDatastructure {
                                                   holes_ * sizeof(XBufferCore::WireHole))
                            : std::span<std::byte>{};
         }
-        // payload_bytes counts the logical payload including sparse gaps.
+        // payload_bytes counts the payload bytes including sparse gaps
+        // (used_bytes - 48).
         void complete(std::size_t header_bytes, std::size_t payload_bytes,
                       std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
             received_ = {header_bytes, payload_bytes, hole_bytes, extent_bytes};
@@ -7528,18 +7559,18 @@ namespace XOffsetDatastructure {
             if (!buffer) throw XException("verified reload: token consumed");
             struct Close { XBuffer& b; ~Close() { b.direct_reload_open_ = false; } } close{*buffer};
             try {
-                if (!complete_ || received_[0] != sizeof(XWireHeaderV2) || received_[1] != payload_ ||
+                if (!complete_ || received_[0] != sizeof(XWireHeaderV2) ||
+                    received_[1] != payload_ - XWIRE_PAYLOAD_BEGIN ||
                     received_[2] != holes_ * sizeof(XBufferCore::WireHole) || received_[3] != extents_ * 8u)
                     throw XException("verified reload: incomplete input");
-                XWireHeaderV2 header{};
-                std::memcpy(&header, tables_, sizeof(header));
                 // admit_wire_header and parse_wire_layout, with the section
                 // lengths fixed by begin instead of read from one wire.
-                detail::check_wire_format(header, who);
+                const auto header = detail::read_wire_header(tables_, sizeof(XWireHeaderV2), who);
                 if (header.root_type_id != detail::wire_root_type_id<T>())
                     throw XException(std::string(who) + ": root type id mismatch");
-                if (header.schema_hash_lo != detail::wire_schema_hash<T>() || header.schema_hash_hi != 0)
+                if (header.schema_hash != detail::wire_schema_hash<T>())
                     throw XException(std::string(who) + ": schema hash mismatch");
+                detail::check_wire_extent(header, who);
                 if (header.used_bytes != payload_ || header.extent_count != extents_ ||
                     header.hole_count != holes_)
                     throw XException(std::string(who) + ": used size mismatch");
@@ -7547,11 +7578,8 @@ namespace XOffsetDatastructure {
                 layout.extent_count = extents_;
                 if (extents_) layout.extents = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2));
                 (void)detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps);
-                if (header.root_offset >= header.used_bytes)
-                    throw XException(std::string(who) + ": root offset out of bounds");
                 layout.holes = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u);
                 layout.hole_count = holes_;
-                detail::check_hole_byte_sum(header, layout.holes, holes_, who);
                 // Gaps read as zero, as in assign_extents: clear what an
                 // earlier content may have left below clean_from_.
                 auto* base = buffer->data();
@@ -7559,6 +7587,7 @@ namespace XOffsetDatastructure {
                     const auto end = std::min<std::size_t>(std::size_t(gap.offset) + gap.bytes, clean_from_);
                     if (gap.offset < end) std::memset(base + gap.offset, 0, end - gap.offset);
                 }
+                XBufferCore::write_payload_header(base, header.root_offset, header.used_bytes);
                 buffer->check_reinit_payload();
                 buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(), who,
                                                          &buffer->retained_reload_scratch());

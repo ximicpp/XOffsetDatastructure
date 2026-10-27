@@ -257,8 +257,9 @@ void pooled_verified_lifecycle() {
     auto malformed = wire;
     XWireHeaderV2 header;
     std::memcpy(&header, malformed.data(), sizeof(header));
-    assert(header.extent_count == 0); // dense wire: payload = bytes [96, 96 + used)
-    auto* vector_bytes = malformed.data() + sizeof(header) + header.root_offset
+    // Dense wire: payload offset p (>= 48) is wire byte sizeof(header) + p - 48.
+    assert(header.extent_count == 0);
+    auto* vector_bytes = malformed.data() + sizeof(header) + (header.root_offset - XWIRE_PAYLOAD_BEGIN)
         + offsetof(PolicyRoot, values);
     using Values = XVector<std::uint32_t>;
     std::uint32_t invalid_size;

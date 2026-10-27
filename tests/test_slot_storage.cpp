@@ -73,7 +73,7 @@ void fill_explicit(XBuffer& b, std::uint64_t id, std::size_t n) {
 }
 
 // The transport side of begin_verified_reload: header, extent table,
-// payload (dense or extent by extent), hole table.
+// payload bytes (dense, or each extent at its payload offset - 48), hole table.
 void direct_reload(XBuffer& b, const std::string& w) {
     XWireHeaderV2 h{};
     std::memcpy(&h, w.data(), sizeof(h));
@@ -89,7 +89,7 @@ void direct_reload(XBuffer& b, const std::string& w) {
         for (std::size_t i = 0; i < table.size() / 8; ++i) {
             std::uint32_t e[2];
             std::memcpy(e, table.data() + i * 8, 8);
-            take(t.payload_bytes().data() + e[0], e[1]);
+            take(t.payload_bytes().data() + e[0] - XWIRE_PAYLOAD_BEGIN, e[1]);
         }
     }
     if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
@@ -142,7 +142,7 @@ void storage_rule() {
     auto loaded_auto = XBuffer::load_verified<SlotRoot>(wire,
         XBuffer::maximum_capacity(256u << 20).with_growth(XGrowPolicy::Automatic));
     need(loaded_auto.storage_kind() == XStorageKind::Vm, "Automatic load -> VM");
-    auto raw = XBuffer::load_unverified(wire.substr(sizeof(XWireHeaderV2)));
+    auto raw = XBuffer::load_unverified(XBuffer::create<SlotRoot>(4096).save());
     need(raw.storage_kind() == XStorageKind::MovableSlot, "unverified load -> movable slot");
 }
 
