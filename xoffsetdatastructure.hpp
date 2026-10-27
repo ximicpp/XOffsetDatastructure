@@ -251,6 +251,17 @@ namespace XOffsetDatastructure {
 #else
 #define XOFFSET_DETAIL_NOINLINE
 #endif
+// [[indeterminate]] (C++26) where the compiler has it: an automatic variable
+// whose bytes are written before they are read does not get the erroneous-
+// behaviour fill (GCC 16 zeroes it; Clang without the attribute does not).
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(indeterminate)
+#define XOFFSET_INDETERMINATE [[indeterminate]]
+#endif
+#endif
+#ifndef XOFFSET_INDETERMINATE
+#define XOFFSET_INDETERMINATE
+#endif
 
     namespace fixed_detail {
         struct StableEraseOwnerWitness;
@@ -1487,7 +1498,31 @@ namespace XOffsetDatastructure {
             register_registry();
         }
 
-        void move_from(XBufferCore&& other) noexcept {
+        // Out of line: inlining the short path into every move site changes
+        // register allocation in unrelated callers (GCC 16 reloc map.find).
+        XOFFSET_DETAIL_NOINLINE void move_from(XBufferCore&& other) noexcept {
+            if (holds_nothing()) [[likely]] {
+                // Nothing to retire (a new or moved-from target, as in all
+                // three moves of std::swap). Take other's storage, record,
+                // free list and schema state; other keeps this empty storage
+                // and gets the default state the retired path below leaves
+                // it. Each epoch still advances by one.
+                buffer_.swap(other.buffer_);
+                owner_record_.swap(other.owner_record_);
+                free_table_.swap(other.free_table_);
+                free_table_lost_ = std::exchange(other.free_table_lost_, false);
+                publish_host_owner();
+                growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
+                root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
+                typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
+                schema_bound_ = std::exchange(other.schema_bound_, false);
+                bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
+                bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
+                ++m_epoch;
+                ++other.m_epoch;
+                update_registry_owner();
+                return;
+            }
             const auto target_epoch = m_epoch;
             const auto source_epoch = other.m_epoch;
             XBufferCore retired;
@@ -1502,6 +1537,13 @@ namespace XOffsetDatastructure {
             other.m_epoch = source_epoch + 1u;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
+        }
+
+        // No storage, slot, pool, registry record or free list: retiring
+        // this owner would release nothing.
+        bool holds_nothing() const noexcept {
+            return !buffer_.data() && !buffer_.is_slot() && !buffer_.pool().enabled() &&
+                !owner_record_ && !free_table_;
         }
 
         void update_registry_owner() noexcept {
@@ -2291,6 +2333,41 @@ namespace XOffsetDatastructure {
                 std::destroy_n(ptr, count);
             }
         }
+#if defined(__linux__)
+
+        // A SHIFT erase from the middle moves the tail of records down by one
+        // element: an overlapping memmove with the destination just below the
+        // source. On x86-64 glibc, one call over a tail of tens of KiB is
+        // about a third slower than the same copy in 4 KiB chunks (SLG
+        // S.ticks_middle on a cloud Xeon); tails up to 16 KiB stay one call.
+        // Chunks go from low to high addresses, so none overwrites source
+        // bytes still to be read. The loop is out of line so that the erase
+        // body keeps its inlining.
+#if defined(__GLIBC__) && defined(__x86_64__)
+        XOFFSET_DETAIL_NOINLINE inline void overlap_move_down_chunked(
+                unsigned char* d, const unsigned char* s, std::size_t bytes) noexcept {
+            constexpr std::size_t chunk = 4096;
+            do {
+                std::memmove(d, s, chunk);
+                d += chunk;
+                s += chunk;
+                bytes -= chunk;
+            } while (bytes > chunk);
+            std::memmove(d, s, bytes);
+        }
+#endif
+
+        inline void overlap_move_down(void* dst, const void* src, std::size_t bytes) noexcept {
+#if defined(__GLIBC__) && defined(__x86_64__)
+            if (bytes > 16384) [[unlikely]] {
+                overlap_move_down_chunked(static_cast<unsigned char*>(dst),
+                                          static_cast<const unsigned char*>(src), bytes);
+                return;
+            }
+#endif
+            std::memmove(dst, src, bytes);
+        }
+#endif
 
         inline allocator_ref allocator_ref_of(XArena* sm) noexcept {
             return {sm};
@@ -3538,7 +3615,11 @@ namespace XOffsetDatastructure {
                 auto* items = data();
                 const auto moved = size_ - index - 1;
                 std::destroy_at(items + index);
+#if defined(__linux__)
+                fixed_detail::overlap_move_down(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+#else
                 std::memmove(static_cast<void*>(items + index), static_cast<const void*>(items + index + 1), std::size_t(moved) * sizeof(T));
+#endif
                 detail::shift_rebase_moved(items + index, moved, static_cast<std::int32_t>(sizeof(T)));
                 detail::empty_vacated_slot(items + size_ - 1);
                 std::destroy_at(items + size_ - 1);
@@ -4966,6 +5047,23 @@ namespace XOffsetDatastructure {
 
 
 
+        // Padding bytes [n, 11) of an inline string of length n, as masks of
+        // bytes 0..7 and 8..10 (little endian). A table keeps the check free
+        // of length-dependent branches.
+        struct InlinePadMasks {
+            std::uint64_t low[XFixedString::inline_max + 1];
+            std::uint32_t high[XFixedString::inline_max + 1];
+        };
+        inline constexpr InlinePadMasks inline_pad_masks = [] {
+            InlinePadMasks masks{};
+            for (unsigned n = 0; n <= XFixedString::inline_max; ++n)
+                for (unsigned i = n; i < 11u; ++i) {
+                    if (i < 8u) masks.low[n] |= std::uint64_t(0xff) << (8u * i);
+                    else masks.high[n] |= std::uint32_t(0xff) << (8u * (i - 8u));
+                }
+            return masks;
+        }();
+
         // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
         inline void validate_inline_string_bytes(const char* head) {
             unsigned char bytes[12];
@@ -4973,10 +5071,13 @@ namespace XOffsetDatastructure {
             const unsigned length = bytes[11] & 0x7fu;
             if (length > XFixedString::inline_max)
                 wire_reject("wire validation failed: inline XFixedString length exceeds 10");
-            for (unsigned i = length; i < 11; ++i) {
-                if (bytes[i] != 0)
-                    wire_reject("wire validation failed: inline XFixedString has nonzero padding");
-            }
+            // bytes[length..10] must be zero.
+            std::uint64_t low;
+            std::uint32_t high;
+            std::memcpy(&low, bytes, sizeof(low));
+            std::memcpy(&high, bytes + 8, sizeof(high));
+            if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
+                wire_reject("wire validation failed: inline XFixedString has nonzero padding");
         }
 
         inline void validate_wire_value(const XFixedString& value,
@@ -5130,13 +5231,17 @@ namespace XOffsetDatastructure {
             if (used > xbuf.segment_size())
                 wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
-            WireValidationContext ctx{
-                .base = static_cast<const char*>(xbuf.get_address()),
-                .end = validated_end,
-                .segment = xbuf.arena(),
-                .upstream = upstream,
-                .retained = retained
-            };
+            // Default-initialized, then assigned: the granule index's inline
+            // words are written by prepare() before any read. GCC 16 zeroes
+            // the whole 1 KiB context for an aggregate initializer, with or
+            // without [[indeterminate]], and for a default-initialized one
+            // without the attribute.
+            XOFFSET_INDETERMINATE WireValidationContext ctx;
+            ctx.base = static_cast<const char*>(xbuf.get_address());
+            ctx.end = validated_end;
+            ctx.segment = xbuf.arena();
+            ctx.upstream = upstream;
+            ctx.retained = retained;
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
                 wire_reject("wire validation: unsupported arena header flags");
             }

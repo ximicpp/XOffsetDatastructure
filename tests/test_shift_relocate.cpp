@@ -229,7 +229,65 @@ template <class Root> std::vector<std::string> run() {
     return wires;
 }
 
+// Erases whose moved tail sits on either side of the chunked-move threshold
+// (16 KiB) and of its 4 KiB chunk boundaries (x86-64 glibc copies SHIFT
+// tails above it in chunks; elsewhere, and for trivially copyable elements,
+// it is one memmove). Each erase is checked against a std model; the SHIFT
+// and per-element wires must match byte for byte.
+template <class Root> std::string erase_tail_sizes() {
+    Rng rng{20261026};
+    xo::XBuffer buf = xo::XBuffer::create<Root>(64 * 1024, policy());
+    std::vector<StdRec> model;
+    for (std::int64_t id = 1; id <= 1400; ++id) {
+        model.push_back(make(rng, id));
+        fill(buf.root<Root>().recs.emplace_back(), model.back());
+    }
+    // Trivially copyable elements: Troop is 16 bytes, so the tail sizes are exact.
+    std::vector<Troop> troops;
+    auto& first = buf.root<Root>().recs[0];
+    first.troops.clear();
+    for (std::int32_t k = 0; k < 6000; ++k) {
+        troops.push_back({k % 4, k, k * 3});
+        first.troops.push_back(troops.back());
+    }
+    model[0].troops = troops;
+    constexpr std::size_t threshold = 16384, chunk = 4096;
+    const std::size_t byte_targets[] = {threshold - chunk, threshold, threshold + chunk,
+                                        threshold + 3 * chunk, 4 * threshold};
+    for (const auto bytes : byte_targets) {
+        for (const auto element : {sizeof(Troop), sizeof(typename decltype(Root::recs)::value_type)}) {
+            for (const std::ptrdiff_t delta : {-1, 0, 1}) {
+                const auto moved = std::size_t(std::ptrdiff_t(bytes / element) + delta);
+                auto& recs = buf.root<Root>().recs;
+                if (element == sizeof(Troop)) {
+                    auto& live = recs[0].troops;
+                    const auto at = std::ptrdiff_t(live.size() - 1 - moved);
+                    live.erase(live.begin() + at);
+                    model[0].troops.erase(model[0].troops.begin() + at);
+                } else {
+                    const auto at = std::ptrdiff_t(recs.size() - 1 - moved);
+                    recs.erase(recs.begin() + at);
+                    model.erase(model.begin() + at);
+                }
+                compare(buf.root<Root>(), model, "erase tail sizes");
+            }
+        }
+    }
+    std::string wire = buf.save_verified<Root>();
+    xo::XBuffer loaded = xo::XBuffer::load_verified<Root>(wire, policy());
+    compare(loaded.root<Root>(), model, "erase tail sizes reload");
+    return wire;
+}
+
 int main() {
+    {
+        const auto shifted = erase_tail_sizes<shift::Root>();
+        const auto plain = erase_tail_sizes<shift::PlainRoot>();
+        constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
+        if (shifted.size() != plain.size() ||
+            shifted.compare(header, std::string::npos, plain, header, std::string::npos) != 0)
+            fail("erase tail sizes: SHIFT wire differs from the per-element path");
+    }
     const auto shifted = run<shift::Root>();
     const auto plain = run<shift::PlainRoot>();
     if (shifted.size() != plain.size()) fail("checkpoint count");
