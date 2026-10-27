@@ -22,7 +22,7 @@ using namespace XOffsetDatastructure;
 
 struct Profile {
     std::int32_t           id{0};
-    XString                name;     // ≤10 字节的字符串内联在 16 字节头里
+    XString                name;     // ≤10 字节的字符串内联在 12 字节头里
     XString                bio;      // 更长的字符串占一个 arena 块
     XVector<std::int32_t>  scores;
     XSet<std::int32_t>     tags;
