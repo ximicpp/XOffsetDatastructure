@@ -13,5 +13,5 @@
 #   user guide says (element records too); .ord heroes now move by SHIFT.
 74551b16f3b99e39ff191e957a29b7c5d55408258a1bb34cc95c0a71a4be0759  CMakeLists.txt
 127ad8a0ece174c7ba30c24fcfa95d9731829d1287f8886751d91fecd147269a  README.md
-ed46792dabb586b49152e49fad14e2f597eb0d2e0f8b28f2646bf2d8de6bcad0  reloc_bench.cpp
+f9d7fa2f65c5e42bce3c0fc5a08315db767ee12862ca964e55243db2193f92fc  reloc_bench.cpp
 a3b0540ba0e85e8a3183fbc4edf1b7314d6ff451de1c86b6c1c85582173bb634  tools/analyze.py

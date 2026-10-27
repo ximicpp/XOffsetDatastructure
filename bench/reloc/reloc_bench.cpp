@@ -470,7 +470,7 @@ void hero_cases(const char* variant, bool primary) {
         const std::string n = name("mid_erase");
         run_case(n, K, base, {
             {"xoffset", [&](int, uint64_t& d) {
-                auto& xv = xb.reset<XVec>().v;
+                auto& xv = xb.template reset<XVec>().v;
                 for (int i = 0; i < M; ++i) fill_hero(xv.emplace_back(), i);
                 const double t = timed(n.c_str(), [&] {
                     for (int k = 0; k < K; ++k) xv.erase(xv.begin() + xv.size() / 2);
@@ -495,7 +495,7 @@ void hero_cases(const char* variant, bool primary) {
         const std::string n = name("mid_insert");
         run_case(n, K, base, {
             {"xoffset", [&](int, uint64_t& d) {
-                auto& root = xb.reset<XVec>();
+                auto& root = xb.template reset<XVec>();
                 fill_hero(root.proto, 9999);
                 auto& xv = root.v;
                 xv.reserve(M + K);
@@ -525,7 +525,7 @@ void hero_cases(const char* variant, bool primary) {
         run_case(n, double(R) * M, base, {
             {"xoffset", [&](int, uint64_t& d) {
                 std::vector<decltype(XVec::v)*> v;
-                for (auto& b : xb) v.push_back(&b.reset<XVec>().v);
+                for (auto& b : xb) v.push_back(&b.template reset<XVec>().v);
                 const double t = timed(n.c_str(), [&] {
                     for (auto* p : v) { for (int i = 0; i < M; ++i) fill_hero(p->emplace_back(), i); keep(p->data()); }
                 });
@@ -852,7 +852,7 @@ void nested_cases(const char* variant, bool primary) {
         run_case(n, R, primary ? "std" : nullptr, {
             {"xoffset", [&](int r, uint64_t& d) {
                 std::vector<XArmy*> a;
-                for (auto& b : xb) a.push_back(&b.reset<XArmy>());
+                for (auto& b : xb) a.push_back(&b.template reset<XArmy>());
                 const double t = timed(n.c_str(), [&] {
                     for (int i = 0; i < R; ++i) { fill_army(*a[std::size_t(i)], (r & 0xffff) + i); keep(a[std::size_t(i)]); }
                 });
@@ -878,8 +878,8 @@ void nested_cases(const char* variant, bool primary) {
         run_case("reset", R, "std", {
             {"xoffset", [&](int r, uint64_t& d) {
                 for (int i = 0; i < R; ++i) fill_army(xb[std::size_t(i)].reset<XArmy>(), (r & 0xffff) + i);
-                const double t = timed("reset", [&] { for (auto& b : xb) keep(&b.reset<XArmy>()); });
-                d = 0; for (auto& b : xb) d = dig_army(d, b.root<XArmy>()); return t; }},
+                const double t = timed("reset", [&] { for (auto& b : xb) keep(&b.template reset<XArmy>()); });
+                d = 0; for (auto& b : xb) d = dig_army(d, b.template root<XArmy>()); return t; }},
             {"std", [&](int r, uint64_t& d) {
                 for (int i = 0; i < R; ++i) { sa[std::size_t(i)] = sm::Army{}; fill_army(sa[std::size_t(i)], (r & 0xffff) + i); }
                 const double t = timed(nullptr, [&] { for (auto& a : sa) { a = sm::Army{}; keep(&a); } });
