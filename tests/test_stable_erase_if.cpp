@@ -84,7 +84,7 @@ namespace fd = xo::fixed_detail;
 namespace track {
 inline bool active = false;
 inline std::array<unsigned,64> destructors{};
-inline const char32_t* observed_size{};
+inline const std::uint32_t* observed_size{};
 inline std::uint32_t expected_size{};
 inline unsigned early_size_publications{};
 }

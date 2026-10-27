@@ -2399,57 +2399,6 @@ namespace XOffsetDatastructure {
                 std::destroy_n(ptr, count);
             }
         }
-
-        // An aggregate element whose destructor is the implicit one only
-        // destroys its subobjects, so its heads may be released first.
-        template <typename T>
-        consteval bool release_walk_supported() {
-            if constexpr (!std::is_class_v<T> || !std::is_aggregate_v<T> ||
-                          std::is_trivially_destructible_v<T>) {
-                return false;
-            } else {
-                for (auto member : std::meta::members_of(^^T, std::meta::access_context::unchecked()))
-                    if (std::meta::is_destructor(member) && std::meta::is_user_provided(member)) return false;
-                return true;
-            }
-        }
-
-        // Owner lookup rule 5 (V2_FORMAT): a container that destroys its
-        // elements passes its own binding down, so the element heads, and the
-        // heads nested in aggregate elements, retire their blocks without a
-        // lookup each. The destructors that run afterwards see empty heads.
-        template <typename Alloc, typename T>
-        void release_in(const Alloc& alloc, T& value) noexcept {
-            if constexpr (requires { value.release_in(alloc); }) {
-                value.release_in(alloc);
-            } else if constexpr (std::is_array_v<T>) {
-                for (auto& item : value) release_in(alloc, item);
-            } else if constexpr (release_walk_supported<T>()) {
-                detail::for_each_reflected_subobject<T>([&](auto index) {
-                    constexpr auto base = std::meta::bases_of(^^T,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    using Base = [:std::meta::type_of(base):];
-                    release_in(alloc, static_cast<Base&>(value));
-                }, [&](auto index) {
-                    constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    if constexpr (!std::meta::is_reference_type(std::meta::type_of(member)) &&
-                                  !std::meta::is_bit_field(member)) {
-                        release_in(alloc, value.[:member:]);
-                    }
-                });
-            }
-        }
-
-        template <typename Alloc, typename T>
-        void destroy_n_in(const Alloc& alloc, T* ptr, std::uint32_t count) noexcept {
-            if constexpr (!std::is_trivially_destructible_v<T>) {
-                for (std::uint32_t i = 0; i < count; ++i) {
-                    release_in(alloc, ptr[i]);
-                    std::destroy_at(ptr + i);
-                }
-            }
-        }
 #if defined(__linux__)
 
         // A SHIFT erase from the middle moves the tail of records down by one
@@ -2711,28 +2660,24 @@ namespace XOffsetDatastructure {
         V second{};
     };
 
-    // V2.1 (R4): a container head is {data_delta, size_, capacity_}, 12 bytes,
-    // 4-aligned. It belongs to the payload it lies in: the owner is found from
-    // the head's address (detail::OwnerMap), never stored in the head.
-    struct XFixedString {
+    struct alignas(8) XFixedString {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
 
-        // I1: a string of at most inline_max bytes may live in bytes 0..10 of
-        // this head. Inline is marked by bit 31 of capacity_ (byte 11, which a
+        // I1: a string of at most inline_max bytes may live in bytes 4..14 of
+        // this head. Inline is marked by bit 31 of capacity_ (byte 15, which a
         // heap capacity < 2^31 never sets); bits 24..30 hold the length. The
         // byte after the last character and every unused inline byte are 0.
         static constexpr std::uint32_t inline_flag = 0x80000000u;
         static constexpr std::uint32_t inline_max = 10;
 
+        std::int32_t arena_delta = 0;
         std::int32_t data_delta = 0;
         std::uint32_t size_ = 0;
         std::uint32_t capacity_ = 0;
 
         XFixedString() = default;
-        // The allocator names the payload this head lies in; V2.1 reads that
-        // from the head's address, so the argument is not stored.
-        explicit XFixedString(allocator_type) noexcept {}
+        explicit XFixedString(allocator_type alloc) { bind(alloc); }
         ~XFixedString() { release(); }
         XFixedString(const XFixedString& other, allocator_type alloc) : XFixedString(alloc) {
             assign(other.view());
@@ -2742,15 +2687,15 @@ namespace XOffsetDatastructure {
         XFixedString(XFixedString&&) = delete;
         XFixedString& operator=(const XFixedString& other) {
             if (this == &other) return *this;
-            if (other.is_inline() && is_inline()) [[likely]] {
-                // Inline into an inline head: the 12 inline bytes are the
+            if (other.is_inline() && is_inline() && is_bound()) [[likely]] {
+                // Inline into a bound inline head: the 12 inline bytes are the
                 // whole value (characters, zero padding, length and flag), as
-                // store_inline would write them from other.view(). Inline
-                // storage needs no binding.
+                // store_inline would write them from other.view().
                 std::memcpy(inline_bytes(), other.inline_bytes(), 12);
                 return *this;
             }
-            // assign() looks the binding up only when it needs a block.
+            if (!is_bound() && other.is_bound()) bind_like(other);
+            ensure_bound();
             assign(other.view());
             return *this;
         }
@@ -2758,15 +2703,20 @@ namespace XOffsetDatastructure {
             if (this == &other) return *this;
             if (other.is_inline()) {
                 // An inline source owns no storage: copy its bytes, no allocator.
+                if (!is_bound() && other.is_bound()) bind_like(other);
                 release();
                 std::memcpy(inline_bytes(), other.inline_bytes(), 12);
                 other.reset_head();
                 return *this;
             }
-            if (auto* const shared = reinterpret_cast<XArena*>(detail::OwnerMap::same_payload(this, &other))) {
-                // Both heads lie in one payload (one owner-table read).
-                if (fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), shared) &&
-                    fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), shared) &&
+            if (is_bound() && other.is_bound()) {
+                const auto destination = binding();
+                const auto source = other.binding();
+                // N6: the ancestor/descendant ownership walk runs only in
+                // debug builds (XOFFSET_MOVE_OWNERSHIP_CHECKS).
+                if (fixed_detail::move_assignment_same_allocator(destination, source) &&
+                    fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
+                    fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
                     fixed_detail::move_assignment_disjoint(*this, other)) {
                     std::int32_t incoming_delta = 0;
                     fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
@@ -2776,13 +2726,12 @@ namespace XOffsetDatastructure {
                     // release() is noexcept; both heads remain in live storage.
                     // MV: release()'s empty-destination case inline (data() is
                     // null exactly when data_delta == 0, and release() then only
-                    // clears the descriptor); otherwise release() with the
-                    // binding just looked up.
+                    // clears the descriptor); otherwise the unchanged release().
                     if (!is_inline() && data_delta == 0) {
                         size_ = 0;
                         capacity_ = 0;
                     } else {
-                        release_in(allocator_type{shared});
+                        release();
                     }
                     data_delta = incoming_delta;
                     size_ = incoming_size;
@@ -2796,27 +2745,24 @@ namespace XOffsetDatastructure {
             return (*this = static_cast<const XFixedString&>(other));
         }
 
-        // Bound = the head lies in a registered payload. Each call is one
-        // owner-table read: callers look the binding up only to allocate,
-        // grow or retire a block, once per operation (V2_FORMAT, Owner lookup).
-        bool is_bound() const noexcept { return arena() != nullptr; }
+        // V2: arena_delta is a rel32 to the payload base (arena header).
+        void bind(allocator_type alloc) {
+            fixed_detail::set_rel32(arena_delta, &arena_delta, alloc.segment);
+        }
+
+        void bind_like(const XFixedString& other) {
+            bind(fixed_detail::allocator_ref_of(other.arena()));
+        }
+
+        bool is_bound() const noexcept { return arena_delta != 0; }
 
         allocator_type binding() const noexcept {
             return {arena()};
         }
 
-        // One lookup that both checks and returns the binding.
-        XOFFSET_DETAIL_MOVE_INLINE allocator_type bound_binding() const {
-            auto* const a = arena();
-            if (!a) [[unlikely]] throw_unbound();
-            return {a};
-        }
-        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD static void throw_unbound() {
-            throw XException("XFixedString needs a block but lies outside every XOffset payload");
-        }
-
         XArena* arena() const noexcept {
-            return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
+            return const_cast<XArena*>(
+                fixed_detail::resolve_rel32_const<XArena>(&arena_delta, arena_delta));
         }
 
         stored_allocator_type get_stored_allocator() const noexcept {
@@ -2869,11 +2815,12 @@ namespace XOffsetDatastructure {
         }
 
         void reserve(std::size_t requested) {
+            ensure_bound();
             if (requested >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             auto new_cap = static_cast<std::uint32_t>(requested);
             if (new_cap <= capacity()) return;
 
-            const auto alloc = bound_binding();
+            auto alloc = binding();
             if (is_inline()) {
                 const auto count = inline_size();
                 move_to_heap(alloc, inline_bytes(), count, new_cap);
@@ -2909,7 +2856,7 @@ namespace XOffsetDatastructure {
                 // inline: the general path below would do the same after
                 // its checks. rhs may alias the inline bytes (store_inline
                 // reads them all first).
-                if (rhs.size() - 1u < inline_max) [[likely]] {
+                if (rhs.size() - 1u < inline_max && is_bound()) [[likely]] {
                     store_inline(rhs.data(), static_cast<std::uint32_t>(rhs.size()));
                     return;
                 }
@@ -2941,6 +2888,7 @@ namespace XOffsetDatastructure {
 #else
         XOFFSET_DETAIL_MOVE_INLINE void assign_general(std::string_view rhs) {
 #endif
+            ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
             const auto new_size = static_cast<std::uint32_t>(rhs.size());
@@ -2952,7 +2900,7 @@ namespace XOffsetDatastructure {
                     store_inline(rhs.data(), new_size);
                     return;
                 }
-                move_to_heap(bound_binding(), rhs.data(), new_size, new_size);
+                move_to_heap(binding(), rhs.data(), new_size, new_size);
                 return;
             }
             auto* old_data = data();
@@ -3084,8 +3032,8 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        char* inline_bytes() noexcept { return reinterpret_cast<char*>(this); }
-        const char* inline_bytes() const noexcept { return reinterpret_cast<const char*>(this); }
+        char* inline_bytes() noexcept { return reinterpret_cast<char*>(this) + 4; }
+        const char* inline_bytes() const noexcept { return reinterpret_cast<const char*>(this) + 4; }
         std::uint32_t inline_size() const noexcept { return (capacity_ >> 24) & 0x7fu; }
 
         void reset_head() noexcept {
@@ -3127,6 +3075,7 @@ namespace XOffsetDatastructure {
 
         // append() when the value is inline or null, or does not fit.
         XOFFSET_DETAIL_NOINLINE void append_general(std::string_view rhs) {
+            ensure_bound();
             if (rhs.empty()) return;
             const std::size_t old_size = size();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) throw XBadAlloc();
@@ -3181,17 +3130,8 @@ namespace XOffsetDatastructure {
                 reset_head();
                 return;
             }
-            // Look up the binding only when there is a block to retire.
-            release_in(data() ? binding() : allocator_type{});
-        }
-
-        // release() with the binding its container already looked up.
-        void release_in(allocator_type alloc) noexcept {
-            if (is_inline()) {
-                reset_head();
-                return;
-            }
             auto* old_data = data();
+            auto alloc = binding();
             std::uint32_t old_cap = capacity_;
 
             data_delta = 0;
@@ -3203,10 +3143,17 @@ namespace XOffsetDatastructure {
                     alloc, old_data, static_cast<std::uint32_t>(old_cap + 1));
             }
         }
+
+        void ensure_bound() const {
+            if (!is_bound() || !arena()) {
+                throw XException(
+                    "XFixedString is not bound to an allocator");
+            }
+        }
     };
 
     template <typename T>
-    struct XFixedVector {
+    struct alignas(8) XFixedVector {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
         using value_type = T;
@@ -3214,17 +3161,13 @@ namespace XOffsetDatastructure {
         using iterator = T*;
         using const_iterator = const T*;
 
-        // size_ and capacity_ are char32_t (32-bit unsigned, converts like
-        // std::uint32_t) because it is a distinct type for type-based alias
-        // analysis: a store to an int or unsigned element cannot alias them,
-        // so a push_back loop keeps capacity_ in a register.
+        std::int32_t arena_delta = 0;
         std::int32_t data_delta = 0;
-        char32_t size_ = 0;
-        char32_t capacity_ = 0;
+        std::uint32_t size_ = 0;
+        std::uint32_t capacity_ = 0;
 
         XFixedVector() = default;
-        // As XFixedString: the head's address names its payload.
-        explicit XFixedVector(allocator_type) noexcept {}
+        explicit XFixedVector(allocator_type alloc) { bind(alloc); }
         ~XFixedVector() { release(); }
         XFixedVector(const XFixedVector& other, allocator_type alloc) : XFixedVector(alloc) {
             copy_from(other);
@@ -3241,7 +3184,7 @@ namespace XOffsetDatastructure {
                 // padding pass of assign_trivial_copy, inline. Regrowth,
                 // binding and an empty source take the general path.
                 const size_type count = other.size_;
-                if (this != &other && count != 0 && count <= capacity_ &&
+                if (this != &other && is_bound() && count != 0 && count <= capacity_ &&
                     detail::subtree_copy_enabled()) [[likely]] {
                     T* items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                     const size_type old_size = size_;
@@ -3267,28 +3210,24 @@ namespace XOffsetDatastructure {
 
         XFixedVector& assign_general(const XFixedVector& other) {
             if (this == &other) return *this;
-            // An empty source keeps the capacity and needs no binding.
-            if (other.size_ == 0) { clear(); return *this; }
+            if (!is_bound() && other.is_bound()) bind_like(other);
+            ensure_bound();
             // T4: a trivially copyable element is one range copy; any other
             // admitted subtree is copied into one fresh segment.
-            // The range copy looks the binding up only when it regrows;
-            // rebuild() checks it for the other paths.
             if constexpr (detail::subtree_copy_supported<T>()) {
                 if (detail::subtree_copy_enabled()) {
                     if constexpr (std::is_trivially_copyable_v<T>) {
                         assign_trivial_copy(other);
                         return *this;
-                    } else {
-                        // Unbound, it falls through to rebuild(), which throws.
-                        if (detail::subtree_copy_assign(*this, other)) return *this;
+                    } else if (other.size_ != 0 && detail::subtree_copy_assign(*this, other)) {
+                        return *this;
                     }
                 }
             } else {
                 XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
             }
-            const auto alloc = element_binding();
             rebuild(other.size_, std::max(capacity_, other.size_), [&](T* dst, size_type i) {
-                fixed_detail::transfer_construct(dst, other.data()[i], alloc);
+                fixed_detail::transfer_construct(dst, other.data()[i], binding());
             });
             return *this;
         }
@@ -3297,10 +3236,14 @@ namespace XOffsetDatastructure {
         XFixedVector& operator=(XFixedVector&& other) {
             if (this == &other) return *this;
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
-                if (auto* const shared = reinterpret_cast<XArena*>(detail::OwnerMap::same_payload(this, &other))) {
-                    // Both heads lie in one payload (one owner-table read).
-                    if (fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), shared) &&
-                        fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), shared) &&
+                if (is_bound() && other.is_bound()) {
+                    const auto destination = binding();
+                    const auto source = other.binding();
+                    // N6: the ancestor/descendant ownership walk runs only in
+                    // debug builds (XOFFSET_MOVE_OWNERSHIP_CHECKS).
+                    if (fixed_detail::move_assignment_same_allocator(destination, source) &&
+                        fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), destination.segment) &&
+                        fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), source.segment) &&
                         fixed_detail::move_assignment_disjoint(*this, other)) {
                         std::int32_t incoming_delta = 0;
                         fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
@@ -3310,13 +3253,12 @@ namespace XOffsetDatastructure {
                         // Ancestor/descendant ownership has already been excluded.
                         // MV: release()'s empty-destination case inline (data()
                         // is null exactly when data_delta == 0, and release()
-                        // then only clears the descriptor); otherwise release()
-                        // with the binding just looked up.
+                        // then only clears the descriptor); otherwise unchanged.
                         if (data_delta == 0) {
                             size_ = 0;
                             capacity_ = 0;
                         } else {
-                            release_in(allocator_type{shared});
+                            release();
                         }
                         data_delta = incoming_delta;
                         size_ = incoming_size;
@@ -3331,34 +3273,24 @@ namespace XOffsetDatastructure {
             return (*this = static_cast<const XFixedVector&>(other));
         }
 
-        // Bound = the head lies in a registered payload. Each call is one
-        // owner-table read: callers look the binding up only to allocate,
-        // grow or retire a block, once per operation (V2_FORMAT, Owner lookup).
-        bool is_bound() const noexcept { return arena() != nullptr; }
+        // V2: arena_delta is a rel32 to the payload base (arena header).
+        void bind(allocator_type alloc) {
+            fixed_detail::set_rel32(arena_delta, &arena_delta, alloc.segment);
+        }
+
+        void bind_like(const XFixedVector& other) {
+            bind(fixed_detail::allocator_ref_of(other.arena()));
+        }
+
+        bool is_bound() const noexcept { return arena_delta != 0; }
 
         allocator_type binding() const noexcept {
             return {arena()};
         }
 
-        // One lookup that both checks and returns the binding.
-        XOFFSET_DETAIL_MOVE_INLINE allocator_type bound_binding() const {
-            auto* const a = arena();
-            if (!a) [[unlikely]] throw_unbound();
-            return {a};
-        }
-        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD static void throw_unbound() {
-            throw XException("XFixedVector needs a block but lies outside every XOffset payload");
-        }
-
-        // Elements without heads never use the binding, so building one does
-        // not look it up.
-        allocator_type element_binding() const noexcept {
-            if constexpr (std::is_trivially_copyable_v<T>) return {};
-            else return binding();
-        }
-
         XArena* arena() const noexcept {
-            return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
+            return const_cast<XArena*>(
+                fixed_detail::resolve_rel32_const<XArena>(&arena_delta, arena_delta));
         }
 
         stored_allocator_type get_stored_allocator() const noexcept {
@@ -3389,42 +3321,37 @@ namespace XOffsetDatastructure {
         T& back() noexcept { return data()[size_ - 1]; }
         const T& back() const noexcept { return data()[size_ - 1]; }
 
-        void clear() noexcept { truncate(0); }
-
-        // Destroys the elements from count on with one binding lookup (rule 5).
-        void truncate(size_type count) noexcept {
+        void clear() noexcept {
             const auto old_size = size_;
-            if (count >= old_size) return;
-            if constexpr (!std::is_trivially_destructible_v<T>)
-                fixed_detail::destroy_n_in(binding(), data() + count, old_size - count);
-            size_ = count;
-            scrub(count, old_size);
+            fixed_detail::destroy_n(data(), size_);
+            size_ = 0;
+            scrub(0, old_size);
         }
 
         void reserve(std::size_t requested) {
+            ensure_bound();
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
-            const auto alloc = bound_binding();
             if (capacity_ == 0) {
                 // First storage: nothing to expand, move or retire.
                 auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
-                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
+                    binding(), static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 return;
             }
             if (fixed_detail::try_expand_dynamic_bytes(
-                    alloc, data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
+                    binding(), data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                     static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T))) {
                 (void)detail::rebuild_dynamic_array<T>(data(), new_cap, size_);
                 capacity_ = new_cap;
                 return;
             }
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
-                reserve_relocate(new_cap, alloc);
+                reserve_relocate(new_cap);
             } else {
                 rebuild(size_, new_cap, [&](T* dst, size_type i) {
-                    fixed_detail::transfer_construct(dst, data()[i], alloc);
+                    fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
             }
         }
@@ -3432,10 +3359,10 @@ namespace XOffsetDatastructure {
     private:
         // reserve into a fresh block for relocatable T; out of line, so the
         // paths above keep their size at the caller.
-        XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap, allocator_type alloc) {
+        XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap) {
             if (new_cap > max_size()) throw XBadAlloc();
             bool published = false;
-            fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
+            fixed_detail::regrow_dynamic_bytes(binding(), static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                                                static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T),
                                                [&](void* block) -> void* {
                 auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
@@ -3464,8 +3391,7 @@ namespace XOffsetDatastructure {
                       std::is_trivially_destructible_v<T>) {
             const auto count = checked_count(values.size());
             if (count == 0) { clear(); return; }
-            // count <= capacity_ means a live block, so the head is bound; only
-            // assign_range_regrow looks the binding up.
+            ensure_bound();
             const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
             if (count <= capacity_) {
                 const auto old_size = size_;
@@ -3481,7 +3407,7 @@ namespace XOffsetDatastructure {
         // path above stays small enough to inline at the caller.
         XOFFSET_DETAIL_NOINLINE void assign_range_regrow(std::span<const T> values, size_type count,
                                                          std::uint32_t bytes) {
-            const auto alloc = bound_binding();
+            auto alloc = binding();
             // D8a: a container that already has capacity regrows to
             // max(count, 2 * capacity), like libc++ assign; the first block
             // stays exact. Fresh blocks are zero, so the spare tail is too (M4).
@@ -3532,7 +3458,7 @@ namespace XOffsetDatastructure {
                 const auto count = checked_count(static_cast<std::size_t>(std::ranges::distance(first, last)));
                 if (count == 0) { clear(); return; }
                 rebuild(count, count, [&](T* dst, size_type) {
-                    fixed_detail::construct_bound(dst, element_binding(), *first);
+                    fixed_detail::construct_bound(dst, binding(), *first);
                     ++first;
                 });
             }
@@ -3544,20 +3470,15 @@ namespace XOffsetDatastructure {
                 // As insert_construct's append fast path, kept here so the
                 // caller's loop builds no closure for the general call.
                 T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
-                fixed_detail::transfer_construct(slot, value, element_binding());
+                fixed_detail::transfer_construct(slot, value, binding());
                 size_ = n + 1u;
                 return;
             }
-            const Grown grown = [&] {
-                if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
-                else return push_back_general<const T&>(value);
-            }();
-            // The general path appended exactly one element. Restating the
-            // head here makes it known on both paths, so a caller's push_back
-            // loop keeps size_ and capacity_ in registers instead of
-            // reloading them through memory.
-            data_delta = grown.data_delta;
-            capacity_ = grown.capacity;
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
+            else push_back_general<const T&>(value);
+            // The general path appended exactly one element. Restating size_
+            // here makes it known on both paths, so a caller's push_back loop
+            // keeps it in a register instead of reloading it through memory.
             size_ = n + 1u;
         }
 
@@ -3580,18 +3501,19 @@ namespace XOffsetDatastructure {
         size_type stable_erase_if(Predicate&& predicate) {
             const auto original_size = size_;
             if (original_size == 0) return 0;
-            const auto alloc = bound_binding();
+            ensure_bound();
+            const auto original_arena_delta = arena_delta;
             const auto original_data_delta = data_delta;
             const auto original_capacity = capacity_;
             auto* const items = data();
-            fixed_detail::StableEraseOwnerWitness witness(alloc, this, sizeof(*this));
+            fixed_detail::StableEraseOwnerWitness witness(binding(), this, sizeof(*this));
             const auto decision_bytes = (std::size_t(original_size) + 7u) / 8u;
             auto decisions = std::make_unique<std::uint8_t[]>(decision_bytes);
             // Preparing host scratch can call new_handler. Recheck reservation
             // identity before touching the in-arena descriptor or old items.
             auto validate_target = [&] {
                 witness.validate();
-                if (data_delta != original_data_delta ||
+                if (arena_delta != original_arena_delta || data_delta != original_data_delta ||
                     size_ != original_size || capacity_ != original_capacity)
                     throw XException("stable_erase_if target changed during decisions");
             };
@@ -3635,7 +3557,7 @@ namespace XOffsetDatastructure {
 
         T& emplace_back() {
             return *insert_construct(size_, [&](T* dst) {
-                fixed_detail::default_construct(dst, element_binding());
+                fixed_detail::default_construct(dst, binding());
             });
         }
 
@@ -3643,26 +3565,18 @@ namespace XOffsetDatastructure {
             requires (sizeof...(Args) > 0)
         T& emplace_back(Args&&... args) {
             return *insert_construct(size_, [&](T* dst) {
-                fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
+                fixed_detail::construct_bound(dst, binding(), std::forward<Args>(args)...);
             });
         }
 
     protected:
-        struct Grown {
-            std::int32_t data_delta;
-            char32_t capacity;
-        };
-
         // push_back beyond capacity or on an unbound head. A small trivially
-        // copyable value arrives by value (registers), not by reference. The
-        // head fields it changed come back in registers for push_back to
-        // restate.
+        // copyable value arrives by value (registers), not by reference.
         template <typename V>
-        XOFFSET_DETAIL_NOINLINE Grown push_back_general(V value) {
+        XOFFSET_DETAIL_NOINLINE void push_back_general(V value) {
             insert_construct(size_, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, static_cast<const T&>(value), element_binding());
+                fixed_detail::transfer_construct(dst, static_cast<const T&>(value), binding());
             });
-            return {data_delta, capacity_};
         }
 
         static size_type checked_count(std::size_t count) {
@@ -3690,9 +3604,10 @@ namespace XOffsetDatastructure {
         // Build in arena storage and publish only after all potentially throwing work.
         template <typename Construct>
         void rebuild(size_type count, size_type cap, Construct&& construct) {
-            const auto alloc = bound_binding();
+            ensure_bound();
             if (cap > max_size() || count > cap) throw XBadAlloc();
             if (cap == 0) { clear(); return; }
+            auto alloc = binding();
             auto bytes = static_cast<std::uint32_t>(cap * sizeof(T));
             auto* fresh = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, bytes, alignof(T)), cap);
@@ -3730,11 +3645,12 @@ namespace XOffsetDatastructure {
                 ++size_;
                 return slot;
             }
+            ensure_bound();
             if (index > size_ || size_ == max_size()) throw XBadAlloc();
             if (index == size_ && append_grow(construct)) {
                 // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
-                // A native temporary is safe only for types without heads.
+                // A native temporary is safe only for types without arena bindings.
                 alignas(T) std::byte storage[sizeof(T)];
                 auto* staged = reinterpret_cast<T*>(storage);
                 construct(staged);
@@ -3768,11 +3684,10 @@ namespace XOffsetDatastructure {
                     ++size_;
                 });
             } else {
-                const auto alloc = element_binding();
                 rebuild(size_ + 1, size_ == capacity_ ? grown_capacity() : capacity_,
                     [&](T* dst, size_type i) {
                         if (i == index) construct(dst);
-                        else fixed_detail::transfer_construct(dst, data()[i < index ? i : i - 1], alloc);
+                        else fixed_detail::transfer_construct(dst, data()[i < index ? i : i - 1], binding());
                     });
             }
             return data() + index;
@@ -3810,9 +3725,8 @@ namespace XOffsetDatastructure {
                 --size_;
                 scrub(size_, size_ + 1);
             } else {
-                const auto alloc = element_binding();
                 rebuild(size_ - 1, capacity_, [&](T* dst, size_type i) {
-                    fixed_detail::transfer_construct(dst, data()[i < index ? i : i + 1], alloc);
+                    fixed_detail::transfer_construct(dst, data()[i < index ? i : i + 1], binding());
                 });
             }
         }
@@ -3825,10 +3739,9 @@ namespace XOffsetDatastructure {
                     fixed_detail::relocate_construct(data() + index, staged);
                 });
             } else {
-                const auto alloc = element_binding();
                 rebuild(size_, capacity_, [&](T* dst, size_type i) {
                     if (i == index) construct(dst);
-                    else fixed_detail::transfer_construct(dst, data()[i], alloc);
+                    else fixed_detail::transfer_construct(dst, data()[i], binding());
                 });
             }
         }
@@ -3848,7 +3761,7 @@ namespace XOffsetDatastructure {
                 return false;
             } else {
                 const auto new_cap = grown_capacity();
-                const auto alloc = bound_binding();
+                auto alloc = binding();
                 const auto new_bytes = static_cast<std::uint32_t>(new_cap * sizeof(T));
                 if (fixed_detail::try_expand_dynamic_bytes(
                         alloc, data(), static_cast<std::uint32_t>(capacity_ * sizeof(T)), new_bytes, alignof(T))) {
@@ -3902,7 +3815,7 @@ namespace XOffsetDatastructure {
 
         template <typename Construct, typename Commit>
         void with_staged(Construct&& construct, Commit&& commit) {
-            const auto alloc = bound_binding();
+            auto alloc = binding();
             auto* staged = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
             bool built = false;
@@ -3936,7 +3849,8 @@ namespace XOffsetDatastructure {
                 size_ = count;
                 return;
             }
-            const auto alloc = bound_binding();
+            ensure_bound();
+            auto alloc = binding();
             auto* old = data();
             const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
             if (fixed_detail::try_expand_dynamic_bytes(
@@ -3950,7 +3864,7 @@ namespace XOffsetDatastructure {
                 return;
             }
             resize_construct(count, [&](T* dst) {
-                fixed_detail::default_construct(dst, alloc);
+                fixed_detail::default_construct(dst, binding());
             });
         }
 
@@ -3958,7 +3872,7 @@ namespace XOffsetDatastructure {
         void resize_construct(size_type count, Construct&& construct) {
             if (count > max_size()) throw XBadAlloc();
             if (count <= size_) {
-                truncate(count);
+                while (size_ > count) pop_back();
             } else if (count <= capacity_) {
                 auto old_size = size_;
                 try {
@@ -3971,7 +3885,8 @@ namespace XOffsetDatastructure {
                 // Stage every potentially throwing operation before touching the
                 // old prefix. In particular, fill arguments may refer to an old
                 // element or one of its owned subobjects.
-                const auto alloc = bound_binding();
+                ensure_bound();
+                auto alloc = binding();
                 const auto old_size = size_;
                 const auto old_cap = capacity_;
                 auto* old = data();
@@ -4002,9 +3917,8 @@ namespace XOffsetDatastructure {
                 fixed_detail::retire_dynamic_bytes(
                     alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
             } else {
-                const auto alloc = element_binding();
                 rebuild(count, count, [&](T* dst, size_type i) {
-                    if (i < size_) fixed_detail::transfer_construct(dst, data()[i], alloc);
+                    if (i < size_) fixed_detail::transfer_construct(dst, data()[i], binding());
                     else construct(dst);
                 });
             }
@@ -4033,13 +3947,12 @@ namespace XOffsetDatastructure {
             } else {
                 XOFFSET_DETAIL_SUBTREE_COUNT(fallback_type, 1);
             }
-            const auto alloc = element_binding();
             reserve(other.size_);
             size_type constructed = 0;
             try {
                 for (; constructed < other.size_; ++constructed) {
                     fixed_detail::transfer_construct(
-                        data() + constructed, other.data()[constructed], alloc);
+                        data() + constructed, other.data()[constructed], binding());
                 }
             } catch (...) {
                 fixed_detail::destroy_n(data(), constructed);
@@ -4059,14 +3972,8 @@ namespace XOffsetDatastructure {
         }
 
         void release() noexcept {
-            // Look up the binding only when there is a block to retire.
-            release_in(data() ? binding() : allocator_type{});
-        }
-
-        // release() with the binding its container already looked up; the
-        // elements reuse it (rule 5).
-        void release_in(allocator_type alloc) noexcept {
             T* old_data = data();
+            auto alloc = binding();
             size_type old_size = size_;
             size_type old_cap = capacity_;
 
@@ -4075,9 +3982,16 @@ namespace XOffsetDatastructure {
             capacity_ = 0;
 
             if (old_data && alloc.segment) {
-                fixed_detail::destroy_n_in(alloc, old_data, old_size);
+                fixed_detail::destroy_n(old_data, old_size);
                 fixed_detail::retire_dynamic_bytes(
                     alloc, old_data, static_cast<std::uint32_t>(old_cap * sizeof(T)));
+            }
+        }
+
+        void ensure_bound() const {
+            if (!is_bound() || !arena()) {
+                throw XException(
+                    "XFixedVector is not bound to an allocator");
             }
         }
 
@@ -4129,7 +4043,7 @@ namespace XOffsetDatastructure {
                 return {items + index, false};
             }
             return {Base::template insert_construct<true>(index, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, value, Base::element_binding());
+                fixed_detail::transfer_construct(dst, value, Base::binding());
             }), true};
         }
 
@@ -4143,7 +4057,7 @@ namespace XOffsetDatastructure {
                 return {items + index, false};
             }
             return {Base::template insert_construct<true>(index, [&](T* dst) {
-                fixed_detail::construct_bound(dst, Base::element_binding(), std::forward<Arg>(arg));
+                fixed_detail::construct_bound(dst, Base::binding(), std::forward<Arg>(arg));
             }), true};
         }
 
@@ -4152,7 +4066,7 @@ namespace XOffsetDatastructure {
             if constexpr (sizeof...(Args) == 1) {
                 return insert(std::forward<Args>(args)...);
             } else {
-                const auto alloc = Base::bound_binding();
+                auto alloc = Base::binding();
                 auto* staged = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
                 bool constructed = false;
@@ -4293,14 +4207,14 @@ namespace XOffsetDatastructure {
         }
     };
 
-    static_assert(sizeof(XFixedString) == 12 && alignof(XFixedString) == 4,
-        "XFixedString ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
-    static_assert(sizeof(XFixedVector<int>) == 12 && alignof(XFixedVector<int>) == 4,
-        "XFixedVector ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
+    static_assert(sizeof(XFixedString) == 16,
+        "XFixedString ABI must stay frozen at 16 bytes");
+    static_assert(sizeof(XFixedVector<int>) == 16,
+        "XFixedVector ABI must stay frozen at 16 bytes");
     static_assert(sizeof(XFixedFlatSet<int>) == sizeof(XFixedVector<int>),
-        "XFixedFlatSet ABI must stay frozen at 12 bytes");
+        "XFixedFlatSet ABI must stay frozen at 16 bytes");
     static_assert(sizeof(XFixedFlatMap<int, int>) == sizeof(XFixedVector<XKeyValue<int, int>>),
-        "XFixedFlatMap ABI must stay frozen at 12 bytes");
+        "XFixedFlatMap ABI must stay frozen at 16 bytes");
 
     class XString : public XFixedString {
         using Base = XFixedString;
@@ -4325,8 +4239,8 @@ namespace XOffsetDatastructure {
             : Base(fixed_detail::allocator_ref_of(alloc)) {}
 
         XString(const XString& other)
-            : Base() {
-            Base::operator=(other);
+            : Base(other.binding()) {
+            if (other.is_bound()) Base::operator=(other);
         }
 
         XString(XString&& other)
@@ -4363,7 +4277,7 @@ namespace XOffsetDatastructure {
         typename Base::iterator insert_value(typename Base::const_iterator pos, Arg&& arg) {
             auto index = index_from(pos);
             return Base::insert_construct(index, [&](T* dst) {
-                fixed_detail::construct_bound(dst, Base::element_binding(), std::forward<Arg>(arg));
+                fixed_detail::construct_bound(dst, Base::binding(), std::forward<Arg>(arg));
             });
         }
 
@@ -4396,8 +4310,8 @@ namespace XOffsetDatastructure {
             : Base(fixed_detail::allocator_ref_of(alloc)) {}
 
         XVector(const XVector& other)
-            : Base() {
-            Base::operator=(other);
+            : Base(other.binding()) {
+            if (other.is_bound()) Base::operator=(other);
         }
 
         XVector(XVector&& other)
@@ -4447,18 +4361,16 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_scalar_v<T>) {
                 Base::resize_default_scalar(n);
             } else {
-                const auto alloc = Base::element_binding();
                 Base::resize_construct(n, [&](T* dst) {
-                    fixed_detail::default_construct(dst, alloc);
+                    fixed_detail::default_construct(dst, Base::binding());
                 });
             }
         }
 
         void resize(std::size_t count, const T& value) {
             auto n = Base::checked_count(count);
-            const auto alloc = Base::element_binding();
             Base::resize_construct(n, [&](T* dst) {
-                fixed_detail::transfer_construct(dst, value, alloc);
+                fixed_detail::transfer_construct(dst, value, Base::binding());
             });
         }
 
@@ -4466,18 +4378,16 @@ namespace XOffsetDatastructure {
             requires alloc_aware_convertible<T, Arg>
         void resize(std::size_t count, Arg&& arg) {
             auto n = Base::checked_count(count);
-            const auto alloc = Base::element_binding();
             Base::resize_construct(n, [&](T* dst) {
-                fixed_detail::construct_bound(dst, alloc, arg);
+                fixed_detail::construct_bound(dst, Base::binding(), arg);
             });
         }
 
         void assign(std::size_t count, const T& value) {
             auto n = Base::checked_count(count);
             if (n == 0) { Base::clear(); return; }
-            const auto alloc = Base::element_binding();
             Base::rebuild(n, std::max(n, Base::capacity()), [&](T* dst, size_type) {
-                fixed_detail::transfer_construct(dst, value, alloc);
+                fixed_detail::transfer_construct(dst, value, Base::binding());
             });
         }
 
@@ -4486,9 +4396,8 @@ namespace XOffsetDatastructure {
         void assign(std::size_t count, Arg&& arg) {
             auto n = Base::checked_count(count);
             if (n == 0) { Base::clear(); return; }
-            const auto alloc = Base::element_binding();
             Base::rebuild(n, std::max(n, Base::capacity()), [&](T* dst, size_type) {
-                fixed_detail::construct_bound(dst, alloc, arg);
+                fixed_detail::construct_bound(dst, Base::binding(), arg);
             });
         }
     };
@@ -4526,8 +4435,8 @@ namespace XOffsetDatastructure {
             : Base(fixed_detail::allocator_ref_of(alloc)) {}
 
         XSet(const XSet& other)
-            : Base() {
-            Base::operator=(other);
+            : Base(other.binding()) {
+            if (other.is_bound()) Base::operator=(other);
         }
 
         XSet(XSet&& other)
@@ -4584,8 +4493,8 @@ namespace XOffsetDatastructure {
             : Base(fixed_detail::allocator_ref_of(alloc)) {}
 
         XMap(const XMap& other)
-            : Base() {
-            Base::operator=(other);
+            : Base(other.binding()) {
+            if (other.is_bound()) Base::operator=(other);
         }
 
         XMap(XMap&& other)
@@ -5091,6 +5000,21 @@ namespace XOffsetDatastructure {
             return ptr; // W9: flat (validated range), no canonical lookup
         }
 
+        XOFFSET_DETAIL_V4_INLINE void validate_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
+            if (delta == 0 || checked_relative(delta, ctx) != ctx.base) {
+                wire_reject("wire validation: invalid allocator binding");
+            }
+        }
+
+        // One check for a head's arena binding: it resolves to the payload
+        // base. When it does not, validate_binding throws its own error.
+        XOFFSET_DETAIL_V4_INLINE void check_binding(const std::int32_t& delta, const WireValidationContext& ctx) {
+            const auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
+            if (delta == 0 || static_cast<std::uintptr_t>(address) != reinterpret_cast<std::uintptr_t>(ctx.base) ||
+                ctx.end == ctx.base) [[unlikely]]
+                validate_binding(delta, ctx);
+        }
+
         // One check for a head's out-of-line block: data_delta resolves to an
         // 8-byte aligned address with [data, data + block) inside the payload
         // (block >= 1 is the head's 8-rounded extent). When it holds, every
@@ -5233,12 +5157,12 @@ namespace XOffsetDatastructure {
             return masks;
         }();
 
-        // I1: head bytes 0..11 of an inline string (byte 11 = 0x80 | length).
+        // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
         inline void validate_inline_string_bytes(const char* head) {
-            std::uint64_t low;   // head bytes 0..7
-            std::uint32_t high;  // head bytes 8..11
-            std::memcpy(&low, head, sizeof(low));
-            std::memcpy(&high, head + 8, sizeof(high));
+            std::uint64_t low;   // head bytes 4..11
+            std::uint32_t high;  // head bytes 12..15
+            std::memcpy(&low, head + 4, sizeof(low));
+            std::memcpy(&high, head + 12, sizeof(high));
             const unsigned length = (high >> 24) & 0x7fu;
             if (length > XFixedString::inline_max)
                 wire_reject("wire validation failed: inline XFixedString length exceeds 10");
@@ -5249,6 +5173,7 @@ namespace XOffsetDatastructure {
 
         inline void validate_wire_value(const XFixedString& value,
                                         WireValidationContext& ctx) {
+            check_binding(value.arena_delta, ctx);
             if (value.is_inline()) {
                 validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
                 return;
@@ -5283,6 +5208,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         void validate_wire_value(const XFixedVector<T>& value,
                                  WireValidationContext& ctx) {
+            check_binding(value.arena_delta, ctx);
             if (value.size_ > value.capacity_ ||
                 value.capacity_ > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(T)) {
                 wire_reject(
@@ -5587,10 +5513,10 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memcpy(dst, &src, sizeof(T));
             } else if constexpr (detail::is_fixed_string_v<T>) {
-                std::construct_at(dst);
+                std::construct_at(dst, src.binding());
                 src.relocate_payload_to(*dst);
             } else if constexpr (is_owning_head<T>::value) {
-                std::construct_at(dst);
+                std::construct_at(dst, src.binding());
                 set_rel32(dst->data_delta, &dst->data_delta, src.data());
                 dst->size_ = src.size_;
                 dst->capacity_ = src.capacity_;
@@ -5734,12 +5660,12 @@ namespace XOffsetDatastructure {
             if constexpr (StableEraseRelocator<T>::enabled) {
                 StableEraseRelocator<T>::relocate_construct(destination, source);
             } else if constexpr (detail::is_fixed_string_v<T>) {
-                std::construct_at(destination);
+                std::construct_at(destination, source.binding());
                 source.relocate_payload_to(*destination);
             } else if constexpr (is_owning_head<T>::value) {
                 // These explicit constructors begin owning-head lifetimes even
                 // when they were not created by an enclosing implicit copy.
-                std::construct_at(destination);
+                std::construct_at(destination, source.binding());
                 set_rel32(destination->data_delta, &destination->data_delta, source.data());
                 destination->size_ = source.size_;
                 destination->capacity_ = source.capacity_;
@@ -6327,7 +6253,7 @@ namespace XOffsetDatastructure {
                    tl::to_fixed_string<sizeof(std::remove_cv_t<T>)>() +
                    tl::FixedString{",a:"} +
                    tl::to_fixed_string<alignof(std::remove_cv_t<T>)>() +
-                   tl::FixedString{"]{data:rel32,size:u32,capacity:u32}"};
+                   tl::FixedString{"]{arena:rel32,data:rel32,size:u32,capacity:u32}"};
         }
 
         template <typename T, std::size_t Index>
@@ -6693,7 +6619,7 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_array_v<U>) {
                 return has_implicit_padding<std::remove_extent_t<U>>();
             } else if constexpr (is_fixed_vector_v<U>) {
-                // The 12-byte head is three u32 fields; elements live in the arena.
+                // The 16-byte head is four u32 fields; elements live in the arena.
                 return has_implicit_padding<typename U::value_type>();
             } else if constexpr (is_xkeyvalue_v<U>) {
                 return record_has_implicit_padding<U>(std::make_index_sequence<2>{});

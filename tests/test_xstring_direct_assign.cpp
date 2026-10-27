@@ -286,7 +286,7 @@ bool test_inline_reassign() {
         std::memcpy(expect, want.data(), want.size());
         expect[11] = static_cast<unsigned char>(0x80u | want.size());
         assert(s.is_inline());
-        assert(std::memcmp(reinterpret_cast<const char*>(&s), expect, 12) == 0);
+        assert(std::memcmp(reinterpret_cast<const char*>(&s) + 4, expect, 12) == 0);
     };
 
     std::cout << "Test 17: Every old and new length... ";
@@ -371,7 +371,7 @@ bool test_copy_assign() {
 
     const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     auto image = [](const XString& s) {
-        return std::string(reinterpret_cast<const char*>(&s), 12);
+        return std::string(reinterpret_cast<const char*>(&s) + 4, 12);
     };
     std::cout << "Test 20: Every source and destination length... ";
     std::size_t cases = 0;

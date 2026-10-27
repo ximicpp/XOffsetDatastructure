@@ -286,9 +286,9 @@ template <class Root> std::string erase_tail_sizes() {
 // null deltas stay null, and a delta the shift would push out of range ends
 // the program (Clang checks the whole run once after it, GCC and MSVC each sum).
 using RebaseHead = xo::XVector<std::uint32_t>;
-static_assert(sizeof(RebaseHead) == 12);
+static_assert(sizeof(RebaseHead) == 16);
 
-struct RawHead { std::int32_t data_delta; std::uint32_t size, capacity; };
+struct RawHead { std::int32_t arena_delta, data_delta; std::uint32_t size, capacity; };
 
 void rebase_run(RawHead* heads, std::size_t count, std::int32_t shift) {
     alignas(RebaseHead) unsigned char storage[4 * sizeof(RebaseHead)];
@@ -300,14 +300,16 @@ void rebase_run(RawHead* heads, std::size_t count, std::int32_t shift) {
 void rebase_edges() {
     constexpr auto max = (std::numeric_limits<std::int32_t>::max)();
     constexpr auto min = (std::numeric_limits<std::int32_t>::min)();
-    RawHead up[3] = {{max - 16, 1, 2}, {0, 3, 4}, {-7, 0, 0}};
+    RawHead up[3] = {{max - 16, 0, 1, 2}, {0, max - 16, 3, 4}, {5, -7, 0, 0}};
     rebase_run(up, 3, 16);
-    if (up[0].data_delta != max || up[1].data_delta != 0 || up[2].data_delta != 9 ||
+    if (up[0].arena_delta != max || up[0].data_delta != 0 || up[1].arena_delta != 0 ||
+        up[1].data_delta != max || up[2].arena_delta != 21 || up[2].data_delta != 9 ||
         up[0].size != 1 || up[0].capacity != 2 || up[1].size != 3 || up[1].capacity != 4)
         fail("rebase by +16 at the int32 edge");
-    RawHead down[3] = {{min + 16, 0, 0}, {0, 0, 0}, {-5, 0, 0}};
-    rebase_run(down, 3, -16);
-    if (down[0].data_delta != min || down[1].data_delta != 0 || down[2].data_delta != -21)
+    RawHead down[2] = {{min + 16, 0, 0, 0}, {-5, min + 16, 0, 0}};
+    rebase_run(down, 2, -16);
+    if (down[0].arena_delta != min || down[0].data_delta != 0 || down[1].arena_delta != -21 ||
+        down[1].data_delta != min)
         fail("rebase by -16 at the int32 edge");
 }
 
@@ -320,14 +322,14 @@ int rebase_overflow(std::string_view mode) {
     constexpr auto max = (std::numeric_limits<std::int32_t>::max)();
     constexpr auto min = (std::numeric_limits<std::int32_t>::min)();
     if (mode == "--overflow-up") {
-        RawHead h[1] = {{max - 15, 0, 0}};
+        RawHead h[1] = {{max - 15, 0, 0, 0}};
         rebase_run(h, 1, 16);
     } else if (mode == "--overflow-down") {
-        RawHead h[1] = {{min + 15, 0, 0}};
+        RawHead h[1] = {{0, min + 15, 0, 0}};
         rebase_run(h, 1, -16);
     } else if (mode == "--overflow-mid") {
         // The out-of-range delta sits inside the run, between valid ones.
-        RawHead h[3] = {{8, 0, 0}, {max - 1, 0, 0}, {8, 0, 0}};
+        RawHead h[3] = {{8, 8, 0, 0}, {8, max - 1, 0, 0}, {8, 8, 0, 0}};
         rebase_run(h, 3, 2);
     } else {
         fail("unknown mode");

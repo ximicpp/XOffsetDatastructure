@@ -48,20 +48,17 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // model its bytes equal the N10 pin of build(true). XWireEmission::dense and
 // ::zero_runs have their own pins (after G1: large dense 10032 -> 9984,
 // zero-run elided 1688 -> 1632).
-// 2026-10-27 (V2.1 R4): 12-byte container heads without arena_delta: dense
-// 1792 -> 1648, large dense 9984 -> 9840, zero-run elided 1632 -> 1520,
-// free runs 1800 -> 1656.
-// 2026-10-27 (V2.1 R7): 40-byte wire header and the 48-byte payload header is
-// no longer on the wire (104 bytes less): dense 1648 -> 1544, large dense
-// 9840 -> 9736, zero-run elided 1520 -> 1416, free runs 1656 -> 1552.
-#define GOLDEN_DENSE_SIZE 1544u
-#define GOLDEN_DENSE_FNV 0x2ead9bf530e5c143ull
-#define GOLDEN_LARGE_DENSE_SIZE 9736u
-#define GOLDEN_LARGE_DENSE_FNV 0x7dedb7e5dc8be9caull
-#define GOLDEN_ELIDED_SIZE 1416u
-#define GOLDEN_ELIDED_FNV 0x7950b2e24c2be667ull
-#define GOLDEN_N10_SIZE 1552u
-#define GOLDEN_N10_FNV 0xa8c268362947aaacull
+// 2026-10-27 (V2.1 R7 without R4): 40-byte wire header and the 48-byte payload
+// header is no longer on the wire (104 bytes less): dense 1792 -> 1688, large
+// dense 9984 -> 9880, zero-run elided 1632 -> 1528, free runs 1800 -> 1696.
+#define GOLDEN_DENSE_SIZE 1688u
+#define GOLDEN_DENSE_FNV 0x1c8de9cde3f5697aull
+#define GOLDEN_LARGE_DENSE_SIZE 9880u
+#define GOLDEN_LARGE_DENSE_FNV 0xf46fecd16871b74full
+#define GOLDEN_ELIDED_SIZE 1528u
+#define GOLDEN_ELIDED_FNV 0x74491f6caa0ea972ull
+#define GOLDEN_N10_SIZE 1696u
+#define GOLDEN_N10_FNV 0xd5dba5f4d8b8835cull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;

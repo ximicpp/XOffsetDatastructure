@@ -23,7 +23,6 @@
 //
 // XOFFSET_SLOT_MAX_BYTES=0 disables slots: every owner is VM.
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -83,109 +82,6 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
     std::size_t shift = 0;
     while ((std::size_t(1) << shift) < value) ++shift;
     return shift;
-}
-
-// V2.1 owner lookup: the payload base of an address (a head names no owner).
-// One byte per 4 MiB granule of a 48-bit address space. 0: no XOffset region.
-// Otherwise bits 0..5 are k, the region's alignment exponent (the region, or
-// the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
-// payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
-// is aligned to 2^k and sets the entries of its granules while it is mapped.
-// Entries change only while no head lives in the region, so plain bytes do.
-struct OwnerMap {
-    static constexpr std::size_t granule_shift = 22;
-    static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
-    static constexpr std::size_t address_bits = 48;
-    static constexpr std::size_t entries = std::size_t(1) << (address_bits - granule_shift);
-    static constexpr std::uint8_t slot_bit = 0x80;
-
-    static std::size_t index(std::uintptr_t address) noexcept {
-        return (address >> granule_shift) & (entries - 1);
-    }
-    // Makes the table usable before a region registers; false when it cannot
-    // be allocated (only on Windows, where it is allocated at run time).
-    static bool ready() noexcept;
-    static std::uint8_t entry(std::uintptr_t address) noexcept;
-    static char* payload_of(const void* p) noexcept;
-    // The payload of a if b lies in the same payload, else null. One table
-    // read when both are in one granule (granules are never shared).
-    static char* same_payload(const void* a, const void* b) noexcept;
-    // Sets (or with entry 0 clears) the entries of [begin, begin + bytes).
-    static void set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept;
-    static bool reachable(const void* begin, std::size_t bytes) noexcept {
-        const auto a = reinterpret_cast<std::uintptr_t>(begin);
-        return bytes != 0 && (a >> address_bits) == 0 &&
-               bytes <= (std::uintptr_t(1) << address_bits) - a;
-    }
-};
-
-#if defined(_WIN32)
-// A PE image stores zero-initialized COMDAT data in the file (MinGW GCC puts
-// this table in .data: a 64 MiB executable), so on Windows the table is
-// committed at the first registration. While it is null no region exists and
-// every lookup finds no owner. The pointer is set once and never changes; a
-// thread that holds a head in a region has synchronized with the region's
-// registration, so relaxed loads see it.
-inline std::atomic<std::uint8_t*> owner_map_table{nullptr};
-
-inline bool OwnerMap::ready() noexcept {
-    if (owner_map_table.load(std::memory_order_acquire)) return true;
-    auto* fresh = static_cast<std::uint8_t*>(
-        ::VirtualAlloc(nullptr, entries, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
-    if (!fresh) return false;
-    std::uint8_t* expected = nullptr;
-    if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel))
-        ::VirtualFree(fresh, 0, MEM_RELEASE);
-    return true;
-}
-
-inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
-    const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
-    return table ? table[index(address)] : std::uint8_t(0);
-}
-#else
-// Zero-initialized (BSS): pages the program never touches cost no memory.
-inline std::uint8_t owner_map_table[OwnerMap::entries];
-
-inline bool OwnerMap::ready() noexcept { return true; }
-
-inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
-    return owner_map_table[index(address)];
-}
-#endif
-
-inline char* OwnerMap::payload_of(const void* p) noexcept {
-    const auto a = reinterpret_cast<std::uintptr_t>(p);
-    const std::uint8_t e = entry(a);
-    if (e == 0) return nullptr;
-    const auto base = a & (~std::uintptr_t(0) << (e & 63u));
-    return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
-}
-
-inline char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
-    const auto ua = reinterpret_cast<std::uintptr_t>(a);
-    const auto ub = reinterpret_cast<std::uintptr_t>(b);
-    const std::uint8_t e = entry(ua);
-    if (e == 0) return nullptr;
-    char* const pa = reinterpret_cast<char*>(
-        (ua & (~std::uintptr_t(0) << (e & 63u))) + ((e & slot_bit) >> 1));
-    if (index(ua) == index(ub)) return ((ua ^ ub) >> (e & 63u)) == 0 ? pa : nullptr;
-    return payload_of(b) == pa ? pa : nullptr;
-}
-
-inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept {
-    if (bytes == 0) return;
-#if defined(_WIN32)
-    std::uint8_t* const table = owner_map_table.load(std::memory_order_acquire);
-    if (!table) return;  // entry 0 before any registration: nothing to clear
-#else
-    std::uint8_t* const table = owner_map_table;
-#endif
-    const auto a = reinterpret_cast<std::uintptr_t>(begin);
-    for (std::size_t i = index(a), last = index(a + bytes - 1); ; ++i) {
-        table[i] = value;
-        if (i == last) break;
-    }
 }
 
 struct SlotGeometry {
@@ -412,12 +308,8 @@ private:
         }
         const auto bytes = SlotGeometry::slot_bytes(cls);
         if (state.carve[cls] == state.carve_end[cls]) {
-            if (!OwnerMap::ready()) return nullptr;
             char* chunk = map_chunk();
             if (!chunk) return nullptr;
-            if (!OwnerMap::reachable(chunk, SlotGeometry::chunk_bytes)) return nullptr;
-            OwnerMap::set(chunk, SlotGeometry::chunk_bytes, static_cast<std::uint8_t>(
-                OwnerMap::slot_bit | (SlotGeometry::min_shift + cls)));
             state.carve[cls] = chunk;
             state.carve_end[cls] = chunk + SlotGeometry::chunk_bytes;
             ++state.stats.chunks;

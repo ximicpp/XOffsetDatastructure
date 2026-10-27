@@ -62,7 +62,7 @@ static_assert(HasBulk<xo::XVector<WithDefaultCallback>>);
 static_assert(!HasBulk<xo::XVector<AssignmentOnly>>);
 static_assert(!HasBulk<xo::XVector<xo::XString>> && !HasBulk<xo::XVector<BulkAttr>>);
 static_assert(!HasBulk<xo::XVector<const std::uint32_t>> && !HasBulk<xo::XVector<volatile std::uint32_t>>);
-static_assert(sizeof(xo::XFixedVector<std::uint8_t>) == 12 && sizeof(xo::XVector<std::uint32_t>) == 12);
+static_assert(sizeof(xo::XFixedVector<std::uint8_t>) == 16 && sizeof(xo::XVector<std::uint32_t>) == 16);
 namespace {
 void need(bool value, const char* what) { if (!value) throw std::runtime_error(what); }
 auto policy(std::size_t maximum = 32u << 20) {
@@ -70,8 +70,8 @@ auto policy(std::size_t maximum = 32u << 20) {
 }
 auto make_buffer(std::size_t initial = 1u << 20) { return xo::XBuffer::create<BulkRoot>(initial, policy()); }
 template<class T> auto descriptor(const T& value) {
-    static_assert(sizeof(T) == 12); std::array<unsigned char, 12> result{};
-    std::memcpy(result.data(), &value, 12); return result;
+    static_assert(sizeof(T) == 16); std::array<unsigned char, 16> result{};
+    std::memcpy(result.data(), &value, 16); return result;
 }
 template<class V> auto values(const V& v) {
     using T = typename V::value_type;

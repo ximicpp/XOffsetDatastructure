@@ -54,7 +54,7 @@ struct Owned {
     // Same ADDRESS only: the already-validated relative integers are unchanged.
     Owned(descriptor_t, const xo::detail::RawOwningDescriptor& h,
           std::uint64_t n) noexcept : text(), value(n) {
-        text.data_delta=h.data_delta;
+        text.arena_delta=h.arena_delta; text.data_delta=h.data_delta;
         text.size_=h.size; text.capacity_=h.capacity;
     }
     ~Owned() noexcept {} // text is destroyed automatically after the body
