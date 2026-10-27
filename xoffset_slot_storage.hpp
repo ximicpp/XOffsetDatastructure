@@ -77,16 +77,6 @@
 #endif
 
 namespace XOffsetDatastructure {
-// Owner-table lookups sit on every allocate, grow and retire; GCC stops
-// inlining them once the table reads are atomic, so force it.
-#if defined(__GNUC__) || defined(__clang__)
-#  define XOFFSET_DETAIL_OWNER_INLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#  define XOFFSET_DETAIL_OWNER_INLINE __forceinline
-#else
-#  define XOFFSET_DETAIL_OWNER_INLINE inline
-#endif
-
 namespace detail {
 
 constexpr std::size_t slot_log2(std::size_t value) noexcept {
@@ -101,10 +91,7 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
 // the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
 // payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
 // is aligned to 2^k and sets the entries of its granules while it is mapped.
-// Entries change only while no head lives in the region. One granule's entry
-// can still be written by two threads: one clears it and unmaps the range,
-// another maps the range again and sets it. The kernel orders the two, C++
-// does not, so every access is a relaxed atomic (a plain byte load or store).
+// Entries change only while no head lives in the region, so plain bytes do.
 struct OwnerMap {
     static constexpr std::size_t granule_shift = 22;
     static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
@@ -119,21 +106,6 @@ struct OwnerMap {
     // be allocated (only on Windows, where it is allocated at run time).
     static bool ready() noexcept;
     static std::uint8_t entry(std::uintptr_t address) noexcept;
-    // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
-    XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
-#if defined(__GNUC__) || defined(__clang__)
-        return __atomic_load_n(&e, __ATOMIC_RELAXED);
-#else
-        return *static_cast<const volatile std::uint8_t*>(&e);
-#endif
-    }
-    XOFFSET_DETAIL_OWNER_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
-#if defined(__GNUC__) || defined(__clang__)
-        __atomic_store_n(&e, value, __ATOMIC_RELAXED);
-#else
-        *static_cast<volatile std::uint8_t*>(&e) = value;
-#endif
-    }
     static char* payload_of(const void* p) noexcept;
     // The payload of a if b lies in the same payload, else null. One table
     // read when both are in one granule (granules are never shared).
@@ -167,9 +139,9 @@ inline bool OwnerMap::ready() noexcept {
     return true;
 }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
-    return table ? load(table[index(address)]) : std::uint8_t(0);
+    return table ? table[index(address)] : std::uint8_t(0);
 }
 #else
 // Zero-initialized (BSS): pages the program never touches cost no memory.
@@ -177,12 +149,12 @@ inline std::uint8_t owner_map_table[OwnerMap::entries];
 
 inline bool OwnerMap::ready() noexcept { return true; }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
-    return load(owner_map_table[index(address)]);
+inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+    return owner_map_table[index(address)];
 }
 #endif
 
-XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
+inline char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
     const std::uint8_t e = entry(a);
     if (e == 0) return nullptr;
@@ -190,7 +162,7 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
 }
 
-XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
+inline char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
     const auto ua = reinterpret_cast<std::uintptr_t>(a);
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
     const std::uint8_t e = entry(ua);
@@ -211,7 +183,7 @@ inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t val
 #endif
     const auto a = reinterpret_cast<std::uintptr_t>(begin);
     for (std::size_t i = index(a), last = index(a + bytes - 1); ; ++i) {
-        store(table[i], value);
+        table[i] = value;
         if (i == last) break;
     }
 }

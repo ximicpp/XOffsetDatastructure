@@ -2765,7 +2765,9 @@ namespace XOffsetDatastructure {
             }
             if (auto* const shared = reinterpret_cast<XArena*>(detail::OwnerMap::same_payload(this, &other))) {
                 // Both heads lie in one payload (one owner-table read).
-                if (fixed_detail::move_assignment_disjoint(*this, other)) {
+                if (fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), shared) &&
+                    fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), shared) &&
+                    fixed_detail::move_assignment_disjoint(*this, other)) {
                     std::int32_t incoming_delta = 0;
                     fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
                     const auto incoming_size = other.size_;
@@ -2813,7 +2815,7 @@ namespace XOffsetDatastructure {
             throw XException("XFixedString needs a block but lies outside every XOffset payload");
         }
 
-        XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
+        XArena* arena() const noexcept {
             return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
         }
 
@@ -3297,7 +3299,9 @@ namespace XOffsetDatastructure {
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 if (auto* const shared = reinterpret_cast<XArena*>(detail::OwnerMap::same_payload(this, &other))) {
                     // Both heads lie in one payload (one owner-table read).
-                    if (fixed_detail::move_assignment_disjoint(*this, other)) {
+                    if (fixed_detail::move_assignment_head_in_arena(this, sizeof(*this), shared) &&
+                        fixed_detail::move_assignment_head_in_arena(&other, sizeof(other), shared) &&
+                        fixed_detail::move_assignment_disjoint(*this, other)) {
                         std::int32_t incoming_delta = 0;
                         fixed_detail::set_rel32(incoming_delta, &data_delta, other.data());
                         const auto incoming_size = other.size_;
@@ -3353,7 +3357,7 @@ namespace XOffsetDatastructure {
             else return binding();
         }
 
-        XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
+        XArena* arena() const noexcept {
             return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
         }
 
