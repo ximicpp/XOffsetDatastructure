@@ -2629,6 +2629,13 @@ namespace XOffsetDatastructure {
         XFixedString(XFixedString&&) = delete;
         XFixedString& operator=(const XFixedString& other) {
             if (this == &other) return *this;
+            if (other.is_inline() && is_inline() && is_bound()) [[likely]] {
+                // Inline into a bound inline head: the 12 inline bytes are the
+                // whole value (characters, zero padding, length and flag), as
+                // store_inline would write them from other.view().
+                std::memcpy(inline_bytes(), other.inline_bytes(), 12);
+                return *this;
+            }
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
             assign(other.view());
