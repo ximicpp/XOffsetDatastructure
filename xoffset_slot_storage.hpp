@@ -91,7 +91,10 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
 // the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
 // payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
 // is aligned to 2^k and sets the entries of its granules while it is mapped.
-// Entries change only while no head lives in the region, so plain bytes do.
+// Entries change only while no head lives in the region. One granule's entry
+// can still be written by two threads: one clears it and unmaps the range,
+// another maps the range again and sets it. The kernel orders the two, C++
+// does not, so every access is a relaxed atomic (a plain byte load or store).
 struct OwnerMap {
     static constexpr std::size_t granule_shift = 22;
     static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
@@ -106,6 +109,21 @@ struct OwnerMap {
     // be allocated (only on Windows, where it is allocated at run time).
     static bool ready() noexcept;
     static std::uint8_t entry(std::uintptr_t address) noexcept;
+    // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
+    static std::uint8_t load(const std::uint8_t& e) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+        return __atomic_load_n(&e, __ATOMIC_RELAXED);
+#else
+        return *static_cast<const volatile std::uint8_t*>(&e);
+#endif
+    }
+    static void store(std::uint8_t& e, std::uint8_t value) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+        __atomic_store_n(&e, value, __ATOMIC_RELAXED);
+#else
+        *static_cast<volatile std::uint8_t*>(&e) = value;
+#endif
+    }
     static char* payload_of(const void* p) noexcept;
     // The payload of a if b lies in the same payload, else null. One table
     // read when both are in one granule (granules are never shared).
@@ -141,7 +159,7 @@ inline bool OwnerMap::ready() noexcept {
 
 inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
-    return table ? table[index(address)] : std::uint8_t(0);
+    return table ? load(table[index(address)]) : std::uint8_t(0);
 }
 #else
 // Zero-initialized (BSS): pages the program never touches cost no memory.
@@ -150,7 +168,7 @@ inline std::uint8_t owner_map_table[OwnerMap::entries];
 inline bool OwnerMap::ready() noexcept { return true; }
 
 inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
-    return owner_map_table[index(address)];
+    return load(owner_map_table[index(address)]);
 }
 #endif
 
@@ -183,7 +201,7 @@ inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t val
 #endif
     const auto a = reinterpret_cast<std::uintptr_t>(begin);
     for (std::size_t i = index(a), last = index(a + bytes - 1); ; ++i) {
-        table[i] = value;
+        store(table[i], value);
         if (i == last) break;
     }
 }
