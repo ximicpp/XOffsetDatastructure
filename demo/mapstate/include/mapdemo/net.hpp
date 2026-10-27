@@ -3,10 +3,15 @@
 // owned by the common-library thread.
 //
 // Frame = 24-byte FrameHeader (little endian) + payload. State payloads are
-// XOffset wires (save_verified output); control payloads are raw bytes.
+// XOffset wires (save_verified / save_compact output, a ViewSnapshot
+// optionally zstd-compressed, see codec.hpp); control payloads are raw bytes.
 // Receivers check magic, direction (allowed types) and the per-type length
 // limit BEFORE allocating the payload buffer.
+//
+// Sockets: POSIX (Linux, macOS, Android, iOS) and Winsock 2 (Windows: MinGW,
+// MSVC). A socket handle is a Socket on both.
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <initializer_list>
@@ -21,8 +26,8 @@ enum class MsgType : std::uint16_t {
     Hello = 1,         // A->B, client->A: hello_payload() (4 schema hashes, 32 B)
     HelloOk = 2,       // B->A, A->client: empty
     Catalog = 3,       // A->client: MapCatalog wire
-    ViewReq = 4,       // client->A: ViewRequest wire; flags = ViewCategory
-    ViewSnapshot = 5,  // A->client: ViewSnapshot wire; flags = ViewCategory echoed
+    ViewReq = 4,       // client->A: ViewRequest wire; flags = codec::view_flags()
+    ViewSnapshot = 5,  // A->client: ViewSnapshot in the requested encoding; flags echoed
     StepReq = 6,       // A->B: UnitStateBatch wire; correlation = batch tick
     StepRes = 7,       // B->A: UnitStateBatch wire; correlation = new tick
     Error = 8,         // any direction: UTF-8 text
@@ -30,7 +35,12 @@ enum class MsgType : std::uint16_t {
 };
 
 // Test categories for view requests (headless sampling); GUI uses Normal.
+// Bits 0-7 of the ViewReq / ViewSnapshot flags (codec.hpp has the rest).
 enum class ViewCategory : std::uint16_t { Normal = 0, FullScene = 1, Empty = 2 };
+
+// Socket handle: a file descriptor on POSIX, a SOCKET on Windows (both fit).
+using Socket = std::intptr_t;
+inline constexpr Socket kInvalidSocket = -1;
 
 inline constexpr std::uint32_t kMagic = 0x31444D58u;   // "XMD1"
 
@@ -69,7 +79,7 @@ struct PeerClosed : ProtocolError {
 class Conn {
 public:
     Conn() = default;
-    explicit Conn(int fd) noexcept : fd_(fd) {}
+    explicit Conn(Socket fd) noexcept : fd_(fd) {}
     ~Conn();
     Conn(Conn&& other) noexcept;
     Conn& operator=(Conn&& other) noexcept;
@@ -79,14 +89,16 @@ public:
     // Connects with TCP_NODELAY, retrying until retry_ms elapses.
     static Conn connect(const std::string& host, std::uint16_t port, int retry_ms = 5000);
 
-    int fd() const noexcept { return fd_; }
-    bool is_open() const noexcept { return fd_ >= 0; }
+    Socket fd() const noexcept { return fd_; }
+    bool is_open() const noexcept { return fd_ != kInvalidSocket; }
     void close() noexcept;
 
     // ---- blocking mode (B; simple tools) ----
-    // Header and payload go out with writev; the payload is not copied.
+    // Header and payload go out in one gathered write; the payload is not copied.
     void send(MsgType type, std::uint64_t correlation, std::string_view payload, std::uint16_t flags = 0);
     Frame recv(std::initializer_list<MsgType> allowed);
+    // Raw bytes, no framing (the --evil probe sends a bare header).
+    void send_raw(std::string_view bytes);
 
     // ---- non-blocking mode (A, client) ----
     void set_nonblocking(bool on);
@@ -116,7 +128,7 @@ private:
         std::string payload;
         std::size_t written = 0;   // over header + payload
     };
-    int fd_ = -1;
+    Socket fd_ = kInvalidSocket;
     // receive state
     FrameHeader rx_header_{};
     std::size_t rx_header_got_ = 0;
@@ -141,12 +153,25 @@ public:
     Listener& operator=(const Listener&) = delete;
 
     static Listener bind(const std::string& host, std::uint16_t port);
-    int fd() const noexcept { return fd_; }
+    Socket fd() const noexcept { return fd_; }
     Conn accept();   // blocking unless set non-blocking by the caller via fd()
 
 private:
-    int fd_ = -1;
+    Socket fd_ = kInvalidSocket;
 };
+
+// Readiness wait: poll() on POSIX, WSAPoll() on Windows. readable is also set
+// when the peer closed or the socket has an error (the next read reports it).
+struct PollItem {
+    Socket fd = kInvalidSocket;
+    bool want_read = false;
+    bool want_write = false;
+    bool readable = false;   // out
+    bool writable = false;   // out
+};
+// Number of ready items, 0 on timeout (and on an interrupted wait);
+// timeout_ms < 0 waits without limit. Throws ProtocolError on failure.
+int poll(PollItem* items, std::size_t count, int timeout_ms);
 
 // Handshake: 4 x u64 wire_schema_hash_v<T>() for MapCatalog, UnitStateBatch,
 // ViewRequest, ViewSnapshot, in that order.

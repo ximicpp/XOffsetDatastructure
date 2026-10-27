@@ -11,7 +11,10 @@
 # TIME_WAIT never blocks the next one), MAPDEMO_SKIP_EVIL=1, MAPDEMO_LABEL
 # (free text stored in the result, e.g. "cloud GCC 16 smoke"),
 # MAPDEMO_COMPARE (another OUT_ROOT, e.g. a run with another compiler or on
-# another platform: its per-tick step wire digests must equal these).
+# another platform: its per-tick step wire digests must equal these),
+# MAPDEMO_CLIENT / MAPDEMO_CLIENT_ARGS (see run_tier.sh; the evil run adds
+# --evil to MAPDEMO_CLIENT_ARGS), MAPDEMO_SKIP_SELFTEST=1 (the self-test of
+# the servers already ran for these binaries).
 #
 # OUT_ROOT (default ./mapdemo-results) gets selftest/, tier_<N>_<mode>/,
 # evil_<mode>/, RESULT_TABLES.md and summary.json. Exit 0 only when every run
@@ -35,14 +38,16 @@ PYTHON=${PYTHON:-python3}
 mkdir -p "$OUT_ROOT"
 FAILED=0
 
-echo "== selftest"
-mkdir -p "$OUT_ROOT/selftest"
-rm -f "$OUT_ROOT/selftest"/*
-"$BIN/mapdemo_selftest" --csv-dir "$OUT_ROOT/selftest" > "$OUT_ROOT/selftest/selftest.log" 2>&1
-RC=$?
-echo "selftest=$RC" > "$OUT_ROOT/selftest/exit_codes.txt"
-echo "selftest: exit $RC"
-[ "$RC" = 0 ] || FAILED=1
+if [ "${MAPDEMO_SKIP_SELFTEST:-0}" != 1 ]; then
+    echo "== selftest"
+    mkdir -p "$OUT_ROOT/selftest"
+    rm -f "$OUT_ROOT/selftest"/*
+    "$BIN/mapdemo_selftest" --csv-dir "$OUT_ROOT/selftest" > "$OUT_ROOT/selftest/selftest.log" 2>&1
+    RC=$?
+    echo "selftest=$RC" > "$OUT_ROOT/selftest/exit_codes.txt"
+    echo "selftest: exit $RC"
+    [ "$RC" = 0 ] || FAILED=1
+fi
 
 for units in $TIERS; do
     for mode in $MODES; do
@@ -55,12 +60,13 @@ done
 
 if [ "${MAPDEMO_SKIP_EVIL:-0}" != 1 ]; then
     # Malformed requests against a running A (100 units, 200 steps): the evil
-    # client exits 0 only when all four were rejected and A still answers
+    # client exits 0 only when all six were rejected and A still answers
     # normal requests (also on the connection that sent a rejected one); A
     # must keep running to its step limit and exit 0.
     for mode in $MODES; do
         echo "== evil (online failure inputs), --buffers $mode"
-        MAPDEMO_PORT_A=$PORT MAPDEMO_PORT_B=$(( PORT + 1 )) MAPDEMO_BUFFERS=$mode MAPDEMO_CLIENT_ARGS=--evil \
+        MAPDEMO_PORT_A=$PORT MAPDEMO_PORT_B=$(( PORT + 1 )) MAPDEMO_BUFFERS=$mode \
+            MAPDEMO_CLIENT_ARGS="--evil ${MAPDEMO_CLIENT_ARGS:-}" MAPDEMO_A_ARGS= \
             "$HERE/run_tier.sh" "$BIN" 100 "$OUT_ROOT/evil_$mode" 200 || FAILED=1
         PORT=$(( PORT + 2 ))
         REJECTED=$(grep -c '^rejected:' "$OUT_ROOT/evil_$mode/a.log" 2>/dev/null || true)
@@ -72,6 +78,7 @@ fi
 echo "== summarize"
 SUMMARY_ARGS="--min-steps $STEPS"
 [ "${MAPDEMO_SKIP_EVIL:-0}" = 1 ] && SUMMARY_ARGS="$SUMMARY_ARGS --no-evil"
+[ "${MAPDEMO_SKIP_SELFTEST:-0}" = 1 ] && SUMMARY_ARGS="$SUMMARY_ARGS --no-selftest"
 [ -n "${MAPDEMO_COMPARE:-}" ] && SUMMARY_ARGS="$SUMMARY_ARGS --compare ${MAPDEMO_COMPARE}"
 # shellcheck disable=SC2086
 "$PYTHON" "$HERE/summarize.py" "$OUT_ROOT" $SUMMARY_ARGS --label "$LABEL" \
