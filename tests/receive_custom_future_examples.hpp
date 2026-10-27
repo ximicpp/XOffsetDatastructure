@@ -54,6 +54,15 @@ struct MissingInline { std::uint32_t value; ~MissingInline() noexcept {} };
 struct HiddenRawOnly { xo::XVector<RawOnly> later; };
 struct HiddenByPolicy { xo::XVector<RawOnly> later; };
 struct FutureOnlyChild { std::uint32_t value{}; };
+} // namespace receive_custom_v2_examples
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::RawOnly, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::MissingRvalue, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::ThrowingDestructor, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::MissingInline, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenRawOnly, (), later)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenByPolicy, (), later)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::FutureOnlyChild, (), value)
+namespace receive_custom_v2_examples {
 inline thread_local long transfer_failure=-1;
 inline void check_transfer_failure() {
     if(transfer_failure==0){transfer_failure=-1;throw std::bad_alloc();}
@@ -65,7 +74,7 @@ inline void check_transfer_failure() {
 
 // Existing explicit TypeLayout user extension, local to these policy examples.
 // It does not bypass the separate production V1 recursive member/layout gate.
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Word> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Owned> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::RawOnly> : std::true_type {};

@@ -8,20 +8,25 @@
 #include <iostream>
 #include <cassert>
 #include <string>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct Player {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     Player(Allocator alloc)
         : name(alloc), items(alloc) {}
+#endif
 
     int32_t id = 0;
     int32_t level = 0;
     XString name;
     XVector<int32_t> items;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(Player, (), id, level, name, items)
+#endif
 
 // ============================================================================
 // Test 1: Basic make_handle and access

@@ -126,6 +126,16 @@ python3 tools/perf_gate/test_perf_gate.py   # 判定逻辑自测，不需要编�
 
 只改内存访问、不改指令数的变化：#27 让 Mac 上的正式修改快 3.0%，Ir 只变 −0.1%；新 M3 在 Mac 上让 B.season_edits 慢 2–3%，x86 Ir 却是 −5%。x86 与 Mac 的方向可能相反。2026-10-26 用 GCC 16 和 P2996 两种 Ir 重放 Mac L2 门禁对：分配器回收型改动（D2、COPS）两种 Ir 都与 Mac 反向；GCC 的内联决定翻转会让 GCC Ir 与 Mac 反向（W0b 的 formal.mutate：GCC 0.955、P2996 1.005、Mac 1.011）；方向一致时 Ir 与 Mac 的幅度也差 0.3–5 倍。所以 L0 只是合并前的过滤器，Mac L2（tag 前必跑、每周一次、ledger 放行 > 1% 的 PR 合并前）才出结论。
 
+## 8a. 机器码比对（0 类证据）
+
+`tools/perf_gate/asm_equal.py` 回答“改动前后，三个基准程序（正式 harness `sc_xoffset`、`slg_bench`、`reloc_bench`）的机器码是否相同”，是 MERGE_RULES_V2 第 0 类“两种编译器反汇编逐条相同”的判据。`tools/local_validate.sh` 的 `asm` 步骤直接用 Ir 步骤的构建，在 GCC 16 和 P2996 下各比一次，结果写进 REPORT.md；默认只报告，`--asm-strict` 时不同就判失败。单独用：`asm_equal.py run --base REV --head REV --compiler gcc16|p2996 --work DIR --cereal INC [--cxx ...]`，或对已有构建 `asm_equal.py compare --base DIR --head DIR`。
+
+- 比什么：objdump 的每个函数按符号大小截取（函数后的对齐填充算摆放，不算代码），去掉地址：函数内跳转改成相对函数起点的偏移，引用别的函数改成那个函数的身份，rip 相对和绝对地址引用数据改成“数据”。函数的身份是它规范化后的指令再把它引用的函数换成对方身份的哈希，迭代几轮，所以改名的函数仍能配上，调用换了对象则配不上。
+- 判定：两边身份的多重集合相同，就是“指令逐条相同”；再加上 .text 里（身份、相对 .text 起点的偏移、大小）的序列相同，就是“摆放相同”。只是摆放变了仍算 0 类，但要写进 PR 正文和 ledger，作为下一次阶段复核的二分点（INT1 的 map.insert 指令相同、只是对齐变了，Mac 上慢了 6–8%）。
+- 不同的时候：先列出自己指令变了的函数（附 diff），再列出只因调用的函数变了而跟着变的函数。
+- 局限：GCC `-static` 是固定地址的可执行文件，立即数里的地址只有“函数起点”或“落在数据段里”才当地址看，其余当数字；所以一个恰好落在数据段地址范围里的常数会被当成地址：摆放变化时可能误报为不同，两边这样的常数不同时也可能漏报。P2996 构建是位置无关的，地址都走 rip 相对，没有这个问题。
+- 自检：`tools/perf_gate/test_asm_equal.py [--cxx ...]` 用小程序验证改名判相同、挪地址判“指令相同、摆放不同”、加函数和改常数判不同并定位到变了的函数。
+
 ## 9. 历史回放（云端，GCC 16 x86-64，valgrind 3.22，SLG 第 4–7 周期，基准代码取自 next_cpp26 的 `bench/`）
 
 | 变化 | 结果 | 失败项 |

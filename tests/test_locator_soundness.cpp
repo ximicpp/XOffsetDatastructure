@@ -8,10 +8,12 @@
 namespace xo=XOffsetDatastructure;
 namespace fd=xo::fixed_detail;
 struct Node { std::uint32_t id{};xo::XVector<Node> children; };
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<>struct is_byte_copy_safe<Node>:std::true_type{};
 }
 struct Forest {xo::XVector<Node> left,right;xo::XVector<std::byte> opaque;};
+XOFFSET_RECORD_DERIVED(Node, (), id, children)
+XOFFSET_RECORD_DERIVED(Forest, (), left, right, opaque)
 namespace {
 void need(bool b,const char* why){if(!b)throw std::runtime_error(why);}
 template<class H> auto descriptor(const H& head){

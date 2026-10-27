@@ -10,7 +10,7 @@ fixed-schema, zero-decode data buffers. It requires **Clang with P2996 reflectio
 (a custom Clang fork) — not standard Clang or GCC.
 
 Key concepts: frozen-layout containers (`XString`, `XVector`, `XSet`, `XMap`, `XBlob`),
-compile-time type admission via TypeLayout, reflection-based zero-boilerplate construction,
+compile-time type admission (K0, computed by XOffset), reflection-based zero-boilerplate construction,
 verified load/save, and arena compaction.
 
 ## Build & Test
@@ -73,14 +73,14 @@ historical comparisons. Supply the SDK explicitly rather than relying on xcrun's
 current default. `build.sh --build-dir PATH --sdk PATH` supports a fresh build
 directory with an explicit macOS SDK.
 
-## Test Suite (38 library executables, 48 CTest cases)
+## Test Suite (39 library executables, 49 CTest cases)
 
 - **Basic (7)**: test_basic_types, test_vector, test_map_set, test_nested, test_compaction, test_modify, test_xbuffer_api
-- **Reflection (29)**: test_reflection_core, test_reflection_advanced, test_type_signatures, test_field_limit_fix, test_type_safety, test_wire_admission, test_enum_support, test_xstring_direct_assign, test_xhandle, test_schema_envelope, test_fixed_layout_containers, test_error_paths, test_memory_efficiency, test_zero_boilerplate, test_complex_nesting, test_inheritance, test_adaptive_reservation, test_main_containers, test_runtime_regressions, test_mutation_failures, test_wire_validation, test_stable_storage, test_vm_lifecycle, test_vm_transport, test_owner_registry, test_tail_expansion, test_storage_policies, test_allocator_model, test_allocator_failures
+- **Reflection (30)**: test_reflection_core, test_reflection_advanced, test_type_signatures, test_field_limit_fix, test_type_safety, test_admission_typelayout, test_wire_admission, test_enum_support, test_xstring_direct_assign, test_xhandle, test_schema_envelope, test_fixed_layout_containers, test_error_paths, test_memory_efficiency, test_zero_boilerplate, test_complex_nesting, test_inheritance, test_adaptive_reservation, test_main_containers, test_runtime_regressions, test_mutation_failures, test_wire_validation, test_stable_storage, test_vm_lifecycle, test_vm_transport, test_owner_registry, test_tail_expansion, test_storage_policies, test_allocator_model, test_allocator_failures
 - **OS storage (2)**: test_virtual_memory_storage, test_vm_pool (standalone C++17; supplement the full reflection suite)
 
-The 38 executables plus 5 lifecycle exit scenarios, 2 actual registry allocation
-failure scenarios, and 3 tooling checks total 48 CTest cases. Configure-time
+The 39 executables plus 5 lifecycle exit scenarios, 2 actual registry allocation
+failure scenarios, and 3 tooling checks total 49 CTest cases. Configure-time
 reflection, positive admission and polymorphic-rejection checks are separate.
 The generated `build/test-inventory.json` is authoritative for the selected mode;
 storage-only currently has 2 programs/2 CTest cases.
@@ -96,18 +96,18 @@ The public library header is organized as follows; its independent VM owner
 lives in `xoffset_virtual_memory.hpp`:
 
 1. **Platform guards** — enforces 64-bit little-endian only
-2. **TypeLayout integration** — delegates ALL type safety to `external/typelayout` (`is_byte_copy_safe_v<T>`, `get_layout_signature<T>()`)
+2. **Schema field interface** — `xoffset_schema.hpp`; every walk asks it for members, offsets and bases (reflection backend `xoffset_schema_reflect.hpp`)
 3. **Arena runtime** — `XBufferCore` owns a payload-resident arena header, root/allocator offsets, backend free blocks, and verified reopen logic
 4. **Frozen-layout containers** — `XString`, `XVector<T>`, `XSet<T>`, `XMap<K,V>`, `XBlob` — all backed by XOffset-owned fixed ABI containers
-5. **Type safety** — `static_assert(is_byte_copy_safe_v<T>)` at entry points (`make<T>()`, `allocator<T>()`, `compact<T>()`). Admission delegated entirely to TypeLayout.
+5. **Type safety** — `static_assert(is_byte_copy_safe_v<T>)` at entry points (`make<T>()`, `allocator<T>()`, `compact<T>()`). Admission: `xoffset_admission.hpp` (TypeLayout's rules, computed over the schema interface; `test_admission_typelayout` cross-checks them).
 6. **Reflect construct/transfer** — P2996-based zero-boilerplate: `reflect_init_all<T>()` auto-injects allocators, `reflect_transfer_init_all<T>()` deep-copies
 7. **XBuffer** — user-facing API: `make<T>()`, `root<T>()`, `save_verified<T>()`, `load_verified<T>()`, `grow()`, `compact<T>()`
 8. **XCompactor** — reflection-based deep migration using per-type strategies (Bitwise, AllocatorAware, Container, Composite)
-9. **Registration macros** — `XOFFSET_REGISTER_TYPE`, `XOFFSET_REGISTER_CONTAINER`, `XOFFSET_REGISTER_MAP` — register types into both TypeLayout and XCompactor
+9. **Registration macros** — `XOFFSET_REGISTER_TYPE`, `XOFFSET_REGISTER_CONTAINER`, `XOFFSET_REGISTER_MAP` — register XCompactor migration strategies
 
 ### Key dependency: TypeLayout (`external/typelayout`)
 
-Git submodule providing the type-signature engine. XOffset does NOT implement its own type introspection — everything is delegated to TypeLayout. Initialize with `git submodule update --init --recursive`.
+Git submodule providing the type-signature engine used by the signature tools (`tools/sigs`, `export_signatures`, `check_compat`) and the C++26 cross tests. The core headers do not include it. Initialize with `git submodule update --init --recursive`.
 
 ### Compiler requirement
 

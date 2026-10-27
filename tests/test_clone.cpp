@@ -34,9 +34,11 @@ struct CloneRoot {
     XVector<XString> tags;
     XMap<std::uint32_t, XString> attrs;
 };
+XOFFSET_RECORD_DERIVED(CloneRoot, (), id, name, values, tags, attrs)
 XOFFSET_REGISTER_SCHEMA_NAME(CloneRoot, "test.CloneRoot")
 
 struct CloneOtherRoot { std::uint32_t x{}; };
+XOFFSET_RECORD_DERIVED(CloneOtherRoot, (), x)
 XOFFSET_REGISTER_SCHEMA_NAME(CloneOtherRoot, "test.CloneOtherRoot")
 
 namespace {

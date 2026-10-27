@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cassert>
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 
 using namespace XOffsetDatastructure;
 using namespace boost::typelayout;
@@ -106,21 +107,21 @@ bool test_enum_safety() {
     std::cout << std::string(50, '-') << "\n";
 
     // Scoped enums should be safe
-    static_assert(is_byte_copy_safe_v<WeaponType>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<WeaponType>,
         "WeaponType (enum class : uint8_t) should be safe");
     std::cout << "  WeaponType (enum class : uint8_t) ... [SAFE]\n";
 
-    static_assert(is_byte_copy_safe_v<QuestStatus>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<QuestStatus>,
         "QuestStatus (enum class : int32_t) should be safe");
     std::cout << "  QuestStatus (enum class : int32_t) ... [SAFE]\n";
 
     // Unscoped enum with explicit type should be safe
-    static_assert(is_byte_copy_safe_v<Color>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Color>,
         "Color (enum : uint16_t) should be safe");
     std::cout << "  Color (enum : uint16_t) ... [SAFE]\n";
 
     // Struct containing enums should be safe
-    static_assert(is_byte_copy_safe_v<PlayerStats>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<PlayerStats>,
         "PlayerStats (struct with enum fields) should be safe");
     std::cout << "  PlayerStats (struct with enums) ... [SAFE]\n";
 
@@ -212,7 +213,7 @@ bool test_enum_default_underlying() {
     std::cout << "  Direction is_fixed_enum = true ... [OK]\n";
 
     // Safety check: enum class defaults to int (portable, safe)
-    static_assert(is_byte_copy_safe_v<Direction>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Direction>,
         "Direction (enum class defaulting to int) should be safe");
     std::cout << "  Direction is_byte_copy_safe_v = true ... [OK]\n";
 
@@ -232,7 +233,7 @@ bool test_enum_in_xvector() {
     std::cout << std::string(50, '-') << "\n";
 
     // XVector<enum> should be safe
-    static_assert(is_byte_copy_safe_v<Inventory>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<Inventory>,
         "Inventory (struct with XVector<enum>) should be safe");
     std::cout << "  Inventory (with XVector<WeaponType>) is_byte_copy_safe_v ... [OK]\n";
 
@@ -354,7 +355,7 @@ bool test_enum_nested_signature() {
     std::cout << std::string(50, '-') << "\n";
 
     // EquipmentSlot contains a WeaponType enum field
-    static_assert(is_byte_copy_safe_v<EquipmentSlot>,
+    static_assert(XOffsetDatastructure::is_byte_copy_safe_v<EquipmentSlot>,
         "EquipmentSlot (struct with enum member) should be safe");
     std::cout << "  EquipmentSlot is_byte_copy_safe_v ... [OK]\n";
 

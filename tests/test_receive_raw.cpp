@@ -50,6 +50,22 @@ struct Bits { unsigned value : 1; };
 struct Empty {};
 struct Overlap { [[no_unique_address]] Empty empty; xo::XString value; };
 struct UserKey { std::uint32_t value; };
+} // namespace model
+XOFFSET_RECORD_DERIVED(model::Attr, (), key, value)
+XOFFSET_RECORD_DERIVED(model::Record, (), id, revision, score, name, samples, payload, attrs)
+XOFFSET_RECORD_DERIVED(model::Snapshot, (), schema_version, epoch, records)
+XOFFSET_RECORD_DERIVED(model::Bools, (), values)
+XOFFSET_RECORD_DERIVED(model::Flag, (), flag, label)
+XOFFSET_RECORD_DERIVED(model::Maps, (), values)
+XOFFSET_RECORD_DERIVED(model::Sets, (), names)
+XOFFSET_RECORD_DERIVED(model::Fixed, (), labels, flags)
+XOFFSET_RECORD_DERIVED(model::FixedScalars, (), values, flags)
+XOFFSET_RECORD_DERIVED(model::Destructor, (), value)
+XOFFSET_RECORD_DERIVED(model::Assignment, (), value)
+XOFFSET_RECORD_DERIVED(model::Volatile, (), value)
+XOFFSET_RECORD_DERIVED(model::Const, (), value)
+XOFFSET_RECORD_DERIVED(model::UserKey, (), value)
+namespace model {
 bool operator<(const UserKey& a, const UserKey& b) { return a.value < b.value; }
 enum class BuiltinEnum : std::uint32_t { low = 1, high = 2 };
 inline std::size_t rvalue_enum_calls{};
@@ -84,13 +100,25 @@ enum FixedEnum : std::uint32_t { fixed_zero=0,fixed_one=1 };
 enum class ScopedEnum : std::uint32_t { zero=0,one=1 };
 enum Wide { wide_min=(-9223372036854775807LL-1),wide_max=9223372036854775807LL };
 enum UnsignedWide { unsigned_wide_max=18446744073709551615ULL };
+// Enums without a fixed underlying type: their value range comes from reflection,
+// so these cases run only with C++26 reflection. Without it they must fail to
+// compile with a clear diagnostic (tests/receive_raw/nonfixed_enum_fail.cpp).
+#if XOFFSET_SCHEMA_REFLECTION
 struct EnumRepresentations {
     Nonfixed plain{};Negative mixed{};Zero zero{};EmptyEnum empty{};
     FixedEnum fixed{};ScopedEnum scoped{};
     xo::XVector<Nonfixed> values;
     xo::XMap<Nonfixed,std::uint32_t> keys;
 };
+#endif
 } // namespace model
+XOFFSET_RECORD_DERIVED(model::Enums, (), values)
+XOFFSET_RECORD_DERIVED(model::CustomScalar, (), value)
+XOFFSET_RECORD_DERIVED(model::CustomHolder, (), values)
+XOFFSET_RECORD_DERIVED(model::CanonicalValidateOnly, (), value)
+#if XOFFSET_SCHEMA_REFLECTION
+XOFFSET_RECORD_DERIVED(model::EnumRepresentations, (), plain, mixed, zero, empty, fixed, scoped, values, keys)
+#endif
 
 namespace XOffsetDatastructure {
 // Source attestations: all these declarations above have only ordinary members.
@@ -113,7 +141,9 @@ template<> struct wire_record_layout<model::Bits> { static constexpr bool ordina
 template<> struct wire_record_layout<model::UserKey> { static constexpr bool ordinary_members = true; };
 template<> struct wire_record_layout<model::Enums> { static constexpr bool ordinary_members = true; };
 template<> struct wire_record_layout<model::CustomHolder> { static constexpr bool ordinary_members = true; };
+#if XOFFSET_SCHEMA_REFLECTION
 template<> struct wire_record_layout<model::EnumRepresentations> { static constexpr bool ordinary_members = true; };
+#endif
 template<> struct wire_activation<model::CustomScalar> {
     static constexpr bool enabled = true;
     static void validate_raw(const char* p,detail::WireValidationContext&) {
@@ -162,7 +192,9 @@ XOFFSET_REGISTER_SCHEMA_NAME(model::Fixed, "four-path.raw.fixed.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(model::FixedScalars, "four-path.raw.fixed-scalars.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(model::Enums, "four-path.raw.enums.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(model::CanonicalValidateOnly,"four-path.raw.incomplete-canonical.v2")
+#if XOFFSET_SCHEMA_REFLECTION
 XOFFSET_REGISTER_SCHEMA_NAME(model::EnumRepresentations,"four-path.raw.enum-representations.v2")
+#endif
 
 static_assert(rd::raw_implicit_lifetime<model::Snapshot>(),
               "fixed compiler must support the implicit-lifetime trait/builtin");
@@ -182,8 +214,12 @@ static_assert(!rd::receive_raw_supported<model::Assignment>());
 static_assert(!rd::raw_only_implicit_special_members<model::Assignment>());
 static_assert(!rd::receive_raw_supported<model::Volatile>());
 static_assert(!rd::receive_raw_supported<model::Const>());
+#if XOFFSET_SCHEMA_REFLECTION
 static_assert(!rd::receive_raw_supported<model::Bits>());
+#endif
+#if XOFFSET_SCHEMA_REFLECTION // overlapping ([[no_unique_address]]) members: no field list possible
 static_assert(!rd::receive_raw_supported<model::Overlap>());
+#endif
 static_assert(!rd::receive_raw_supported<xo::XSet<model::UserKey>>());
 static_assert(!rd::receive_raw_supported<xo::XSet<float>>());
 static_assert(xo::raw_key_order<model::BuiltinEnum>::enabled);
@@ -212,6 +248,7 @@ static_assert(!rd::raw_enum_fixed_underlying<model::Zero>());
 static_assert(!rd::raw_enum_fixed_underlying<model::EmptyEnum>());
 static_assert(rd::raw_enum_fixed_underlying<model::FixedEnum>());
 static_assert(rd::raw_enum_fixed_underlying<model::ScopedEnum>());
+#if XOFFSET_SCHEMA_REFLECTION
 static_assert(rd::raw_enum_bounds<model::Nonfixed>().low==0&&rd::raw_enum_bounds<model::Nonfixed>().high==7);
 static_assert(rd::raw_enum_bounds<model::Negative>().low==-4&&rd::raw_enum_bounds<model::Negative>().high==3);
 static_assert(rd::raw_enum_bounds<model::Zero>().high==1&&rd::raw_enum_bounds<model::EmptyEnum>().high==1);
@@ -219,6 +256,7 @@ static_assert(rd::raw_enum_bounds<model::Wide>().low==(std::numeric_limits<std::
 static_assert(rd::raw_enum_bounds<model::UnsignedWide>().high==(std::numeric_limits<std::underlying_type_t<model::UnsignedWide>>::max)());
 static_assert(rd::raw_needs_validation<model::Nonfixed>()&&!rd::raw_needs_validation<model::FixedEnum>());
 static_assert(rd::raw_needs_validation<model::EnumRepresentations>());
+#endif
 static_assert(!std::is_default_constructible_v<rr::Proof<model::Snapshot>>);
 static_assert(!std::is_copy_constructible_v<rr::Proof<model::Snapshot>>);
 static_assert(std::is_nothrow_move_constructible_v<rr::Proof<model::Snapshot>>);
@@ -742,6 +780,7 @@ void null_upstream_rejected(){
     catch(const std::invalid_argument& e){rejected=std::string_view(e.what())=="validation scratch: null upstream";}
     need(rejected&&owner.copy_bytes()==before,"explicit null raw upstream was replaced or changed valid input");
 }
+#if XOFFSET_SCHEMA_REFLECTION
 void enum_representations(){
     using T=model::EnumRepresentations;
     auto source=xo::XBuffer::create<T>(16384,capacity());auto& r=source.root<T>();
@@ -784,6 +823,7 @@ void enum_representations(){
      bad.put<std::underlying_type_t<model::Nonfixed>>(bad.target(root+offsetof(T,keys))+offsetof(Pair,first),0x7fffffff);
      rejects<T>(bad,"wire validation: invalid enum representation");}
 }
+#endif
 } // namespace
 int main() {
     try {
@@ -798,7 +838,9 @@ int main() {
         fixed_arrays();
         incomplete_canonical_policy();
         null_upstream_rejected();
+#if XOFFSET_SCHEMA_REFLECTION
         enum_representations();
+#endif
         std::cout << "receive raw: source tests completed\n";
         return 0;
     } catch (const std::exception& e) {

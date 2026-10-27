@@ -24,6 +24,8 @@ struct Root {
     std::int16_t level{};
 };
 } // namespace pin
+XOFFSET_RECORD_DERIVED(pin::Inner, (), id, active, name)
+XOFFSET_RECORD_DERIVED(pin::Root, (), epoch, title, items, keys, attrs, kinds, weight, level)
 
 XOFFSET_REGISTER_SCHEMA_NAME(pin::Root, "test.schema_pin.root")
 

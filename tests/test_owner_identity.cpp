@@ -103,8 +103,10 @@ namespace xo = XOffsetDatastructure;
 namespace fd = xo::fixed_detail;
 namespace dt = xo::detail;
 struct OwnerRoot { xo::XVector<std::uint32_t> numbers; xo::XString name; };
+XOFFSET_RECORD_DERIVED(OwnerRoot, (), numbers, name)
 XOFFSET_REGISTER_SCHEMA_NAME(OwnerRoot, "test.v5.OwnerIdentity.v1")
 struct OtherOwnerRoot { xo::XString other; };
+XOFFSET_RECORD_DERIVED(OtherOwnerRoot, (), other)
 XOFFSET_REGISTER_SCHEMA_NAME(OtherOwnerRoot, "test.v5.OtherOwnerIdentity.v1")
 
 namespace {

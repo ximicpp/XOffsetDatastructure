@@ -8,7 +8,7 @@
 #include <cassert>
 #include <vector>
 #include <memory>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
@@ -18,9 +18,14 @@ struct SmallData {
     XString name;
     XVector<int> numbers;
 
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template<typename Alloc>
     SmallData(Alloc alloc) : name(alloc), numbers(alloc) {}
+#endif
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(SmallData, (), id, value, name, numbers)
+#endif
 
 bool test_default_reservation() {
     std::cout << "\n[TEST] Default virtual address reservation\n";
