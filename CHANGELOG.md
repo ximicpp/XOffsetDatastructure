@@ -34,6 +34,12 @@
   (G9 measured `vec.push_back` at 1.29x `std::vector` on the Mac M4).
 - The formal M input wire changes with the format; `bench/formal` pins the new
   one.
+- Performance: `reload_verified<T>()` of a dense wire (no extent table) whose
+  payload is at most 32 KiB, into a buffer whose storage already holds it,
+  takes a straight path: one pass over the header words, the copy in place,
+  and no free table when the wire has no holes. Admission, verification,
+  errors and the loaded state are those of the general path (SLG D read:
+  -32% instructions, P2996).
 
 ## 3.0.0: first release of the C++26 line
 
