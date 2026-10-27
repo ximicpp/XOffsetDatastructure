@@ -2785,7 +2785,7 @@ namespace XOffsetDatastructure {
             throw XException("XFixedString needs a block but lies outside every XOffset payload");
         }
 
-        XArena* arena() const noexcept {
+        XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
             return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
         }
 
@@ -3325,7 +3325,7 @@ namespace XOffsetDatastructure {
             else return binding();
         }
 
-        XArena* arena() const noexcept {
+        XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
             return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
         }
 
