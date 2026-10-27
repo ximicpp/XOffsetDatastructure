@@ -75,6 +75,8 @@ Outcome exercise(long n,bool cold) {
 // allocation; a bin that grew past 64 entries returns its storage, and so does
 // every bin of a table released by destroying its buffer. The hole table is
 // the same as with freshly allocated bins.
+// Without per-thread caches (XOFFSET_THREAD_CACHES=0, GCC on MinGW/Cygwin)
+// every reload allocates its table and bins again; the hole table is the same.
 void reload_keeps_small_bin_storage() {
     XBufferCore::trim_free_table_cache();
     auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024).with_growth(XGrowPolicy::Automatic));
@@ -99,7 +101,11 @@ void reload_keeps_small_bin_storage() {
     const auto second=round(s1,m1);
     const auto third=round(s2,m2);
     require(s0>=2 && m0>=1,"first round: table and bin storage were not host allocations");
+#if XOFFSET_THREAD_CACHES
     require(s1==0 && s2==0,"reload did not keep the small bin's storage");
+#else
+    require(s1==s0 && s2==s0,"without thread caches a reload must allocate as the first load did");
+#endif
     require(m1>=1 && m2>=1,"bin storage above the keep limit was kept");
     require(same(first,second) && same(first,third),"kept bin storage changed the hole table");
     b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
@@ -107,7 +113,11 @@ void reload_keeps_small_bin_storage() {
     attempts=hits=0;fail_after=-1;watch=true;
     b.arena()->deallocate(p,64);
     watch=false;
+#if XOFFSET_THREAD_CACHES
     require(attempts==1,"a table released by destroying its buffer kept bin storage");
+#else
+    require(attempts==2,"without thread caches the retire allocates its table and bin");
+#endif
     XBufferCore::trim_free_table_cache();
 }
 // V2 replacement for the V1 release_cached_blocks transfer (in-arena free lists

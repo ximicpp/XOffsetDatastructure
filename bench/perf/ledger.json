@@ -303,6 +303,34 @@
       "reason": "L 类合并（校验代码）：P4m，内联 XFixedString 的填充检查改为按长度查 11 项 constexpr 掩码表、两次掩码读取，去掉随长度变化的逐字节循环；接受和拒绝的 wire、错误信息、检查顺序不变；tests/test_wire_validation.cpp 加长度 0..10 × 位置 0..10 的穷举测试。只作记录，不放行任何指标。INT3 的独立 L2 点 G-P4m（235dcda 对 anchor e46cf38）判 pass：SLG A 0.944、B 0.972、C 0.992、D 0.994，最大上界 1.0049，formal 最大上界 1.0117；分阶段 A.req_decode 0.790、A.res_decode 0.860、B.in_decode 0.900、B.back_decode 0.974，B.back_encode 1.019 [1.010, 1.029]（Ir 持平，按代码布局只记录）。合在 b50fc8a（Z1–Z3 之后）上，试合点 0847879 的库 diff 与门禁时逐行相同；0847879 ÷ b50fc8a 两种 Ir 的最大 head÷base 是 1.0000；max_ratio 记的是下面 GCC 16 formal.load 的组合偏离 1.0172。两种 Ir 组合检查（新主线比值 ÷ 旧锚点比值）：P2996 全部在 0.0001 以内，P4m 省下的 Ir 两边相同，Mac 判定直接适用；GCC 16 formal.load 1.0172（0.8402 → 0.8547）、formal.reload 1.0149（0.9060 → 0.9195），超过 1.003，原因是 Z1–Z3 之后 GCC 把 validate_wire_value(XFixedString) 内联进 Attr 和 Record 两个向量校验，加 P4m 后只内联进 Attr，Record 路径比 b50fc8a 多约 15.5 万 Ir，P4m 在 GCC formal.load 上省 179 万而不是 211 万；对新主线仍无回退、无警告。GCC 的 Record 内联另开 S 类小项追。",
       "evidence": "Mac INT3 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int3-e46cf38/VERDICT.md（sha 46d3c449，分阶段表 stages/p4m.md，P2996 ctest 103/103）；组合检查 /mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/int3-merge/IR_COMPOSE.md（sha a3e7b09b，函数级表）与同目录 p4m_0847879_*（local_validate 8/8、扩展差分 3×100 万 + ASan 20 万、两种门禁 json）；门禁点验证 validate/p4m_235dcda_*",
       "approved_by": "「性能优化」（2026-10-27 00:20Z 交办先合 #113，00:58Z 同意 GCC 组合偏离后合并；L2 由「Mac 门禁批次」00:20Z 判 pass）"
+    },
+    {
+      "id": "int3-pr93",
+      "pr": 93,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0045,
+      "record_only": true,
+      "class": "L",
+      "head": "4e6944a8c0e1",
+      "base": "e46cf38190e1",
+      "reason": "L 类合并（容器增长路径）：FR 第一部分，XVector assign_range 的增长改为融合式 regrow（regrow_dynamic_bytes：分配、填充并发布、再按重新解析的 owner 退休旧块，一次调用完成），增长走 out of line 的 assign_range_regrow；wire、分配决策、空洞表不变。只作记录，不放行任何指标。INT3 的 L2 点 G-FR（4e6944a = #93 + #118 对 anchor e46cf38）判 pass：SLG 两组合并 A 1.003、B 0.996、C 0.993、D 1.007，最大上界 1.0150；分阶段 A.apply 0.978、A.simulate 0.983，与 P2996 Ir 0.972/0.988 一致；reloc hero.push_back_grow.ord 0.980、nested.build.ord 0.997。合在 4434448c（#113 之后）上，试合点 9abcbc33（树 abfeddcb，与本 PR 合入时的树相同）GCC 16 和 P2996 ctest 103/103；#93+#118 末点 a5a5d8f0 local_validate 8/8，两种 Ir 无告警。组合检查（新主线比值 ÷ 旧锚点比值）：P2996 严格相加（A.apply 0.9717、push_back_grow 0.9876、nested.build 0.9883 两边相同），Mac 判定直接适用；GCC 16 偏离超过 1.003：reloc.hero.push_back_grow 0.928 → 1.0045、nested.build 0.935 → 1.0033、formal.load 0.937 → 0.986、formal.reload 0.960 → 0.991。原因是底座内联变好（Z1–Z3、P4m 之后 GCC 主线 push_back_grow 3,126,307 Ir，低于 FR 版的 3,140,299），FR 的写法没跟上；合入 FR 后这些 reloc 指标的 Ir 与旧点逐条相同。max_ratio 记 GCC push_back_grow 对新底座的 1.0045（nested.build 1.0033）。这一项不另外追。",
+      "evidence": "Mac INT3 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int3-e46cf38/VERDICT.md（分阶段表 stages/fr.md，P2996 ctest 103/103）；组合检查 /mnt/project-files/alloc-fastpath-20261022/fused-regrow/merge/IR_COMPOSE_FR.md（sha 00458425）与同目录 LOCAL_VALIDATE_9abcbc33.md、LOCAL_VALIDATE_a5a5d8f0.md、ir_{gcc16,p2996}_a5a5d8f0.json；门禁点说明 fused-regrow/int3/INT3_GFR_POINT.md",
+      "approved_by": "「性能优化」（2026-10-27 00:20Z 交办 #113 之后合 FR，01:22Z 同意 GCC 组合偏离后合并；L2 由「Mac 门禁批次」00:20Z 判 pass）"
+    },
+    {
+      "id": "int3-pr118",
+      "pr": 118,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0045,
+      "record_only": true,
+      "class": "L",
+      "head": "4e6944a8c0e1",
+      "base": "e46cf38190e1",
+      "reason": "L 类合并（容器增长路径）：FR 第二部分，XVector reserve 的搬迁路径改走 regrow_dynamic_bytes（out of line 的 reserve_relocate），reserve 只把原地和首次存储路径留在内联；flat set insert 与 flat map try_emplace 的增长固定走 out of line 的 reserve_for_insert(grown_capacity())（insert_construct<true>），普通 vector insert 保留内联 reserve（全局 out of line 会让 GCC slg C.ticks +2.6%，不固定会让 GCC 不再把 try_emplace 内联、reloc map.insert +8.5%）。wire、分配决策、空洞表不变。只作记录，不放行任何指标。Mac 判定与 #93 同一个 INT3 L2 点 G-FR（4e6944a = #93 + #118 对 e46cf38，pass：SLG A 1.003、B 0.996、C 0.993、D 1.007，最大上界 1.0150；A.apply 0.978、A.simulate 0.983；reloc map.insert、set.insert 持平）。合在 4492096a（#93 之后）上，合入时的树等于试合末点 a5a5d8f0 加 ledger：local_validate 8/8（gcc/asan/p2996 103/103，fuzz 42 万例 0 不一致，diff 40 万例一致），两种 Ir 无告警。组合检查（新主线比值 ÷ 旧锚点比值）：P2996 严格相加，Mac 判定直接适用；GCC 16 上 push_back_grow 对新底座 1.0045、nested.build 1.0033（旧锚点上是 0.928 / 0.935），原因是底座内联变好（Z1–Z3、P4m 之后），FR 的写法没跟上，FR 本身的 Ir 与旧点逐条相同；formal.load 0.986、formal.reload 0.991。这一项不另外追。",
+      "evidence": "Mac INT3 判定 /mnt/project-files/perf-gate/mac/2026-10-26-int3-e46cf38/VERDICT.md（分阶段表 stages/fr.md）；组合检查 /mnt/project-files/alloc-fastpath-20261022/fused-regrow/merge/IR_COMPOSE_FR.md（sha 00458425）与同目录 LOCAL_VALIDATE_a5a5d8f0.md（sha 45c0d8b2）、ir_{gcc16,p2996}_a5a5d8f0.json；内联固定的来由 fused-regrow/FUSED_REGROW_REPORT.md（v11 节）",
+      "approved_by": "「性能优化」（2026-10-27 00:20Z 交办 #113 之后合 FR，01:22Z 同意 GCC 组合偏离后合并；L2 由「Mac 门禁批次」00:20Z 判 pass）"
     }
   ]
 }
