@@ -199,6 +199,96 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：P1，XFixedVector 的 POD 元素拷贝赋值在 0 < count ≤ capacity 时走内联原地拷贝（memmove、scrub 收缩的尾部、M6 填充清零，与 assign_range 原地分支加 assign_trivial_copy 相同），扩容、绑定、空源和自赋值走一次 out-of-line 的原通用路径；非 POD 保持内联。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 35 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.A），≥5% 阶段最大 1.0017（slg.A.apply）；P2996 d77eff1 + libc++ 合计最大 1.0007（formal.mutate），阶段最大 1.0001。声称的阶段 slg.A.apply：P2996 0.9538；GCC 16 1.0017，GCC 16 上不宣称收益。",
       "evidence": "PR #91 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/validate/p1_e15c5d5_REPORT.md 与 p1_e15c5d5_ir-{gcc16,p2996}_gate.json；设计与计时 /mnt/project-files/perf-next-20261022/A_ZPP_LEVERS_20261026.md",
       "approved_by": "「性能优化」（2026-10-26 12:07Z，判 S 类：INT1 合入后在新主线上两种 Ir 门禁不出警告即合并）"
+    },
+    {
+      "id": "s-class-pr95",
+      "pr": 95,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0034,
+      "record_only": true,
+      "class": "S",
+      "head": "1a7addb11531",
+      "base": "902ff18492b0",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G2，fixed_detail::try_expand_dynamic_bytes 先判断块尾是否等于 arena->used_end，不是就返回 false，省掉参数检查和 owner 查找（try_expand_block 只在同一个条件下才可能成功）；函数保持原来的内联方式，强制内联到五个调用点的第一版让 GCC 内联翻转（reloc.hero.push_back_grow 1.057），已弃。不改 wire、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API；库头 diff 10 行。Ir 门禁两种编译器都通过、无警告：GCC 16 场景合计和正式判定项 head÷base 最大 1.0001（slg.C），阶段最大 1.0034（reloc.vec.push_back_grow，块在末尾时多一次比较）；P2996 d77eff1 + libc++ 合计最大 1.0000，阶段最大 1.0013（reloc.vec.push_back_grow）。声称的阶段 slg.A.simulate：GCC 16 0.9828，P2996 0.9837；另有 formal.mutate 0.9843 / 0.9904。",
+      "evidence": "PR #95 描述（两种 Ir 表与本地验证）；/mnt/project-files/perf-next-20261022/a_zpp_levers_20261026/g2/（g2_1a7addb_local_validate_REPORT.md、g2_1a7addb_gate_{gcc16,p2996}.json、弃掉的第一版 diff）；手段清单 /mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 3 节",
+      "approved_by": "「性能优化」（2026-10-26 15:40Z，G2 按 S 类做）"
+    },
+    {
+      "id": "ir-env-stosb",
+      "pr": 98,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0231,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#98 让 callgrind 也关掉 glibc memset 的 rep stosb 路径（perf_gate.py IR_ENV 加 x86_rep_stosb_threshold，与 #84 的 movsb 同理）：valgrind 把 rep stosb 每次迭代算一条 Ir，≥ 2 KiB 的 memset 约每字节一条，是向量循环的 15–18 倍。从本 PR 起绝对 Ir 是新口径，不能和之前的门禁 JSON、校准表、ledger 里的绝对值比，head÷base 仍可比。重判 D2、P69、T4、COPS、SEND、COMPOSED、INT1 七对 × GCC 16 / P2996（同一二进制新旧口径各测一次）：14 个门禁判定全部不变，失败项不变；新旧之差全在 memset 函数，非 memset Ir 逐位相同。指标级唯一变化：D2（#33）P2996 reloc.reset 1.0065 → 1.0231（警告），base 和 head 的 memset 相同（3.14M → 0.17M Ir），head 多出的 +26,735 Ir 在 glibc 堆（malloc_consolidate），属于校准里方向不可信的分配器回收型，GCC 16 同一对是 0.9851；D2 本来判失败且已按 Mac L2 合并，不影响任何决定。改了大块清零的两对（SEND、INT1），新口径的幅度大多更接近 Mac，例如 INT1 reloc.reset 0.016/0.019 → 0.061/0.070（Mac 0.075），slg.C 0.862 → 0.987/0.979（Mac 0.962）。",
+      "evidence": "/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/STOSB_REJUDGE.md（汇总表、逐项 memset 归因 data/moved_metrics_memset.txt、两种口径的 gate JSON 与原始 Ir）；/mnt/project-files/perf-next-20261022/A_SIMULATE_REGROW_20261026.md 第 4 节（RH 原型 A.simulate 1.416 → 1.0003）；PR #98 描述",
+      "approved_by": "「性能优化」（2026-10-26 15:40Z，按 0 类提 PR，参照 #85 重判已有门禁对）"
+    },
+    {
+      "id": "d5-shelved-pr87",
+      "pr": 87,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0364,
+      "record_only": true,
+      "class": "L",
+      "reason": "只作记录，不放行任何指标；#87 关闭、不合并。D5（VM owner 小块分配/回收前端环）的 Mac L2 失败：D5_FULL（p1 8cb6221 ÷ f8eebf4）SLG B 1.0276 [1.0188, 1.0364]，上界超过 1.03 直接失败；INT2 bisect-1 独立复现 B 1.0300（上界 1.0430）。formal 通过（合并最大上界 1.0142），SLG A 0.9938，C 1.0079。分阶段 B.in_decode +8%、B.out_encode +6%，每周期约多 55 µs；reloc hero.push_back_grow 慢 6%。原因：分配和回收路径上多出的前端判断，在 B 上的代价超过了 A 的收益。云端 Ir 也一致报警（GCC 16 formal.mutate 1.066、slg.D 1.043；P2996 slg.D 1.048、hero.push_back_grow 1.070）。以后再做，前端判断在 B 路径上的成本必须为零。max_ratio 记的是 SLG B 的 Mac 上界。",
+      "evidence": "/mnt/project-files/perf-gate/mac/2026-10-26-int2-737f43c/VERDICT.md（D5_FULL、INT2、分阶段 stages/）；/mnt/project-files/alloc-fastpath-20261022/d5/（云端 Ir 与本地验证）；PR #87 关闭说明",
+      "approved_by": "「性能优化」（2026-10-26 19:3xZ：D5 搁置，#87 关闭，ledger 记 record_only）"
+    },
+    {
+      "id": "reloc-ord-element-records",
+      "pr": 102,
+      "metric": "reloc.vec.push_back_grow",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。有意的基准变更：bench/reloc 原来只把 rb::xm::HeroOrd、ArmyOrd 声明为普通记录，漏了它们容器里的元素记录 rb::Skill、rb::Buff、rb::Troop；receive_raw_supported 要求类类型元素也有 ordinary_members，所以 HeroOrd 一直不满足 shift_relocate_supported，.ord 用例和 .plain 一样逐元素搬动（G9 里 hero.*.ord 比 std 慢 4.6× 的主因）。按使用指南 §3.1 补上，并加 static_assert 锁住 HeroOrd 走 SHIFT、HeroPlain 不走。门禁三份都用 head 的基准代码编，本 PR 不会改变任何门禁比值。同一库（主线 7620bc3）新基准÷旧基准 Ir，29 个用例全测：hero.mid_erase.ord P2996 0.5380 / GCC 16 0.4276，hero.mid_insert.ord 0.5486 / 0.4434，hero.push_back_grow.ord 0.9849 / 0.9721，nested.build.ord 0.9973 / 0.9922；唯一上升是 GCC 16 reloc.vec.push_back_grow 1.0001（+69 Ir），其余（全部 .plain、map、set、str、其他 vec、reset）两种编译器都是 1.0000。云端计时（P2996，3×41 轮，÷std）hero.mid_erase.ord 5.28× → 2.66×，hero.mid_insert.ord 5.18× → 2.62×。G9 的 hero.* 数字从本 PR 起是新基准，要在下一个 G8/G9 检查点或 reloc 批次重测，不能和之前的批次直接比；那一批 hero.*.ord 同时报旧声明（d924f24 的 bench/reloc，逐元素路径）和新声明两组数字。这是修基准缺陷，不是库的提速。bench/slg 对 Buff、Skill、Troop 的声明方式（XOFFSET_ORDINARY_RECORDS，无宏时写出两个特化）与修正后的 bench/reloc 一致。",
+      "evidence": "PR #102 描述；/mnt/project-files/pareto-rivals-20261024/round2/reloc_ir_old_vs_new_bench.txt（两种编译器 29 个用例新旧 Ir）与 reloc_timing/；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「G9 基准补声明」节",
+      "approved_by": "「性能优化」19:58Z 10-26 判 0 类（只改 bench；susu 16:54Z 授权）；下一次 reloc 批次 hero.*.ord 新旧声明两组数字并列报告"
+    },
+    {
+      "id": "s-class-pr104",
+      "pr": 104,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "class": "S",
+      "head": "374a0b7dfdee",
+      "base": "7c8c6a183613",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：SR，SHIFT 搬动后重启内联容器头的两处改动，只动 xoffset_core_lifetime.hpp（+47/−15）。shift_rel32 改用 __builtin_add_overflow 加无分支的空值步长，溢出仍 std::terminate，结果与原 int64 检查逐位相同（MSVC 保留原写法）；逐成员重启改为 index_sequence 折叠并用文件内的 XOFFSET_DETAIL_SHIFT_INLINE 强制内联。不改 wire、布局签名、校验、分配位置、清零和页面行为、分配器元数据和容量策略，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 与 P2996 d77eff1 + libc++ 全部 65 个指标 head÷base 最大都是 1.0000（max_ratio 字段要求 > 1，取 1.0001）。声称的阶段：slg.B.season_edits GCC 16 0.9632、P2996 0.8413；slg.S.ticks_middle GCC 16 0.8374、P2996 0.8937；slg.B 合计 0.9857 / 0.9326。首轮门禁（base d924f24，head ac4ca46）时 bench/reloc 的 hero.*.ord 还不走 SHIFT，reloc 全为 1.0000；合入 #102 后在 base 7c8c6a1、head 374a0b7 上两种 Ir 门禁重跑，仍 pass 无警告，SLG 与 formal 各值不变，reloc 下降：hero.mid_erase.ord GCC 16 0.8997 / P2996 0.6139，hero.mid_insert.ord 0.9062 / 0.6295，hero.push_back_grow.ord 0.9934 / 0.9658，nested.build.ord 0.9966 / 0.9833；最大值 GCC 16 reloc.vec.push_back_grow 1.00002，P2996 1.0000。",
+      "evidence": "PR #104 描述（两种 Ir 表与本地验证）；/mnt/project-files/pareto-rivals-20261024/round2/sr_validate/（sr_ac4ca46_REPORT.md、sr_ac4ca46_p2996_ctest_REPORT.md、sr_ac4ca46_gate_{gcc16,p2996}.json，新 base 重跑 on_7c8c6a1/）；方案文档 https://claude.ai/artifact/4PFrit6dwpeZKUwzysvZ2B 第二轮「SR」节",
+      "approved_by": "「性能优化」19:58Z 10-26 判 S 类（susu 16:54Z 授权），414dea4 以来第 4 个 S 类（#59、#91、#95、#104）；逐成员强制内联在 Mac 上可能有摆放效应，列为下一次阶段复核的二分点"
+    },
+    {
+      "id": "s-class-pr114",
+      "pr": 114,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0001,
+      "record_only": true,
+      "class": "S",
+      "head": "7df534dc7b0f",
+      "base": "e46cf38190e1",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：Z2，verify_structural_wire_graph 的 WireValidationContext 改为默认初始化加 XOFFSET_INDETERMINATE（[[indeterminate]]，有 __has_cpp_attribute 时）再逐个赋值，去掉 GCC 16 对 1,136 字节上下文的整块清零（聚合初始化不管加不加属性都清零）。只改 xoffsetdatastructure.hpp（+20/−7）。不改 wire、校验和拒绝集合、分配位置、库的清零约定，无新公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 slg.D.read 0.9240、A.req_decode 0.9701、A.res_decode 0.9817、slg.A 0.9904、slg.D 0.9240，其余 ≤ 1.0000；P2996 d77eff1 全部 1.0000（A.res_decode 0.9998）。valgrind memcheck（GCC 16 构建）test_wire_validation、test_error_paths、test_v2_fuzz 1 万例（含 10,212 个拒绝）0 错误；反向对照（prepare 不清内联位图）报 3 处，证明能看到。",
+      "evidence": "PR #114 描述；/mnt/project-files/zpp-parity-20261026/impl/z2/（LOCAL_VALIDATE_7df534d.md、gate_{gcc16,p2996}_7df534d.json、memcheck 日志、probe/p4.cpp）；方案文档 https://claude.ai/artifact/P77mo29Lr9HEH2ebUGSazS Z2 节",
+      "approved_by": "「实现 zpp_bits 对标优化 Z1–Z3」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；「性能优化」20:41Z 同意 Z1–Z3 分级并加 memcheck 条件）；414dea4 以来第 5 个 S 类（#59、#91、#95、#104、#114），触发阶段复核，CKPT2 单列二分点"
+    },
+    {
+      "id": "s-class-pr117",
+      "pr": 117,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0003,
+      "record_only": true,
+      "class": "S",
+      "head": "e26f0dfad64a",
+      "base": "e46cf38190e1",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：Z3，XBufferCore::move_from 在目标什么都不持有（无数据、无槽位、无池、无 owner 记录、无空闲表）时直接接管源的成员，源回到默认标量，不再经过 retire/重登记；move_from 改为 out of line（内联短路径会改变 GCC 16 reloc.map.find 等无关调用点的寄存器分配）。std::swap(XBuffer) P2996 1,080 -> 448 Ir。只改 xoffsetdatastructure.hpp（+32/−1）和 tests/test_owner_registry.cpp（std::swap 与成员 swap 等价测试）。不改 wire、epoch 语义、owner 登记、宿主 owner 发布、公开 API。Ir 门禁两种编译器都通过、无警告：GCC 16 formal.load 0.9366、formal.reload 0.9598、reloc.hero.push_back_grow 0.924/0.926、reloc.nested.build 0.932/0.933、slg.B 0.9973，最高 slg.A.simulate 1.0003；P2996 slg.B 0.9931、slg.C 0.9994，其余 1.0000。local_validate 在 e26f0df 上 8/8（gcc/asan/p2996 103/103，fuzz 42 万例 0 不一致，diff 40 万例一致）。",
+      "evidence": "PR #117 描述；/mnt/project-files/zpp-parity-20261026/impl/z3/（LOCAL_VALIDATE_e26f0df.md、gate_{gcc16,p2996}_e26f0df.json、swp.cpp）；方案文档 https://claude.ai/artifact/P77mo29Lr9HEH2ebUGSazS Z3 节",
+      "approved_by": "「实现 zpp_bits 对标优化 Z1–Z3」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；「性能优化」20:41Z 同意 Z1–Z3 分级）；414dea4 以来第 6 个 S 类（#59、#91、#95、#104、#114、#117），CKPT2 单列二分点"
     }
   ]
 }

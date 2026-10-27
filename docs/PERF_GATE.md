@@ -4,6 +4,8 @@
 
 设计依据：H3 设计 `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md` 第 5 节。本页是实现说明。
 
+**运行状态（2026-10-26）**：GitHub CI 已停用（susu 10-23 决定），`perf-gate.yml` 保留但不再自动运行，门禁改由本地验证脚本运行（命令见第 6 节）。实现验收：1（历史回放）、2（人为回归被拦）已通过；3（一周稳定）作废：GitHub CI 停用，门禁改由本地验证脚本运行。
+
 ## 1. 它做什么
 
 `.github/workflows/perf-gate.yml` 在 PR 指向 `next_cpp26`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `next_cpp26` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
@@ -12,9 +14,11 @@
 2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败，但这个 PR 合并前要跑一次 Mac L2。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
 3. 计数前先查正确性：SLG `--mode verify --scale S`（xoffset 与 cereal 一致，复用协议和逐条协议各一次）；正式 harness 用各自的 `encode` 生成 S、M 输入 wire，`validate` S 和 M；`reloc_bench --mode verify`（每轮各方结果摘要一致，同时给出项名）。head 任何一项失败，门禁直接失败，不出数字。
 4. 在 valgrind callgrind 下数每个阶段的指令数（Ir），`--collect-atstart=no`，只在被测阶段里打开收集。各阶段一个进程，`nproc` 个并行。
-   - 每个进程都带 `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff`，关掉 glibc memcpy 的 rep movsb 路径。
-   - 原因：valgrind 把 `rep movsb` 的每次迭代算一条指令，落在这条路径上的拷贝约每字节一条 Ir；同样的字节放在一次大拷贝里走的是向量循环。
-   - 例子：#83 把 12 MiB 输出拆成 256 KiB 一块，formal.emit_after 的 Ir 就成了 5.96 倍，实际工作量并没有变。关掉这条路径后 memcpy 的 Ir 跟拷贝字节数走，#83 是 1.058 倍。
+   - 每个进程都带 `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff`，关掉 glibc memcpy 的 rep movsb 路径和 memset 的 rep stosb 路径。
+   - 原因：valgrind 把 `rep movsb` / `rep stosb` 的每次迭代算一条指令，落在这条路径上的拷贝或清零约每字节一条 Ir；同样的字节走向量循环只要几十分之一。
+   - memcpy 的例子：#83 把 12 MiB 输出拆成 256 KiB 一块，formal.emit_after 的 Ir 就成了 5.96 倍，实际工作量并没有变。关掉这条路径后 memcpy 的 Ir 跟拷贝字节数走，#83 是 1.058 倍。
+   - memset 的例子：glibc 对 ≥ 2 KiB（`x86_rep_stosb_threshold` 默认值）的 memset 走 rep stosb。一个把几次小清零合成一次 3 KiB 清零的原型，只关 movsb 时 A.simulate 是 1.416 倍（memset 61.7 万 Ir），两条都关是 1.0003 倍（memset 5.7 万 Ir）（`A_SIMULATE_REGROW_20261026.md` 第 4 节）。
+   - 口径从 movsb 单项改成两项是 2026-10-26（PR 见 ledger `record_only` 条目 `ir-env-stosb`）。之前的门禁 JSON、校准表和 ledger 里的绝对 Ir 是旧口径，不能和之后的绝对值直接比；head÷base 的比值只在改动改变了 ≥ 2 KiB memset 的次数或大小时才会不同，已有门禁对的重判见 `/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/`。
 5. head 的一个 SLG 阶段、正式 mutate 和第一个 reloc 项各多跑一次，两次 Ir 必须逐位相同，否则门禁失败（结果不可信）。
 6. 按第 3 节的门槛判定，作业摘要里一张表，JSON 产物 `perf-gate-<编译器>-<head sha>.json`（90 天）。不发 PR 评论。
 7. 每个警告、失败或要 ledger 放行的指标，再从同一次 callgrind 输出列一张函数差异表（见第 5 节）。
