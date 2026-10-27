@@ -1,10 +1,6 @@
 // Map state demo: client network, SnapshotHolder, sampling script. OWNER: client thread.
 #include "client_core.hpp"
 
-#include <poll.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <cerrno>
 #include <cinttypes>
@@ -22,8 +18,10 @@ namespace mapdemo::client {
 
 const char* usage_text() {
     return "usage: mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check | --no-check]\n"
-           "                      [--buffers reuse|fresh] [--csv-dir DIR] [--auto-drag]\n"
-           "                      [--screenshot-at F1,F2,...] [--evil]\n";
+           "                      [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]\n"
+           "                      [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]\n"
+           "       mapdemo_client --self-check [--csv-dir DIR]\n"
+           "       mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]\n";
 }
 
 static long parse_long(std::string_view flag, const char* text, long lo, long hi) {
@@ -51,6 +49,19 @@ Options parse_options(int argc, char** argv) {
         else if (a == "--csv-dir") o.csv_dir = value();
         else if (a == "--auto-drag") o.auto_drag = true;
         else if (a == "--evil") o.evil = true;
+        else if (a == "--self-check") o.self_check = true;
+        else if (a == "--replay") o.replay_dir = value();
+        else if (a == "--encoding") {
+            const char* t = value();
+            if (std::string_view(t) == "cycle") {
+                o.cycle_encodings = true;
+            } else {
+                const auto e = codec::parse_encoding(t);
+                if (!e) throw UsageError(std::string(a) + ": bad value '" + t + "'");
+                o.encoding = *e;
+                o.cycle_encodings = false;
+            }
+        }
         else if (a == "--buffers") {
             const char* t = value();
             const auto m = parse_buffer_mode(t);
@@ -91,6 +102,19 @@ void SnapshotHolder::reload(const std::string& wire) {
     if (buf_) buf_->reload_verified<ViewSnapshot>(wire);
     else buf_.emplace(XBuffer::load_verified<ViewSnapshot>(wire, cap_snapshot()));
     root_ = &buf_->root<ViewSnapshot>();
+}
+
+double SnapshotHolder::install(const std::string& wire, BufferMode mode, double* destroy_us) {
+    metrics::Stopwatch sw;
+    if (mode == BufferMode::Reuse) {
+        reload(wire);
+        return sw.us();
+    }
+    XBuffer next = XBuffer::load_verified<ViewSnapshot>(wire, cap_snapshot());
+    const double load_us = sw.us();
+    const double d = replace(std::move(next));
+    if (destroy_us != nullptr) *destroy_us = d;
+    return load_us;
 }
 
 double SnapshotHolder::clear() {
@@ -195,7 +219,7 @@ bool CheckLog::write_csv(const std::string& path) const {
 
 // ---- Session ---------------------------------------------------------------------
 
-static std::string join_path(const std::string& dir, const char* file) {
+std::string join_path(const std::string& dir, const char* file) {
     if (dir.empty()) return file;
     return dir.back() == '/' ? dir + file : dir + "/" + file;
 }
@@ -245,8 +269,7 @@ void Session::connect() {
 
     conn_.set_nonblocking(true);
     if (!opt_.csv_dir.empty()) {
-        snap_csv_open_ = snap_csv_.open(join_path(opt_.csv_dir, "client_snapshots.csv"),
-            "request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok");
+        snap_csv_open_ = snap_csv_.open(join_path(opt_.csv_dir, "client_snapshots.csv"), kSnapshotCsvHeader);
         if (!snap_csv_open_) throw std::runtime_error("cannot write client_snapshots.csv in " + opt_.csv_dir);
     }
 }
@@ -270,20 +293,23 @@ void Session::send_view(const Rect& rect, net::ViewCategory category) {
     }
     sent_request_id_ = r.request_id;
     sent_category_ = category;
+    sent_encoding_ = opt_.cycle_encodings ? static_cast<codec::Encoding>(r.request_id % codec::kEncodingCount)
+                                          : opt_.encoding;
     sent_rect_ = rect;
     inflight_ = true;
     sent_ns_ = net::now_ns();
-    conn_.enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire), static_cast<std::uint16_t>(category));
+    conn_.enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire), codec::view_flags(category, sent_encoding_));
     conn_.flush();
 }
 
 void Session::pump(int timeout_ms) {
-    pollfd p{conn_.fd(), static_cast<short>(POLLIN | (conn_.want_write() ? POLLOUT : 0)), 0};
-    int n = ::poll(&p, 1, std::max(timeout_ms, 0));
-    if (n < 0 && errno != EINTR) throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
-    if (n <= 0) return;
+    net::PollItem p;
+    p.fd = conn_.fd();
+    p.want_read = true;
+    p.want_write = conn_.want_write();
+    if (net::poll(&p, 1, std::max(timeout_ms, 0)) <= 0) return;
     if (conn_.want_write()) conn_.flush();
-    if (!(p.revents & (POLLIN | POLLHUP | POLLERR))) return;
+    if (!p.readable) return;
     while (!bye_) {
         std::optional<net::Frame> f =
             conn_.try_recv({net::MsgType::ViewSnapshot, net::MsgType::Bye, net::MsgType::Error});
@@ -295,7 +321,7 @@ void Session::pump(int timeout_ms) {
         } else {
             double rtt = double(net::now_ns() - sent_ns_) / 1000.0;
             if (!inflight_) throw net::ProtocolError("ViewSnapshot without an outstanding request");
-            if (f->correlation != sent_request_id_ || f->flags != static_cast<std::uint16_t>(sent_category_)) {
+            if (f->correlation != sent_request_id_ || f->flags != codec::view_flags(sent_category_, sent_encoding_)) {
                 checks_.fail("correlation", "frame corr " + std::to_string(f->correlation) + " flags " +
                                                 std::to_string(f->flags) + " for request " + std::to_string(sent_request_id_));
             } else {
@@ -305,7 +331,7 @@ void Session::pump(int timeout_ms) {
             rec_.add("c.view_rtt_us", rtt);
             last_rtt_us_ = rtt;
             // Only one request is outstanding, so at most one snapshot is pending.
-            pending_.emplace(Pending{std::move(*f), rtt, sent_category_, sent_rect_});
+            pending_.emplace(Pending{std::move(*f), rtt, sent_category_, sent_encoding_, sent_rect_});
         }
     }
 }
@@ -316,17 +342,18 @@ bool Session::install_pending() {
     pending_.reset();
 
     const bool reuse = opt_.buffers == BufferMode::Reuse;
-    metrics::Stopwatch sw;
-    double load_us = 0;
-    double destroy_us = -1;   // reuse: nothing is destroyed per snapshot
-    if (reuse) {
-        holder_.reload(p.frame.payload);
-        load_us = sw.us();
-    } else {
-        XBuffer next = XBuffer::load_verified<ViewSnapshot>(p.frame.payload, cap_snapshot());
-        load_us = sw.us();
-        destroy_us = holder_.replace(std::move(next));
+    // zstd: the declared size is checked against the snapshot cap before
+    // anything is allocated; the result is an unverified XOffset wire.
+    double decompress_us = -1;
+    const std::string* wire = &p.frame.payload;
+    if (p.encoding == codec::Encoding::Zstd) {
+        metrics::Stopwatch zw;
+        unzstd_.decompress(p.frame.payload, kCapSnapshot, plain_);
+        decompress_us = zw.us();
+        wire = &plain_;
     }
+    double destroy_us = -1;   // reuse: nothing is destroyed per snapshot
+    const double load_us = holder_.install(*wire, opt_.buffers, &destroy_us);
     if (cur_.live) retire_current(destroy_us);
 
     rec_.add("c.load_us", load_us);
@@ -339,14 +366,21 @@ bool Session::install_pending() {
     cur_.category = p.category;
     cur_.rect = p.rect;
     cur_.visible = s.units.size();
-    cur_.wire_bytes = p.frame.payload.size();
+    cur_.wire_bytes = wire->size();
+    cur_.net_bytes = p.frame.payload.size();
+    cur_.encoding = p.encoding;
     cur_.rtt_us = p.rtt_us;
     cur_.load_us = load_us;
+    cur_.decompress_us = decompress_us;
     rec_.add("c.snap_bytes", double(cur_.wire_bytes));
+    rec_.add("c.snap_net_bytes", double(cur_.net_bytes));
+    if (decompress_us >= 0) rec_.add("c.decompress_us", decompress_us);
     rec_.add("c.visible_count", double(cur_.visible));
     ++snapshots_;
-    // Outside the timed region: digest (compared with A's log) and checks.
+    ++by_encoding_[static_cast<int>(p.encoding)];
+    // Outside the timed region: digests (compared with A's log) and checks.
     cur_.digest = checks::snapshot_digest(s);
+    cur_.wire_digest = checks::wire_digest(*wire);
     if (opt_.check_on()) check_snapshot(p.frame);
     if (reuse) conn_.recycle_rx(std::move(p.frame.payload));
     return true;
@@ -427,10 +461,14 @@ void Session::retire_current(double destroy_us) {
     if (snap_csv_open_) {
         char destroy[32] = "";
         if (destroy_us >= 0) std::snprintf(destroy, sizeof destroy, "%.3f", destroy_us);
+        char unzstd[32] = "";
+        if (cur_.decompress_us >= 0) std::snprintf(unzstd, sizeof unzstd, "%.3f", cur_.decompress_us);
         char line[512];
-        std::snprintf(line, sizeof line, "%" PRIu64 ",%" PRIu64 ",%s,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,%.3f,%s,%d",
+        std::snprintf(line, sizeof line,
+                      "%" PRIu64 ",%" PRIu64 ",%s,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,%.3f,%s,%d,%s,%zu,%016" PRIx64 ",%s",
                       cur_.request_id, cur_.tick, category_name(cur_.category), cur_.visible, cur_.wire_bytes,
-                      cur_.digest, cur_.rtt_us, cur_.load_us, rp, destroy, cur_.check_ok ? 1 : 0);
+                      cur_.digest, cur_.rtt_us, cur_.load_us, rp, destroy, cur_.check_ok ? 1 : 0,
+                      codec::encoding_name(cur_.encoding), cur_.net_bytes, cur_.wire_digest, unzstd);
         snap_csv_.row(line);
     }
     cur_.live = false;
@@ -445,7 +483,10 @@ bool Session::finish() {
         if (snapshots_ == 0) checks_.fail("snapshots_received", "no snapshot received");
         else {
             checks_.pass("snapshots_received", snapshots_);
-            checks_.note("snapshots_received", "count=" + std::to_string(snapshots_));
+            checks_.note("snapshots_received", "count=" + std::to_string(snapshots_) +
+                                                   " dense=" + std::to_string(by_encoding_[0]) +
+                                                   " compact=" + std::to_string(by_encoding_[1]) +
+                                                   " zstd=" + std::to_string(by_encoding_[2]));
         }
     }
     bool ok = checks_.all_ok();
@@ -480,8 +521,10 @@ static Rect route_rect(std::uint64_t k, const Rect& scene) {
 int run_headless(const Options& opt) {
     Session s(opt);
     s.connect();
-    std::fprintf(stdout, "client: connected to %s:%u, catalog %u sites, sampling at %.0f Hz (8 normal / 1 full / 1 empty)\n",
-                 opt.host.c_str(), unsigned(opt.port), unsigned(s.catalog().sites.size()), kViewRequestHz);
+    std::fprintf(stdout, "client: connected to %s:%u, catalog %u sites, sampling at %.0f Hz (8 normal / 1 full / 1 empty), "
+                         "encoding %s\n",
+                 opt.host.c_str(), unsigned(opt.port), unsigned(s.catalog().sites.size()), kViewRequestHz,
+                 opt.cycle_encodings ? "cycle" : codec::encoding_name(opt.encoding));
     std::fflush(stdout);
 
     const std::uint64_t period_ns = std::uint64_t(1e9 / kViewRequestHz);
@@ -527,9 +570,11 @@ int run_headless(const Options& opt) {
         if (now >= next_print) {
             next_print += 1000000000ull;
             const ViewSnapshot* v = s.holder().empty() ? nullptr : &s.holder().view();
-            std::fprintf(stdout, "client snaps=%" PRIu64 " tick=%" PRIu64 " visible=%zu snap_bytes=%zu view_rtt_us=%.0f load_us=%.1f\n",
+            std::fprintf(stdout, "client snaps=%" PRIu64 " tick=%" PRIu64 " visible=%zu snap_bytes=%zu net_bytes=%zu (%s) "
+                                 "view_rtt_us=%.0f load_us=%.1f\n",
                          s.snapshots(), v ? std::uint64_t(v->tick) : 0, v ? std::size_t(v->units.size()) : 0,
-                         s.last_wire_bytes(), s.last_rtt_us(), s.last_load_us());
+                         s.last_wire_bytes(), s.last_net_bytes(), codec::encoding_name(s.last_encoding()),
+                         s.last_rtt_us(), s.last_load_us());
             std::fflush(stdout);
         }
     }
@@ -546,8 +591,8 @@ int run_headless(const Options& opt) {
         }
     }
     bool ok = s.finish();
-    s.recorder().print_line(stdout, {"c.view_rtt_us", "c.load_us", "c.read_present_us", "c.destroy_us",
-                                     "c.snap_bytes", "c.visible_count"});
+    s.recorder().print_line(stdout, {"c.view_rtt_us", "c.load_us", "c.decompress_us", "c.read_present_us",
+                                     "c.destroy_us", "c.snap_bytes", "c.snap_net_bytes", "c.visible_count"});
     s.checks().print(stdout);
     std::fprintf(stdout, "client: Bye received after %" PRIu64 " snapshots (%" PRIu64 ")\n", s.snapshots(), sink % 2);
     return ok ? 0 : 1;
@@ -581,8 +626,10 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
             }
             std::uint64_t now = net::now_ns();
             if (now >= deadline) return a;
-            pollfd p{c.fd(), POLLIN, 0};
-            ::poll(&p, 1, int((deadline - now) / 1000000) + 1);
+            net::PollItem p;
+            p.fd = c.fd();
+            p.want_read = true;
+            net::poll(&p, 1, int((deadline - now) / 1000000) + 1);
         }
     } catch (const std::exception& e) {
         a.outcome = Outcome::Closed;
@@ -671,15 +718,22 @@ int run_evil(const Options& opt) {
         h.length = std::uint32_t(1) << 30;
         h.reserved = 0;
         h.correlation = 3;
-        const char* p = reinterpret_cast<const char*>(&h);
-        std::size_t left = sizeof h;
-        while (left > 0) {
-            ssize_t n = ::send(c.fd(), p, left, 0);
-            if (n <= 0) throw std::runtime_error(std::string("send: ") + std::strerror(errno));
-            p += n;
-            left -= std::size_t(n);
-        }
+        c.send_raw(std::string_view(reinterpret_cast<const char*>(&h), sizeof h));
         expect_rejected(log, "evil_oversize_header", "header declaring a 1 GiB ViewReq", c);
+    }
+    {   // (5) an encoding A does not know (3 is reserved)
+        net::Conn c = net::Conn::connect(opt.host, opt.port);
+        handshake(c);
+        c.send(net::MsgType::ViewReq, 8, view_request_wire(8, normal),
+               static_cast<std::uint16_t>(static_cast<unsigned>(net::ViewCategory::Normal) | (3u << 8)));
+        expect_rejected(log, "evil_unknown_encoding", "ViewReq asking for encoding 3", c);
+    }
+    {   // (6) a reserved flag bit
+        net::Conn c = net::Conn::connect(opt.host, opt.port);
+        handshake(c);
+        c.send(net::MsgType::ViewReq, 9, view_request_wire(9, normal),
+               static_cast<std::uint16_t>(codec::view_flags(net::ViewCategory::Normal, codec::Encoding::Compact) | 0x1000u));
+        expect_rejected(log, "evil_reserved_flag", "ViewReq with reserved flag bit 12", c);
     }
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty
@@ -742,9 +796,11 @@ int run_evil(const Options& opt) {
                 rec.add("c.snap_bytes", double(a.frame.payload.size()));
                 rec.add("c.visible_count", double(v.units.size()));
                 char line[512];
-                std::snprintf(line, sizeof line, "%" PRIu64 ",%" PRIu64 ",normal,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,0.000,0.000,%d",
+                std::snprintf(line, sizeof line,
+                              "%" PRIu64 ",%" PRIu64 ",normal,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,0.000,0.000,%d,dense,%zu,%016" PRIx64 ",",
                               std::uint64_t(v.request_id), std::uint64_t(v.tick), std::size_t(v.units.size()),
-                              a.frame.payload.size(), checks::snapshot_digest(v), rtt_us, load_us, r.ok ? 1 : 0);
+                              a.frame.payload.size(), checks::snapshot_digest(v), rtt_us, load_us, r.ok ? 1 : 0,
+                              a.frame.payload.size(), checks::wire_digest(a.frame.payload));
                 snap_row = line;
             } catch (const std::exception& e) {
                 why = std::string("load_verified: ") + e.what();
@@ -760,8 +816,7 @@ int run_evil(const Options& opt) {
     }
     if (!opt.csv_dir.empty()) {
         metrics::CsvFile snaps;
-        bool ok = snaps.open(join_path(opt.csv_dir, "client_snapshots.csv"),
-            "request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok");
+        bool ok = snaps.open(join_path(opt.csv_dir, "client_snapshots.csv"), kSnapshotCsvHeader);
         if (ok && !snap_row.empty()) snaps.row(snap_row);
         if (!ok || !log.write_csv(join_path(opt.csv_dir, "client_checks.csv")) ||
             !rec.write_csv(join_path(opt.csv_dir, "client_metrics.csv")))

@@ -65,6 +65,7 @@ struct Fnv {
 Result batch_invariants(const UnitStateBatch& batch, std::uint32_t expected_units, std::uint64_t expected_tick) {
     if (batch.tick != expected_tick)
         return fail("tick " + std::to_string(batch.tick) + ", expected " + std::to_string(expected_tick));
+    if (batch.reserved0 != 0) return fail("reserved0 " + std::to_string(batch.reserved0) + ", expected 0");
     const auto& units = batch.units;
     if (units.size() != expected_units)
         return fail("unit count " + std::to_string(units.size()) + ", expected " + std::to_string(expected_units));
@@ -159,7 +160,6 @@ Result compare_snapshot(const ViewSnapshot& snapshot, const ViewRequest& request
     if (!same(snapshot.rect, request.rect)) return fail("rect not echoed");
     if (snapshot.tick != ref.tick)
         return fail("snapshot tick " + std::to_string(snapshot.tick) + ", reference " + std::to_string(ref.tick));
-    if (snapshot.reserved0 != 0) return fail("reserved0 not zero");
 
     std::size_t expected = 0;
     for (const stdm::UnitState& r : ref.units)
@@ -180,7 +180,6 @@ Result compare_snapshot(const ViewSnapshot& snapshot, const ViewRequest& request
         if (v.hp != r.hp) return fail(tag + "hp differs");
         if (!same(v.pos, r.pos)) return fail(tag + "pos " + fmt_point(v.pos) + " vs reference " + fmt_point(r.pos));
         if (v.behavior != r.behavior) return fail(tag + "behavior differs");
-        if (v.reserved0 != 0) return fail(tag + "reserved0 not zero");
         if (v.name.view() != std::string_view(r.name)) return fail(tag + "name differs");
     }
     // Same count, every element in the expected set, no duplicates: the id sets are equal.

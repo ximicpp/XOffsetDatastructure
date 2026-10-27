@@ -1,9 +1,12 @@
 // Map state demo: framing bodies. OWNER: common-library thread.
 //
-// POSIX sockets only (Linux, macOS). Every receive path validates the header
-// (magic, reserved, allowed type, per-type length limit) before the payload
-// buffer is sized. An Error frame that the caller did not list in `allowed`
-// is turned into a ProtocolError carrying the peer's text.
+// POSIX sockets (Linux, macOS, Android, iOS) and Winsock 2 (Windows). The
+// platform differences stay in the first block of this file: socket type,
+// error codes, close, non-blocking mode, gathered send and poll. Every
+// receive path validates the header (magic, reserved, allowed type, per-type
+// length limit) before the payload buffer is sized. An Error frame that the
+// caller did not list in `allowed` is turned into a ProtocolError carrying
+// the peer's text.
 #include "mapdemo/net.hpp"
 
 #include <algorithm>
@@ -13,7 +16,18 @@
 #include <cstring>
 #include <thread>
 #include <utility>
+#include <vector>
 
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -23,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#endif
 
 #include "mapdemo/schema.hpp"
 
@@ -31,22 +46,99 @@ static_assert(std::endian::native == std::endian::little, "mapdemo frames are li
 namespace mapdemo::net {
 namespace {
 
+// ---- platform layer -------------------------------------------------------------
+
+#if defined(_WIN32)
+using NativeSocket = SOCKET;
+using IoSize = int;
+constexpr int kSendFlags = 0;
+
+int last_error() noexcept { return ::WSAGetLastError(); }
+bool would_block(int e) noexcept { return e == WSAEWOULDBLOCK; }
+bool interrupted(int e) noexcept { return e == WSAEINTR; }
+bool conn_reset(int e) noexcept { return e == WSAECONNRESET || e == WSAECONNABORTED; }
+bool accept_retry(int e) noexcept { return e == WSAEINTR || e == WSAECONNRESET; }
+
+std::string error_text(const char* what, int e) {
+    char buf[256] = {};
+    const DWORD n = ::FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+                                     DWORD(e), 0, buf, DWORD(sizeof buf), nullptr);
+    std::string text(buf, n);
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ')) text.pop_back();
+    return std::string(what) + ": " + (text.empty() ? "error " + std::to_string(e) : text) +
+           " (WSA " + std::to_string(e) + ")";
+}
+
+// Winsock needs WSAStartup before the first call; it stays up for the process.
+void ensure_sockets() {
+    static const int rc = [] {
+        WSADATA data;
+        return ::WSAStartup(MAKEWORD(2, 2), &data);
+    }();
+    if (rc != 0) throw ProtocolError("WSAStartup failed: " + std::to_string(rc));
+}
+
+void close_socket(Socket s) noexcept { ::closesocket(NativeSocket(s)); }
+
+bool set_socket_nonblocking(Socket s, bool on) noexcept {
+    u_long mode = on ? 1 : 0;
+    return ::ioctlsocket(NativeSocket(s), FIONBIO, &mode) == 0;
+}
+#else
+using NativeSocket = int;
+using IoSize = std::size_t;
 #ifdef MSG_NOSIGNAL
 constexpr int kSendFlags = MSG_NOSIGNAL;
 #else
 constexpr int kSendFlags = 0;
 #endif
 
-std::string errno_text(const char* what) {
-    return std::string(what) + ": " + std::strerror(errno);
+int last_error() noexcept { return errno; }
+bool would_block(int e) noexcept { return e == EAGAIN || e == EWOULDBLOCK; }
+bool interrupted(int e) noexcept { return e == EINTR; }
+bool conn_reset(int e) noexcept { return e == ECONNRESET; }
+bool accept_retry(int e) noexcept { return e == EINTR || e == ECONNABORTED; }
+
+std::string error_text(const char* what, int e) { return std::string(what) + ": " + std::strerror(e); }
+
+void ensure_sockets() {}
+
+void close_socket(Socket s) noexcept { ::close(NativeSocket(s)); }
+
+bool set_socket_nonblocking(Socket s, bool on) noexcept {
+    const int fl = ::fcntl(NativeSocket(s), F_GETFL, 0);
+    if (fl < 0) return false;
+    const int want = on ? (fl | O_NONBLOCK) : (fl & ~O_NONBLOCK);
+    return want == fl || ::fcntl(NativeSocket(s), F_SETFL, want) == 0;
+}
+#endif
+
+std::string errno_text(const char* what) { return error_text(what, last_error()); }
+
+// socket() result as a Socket; kInvalidSocket on failure.
+Socket open_socket(int family, int type, int protocol) noexcept {
+    const NativeSocket s = ::socket(family, type, protocol);
+#if defined(_WIN32)
+    return s == INVALID_SOCKET ? kInvalidSocket : Socket(s);
+#else
+    return s < 0 ? kInvalidSocket : Socket(s);
+#endif
 }
 
-void tune_socket(int fd) {
-    int one = 1;
-    ::setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
+void set_int_option(Socket s, int level, int name, int value) noexcept {
+    ::setsockopt(NativeSocket(s), level, name, reinterpret_cast<const char*>(&value), sizeof value);
+}
+
+void tune_socket(Socket fd) {
+    set_int_option(fd, IPPROTO_TCP, TCP_NODELAY, 1);
 #ifdef SO_NOSIGPIPE
-    ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
+    set_int_option(fd, SOL_SOCKET, SO_NOSIGPIPE, 1);
 #endif
+}
+
+// recv() of up to n bytes: > 0 bytes read, 0 peer closed, < 0 error (last_error()).
+long long recv_some(Socket fd, char* dst, std::size_t n) noexcept {
+    return ::recv(NativeSocket(fd), dst, IoSize(n), 0);
 }
 
 FrameHeader make_header(MsgType type, std::uint64_t correlation, std::size_t length, std::uint16_t flags) {
@@ -94,65 +186,84 @@ Frame finish_frame(const FrameHeader& h, std::string payload, std::initializer_l
     return f;
 }
 
-void wait_fd(int fd, short events) {
-    pollfd p{fd, events, 0};
-    while (::poll(&p, 1, -1) < 0) {
-        if (errno != EINTR) throw ProtocolError(errno_text("poll"));
+void wait_fd(Socket fd, bool for_write) {
+    PollItem p;
+    p.fd = fd;
+    p.want_read = !for_write;
+    p.want_write = for_write;
+    while (poll(&p, 1, -1) == 0) {
     }
 }
 
-// Blocking read of exactly n bytes (waits on EAGAIN when the fd is non-blocking).
-void read_exact(int fd, char* dst, std::size_t n, std::uint64_t& counter) {
+// Blocking read of exactly n bytes (waits when the socket is non-blocking).
+void read_exact(Socket fd, char* dst, std::size_t n, std::uint64_t& counter) {
     std::size_t got = 0;
     while (got < n) {
-        const ssize_t r = ::recv(fd, dst + got, n - got, 0);
+        const long long r = recv_some(fd, dst + got, n - got);
         if (r > 0) {
             got += static_cast<std::size_t>(r);
             counter += static_cast<std::uint64_t>(r);
-        } else if (r == 0) {
+            continue;
+        }
+        if (r == 0) {
             if (got == 0) throw PeerClosed("connection closed by peer");
             throw ProtocolError("connection closed mid-frame");
-        } else if (errno == EINTR) {
-            continue;
-        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            wait_fd(fd, POLLIN);
-        } else if (errno == ECONNRESET && got == 0) {
-            throw PeerClosed(errno_text("recv"));
-        } else {
-            throw ProtocolError(errno_text("recv"));
         }
+        const int e = last_error();
+        if (interrupted(e)) continue;
+        if (would_block(e)) wait_fd(fd, false);
+        else if (conn_reset(e) && got == 0) throw PeerClosed(error_text("recv", e));
+        else throw ProtocolError(error_text("recv", e));
     }
 }
 
-// One sendmsg over the unsent tail of header + payload. Returns bytes written,
-// 0 on EAGAIN; throws on a broken connection.
-std::size_t send_some(int fd, const FrameHeader& h, std::string_view payload, std::size_t written) {
-    iovec iov[2];
+// One gathered send over the unsent tail of header + payload. Returns bytes
+// written, 0 when the socket would block; throws on a broken connection.
+std::size_t send_some(Socket fd, const FrameHeader& h, std::string_view payload, std::size_t written) {
+    const char* part[2];
+    std::size_t len[2];
     int n = 0;
     if (written < sizeof h) {
-        iov[n].iov_base = const_cast<char*>(reinterpret_cast<const char*>(&h)) + written;
-        iov[n].iov_len = sizeof h - written;
+        part[n] = reinterpret_cast<const char*>(&h) + written;
+        len[n] = sizeof h - written;
         ++n;
         if (!payload.empty()) {
-            iov[n].iov_base = const_cast<char*>(payload.data());
-            iov[n].iov_len = payload.size();
+            part[n] = payload.data();
+            len[n] = payload.size();
             ++n;
         }
     } else {
         const std::size_t off = written - sizeof h;
-        iov[n].iov_base = const_cast<char*>(payload.data()) + off;
-        iov[n].iov_len = payload.size() - off;
+        part[n] = payload.data() + off;
+        len[n] = payload.size() - off;
         ++n;
     }
-    msghdr msg{};
-    msg.msg_iov = iov;
-    msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(n);
     for (;;) {
-        const ssize_t w = ::sendmsg(fd, &msg, kSendFlags);
+#if defined(_WIN32)
+        WSABUF buf[2];
+        for (int i = 0; i < n; ++i) {
+            buf[i].buf = const_cast<char*>(part[i]);
+            buf[i].len = ULONG(std::min<std::size_t>(len[i], 0x7fffffff));
+        }
+        DWORD sent = 0;
+        if (::WSASend(NativeSocket(fd), buf, DWORD(n), &sent, 0, nullptr, nullptr) == 0)
+            return static_cast<std::size_t>(sent);
+#else
+        iovec iov[2];
+        for (int i = 0; i < n; ++i) {
+            iov[i].iov_base = const_cast<char*>(part[i]);
+            iov[i].iov_len = len[i];
+        }
+        msghdr msg{};
+        msg.msg_iov = iov;
+        msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(n);
+        const ssize_t w = ::sendmsg(NativeSocket(fd), &msg, kSendFlags);
         if (w >= 0) return static_cast<std::size_t>(w);
-        if (errno == EINTR) continue;
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
-        throw ProtocolError(errno_text("send"));
+#endif
+        const int e = last_error();
+        if (interrupted(e)) continue;
+        if (would_block(e)) return 0;
+        throw ProtocolError(error_text("send", e));
     }
 }
 
@@ -193,7 +304,7 @@ const char* type_name(MsgType type) noexcept {
 Conn::~Conn() { close(); }
 
 Conn::Conn(Conn&& other) noexcept
-    : fd_(std::exchange(other.fd_, -1)),
+    : fd_(std::exchange(other.fd_, kInvalidSocket)),
       rx_header_(other.rx_header_),
       rx_header_got_(std::exchange(other.rx_header_got_, 0)),
       rx_have_header_(std::exchange(other.rx_have_header_, false)),
@@ -211,7 +322,7 @@ Conn::Conn(Conn&& other) noexcept
 Conn& Conn::operator=(Conn&& other) noexcept {
     if (this != &other) {
         close();
-        fd_ = std::exchange(other.fd_, -1);
+        fd_ = std::exchange(other.fd_, kInvalidSocket);
         rx_header_ = other.rx_header_;
         rx_header_got_ = std::exchange(other.rx_header_got_, 0);
         rx_have_header_ = std::exchange(other.rx_have_header_, false);
@@ -229,6 +340,7 @@ Conn& Conn::operator=(Conn&& other) noexcept {
 }
 
 Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
+    ensure_sockets();
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -241,21 +353,21 @@ Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
     std::string last = "no address";
     for (;;) {
         for (addrinfo* ai = res; ai != nullptr; ai = ai->ai_next) {
-            const int fd = ::socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-            if (fd < 0) {
+            const Socket fd = open_socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+            if (fd == kInvalidSocket) {
                 last = errno_text("socket");
                 continue;
             }
             int rc;
-            do rc = ::connect(fd, ai->ai_addr, ai->ai_addrlen);
-            while (rc < 0 && errno == EINTR);
+            do rc = ::connect(NativeSocket(fd), ai->ai_addr, static_cast<int>(ai->ai_addrlen));
+            while (rc != 0 && interrupted(last_error()));
             if (rc == 0) {
                 ::freeaddrinfo(res);
                 tune_socket(fd);
                 return Conn(fd);
             }
             last = errno_text("connect");
-            ::close(fd);
+            close_socket(fd);
         }
         if (std::chrono::steady_clock::now() >= deadline) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -266,8 +378,8 @@ Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
 }
 
 void Conn::close() noexcept {
-    if (fd_ >= 0) ::close(fd_);
-    fd_ = -1;
+    if (fd_ != kInvalidSocket) close_socket(fd_);
+    fd_ = kInvalidSocket;
     rx_header_ = FrameHeader{};
     rx_header_got_ = 0;
     rx_have_header_ = false;
@@ -277,16 +389,16 @@ void Conn::close() noexcept {
 }
 
 void Conn::send(MsgType type, std::uint64_t correlation, std::string_view payload, std::uint16_t flags) {
-    if (fd_ < 0) throw ProtocolError("send on a closed connection");
+    if (fd_ == kInvalidSocket) throw ProtocolError("send on a closed connection");
     // Frames already queued by enqueue() go first so the stream stays ordered.
-    while (!flush()) wait_fd(fd_, POLLOUT);
+    while (!flush()) wait_fd(fd_, true);
     const FrameHeader h = make_header(type, correlation, payload.size(), flags);
     const std::size_t total = sizeof h + payload.size();
     std::size_t written = 0;
     while (written < total) {
         const std::size_t w = send_some(fd_, h, payload, written);
         if (w == 0) {
-            wait_fd(fd_, POLLOUT);
+            wait_fd(fd_, true);
             continue;
         }
         written += w;
@@ -294,8 +406,26 @@ void Conn::send(MsgType type, std::uint64_t correlation, std::string_view payloa
     }
 }
 
+void Conn::send_raw(std::string_view bytes) {
+    if (fd_ == kInvalidSocket) throw ProtocolError("send on a closed connection");
+    while (!flush()) wait_fd(fd_, true);
+    std::size_t written = 0;
+    while (written < bytes.size()) {
+        const auto w = ::send(NativeSocket(fd_), bytes.data() + written, IoSize(bytes.size() - written), kSendFlags);
+        if (w > 0) {
+            written += static_cast<std::size_t>(w);
+            bytes_sent_ += static_cast<std::uint64_t>(w);
+            continue;
+        }
+        const int e = last_error();
+        if (interrupted(e)) continue;
+        if (would_block(e)) wait_fd(fd_, true);
+        else throw ProtocolError(error_text("send", e));
+    }
+}
+
 Frame Conn::recv(std::initializer_list<MsgType> allowed) {
-    if (fd_ < 0) throw ProtocolError("recv on a closed connection");
+    if (fd_ == kInvalidSocket) throw ProtocolError("recv on a closed connection");
     if (rx_header_got_ != 0 || rx_have_header_)
         throw ProtocolError("recv: a non-blocking receive is in progress on this connection");
     FrameHeader h{};
@@ -312,15 +442,12 @@ Frame Conn::recv(std::initializer_list<MsgType> allowed) {
 }
 
 void Conn::set_nonblocking(bool on) {
-    if (fd_ < 0) throw ProtocolError("set_nonblocking on a closed connection");
-    const int fl = ::fcntl(fd_, F_GETFL, 0);
-    if (fl < 0) throw ProtocolError(errno_text("fcntl"));
-    const int want = on ? (fl | O_NONBLOCK) : (fl & ~O_NONBLOCK);
-    if (want != fl && ::fcntl(fd_, F_SETFL, want) < 0) throw ProtocolError(errno_text("fcntl"));
+    if (fd_ == kInvalidSocket) throw ProtocolError("set_nonblocking on a closed connection");
+    if (!set_socket_nonblocking(fd_, on)) throw ProtocolError(errno_text("set_nonblocking"));
 }
 
 void Conn::enqueue(MsgType type, std::uint64_t correlation, std::string payload, std::uint16_t flags) {
-    if (fd_ < 0) throw ProtocolError("enqueue on a closed connection");
+    if (fd_ == kInvalidSocket) throw ProtocolError("enqueue on a closed connection");
     Pending p;
     p.header = make_header(type, correlation, payload.size(), flags);
     p.payload = std::move(payload);
@@ -329,7 +456,7 @@ void Conn::enqueue(MsgType type, std::uint64_t correlation, std::string payload,
 
 bool Conn::flush() {
     while (!tx_.empty()) {
-        if (fd_ < 0) throw ProtocolError("flush on a closed connection");
+        if (fd_ == kInvalidSocket) throw ProtocolError("flush on a closed connection");
         Pending& p = tx_.front();
         const std::size_t total = sizeof p.header + p.payload.size();
         const std::size_t w = send_some(fd_, p.header, p.payload, p.written);
@@ -345,7 +472,7 @@ bool Conn::flush() {
 }
 
 std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
-    if (fd_ < 0) throw ProtocolError("try_recv on a closed connection");
+    if (fd_ == kInvalidSocket) throw ProtocolError("try_recv on a closed connection");
     for (;;) {
         char* dst;
         std::size_t want;
@@ -357,17 +484,18 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
             want = rx_payload_.size() - rx_payload_got_;
         }
         if (want != 0) {
-            const ssize_t r = ::recv(fd_, dst, want, 0);
+            const long long r = recv_some(fd_, dst, want);
             const bool mid = rx_header_got_ != 0;
             if (r == 0) {
                 if (!mid) throw PeerClosed("connection closed by peer");
                 throw ProtocolError("connection closed mid-frame");
             }
             if (r < 0) {
-                if (errno == EINTR) continue;
-                if (errno == EAGAIN || errno == EWOULDBLOCK) return std::nullopt;
-                if (errno == ECONNRESET && !mid) throw PeerClosed(errno_text("recv"));
-                throw ProtocolError(errno_text("recv"));
+                const int e = last_error();
+                if (interrupted(e)) continue;
+                if (would_block(e)) return std::nullopt;
+                if (conn_reset(e) && !mid) throw PeerClosed(error_text("recv", e));
+                throw ProtocolError(error_text("recv", e));
             }
             bytes_received_ += static_cast<std::uint64_t>(r);
             if (!rx_have_header_) rx_header_got_ += static_cast<std::size_t>(r);
@@ -407,20 +535,21 @@ std::string Conn::take_tx_buffer() noexcept {
 // ---- Listener ----------------------------------------------------------------
 
 Listener::~Listener() {
-    if (fd_ >= 0) ::close(fd_);
+    if (fd_ != kInvalidSocket) close_socket(fd_);
 }
 
-Listener::Listener(Listener&& other) noexcept : fd_(std::exchange(other.fd_, -1)) {}
+Listener::Listener(Listener&& other) noexcept : fd_(std::exchange(other.fd_, kInvalidSocket)) {}
 
 Listener& Listener::operator=(Listener&& other) noexcept {
     if (this != &other) {
-        if (fd_ >= 0) ::close(fd_);
-        fd_ = std::exchange(other.fd_, -1);
+        if (fd_ != kInvalidSocket) close_socket(fd_);
+        fd_ = std::exchange(other.fd_, kInvalidSocket);
     }
     return *this;
 }
 
 Listener Listener::bind(const std::string& host, std::uint16_t port) {
+    ensure_sockets();
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -431,21 +560,25 @@ Listener Listener::bind(const std::string& host, std::uint16_t port) {
     if (gai != 0) throw ProtocolError("resolve " + host + ": " + ::gai_strerror(gai));
     std::string last = "no address";
     for (addrinfo* ai = res; ai != nullptr; ai = ai->ai_next) {
-        const int fd = ::socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if (fd < 0) {
+        const Socket fd = open_socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (fd == kInvalidSocket) {
             last = errno_text("socket");
             continue;
         }
-        int one = 1;
-        ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
-        if (::bind(fd, ai->ai_addr, ai->ai_addrlen) == 0 && ::listen(fd, 16) == 0) {
+#if !defined(_WIN32)
+        // POSIX: rebind over TIME_WAIT. (On Windows SO_REUSEADDR would allow a
+        // second live listener on the port instead.)
+        set_int_option(fd, SOL_SOCKET, SO_REUSEADDR, 1);
+#endif
+        if (::bind(NativeSocket(fd), ai->ai_addr, static_cast<int>(ai->ai_addrlen)) == 0 &&
+            ::listen(NativeSocket(fd), 16) == 0) {
             ::freeaddrinfo(res);
             Listener l;
             l.fd_ = fd;
             return l;
         }
         last = errno_text("bind/listen");
-        ::close(fd);
+        close_socket(fd);
     }
     ::freeaddrinfo(res);
     throw ProtocolError("listen on " + host + ":" + service + " failed (" + last + ")");
@@ -453,17 +586,57 @@ Listener Listener::bind(const std::string& host, std::uint16_t port) {
 
 // On a non-blocking listener with nothing pending, returns a closed Conn.
 Conn Listener::accept() {
-    if (fd_ < 0) throw ProtocolError("accept on a closed listener");
+    if (fd_ == kInvalidSocket) throw ProtocolError("accept on a closed listener");
     for (;;) {
-        const int fd = ::accept(fd_, nullptr, nullptr);
-        if (fd >= 0) {
+        const NativeSocket raw = ::accept(NativeSocket(fd_), nullptr, nullptr);
+#if defined(_WIN32)
+        const Socket fd = raw == INVALID_SOCKET ? kInvalidSocket : Socket(raw);
+#else
+        const Socket fd = raw < 0 ? kInvalidSocket : Socket(raw);
+#endif
+        if (fd != kInvalidSocket) {
             tune_socket(fd);
             return Conn(fd);
         }
-        if (errno == EINTR || errno == ECONNABORTED) continue;
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return Conn();
-        throw ProtocolError(errno_text("accept"));
+        const int e = last_error();
+        if (accept_retry(e)) continue;
+        if (would_block(e)) return Conn();
+        throw ProtocolError(error_text("accept", e));
     }
+}
+
+// ---- poll ----------------------------------------------------------------------
+
+int poll(PollItem* items, std::size_t count, int timeout_ms) {
+#if defined(_WIN32)
+    using PollFd = WSAPOLLFD;
+#else
+    using PollFd = pollfd;
+#endif
+    thread_local std::vector<PollFd> fds;
+    fds.resize(count);
+    for (std::size_t i = 0; i < count; ++i) {
+        fds[i] = PollFd{};
+        fds[i].fd = NativeSocket(items[i].fd);
+        fds[i].events = static_cast<short>((items[i].want_read ? POLLIN : 0) | (items[i].want_write ? POLLOUT : 0));
+        items[i].readable = items[i].writable = false;
+    }
+#if defined(_WIN32)
+    const int rc = ::WSAPoll(fds.data(), ULONG(count), timeout_ms < 0 ? -1 : timeout_ms);
+#else
+    const int rc = ::poll(fds.data(), nfds_t(count), timeout_ms < 0 ? -1 : timeout_ms);
+#endif
+    if (rc < 0) {
+        const int e = last_error();
+        if (interrupted(e)) return 0;
+        throw ProtocolError(error_text("poll", e));
+    }
+    for (std::size_t i = 0; i < count; ++i) {
+        const short rev = fds[i].revents;
+        items[i].readable = (rev & (POLLIN | POLLHUP | POLLERR)) != 0;
+        items[i].writable = (rev & (POLLOUT | POLLERR | POLLHUP)) != 0;
+    }
+    return rc;
 }
 
 // ---- handshake and clock ------------------------------------------------------

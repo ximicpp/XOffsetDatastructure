@@ -11,7 +11,10 @@ XOffset paths with real processes and real TCP:
 2. **Server to client**: a C++ client asks A for its viewport; A filters the
    current batch, builds a `ViewSnapshot`, saves and sends it; the client
    verifies it and draws by reading fields **directly from the live, verified
-   snapshot buffer**.
+   snapshot buffer**. The client builds as C++20 for Windows (MinGW, MSVC),
+   Android and iOS from the same sources, with no game engine; it asks for
+   the snapshot dense, compact (`save_compact`) or compact + zstd, and
+   verifies it the same way after decompression.
 
 Every process takes `--buffers reuse|fresh`. `reuse` (the default) keeps one
 buffer per role and refills it in place (`reload_verified`, `reset`,
@@ -35,14 +38,18 @@ folder (`slg-demo-20261022/MAP_DEMO_DESIGN_20261022.md`). Results:
 | `include/mapdemo/schema.hpp` | XOffset types (`UnitStateBatch`, `ViewSnapshot`, `MapCatalog`, ...), receive caps, no-padding asserts |
 | `include/mapdemo/std_model.hpp` | the same fields in std types; reference model for checks only |
 | `include/mapdemo/rules.hpp`, `rules_impl.hpp` | deterministic generation and step rules, one template for both models |
-| `include/mapdemo/net.hpp`, `src/net.cpp` | 24-byte frame header, per-type length caps checked before allocation, handshake, payload recycling |
+| `include/mapdemo/net.hpp`, `src/net.cpp` | 24-byte frame header, per-type length caps checked before allocation, handshake, payload recycling; POSIX sockets and Winsock |
+| `include/mapdemo/codec.hpp`, `src/codec.cpp` | `ViewReq` flags (category + snapshot encoding), zstd compression and the guarded decompression |
+| `include/mapdemo/build_info.hpp` | the `build` line each process prints (compiler, platform, C++ standard, schema backend, zstd) |
 | `include/mapdemo/buffer_mode.hpp` | the `--buffers` option (`reuse`, `fresh`) |
 | `include/mapdemo/metrics.hpp`, `src/metrics.cpp` | samples, mean / p50 / p95 / max, CSV |
 | `include/mapdemo/checks.hpp`, `src/checks.cpp` | invariants, reference comparison, snapshot comparison, snapshot and wire digests |
 | `src/server_a.cpp`, `src/server_b.cpp` | A (single-threaded `poll` loop) and B (blocking step loop) |
 | `src/client_core.*`, `src/client_main.cpp`, `src/client_gui.cpp` | client network, snapshot holder, headless sampling, `--evil`, raylib window |
+| `src/client_offline.cpp` | client `--self-check` (no network: every encoding verifies, refusal cases refused) and `--replay` (a snapshot corpus written by A, checked against A's digests) |
 | `src/selftest.cpp` | allocation / free / reuse across save + load and reload, both buffer modes byte for byte, independent output, failure inputs, rect rule |
 | `tools/run_tier.sh`, `tools/run_all_tiers.sh`, `tools/summarize.py` | one tier, all tiers + evil in both modes, result tables, cross-run digest comparison |
+| `tools/run_e2e.sh`, `tools/e2e_report.py` | one Linux A/B against several client builds (native, wine, qemu, emulator): self-check, corpus replay, tiers, evil; `E2E_RESULT.md` |
 
 ## Build
 
@@ -86,6 +93,32 @@ cmake -S . -B build-demo -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=<p2996>
       -DCMAKE_PREFIX_PATH=$PWD/deps/raylib-5.5
 cmake --build build-demo -j
 ```
+
+**Client targets (C++20, the `XOFFSET_RECORD` field lists)**
+
+A and B stay on Linux with C++26 reflection; the client alone builds with
+`-DMAPDEMO_CLIENT_ONLY=ON -DXOFFSET_CXX_STANDARD=20`. The schema's field
+lists give the same layout and the same Hello schema hash as reflection (a
+C++26 build checks the lists), so a mismatch fails the handshake.
+
+```bash
+COMMON="-DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20 -DXOFFSET_BUILD_DEMOS=ON -DMAPDEMO_CLIENT_ONLY=ON \
+        -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF"
+# Windows x64, MinGW-w64 cross build (runs under wine on Linux)
+cmake -S . -B build/client-mingw -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-x86_64.cmake
+# Android arm64 (NDK r26+); XOFFSET_ANDROID_QEMU=ON links statically for qemu-aarch64 on Linux
+cmake -S . -B build/client-android -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/android-arm64.cmake \
+      -DANDROID_NDK=<ndk> -DCMAKE_MAKE_PROGRAM=$(command -v ninja)
+# iOS Simulator (macOS host, Xcode)
+cmake -S . -B build/client-iossim -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/ios-simulator.cmake
+# Windows, MSVC (Developer Command Prompt)
+cmake -S . -B build/client-msvc %COMMON%
+cmake --build <dir> --target mapdemo_client
+```
+
+zstd 1.5.7 is built from its release tarball, checked by SHA-256; offline,
+pass `-DMAPDEMO_ZSTD_URL=<local zstd-1.5.7.tar.gz>`. `-DMAPDEMO_WITH_ZSTD=OFF`
+builds without it (dense and compact only).
 
 All demo code is compiled with `-ffp-contract=off` (B's real state and A's
 reference model are compared bit for bit); never add `-ffast-math`.
@@ -139,8 +172,35 @@ every unit; every metric name of INTERFACES.md section 6 present (no destroy
 metrics in `reuse`). Across tiers: `fresh` and `reuse` with the same unit
 count send identical step wires over at least 500 common ticks; with
 `--compare`, every tier matches the other run. Self-test: exit 0, every row
-passing. Evil: all three processes exit 0, A logged at least four `rejected:`
-lines and every row of the evil client's `client_checks.csv` passes.
+passing. Evil: all three processes exit 0, A logged at least six `rejected:`
+lines and every row of the evil client's `client_checks.csv` passes. Snapshot
+rows also agree on encoding, bytes sent and wire digest; a client run with
+`--encoding cycle` must have received every encoding.
+
+### End to end across client platforms
+
+```bash
+demo/mapstate/tools/run_e2e.sh SERVER_BIN OUT_ROOT \
+    linux=build/client-linux/bin/Release/mapdemo_client \
+    windows-mingw="wine build/client-mingw/bin/Release/mapdemo_client.exe" \
+    android-arm64="qemu-aarch64-static build/client-android/bin/Release/mapdemo_client"
+```
+
+`SERVER_BIN` holds `mapdemo_a`, `mapdemo_b` and `mapdemo_selftest` (Linux,
+C++26). First A writes a snapshot corpus (`OUT_ROOT/corpus/`: 60 snapshots
+of a 10000-unit run, every encoding, with A's digests), unless
+`MAPDEMO_CORPUS` names one. Then, for every `NAME=CLIENT_CMD` target:
+`--self-check`, `--replay` of the corpus, and `run_all_tiers.sh` with that
+client and `--encoding cycle` (dense, compact and zstd snapshots in turn) in
+`reuse` mode (`MAPDEMO_MODES` to change), evil included; targets after the
+first compare their step wires with the first. `tools/e2e_report.py` writes
+`OUT_ROOT/E2E_RESULT.md`: per target the client build line, self-check,
+replay (same digests as A for every corpus snapshot, and the same on every
+target), tiers, evil, and snapshot sizes per encoding. A client in an
+emulator or simulator is run through a wrapper command that starts it there
+and copies its `--csv-dir` back (A with `MAPDEMO_A_HOST=0.0.0.0`;
+the Android emulator reaches the host as 10.0.2.2). Timings under wine,
+qemu or an emulator are not device timings.
 
 ## Deterministic generation (design section 3)
 
@@ -155,8 +215,9 @@ path by one point between 4 and 8. Rects are min-inclusive, max-exclusive.
 
 ## What the demo does not claim
 
-Structural validation is not authentication or tamper-proofing. No
-`XBufferPool`, compression, incremental sync, LOD or gameplay; one arena per
+Structural validation is not authentication or tamper-proofing; zstd is a
+transport encoding, and the decompressed wire goes through the same
+verification. No `XBufferPool`, incremental sync, LOD or gameplay; one arena per
 batch, per snapshot and for the catalog (kept and refilled in `reuse`, new per
 message in `fresh`). Cloud (GCC 16, x86-64 VM) numbers are smoke
 numbers; formal timing is the Mac run recorded in `RESULT.md`.
