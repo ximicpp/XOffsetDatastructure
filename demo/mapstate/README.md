@@ -111,7 +111,11 @@ cmake -S . -B build/client-android -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake
       -DANDROID_NDK=<ndk> -DCMAKE_MAKE_PROGRAM=$(command -v ninja)
 # iOS Simulator (macOS host, Xcode)
 cmake -S . -B build/client-iossim -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/ios-simulator.cmake
-# Windows, MSVC (Developer Command Prompt)
+# Windows x64, real MSVC 19.44 under wine, or clang-cl with the MSVC STL and Windows SDK
+# ($XOFFSET_MSVC_ROOT, default /opt/msvc; both run under wine on Linux)
+cmake -S . -B build/client-msvc -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/msvc-wine-x86_64.cmake
+cmake -S . -B build/client-clang-cl -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/clang-cl-x86_64.cmake
+# Windows, MSVC on Windows (Developer Command Prompt)
 cmake -S . -B build/client-msvc %COMMON%
 cmake --build <dir> --target mapdemo_client
 ```
