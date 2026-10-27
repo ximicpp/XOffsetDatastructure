@@ -38,6 +38,9 @@ if(XOFFSET_ANDROID_QEMU)
     set(CMAKE_EXE_LINKER_FLAGS "-static" CACHE STRING "Flags used by the linker.")
 endif()
 include("${ANDROID_NDK}/build/cmake/android.toolchain.cmake")
+# Programs (ninja, qemu) run on the host: without this, the Ninja generator
+# could miss a ninja outside the NDK's find root.
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 
 if(XOFFSET_ANDROID_QEMU)
     find_program(XOFFSET_QEMU_AARCH64 NAMES qemu-aarch64-static qemu-aarch64 REQUIRED)

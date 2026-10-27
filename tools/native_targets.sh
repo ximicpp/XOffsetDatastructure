@@ -11,6 +11,8 @@
 #                  (boot a device first; -DXOFFSET_IOS_SIM_DEVICE=<udid> picks one)
 #   android-arm64  NDK Clang + static libc++ ($ANDROID_NDK); CTest through qemu-aarch64
 #   mingw-x64      MinGW-w64 GCC on Linux; CTest through wine
+#   msvc-x64       MSVC (cl, link) under wine, static CRT ($XOFFSET_MSVC_ROOT); CTest through wine
+#   clang-cl-x64   clang-cl + lld-link with the MSVC STL and Windows SDK; CTest through wine
 #   host           the host compiler, no toolchain file (e.g. writing the reference)
 #
 # --ref DIR: corpus from `test_cross_compiler_wire --write` on the reference build
@@ -22,7 +24,7 @@ set -uo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TARGET=${1:-}
-[[ -n "$TARGET" ]] || { sed -n '2,22p' "$0"; exit 2; }
+[[ -n "$TARGET" ]] || { sed -n '2,21p' "$0"; exit 2; }
 shift
 STD=20
 BUILD=""
@@ -47,6 +49,8 @@ case "$TARGET" in
     ios-sim) ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TC/ios-simulator.cmake") ;;
     android-arm64) ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TC/android-arm64.cmake" -DXOFFSET_ANDROID_QEMU=ON) ;;
     mingw-x64) ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TC/mingw-w64-x86_64.cmake") ;;
+    msvc-x64) ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TC/msvc-wine-x86_64.cmake") ;;
+    clang-cl-x64) ARGS+=(-DCMAKE_TOOLCHAIN_FILE="$TC/clang-cl-x86_64.cmake") ;;
     host) ;;
     *) echo "unknown target: $TARGET" >&2; exit 2 ;;
 esac
