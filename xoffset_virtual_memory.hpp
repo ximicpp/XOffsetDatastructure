@@ -282,13 +282,14 @@ public:
         return from_bytes(bytes, length, maximum_capacity, VmStoragePool{});
     }
 
+    // With `at`, `bytes` fill [at, length) and the caller writes [0, at).
     static VirtualMemoryStorage from_bytes(const char* bytes, std::size_t length,
                                            std::size_t maximum_capacity,
-                                           const VmStoragePool& pool) {
-        if (length > maximum_capacity) {
+                                           const VmStoragePool& pool, std::size_t at = 0) {
+        if (length > maximum_capacity || at > length) {
             throw std::invalid_argument("VM input length exceeds maximum capacity");
         }
-        if (length != 0 && bytes == nullptr) {
+        if (length != at && bytes == nullptr) {
             throw std::invalid_argument("VM input is null");
         }
         VirtualMemoryStorage owner(0, maximum_capacity, pool,
@@ -297,7 +298,7 @@ public:
         if (!owner.enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
-        std::memcpy(owner.base_, bytes, length);
+        std::memcpy(owner.base_ + at, bytes, length - at);
         owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
         return owner;
@@ -306,7 +307,8 @@ public:
     // V2 sparse load: `stored` holds the concatenated extents; extent i is
     // {u32 offset, u32 bytes} at extents + 8*i (unaligned allowed), ascending
     // and validated by the caller to tile [0, length) with gaps. Gap bytes
-    // read as zero (fresh pages, or explicitly cleared if previously exposed).
+    // read as zero (fresh pages, or explicitly cleared if previously exposed),
+    // [0, first offset) included.
     static VirtualMemoryStorage from_extents(const char* stored, const void* extents,
                                              std::size_t count, std::size_t length,
                                              std::size_t maximum_capacity,
@@ -369,18 +371,19 @@ public:
     // payload address. Bytes beyond `length` that the old content exposed
     // stay below zero_from_, so every later growth zeroes them. A failure
     // leaves the old bytes and length unchanged.
-    void assign_bytes(const char* bytes, std::size_t length) {
-        if (length > maximum_capacity_) {
+    // `at` as in from_bytes.
+    void assign_bytes(const char* bytes, std::size_t length, std::size_t at = 0) {
+        if (length > maximum_capacity_ || at > length) {
             throw std::invalid_argument("VM input length exceeds maximum capacity");
         }
-        if (length != 0 && bytes == nullptr) {
+        if (length != at && bytes == nullptr) {
             throw std::invalid_argument("VM input is null");
         }
         if (length == 0) { logical_bytes_ = 0; return; }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
-        std::memcpy(base_, bytes, length);
+        std::memcpy(base_ + at, bytes, length - at);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
     }

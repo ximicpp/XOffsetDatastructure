@@ -98,8 +98,10 @@ bool test_schema_rejection() {
     return true;
 }
 
-bool test_endian_tag_rejection() {
-    std::cout << "\n[TEST] invalid endian tag rejected\n";
+// V2.1 has no endian tag (little-endian 64-bit only, checked at compile
+// time); every flag bit is reserved and rejected.
+bool test_flags_rejection() {
+    std::cout << "\n[TEST] reserved wire flags rejected\n";
 
     XBuffer xbuf(4096);
     auto* obj = xbuf.make<EnvelopeData>();
@@ -108,14 +110,14 @@ bool test_endian_tag_rejection() {
     std::string data = xbuf.save_verified<EnvelopeData>();
     XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
-    header.endian_tag ^= 0x1;
+    header.flags ^= 0x1;
     std::memcpy(data.data(), &header, sizeof(header));
 
     bool threw = false;
     try {
         (void)XBuffer::load_verified<EnvelopeData>(data);
-    } catch (const XException&) {
-        threw = true;
+    } catch (const XException& e) {
+        threw = std::string(e.what()).find("unsupported wire flags 0x00000001") != std::string::npos;
     }
 
     assert(threw);
@@ -146,15 +148,17 @@ std::string envelope_with_hole() {
 }
 
 // V2 replacement of the retired allocator_offset check: the hole table's
-// envelope (hole_count, hole_bytes, used_bytes) must describe the wire exactly.
+// envelope (hole_count, used_bytes) must describe the wire exactly. V2.1 has
+// no hole_bytes sum: exact coverage accounts for every hole byte.
 bool test_hole_envelope_rejection() {
     std::cout << "\n[TEST] inconsistent hole table envelope rejected\n";
 
     const std::string data = envelope_with_hole();
     XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
-    assert(header.hole_count == 1 && header.hole_bytes > 0);
-    assert(data.size() == sizeof(header) + header.used_bytes + header.hole_count * sizeof(XBufferCore::WireHole));
+    assert(header.hole_count == 1);
+    assert(data.size() == sizeof(header) + header.used_bytes - XWIRE_PAYLOAD_BEGIN +
+                              header.hole_count * sizeof(XBufferCore::WireHole));
     (void)XBuffer::load_verified<EnvelopeData>(data);
 
     auto mutate = [&](auto&& edit) {
@@ -165,14 +169,12 @@ bool test_hole_envelope_rejection() {
         std::memcpy(copy.data(), &h, sizeof(h));
         return copy;
     };
-    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_bytes += 8; }), "hole byte count mismatch"));
-    assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_bytes = 0; }), "hole byte count mismatch"));
     assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_count += 1; }), "used size mismatch"));
     assert(rejects_with(mutate([](XWireHeaderV2& h) { h.hole_count = 0; }), "used size mismatch"));
     assert(rejects_with(mutate([](XWireHeaderV2& h) { h.used_bytes += 8; }), "used size mismatch"));
     // Dropping the table entry together with its envelope leaves the retired
     // block unaccounted for: exact coverage fails.
-    auto dropped = mutate([](XWireHeaderV2& h) { h.hole_count = 0; h.hole_bytes = 0; });
+    auto dropped = mutate([](XWireHeaderV2& h) { h.hole_count = 0; });
     dropped.resize(dropped.size() - sizeof(XBufferCore::WireHole));
     assert(rejects_with(dropped, "payload is not exactly covered by live blocks and holes"));
     std::cout << "  [OK]\n";
@@ -188,15 +190,18 @@ bool test_v1_wire_rejected() {
     std::string data = xbuf.save_verified<EnvelopeData>();
 
     auto v1 = data;
-    std::memcpy(v1.data(), XWIRE_MAGIC_V1, sizeof(XWIRE_MAGIC_V1));
-    assert(rejects_with(v1, "unsupported wire format version 1"));
+    std::memcpy(v1.data(), "XOFFV1\0\0", 8);
+    assert(rejects_with(v1, "wire format 1 is not supported; this build reads 2.1"));
+    auto v20 = data;
+    std::memcpy(v20.data(), "XOFFV2\0\0", 8);
+    assert(rejects_with(v20, "wire format 2.0 is not supported; this build reads 2.1"));
 
     XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
-    header.format_major = 1;
+    header.magic = XWIRE_MAGIC - (1u << 16); // 'X' 'O' 1.1
     auto major1 = data;
     std::memcpy(major1.data(), &header, sizeof(header));
-    assert(rejects_with(major1, "unsupported format version"));
+    assert(rejects_with(major1, "wire format 1.1 is not supported"));
     std::cout << "  [OK]\n";
     return true;
 }
@@ -322,7 +327,7 @@ int main() {
     all_passed &= test_verified_round_trip();
     all_passed &= test_magic_rejection();
     all_passed &= test_schema_rejection();
-    all_passed &= test_endian_tag_rejection();
+    all_passed &= test_flags_rejection();
     all_passed &= test_hole_envelope_rejection();
     all_passed &= test_v1_wire_rejected();
     all_passed &= test_typed_buffer_verified_api();

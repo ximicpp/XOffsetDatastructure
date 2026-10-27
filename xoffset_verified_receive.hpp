@@ -63,12 +63,6 @@ namespace detail {
         target.root_type_identity_ = nullptr;
         target.bound_root_type_id_ = target.bound_schema_hash_ = 0;
     }
-    inline void VerifiedPathsAccess::check_received_payload(XBufferCore& source,
-                                                           const XWireHeaderV2& header) {
-        const auto arena = read_raw_arena_header(source.data(),source.segment_size());
-        if (arena.used_end != header.used_bytes)
-            throw XException("load_verified<T>(): non-normalized payload extent");
-    }
     inline void VerifiedPathsAccess::rollback_storage(XBufferCore& source, VirtualMemoryStorage& storage) noexcept {
         // Detach the registry before returning the reservation to its token.
         source.unregister_registry();
@@ -88,39 +82,35 @@ namespace detail {
         source.update_registry_owner();
     }
 
+    // The wire admission of load_verified, with the section lengths fixed by
+    // begin_verified_receive instead of read from one wire.
     template<class T>
-    void check_received_wire_header(const XWireHeaderV2& h, std::size_t payload_bytes,
-                                    const std::byte* holes, std::size_t hole_count,
-                                    const std::byte* extents, std::size_t extent_count,
-                                    std::vector<XBufferCore::WireHole>& gaps) {
-        check_wire_format(h, "load_verified<T>()");
-        if (h.extent_count != extent_count) throw XException("load_verified<T>(): extent count mismatch");
-        (void)parse_extent_table(reinterpret_cast<const char*>(extents), extent_count, h.used_bytes,
-                                 "load_verified<T>()", gaps);
+    XWireHeaderV2 check_received_wire_header(const std::byte* header, std::size_t payload_bytes,
+                                             std::size_t hole_count,
+                                             const std::byte* extents, std::size_t extent_count,
+                                             std::vector<XBufferCore::WireHole>& gaps) {
+        constexpr const char* who = "load_verified<T>()";
+        const auto h = read_wire_header(header, sizeof(XWireHeaderV2), who);
         if (h.root_type_id != wire_root_type_id<T>()) throw XException("load_verified<T>(): root type id mismatch");
-        if (h.schema_hash_lo != wire_schema_hash<T>() || h.schema_hash_hi != 0)
-            throw XException("load_verified<T>(): schema hash mismatch");
-        if (h.used_bytes != payload_bytes || h.used_bytes > XBufferCore::MAX_PAYLOAD)
-            throw XException("load_verified<T>(): used size mismatch");
+        if (h.schema_hash != wire_schema_hash<T>()) throw XException("load_verified<T>(): schema hash mismatch");
+        check_wire_extent(h, who);
+        if (h.used_bytes != payload_bytes) throw XException("load_verified<T>(): used size mismatch");
+        if (h.extent_count != extent_count) throw XException("load_verified<T>(): extent count mismatch");
+        (void)parse_extent_table(reinterpret_cast<const char*>(extents), extent_count, h.used_bytes, who, gaps);
         if (h.hole_count != hole_count) throw XException("load_verified<T>(): hole count mismatch");
-        if (h.root_offset >= h.used_bytes) throw XException("load_verified<T>(): root offset out of bounds");
-        std::uint64_t hole_bytes = 0;
-        for (std::size_t i = 0; i < hole_count; ++i) {
-            XBufferCore::WireHole hole;
-            std::memcpy(&hole, holes + i * sizeof(hole), sizeof(hole));
-            hole_bytes += hole.bytes;
-        }
-        if (hole_bytes != h.hole_bytes) throw XException("load_verified<T>(): hole byte count mismatch");
+        return h;
     }
 }
 
 template<class T> class VerifiedReceiveToken;
-// V2: `holes` / `extents` are the wire header's hole_count / extent_count.
-// The transport writes the hole table into Operation::hole_bytes() and, for a
-// sparse wire, the extent table into Operation::extent_bytes() and each extent
-// at its payload offset inside Operation::payload_bytes(). Gaps stay untouched
-// and read as zero (receive storage starts zeroed); the payload actually held
-// is what is validated.
+// V2.1: the first argument is the wire header's used_bytes; `holes` /
+// `extents` are its hole_count / extent_count. The transport writes the
+// header into Operation::header_bytes(), the payload bytes into
+// Operation::payload_bytes() (payload [48, used_bytes)), the hole table into
+// Operation::hole_bytes() and, for a sparse wire, the extent table into
+// Operation::extent_bytes() and each extent at its payload offset - 48 inside
+// Operation::payload_bytes(). Gaps stay untouched and read as zero (receive
+// storage starts zeroed); the payload actually held is what is validated.
 template<class T> requires(detail::receive_raw::future_supported_v<T>)
 VerifiedReceiveToken<T> begin_verified_receive(std::size_t,
     std::optional<XBufferCore::MaximumCapacity> = std::nullopt, std::size_t holes = 0,
@@ -194,7 +184,9 @@ public:
             return owner_ ? std::span<std::byte>(owner_->header) : std::span<std::byte>{};
         }
         std::span<std::byte> payload_bytes() const noexcept {
-            return owner_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(owner_->base), owner_->expected) : std::span<std::byte>{};
+            return owner_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(owner_->base) + XWIRE_PAYLOAD_BEGIN,
+                                                 owner_->expected - XWIRE_PAYLOAD_BEGIN)
+                          : std::span<std::byte>{};
         }
         std::span<std::byte> hole_bytes() const noexcept {
             return owner_ ? std::span<std::byte>(owner_->holes) : std::span<std::byte>{};
@@ -204,7 +196,7 @@ public:
         }
         void cancel() noexcept { if (owner_) owner_->cancelled.store(true, std::memory_order_release); }
         // payload_bytes counts the received payload bytes INCLUDING sparse
-        // gaps (i.e. the full logical payload length once every extent landed).
+        // gaps (used_bytes - 48 once every extent landed).
         void complete(std::size_t header_bytes, std::size_t payload_bytes,
                       std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
             if (!owner_) return;
@@ -258,6 +250,7 @@ VerifiedReceiveToken<T> begin_verified_receive(std::size_t bytes,
     detail::require_wire_within_capacity(bytes,
         capacity ? capacity->value : XBufferCore::DEFAULT_MAXIMUM_CAPACITY,
         capacity.has_value(), "begin_verified_receive<T>()");
+    if (bytes < XWIRE_PAYLOAD_BEGIN) throw XException("begin_verified_receive<T>(): used size mismatch");
     const auto cap = capacity.value_or(XBufferCore::maximum_capacity(bytes));
     if (bytes > XBufferCore::MAX_PAYLOAD || cap.value > XBufferCore::MAX_PAYLOAD || bytes > cap.value ||
         holes > XBufferCore::MAX_PAYLOAD / sizeof(XBufferCore::WireHole) ||
@@ -282,20 +275,20 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
         bool armed=true;
         ~Reset(){if(armed)s.phase.store(Phase::Idle,std::memory_order_release);} } reset{*state};
     if (!state->complete.load(std::memory_order_acquire) || state->cancelled.load(std::memory_order_acquire) ||
-        state->received_header != sizeof(XWireHeaderV2) || state->received_payload != state->expected ||
+        state->received_header != sizeof(XWireHeaderV2) ||
+        state->received_payload != state->expected - XWIRE_PAYLOAD_BEGIN ||
         state->received_holes != state->holes.size() || state->received_extents != state->extents.size())
         throw XException("verified receive: incomplete or cancelled input");
-    XWireHeaderV2 header{};
-    std::memcpy(&header,state->header.data(),sizeof(header));
     std::vector<XBufferCore::WireHole> gaps;
-    detail::check_received_wire_header<T>(header,state->expected,state->holes.data(),state->expected_holes,
-                                          state->extents.data(),state->expected_extents,gaps);
+    const auto header = detail::check_received_wire_header<T>(state->header.data(), state->expected,
+        state->expected_holes, state->extents.data(), state->expected_extents, gaps);
     XBuffer prepared; // default only; no arena/allocator/storage constructor
     detail::VerifiedPathsAccess::adopt_storage(prepared,state->storage,state->growth);
     struct Rollback {
         XBuffer& buffer; detail::VirtualMemoryStorage& storage; bool active=true;
         ~Rollback(){if(active) detail::VerifiedPathsAccess::rollback_storage(buffer,storage);}
     } rollback{prepared,state->storage}; // established before first possible throw
+    XBufferCore::write_payload_header(reinterpret_cast<char*>(state->base), header.root_offset, header.used_bytes);
     const auto raw_arena=detail::read_raw_arena_header(reinterpret_cast<char*>(state->base),state->expected);
     if(raw_arena.used_end!=header.used_bytes)
         throw XException("load_verified<T>(): non-normalized payload extent");
