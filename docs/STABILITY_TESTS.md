@@ -41,5 +41,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 - K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
-  不在 CTest 里，记录在项目文件 `fuzz-nightly/`。libFuzzer 覆盖率引导 fuzz 需要 P2996 Clang，
-  目前不在每日长跑里。
+  不在 CTest 里，记录在项目文件 `fuzz-nightly/`。2026-10-27 起，同一晚接着跑
+  `tools/fuzz_libfuzzer.sh`：用云端的 P2996 工具链（自带 libFuzzer 运行库）原生构建两个
+  libFuzzer 目标（ASan+UBSan，`-fork=4`，每个目标约 20 分钟），语料跨夜保存在项目文件
+  `fuzz-nightly/corpus/`，发现走同一个 `fuzz_report.py`。
