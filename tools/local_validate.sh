@@ -8,6 +8,9 @@
 # Steps, in this order (default: every step the host can run except tsan; --release adds it;
 # LIST may also name the groups "classic" = the steps up to asm and "matrix" = the
 # C++20/C++23 columns):
+#   meta      the library's own files (top-level *.hpp, *.cpp) use reflection (std::meta, ^^)
+#             only in xoffset_schema_reflect.hpp; every other walk goes through the schema
+#             interface (xoffset_schema.hpp), so the field-list builds see the same code
 #   gcc       GCC 16 Release: build + full CTest
 #   asan      GCC 16 Debug, -fsanitize=address,undefined -fno-sanitize-recover=undefined
 #             (no exclusions): build + full CTest
@@ -62,7 +65,7 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-CLASSIC_STEPS="gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm"
+CLASSIC_STEPS="meta gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm"
 ASM_STRICT=0
 MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 gcc16-c++26d p2996-c++20 diff-c++20 wire-matrix"
 ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS"
@@ -164,6 +167,30 @@ in_gcc() {
 
 # Each step writes logs/<step>.log and echoes a one-line detail on its last stdout line.
 ctest_line() { grep -E 'tests passed|tests failed' "$1" | tail -n 1; }
+
+step_meta() {
+    python3 - "$REPO" <<'PY'
+import pathlib, re, subprocess, sys
+repo = pathlib.Path(sys.argv[1])
+files = subprocess.run(["git", "-C", str(repo), "ls-files", "*.hpp", "*.cpp", "*.h"],
+                       capture_output=True, text=True, check=True).stdout.split()
+token = re.compile(r"std::meta|\^\^")
+bad = 0
+for name in files:
+    if "/" in name or name == "xoffset_schema_reflect.hpp":
+        continue
+    text = (repo / name).read_text()
+    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    for n, line in enumerate(text.splitlines(), 1):
+        code = re.sub(r'"(?:\\.|[^"\\])*"', '""', line.split("//", 1)[0])
+        if token.search(code):
+            print(f"{name}:{n}: {line.strip()}")
+            bad += 1
+checked = sum(1 for f in files if "/" not in f)
+print(f"reflection outside the backend: {bad} lines in {checked} library files")
+sys.exit(1 if bad else 0)
+PY
+}
 
 step_gcc() {
     in_gcc "g++ --version | head -n 1 &&
@@ -385,6 +412,7 @@ print(f"{n} C++26-only tests/tools not built")' "$WORK/m-$s/test-inventory.json"
         p2996) { ctest_line "$f"; grep -m1 -E 'type signatures changed|completed successfully' "$f"; } | paste -sd ';' ;;
         fuzz) grep -E '^test_v2_fuzz: seed=' "$f" | sed -E 's/.*seed=([0-9]+).* cases=([0-9]+).*inconsistencies=([0-9]+).*/seed \1: \2 cases, \3 inconsistencies/' | paste -sd ';' ;;
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
+        meta) tail -n 1 "$f" ;;
         smoke) grep -E 'bench smoke passed|input wire' "$f" | tail -n 1 ;;
         asm) for c in gcc16 p2996; do [[ -f $WORK/asm-$c.json ]] && python3 -c 'import json, sys
 print(sys.argv[2] + ": " + json.load(open(sys.argv[1]))["verdict"])' "$WORK/asm-$c.json" "$c"; done | paste -sd ';' ;;
