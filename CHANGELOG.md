@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### Public API change: container iterators are a class, not `T*`
+
+`XVector`, `XSet`, `XMap`, `XFixedVector`, `XFixedFlatSet` and `XFixedFlatMap`
+now use `fixed_detail::contiguous_iterator<T>` for `iterator` and
+`fixed_detail::contiguous_iterator<const T>` for `const_iterator`. Before this
+change they were `T*` and `const T*`. The new iterator is a
+`std::contiguous_iterator` whose `operator*` returns `T&`. That tells the
+compiler every element can be read, so a `for (const auto& e : v)` loop with a
+conditional field read is if-converted and vectorized, as it is over
+`std::vector`. With a raw pointer the loop stayed scalar with a branch.
+
+On the Mac (GATE_D3, against `f0308ee7`) SLG D got faster: D.read went from
+82.2 to 67.0 µs, and D÷FlatBuffers from 1.125 to 0.898 (upper bound 0.912),
+so O4 is met. A/B/C did not regress (largest upper bound 1.0107), G9 stays
+at 17/19, and D on x86 is not slower.
+
+Still compiles:
+
+- range-for, `begin() + n`, `it - v.begin()`, `it[n]`, `&*it`, `it->x` and
+  comparisons;
+- `v.end() == nullptr`;
+- passing a `T*` where an iterator is expected, e.g. `v.erase(ptr)` or
+  `v.insert(ptr, x)`;
+- std algorithms, `std::span(v)` and `assign(v.begin(), v.end())`.
+
+`iterator` converts to `const_iterator`, not the reverse.
+
+No longer compiles. Use `v.data()` or `std::to_address(it)` instead:
+
+1. `T* p = v.begin();`
+2. passing `v.begin()` to a `T*` parameter;
+3. `std::memcpy(v.begin(), ...)` and other `void*` parameters;
+4. `std::is_pointer_v<XVector<T>::iterator>`;
+5. `T* q = it;` for an iterator `it`;
+6. `if (v.begin())` as an emptiness test (use `v.empty()`).
+
+`XString` is unchanged. At `-O0` a range-for over a container is about 2.4
+times slower per element than with `T*`, but it is still faster than the same
+loop over `std::vector`.
+
 ## 3.1.0: wire format 2.1
 
 Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade
