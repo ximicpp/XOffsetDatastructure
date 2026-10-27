@@ -51,6 +51,10 @@
 namespace xo = XOffsetDatastructure;
 namespace rr = xo::detail::receive_raw;
 
+// Older libraries (the differential's base) predate the switch.
+#if !defined(XOFFSET_NO_EXCEPTIONS)
+#define XOFFSET_NO_EXCEPTIONS 0
+#endif
 // Raw and verified receive report rejection only by exception.
 constexpr bool kRawAcceptors = !XOFFSET_NO_EXCEPTIONS;
 
@@ -369,10 +373,12 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
 // ---------------------------------------------------------------------------
 // Library acceptors.
 // ---------------------------------------------------------------------------
+// The verified load of every acceptor. Through try_load_verified where the
+// library has it (older libraries, as built by the differential, throw).
 template <class Root = fz::Root>
-std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::string* error = nullptr) {
-    // Growable so accepted inputs can be mutated afterwards.
-    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+std::optional<xo::TypedXBuffer<Root>> load_entry(const std::string& wire, xo::XBuffer::MaximumCapacity cap,
+                                                 std::string* error) {
+#if defined(XOFFSET_TRY_ENTRIES_API)
     auto loaded = xo::TypedXBuffer<Root>::try_load_verified(wire, cap);
 #if !XOFFSET_NO_EXCEPTIONS
     // The throwing entry must agree exactly: outcome, code and message.
@@ -397,6 +403,21 @@ std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::s
         return std::nullopt;
     }
     return std::move(*loaded);
+#else
+    try {
+        return xo::TypedXBuffer<Root>(xo::XBuffer::load_verified<Root>(wire, cap));
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+        return std::nullopt;
+    }
+#endif
+}
+
+template <class Root = fz::Root>
+std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::string* error = nullptr) {
+    // Growable so accepted inputs can be mutated afterwards.
+    return load_entry<Root>(wire, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic),
+                            error);
 }
 
 // After a rejected reload the target has no root; with exceptions on, root()
@@ -419,9 +440,18 @@ Buffer& reloader() {
 }
 
 bool reload_accepts(Buffer& target, const std::string& wire, std::string* error) {
+#if defined(XOFFSET_TRY_ENTRIES_API)
     const auto status = target.try_reload_verified(wire);
     if (status) return true;
     if (error) *error = status.error().message;
+#else
+    try {
+        target.reload_verified(wire);
+        return true;
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+    }
+#endif
     require_no_root(target, "reload_verified");
     return false;
 }
@@ -464,6 +494,38 @@ Buffer& direct_slot() {
     return buffer;
 }
 
+using DirectToken = xo::VerifiedReloadToken<fz::Root>;
+std::optional<DirectToken> direct_begin(Buffer& target, std::size_t used, std::size_t holes, std::size_t extents,
+                                        std::string* error) {
+#if defined(XOFFSET_TRY_ENTRIES_API)
+    auto begun = target.try_begin_verified_reload<fz::Root>(used, holes, extents);
+    if (begun) return std::optional<DirectToken>(std::move(*begun));
+    if (error) *error = begun.error().message;
+#else
+    try {
+        return std::optional<DirectToken>(target.begin_verified_reload<fz::Root>(used, holes, extents));
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+    }
+#endif
+    return std::nullopt;
+}
+bool direct_finish(DirectToken& token, std::string* error) {
+#if defined(XOFFSET_TRY_ENTRIES_API)
+    const auto finished = token.try_finish();
+    if (finished) return true;
+    if (error) *error = finished.error().message;
+#else
+    try {
+        token.finish();
+        return true;
+    } catch (const xo::XException& e) {
+        if (error) *error = e.what();
+    }
+#endif
+    return false;
+}
+
 bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, std::string* error) {
     if (wire.size() < kHeader) { if (error) *error = "transport: short header"; return false; }
     xo::XWireHeaderV2 h{};
@@ -477,11 +539,8 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
         }
     }
     {
-        auto begun = target.try_begin_verified_reload<fz::Root>(used, holes, extents);
-        if (!begun) {
-            if (error) *error = begun.error().message;
-            return false;
-        }
+        auto begun = direct_begin(target, used, holes, extents, error);
+        if (!begun) return false;
         auto& token = *begun;
         std::size_t at = kHeader;
         // Copies up to n bytes of the message into to[off, off + n) as far
@@ -527,10 +586,7 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
         }
         if (mode == DirectMode::Short) pb = pb >= 8 ? pb - 8 : pb + 8;
         token.complete(kHeader, pb, lb, eb);
-        const auto finished = token.try_finish();
-        if (finished) return true;
-        if (error) *error = finished.error().message;
-        return false;
+        return direct_finish(token, error);
     }
 }
 
@@ -579,8 +635,7 @@ Buffer& slot_direct() {
 void check_slots(const std::string& w, bool accepted, Buffer* fresh, const std::string& where) {
     std::optional<Buffer> loaded;
     std::string error;
-    if (auto r = Buffer::try_load_verified(w, xo::XBuffer::maximum_capacity(kLimit))) loaded.emplace(std::move(*r));
-    else error = r.error().message;
+    if (auto r = load_entry(w, xo::XBuffer::maximum_capacity(kLimit), &error)) loaded.emplace(std::move(*r));
     if (bool(loaded) != accepted)
         fail(where + ": slot load=" + (loaded ? "accept" : "reject(" + error + ")") +
              " typed=" + (accepted ? "accept" : "reject"));
