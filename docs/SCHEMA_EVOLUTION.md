@@ -10,8 +10,10 @@
 | `xoffset_evolution.hpp` | 服务端 | 转换、版本链、按对端收发 |
 | `xoffset_schema_freeze.hpp` | 服务端构建 | 发版时冻结版本，CTest 里检查锁文件 |
 
-依赖 C++26 反射（GCC 16、P2996 Clang）。字段表后端（客户端编译器）接入后，客户端
-只需要 `xoffset_handshake.hpp`。
+`xoffset_evolution.hpp` 和 `xoffset_schema_freeze.hpp` 只在服务端用，需要 C++26 反射后端
+（GCC 16、P2996 Clang）；在字段表后端下包含它们会编译失败。客户端只需要
+`xoffset_handshake.hpp`，C++20 字段表构建（`XOFFSET_RECORD`）和反射构建都能编译。
+字段名摘要在两个后端下相同（字段名来自 `schema::member_t<T, I>::name`）。
 
 ## 1. 模型
 
