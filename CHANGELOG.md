@@ -58,8 +58,11 @@ Release goals (roadmap O1-O7) and where this release stands:
 - O7 platform matrix: on 3.0.0 code, full CTest passes on Linux x86-64 (GCC
   16, P2996), Linux arm64 (GCC 16, P2996), macOS arm64 (P2996) and Windows
   x64 MinGW-w64 GCC 16 (104 pass, 2 thread-cache tests skipped), and the
-  2.0 corpus is byte-identical across them. On the release candidate:
-  TBD-O7. iOS was not done.
+  2.0 corpus is byte-identical across them. On the release candidate
+  (`e913d22`): met. Linux x86-64 GCC 16 and P2996 107/107, Linux arm64 GCC
+  16 and P2996 107/107, Windows x64 MinGW-w64 GCC 16 105 pass and the same 2
+  skipped, and the six 2.1 corpus files are byte-identical across all five.
+  macOS arm64 (P2996): TBD-MAC-CTEST. iOS was not done.
 
 Changes:
 
