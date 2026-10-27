@@ -6,6 +6,7 @@
 // and receive only for wires whose framing the oracle accepts). A library with
 // the direct reload also checks it against typed load (marked only on
 // disagreement, so the lines stay comparable with older libraries).
+// Without exceptions only typed load, reload and direct reload run.
 //
 // usage: validation_outcomes <cases> <seed>             digest per 10000 cases
 //        validation_outcomes <cases> <seed> <from> <to> one line per case in [from, to)
@@ -27,6 +28,14 @@ std::uint64_t fnv(std::string_view s, std::uint64_t h = 0xcbf29ce484222325ull) {
     return h;
 }
 std::string outcome(bool accepted, const std::string& error) { return accepted ? "ok" : error; }
+// Builds without exceptions have no raw or receive acceptor; an exceptions
+// build compiled with -DXOFFSET_OUTCOMES_NO_RAW prints the same T:/L: lines,
+// so the two builds can be compared (tools/no_exceptions_differential.sh).
+#if defined(XOFFSET_OUTCOMES_NO_RAW)
+constexpr bool kOutcomesWithRaw = false;
+#else
+constexpr bool kOutcomesWithRaw = kRawAcceptors;
+#endif
 } // namespace
 
 int main(int argc, char** argv) {
@@ -74,7 +83,7 @@ int main(int argc, char** argv) {
             if (direct_accepts(w, nullptr, mode)) line += " D:interrupted-accepted";
         if (direct_accepts(w, nullptr) != typed) line += " D:disagrees";
 #endif
-        if (o.ok || o.stage == Oracle::Stage::Payload) {
+        if (kOutcomesWithRaw && (o.ok || o.stage == Oracle::Stage::Payload)) {
             const bool raw = raw_accepts(w, &rerr);
             const bool recv = receive_accepts(w, &verr);
             line += " R:" + outcome(raw, rerr) + " V:" + outcome(recv, verr);

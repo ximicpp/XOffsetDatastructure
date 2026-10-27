@@ -18,7 +18,13 @@
 //      reload on movable slots must equal the VM load byte for byte, and the
 //      same mutations on a pinned slot must re-save the same wire.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
-// wire header is well formed). Accepted inputs are then read, mutated and
+// wire header is well formed). Acceptors 2, 5, 6 and 7 go through the
+// non-throwing entries (try_load_verified, try_reload_verified,
+// try_begin_verified_reload / try_finish); with exceptions on, typed_load
+// also runs the throwing load_verified and requires the same outcome, error
+// code and message. Without exceptions (XOFFSET_NO_EXCEPTIONS) the raw and
+// verified receive acceptors (3, 4), which have no non-throwing entry yet,
+// are skipped, as is the "root() throws after a reject" check. Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
 // The mutated buffer is then copied with clone() and with clone_into() into
 // ONE long-lived buffer: both copies must hold its bytes and free table,
@@ -44,6 +50,9 @@
 
 namespace xo = XOffsetDatastructure;
 namespace rr = xo::detail::receive_raw;
+
+// Raw and verified receive report rejection only by exception.
+constexpr bool kRawAcceptors = !XOFFSET_NO_EXCEPTIONS;
 
 namespace fz {
 struct Item {
@@ -362,14 +371,44 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
 // ---------------------------------------------------------------------------
 template <class Root = fz::Root>
 std::optional<xo::TypedXBuffer<Root>> typed_load(const std::string& wire, std::string* error = nullptr) {
+    // Growable so accepted inputs can be mutated afterwards.
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto loaded = xo::TypedXBuffer<Root>::try_load_verified(wire, cap);
+#if !XOFFSET_NO_EXCEPTIONS
+    // The throwing entry must agree exactly: outcome, code and message.
+    std::optional<xo::XError> thrown;
     try {
-        // Growable so accepted inputs can be mutated afterwards.
-        return xo::TypedXBuffer<Root>(xo::XBuffer::load_verified<Root>(
-            wire, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic)));
+        (void)xo::XBuffer::load_verified<Root>(wire, cap);
     } catch (const xo::XException& e) {
-        if (error) *error = e.what();
+        thrown = xo::XError{e.code(), e.what()};
+    }
+    if (bool(thrown) == bool(loaded))
+        fail(std::string("try_load_verified ") + (loaded ? "accepted" : "rejected (" + loaded.error().message + ")") +
+             " where load_verified " + (thrown ? "threw (" + thrown->message + ")" : "accepted"));
+    if (thrown && (thrown->code != loaded.code() || thrown->message != loaded.error().message))
+        fail("try_load_verified reported " + std::string(xo::to_string(loaded.code())) + " (" +
+             loaded.error().message + "), load_verified threw " + xo::to_string(thrown->code) + " (" +
+             thrown->message + ")");
+#endif
+    if (!loaded) {
+        if (loaded.code() == xo::XErrc::ok || loaded.error().message.empty())
+            fail("try_load_verified rejected without a code and message");
+        if (error) *error = loaded.error().message;
         return std::nullopt;
     }
+    return std::move(*loaded);
+}
+
+// After a rejected reload the target has no root; with exceptions on, root()
+// must also throw.
+template <class B>
+void require_no_root(B& target, const char* who) {
+#if !XOFFSET_NO_EXCEPTIONS
+    bool refused = false;
+    try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
+    if (!refused) fail(std::string("root() succeeded after a rejected ") + who);
+#endif
+    if (target.has_root()) fail(std::string("has_root() after a rejected ") + who);
 }
 
 // Acceptor 5: one buffer reused for every case (same maximum as typed_load).
@@ -380,17 +419,11 @@ Buffer& reloader() {
 }
 
 bool reload_accepts(Buffer& target, const std::string& wire, std::string* error) {
-    try {
-        target.reload_verified(wire);
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-        bool refused = false;
-        try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
-        if (!refused) fail("root() succeeded after a rejected reload_verified");
-        if (target.has_root()) fail("has_root() after a rejected reload_verified");
-        return false;
-    }
+    const auto status = target.try_reload_verified(wire);
+    if (status) return true;
+    if (error) *error = status.error().message;
+    require_no_root(target, "reload_verified");
+    return false;
 }
 bool reload_accepts(const std::string& wire, std::string* error) { return reload_accepts(reloader(), wire, error); }
 
@@ -443,8 +476,13 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
         default: extents = extents ? extents - 1 : 1; break;
         }
     }
-    try {
-        auto token = target.begin_verified_reload<fz::Root>(used, holes, extents);
+    {
+        auto begun = target.try_begin_verified_reload<fz::Root>(used, holes, extents);
+        if (!begun) {
+            if (error) *error = begun.error().message;
+            return false;
+        }
+        auto& token = *begun;
         std::size_t at = kHeader;
         // Copies up to n bytes of the message into to[off, off + n) as far
         // as both reach; returns the bytes copied.
@@ -489,10 +527,9 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
         }
         if (mode == DirectMode::Short) pb = pb >= 8 ? pb - 8 : pb + 8;
         token.complete(kHeader, pb, lb, eb);
-        token.finish();
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
+        const auto finished = token.try_finish();
+        if (finished) return true;
+        if (error) *error = finished.error().message;
         return false;
     }
 }
@@ -502,12 +539,7 @@ bool direct_accepts(Buffer& target, const std::string& wire, std::string* error,
     const bool ok = direct_deliver(target, wire, mode, error);
     // A wire shorter than the header is refused by the transport before a
     // reload begins, so the target keeps whatever it held (#130).
-    if (!ok && wire.size() >= kHeader) {
-        bool refused = false;
-        try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
-        if (!refused) fail("root() succeeded after a rejected direct reload");
-        if (target.has_root()) fail("has_root() after a rejected direct reload");
-    }
+    if (!ok && wire.size() >= kHeader) require_no_root(target, "direct reload");
     return ok;
 }
 bool direct_accepts(const std::string& wire, std::string* error, DirectMode mode = DirectMode::Whole) {
@@ -547,9 +579,8 @@ Buffer& slot_direct() {
 void check_slots(const std::string& w, bool accepted, Buffer* fresh, const std::string& where) {
     std::optional<Buffer> loaded;
     std::string error;
-    try {
-        loaded.emplace(xo::XBuffer::load_verified<fz::Root>(w, xo::XBuffer::maximum_capacity(kLimit)));
-    } catch (const xo::XException& e) { error = e.what(); }
+    if (auto r = Buffer::try_load_verified(w, xo::XBuffer::maximum_capacity(kLimit))) loaded.emplace(std::move(*r));
+    else error = r.error().message;
     if (bool(loaded) != accepted)
         fail(where + ": slot load=" + (loaded ? "accept" : "reject(" + error + ")") +
              " typed=" + (accepted ? "accept" : "reject"));
@@ -608,6 +639,7 @@ Unpacked unpack(const std::string& wire) {
     return u;
 }
 
+#if !XOFFSET_NO_EXCEPTIONS
 template <class Root = fz::Root>
 bool raw_accepts(const std::string& wire, std::string* error) {
     auto u = unpack(wire);
@@ -663,6 +695,12 @@ bool receive_accepts(const std::string& wire, std::string* error) {
         return false;
     }
 }
+#else
+template <class Root = fz::Root>
+bool raw_accepts(const std::string&, std::string*) { std::abort(); }
+template <class Root = fz::Root>
+bool receive_accepts(const std::string&, std::string*) { std::abort(); }
+#endif
 
 // Semantic dump of a root (for round-trip comparison).
 std::string dump(const fz::Root& r) {
@@ -1158,7 +1196,7 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     check_direct(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
 #endif
     compare_inflated(w, typed, terr, o, "case " + id);
-    if (o.ok || o.stage == Oracle::Stage::Payload) {
+    if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
         if (raw != o.ok)

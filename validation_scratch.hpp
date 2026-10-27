@@ -72,13 +72,13 @@ struct alignas(std::max_align_t) Header {
 
 struct Plan { std::size_t raw_bytes, raw_alignment, user_offset; };
 inline Plan allocation_plan(std::size_t bytes, std::size_t alignment) {
-    if (!alignment || (alignment & (alignment - 1u))) throw std::bad_alloc();
+    if (!alignment || (alignment & (alignment - 1u))) XOFFSET_THROW(std::bad_alloc());
     const auto a = alignment < alignof(Header) ? alignof(Header) : alignment;
     constexpr auto maximum = (std::numeric_limits<std::size_t>::max)();
-    if (sizeof(Header) > maximum - (a - 1u)) throw std::bad_alloc();
+    if (sizeof(Header) > maximum - (a - 1u)) XOFFSET_THROW(std::bad_alloc());
     const auto offset = (sizeof(Header) + a - 1u) & ~(a - 1u);
     const auto payload = bytes ? bytes : std::size_t{1};
-    if (payload > maximum - offset) throw std::bad_alloc();
+    if (payload > maximum - offset) XOFFSET_THROW(std::bad_alloc());
     return {offset + payload, a, offset};
 }
 
@@ -170,12 +170,12 @@ class Resource final : public std::pmr::memory_resource {
             }
         }
         void* raw;
-        try {
+        XOFFSET_TRY {
             raw = upstream_->allocate(plan.raw_bytes, plan.raw_alignment);
-        } catch (...) {
+        } XOFFSET_CATCH(...) {
             std::lock_guard<std::mutex> guard(p.mutex);
             ++p.counts.upstream_failures;
-            throw; // An upstream OOM never silently retries via the fallback.
+            XOFFSET_RETHROW; // An upstream OOM never silently retries via the fallback.
         }
         auto* result = static_cast<std::byte*>(raw) + plan.user_offset;
         auto* h = ::new (static_cast<void*>(result - sizeof(Header))) Header{
@@ -202,7 +202,7 @@ public:
     Resource(std::pmr::memory_resource* upstream, bool cache)
         : upstream_(upstream), cache_(cache) {
         (void)pool(); // Before this resource/context can finish construction.
-        if (!upstream) throw std::invalid_argument("null scratch upstream");
+        if (!upstream) XOFFSET_THROW(std::invalid_argument("null scratch upstream"));
     }
     ~Resource() override {
         if (active_blocks() != 0) std::terminate();

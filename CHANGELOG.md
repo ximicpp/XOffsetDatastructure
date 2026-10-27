@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- SC-8: builds without exceptions (`-fno-exceptions`, MSVC `/EHs-c-`) for
+  engine clients. Non-throwing receive entries `try_load_verified`,
+  `try_load_verified_with_resource`, `try_reload_verified`,
+  `try_reload_verified_with_resource`, `try_begin_verified_reload` and
+  `VerifiedReloadToken::try_finish` (and the `TypedXBuffer` forms) return
+  `XResult<T>` / `XStatus` with an `XErrc` code and the exact message the
+  throwing entry throws. `XException::code()` is new; `XException` and
+  `XBadAlloc` moved to the new header `xoffset_error.hpp` (installed with
+  the storage package). Without exceptions, failures that cannot be
+  returned call the handler set with `set_fatal_handler` and abort.
+  Validation is unchanged: the fuzz core compares every rejection of
+  `try_load_verified` with `load_verified`, and 23 test programs, the OS
+  layer test and the validator fuzz run without exceptions in CTest.
+  Raw validation and verified receive have no non-throwing entry yet.
+
 ## 3.1.0: wire format 2.1
 
 Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade

@@ -304,6 +304,7 @@ std::string_view who = r.name.view();
   违反规则或超过 wire 上限时抛 `XException`，`out` 为空串。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
+  不想用异常时调用 `try_load_verified`，见第 6.1 节。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。
 - `load_unverified` 跳过校验，只适合调用方已经信任的数据。
 - 直接把数据收进最终 arena 的接收接口是 `begin_verified_receive<T>` /
@@ -414,7 +415,51 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 ## 6. 错误处理
 
 - 所有库错误都是 `XException`（派生自 `std::runtime_error`）；空间不足是它的子类
-  `XBadAlloc`。
+  `XBadAlloc`。每个 `XException` 都带错误码：`e.code()` 返回 `XErrc`
+  （`xoffset_error.hpp`，例如 `bad_magic`、`schema_mismatch`、`invalid_payload`、
+  `capacity_exceeded`，`to_string(code)` 给出名字）。
+
+### 6.1 不抛异常的接收入口
+
+接收入口都有一个不抛异常的版本，返回 `XResult<T>`（值或 `XError{code, message}`）或
+`XStatus`。校验与抛出版本完全相同；失败时的错误码和错误文字就是抛出版本会抛的那个，
+buffer 留下的状态也相同（reload 失败后为空、无根）。
+
+```cpp
+auto in = XBuffer::try_load_verified<Profile>(wire, cap);     // XResult<XBuffer>
+if (!in) { log(to_string(in.code()), in.error().message); return; }
+const Profile& r = in->root<Profile>();
+
+if (auto s = buf.try_reload_verified<Profile>(wire); !s) drop(s.error());
+
+auto token = buf.try_begin_verified_reload<Profile>(used, holes, extents);
+// ... 写入 token->header_bytes() / payload_bytes() / hole_bytes()，complete(...)
+XStatus done = token ? token->try_finish() : XStatus(token.error());
+```
+
+还有 `try_load_verified_with_resource`、`try_reload_verified_with_resource` 和
+`TypedXBuffer<T>::try_load_verified / try_reload_verified`。`XResult::value()` 在没有值时
+抛出（关异常构建里调用致命处理器）；`*r` / `r->` 不检查。
+
+### 6.2 关异常构建（`-fno-exceptions`、MSVC `/EHs-c-`）
+
+整个库可以在关异常的编译选项下使用，面向不开异常的客户端引擎。检测
+`__cpp_exceptions` / `_CPPUNWIND`，也可以用 `-DXOFFSET_NO_EXCEPTIONS=1` 强制。不需要 RTTI。
+
+- 接收路径（wire 头、extent 表、容量检查、OS 存储预留与拷贝、owner 登记、整图校验、
+  空闲表装载）沿调用链返回第一个失败，由上面的 `try_*` 入口交给调用方。同一条 wire 在
+  开、关异常两种构建里得到同样的结果和同样的错误文字（`tools/no_exceptions_differential.sh`
+  对 20 万条变异 wire 逐条比对）。
+- 其他失败（修改时 arena 空间不足、`root<T>()` 没有根、保存时超过 wire 上限、调用抛出版本
+  的接收入口被拒等）没有调用方可以返回，调用致命处理器后 `abort()`。引擎用
+  `set_fatal_handler(fn)` 接入自己的崩溃上报；`fn(XErrc, const char*)` 不能返回。
+- 宿主 `operator new` 失败按标准库在关异常下的行为终止。
+- 开异常时会从 `XBadAlloc` 恢复的两处，关异常时也是致命的：容器拷贝赋值的整块拷贝
+  （开异常时退回逐元素拷贝）和 `XCompactor::compact` 的倍数重试（2 倍已用空间足够时不会
+  走到）。客户端只接收、读取、做少量修改时不受影响。
+- `receive_raw::validate` 和 `begin_verified_receive` / `finish_verified` 还没有不抛出的
+  版本，关异常时它们的拒绝是致命的；客户端请用 `try_load_verified`、
+  `try_reload_verified` 或 `try_begin_verified_reload`。
 - 库容器的修改在分配失败时保留原有逻辑内容，但容量和分配器记账不一定回滚。多步
   业务操作不是事务。
 

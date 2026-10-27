@@ -54,6 +54,17 @@ function(xoffset_check_full_toolchain)
     message(STATUS "Using C++${XOFFSET_CXX_STANDARD} with XOFFSET_RECORD field lists")
 endfunction()
 
+# SC-8: a target built without exceptions, as engine clients build
+# (-fno-exceptions; MSVC /EHs-c- with the standard library's exceptions off).
+function(xoffset_disable_exceptions target_name)
+    if(MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+        target_compile_options(${target_name} PRIVATE /EHs-c-)
+        target_compile_definitions(${target_name} PRIVATE _HAS_EXCEPTIONS=0)
+    else()
+        target_compile_options(${target_name} PRIVATE -fno-exceptions)
+    endif()
+endfunction()
+
 function(xoffset_configure_full_interface target_name)
     target_link_libraries(${target_name} INTERFACE Threads::Threads)
     if(XOFFSET_SCHEMA_BACKEND STREQUAL "describe")
@@ -108,6 +119,7 @@ function(xoffset_compile_check check_name source_file result_variable output_var
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
         "${source_file}" "${PROJECT_SOURCE_DIR}/xoffsetdatastructure.hpp"
         "${PROJECT_SOURCE_DIR}/xoffset_virtual_memory.hpp"
+        "${PROJECT_SOURCE_DIR}/xoffset_error.hpp"
         "${PROJECT_SOURCE_DIR}/xoffset_slot_storage.hpp")
     # A toolchain's STATIC_LIBRARY override would bypass the link check.
     set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)

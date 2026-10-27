@@ -73,7 +73,7 @@ std::string outcomes(const std::string& w) {
     std::string line = std::string("T:") + (typed_load(w, &terr) ? "ok" : terr) +
                        " L:" + (reload_accepts(w, &lerr) ? "ok" : lerr);
     const auto o = oracle(w);
-    if (o.ok || o.stage == Oracle::Stage::Payload) {
+    if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
         line += std::string(" R:") + (raw_accepts(w, &rerr) ? "ok" : rerr);
         line += std::string(" V:") + (receive_accepts(w, &verr) ? "ok" : verr);
     }
