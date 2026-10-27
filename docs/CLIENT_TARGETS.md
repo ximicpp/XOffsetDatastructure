@@ -37,7 +37,7 @@
 - **macOS / iOS（std::pmr）**：库用系统 libc++ 的 `std::pmr`（`new_delete_resource`、
   `monotonic_buffer_resource`、`memory_resource` 虚表）。系统 libc++ 从 macOS 14 / iOS 17 起才有这些
   符号，而 libc++ 头文件（上游和 Apple SDK 都一样）没有给 pmr 加可用性标注，部署目标更低时
-  照样能编译、链接，到旧系统上加载时才失败。所以 C++20/23 构建的默认部署目标是 macOS 14，
+  照样能编译、链接，到旧系统上加载时才失败。所以 C++20/23 构建的默认部署目标是 macOS 14（用户没设时 CMake 强制设成 14.0，Mac 上已确认二进制 minos 14.0），
   更低的部署目标在编译期报错（探索分支 067b112）。C++26 构建带 clang-p2996 自己的 libc++，不受影响。
   NDK 和 MinGW 把标准库静态链进程序，没有这个系统版本门槛。
 - **MSVC（未验证）**：`XOFFSET_RECORD` 依赖 `__VA_OPT__`，需要符合标准的预处理器
