@@ -1,0 +1,18 @@
+== 2026-10-27T05:27:45Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+ProductName:		macOS ProductVersion:		26.3 BuildVersion:		25D125 
+Apple M4
+== 2026-10-27T05:27:46Z 1. export
+t0 35492720b5981d9672c8b8f00037dcb687aaf9fd tree 509b344339ea42adc60f8a66be3bd98d839219a8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 3549272 (G8 checkpoint))
+t1 30af216f6063316fb3348188f1570e53ecf26468 tree 039f816a0d30dd6acb25c55fe340d40f811edb2d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 30af216 (L5 #125, L1 #126, L2 #127, L3 #128, L4 #129; also #120, #121))
+t1: diff over t0 8d42e43b2fbd ( 19 files changed, 475 insertions(+), 88 deletions(-))
+/Volumes/XOffsetCS/perf-gate/src/g9r/t1/bench/reloc/MANIFEST: 4 files match
+== 2026-10-27T05:27:51Z 2. build
+reloc_bench t0 sha256 85858977d8dc492296ac9992e489a0e9f237633956e1ae315cedde8914c12aeb
+reloc_bench t1 sha256 feaaeab71a10b25a2345694eb865b6c7661c4b9b5c37aee92a5b484c1dd14afe
+reloc verify t0: 31 cases; checks: all passed
+reloc verify t1: 31 cases; checks: all passed
+disasm: done (/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/llvm-objdump)
+== 2026-10-27T05:28:05Z 3. timing
