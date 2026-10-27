@@ -25,6 +25,8 @@ it. Both run the same validator and send the same bytes.
 | Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
 | End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all six targets PASS (section 5) |
 | End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 145 / 145 verdicts, no sanitizer report |
+| End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
+| Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
 | End to end, emulators (10-27) | Android emulator (arm64) and iOS Simulator on the Mac, A/B in a Linux VM there | pending (emulator thread, Mac queue) |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
@@ -184,8 +186,12 @@ Output in the project folder `slg-demo-20261022/e2e-20261027/`
 | windows-msvc | wine | MSVC 19.44, `/MT`, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | windows-clang-cl | wine | clang-cl 19.1, MSVC STL, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | android-arm64 | qemu-aarch64 user mode | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| macos (Mac M4, separate run) | native; A/B in colima, Linux arm64 | Apple clang 21, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 
 What this shows:
+- Server to server across architectures: A and B built by GCC 16 for Linux
+  arm64 (colima on the Mac) sent the same step wires as the cloud x86-64
+  build at every one of 500 ticks in all three tiers.
 - C++26 reflection servers and C++20 field-list clients agree on the layout:
   the Hello schema hash matches, and per request A and every client log the
   same encoding, bytes sent, wire digest and content digest.
@@ -213,9 +219,11 @@ on), both buffer modes: self-check 23 / 23, replay 60 / 60, three tiers x two
 modes + evil x two, 145 / 145 verdicts, no sanitizer report
 (`mapdemo_e2e_cloud_asan1.tgz`).
 
-Still open for this section: the Android emulator and iOS Simulator runs on
-the Mac (wrapper scripts by the emulator thread) and the macOS window client
-with screenshots.
+The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
+the Mac's screen was asleep); the client now exits 2 with "cannot open a
+window" instead (checked without a display and under Xvfb). Still open for
+this section: the Android emulator and iOS Simulator runs and the macOS
+window screenshots, on the Mac.
 
 ## 6. Scope
 
