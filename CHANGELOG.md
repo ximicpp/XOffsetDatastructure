@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- GCC on MinGW and Cygwin (emulated TLS): the per-thread caches (slot free
+  lists, free-table cache, owner cache) are off, because emutls can free a
+  thread's TLS before its `thread_local` destructors run; threads that
+  created buffers crashed or hung at exit. `XOFFSET_THREAD_CACHES` (0 there,
+  1 elsewhere) selects this; Clang on MinGW keeps the caches. Other targets
+  are unchanged.
 - Owner registration: an ordinary owner (created, loaded or reloaded) keeps
   only its identity record and no longer enters the process-wide index or
   takes its mutex. Only direct-receive owners, the ones
