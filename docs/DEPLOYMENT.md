@@ -1,4 +1,4 @@
-# XOffsetDatastructure 部署指南（0.3.0-beta.1）
+# XOffsetDatastructure 部署指南（3.0.0）
 
 本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
 API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
