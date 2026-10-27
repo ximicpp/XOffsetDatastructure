@@ -8,7 +8,9 @@
 #   tools/analyze.py (geometric mean, Bonferroni one-sided 95% UB).
 # 2026-10-26: Skill, Buff and Troop declared ordinary with the .ord records, as the
 #   user guide says (element records too); .ord heroes now move by SHIFT.
+# 2026-10-27: reported str.assign_short.view / .copy (like-for-like short assignment).
+# 2026-10-27: G9 judges str.assign_short.view; str.assign_short and .copy reported (g9-assign-protocol).
 74551b16f3b99e39ff191e957a29b7c5d55408258a1bb34cc95c0a71a4be0759  CMakeLists.txt
-127ad8a0ece174c7ba30c24fcfa95d9731829d1287f8886751d91fecd147269a  README.md
-b9cc1a19e569cb2d4f4442d52bc9f73aba8c1d518b487140c421087b73befe23  reloc_bench.cpp
+061f93e346edd28314beacf83a32398327c25778e897b69c058a16cf4ebf45e3  README.md
+c4d3fb20ec465c3b59a949823fe4b01db0909f5331e66bfc7bf4e6ef24112288  reloc_bench.cpp
 a3b0540ba0e85e8a3183fbc4edf1b7314d6ff451de1c86b6c1c85582173bb634  tools/analyze.py
