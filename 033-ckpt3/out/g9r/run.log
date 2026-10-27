@@ -1,0 +1,79 @@
+== 2026-10-27T06:02:20Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+ProductName:		macOS ProductVersion:		26.3 BuildVersion:		25D125 
+Apple M4
+== 2026-10-27T06:02:20Z 1. export
+t0 35492720b5981d9672c8b8f00037dcb687aaf9fd tree 509b344339ea42adc60f8a66be3bd98d839219a8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 3549272 (G8 checkpoint))
+t1 30af216f6063316fb3348188f1570e53ecf26468 tree 039f816a0d30dd6acb25c55fe340d40f811edb2d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 30af216 (L5 #125, L1 #126, L2 #127, L3 #128, L4 #129; also #120, #121))
+t1: diff over t0 8d42e43b2fbd ( 19 files changed, 475 insertions(+), 88 deletions(-))
+/Volumes/XOffsetCS/perf-gate/src/g9r/t1/bench/reloc/MANIFEST: 4 files match
+== 2026-10-27T06:02:21Z 2. build
+reloc_bench t0 sha256 85858977d8dc492296ac9992e489a0e9f237633956e1ae315cedde8914c12aeb
+reloc_bench t1 sha256 feaaeab71a10b25a2345694eb865b6c7661c4b9b5c37aee92a5b484c1dd14afe
+reloc verify t0: 31 cases; checks: all passed
+reloc verify t1: 31 cases; checks: all passed
+disasm: done (/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/llvm-objdump)
+== 2026-10-27T06:02:36Z 3. timing
+fwd_probe: 50000000 iterations x 9 rounds; calibration 0.2280 ns/cycle (4.39 GHz)
+case  pattern                                         min ns    med ns   min cyc   med cyc
+calib 8 dependent adds (8 cycles)                      1.824     1.827      8.00      8.01
+F1    str w, ldr w same 4 B                            0.231     0.240      1.01      1.05
+F2    str x, ldr x same 8 B                            0.227     0.236      0.99      1.04
+F3    str w, ldr x over it (low half)                  1.594     1.599      6.99      7.01
+F4    str w size_, ldp w,w [#8] (xo push_back)         1.596     1.599      7.00      7.01
+F5    str w size_, ldp w,w [#4] (begin+size)           1.596     1.600      7.00      7.02
+F6    str x end, ldp x,x [#0] (libc++ vector)          1.596     1.600      7.00      7.02
+F7    stp w,w, ldp w,w same 8 B                        1.597     1.599      7.00      7.01
+F8    str q head, ldp w,w [#8] inside                  4.205     4.210     18.44     18.46
+F9    str q head, ldr w [#8] inside                    4.199     4.202     18.42     18.43
+F10   str x [#8], ldp w,w [#4] straddling              1.824     1.826      8.00      8.01
+fwd_probe: 50000000 iterations x 9 rounds; calibration 0.2277 ns/cycle (4.39 GHz)
+case  pattern                                         min ns    med ns   min cyc   med cyc
+calib 8 dependent adds (8 cycles)                      1.822     1.827      8.00      8.02
+F1    str w, ldr w same 4 B                            0.227     0.232      1.00      1.02
+F2    str x, ldr x same 8 B                            0.227     0.298      1.00      1.31
+F3    str w, ldr x over it (low half)                  1.595     1.597      7.01      7.02
+F4    str w size_, ldp w,w [#8] (xo push_back)         1.597     1.599      7.01      7.02
+F5    str w size_, ldp w,w [#4] (begin+size)           1.594     1.597      7.00      7.02
+F6    str x end, ldp x,x [#0] (libc++ vector)          1.595     1.598      7.00      7.02
+F7    stp w,w, ldp w,w same 8 B                        1.596     1.598      7.01      7.02
+F8    str q head, ldp w,w [#8] inside                  4.197     4.205     18.43     18.47
+F9    str q head, ldr w [#8] inside                    4.192     4.200     18.41     18.45
+F10   str x [#8], ldp w,w [#4] straddling              1.824     1.827      8.01      8.02
+== 2026-10-27T06:36:16Z 4. analysis
+| case | t0 xo ns/op | t1 xo ns/op | t1 / t0 | first baseline ns/op (t0 runs) |
+| --- | ---: | ---: | ---: | ---: |
+| hero.mid_erase.ord | 270.50 | 172.04 | 0.636 | 228.02 |
+| hero.mid_erase.plain | 1031.07 | 1041.24 | 1.010 | 225.33 |
+| hero.mid_insert.ord | 366.62 | 242.51 | 0.661 | 300.14 |
+| hero.mid_insert.plain | 1393.57 | 1409.58 | 1.011 | 301.54 |
+| hero.push_back_grow.ord | 39.33 | 38.05 | 0.968 | 89.93 |
+| hero.push_back_grow.plain | 42.72 | 42.43 | 0.993 | 88.32 |
+| map.erase.fresh | 33.92 | 33.96 | 1.001 | 35.24 |
+| map.erase.reused | 30.09 | 29.98 | 0.996 | 27.32 |
+| map.find.fresh | 5.15 | 5.15 | 1.000 | 6.55 |
+| map.find.reused | 5.15 | 5.15 | 1.000 | 6.56 |
+| map.insert.fresh | 35.52 | 35.53 | 1.000 | 36.88 |
+| map.insert.reused | 33.18 | 33.20 | 1.001 | 29.34 |
+| nested.build.ord | 387.52 | 369.62 | 0.954 | 852.77 |
+| nested.build.plain | 392.89 | 386.22 | 0.983 | 838.64 |
+| reset | 32.72 | 34.01 | 1.039 | 162.08 |
+| set.erase.fresh | 30.70 | 30.73 | 1.001 | 27.34 |
+| set.erase.reused | 23.21 | 23.09 | 0.995 | 20.24 |
+| set.find.fresh | 4.88 | 4.88 | 0.999 | 6.45 |
+| set.find.reused | 4.87 | 4.88 | 1.001 | 6.45 |
+| set.insert.fresh | 32.32 | 32.29 | 0.999 | 28.90 |
+| set.insert.reused | 27.00 | 26.84 | 0.994 | 21.16 |
+| str.append | 1.52 | 1.61 | 1.064 | 4.35 |
+| str.assign_long | 3.29 | 2.93 | 0.891 | 3.41 |
+| str.assign_short | 1.30 | 0.97 | 0.744 | 0.51 |
+| str.assign_short.copy | 1.59 | 0.81 | 0.507 | 0.51 |
+| str.assign_short.view | 1.28 | 0.99 | 0.769 | 2.72 |
+| vec.iterate | 0.03 | 0.04 | 1.073 | 0.03 |
+| vec.mid_erase | 41.61 | 41.91 | 1.007 | 39.33 |
+| vec.mid_insert | 44.79 | 47.72 | 1.066 | 40.69 |
+| vec.push_back | 2.03 | 0.41 | 0.202 | 0.31 |
+| vec.push_back_grow | 1.76 | 0.32 | 0.182 | 0.39 |
+== 2026-10-27T06:36:17Z finish rc=0

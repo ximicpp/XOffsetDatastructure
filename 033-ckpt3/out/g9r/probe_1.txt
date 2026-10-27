@@ -1,0 +1,13 @@
+fwd_probe: 50000000 iterations x 9 rounds; calibration 0.2280 ns/cycle (4.39 GHz)
+case  pattern                                         min ns    med ns   min cyc   med cyc
+calib 8 dependent adds (8 cycles)                      1.824     1.827      8.00      8.01
+F1    str w, ldr w same 4 B                            0.231     0.240      1.01      1.05
+F2    str x, ldr x same 8 B                            0.227     0.236      0.99      1.04
+F3    str w, ldr x over it (low half)                  1.594     1.599      6.99      7.01
+F4    str w size_, ldp w,w [#8] (xo push_back)         1.596     1.599      7.00      7.01
+F5    str w size_, ldp w,w [#4] (begin+size)           1.596     1.600      7.00      7.02
+F6    str x end, ldp x,x [#0] (libc++ vector)          1.596     1.600      7.00      7.02
+F7    stp w,w, ldp w,w same 8 B                        1.597     1.599      7.00      7.01
+F8    str q head, ldp w,w [#8] inside                  4.205     4.210     18.44     18.46
+F9    str q head, ldr w [#8] inside                    4.199     4.202     18.42     18.43
+F10   str x [#8], ldp w,w [#4] straddling              1.824     1.826      8.00      8.01

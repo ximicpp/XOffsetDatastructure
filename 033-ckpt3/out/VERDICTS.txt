@@ -1,0 +1,5 @@
+CKPT3 11
+anchor 3549272 (CKPT2b: pass)
+screen watcher: 61 calls (dark.log)
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 14 of 19 comparisons have UB <= 1.05; above: vec.push_back, vec.mid_insert, vec.mid_erase, set.insert.fresh, set.erase.fresh
+ctest 100% tests passed out of 106 (rc 0)

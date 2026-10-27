@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-27T05:31:22Z after 033-ckpt3: running 2026-10-27T05:31:20Z
+Updated 2026-10-27T06:38:12Z after 033-ckpt3: done 11 2026-10-27T06:38:07Z
 
 ```
 runner: pid 45762 (version 2)
@@ -37,5 +37,5 @@ free: 25 GB on /Volumes/XOffsetCS, 25 GB on /Users/ximi
 030-XMODES                               done 0 2026-10-27T03:53:22Z
 031-g9r                                  cancelled
 032-g9r                                  done 70 2026-10-27T05:30:04Z
-033-ckpt3                                running 2026-10-27T05:31:20Z
+033-ckpt3                                done 11 2026-10-27T06:38:07Z
 ```
