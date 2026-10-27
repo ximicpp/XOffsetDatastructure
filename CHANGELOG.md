@@ -7,23 +7,43 @@
 Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade
 together; 3.0.0 readers reject 2.1 and 3.1.0 readers reject 2.0). Same
 toolchains as 3.0.0. Mac M4 at the INT4 checkpoint against `v3.0.0`
-(`docs/PERFORMANCE.md` section 3): TBD-INT4. Known gaps: TBD-INT4 (G9 items
-still over 1.05, D against FlatBuffers), schema evolution is not supported,
-iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
+(`docs/PERFORMANCE.md` section 3): SLG A 0.991, B 0.951, C 0.950, D 0.846;
+formal read_sum 0.950, mutate 0.970, emit_after 0.869 (largest upper bound
+0.981). Known gaps: D is still slower than FlatBuffers (1.117, upper bound
+1.156), D's wire is 0.864 of 3.0.0 against a 0.70 target, TBD-G9, schema
+evolution is not supported, and iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
 
 Release goals (roadmap O1-O7) and where this release stands:
 
 - O1 wire 2.1, frozen for 3.x: R7 (40-byte header, no payload header on the
   wire) and R4 (12-byte container heads) are both in. Bytes per message
   against 3.0.0 (target A.req, A.res, B <= 0.92, D <= 0.70, formal M final
-  wire <= 0.94): TBD-INT4. `emit_after` against cereal (target UB <= 0.20):
-  TBD-INT4. 2.0 wires are rejected with the version named.
-- O2 no regression against `v3.0.0`, G1-G3 and G8 still met: TBD-INT4.
+  wire <= 0.94): TBD-WIRE; D is 0.864, not met. `emit_after` against cereal
+  (target UB <= 0.20): met, upper bound 0.168 and 0.170 in two batches (3.0.0
+  in the same batches: median 0.188 and 0.194). 2.0 wires are rejected with
+  the version named.
+- O2 no regression against `v3.0.0`, G1-G3 and G8 still met: met for the
+  regression check (INT4 L2 pass, see above) and G1-G3 (A, B, C upper bound
+  <= 0.50 against cereal, protobuf and FlatBuffers; largest A against
+  FlatBuffers 0.318). G8 (zpp_bits, cista) was not measured in INT4; it is
+  inferred from 3.0.0 (met) and the A/B/C ratios above, not measured.
 - O3 G9 relocation tax (target 19/19 items UB <= 1.05; floor: no item worse
   than 3.0.0, each open item with a measured root cause): TBD-G9.
 - O4 D against FlatBuffers (target UB <= 1.0, no API change, full validation
-  kept): TBD-INT4. If the upper bound is still above 1.0, this release ships
-  the speedups it has and the target moves to 3.2 (susu, 2026-10-27).
+  kept): not met. D against FlatBuffers is 1.117, upper bound 1.156 (3.0.0:
+  1.355 / 1.383), and D is 0.846 of 3.0.0. As decided by susu (2026-10-27),
+  this release ships these speedups and the target moves to 3.2. At the
+  upper bound D needs about 14% more (8.6 µs per cycle, about 4 ns per
+  read). The gap is not instruction count (619 Ir per read on the cloud, 786
+  for FlatBuffers) but stalls on the M4; the 619 Ir split: structure
+  validation 30%, lookup and `root<T>()` 22%, copy and reinit 21%, root and
+  free-table lookup 11%, header admission 6%. Plan for 3.2: (1) check on the
+  Mac whether the narrow validation reads right after the payload copy hit
+  the M4 store-forwarding stall, and if so change the copy shape for small
+  payloads (5-10%, not yet verified, the largest unknown); (2) cache the
+  validated root pointer (2-3%); (3) trim the validation context set-up and
+  fixed lookup costs (2-3%). Together 9-16%, so reaching 1.0 depends on step
+  (1).
 - O5 stability: changed to a one-time fuzz run on the release candidate
   (susu, 2026-10-27); the seven-night runs move to 3.2. TBD-FUZZ.
 - O6 release procedure and documents: met in 3.0.0 (`docs/RELEASING.md`,
