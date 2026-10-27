@@ -67,9 +67,21 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
 // system libc++, which Apple ships from macOS 14 / iOS 17 / tvOS 17 / watchOS 10.
 // The SDK does not mark those symbols with availability, so an older
 // deployment target compiles and links, then fails at launch on the old
-// system. Fail the build instead.
+// system. Fail the build instead. Only the system libc++ is checked: its
+// headers are configured with vendor availability annotations, while a
+// toolchain's own libc++ (P2996 Clang, linked with its rpath) and libstdc++
+// carry std::pmr themselves.
 #if defined(__APPLE__)
-#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 140000
+#include <version>
+#if defined(_LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS)
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS
+#elif defined(_LIBCPP_VERSION) && !defined(_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS)
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 1
+#else
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 0
+#endif
+#if !XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX
+#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 140000
 #error "XOffset needs macOS 14 or newer (std::pmr in the system libc++): build with -mmacosx-version-min=14.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=14.0)"
 #elif defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 170000
 #error "XOffset needs iOS 17 or newer (std::pmr in the system libc++): build with -miphoneos-version-min=17.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=17.0)"
