@@ -16,6 +16,12 @@ tax is not closed, the D scenario is slower than zpp_bits and FlatBuffers,
 schema evolution is not supported, and iOS, Android and MSVC full builds are
 not verified (`docs/CLIENT_TARGETS.md`).
 
+- Performance (G9 relocation tax; same wire bytes, same behavior):
+  `XVector::push_back` restates `size_` after the general path; under Clang,
+  the SHIFT rebase checks overflow once per moved run and the general path of
+  `XString::assign` is out of line; copy-assigning an inline `XString` into a
+  bound inline head copies 12 bytes. `bench/reloc` reports
+  `str.assign_short.view` and `str.assign_short.copy`.
 - Documentation: `docs/RELEASING.md` is the fixed release procedure (Mac
   checkpoint, local validation with TSan, the release PR, the three tag
   commands); `docs/USER_GUIDE.md` 4.3 explains the two conventions behind the
