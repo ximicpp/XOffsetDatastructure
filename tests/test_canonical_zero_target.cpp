@@ -153,6 +153,11 @@ void run_case(bool b_canonical,bool expect_old_bug){
 }
 } // namespace fixture
 
+// Both cases drive the per-thread owner cache; GCC on MinGW/Cygwin builds without it
+// (XOFFSET_THREAD_CACHES=0), so there is nothing to test: CTest reports a skip (77).
+#if !XOFFSET_THREAD_CACHES
+int main(){std::cout<<"skipped: no per-thread owner cache (XOFFSET_THREAD_CACHES=0)\n";return 77;}
+#else
 int main(int argc,char** argv){try{
     const bool control=argc==2&&std::string_view(argv[1])=="--expect-old-bug";
     fixture::need(argc==1||control,"only optional --expect-old-bug control is supported");
@@ -161,3 +166,4 @@ int main(int argc,char** argv){try{
              <<"; two deterministic adjacent-array registry fixtures; no VM/platform result\n";
     return 0;
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
+#endif
