@@ -59,6 +59,18 @@ def fmt(x, digits=1):
     return "{:.{}f}".format(x, digits)
 
 
+def pct(values, p):
+    """Nearest rank, as summarize.py."""
+    v = sorted(values)
+    if not v:
+        return float("nan")
+    return v[max(0, int(math.ceil(p * len(v))) - 1)]
+
+
+def mean(values):
+    return sum(values) / len(values) if values else float("nan")
+
+
 def runner(cmd):
     """How the client ran: natively, or under wine / qemu / a device bridge."""
     first = os.path.basename(cmd.split()[0]) if cmd.strip() else "-"
@@ -137,13 +149,23 @@ def target_summary(out_root, name, corpus_rows):
     elif not t["tiers_ok"]:
         t["problems"].append("tiers: {} of {} verdicts failed".format(t["verdicts_failed"], t["verdicts"]))
 
-    # Snapshot sizes and client costs by encoding, largest tier.
+    # Snapshot sizes and client costs by category and encoding, largest
+    # tier: within one category the encodings carry comparable content.
     tiers = (s or {}).get("tiers", [])
     t["largest"] = None
     if tiers:
         big = max(tiers, key=lambda x: x.get("units", 0))
-        t["largest"] = {"name": big.get("name"), "units": big.get("units"),
-                        "per_encoding": big.get("per_encoding", {})}
+        rows = read_csv(os.path.join(root, big.get("name", ""), "client_snapshots.csv")) or []
+        cells = {}
+        for cat in ("normal", "full"):
+            for e in ENCODINGS:
+                sel = [r for r in rows if r.get("category") == cat and r.get("encoding") == e]
+                col = lambda k: [float(r[k]) for r in sel if r.get(k) not in (None, "")]
+                cells[cat + "/" + e] = {
+                    "count": len(sel), "wire_bytes": mean(col("wire_bytes")), "net_bytes": mean(col("net_bytes")),
+                    "decompress_p50": pct(col("decompress_us"), 0.5), "load_p50": pct(col("load_us"), 0.5),
+                    "rtt_p50": pct(col("rtt_us"), 0.5)}
+        t["largest"] = {"name": big.get("name"), "units": big.get("units"), "cells": cells}
     t["ok"] = not t["problems"]
     return t
 
@@ -202,24 +224,25 @@ def main():
             lines.append("- {}: {}".format(name, p))
         lines.append("")
 
-    lines.append("## Snapshots by encoding (largest tier, client side, mean / p50)")
+    lines.append("## Snapshots by category and encoding (largest tier, client side)")
     lines.append("")
-    lines.append("| target | tier | encoding | count | XOffset wire bytes | bytes sent | ratio | "
-                 "decompress p50 (us) | verify p50 (us) | round trip p50 (us) |")
+    lines.append("`normal` is a 1024x768 viewport, `full` the whole scene. Bytes are means; times are p50 "
+                 "in microseconds. Round trip includes A's save and compression.")
+    lines.append("")
+    lines.append("| target | category | encoding | count | XOffset wire bytes | bytes sent | sent / wire | "
+                 "decompress | verify | round trip |")
     lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
     for t in targets:
         big = t["largest"]
         if not big:
             continue
-        for e in ENCODINGS:
-            pe = big["per_encoding"].get(e, {})
-            wire = pe.get("wire_bytes", {}).get("mean", float("nan"))
-            net = pe.get("net_bytes", {}).get("mean", float("nan"))
+        for key, c in big["cells"].items():
+            cat, e = key.split("/")
+            wire, net = c["wire_bytes"], c["net_bytes"]
             ratio = net / wire if wire and not math.isnan(wire) and not math.isnan(net) else float("nan")
             lines.append("| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
-                t["name"], big["name"], e, pe.get("client_count", 0), fmt(wire), fmt(net),
-                fmt(ratio, 3), fmt(pe.get("c.decompress_us", {}).get("p50")) if e == "zstd" else "-",
-                fmt(pe.get("c.load_us", {}).get("p50")), fmt(pe.get("c.rtt_us", {}).get("p50"))))
+                t["name"], cat, e, c["count"], fmt(wire), fmt(net), fmt(ratio, 3),
+                fmt(c["decompress_p50"]) if e == "zstd" else "-", fmt(c["load_p50"]), fmt(c["rtt_p50"])))
     lines.append("")
     lines.append("Per-target detail: `<target>/RESULT_TABLES.md`; offline runs: `<target>/selfcheck/`, "
                  "`<target>/replay/client_replay.csv`.")

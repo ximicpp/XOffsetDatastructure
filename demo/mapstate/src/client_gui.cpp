@@ -201,8 +201,9 @@ int run_gui(const Options& opt) {
         DrawRectangle(8, 8, 520, 122, Color{20, 20, 20, 200});
         if (have) {
             const ViewSnapshot& v = s.holder().view();
-            DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B", std::uint64_t(v.tick),
-                                unsigned(v.units.size()), unsigned(s.last_wire_bytes())),
+            DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B (%s, %u B sent)", std::uint64_t(v.tick),
+                                unsigned(v.units.size()), unsigned(s.last_wire_bytes()),
+                                codec::encoding_name(s.last_encoding()), unsigned(s.last_net_bytes())),
                      16, 14, 16, RAYWHITE);
         } else {
             DrawText("waiting for the first snapshot...", 16, 14, 16, RAYWHITE);
