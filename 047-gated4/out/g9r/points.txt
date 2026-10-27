@@ -1,0 +1,11 @@
+t0 43669586b5ad29962050e36dff8ffc252917f868 tree dc3e42d4fb25ef7e2cb4aa98bff6e3460377f989 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 43669586 (#146 merge, with #149))
+t1 3dacea2c9627aef295d74caf0b6b097a8ed05224 tree c67fa69e0f3670111ccb36be9eb3d743195463c7 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (GATE_D4 head claude/d-iter-20261027 (XFixedVector iterator class PR))
+t1: diff over t0 sha256 20200051c12f3cd5e119d417a3ea206403f6e7086d1d893323316337a2b686e3 ( 3 files changed, 152 insertions(+), 5 deletions(-))
+t1: library header diff over t0:  1 file changed, 53 insertions(+), 4 deletions(-)
+t1: first-parent commits over t0:
+  3dacea2c Container iterators: a contiguous iterator class instead of T*
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 a936ef69e9796e7278aaf8026a293114f782baee75604a85ffd62d4c68236b7b
+reloc_bench t1 sha256 adf6662df28f6fbca26935b706d2a19849b87c701507bfeb11d8cd0cb958f2c7
+reloc_bench t0a sha256 f687c5133aa0b2dbb61f7811bc254744edd4cefd16e6e5d65ddc8cc133732e4d
+reloc_bench t1a sha256 f8d3a6dc6d41f326221127305b68af868523f552e84d4af55a18f153e91d89fe

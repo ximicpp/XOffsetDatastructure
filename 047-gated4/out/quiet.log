@@ -1,0 +1,6 @@
+2026-10-27T20:38:30Z block 1 start: waited 180s load 1.75 WindowServer 4.3% (gated 0) remote 6
+2026-10-27T20:41:56Z block 2 start: waited 180s load 1.68 WindowServer 4% (gated 0) remote 6
+2026-10-27T20:45:23Z block 3 start: waited 180s load 1.53 WindowServer 4% (gated 0) remote 6
+2026-10-27T20:48:49Z block 4 start: waited 180s load 1.44 WindowServer 4.3% (gated 0) remote 6
+2026-10-27T20:52:16Z block 5 start: waited 180s load 1.79 WindowServer 3.7% (gated 0) remote 6
+2026-10-27T20:55:42Z block 6 start: waited 180s load 1.62 WindowServer 3.5% (gated 0) remote 6
