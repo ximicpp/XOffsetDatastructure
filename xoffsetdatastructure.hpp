@@ -3411,6 +3411,10 @@ namespace XOffsetDatastructure {
             }
             if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
             else push_back_general<const T&>(value);
+            // The general path appended exactly one element. Restating size_
+            // here makes it known on both paths, so a caller's push_back loop
+            // keeps it in a register instead of reloading it through memory.
+            size_ = n + 1u;
         }
 
         void push_back(T&& value) {

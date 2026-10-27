@@ -9,9 +9,9 @@ save/load 仍复制字节，不是零复制接口。
 
 | 交付物 | 内容 | 不包含的环境输入 |
 | --- | --- | --- |
-| `xoffsetdatastructure-0.2.0-alpha.1.tar.gz` 源码包 | 两个生产头、CMake、tests/examples、必要工具与用户文档、固定的 851 个依赖头及许可证 | 编译器、libc++/系统 runtime、SDK、构建输出、实验目录与历史大型证据 |
-| `xoffsetdatastructure-0.2.0-alpha.1-full.tar.gz` 安装包 | 两个生产头、`XOffset::xoffset` 与 `XOffset::storage`、851 个私有依赖头、CMake 配置、版本/兼容文档与许可证 | 编译器、SDK、runtime、原生程序二进制 |
-| `xoffsetdatastructure-0.2.0-alpha.1-storage.tar.gz` 安装包 | OS 头 `xoffset_virtual_memory.hpp`、`XOffset::storage`、CMake 配置、版本/兼容文档与项目许可证 | 完整 XBuffer/容器头、Boost、TypeLayout、编译器、SDK、runtime |
+| `xoffsetdatastructure-<VERSION>.tar.gz` 源码包 | 两个生产头、CMake、tests/examples、必要工具与用户文档、固定的 851 个依赖头及许可证 | 编译器、libc++/系统 runtime、SDK、构建输出、实验目录与历史大型证据 |
+| `xoffsetdatastructure-<VERSION>-full.tar.gz` 安装包 | 两个生产头、`XOffset::xoffset` 与 `XOffset::storage`、851 个私有依赖头、CMake 配置、版本/兼容文档与许可证 | 编译器、SDK、runtime、原生程序二进制 |
+| `xoffsetdatastructure-<VERSION>-storage.tar.gz` 安装包 | OS 头 `xoffset_virtual_memory.hpp`、`XOffset::storage`、CMake 配置、版本/兼容文档与项目许可证 | 完整 XBuffer/容器头、Boost、TypeLayout、编译器、SDK、runtime |
 
 源码包的依赖闭包可在没有 `.git` 的解压目录中通过内容锁检查。它不是完整 Boost
 发行版，也不是包含全部历史原始证据的离线研究档案。源码归档中的
@@ -83,46 +83,46 @@ SDK、标准库 include/library 和运行时搜索路径由调用方 toolchain �
 
 ## 创建、审计与解压归档
 
-在已经准备好固定依赖的源码树执行：
+在已经准备好固定依赖的源码树执行（下文 `<VERSION>` 是 `XOFFSET_VERSION` 的内容，`prepare_release.py` 从同一源码树的这个文件读版本）：
 
 ```sh
-python3 tools/prepare_alpha_release.py create --source-dir . --out build/alpha-source-release
-python3 tools/prepare_alpha_release.py audit \
-  --archive build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.tar.gz \
-  --manifest build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.manifest.json \
-  --checksums build/alpha-source-release/SHA256SUMS
-python3 tools/prepare_alpha_release.py extract \
-  --archive build/alpha-source-release/xoffsetdatastructure-0.2.0-alpha.1.tar.gz \
-  --out build/alpha-source-extracted
+python3 tools/prepare_release.py create --source-dir . --out build/release-source
+python3 tools/prepare_release.py audit \
+  --archive build/release-source/xoffsetdatastructure-<VERSION>.tar.gz \
+  --manifest build/release-source/xoffsetdatastructure-<VERSION>.manifest.json \
+  --checksums build/release-source/SHA256SUMS
+python3 tools/prepare_release.py extract \
+  --archive build/release-source/xoffsetdatastructure-<VERSION>.tar.gz \
+  --out build/release-source-extracted
 ```
 
 创建输出含 archive、同名 `.manifest.json` 及 `SHA256SUMS`；归档根目录为
-`xoffsetdatastructure-0.2.0-alpha.1/`，内含 `SOURCE_MANIFEST.json`。
+`xoffsetdatastructure-<VERSION>/`，内含 `SOURCE_MANIFEST.json`。
 `audit` 可不传外部 manifest/checksums，但对外分发时应另行固定 archive/manifest 身份。
 `extract` 先审计再提取，源码位于
-`build/alpha-source-extracted/xoffsetdatastructure-0.2.0-alpha.1/`。
+`build/release-source-extracted/xoffsetdatastructure-<VERSION>/`。
 完整性哈希不是签名或来源认证。
 
 已验证的安装 prefix 可分别包装为 full/storage 归档：
 
 ```sh
-python3 tools/prepare_alpha_release.py pack-prefix --prefix /path/to/verified-full-prefix \
-  --component full --out build/alpha-full-release
-python3 tools/prepare_alpha_release.py pack-prefix --prefix /path/to/verified-storage-prefix \
-  --component storage --out build/alpha-storage-release
-python3 tools/prepare_alpha_release.py extract \
-  --archive build/alpha-full-release/xoffsetdatastructure-0.2.0-alpha.1-full.tar.gz \
-  --out build/alpha-full-extracted
+python3 tools/prepare_release.py pack-prefix --prefix /path/to/verified-full-prefix \
+  --component full --out build/release-full
+python3 tools/prepare_release.py pack-prefix --prefix /path/to/verified-storage-prefix \
+  --component storage --out build/release-storage
+python3 tools/prepare_release.py extract \
+  --archive build/release-full/xoffsetdatastructure-<VERSION>-full.tar.gz \
+  --out build/release-full-extracted
 ```
 
 安装归档同样带外部 `.manifest.json`/`SHA256SUMS`，内部为 `INSTALL_MANIFEST.json`。
-full 解压后 prefix 为 `build/alpha-full-extracted/xoffsetdatastructure-0.2.0-alpha.1-full`，
+full 解压后 prefix 为 `build/release-full-extracted/xoffsetdatastructure-<VERSION>-full`，
 将它传给消费项目的 `CMAKE_PREFIX_PATH`；storage 的根名以 `-storage` 结尾。
 `audit`/`extract` 同时支持三类 archive。包装/哈希通过不能替代实际解压后的消费构建。
 
 所有输出使用新目录；source/out 不接受 symlink。create 输出不能等于或包围源码，
 也不能位于待复制的 cmake/tests/tools/examples/include/external/docs/toolchains 内；
-`build/alpha-source-release` 这类独立目录可用。工具不会覆盖已有产物或触发 CI/发布。
+`build/release-source` 这类独立目录可用。工具不会覆盖已有产物或触发 CI/发布。
 
 ## 构建和安装
 
