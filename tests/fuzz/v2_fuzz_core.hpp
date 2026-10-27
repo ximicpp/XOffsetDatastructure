@@ -72,6 +72,7 @@ template<> struct wire_record_layout<fz::Root> { static constexpr bool ordinary_
 namespace {
 using Buffer = xo::TypedXBuffer<fz::Root>;
 constexpr std::size_t kHeader = sizeof(xo::XWireHeaderV2);
+constexpr std::size_t kBegin = xo::XWIRE_PAYLOAD_BEGIN; // first payload offset on the wire
 constexpr std::uint32_t kMaxPayload = 0x7ffffff8u;
 
 // Every acceptor and the oracle use this payload limit. An input that declares
@@ -181,32 +182,27 @@ struct OracleRun {
         if (t < 0 || std::uint64_t(t) >= used) return std::nullopt;
         return std::uint64_t(t);
     }
-    bool binding(std::size_t head) {
-        if (rd<std::int32_t>(head) == 0) return bad("unbound head");
-        auto t = rel(head);
-        if (!t || *t != 0) return bad("binding not payload base");
-        return true;
-    }
     bool string(std::size_t h, std::string* out = nullptr) {
         if (heads) heads->push_back(h);
-        if (!binding(h)) return false;
-        const auto cap = rd<std::uint32_t>(h + 12);
+        // V2.1 head {data rel32, size u32, capacity u32}; inline: bytes 0..10,
+        // byte 11 = 0x80 | length.
+        const auto cap = rd<std::uint32_t>(h + 8);
         if (cap & 0x80000000u) {
             const unsigned len = (cap >> 24) & 0x7fu;
             if (len > 10) return bad("inline length");
             for (unsigned i = len; i < 11; ++i)
-                if (p[h + 4 + i] != 0) return bad("inline padding");
-            if (out) out->assign(reinterpret_cast<const char*>(p + h + 4), len);
+                if (p[h + i] != 0) return bad("inline padding");
+            if (out) out->assign(reinterpret_cast<const char*>(p + h), len);
             return true;
         }
-        const auto size = rd<std::uint32_t>(h + 8);
+        const auto size = rd<std::uint32_t>(h + 4);
         if (size > cap || cap >= kMaxPayload) return bad("string size/cap");
         if (cap == 0) {
-            if (size != 0 || rd<std::int32_t>(h + 4) != 0) return bad("empty string payload");
+            if (size != 0 || rd<std::int32_t>(h) != 0) return bad("empty string payload");
             if (out) out->clear();
             return true;
         }
-        auto d = rel(h + 4);
+        auto d = rel(h);
         if (!d) return bad("string data out of bounds");
         if (*d % 8) return bad("string data misaligned");
         const std::uint64_t ext = (std::uint64_t(cap) + 1 + 7) & ~std::uint64_t(7);
@@ -218,14 +214,13 @@ struct OracleRun {
     template <class Elem, class Fn>
     bool vector(std::size_t h, Fn&& each) {
         if (heads) heads->push_back(h);
-        if (!binding(h)) return false;
-        const auto size = rd<std::uint32_t>(h + 8), cap = rd<std::uint32_t>(h + 12);
+        const auto size = rd<std::uint32_t>(h + 4), cap = rd<std::uint32_t>(h + 8);
         if (size > cap || cap > (kMaxPayload - 8u) / sizeof(Elem)) return bad("vector size/cap");
         if (cap == 0) {
-            if (size != 0 || rd<std::int32_t>(h + 4) != 0) return bad("empty vector payload");
+            if (size != 0 || rd<std::int32_t>(h) != 0) return bad("empty vector payload");
             return true;
         }
-        auto d = rel(h + 4);
+        auto d = rel(h);
         if (!d) return bad("vector data out of bounds");
         if (*d % 8) return bad("vector data misaligned");
         const std::uint64_t bytes = std::uint64_t(cap) * sizeof(Elem);
@@ -261,34 +256,49 @@ struct OracleRun {
     }
 };
 
+// The payload header a V2.1 receiver writes (the wire does not carry it).
+void put_payload_header(unsigned char* p, std::uint64_t root_offset, std::uint64_t used_end) {
+    std::memset(p, 0, kBegin);
+    std::memcpy(p, "XBUFV2\0\0", 8);
+    const std::uint32_t header_size = 48;
+    std::memcpy(p + 8, &header_size, 4);
+    std::memcpy(p + 16, &root_offset, 8);
+    std::memcpy(p + 24, &used_end, 8);
+}
+
 Oracle oracle(const std::string& wire, bool collect_heads = false) {
     Oracle result;
     auto reject = [&](Oracle::Stage stage, std::string why) {
         result.ok = false; result.stage = stage; result.why = std::move(why); return result;
     };
+    // V2.1 header: 'X' 'O' 2 1, flags 0, used_bytes, root_offset, hole_count,
+    // extent_count, schema hash, root type id.
+    if (wire.size() < 4 || wire[0] != 'X' || wire[1] != 'O') return reject(Oracle::Stage::Header, "magic");
+    if (wire[2] != 2 || wire[3] != 1) return reject(Oracle::Stage::Header, "version");
     if (wire.size() < kHeader) return reject(Oracle::Stage::Header, "short");
     xo::XWireHeaderV2 h;
     std::memcpy(&h, wire.data(), kHeader);
-    if (std::memcmp(h.magic, xo::XWIRE_MAGIC_V2, 8) != 0) return reject(Oracle::Stage::Header, "magic");
-    if (h.format_major != 2 || h.format_minor != 0 || h.header_size != kHeader ||
-        h.endian_tag != 0x01020304u || h.flags != 0 || h.crc32c != 0 || h.reserved0 != 0)
-        return reject(Oracle::Stage::Header, "header fields");
+    if (h.flags != 0) return reject(Oracle::Stage::Header, "header fields");
     if (h.root_type_id != xo::detail::wire_root_type_id<fz::Root>() ||
-        h.schema_hash_lo != xo::detail::wire_schema_hash<fz::Root>() || h.schema_hash_hi != 0)
+        h.schema_hash != xo::detail::wire_schema_hash<fz::Root>())
         return reject(Oracle::Stage::Header, "schema");
+    if (h.used_bytes < kBegin || h.used_bytes > kMaxPayload || h.used_bytes % 8)
+        return reject(Oracle::Stage::Header, "sizes");
+    if (h.root_offset < kBegin || h.root_offset >= h.used_bytes) return reject(Oracle::Stage::Header, "root offset");
     const std::uint64_t body = wire.size() - kHeader;
-    if (h.used_bytes > kMaxPayload || h.extent_count > body / 8) return reject(Oracle::Stage::Header, "sizes");
+    if (h.extent_count > body / 8) return reject(Oracle::Stage::Header, "sizes");
     if (h.used_bytes > kLimit) return reject(Oracle::Stage::Header, "declared size above limit");
-    // Extent table (sparse) -> gaps; stored bytes.
+    // Extent table (sparse) -> gaps; stored bytes. The wire carries payload
+    // bytes from offset 48; the first extent starts there.
     const auto* table = reinterpret_cast<const unsigned char*>(wire.data()) + kHeader;
-    std::uint64_t stored = h.used_bytes, end = 0;
+    std::uint64_t stored = h.used_bytes - kBegin, end = 0;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> extents;
     bool gap = false;
     if (h.extent_count) {
         stored = 0;
         for (std::uint64_t i = 0; i < h.extent_count; ++i) {
             std::uint32_t off, b; std::memcpy(&off, table + i * 8, 4); std::memcpy(&b, table + i * 8 + 4, 4);
-            if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != 0 : off <= end) || std::uint64_t(off) + b > h.used_bytes)
+            if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != kBegin : off <= end) || std::uint64_t(off) + b > h.used_bytes)
                 return reject(Oracle::Stage::Header, "extent table");
             gap |= i != 0;
             extents.push_back({off, b});
@@ -301,16 +311,12 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
     if (stored > body - tbytes) return reject(Oracle::Stage::Header, "sizes");
     const auto rest = body - tbytes - stored;
     if (h.hole_count > rest / 8 || h.hole_count * 8 != rest) return reject(Oracle::Stage::Header, "sizes");
-    if (h.root_offset >= h.used_bytes) return reject(Oracle::Stage::Header, "root offset");
-    std::uint64_t hole_sum = 0;
     const auto* holes = table + tbytes + stored;
-    for (std::uint64_t i = 0; i < h.hole_count; ++i) {
-        std::uint32_t b; std::memcpy(&b, holes + i * 8 + 4, 4); hole_sum += b;
-    }
-    if (hole_sum != h.hole_bytes) return reject(Oracle::Stage::Header, "hole bytes");
-    // Payload stage (also what the raw/receive validators see). Gaps read as 0.
+    // Payload stage (also what the raw/receive validators see). Gaps read as
+    // 0; the payload header is the receiver's, from used_bytes and root_offset.
     std::vector<unsigned char> payload(std::size_t(h.used_bytes), 0);
-    if (h.extent_count == 0 && !payload.empty()) std::memcpy(payload.data(), table, payload.size());
+    put_payload_header(payload.data(), h.root_offset, h.used_bytes);
+    if (h.extent_count == 0) std::memcpy(payload.data() + kBegin, table, payload.size() - kBegin);
     else {
         const auto* src = table + tbytes;
         for (auto [off, b] : extents) { std::memcpy(payload.data() + off, src, b); src += b; }
@@ -320,16 +326,8 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
     run.used = std::size_t(h.used_bytes);
     if (collect_heads) run.heads = &result.heads;
     auto preject = [&](std::string why) { return reject(Oracle::Stage::Payload, std::move(why)); };
-    if (run.used < 48) return preject("payload too small");
-    if (std::memcmp(run.p, "XBUFV2\0\0", 8) != 0 || run.rd<std::uint32_t>(8) != 48)
-        return preject("payload header");
-    if (run.rd<std::uint64_t>(24) != run.used) return preject("used_end");
-    const auto aroot = run.rd<std::uint64_t>(16);
-    if (aroot == 0 || aroot > run.used || sizeof(fz::Root) > run.used - aroot || aroot % 8)
-        return preject("root not found");
-    if (aroot != h.root_offset) return preject("root offset mismatch");
-    if (run.rd<std::uint32_t>(12) != 0 || run.rd<std::uint64_t>(32) != 0 || run.rd<std::uint64_t>(40) != 0)
-        return preject("payload flags");
+    const auto aroot = std::uint64_t(h.root_offset);
+    if (sizeof(fz::Root) > run.used - aroot || aroot % 8) return preject("root not found");
     run.ranges.push_back({0, 48});
     for (std::uint64_t i = 0; i < h.hole_count; ++i) {
         std::uint32_t off, b;
@@ -454,10 +452,11 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
         std::memcpy(token.header_bytes().data(), wire.data(), kHeader);
         const auto table = token.extent_bytes();
         const auto eb = take(table, 0, table.size());
+        // payload_bytes(): payload [48, used); an extent at offset o lands at o - 48.
         const auto payload = token.payload_bytes();
         std::size_t pb = 0;
         if (extents == 0) {
-            const auto n = mode == DirectMode::Abort ? used / 2 : used;
+            const auto n = mode == DirectMode::Abort ? payload.size() / 2 : payload.size();
             pb = take(payload, 0, n);
             if (mode == DirectMode::Abort) {
                 if (error) *error = "transport: aborted";
@@ -468,13 +467,14 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
             for (std::size_t i = 0; landed && i < eb / 8u; ++i) {
                 std::uint32_t e[2];
                 std::memcpy(e, table.data() + i * 8u, sizeof(e));
-                landed = e[0] <= payload.size() && e[1] <= payload.size() - e[0] && take(payload, e[0], e[1]) == e[1];
+                landed = e[0] >= kBegin && e[0] - kBegin <= payload.size() && e[1] <= payload.size() - (e[0] - kBegin) &&
+                         take(payload, e[0] - kBegin, e[1]) == e[1];
                 if (mode == DirectMode::Abort && i * 2 + 1 >= eb / 8u) {
                     if (error) *error = "transport: aborted";
                     return false;
                 }
             }
-            pb = landed ? used : 0;
+            pb = landed ? payload.size() : 0;
         }
         const auto lb = take(token.hole_bytes(), 0, token.hole_bytes().size());
         if (at != wire.size()) {
@@ -567,7 +567,8 @@ void check_slots(const std::string& w, bool accepted, Buffer* fresh, const std::
 
 #endif
 
-// Header-valid wire -> {aligned payload with gaps zeroed, gaps, hole pointer}.
+// Header-valid wire -> {aligned payload (receiver-written payload header,
+// gaps zeroed), gaps, hole pointer}.
 struct Unpacked {
     std::vector<std::uint64_t> storage;
     std::vector<xo::XBufferCore::WireHole> gaps;
@@ -581,11 +582,16 @@ Unpacked unpack(const std::string& wire) {
     std::memcpy(&u.h, wire.data(), kHeader);
     const auto used = std::size_t(u.h.used_bytes);
     u.storage.assign((used + 7) / 8 + 1, 0);
+    put_payload_header(reinterpret_cast<unsigned char*>(u.base()), u.h.root_offset, used);
     const char* p = wire.data() + kHeader;
     u.table = p;
-    if (u.h.extent_count == 0) { std::memcpy(u.base(), p, used); u.holes = p + used; return u; }
+    if (u.h.extent_count == 0) {
+        std::memcpy(u.base() + kBegin, p, used - kBegin);
+        u.holes = p + used - kBegin;
+        return u;
+    }
     const char* src = p + u.h.extent_count * 8;
-    std::uint64_t end = 0;
+    std::uint64_t end = kBegin;
     for (std::uint64_t i = 0; i < u.h.extent_count; ++i) {
         std::uint32_t off, b; std::memcpy(&off, p + i * 8, 4); std::memcpy(&b, p + i * 8 + 4, 4);
         if (i) u.gaps.push_back({std::uint32_t(end), std::uint32_t(off - end)});
@@ -623,21 +629,25 @@ bool receive_accepts(const std::string& wire, std::string* error) {
         {
             auto op = token.acquire_operation();
             auto hb = op.header_bytes(); std::memcpy(hb.data(), wire.data(), kHeader);
-            // Scatter: write only extents (gap bytes stay as received storage).
+            // Scatter: write only extents (gap bytes stay as received
+            // storage). payload_bytes() is payload [48, used).
             auto pb = op.payload_bytes();
-            if (u.h.extent_count == 0) { if (used) std::memcpy(pb.data(), u.base(), used); }
+            auto put = [&](std::uint64_t from, std::uint64_t to) {
+                if (to > from) std::memcpy(pb.data() + (from - kBegin), u.base() + from, to - from);
+            };
+            if (u.h.extent_count == 0) put(kBegin, used);
             else {
-                std::uint64_t pos = 0;
+                std::uint64_t pos = kBegin;
                 for (const auto& g : u.gaps) {
-                    std::memcpy(pb.data() + pos, u.base() + pos, g.offset - pos);
+                    put(pos, g.offset);
                     pos = std::uint64_t(g.offset) + g.bytes;
                 }
-                if (pos < used) std::memcpy(pb.data() + pos, u.base() + pos, used - pos);
+                put(pos, used);
             }
             // Empty spans have null data(); memcpy requires non-null pointers.
             auto eb = op.extent_bytes(); if (!eb.empty()) std::memcpy(eb.data(), u.table, eb.size());
             auto lb = op.hole_bytes(); if (!lb.empty()) std::memcpy(lb.data(), u.holes, lb.size());
-            op.complete(kHeader, used, lb.size(), eb.size());
+            op.complete(kHeader, pb.size(), lb.size(), eb.size());
         }
         auto received = xo::finish_verified<Root>(token);
         (void)received;
@@ -737,7 +747,9 @@ std::string build_wire(std::mt19937_64& rng) {
 // Bytes before the hole table (extent table + stored payload), or nullopt.
 std::optional<std::uint64_t> data_bytes(const std::string& w, const xo::XWireHeaderV2& h) {
     const auto body = w.size() - kHeader;
-    if (h.extent_count == 0) return h.used_bytes <= body ? std::optional<std::uint64_t>(h.used_bytes) : std::nullopt;
+    if (h.extent_count == 0)
+        return h.used_bytes >= kBegin && h.used_bytes - kBegin <= body
+            ? std::optional<std::uint64_t>(h.used_bytes - kBegin) : std::nullopt;
     if (h.extent_count > body / 8) return std::nullopt;
     std::uint64_t stored = 0;
     for (std::uint64_t i = 0; i < h.extent_count; ++i) {
@@ -752,19 +764,16 @@ void fix_header_sizes(std::string& w) {
     const auto body = w.size() - kHeader;
     const auto data = data_bytes(w, h);
     if (!data) return; // leave the inconsistent header as is
-    h.hole_count = (body - *data) / 8;
-    std::uint64_t sum = 0;
-    for (std::uint64_t i = 0; i < h.hole_count; ++i) {
-        std::uint32_t b; std::memcpy(&b, w.data() + kHeader + *data + i * 8 + 4, 4); sum += b;
-    }
-    h.hole_bytes = sum;
+    h.hole_count = std::uint32_t((body - *data) / 8);
     std::memcpy(w.data(), &h, kHeader);
 }
 
-// File position of a payload offset (nullopt inside a sparse gap).
+// File position of a payload offset (nullopt inside a sparse gap or the
+// payload header, which is not on the wire).
 std::optional<std::size_t> file_pos(const std::string& w, std::uint64_t off) {
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
-    if (h.extent_count == 0) return kHeader + off;
+    if (off < kBegin) return std::nullopt;
+    if (h.extent_count == 0) return kHeader + (off - kBegin);
     // Division form: extent_count * 8 can wrap after a header mutation.
     if (h.extent_count > (w.size() - kHeader) / 8) return std::nullopt;
     std::uint64_t cum = 0;
@@ -786,17 +795,17 @@ std::uint32_t get32(const std::string& w, std::size_t at) {
 using Range = std::pair<std::uint64_t, std::uint64_t>; // payload [begin, end)
 
 // Extents of a wire whose extent table is well formed (the oracle's header
-// rules) and whose framing adds up; {[0, used)} for a dense wire.
+// rules) and whose framing adds up; {[48, used)} for a dense wire.
 std::optional<std::vector<Range>> extents_of(const std::string& w) {
     if (w.size() < kHeader) return std::nullopt;
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
-    if (h.used_bytes > kLimit || !data_bytes(w, h)) return std::nullopt;
-    if (h.extent_count == 0) return std::vector<Range>{{0, h.used_bytes}};
+    if (h.used_bytes > kLimit || h.used_bytes < kBegin || !data_bytes(w, h)) return std::nullopt;
+    if (h.extent_count == 0) return std::vector<Range>{{kBegin, h.used_bytes}};
     std::vector<Range> out;
-    std::uint64_t end = 0;
+    std::uint64_t end = kBegin;
     for (std::uint64_t i = 0; i < h.extent_count; ++i) {
         const auto off = get32(w, kHeader + i * 8), b = get32(w, kHeader + i * 8 + 4);
-        if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != 0 : off <= end) || std::uint64_t(off) + b > h.used_bytes)
+        if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != kBegin : off <= end) || std::uint64_t(off) + b > h.used_bytes)
             return std::nullopt;
         out.push_back({off, std::uint64_t(off) + b});
         end = std::uint64_t(off) + b;
@@ -810,9 +819,9 @@ std::optional<std::string> inflate(const std::string& w) {
     const auto ext = extents_of(w);
     if (!ext) return std::nullopt;
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
-    std::string payload(std::size_t(h.used_bytes), '\0');
+    std::string payload(std::size_t(h.used_bytes - kBegin), '\0');
     std::size_t at = kHeader + std::size_t(h.extent_count) * 8;
-    for (auto [b, e] : *ext) { std::memcpy(payload.data() + b, w.data() + at, e - b); at += e - b; }
+    for (auto [b, e] : *ext) { std::memcpy(payload.data() + (b - kBegin), w.data() + at, e - b); at += e - b; }
     h.extent_count = 0;
     std::string out(reinterpret_cast<const char*>(&h), kHeader);
     return out + payload + w.substr(at);
@@ -821,40 +830,45 @@ std::optional<std::string> inflate(const std::string& w) {
 std::string dense_of(const std::string& w) { return inflate(w).value_or(w); }
 
 // Re-emits a dense wire with `gaps` (sorted, disjoint, nonadjacent, inside
-// [8, used)) skipped through an extent table.
+// [56, used)) skipped through an extent table.
 std::string sparsify(const std::string& dense, const std::vector<Range>& gaps) {
     xo::XWireHeaderV2 h; std::memcpy(&h, dense.data(), kHeader);
     const auto used = h.used_bytes;
     std::string table, data;
-    std::uint64_t begin = 0;
+    std::uint64_t begin = kBegin;
     auto extent = [&](std::uint64_t from, std::uint64_t to) {
         const std::uint32_t e[2] = {std::uint32_t(from), std::uint32_t(to - from)};
         table.append(reinterpret_cast<const char*>(e), 8);
-        data.append(dense, kHeader + std::size_t(from), std::size_t(to - from));
+        data.append(dense, kHeader + std::size_t(from - kBegin), std::size_t(to - from));
     };
     for (auto [b, e] : gaps) { extent(begin, b); begin = e; }
     if (begin < used) extent(begin, used);
-    h.extent_count = table.size() / 8;
+    h.extent_count = std::uint32_t(table.size() / 8);
     std::string out(reinterpret_cast<const char*>(&h), kHeader);
-    return out + table + data + dense.substr(kHeader + std::size_t(used));
+    return out + table + data + dense.substr(kHeader + std::size_t(used - kBegin));
 }
 
 // The library's zero_runs rule on a dense wire: payloads of at least 4 KiB;
-// a run grows from a 64-byte aligned zero block word by word on both sides,
-// never covers the first 8 bytes, and is skipped when at least 64 bytes; the
-// sparse form is kept only if it saves at least max(256, used / 16) bytes.
+// a run grows from a 64-byte aligned zero block (blocks counted from payload
+// offset 0, payload header included) word by word on both sides, never covers
+// the payload header or the first payload word, and is skipped when at least
+// 64 bytes; the sparse form is kept only if it saves at least
+// max(256, used / 16) bytes.
 std::string elide_zero_runs(const std::string& dense) {
     xo::XWireHeaderV2 h; std::memcpy(&h, dense.data(), kHeader);
     const std::size_t used = h.used_bytes;
-    if (h.extent_count != 0 || used < 4096 || used % 8) return dense;
-    const char* p = dense.data() + kHeader;
+    if (h.extent_count != 0 || used < 4096 || used % 8 || dense.size() < kHeader + used - kBegin) return dense;
+    std::vector<unsigned char> image(used);
+    put_payload_header(image.data(), h.root_offset, used);
+    std::memcpy(image.data() + kBegin, dense.data() + kHeader, used - kBegin);
+    const unsigned char* p = image.data();
     auto word = [&](std::size_t at) { std::uint64_t v; std::memcpy(&v, p + at, 8); return v; };
     auto block_zero = [&](std::size_t b) {
         for (std::size_t i = 0; i < 8; ++i) if (word(b * 64 + i * 8)) return false;
         return true;
     };
     std::vector<Range> gaps;
-    std::size_t cursor = 0, skipped = 0;
+    std::size_t cursor = kBegin, skipped = 0;
     for (std::size_t b = 0, blocks = used / 64; b < blocks;) {
         if (!block_zero(b)) { ++b; continue; }
         std::size_t start = b * 64, e = b + 1;
@@ -862,7 +876,7 @@ std::string elide_zero_runs(const std::string& dense) {
         while (e < blocks && block_zero(e)) ++e;
         std::size_t stop = e * 64;
         while (stop < used && word(stop) == 0) stop += 8;
-        start = std::max<std::size_t>(start, 8);
+        start = std::max<std::size_t>(start, kBegin + 8);
         if (stop - start >= 64) { gaps.push_back({start, stop}); skipped += stop - start; cursor = stop; }
         b = stop / 64 + 1;
     }
@@ -872,7 +886,7 @@ std::string elide_zero_runs(const std::string& dense) {
     return sparsify(dense, gaps);
 }
 
-// Adds one gap of 8..512 bytes at a random aligned payload offset >= 8 to a
+// Adds one gap of 8..512 bytes at a random aligned payload offset >= 56 to a
 // wire with a well-formed extent table: those bytes now load as zero.
 void cut_gap(std::string& w, std::mt19937_64& rng) {
     const auto ext = extents_of(w);
@@ -880,12 +894,12 @@ void cut_gap(std::string& w, std::mt19937_64& rng) {
     if (!ext || !dense) return;
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
     const auto used = h.used_bytes;
-    if (used < 24 || used % 8) return;
+    if (used < kBegin + 24 || used % 8) return;
     std::vector<Range> gaps;
-    std::uint64_t begin = 0;
+    std::uint64_t begin = kBegin;
     for (auto [b, e] : *ext) { if (b > begin) gaps.push_back({begin, b}); begin = e; }
     if (begin < used) gaps.push_back({begin, used});
-    const std::uint64_t a = 8 * (1 + rng() % (used / 8 - 1));
+    const std::uint64_t a = kBegin + 8 * (1 + rng() % ((used - kBegin) / 8 - 1));
     gaps.push_back({a, std::min<std::uint64_t>(used, a + 8 * (1 + rng() % 64))});
     std::sort(gaps.begin(), gaps.end());
     std::vector<Range> merged;
@@ -898,9 +912,11 @@ void cut_gap(std::string& w, std::mt19937_64& rng) {
 
 void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::size_t>& heads) {
     xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
-    const auto used = std::size_t(std::min<std::uint64_t>(h.used_bytes, w.size() - kHeader));
+    // Payload bytes on the wire (the payload header is not sent).
+    const auto used = std::size_t(std::min<std::uint64_t>(h.used_bytes < kBegin ? 0 : h.used_bytes - kBegin,
+                                                          w.size() - kHeader));
     // Earlier mutations may have desynchronized the header: clamp.
-    h.hole_count = std::min<std::uint64_t>(h.hole_count, (w.size() - kHeader) / 8);
+    h.hole_count = std::uint32_t(std::min<std::uint64_t>(h.hole_count, (w.size() - kHeader) / 8));
     const auto hole_at = w.size() - std::size_t(h.hole_count) * 8;
     static const std::uint32_t interesting[] = {
         0u, 1u, 4u, 7u, 8u, 9u, 10u, 11u, 16u, 24u, 0x7ffffff8u, 0x7fffffffu, 0x80000000u,
@@ -915,7 +931,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         const auto mapped = file_pos(w, heads[rng() % heads.size()]);
         if (!mapped) break;
         const auto head = *mapped;
-        const auto field = std::size_t(rng() % 4) * 4;
+        const auto field = std::size_t(rng() % 3) * 4; // data, size, capacity
         auto v = get32(w, head + field);
         switch (rng() % 4) {
         case 0: v = interesting[rng() % std::size(interesting)]; break;
@@ -952,12 +968,11 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         }
         fix_header_sizes(w);
         break; }
-    case 7: { // header field
-        static const std::size_t fields[] = {16, 24, 32, 40};
+    case 7: { // header size field: used_bytes, root_offset (+-8), hole_count, extent_count (+-1)
+        static const std::size_t fields[] = {8, 12, 16, 20};
         const auto at = fields[rng() % 4];
-        std::uint64_t v; std::memcpy(&v, w.data() + at, 8);
-        v += (rng() & 1) ? 8 : std::uint64_t(-8);
-        std::memcpy(w.data() + at, &v, 8);
+        const std::uint32_t d = at < 16 ? 8u : 1u;
+        put32(w, at, (rng() & 1) ? get32(w, at) + d : get32(w, at) - d);
         break; }
     case 8: { // truncate / extend
         if (rng() & 1) { if (w.size() > kHeader) w.resize(w.size() - 1 - rng() % std::min<std::size_t>(16, w.size() - kHeader)); }
@@ -972,11 +987,9 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
     case 11: case 12: // a gap over arbitrary payload bytes
         cut_gap(w, rng);
         break;
-    case 9: { // payload header field
-        static const std::size_t fields[] = {8, 12, 16, 24, 32, 40};
-        const auto mapped = file_pos(w, fields[rng() % 6]);
-        if (!mapped) break;
-        put32(w, *mapped, get32(w, *mapped) + std::uint32_t(8 * (1 + rng() % 2)));
+    case 9: { // root offset moved to another aligned payload offset
+        if (h.used_bytes <= kBegin) break;
+        put32(w, 12, std::uint32_t(kBegin + 8 * (rng() % ((h.used_bytes - kBegin + 7) / 8))));
         break; }
     }
 }
@@ -1202,7 +1215,7 @@ void check_golden(const std::string& w, const std::string& where) {
             if (hb <= covered && he > covered) covered = he;
         if (covered < to) fail(where + ": default emission skipped bytes outside holes");
     };
-    std::uint64_t prev = 0;
+    std::uint64_t prev = kBegin;
     for (auto [b, e] : *ext) {
         if (b > prev) check_gap(prev, b);
         prev = e;
@@ -1276,12 +1289,12 @@ std::vector<std::string> page_boundary_wires(std::mt19937_64& rng) {
     const auto& at_page = out[1];
     xo::XWireHeaderV2 h; std::memcpy(&h, at_page.data(), kHeader);
     auto shorter = at_page;
-    shorter.erase(kHeader + page - 1, 1);
+    shorter.erase(kHeader + page - 1 - kBegin, 1);
     h.used_bytes = page - 1;
     std::memcpy(shorter.data(), &h, kHeader);
     fix_header_sizes(shorter);
     auto longer = at_page;
-    longer.insert(kHeader + page, 1, '\0');
+    longer.insert(kHeader + page - kBegin, 1, '\0');
     h.used_bytes = page + 1;
     std::memcpy(longer.data(), &h, kHeader);
     fix_header_sizes(longer);

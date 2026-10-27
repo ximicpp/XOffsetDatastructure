@@ -13,9 +13,9 @@
 
 namespace xo = XOffsetDatastructure;
 
-XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
+XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
 XOFFSET_PIN_SCHEMA(pin::Root,
-    "record[s:96,a:8]{@0:u64,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}>,@40:xflatset[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>,@56:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},u64>,@72:array[3]<enum<u8char>>,@80:f64,@88:i16}");
+    "record[s:80,a:8]{@0:u64,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@32:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>,@44:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},u64>,@56:array[3]<enum<u8char>>,@64:f64,@72:i16}");
 
 namespace {
 [[noreturn]] void fail(const std::string& message) {
@@ -26,7 +26,7 @@ namespace {
 
 int main() {
     // Block scope works too.
-    XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:24,a:8]{@0:u32,@4:bool,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
+    XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
 
     const auto line = xo::schema_pin<pin::Root>("pin::Root");
     // wire_abi_signature returns the text by value; keep it alive for the view.
@@ -43,7 +43,7 @@ int main() {
     const auto wire = buffer.save_verified();
     xo::XWireHeaderV2 header{};
     std::memcpy(&header, wire.data(), sizeof(header));
-    if (header.schema_hash_lo != xo::wire_schema_hash_v<pin::Root>())
+    if (header.schema_hash != xo::wire_schema_hash_v<pin::Root>())
         fail("wire header does not carry wire_schema_hash_v");
     std::cout << line << "\n" << xo::schema_pin<pin::Inner>("pin::Inner") << "\n";
     std::cout << "schema pins: match compiles, generator reproduces the pin\n";

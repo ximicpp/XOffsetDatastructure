@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -35,6 +36,9 @@ namespace detail {
 enum class VmOperation : std::uint8_t { Reserve, Enable, Prepare, Reclaim, Protect };
 
 inline thread_local unsigned vm_pending_failures = 0;
+// Set once any thread arms a failure: until then consume_vm_failure reads no
+// thread-local storage (a call through the TLV descriptor on Apple targets).
+inline std::atomic<bool> vm_failure_injection_used{false};
 
 inline unsigned vm_operation_bit(VmOperation operation) noexcept {
     switch (operation) {
@@ -48,12 +52,14 @@ inline unsigned vm_operation_bit(VmOperation operation) noexcept {
 }
 
 inline void fail_next_vm_operation(VmOperation operation) noexcept {
+    vm_failure_injection_used.store(true, std::memory_order_relaxed);
     vm_pending_failures |= vm_operation_bit(operation);
 }
 
 inline void clear_vm_failures() noexcept { vm_pending_failures = 0; }
 
 inline bool consume_vm_failure(VmOperation operation) noexcept {
+    if (!vm_failure_injection_used.load(std::memory_order_relaxed)) return false;
     const unsigned bit = vm_operation_bit(operation);
     const bool fail = (vm_pending_failures & bit) != 0;
     vm_pending_failures &= ~bit;
@@ -170,28 +176,68 @@ private:
             if (reserved > static_cast<std::size_t>(
                     (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
                 throw std::length_error("VM reservation page rounding overflows");
+            // V2.1 owner lookup: the payload starts at a 2^k boundary,
+            // k = max(22, ceil(log2 span)), and the mapping covers whole 4 MiB
+            // granules, so OwnerMap finds the payload from any address inside
+            // and no other mapping shares a granule with it. The host page sits
+            // just below the payload, in the granule before it.
+            const std::size_t span =
+                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
+            if (span < reserved) throw std::length_error("VM reservation page rounding overflows");
+            std::size_t shift = slot_log2(span);
+            if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
+            if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) throw std::bad_alloc();
+            const std::size_t align = std::size_t(1) << shift;
 #if defined(_WIN32)
-            auto* mapping = static_cast<char*>(::VirtualAlloc(
-                nullptr, reserved + prefix, MEM_RESERVE, PAGE_NOACCESS));
+            // A reservation starts on an allocation-granularity boundary, so
+            // the prefix is one granularity unit; only its last page (the host
+            // page) is committed. Find an aligned hole, release it and reserve
+            // exactly there; another thread may take the hole in between.
+            const std::size_t win_prefix = reservation_granularity_;
+            char* mapping = nullptr;
+            for (int attempt = 0; attempt < 8 && !mapping; ++attempt) {
+                auto* probe = static_cast<char*>(::VirtualAlloc(
+                    nullptr, win_prefix + span + align, MEM_RESERVE, PAGE_NOACCESS));
+                if (!probe) throw std::bad_alloc();
+                const auto payload = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
+                                     ~std::uintptr_t(align - 1);
+                ::VirtualFree(probe, 0, MEM_RELEASE);
+                auto* want = reinterpret_cast<char*>(payload - win_prefix);
+                mapping = static_cast<char*>(::VirtualAlloc(want, win_prefix + span, MEM_RESERVE, PAGE_NOACCESS));
+                if (mapping && mapping != want) {
+                    ::VirtualFree(mapping, 0, MEM_RELEASE);
+                    mapping = nullptr;
+                }
+            }
             if (!mapping) throw std::bad_alloc();
-            if (!::VirtualAlloc(mapping, prefix, MEM_COMMIT, PAGE_READWRITE)) {
+            if (!OwnerMap::reachable(mapping, win_prefix + span) ||
+                !::VirtualAlloc(mapping + win_prefix - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
                 ::VirtualFree(mapping, 0, MEM_RELEASE);
                 throw std::bad_alloc();
             }
-            base_ = mapping + prefix;
+            base_ = mapping + win_prefix;
 #else
             if (full_copy && consume_vm_failure(VmOperation::Enable)) throw std::bad_alloc();
-            void* mapping = ::mmap(nullptr, reserved + prefix,
-                                   full_copy ? PROT_READ | PROT_WRITE : PROT_NONE,
-                                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-            if (mapping == MAP_FAILED) throw std::bad_alloc();
-            if (!full_copy && ::mprotect(mapping, prefix, PROT_READ | PROT_WRITE) != 0) {
-                ::munmap(mapping, reserved + prefix);
+            // Over-map PROT_NONE, then trim both ends.
+            const std::size_t total = span + prefix + align;
+            void* raw = ::mmap(nullptr, total, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (raw == MAP_FAILED) throw std::bad_alloc();
+            const auto start = reinterpret_cast<std::uintptr_t>(raw);
+            const auto payload = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
+            if (payload - prefix != start) ::munmap(raw, payload - prefix - start);
+            if (start + total != payload + span)
+                ::munmap(reinterpret_cast<void*>(payload + span), start + total - (payload + span));
+            char* mapping = reinterpret_cast<char*>(payload - prefix);
+            if (!OwnerMap::reachable(mapping, span + prefix) ||
+                ::mprotect(mapping, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
+                ::munmap(mapping, span + prefix);
                 throw std::bad_alloc();
             }
-            base_ = static_cast<char*>(mapping) + prefix;
+            base_ = mapping + prefix;
             if (full_copy) accessible_bytes_ = reserved;
 #endif
+            mapped_bytes_ = span;
+            OwnerMap::set(base_, span, static_cast<std::uint8_t>(shift));
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
@@ -242,13 +288,14 @@ public:
         return from_bytes(bytes, length, maximum_capacity, VmStoragePool{});
     }
 
+    // With `at`, `bytes` fill [at, length) and the caller writes [0, at).
     static VirtualMemoryStorage from_bytes(const char* bytes, std::size_t length,
                                            std::size_t maximum_capacity,
-                                           const VmStoragePool& pool) {
-        if (length > maximum_capacity) {
+                                           const VmStoragePool& pool, std::size_t at = 0) {
+        if (length > maximum_capacity || at > length) {
             throw std::invalid_argument("VM input length exceeds maximum capacity");
         }
-        if (length != 0 && bytes == nullptr) {
+        if (length != at && bytes == nullptr) {
             throw std::invalid_argument("VM input is null");
         }
         VirtualMemoryStorage owner(0, maximum_capacity, pool,
@@ -257,7 +304,7 @@ public:
         if (!owner.enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
-        std::memcpy(owner.base_, bytes, length);
+        std::memcpy(owner.base_ + at, bytes, length - at);
         owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
         return owner;
@@ -266,7 +313,8 @@ public:
     // V2 sparse load: `stored` holds the concatenated extents; extent i is
     // {u32 offset, u32 bytes} at extents + 8*i (unaligned allowed), ascending
     // and validated by the caller to tile [0, length) with gaps. Gap bytes
-    // read as zero (fresh pages, or explicitly cleared if previously exposed).
+    // read as zero (fresh pages, or explicitly cleared if previously exposed),
+    // [0, first offset) included.
     static VirtualMemoryStorage from_extents(const char* stored, const void* extents,
                                              std::size_t count, std::size_t length,
                                              std::size_t maximum_capacity,
@@ -329,20 +377,35 @@ public:
     // payload address. Bytes beyond `length` that the old content exposed
     // stay below zero_from_, so every later growth zeroes them. A failure
     // leaves the old bytes and length unchanged.
-    void assign_bytes(const char* bytes, std::size_t length) {
-        if (length > maximum_capacity_) {
+    // `at` as in from_bytes.
+    void assign_bytes(const char* bytes, std::size_t length, std::size_t at = 0) {
+        if (length > maximum_capacity_ || at > length) {
             throw std::invalid_argument("VM input length exceeds maximum capacity");
         }
-        if (length != 0 && bytes == nullptr) {
+        if (length != at && bytes == nullptr) {
             throw std::invalid_argument("VM input is null");
         }
         if (length == 0) { logical_bytes_ = 0; return; }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
             throw std::bad_alloc();
         }
-        std::memcpy(base_, bytes, length);
+        std::memcpy(base_ + at, bytes, length - at);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
+    }
+
+    // assign_bytes for a length that the accessible prefix already holds
+    // (can_assign_in_place): no permission change, so the only failure left
+    // is the injected Prepare failure, reported as false with nothing changed.
+    bool can_assign_in_place(std::size_t length) const noexcept {
+        return base_ != nullptr && length != 0 && length <= accessible_bytes_ && length <= maximum_capacity_;
+    }
+    bool assign_in_place(const char* bytes, std::size_t length, std::size_t at) noexcept {
+        if (consume_vm_failure(VmOperation::Prepare)) return false;
+        std::memcpy(base_ + at, bytes, length - at);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+        return true;
     }
 
     // In-place form of from_extents (same extent contract). Gap bytes are
@@ -528,6 +591,7 @@ private:
         swap(base_, other.base_);
         swap(canonical_byte_origin_, other.canonical_byte_origin_);
         swap(reserved_bytes_, other.reserved_bytes_);
+        swap(mapped_bytes_, other.mapped_bytes_);
         swap(maximum_capacity_, other.maximum_capacity_);
         swap(accessible_bytes_, other.accessible_bytes_);
         swap(logical_bytes_, other.logical_bytes_);
@@ -599,15 +663,18 @@ private:
 
     void release_mapping() noexcept {
         if (base_) {
+            // No head of this payload is live; clear its granules before the
+            // range can be mapped again.
+            OwnerMap::set(base_, mapped_bytes_, 0);
 #if defined(_WIN32)
-            ::VirtualFree(base_ - page_size_, 0, MEM_RELEASE);
+            ::VirtualFree(base_ - reservation_granularity_, 0, MEM_RELEASE);
 #else
-            ::munmap(base_ - page_size_, reserved_bytes_ + page_size_);
+            ::munmap(base_ - page_size_, mapped_bytes_ + page_size_);
 #endif
         }
         base_ = nullptr;
         canonical_byte_origin_ = nullptr;
-        reserved_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
+        reserved_bytes_ = mapped_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         zero_from_ = 0;
         page_size_ = reservation_granularity_ = 0;
     }
@@ -615,6 +682,9 @@ private:
     char* base_{nullptr};
     std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
+    // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
+    // granules (4 MiB). 0 for a slot owner.
+    std::size_t mapped_bytes_{0};
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};
     std::size_t logical_bytes_{0};

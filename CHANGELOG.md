@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+- Wire format 2.1 (breaking; `docs/V2_FORMAT.md` section 7). Senders and
+  receivers upgrade together: a 2.1 reader rejects 2.0 wires with `wire format
+  2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade
+  together)`, and a 3.0.0 reader rejects 2.1 wires.
+  - The wire header is 40 bytes instead of 96: magic `'X' 'O' 2 1`, flags,
+    `used_bytes`, `root_offset`, `hole_count`, `extent_count` (u32 each),
+    `schema_hash`, `root_type_id`. `header_size`, the format fields,
+    `endian_tag`, `crc32c`, `reserved0`, `schema_hash_hi` and `hole_bytes` are
+    gone.
+  - The 48-byte payload header is no longer sent; the receiver writes it from
+    `used_bytes` and `root_offset`. The wire carries payload bytes from offset
+    48, and every offset on it stays a payload offset. Every message is 104
+    bytes shorter.
+  - Container heads are 12 bytes (`data_delta`, `size_`, `capacity_`) instead
+    of 16: a head no longer stores its payload (`arena_delta`); the owner is
+    found from the head's address through a table with one byte per 4 MiB of
+    address space, and only to allocate, grow or retire a block. Inline
+    strings keep up to 10 bytes. `bind()`, `bind_like()` and `field_binding()`
+    are removed.
+  - Direct receive and reload: `payload_bytes()` spans payload
+    `[48, used_bytes)`, so a sparse extent at payload offset `o` lands at
+    `o - 48` and `complete()` reports `used_bytes - 48` payload bytes;
+    `VerifiedSnapshot::segments()[1]` starts at offset 48.
+  - Readers check the version before anything else and say which format they
+    got (1, 2.0, or M.m).
+- Performance: `XVector`'s `size_` and `capacity_` are `char32_t` (same bytes),
+  a type that int and unsigned element stores cannot alias, and the general
+  `push_back` path returns the head fields it changed; a `push_back` loop keeps
+  `capacity_` in a register instead of reloading it after every element store
+  (G9 measured `vec.push_back` at 1.29x `std::vector` on the Mac M4).
+- Performance (Clang builds): an `XVector` insert of a trivially copyable
+  element before the end, into spare capacity, runs inline at the call site
+  and stores `size_` before moving the tail, and `erase` keeps the head in
+  registers across the move. The flat `XSet` / `XMap` inserts and erases use
+  the same paths. GCC and MSVC builds keep the previous code. (G9 measured
+  `vec.mid_insert` at 1.10x, `set.insert.fresh` at 1.12x and
+  `set.erase.fresh` at 1.14x their `std` baselines on the Mac M4.)
+- The formal M input wire changes with the format; `bench/formal` pins the new
+  one.
+- Performance: `reload_verified<T>()` of a dense wire (no extent table) whose
+  payload is at most 32 KiB, into a buffer whose storage already holds it,
+  takes a straight path: one pass over the header words, the copy in place,
+  and no free table when the wire has no holes. Admission, verification,
+  errors and the loaded state are those of the general path (SLG D read:
+  -32% instructions, P2996).
 - Nightly libFuzzer without GitHub Actions or Docker (threat model F1, F2):
   `tools/fuzz_libfuzzer.sh` builds `fuzz_v2_wire` and `fuzz_wire_schemas` with
   the P2996 toolchain's own libFuzzer runtime (ASan+UBSan) and runs the steps

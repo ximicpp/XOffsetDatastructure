@@ -37,8 +37,8 @@ auto make_buffer(std::size_t initial = 1024u * 1024u) {
     return xo::XBuffer::create<ReplaceRoot>(initial, policy());
 }
 template<class T> auto descriptor(const T& value) {
-    static_assert(sizeof(T) == 16);
-    std::array<unsigned char, 16> result{};
+    static_assert(sizeof(T) == 12);
+    std::array<unsigned char, 12> result{};
     std::memcpy(result.data(), &value, result.size());
     return result;
 }
@@ -193,10 +193,14 @@ void failed_growth_preserves_descriptor_and_source() {
 }
 
 void rejection_order_and_layout() {
-    static_assert(sizeof(xo::XFixedString) == 16 && sizeof(xo::XString) == 16);
+    static_assert(sizeof(xo::XFixedString) == 12 && sizeof(xo::XString) == 12);
+    // V2.1: a head outside every payload takes empty and inline values; only
+    // a value that needs a block is rejected, and it leaves the head as it was.
     xo::XFixedString unbound; const auto initial = descriptor(unbound); bool caught = false;
-    try { unbound.assign({}); } catch (const xo::XException&) { caught = true; }
-    need(caught && descriptor(unbound) == initial, "unbound empty validation changed");
+    unbound.assign({});
+    need(descriptor(unbound) == initial, "unbound empty assignment changed the head");
+    try { unbound.assign(std::string(40, 'u')); } catch (const xo::XException&) { caught = true; }
+    need(caught && descriptor(unbound) == initial, "unbound block assignment changed the head");
     // A fabricated >MAX_PAYLOAD string_view backed by one byte would itself
     // violate the view's valid-range contract. The patch keeps the existing
     // size rejection byte-for-byte; this test does not manufacture such input.
