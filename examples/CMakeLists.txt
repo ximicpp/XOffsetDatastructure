@@ -6,3 +6,6 @@ configure_xoffset_target(helloworld)
 
 add_executable(stable_storage stable_storage.cpp)
 configure_xoffset_target(stable_storage)
+
+add_executable(schema_handshake schema_handshake.cpp)
+configure_xoffset_target(schema_handshake)
