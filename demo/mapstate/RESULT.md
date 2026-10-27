@@ -24,7 +24,8 @@ it. Both run the same validator and send the same bytes.
 | Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | deferred (Mac queue, 10-26): same Mac step file |
 | Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
 | End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all six targets PASS (section 5) |
-| End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 145 / 145 verdicts, no sanitizer report |
+| End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 151 / 151 verdicts (with step wires equal to `full1`), no sanitizer report |
+| Final local validation (10-27) | rebased on next_cpp26 5af77d3 (field-list backend #149): `full3` (six targets) and `asan2` | both PASS; corpus of `full1` replayed 60 / 60 on every target, step wires equal to `full1` at 500 / 500 ticks in every tier and mode |
 | End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
 | Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
 | End to end, emulators (10-27) | Android emulator (arm64) and iOS Simulator on the Mac, A/B in a Linux VM there | pending (emulator thread, Mac queue) |
@@ -175,10 +176,12 @@ the three tiers with `--encoding cycle` (`reuse`) and `--evil`. Two runs:
 `full2` (six targets, rebased on c8fc851 with the MSVC toolchains and
 next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 `full1`: 500 / 500 ticks equal in every tier, so the rebase changed no byte.
-Output in the project folder `slg-demo-20261022/e2e-20261027/`
-(`mapdemo_e2e_cloud_full{1,2}.tgz`, `E2E_RESULT_cloud_full{1,2}.md`).
+`full3` and `asan2` repeat this on next_cpp26 5af77d3 with the same result
+(the table below is `full3`). Output in the project folder
+`slg-demo-20261022/e2e-20261027/` (`mapdemo_e2e_cloud_full{1,2,3}.tgz`,
+`mapdemo_e2e_cloud_asan{1,2}.tgz`, `E2E_RESULT_cloud_full{1,2,3}.md`).
 
-| Client target (`full2`) | Runs under | Client build | Self-check | Replay (60 snapshots) | Tiers + evil | Step wires vs first target |
+| Client target (`full3`) | Runs under | Client build | Self-check | Replay (60 snapshots) | Tiers + evil | Step wires vs first target |
 | --- | --- | --- | --- | --- | --- | --- |
 | linux-gcc16-cxx26 | native | GCC 16.2, C++26, reflection | 23 / 23 | 60 / 60 same digests | 77 / 77 verdicts (with server self-test) | 3 / 3 equal to `full1` |
 | linux-gcc13-cxx20 | native | GCC 13.3, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 tiers equal |
@@ -216,8 +219,8 @@ What this shows:
 Sanitizers: the same run with GCC 16 Debug ASan+UBSan (A, B and a C++26
 client; `UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1`, leak detection
 on), both buffer modes: self-check 23 / 23, replay 60 / 60, three tiers x two
-modes + evil x two, 145 / 145 verdicts, no sanitizer report
-(`mapdemo_e2e_cloud_asan1.tgz`).
+modes + evil x two, no sanitizer report (`asan1` 145 / 145 verdicts;
+`asan2` on next_cpp26 151 / 151, step wires equal to `full1`).
 
 The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
 the Mac's screen was asleep); the client now exits 2 with "cannot open a
