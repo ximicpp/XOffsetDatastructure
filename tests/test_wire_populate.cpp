@@ -91,7 +91,9 @@ int main() {
     // Every output of at least 1 MiB is a fresh mapping: glibc without its
     // dynamic threshold; sanitizer allocators map large blocks anyway (and
     // ignore mallopt).
+#if defined(M_MMAP_THRESHOLD) // glibc; bionic has no such knob
     (void)mallopt(M_MMAP_THRESHOLD, 1 << 20);
+#endif
     namespace h = populate_hook;
     const auto big_size = big.save_verified().size();
     h::calls = h::bytes = 0;
