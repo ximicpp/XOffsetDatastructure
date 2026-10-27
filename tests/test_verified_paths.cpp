@@ -184,13 +184,13 @@ void freeze_transaction_and_lease() {
         check(candidate.root());
     }
     auto frozen=xo::freeze_verified(std::move(source));
-    need(!source.get_address() && frozen.segments()[1].data()==base,"freeze copied payload or failed to consume at commit");
+    need(!source.get_address() && frozen.segments()[1].data()==reinterpret_cast<const std::byte*>(base)+xo::XWIRE_PAYLOAD_BEGIN,"freeze copied payload or failed to consume at commit");
     check(frozen.root());const auto segments=frozen.segments();const auto wire=join(frozen);
     auto moved=std::move(frozen);need(moved.segments()[0].data()==segments[0].data() &&
         moved.segments()[1].data()==segments[1].data() && moved.segments()[2].data()==segments[2].data(),
         "snapshot handle move invalidated segments");
     auto io=moved.acquire_io_lease();moved={};io.cancel();
-    need(io.cancellation_requested() && io.segments()[1].data()==base,"cancellation released payload before completion");
+    need(io.cancellation_requested() && io.segments()[1].data()==reinterpret_cast<const std::byte*>(base)+xo::XWIRE_PAYLOAD_BEGIN,"cancellation released payload before completion");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(wire);check(loaded.root<PathsRoot>());
     io.complete();need(io.segments()[0].empty() && io.segments()[1].empty() && io.segments()[2].empty(),
                        "completion did not release lease");
@@ -212,13 +212,14 @@ void hole_table_paths() {
     const auto saved=source.save_verified();
     const auto h=header_of(into);
     need(into==saved,"save_verified_into differs from save_verified with holes");
-    need(h.extent_count==0&&h.hole_count==holes&&h.hole_bytes==hole_bytes&&
-         into.size()==sizeof(h)+h.used_bytes+holes*sizeof(xo::XBufferCore::WireHole),"dense V2 wire layout differs");
+    need(h.extent_count==0&&h.hole_count==holes&&
+         into.size()==sizeof(h)+h.used_bytes-xo::XWIRE_PAYLOAD_BEGIN+holes*sizeof(xo::XBufferCore::WireHole),
+         "dense V2.1 wire layout differs");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(into);check(loaded.root<PathsRoot>());
     need(loaded.free_block_count()==holes&&loaded.free_block_bytes()==hole_bytes,"loaded free table differs");
     auto frozen=xo::freeze_verified(std::move(source));
     const auto segments=frozen.segments();
-    need(segments[0].size()==sizeof(xo::XWireHeaderV2)&&segments[1].size()==h.used_bytes&&
+    need(segments[0].size()==sizeof(xo::XWireHeaderV2)&&segments[1].size()==h.used_bytes-xo::XWIRE_PAYLOAD_BEGIN&&
          segments[2].size()==holes*sizeof(xo::XBufferCore::WireHole),"snapshot segment sizes differ");
     need(join(frozen)==saved,"snapshot segments differ from the saved V2 wire");
     auto io=frozen.acquire_io_lease();need(io.segments()[2].data()==segments[2].data(),"lease hole segment differs");
@@ -243,8 +244,8 @@ void hole_table_paths() {
     auto from_sparse=xo::XBuffer::load_verified<PathsRoot>(sparse);check(from_sparse.root<PathsRoot>());
     auto dense_snapshot=xo::freeze_verified(std::move(large));
     const auto dense=join(dense_snapshot);const auto dh=header_of(dense);
-    need(dh.extent_count==0&&dense_snapshot.segments()[1].size()==dh.used_bytes&&dh.used_bytes==sh.used_bytes&&
-         dh.hole_count==sh.hole_count&&dh.hole_bytes==sh.hole_bytes,"snapshot of a sparse-saving source is not dense");
+    need(dh.extent_count==0&&dense_snapshot.segments()[1].size()==dh.used_bytes-xo::XWIRE_PAYLOAD_BEGIN&&
+         dh.used_bytes==sh.used_bytes&&dh.hole_count==sh.hole_count,"snapshot of a sparse-saving source is not dense");
     need(sh.extent_count!=0&&sparse.size()+8192<dense.size(),"elided save did not skip its zero runs (sparse wire)");
     auto from_dense=xo::XBuffer::load_verified<PathsRoot>(dense);check(from_dense.root<PathsRoot>());
     need(from_dense.root<PathsRoot>().blob.size()==8192,"dense snapshot reload differs");

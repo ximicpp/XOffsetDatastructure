@@ -49,21 +49,10 @@ namespace detail {
                                          nullptr, 0, false, &holes);
             source.replace_free_blocks(holes);
         }
-        XWireHeaderV2 result{};
-        std::memcpy(result.magic, XWIRE_MAGIC_V2, sizeof(result.magic));
-        result.format_major = XWIRE_FORMAT_MAJOR_V2;
-        result.format_minor = XWIRE_FORMAT_MINOR_V2;
-        result.header_size = sizeof(result);
-        result.used_bytes = source.arena()->used_end;
         const auto* base = static_cast<const char*>(source.get_address());
-        result.root_offset = reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base);
-        result.hole_count = source.free_block_count();
-        result.hole_bytes = source.free_block_bytes();
-        result.root_type_id = wire_root_type_id<T>();
-        result.schema_hash_lo = wire_schema_hash<T>();
-        result.flags = XWIRE_FLAGS_V2;
-        result.endian_tag = XWIRE_ENDIAN_TAG_V2;
-        return result;
+        return make_wire_header<T>(source.arena()->used_end,
+            reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base),
+            source.free_block_count());
     }
 
     template<class T>
@@ -93,15 +82,16 @@ namespace detail {
         auto gaps_of = [&](const XBufferCore& core, std::uint64_t used) {
             return emission == XWireEmission::free_runs ? wire_free_runs(core, used) : WireGaps{};
         };
-        auto same_holes = [](const XWireHeaderV2& a, const XWireHeaderV2& b) {
-            return a.used_bytes == b.used_bytes && a.hole_count == b.hole_count && a.hole_bytes == b.hole_bytes;
+        auto same_holes = [](const XWireHeaderV2& a, std::uint64_t a_bytes, const XWireHeaderV2& b,
+                             std::uint64_t b_bytes) {
+            return a.used_bytes == b.used_bytes && a.hole_count == b.hole_count && a_bytes == b_bytes;
         };
         XWireHeaderV2 final_header{};
         WireGaps gaps;
         std::size_t final_size = 0;
         const auto* arena = current->arena();
-        if (arena && current->free_table_complete() &&
-            sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end) +
+        if (arena && current->free_table_complete() && arena->used_end >= XWIRE_PAYLOAD_BEGIN &&
+            sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end - XWIRE_PAYLOAD_BEGIN) +
                 std::uint64_t(current->free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) {
             gaps = gaps_of(*current, arena->used_end);
             current = &owner(token);
@@ -111,12 +101,13 @@ namespace detail {
             const auto hole_bytes = current->free_block_bytes();
             final_header = header<T>(*current, true);
             if (final_header.used_bytes != used || final_header.hole_count != holes ||
-                final_header.hole_bytes != hole_bytes)
+                current->free_block_bytes() != hole_bytes)
                 throw XException("save_verified_into: source changed while preparing the output");
             final_size = size_of(final_header, gaps);
         }
         if (final_size == 0 || final_size > out.capacity()) {
             const auto initial = header<T>(*current, false);
+            const auto initial_hole_bytes = current->free_block_bytes();
             gaps = gaps_of(*current, initial.used_bytes);
             const auto prepared_size = size_of(initial, gaps);
             if (prepared_size > out.max_size())
@@ -126,7 +117,8 @@ namespace detail {
             check_alias(*current);
             final_header = header<T>(*current, true);
             final_size = size_of(final_header, gaps);
-            if (final_size > out.capacity() || final_size != prepared_size || !same_holes(initial, final_header))
+            if (final_size > out.capacity() || final_size != prepared_size ||
+                !same_holes(initial, initial_hole_bytes, final_header, current->free_block_bytes()))
                 throw XException("save_verified_into: source changed beyond prepared output capacity");
         }
         const auto* base = static_cast<const char*>(current->get_address());
@@ -203,23 +195,21 @@ namespace detail {
     }
 
     // The head writers of DirectWriter (below), the one place the canonical
-    // head layout is written: a 16-byte container head at payload offset
-    // `at` (bound to the payload base), and the inline form of a string of
-    // 1..inline_max bytes (store_inline: bytes 4..14 the characters then
-    // zeros, byte 15 = 0x80 | length).
+    // head layout is written: a 12-byte container head at payload offset
+    // `at` (data_delta is relative to the head's own address), and the inline
+    // form of a string of 1..inline_max bytes (store_inline: bytes 0..10 the
+    // characters then zeros, byte 11 = 0x80 | length).
     XOFFSET_DETAIL_WIRE_INLINE void write_container_head(char* base, std::size_t at, std::int32_t data_delta,
                                                          std::uint32_t size, std::uint32_t capacity) noexcept {
-        const std::int32_t head[4] = {-static_cast<std::int32_t>(at), data_delta,
-                                      static_cast<std::int32_t>(size), static_cast<std::int32_t>(capacity)};
+        const std::int32_t head[3] = {data_delta, static_cast<std::int32_t>(size),
+                                      static_cast<std::int32_t>(capacity)};
         std::memcpy(base + at, head, sizeof(head));
     }
     XOFFSET_DETAIL_WIRE_INLINE void write_inline_string(char* base, std::size_t at, const char* text,
                                                         std::uint32_t n) noexcept {
-        char head[16] = {};
-        const std::int32_t delta = -static_cast<std::int32_t>(at);
-        std::memcpy(head, &delta, 4);
-        for (std::uint32_t i = 0; i < n; ++i) head[4 + i] = text[i];
-        head[15] = static_cast<char>(0x80u | n);
+        char head[12] = {};
+        for (std::uint32_t i = 0; i < n; ++i) head[i] = text[i];
+        head[11] = static_cast<char>(0x80u | n);
         std::memcpy(base + at, head, sizeof(head));
     }
 
@@ -247,10 +237,10 @@ namespace detail {
             return true;
         }
     };
-    static_assert(offsetof(XFixedString, arena_delta) == 0 && offsetof(XFixedString, data_delta) == 4 &&
-                  offsetof(XFixedString, size_) == 8 && offsetof(XFixedString, capacity_) == 12);
-    static_assert(offsetof(XFixedVector<int>, arena_delta) == 0 && offsetof(XFixedVector<int>, data_delta) == 4 &&
-                  offsetof(XFixedVector<int>, size_) == 8 && offsetof(XFixedVector<int>, capacity_) == 12);
+    static_assert(offsetof(XFixedString, data_delta) == 0 && offsetof(XFixedString, size_) == 4 &&
+                  offsetof(XFixedString, capacity_) == 8 && sizeof(XFixedString) == 12);
+    static_assert(offsetof(XFixedVector<int>, data_delta) == 0 && offsetof(XFixedVector<int>, size_) == 4 &&
+                  offsetof(XFixedVector<int>, capacity_) == 8 && sizeof(XFixedVector<int>) == 12);
 
     // Measures the subtree of the source value `src`.
     template <class U>
@@ -317,8 +307,11 @@ namespace detail {
 namespace detail {
     // ---- direct writer: the write pass of save_compact, write-only ------
     // Writes the canonical layout (see above) that CompactMeasure measures:
-    // one 16-byte store per head, small blocks copied in 8-byte words.
+    // one 12-byte store per head, small blocks copied in 8-byte words.
     // Plain: capacity == size (slack_div == 0), decided once per save.
+    // Offsets (cursor, limit, `at`) count from `base`, the first payload byte
+    // on the wire (payload offset 48); heads hold differences of offsets, so
+    // they come out as in the payload.
     template <bool Plain>
     struct DirectWriter {
         char* base;
@@ -387,7 +380,7 @@ namespace detail {
         std::memcpy(&last, dst + padded - 8u, 8);
         last &= keep == 0 ? 0 : (~std::uint64_t(0) >> (64u - 8u * keep));
         std::memcpy(dst + padded - 8u, &last, 8);
-        write_container_head(w.base, at, static_cast<std::int32_t>(data - (at + 4u)), n, n);
+        write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, n);
     }
 
     template <class E, bool P>
@@ -408,7 +401,7 @@ namespace detail {
             std::memcpy(dst, from, live);
             std::memset(dst + live, 0, padded - live);
         }
-        write_container_head(w.base, at, static_cast<std::int32_t>(data - (at + 4u)), n, cap);
+        write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, cap);
         if constexpr (compact_has_heads<E>()) {
             for (std::uint32_t i = 0; i < n; ++i) direct_value(elements[i], data + std::size_t(i) * sizeof(E), w);
         }
@@ -437,18 +430,7 @@ namespace detail {
     // extents, root at offset 48.
     template <class T>
     XWireHeaderV2 compact_wire_header(std::size_t used) noexcept {
-        XWireHeaderV2 header{};
-        std::memcpy(header.magic, XWIRE_MAGIC_V2, sizeof(header.magic));
-        header.format_major = XWIRE_FORMAT_MAJOR_V2;
-        header.format_minor = XWIRE_FORMAT_MINOR_V2;
-        header.header_size = sizeof(header);
-        header.used_bytes = used;
-        header.root_offset = sizeof(XBufferCore::arena_header);
-        header.root_type_id = wire_root_type_id<T>();
-        header.schema_hash_lo = wire_schema_hash<T>();
-        header.flags = XWIRE_FLAGS_V2;
-        header.endian_tag = XWIRE_ENDIAN_TAG_V2;
-        return header;
+        return make_wire_header<T>(used, XWIRE_PAYLOAD_BEGIN, 0);
     }
 }
 
@@ -555,7 +537,7 @@ namespace detail {
     }
 
     // With a DirectWriter: writes the subobject `draft` (already copied to
-    // payload offset `at`) composed. With a CompactMeasure: only measures.
+    // writer offset `at`) composed. With a CompactMeasure: only measures.
     template <class U, class W, class Set>
     void compose_value(const U& draft, std::size_t at, W& w, const Set& set) noexcept;
 
@@ -606,28 +588,29 @@ namespace detail {
         return w.overflow ? 0 : w.cursor;
     }
 
+    // Payload end limit of a compact wire written into `capacity` bytes.
+    inline std::size_t compact_wire_limit(std::size_t capacity) noexcept {
+        if (capacity <= sizeof(XWireHeaderV2)) return 0;
+        return (std::min)(capacity - sizeof(XWireHeaderV2) + XWIRE_PAYLOAD_BEGIN,
+                          std::size_t(XBufferCore::MAX_PAYLOAD));
+    }
+
     // Writes the canonical wire of `root` (with the assignments of `set`)
-    // into `out`, which holds at least sizeof(XWireHeaderV2) + `limit` bytes;
-    // returns the bytes written, or 0 if it did not fit. No allocation.
+    // into `out`, which holds at least sizeof(XWireHeaderV2) + `limit` - 48
+    // bytes; returns the bytes written, or 0 if the payload would end past
+    // `limit`. No allocation.
     template <bool Plain, class T, class Set>
-    std::size_t write_compact_wire(char* out, std::size_t limit, const XBufferCore::arena_header& source_arena,
-                                    const T& root, std::uint32_t slack_div, const Set& set) noexcept {
-        constexpr std::size_t arena = sizeof(XBufferCore::arena_header);
-        constexpr std::size_t root_bytes = compact_root_end<T>() - arena;
-        if (limit < arena + root_bytes) return 0;
+    std::size_t write_compact_wire(char* out, std::size_t limit, const T& root, std::uint32_t slack_div,
+                                    const Set& set) noexcept {
+        constexpr std::size_t root_bytes = compact_root_end<T>() - XWIRE_PAYLOAD_BEGIN;
+        if (limit < compact_root_end<T>()) return 0;
         char* payload = out + sizeof(XWireHeaderV2);
-        DirectWriter<Plain> w{payload, arena + root_bytes, limit, slack_div};
-        std::memcpy(payload + arena, static_cast<const void*>(&root), sizeof(T));
-        if (root_bytes != sizeof(T)) std::memset(payload + arena + sizeof(T), 0, root_bytes - sizeof(T));
-        compose_value(root, arena, w, set);
+        DirectWriter<Plain> w{payload, root_bytes, limit - XWIRE_PAYLOAD_BEGIN, slack_div};
+        std::memcpy(payload, static_cast<const void*>(&root), sizeof(T));
+        if (root_bytes != sizeof(T)) std::memset(payload + sizeof(T), 0, root_bytes - sizeof(T));
+        compose_value(root, 0, w, set);
         if (w.overflow) return 0;
-        XBufferCore::arena_header h{};
-        std::memcpy(h.magic, source_arena.magic, sizeof(h.magic));
-        h.header_size = static_cast<std::uint32_t>(arena);
-        h.root_offset = arena;
-        h.used_end = w.cursor;
-        std::memcpy(payload, &h, sizeof(h));
-        const auto header = compact_wire_header<T>(w.cursor);
+        const auto header = compact_wire_header<T>(XWIRE_PAYLOAD_BEGIN + w.cursor);
         std::memcpy(out, &header, sizeof(header));
         return sizeof(XWireHeaderV2) + w.cursor;
     }
@@ -651,15 +634,14 @@ namespace detail {
         check_alias(*current);
         const ComposeSet<> none{};
         auto write = [&](XBufferCore& core, std::size_t capacity) -> std::size_t {
-            if (capacity <= sizeof(XWireHeaderV2)) return 0;
-            const auto limit = (std::min)(capacity - sizeof(XWireHeaderV2), std::size_t(XBufferCore::MAX_PAYLOAD));
+            const auto limit = compact_wire_limit(capacity);
+            if (limit == 0) return 0;
             const T& root = *find_root<T>(core);
-            const auto& source_arena = *core.arena();
             std::size_t written = 0;
             auto emit = [&](char* destination) noexcept {
                 return options.slack_div == 0
-                    ? write_compact_wire<true>(destination, limit, source_arena, root, 0, none)
-                    : write_compact_wire<false>(destination, limit, source_arena, root, options.slack_div, none);
+                    ? write_compact_wire<true>(destination, limit, root, 0, none)
+                    : write_compact_wire<false>(destination, limit, root, options.slack_div, none);
             };
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(capacity, [&](char* destination, std::size_t) noexcept {
@@ -678,7 +660,7 @@ namespace detail {
         // can be larger: an output with room is written without measuring,
         // otherwise the payload is measured first (a walk of the heads).
         auto bound = std::size_t(h.used_bytes);
-        if (options.slack_div != 0 || sizeof(XWireHeaderV2) + bound <= out.capacity()) {
+        if (options.slack_div != 0 || sizeof(XWireHeaderV2) + bound - XWIRE_PAYLOAD_BEGIN <= out.capacity()) {
             if (write(*current, out.capacity()) != 0) return;
         }
         if (options.slack_div != 0) {
@@ -686,7 +668,7 @@ namespace detail {
                                     options.slack_div);
             if (bound == 0) throw XException("save_compact_into: compact payload exceeds the wire limit");
         }
-        const auto size = sizeof(XWireHeaderV2) + bound;
+        const auto size = sizeof(XWireHeaderV2) + bound - XWIRE_PAYLOAD_BEGIN;
         if (size > out.max_size())
             throw std::length_error("save_compact_into: output size exceeds string limit");
         if (size > out.capacity()) {
@@ -757,15 +739,14 @@ namespace detail {
                                  "(an element of a container cannot be a target)");
 
             constexpr std::size_t kMaxLimit = XBufferCore::MAX_PAYLOAD;
-            auto write = [&](const T& from, const XBufferCore::arena_header& source_arena,
-                             std::size_t capacity) -> std::size_t {
-                if (capacity <= sizeof(XWireHeaderV2)) return 0;
-                const auto limit = (std::min)(capacity - sizeof(XWireHeaderV2), kMaxLimit);
+            auto write = [&](const T& from, std::size_t capacity) -> std::size_t {
+                const auto limit = compact_wire_limit(capacity);
+                if (limit == 0) return 0;
                 std::size_t written = 0;
                 auto emit = [&](char* destination) noexcept {
                     return options.slack_div == 0
-                        ? write_compact_wire<true>(destination, limit, source_arena, from, 0, set)
-                        : write_compact_wire<false>(destination, limit, source_arena, from, options.slack_div, set);
+                        ? write_compact_wire<true>(destination, limit, from, 0, set)
+                        : write_compact_wire<false>(destination, limit, from, options.slack_div, set);
                 };
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
                 out.resize_and_overwrite(capacity, [&](char* destination, std::size_t) noexcept {
@@ -781,14 +762,14 @@ namespace detail {
             };
             // Fast path: a reused output usually has room. Writing allocates
             // nothing and runs no host callback, so nothing can move.
-            if (write(*root, *arena, out.capacity()) != 0) return;
+            if (write(*root, out.capacity()) != 0) return;
             // Measure, reserve (the only allocation/callback boundary), and
             // write again against the re-resolved owner. Targets are
             // addresses in the draft: if the draft moved, they are stale.
             const auto token = identity(source);
             const auto bound = measure_composed(*root, kMaxLimit, options.slack_div, set);
             if (bound == 0) throw XException("save_compact_into: composed payload exceeds the wire limit");
-            const auto size = sizeof(XWireHeaderV2) + bound;
+            const auto size = sizeof(XWireHeaderV2) + bound - XWIRE_PAYLOAD_BEGIN;
             if (size > out.max_size())
                 throw std::length_error("save_compact_into: output size exceeds string limit");
             // Headroom, so a reused output takes the fast path again when the
@@ -798,7 +779,7 @@ namespace detail {
             check_alias(*current);
             if (find_root<T>(*current) != root)
                 throw XException("save_compact_into: the draft moved while the output was allocated");
-            if (write(*root, *current->arena(), out.capacity()) == 0)
+            if (write(*root, out.capacity()) == 0)
                 throw XException("save_compact_into: source changed beyond prepared output capacity");
         } catch (...) {
             if (!out_aliases) out.clear();
@@ -824,12 +805,13 @@ class VerifiedSnapshot {
     std::shared_ptr<Control> owner_;
     explicit VerifiedSnapshot(std::shared_ptr<Control> owner) noexcept : owner_(std::move(owner)) {}
     friend VerifiedSnapshot<T> freeze_verified<T>(TypedXBuffer<T>&&, std::pmr::memory_resource*);
-    // V2: {header, payload, hole table}.
+    // V2.1: {header, payload [48, used_bytes), hole table}.
     static std::array<std::span<const std::byte>, 3> views(const std::shared_ptr<Control>& owner) noexcept {
         if (!owner) return {};
         return {std::span<const std::byte>(reinterpret_cast<const std::byte*>(&owner->header), sizeof(owner->header)),
-                std::span<const std::byte>(reinterpret_cast<const std::byte*>(owner->source.get_address()),
-                                          std::size_t(owner->header.used_bytes)),
+                std::span<const std::byte>(reinterpret_cast<const std::byte*>(owner->source.get_address()) +
+                                               XWIRE_PAYLOAD_BEGIN,
+                                           std::size_t(owner->header.used_bytes) - XWIRE_PAYLOAD_BEGIN),
                 std::span<const std::byte>(reinterpret_cast<const std::byte*>(owner->holes.data()),
                                           owner->holes.size() * sizeof(XBufferCore::WireHole))};
     }
