@@ -26,9 +26,11 @@ struct NoExcRoot {
     XVector<std::uint32_t> values;
     XMap<std::uint32_t, XString> labels;
 };
+XOFFSET_RECORD_DERIVED(NoExcRoot, (), id, name, values, labels)
 XOFFSET_REGISTER_SCHEMA_NAME(NoExcRoot, "test.NoExcRoot")
 
 struct NoExcOther { std::uint32_t x{}; };
+XOFFSET_RECORD_DERIVED(NoExcOther, (), x)
 XOFFSET_REGISTER_SCHEMA_NAME(NoExcOther, "test.NoExcOther")
 
 namespace {

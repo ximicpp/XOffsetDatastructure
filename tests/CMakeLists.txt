@@ -248,6 +248,10 @@ set(NO_EXCEPTIONS_TESTS
     test_schema_handshake
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
+    if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+        xoffset_cxx26_only(${test_name}_noexc)
+        continue()
+    endif()
     add_executable(${test_name}_noexc ${test_name}.cpp)
     configure_xoffset_target(${test_name}_noexc)
     xoffset_enable_test_assertions(${test_name}_noexc)
