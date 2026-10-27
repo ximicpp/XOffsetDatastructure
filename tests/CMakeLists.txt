@@ -18,6 +18,8 @@ set(XOFFSET_CXX26_ONLY_TESTS
     test_field_limit_fix
     test_reflection_advanced
     test_reflection_core
+    test_schema_evolution
+    test_schema_lineage
     test_subtree_copy
     test_type_safety
     test_type_signatures
@@ -156,19 +158,65 @@ target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
 # (xoffset_evolution.hpp, server side).
 set(EVOLUTION_TESTS
     test_schema_handshake
+    test_schema_evolution
+    test_schema_lineage
 )
 foreach(test_name ${EVOLUTION_TESTS})
     add_xoffset_test(${test_name} "reflection;evolution")
 endforeach()
 
-# G5/F4: the two libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
+# Server side (xoffset_evolution.hpp, xoffset_schema_freeze.hpp): reflection
+# backend only.
+if(XOFFSET_TESTS_REFLECTION)
+    # tools/schema_freeze: snapshots and lock file against the checked-in copies.
+    add_executable(test_schema_freeze test_schema_freeze.cpp)
+    configure_xoffset_target(test_schema_freeze)
+    xoffset_enable_test_assertions(test_schema_freeze)
+    add_test(NAME test_schema_freeze COMMAND test_schema_freeze "${CMAKE_CURRENT_SOURCE_DIR}/schema_freeze")
+    set_tests_properties(test_schema_freeze PROPERTIES LABELS "reflection;evolution")
+
+    # Schema evolution: conversions the default rules do not cover, hooks that
+    # name a field neither version has, and lineages whose versions share a
+    # schema_hash must fail the build, naming the field or the versions.
+    foreach(variant type_change container_kind unknown_handle lineage_same_hash)
+        add_executable(schema_evolution_${variant}_fail EXCLUDE_FROM_ALL schema_evolution/${variant}_fail.cpp)
+        configure_xoffset_target(schema_evolution_${variant}_fail)
+        add_test(NAME schema_evolution_${variant}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_evolution_${variant}_fail --config $<CONFIG>)
+    endforeach()
+    set_tests_properties(schema_evolution_type_change_fail PROPERTIES
+        LABELS "reflection;evolution"
+        PASS_REGULAR_EXPRESSION "field 'gold' changed type from int to long")
+    set_tests_properties(schema_evolution_container_kind_fail PROPERTIES
+        LABELS "reflection;evolution"
+        PASS_REGULAR_EXPRESSION "field 'items' changed type from [A-Za-z:]*XVector<int> to [A-Za-z:]*XSet<int>")
+    set_tests_properties(schema_evolution_unknown_handle_fail PROPERTIES
+        LABELS "reflection;evolution"
+        PASS_REGULAR_EXPRESSION "handles names 'glod', which neither version has")
+    set_tests_properties(schema_evolution_lineage_same_hash_fail PROPERTIES
+        LABELS "reflection;evolution"
+        PASS_REGULAR_EXPRESSION "v1::Stats and v2::Stats have the same schema_hash")
+else()
+    xoffset_cxx26_only(test_schema_freeze)
+    foreach(variant type_change container_kind unknown_handle lineage_same_hash)
+        xoffset_cxx26_only(schema_evolution_${variant}_fail)
+    endforeach()
+endif()
+
+# G5/F4: the libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
 #   fuzz_<target>_replay          replays fuzz/regressions/<target>/: crash
 #                                 inputs kept by fix PRs (see its README.md)
 #   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
 #                                 by fuzz_<target>_replay_seeds
 # Names start with the target name so tools/validate_vm.py --targets selects all three.
-foreach(fuzz_target v2_wire wire_schemas)
+set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas)
+if(XOFFSET_TESTS_REFLECTION)
+    list(APPEND XOFFSET_REPLAY_TARGETS schema_evolution)  # server side, reflection only
+else()
+    xoffset_cxx26_only(fuzz_schema_evolution_replay)
+endif()
+foreach(fuzz_target ${XOFFSET_REPLAY_TARGETS})
     set(replay fuzz_${fuzz_target}_replay)
     add_executable(${replay} fuzz/fuzz_${fuzz_target}.cpp fuzz/replay_main.cpp)
     configure_xoffset_target(${replay})
