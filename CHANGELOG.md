@@ -13,9 +13,11 @@
   the storage package). Without exceptions, failures that cannot be
   returned call the handler set with `set_fatal_handler` and abort.
   Validation is unchanged: the fuzz core compares every rejection of
-  `try_load_verified` with `load_verified`, and 23 test programs, the OS
+  `try_load_verified` with `load_verified`, and 24 test programs, the OS
   layer test and the validator fuzz run without exceptions in CTest.
   Raw validation and verified receive have no non-throwing entry yet.
+  `xoffset_handshake.hpp` loads handshake messages through
+  `try_load_verified` in builds without exceptions.
 
 ## 3.1.0: wire format 2.1
 

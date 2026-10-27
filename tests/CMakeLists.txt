@@ -245,6 +245,7 @@ set(NO_EXCEPTIONS_TESTS
     test_wire_populate
     test_xhandle
     test_xstring_direct_assign
+    test_schema_handshake
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     add_executable(${test_name}_noexc ${test_name}.cpp)
