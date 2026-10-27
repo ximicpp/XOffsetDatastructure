@@ -72,7 +72,7 @@ static_assert(!is_v1_wire_admitted_v<ExtendedString>);
 static_assert(!is_v1_wire_admitted_v<ExtendedMap>);
 static_assert(std::string_view(xstring_wire_sig) == std::string_view(fixed_string_wire_sig));
 static_assert(std::string_view(xvector_wire_sig) == std::string_view(fixed_vector_wire_sig));
-static_assert(std::string_view(xstring_wire_sig).find("arena:rel32") != std::string_view::npos);
+static_assert(std::string_view(xstring_wire_sig).find("[s:12,a:4]{data:rel32,size:u32,capacity:u32}") != std::string_view::npos);
 static_assert(std::string_view(xvector_wire_sig).find("xvector") != std::string_view::npos);
 static_assert(std::string_view(xmap_wire_sig).find("xflatmap") != std::string_view::npos);
 static_assert(std::string_view(xset_wire_sig).find("xflatset") != std::string_view::npos);

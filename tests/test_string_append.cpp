@@ -29,9 +29,9 @@ void check_exact(const XString& s, const std::string& want) {
         const auto* head = reinterpret_cast<const unsigned char*>(&s);
         for (std::size_t i = 0; i < 11; ++i) {
             const unsigned char expect = i < want.size() ? static_cast<unsigned char>(want[i]) : 0;
-            assert(head[4 + i] == expect);
+            assert(head[i] == expect);
         }
-        assert(head[15] == (0x80u | want.size()));
+        assert(head[11] == (0x80u | want.size()));
         return;
     }
     if (s.capacity() == 0) { assert(want.empty()); return; }
