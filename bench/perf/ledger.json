@@ -359,6 +359,20 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L1，XVector push_back(const T&) 在一般路径之后重述 size_ = n + 1，调用方的 push_back 循环把 size_ 留在寄存器里；arm64 上原来 4 字节写后紧跟 8 字节 ldp 读回，部分重叠转发失败（Mac vec.push_back 6.45×、push_back_grow 4.53×）。只改 xoffsetdatastructure.hpp 4 行；不改 wire、API。试合点 2（5d37624b，对点 1 bc458310）local_validate 8/8（gcc/asan/p2996 103/103，fuzz 42 万例 0 不一致，diff 40 万例一致），两种 Ir 无警告：GCC 16 reloc.vec.push_back 0.9298、push_back_grow 0.9205，其余 1.0000；P2996 无下降，最高 reloc.hero.push_back_grow.ord 1.0031（max_ratio；收益在 arm64 转发，不在 Ir 里）。",
       "evidence": "PR #126 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p2_*.md、ir_{gcc16,p2996}_p2.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
       "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 1 个 S 类，CKPT3（对 3549272）单列二分点"
+    },
+    {
+      "id": "s-class-pr127",
+      "pr": 127,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0045,
+      "record_only": true,
+      "class": "S",
+      "head": "559624bc3e11",
+      "base": "87a0514b6fd7",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L2，SHIFT 重定位：一段搬动共用一个 shift（ShiftRun）；Clang 下溢出检查改为与固定上下界比较、整段收集后在段尾检查一次（越界的和不会被使用），搬动循环强制内联，单元素 insert/erase 可向量化；GCC/MSVC 保持逐个 checked add；先算和再 placement new，默认成员初始化的零写成为死存储。溢出仍然 terminate（Clang 下推迟到段尾）。只改 xoffset_core_lifetime.hpp；tests/test_shift_relocate.cpp 加 int32 边界重定位与 3 个必须 terminate 的独立进程 CTest（overflow-up/down/mid，新旧库都通过）。试合点 3（559624bc，对点 2）local_validate 8/8（106/106），两种 Ir 无警告：P2996 hero.mid_erase.ord 0.7374、mid_insert.ord 0.7653、slg.S.ticks_middle 0.8132、slg.B.season_edits 0.9345、slg.B 0.9744；GCC 16 hero.mid_erase.ord 0.8131、mid_insert.ord 0.8174、slg.S.ticks_middle 0.8729、slg.B 0.9809，最高 hero.push_back_grow.plain 1.0045（max_ratio）。",
+      "evidence": "PR #127 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p3_*.md、ir_{gcc16,p2996}_p3.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
+      "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 2 个 S 类，CKPT3（对 3549272）单列二分点"
     }
   ]
 }
