@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -35,6 +36,9 @@ namespace detail {
 enum class VmOperation : std::uint8_t { Reserve, Enable, Prepare, Reclaim, Protect };
 
 inline thread_local unsigned vm_pending_failures = 0;
+// Set once any thread arms a failure: until then consume_vm_failure reads no
+// thread-local storage (a call through the TLV descriptor on Apple targets).
+inline std::atomic<bool> vm_failure_injection_used{false};
 
 inline unsigned vm_operation_bit(VmOperation operation) noexcept {
     switch (operation) {
@@ -48,12 +52,14 @@ inline unsigned vm_operation_bit(VmOperation operation) noexcept {
 }
 
 inline void fail_next_vm_operation(VmOperation operation) noexcept {
+    vm_failure_injection_used.store(true, std::memory_order_relaxed);
     vm_pending_failures |= vm_operation_bit(operation);
 }
 
 inline void clear_vm_failures() noexcept { vm_pending_failures = 0; }
 
 inline bool consume_vm_failure(VmOperation operation) noexcept {
+    if (!vm_failure_injection_used.load(std::memory_order_relaxed)) return false;
     const unsigned bit = vm_operation_bit(operation);
     const bool fail = (vm_pending_failures & bit) != 0;
     vm_pending_failures &= ~bit;
@@ -386,6 +392,20 @@ public:
         std::memcpy(base_ + at, bytes, length - at);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
+    }
+
+    // assign_bytes for a length that the accessible prefix already holds
+    // (can_assign_in_place): no permission change, so the only failure left
+    // is the injected Prepare failure, reported as false with nothing changed.
+    bool can_assign_in_place(std::size_t length) const noexcept {
+        return base_ != nullptr && length != 0 && length <= accessible_bytes_ && length <= maximum_capacity_;
+    }
+    bool assign_in_place(const char* bytes, std::size_t length, std::size_t at) noexcept {
+        if (consume_vm_failure(VmOperation::Prepare)) return false;
+        std::memcpy(base_ + at, bytes, length - at);
+        logical_bytes_ = length;
+        if (zero_from_ < length) zero_from_ = length;
+        return true;
     }
 
     // In-place form of from_extents (same extent contract). Gap bytes are
