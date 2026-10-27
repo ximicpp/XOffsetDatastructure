@@ -228,8 +228,14 @@ void real_free_table_growth_has_no_callback(const std::string& bytes){
 }
 }
 
+// Both cases drive the per-thread owner cache; GCC on MinGW/Cygwin builds without it
+// (XOFFSET_THREAD_CACHES=0), so there is nothing to test: CTest reports a skip (77).
+#if !XOFFSET_THREAD_CACHES
+int main(){std::cout<<"skipped: no per-thread owner cache (XOFFSET_THREAD_CACHES=0)\n";return 77;}
+#else
 int main(){try{const auto bytes=test::wire();
     test::direct_cold_has_no_eviction(bytes);test::real_free_table_growth_has_no_callback(bytes);
     std::cout<<"canonical-v4: cold no-eviction/no-C++-allocation; real free-table growth and exact terminal-delete owner-move controls passed\n";
     return 0;
 }catch(const std::exception& e){host::disarm();std::set_new_handler(nullptr);std::cerr<<e.what()<<'\n';return 1;}}
+#endif
