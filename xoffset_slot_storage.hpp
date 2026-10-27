@@ -51,6 +51,23 @@
 #  include <sanitizer/asan_interface.h>
 #endif
 
+// Per-thread caches (this slab's free lists, the free-table cache and the
+// owner cache in xoffsetdatastructure.hpp). Each keeps a trivial thread_local
+// flag that its nontrivial cache clears on thread exit, so late destructors
+// take the global path. GCC on MinGW and Cygwin emulates TLS (emutls): a
+// thread's TLS blocks can be freed before its thread_local destructors run,
+// and a TLS access from such a destructor gets a fresh block, so neither the
+// cache nor the flag is reliable there. Those targets get no per-thread
+// caches; every path uses the global structures. Clang on MinGW uses native
+// TLS and keeps them.
+#ifndef XOFFSET_THREAD_CACHES
+#  if (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(__GNUC__) && !defined(__clang__)
+#    define XOFFSET_THREAD_CACHES 0
+#  else
+#    define XOFFSET_THREAD_CACHES 1
+#  endif
+#endif
+
 #ifndef XOFFSET_SLOT_MAX_BYTES
 #  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
 #endif
@@ -246,7 +263,11 @@ private:
     // Same pattern as the free-table cache: this trivial flag outlives the
     // cache, so late thread and static destructors use the global lists.
     static bool& cache_available() noexcept {
+#if XOFFSET_THREAD_CACHES
         static thread_local bool available = true;
+#else
+        static bool available = false; // never set: see XOFFSET_THREAD_CACHES
+#endif
         return available;
     }
     static ThreadCache& thread_cache() noexcept {
