@@ -24,8 +24,9 @@ if(NOT ANDROID_NDK OR NOT EXISTS "${ANDROID_NDK}/build/cmake/android.toolchain.c
 endif()
 set(ANDROID_NDK "${ANDROID_NDK}" CACHE PATH "Android NDK root")
 set(ANDROID_ABI arm64-v8a)
+# API 28 (Android 9): the tests' failure-injection allocators call aligned_alloc.
 if(NOT ANDROID_PLATFORM)
-    set(ANDROID_PLATFORM android-24)
+    set(ANDROID_PLATFORM android-28)
 endif()
 set(ANDROID_STL c++_static)
 option(XOFFSET_ANDROID_QEMU "Run CTest through qemu-aarch64 user mode (static programs)" OFF)

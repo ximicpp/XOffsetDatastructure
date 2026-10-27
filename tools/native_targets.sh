@@ -71,6 +71,7 @@ step configure "$LOG/configure.log" cmake -S "$REPO" -B "$BUILD" "${ARGS[@]}" ${
 if [[ $STATUS -eq 0 ]]; then
     step build "$LOG/build.log" cmake --build "$BUILD" --parallel "$JOBS"
 fi
+BUILT=$STATUS
 if [[ $STATUS -eq 0 ]]; then
     step ctest "$LOG/ctest.log" ctest --test-dir "$BUILD" --output-on-failure --parallel "$JOBS" --timeout 1800
     summary=$(grep -E 'tests passed|tests failed' "$LOG/ctest.log" | tail -1)
@@ -94,7 +95,8 @@ for word in ${ANY_CMD[@]+"${ANY_CMD[@]}"}; do
     [[ "$word" == "$BUILD"/* ]] && break
     EMU="${EMU:+$EMU }$word"
 done
-if [[ $STATUS -eq 0 && -n "$CW" ]]; then
+# The corpus is checked whenever the build passed, also after a failed CTest.
+if [[ $BUILT -eq 0 && -n "$CW" ]]; then
     rm -rf "$BUILD/corpus"
     step "corpus write" "$LOG/corpus-write.log" "${CW_CMD[@]}" --write "$BUILD/corpus"
     if [[ -n "$REF" ]]; then
@@ -103,7 +105,7 @@ if [[ $STATUS -eq 0 && -n "$CW" ]]; then
     else
         rows+=("| corpus read / diff | not run: no --ref | |")
     fi
-elif [[ $STATUS -eq 0 ]]; then
+elif [[ $BUILT -eq 0 ]]; then
     rows+=("| corpus | **not run**: test_cross_compiler_wire was not built | |")
     STATUS=1
 fi
