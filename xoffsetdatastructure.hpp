@@ -4701,13 +4701,12 @@ namespace XOffsetDatastructure::schema {
     namespace describe_detail {
         template <class H>
         struct head_fields {
-            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, arena_delta)
             XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, data_delta)
             XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, size_)
             XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, capacity_)
         };
         template <class H, class F = head_fields<H>>
-        using head_record = record<H, false, bases<>, typename F::field_arena_delta,
+        using head_record = record<H, false, bases<>,
                                    typename F::field_data_delta, typename F::field_size_,
                                    typename F::field_capacity_>;
 

@@ -61,17 +61,17 @@ XOFFSET_RECORD_DERIVED(sd::Counted, (), value)
 // must give the same text.
 XOFFSET_PIN_SCHEMA(sd::Vec3, "record[s:12,a:4]{@0:f32,@4:f32,@8:f32}");
 XOFFSET_PIN_SCHEMA(sd::Item,
-    "record[s:104,a:8]{@0:i32,@4:enum<u8char>,@6:enum<u16>,@8:record[s:10,a:2]{@0:array[5]<i16>},"
+    "record[s:96,a:8]{@0:i32,@4:enum<u8char>,@6:enum<u16>,@8:record[s:10,a:2]{@0:array[5]<i16>},"
     "@24:array[2]<array[3]<f64>>,@72:record[s:12,a:4]{@0:f32,@4:f32,@8:f32},"
-    "@88:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}");
+    "@84:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
 XOFFSET_PIN_SCHEMA(sd::Bag,
-    "record[s:56,a:8]{@0:u64,@8:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}"
-    "<record[s:104,a:8]{@0:i32,@4:enum<u8char>,@6:enum<u16>,@8:record[s:10,a:2]{@0:array[5]<i16>},"
+    "record[s:48,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}"
+    "<record[s:96,a:8]{@0:i32,@4:enum<u8char>,@6:enum<u16>,@8:record[s:10,a:2]{@0:array[5]<i16>},"
     "@24:array[2]<array[3]<f64>>,@72:record[s:12,a:4]{@0:f32,@4:f32,@8:f32},"
-    "@88:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}}>,"
-    "@24:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32,"
-    "xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10}>,"
-    "@40:xflatset[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>}");
+    "@84:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,"
+    "@20:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,"
+    "xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}>,"
+    "@32:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
 XOFFSET_REGISTER_SCHEMA_NAME(sd::Bag, "test.schema-describe.bag.v1")
 
 namespace schema = xo::schema;
@@ -84,7 +84,7 @@ static_assert(schema::base_count_v<sd::Player> == 1);
 static_assert(std::is_same_v<schema::base_t<sd::Player, 0>, sd::Entity>);
 static_assert(schema::member_count_v<sd::Player> == 2);
 static_assert(schema::base_count_v<xo::XVector<int>> == 1);
-static_assert(schema::member_count_v<xo::XFixedVector<int>> == 4);
+static_assert(schema::member_count_v<xo::XFixedVector<int>> == 3);
 static_assert(xo::wire_record_layout<sd::Item>::ordinary_members);
 static_assert(xo::StableEraseOrdinaryMembers<sd::Bag>::value);
 static_assert(!xo::wire_record_layout<sd::Player>::ordinary_members);
