@@ -1,0 +1,25 @@
+d2_probe check-base: 2048 reads per cell and round, 3 rounds (+1 warm-up)
+  cycle 1: 512 reports, bytes per report xoffset 712 flatbuffers 587, max used 2032 B, wires with holes 0
+  cycle 10: 512 reports, bytes per report xoffset 207 flatbuffers 167, max used 1288 B, wires with holes 0
+  cycle 20: 512 reports, bytes per report xoffset 197 flatbuffers 158, max used 496 B, wires with holes 0
+  cycle 40: 512 reports, bytes per report xoffset 186 flatbuffers 149, max used 352 B, wires with holes 0
+median ns per read
+variant           cycle 1      cycle 10     cycle 20     cycle 40 
+xo.read               56.66        31.13        30.21        30.35
+xo.reload             31.62        23.01        22.66        22.36
+xo.reverify           36.34        29.13        28.65        28.04
+syn.q+scan            40.00        16.17        14.97        15.22
+syn.w8+scan           50.33        17.90        17.11        16.50
+syn.q                 13.88         5.62         5.07         4.98
+syn.scan              27.75        10.09         8.89         9.42
+fb.verify              8.32         7.49         7.69         8.00
+fb.read               60.28        36.23        31.15        26.25
+t.empty               34.46        34.53        34.53        34.51
+xo.read.t             88.48        66.43        65.73        65.61
+xo.reload.t           60.30        53.59        53.18        54.10
+syn.q+scan.t          72.39        50.92        49.95        48.28
+syn.w8+scan.t         82.76        50.88        50.19        49.46
+syn.q.t               46.39        41.61        41.16        40.26
+syn.scan.t            60.63        44.86        44.62        43.78
+fb.verify.t           38.59        38.72        38.68        38.70
+fb.read.t             91.61        68.56        62.70        58.09
