@@ -10,7 +10,7 @@ toolchains as 3.0.0. Mac M4 at the INT4 checkpoint against `v3.0.0`
 (`docs/PERFORMANCE.md` section 3): SLG A 0.991, B 0.951, C 0.950, D 0.846;
 formal read_sum 0.950, mutate 0.970, emit_after 0.869 (largest upper bound
 0.981). Known gaps: D is still slower than FlatBuffers (1.117, upper bound
-1.156), D's wire is 0.864 of 3.0.0 against a 0.70 target, TBD-G9, schema
+1.156), TBD-G9, schema
 evolution is not supported, and iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
 
 Release goals (roadmap O1-O7) and where this release stands:
@@ -18,7 +18,13 @@ Release goals (roadmap O1-O7) and where this release stands:
 - O1 wire 2.1, frozen for 3.x: R7 (40-byte header, no payload header on the
   wire) and R4 (12-byte container heads) are both in. Bytes per message
   against 3.0.0 (target A.req, A.res, B <= 0.92, D <= 0.70, formal M final
-  wire <= 0.94): TBD-WIRE; D is 0.864, not met. `emit_after` against cereal
+  wire <= 0.94), cloud GCC 16: on the measure the targets were set with
+  (M scale, cycle 20, mean per message) A.req 1508 -> 1253 B (0.831), A.res
+  1743 -> 1488 (0.854), B 15657 -> 13667 (0.873), D 309 -> 197 (0.638), all
+  met; on the last cycle of the default two-cycle run A.req 0.820, A.res
+  0.902, B 0.857, D 824 -> 712 (0.864). TBD-D-WIRE. Formal M final wire
+  12,627,496 -> 11,182,856 B (0.886), met; formal M input wire 0.917.
+  `emit_after` against cereal
   (target UB <= 0.20): met, upper bound 0.168 and 0.170 in two batches (3.0.0
   in the same batches: median 0.188 and 0.194). 2.0 wires are rejected with
   the version named.
