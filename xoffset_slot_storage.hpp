@@ -77,6 +77,16 @@
 #endif
 
 namespace XOffsetDatastructure {
+// Owner-table lookups sit on every allocate, grow and retire; GCC stops
+// inlining them once the table reads are atomic, so force it.
+#if defined(__GNUC__) || defined(__clang__)
+#  define XOFFSET_DETAIL_OWNER_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define XOFFSET_DETAIL_OWNER_INLINE __forceinline
+#else
+#  define XOFFSET_DETAIL_OWNER_INLINE inline
+#endif
+
 namespace detail {
 
 constexpr std::size_t slot_log2(std::size_t value) noexcept {
@@ -110,14 +120,14 @@ struct OwnerMap {
     static bool ready() noexcept;
     static std::uint8_t entry(std::uintptr_t address) noexcept;
     // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
-    static std::uint8_t load(const std::uint8_t& e) noexcept {
+    XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         return __atomic_load_n(&e, __ATOMIC_RELAXED);
 #else
         return *static_cast<const volatile std::uint8_t*>(&e);
 #endif
     }
-    static void store(std::uint8_t& e, std::uint8_t value) noexcept {
+    XOFFSET_DETAIL_OWNER_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         __atomic_store_n(&e, value, __ATOMIC_RELAXED);
 #else
@@ -157,7 +167,7 @@ inline bool OwnerMap::ready() noexcept {
     return true;
 }
 
-inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
     return table ? load(table[index(address)]) : std::uint8_t(0);
 }
@@ -167,12 +177,12 @@ inline std::uint8_t owner_map_table[OwnerMap::entries];
 
 inline bool OwnerMap::ready() noexcept { return true; }
 
-inline std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     return load(owner_map_table[index(address)]);
 }
 #endif
 
-inline char* OwnerMap::payload_of(const void* p) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
     const std::uint8_t e = entry(a);
     if (e == 0) return nullptr;
@@ -180,7 +190,7 @@ inline char* OwnerMap::payload_of(const void* p) noexcept {
     return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
 }
 
-inline char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
     const auto ua = reinterpret_cast<std::uintptr_t>(a);
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
     const std::uint8_t e = entry(ua);
