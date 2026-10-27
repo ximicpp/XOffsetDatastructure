@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-27T16:24:15Z after 041-d1: running 2026-10-27T16:24:12Z
+Updated 2026-10-27T16:34:00Z after 041-d1: done 0 2026-10-27T16:33:57Z
 
 ```
 runner: pid 45762 (version 2)
@@ -45,5 +45,5 @@ free: 16 GB on /Volumes/XOffsetCS, 16 GB on /Users/ximi
 038-int4pre                              done 0 2026-10-27T08:54:58Z
 039-int4                                 done 2 2026-10-27T09:46:26Z
 040-int4                                 done 0 2026-10-27T11:18:05Z
-041-d1                                   running 2026-10-27T16:24:12Z
+041-d1                                   done 0 2026-10-27T16:33:57Z
 ```

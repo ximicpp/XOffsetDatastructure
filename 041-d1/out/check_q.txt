@@ -1,0 +1,16 @@
+d1_probe check-q: 2048 reads per cell and round, 3 rounds (+1 warm-up)
+  cycle 1: 512 reports, bytes per report xoffset 712 flatbuffers 587, max used 2032 B, wires with holes 0
+  cycle 10: 512 reports, bytes per report xoffset 207 flatbuffers 167, max used 1288 B, wires with holes 0
+  cycle 20: 512 reports, bytes per report xoffset 197 flatbuffers 158, max used 496 B, wires with holes 0
+  cycle 40: 512 reports, bytes per report xoffset 186 flatbuffers 149, max used 352 B, wires with holes 0
+median ns per read
+variant           cycle 1      cycle 10     cycle 20     cycle 40 
+xo.read               51.86        31.53        31.27        31.31
+xo.reload             29.95        23.46        23.48        23.05
+xo.reverify           36.13        29.54        29.40        28.46
+syn.q+scan            39.69        16.97        16.11        15.75
+syn.w8+scan           53.55        18.66        18.03        16.74
+syn.q                 13.18         7.14         6.71         6.49
+syn.scan              27.57        10.66        10.46         9.83
+fb.verify              8.04         7.51         7.43         7.43
+fb.read               59.31        34.71        30.01        26.98
