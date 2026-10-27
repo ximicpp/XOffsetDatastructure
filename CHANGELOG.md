@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+## 3.1.0: wire format 2.1
+
+Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade
+together; 3.0.0 readers reject 2.1 and 3.1.0 readers reject 2.0). Same
+toolchains as 3.0.0. Mac M4 at the INT4 checkpoint against `v3.0.0`
+(`docs/PERFORMANCE.md` section 3): TBD-INT4. Known gaps: TBD-INT4 (G9 items
+still over 1.05, D against FlatBuffers), schema evolution is not supported,
+iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
+
+Release goals (roadmap O1-O7) and where this release stands:
+
+- O1 wire 2.1, frozen for 3.x: R7 (40-byte header, no payload header on the
+  wire) and R4 (12-byte container heads) are both in. Bytes per message
+  against 3.0.0 (target A.req, A.res, B <= 0.92, D <= 0.70, formal M final
+  wire <= 0.94): TBD-INT4. `emit_after` against cereal (target UB <= 0.20):
+  TBD-INT4. 2.0 wires are rejected with the version named.
+- O2 no regression against `v3.0.0`, G1-G3 and G8 still met: TBD-INT4.
+- O3 G9 relocation tax (target 19/19 items UB <= 1.05; floor: no item worse
+  than 3.0.0, each open item with a measured root cause): TBD-G9.
+- O4 D against FlatBuffers (target UB <= 1.0, no API change, full validation
+  kept): TBD-INT4. If the upper bound is still above 1.0, this release ships
+  the speedups it has and the target moves to 3.2 (susu, 2026-10-27).
+- O5 stability: changed to a one-time fuzz run on the release candidate
+  (susu, 2026-10-27); the seven-night runs move to 3.2. TBD-FUZZ.
+- O6 release procedure and documents: met in 3.0.0 (`docs/RELEASING.md`,
+  `tools/prepare_release.py`, V1/VM documents out of the tree); 3.1.0 is the
+  second release made with it.
+- O7 platform matrix: on 3.0.0 code, full CTest passes on Linux x86-64 (GCC
+  16, P2996), Linux arm64 (GCC 16, P2996), macOS arm64 (P2996) and Windows
+  x64 MinGW-w64 GCC 16 (104 pass, 2 thread-cache tests skipped), and the
+  2.0 corpus is byte-identical across them. On the release candidate:
+  TBD-O7. iOS was not done.
+
+Changes:
+
+- Documentation: `docs/PERFORMANCE.md` holds each release's Mac numbers, the
+  protocol and the limits; README and `docs/USER_GUIDE.md` section 9 point to
+  it instead of the round-3 report.
 - Wire format 2.1 (breaking; `docs/V2_FORMAT.md` section 7). Senders and
   receivers upgrade together: a 2.1 reader rejects 2.0 wires with `wire format
   2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade

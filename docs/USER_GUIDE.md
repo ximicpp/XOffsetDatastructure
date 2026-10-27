@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.0.0，V2 格式）
+# XOffsetDatastructure 用户指南（3.1.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -439,8 +439,8 @@ Windows、Android、iOS，能接收、读写、校验、再发。三个客户端
 
 ## 9. 性能数据的口径
 
-唯一的正式测量来自一台 Apple M4、一个 demo 负载，对比 cista、FlatBuffers、
-Cap'n Proto、cereal，见 [docs/perf/round3-20261021/REPORT.md](perf/round3-20261021/REPORT.md)。
-引用时请同时说明机器、负载和竞品用法（例如 FlatBuffers 走 Object API）；
-没有 Linux 或 Windows 的性能数据。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
+正式计时只来自一台 Apple M4、一个游戏服务器负载（`bench/slg`），六家在同一进程里对比
+zpp_bits、cista、cereal、protobuf、FlatBuffers；每个版本的数字、测法和局限见
+[PERFORMANCE.md](PERFORMANCE.md)。引用时请同时说明机器、负载和适配写法；
+没有 Linux 或 Windows 的计时结论。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
 说明声明普通记录的量级，不是正式测量。

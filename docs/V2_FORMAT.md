@@ -4,7 +4,7 @@ V2 replaces the V1 fixed-schema storage format. It is not backward compatible:
 readers reject V1 input with `wire format 1 is not supported`, and there is no
 V1 reader or migration path in the library.
 
-This document describes wire format 2.1 (after 3.0.0): 12-byte container heads
+This document describes wire format 2.1 (3.1.0 and later): 12-byte container heads
 that name no owner, a 40-byte wire header, and no payload header on the wire.
 Format 2.0 (3.0.0 and earlier) is rejected with `wire format 2.0 is not
 supported; this build reads 2.1 (sender and receiver must upgrade together)`.

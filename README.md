@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**3.0.0** is a C++26/P2996 library for reflected objects
+**3.1.0** is a C++26/P2996 library for reflected objects
 and offset containers stored in one contiguous, position-independent arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
@@ -121,8 +121,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "3.0.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.0.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.1.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.1.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -161,11 +161,13 @@ says how to retrieve them. They do not describe the V2 format.
 
 ## Performance
 
-The only formal measurement is one Apple M4 machine running one demo workload
-against cista, FlatBuffers, Cap'n Proto and cereal; see
-[the round-3 report](docs/perf/round3-20261021/REPORT.md) for the protocol, raw
-data and adapter notes. Treat those numbers as specific to that machine,
-workload and adapter set. No Linux or Windows performance figures are claimed.
+All timing claims come from one Apple M4 running one game-server workload
+(`bench/slg`) against zpp_bits, cista, cereal, protobuf and FlatBuffers in the
+same process. [docs/PERFORMANCE.md](docs/PERFORMANCE.md) has the numbers for
+each release, the protocol and the limits. Treat them as specific to that
+machine, workload and adapter set. No Linux or Windows timing figures are
+claimed; the cloud instruction-count gate ([docs/PERF_GATE.md](docs/PERF_GATE.md))
+only blocks regressions.
 
 ## Storage and ownership rules
 
