@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cinttypes>
 #include <cmath>
 #include <cstdio>
@@ -10,6 +11,7 @@
 #include <cstring>
 #include <exception>
 #include <span>
+#include <thread>
 #include <utility>
 
 namespace mapdemo::client {
@@ -224,14 +226,31 @@ std::string join_path(const std::string& dir, const char* file) {
     return dir.back() == '/' ? dir + file : dir + "/" + file;
 }
 
+// Connects to A and sends Hello; returns A's answer (HelloOk or Error). A port
+// forwarder (docker -p, a VM's or an emulator's) can accept the connection
+// before A listens and then close it, so a close before any answer is retried
+// like a refused connect, for up to 5 s.
+static net::Frame connect_hello(net::Conn& c, const Options& opt) {
+    const std::uint64_t give_up = net::now_ns() + 5000000000ull;
+    for (;;) {
+        c = net::Conn::connect(opt.host, opt.port);
+        try {
+            c.send(net::MsgType::Hello, 0, net::hello_payload());
+            return c.recv({net::MsgType::HelloOk, net::MsgType::Error});
+        } catch (const net::PeerClosed&) {
+            if (net::now_ns() >= give_up) throw;
+        }
+        c.close();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
 Session::Session(const Options& options) : opt_(options) {}
 
 Session::~Session() = default;
 
 void Session::connect() {
-    conn_ = net::Conn::connect(opt_.host, opt_.port);
-    conn_.send(net::MsgType::Hello, 0, net::hello_payload());
-    net::Frame ok = conn_.recv({net::MsgType::HelloOk, net::MsgType::Error});
+    net::Frame ok = connect_hello(conn_, opt_);
     if (ok.type == net::MsgType::Error)
         throw net::ProtocolError("A refused the handshake: " + ok.payload);
     checks_.pass("handshake");
@@ -638,9 +657,8 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
     return a;
 }
 
-void handshake(net::Conn& c) {
-    c.send(net::MsgType::Hello, 0, net::hello_payload());
-    net::Frame ok = c.recv({net::MsgType::HelloOk, net::MsgType::Error});
+void handshake(net::Conn& c, const Options& opt) {
+    net::Frame ok = connect_hello(c, opt);
     if (ok.type != net::MsgType::HelloOk) throw net::ProtocolError("handshake refused: " + ok.payload);
     (void)c.recv({net::MsgType::Catalog});
 }
@@ -689,16 +707,16 @@ int run_evil(const Options& opt) {
     const Rect normal{{0.0f, 0.0f}, {kViewWidth, kViewHeight}};
 
     {   // (1) truncated ViewRequest wire
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         std::string wire = view_request_wire(1, normal);
         wire.pop_back();
         c.send(net::MsgType::ViewReq, 1, wire, static_cast<std::uint16_t>(net::ViewCategory::Normal));
         expect_rejected(log, "evil_truncated", "truncated ViewRequest wire (-1 byte)", c);
     }
     {   // (2) wrong schema: a ViewSnapshot wire sent as ViewReq
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         XBuffer snap = XBuffer::create<ViewSnapshot>(512, cap_snapshot());
         ViewSnapshot& v = snap.root<ViewSnapshot>();
         v.request_id = 2;
@@ -709,8 +727,8 @@ int run_evil(const Options& opt) {
         expect_rejected(log, "evil_wrong_schema", "ViewSnapshot wire sent as ViewReq", c);
     }
     {   // (3) header declaring a 1 GiB ViewReq payload, no payload follows
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         net::FrameHeader h{};
         h.magic = net::kMagic;
         h.type = static_cast<std::uint16_t>(net::MsgType::ViewReq);
@@ -722,15 +740,15 @@ int run_evil(const Options& opt) {
         expect_rejected(log, "evil_oversize_header", "header declaring a 1 GiB ViewReq", c);
     }
     {   // (5) an encoding A does not know (3 is reserved)
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         c.send(net::MsgType::ViewReq, 8, view_request_wire(8, normal),
                static_cast<std::uint16_t>(static_cast<unsigned>(net::ViewCategory::Normal) | (3u << 8)));
         expect_rejected(log, "evil_unknown_encoding", "ViewReq asking for encoding 3", c);
     }
     {   // (6) a reserved flag bit
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         c.send(net::MsgType::ViewReq, 9, view_request_wire(9, normal),
                static_cast<std::uint16_t>(codec::view_flags(net::ViewCategory::Normal, codec::Encoding::Compact) | 0x1000u));
         expect_rejected(log, "evil_reserved_flag", "ViewReq with reserved flag bit 12", c);
@@ -738,8 +756,8 @@ int run_evil(const Options& opt) {
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty
         // by the rejected reload and must be refilled by the next one.
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         auto served = [&](std::uint64_t id) -> std::string {
             c.send(net::MsgType::ViewReq, id, view_request_wire(id, normal), static_cast<std::uint16_t>(net::ViewCategory::Normal));
             Awaited a = await_frame(c, 5000);
@@ -773,8 +791,8 @@ int run_evil(const Options& opt) {
     }
     {   // A still serves a normal client. Its snapshot is logged like any other
         // (client_snapshots.csv) so it can be matched with A's a_snapshots.csv.
-        net::Conn c = net::Conn::connect(opt.host, opt.port);
-        handshake(c);
+        net::Conn c;
+        handshake(c, opt);
         const std::uint64_t sent = net::now_ns();
         c.send(net::MsgType::ViewReq, 4, view_request_wire(4, normal), static_cast<std::uint16_t>(net::ViewCategory::Normal));
         Awaited a = await_frame(c, 5000);
