@@ -33,12 +33,12 @@ inline constexpr bool catalog_ScalarRecord_byte_copy_safe = true;
 
 // --- catalog.NestedValue ---
 inline constexpr const char catalog_NestedValue_layout[] =
-    "record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}";
+    "record[s:28,a:4]{@0:i32,@4:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@16:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u16>}";
 inline constexpr bool catalog_NestedValue_byte_copy_safe = true;
 
 // --- catalog.WireCatalogRoot ---
 inline constexpr const char catalog_WireCatalogRoot_layout[] =
-    "record[s:144,a:8]{@0:enum<u32>,@4:array[2]<array[3]<i32>>,@32:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},@48:xblob[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32},@64:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>,@80:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}>,@96:xflatset[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32>,@112:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<i32,record[s:40,a:8]{@0:i32,@8:xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},@24:xvector[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<u16>}>,@128:xflatmap[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}<xstring[s:16,a:8]{arena:rel32,data:rel32,size:u32,capacity:u32}{inline:10},i32>}";
+    "record[s:112,a:4]{@0:enum<u32>,@4:array[2]<array[3]<i32>>,@28:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@40:xblob[s:12,a:4]{data:rel32,size:u32,capacity:u32},@52:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>,@64:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:28,a:4]{@0:i32,@4:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@16:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u16>}>,@76:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>,@88:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,record[s:28,a:4]{@0:i32,@4:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@16:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u16>}>,@100:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},i32>}";
 inline constexpr bool catalog_WireCatalogRoot_byte_copy_safe = true;
 
 // ---- Type Registry ----

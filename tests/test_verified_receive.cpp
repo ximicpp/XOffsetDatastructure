@@ -344,7 +344,8 @@ void rollback_and_rejection(){
         if(kind==0)malformed[0]^=1;
         if(kind==1)malformed[sizeof(h)+h.root_offset+offsetof(ReceiveRoot,enabled)]=2;
         if(kind==2){auto arena=xo::XBufferCore::arena_header{};std::memcpy(&arena,malformed.data()+sizeof(h),sizeof(arena));arena.used_end+=1;std::memcpy(malformed.data()+sizeof(h),&arena,sizeof(arena));}
-        if(kind==3){auto offset=sizeof(h)+h.root_offset+offsetof(ReceiveRoot,name)+offsetof(xo::XFixedString,arena_delta);std::int32_t bad=0;std::memcpy(malformed.data()+offset,&bad,sizeof(bad));}
+        // An inline string longer than the 11 bytes inline storage holds.
+        if(kind==3)malformed[sizeof(h)+h.root_offset+offsetof(ReceiveRoot,name)+11]=char(0x80|15);
         // V2 hole table: a misaligned entry, and an entry moved onto the live root.
         xo::XBufferCore::WireHole hole{};std::memcpy(&hole,malformed.data()+hole_at,sizeof(hole));
         if(kind==4){hole.offset+=4;std::memcpy(malformed.data()+hole_at,&hole,sizeof(hole));}
@@ -493,62 +494,39 @@ void canonical_external_heads_and_many_owners(){
     {auto token=receive(wire,capacity);owners[3].emplace(xo::finish_verified(token));}
     for(auto& owner:owners)check(owner->root());
 
-    // Pinned: a VM mapping like the receive owners, so the external heads
-    // below stay within rel32 reach of them (a slab slot may map elsewhere).
+    // V2.1: a head belongs to the payload it lies in (the owner table); the
+    // allocator a constructor receives names no owner. Heads placed in a
+    // normal arena with a received target's allocator bind to the normal arena.
     auto normal=xo::TypedXBuffer<ReceiveRoot>::create(16384,capacity.with_storage(xo::XStorage::Pinned));
     auto& target=*owners[2];const auto binding=target.root().name.binding();
     auto* text_slot=normal.arena()->allocate_aligned(sizeof(xo::XString),alignof(xo::XString));
     auto* vector_slot=normal.arena()->allocate_aligned(sizeof(xo::XVector<std::uint32_t>),alignof(xo::XVector<std::uint32_t>));
-    auto rel32=[](std::uintptr_t from,std::uintptr_t to){
-        const auto positive_limit=std::uint64_t((std::numeric_limits<std::int32_t>::max)());
-        return to>=from?std::uint64_t(to-from)<=positive_limit:
-                        std::uint64_t(from-to)<=positive_limit+1;
-    };
-    // V2: arena_delta is a rel32 to the payload base itself (no allocator state).
-    auto require_head_domain=[&](const void* slot,const auto& owner,const void* segment){
-        const auto head=reinterpret_cast<std::uintptr_t>(slot);
-        const auto base=reinterpret_cast<std::uintptr_t>(owner.get_address());
-        const auto last=base+owner.maximum_capacity()-1;
-        need(segment==owner.get_address()&&rel32(head,reinterpret_cast<std::uintptr_t>(segment))&&
-             rel32(head+4,base)&&rel32(head+4,last),
-             "external-head fixture mapping does not satisfy checked rel32 domain");
-    };
-    require_head_domain(text_slot,target,binding.segment);
-    require_head_domain(vector_slot,target,binding.segment);
-    // Both constructors check the real rel32 distance. These heads are live in
-    // a distinct normal arena; they are not forged within received byte storage.
+    const auto target_before=target.free_block_bytes();
     auto* text=::new(text_slot) xo::XString(binding);
     auto* values=::new(vector_slot) xo::XVector<std::uint32_t>(binding);
     try{
-        text->assign("external normal-arena head");values->resize(4);(*values)[2]=77;
-        need(text->view()=="external normal-arena head"&&(*values)[2]==77&&
-             text->binding().segment==binding.segment&&values->binding().segment==binding.segment,
-             "normal-anchor to received-target canonical resolution failed");
+        text->assign("a head in the normal arena");values->resize(4);(*values)[2]=77;
+        need(text->view()=="a head in the normal arena"&&(*values)[2]==77&&
+             text->binding().segment==normal.arena()&&values->binding().segment==normal.arena()&&
+             binding.segment!=normal.arena(),"a head did not bind to the payload it lies in");
         auto destination=std::move(target);target=std::move(destination);
-        text->assign("external normal-arena head retained");values->push_back(91);
-        need(text->view()=="external normal-arena head retained"&&values->back()==91,
-             "external head lost binding after received Core move");
+        text->assign("a head in the normal arena, after a target move");values->push_back(91);
+        need(text->view()=="a head in the normal arena, after a target move"&&values->back()==91,
+             "normal-arena head changed after a received Core move");
     }catch(...){std::destroy_at(values);std::destroy_at(text);throw;}
-    const auto before=target.free_block_bytes();
     std::destroy_at(values);std::destroy_at(text);
-    need(target.free_block_bytes()>before,"external head destruction did not retire received allocations");
+    need(target.free_block_bytes()==target_before,"a head outside the target payload used target storage");
 
-    // Distinct C anchor A must not force target B through A's byte origin.
-    const auto second_binding=owners[5]->root().name.binding();
-    auto* cross_slot=owners[4]->arena()->allocate_aligned(sizeof(xo::XString),alignof(xo::XString));
-    require_head_domain(cross_slot,*owners[5],second_binding.segment);
-    auto* cross=::new(cross_slot) xo::XString(second_binding);
-    try{
-        cross->assign("cross-C allocator target");
-        need(cross->view()=="cross-C allocator target"&&cross->binding().segment==second_binding.segment,
-             "received anchor A incorrectly selected its origin for received target B");
-        cross->assign("cross-C allocator target live");
-        need(cross->view()=="cross-C allocator target live","cross-C payload access/growth failed");
-    }catch(...){std::destroy_at(cross);throw;}
-    const auto second_before=owners[5]->free_block_bytes();const auto anchor_before=owners[4]->free_block_bytes();
-    std::destroy_at(cross);
-    need(owners[5]->free_block_bytes()>second_before&&owners[4]->free_block_bytes()==anchor_before,
-         "cross-C head did not retire target B payload");
+    // A head outside every payload holds inline values; a block needs a binding.
+    {
+        xo::XString loose;loose="inline ok";
+        bool threw=false;
+        try{loose=std::string_view("a value longer than the inline storage");}catch(const xo::XException&){threw=true;}
+        need(threw&&loose.view()=="inline ok","a head outside every payload allocated a block");
+        xo::XVector<std::uint32_t> loose_values;threw=false;
+        try{loose_values.push_back(1);}catch(const xo::XException&){threw=true;}
+        need(threw&&loose_values.empty(),"a vector outside every payload allocated a block");
+    }
 }
 
 void custom_future_lifetimes(){

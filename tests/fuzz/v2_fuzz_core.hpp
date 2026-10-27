@@ -181,32 +181,27 @@ struct OracleRun {
         if (t < 0 || std::uint64_t(t) >= used) return std::nullopt;
         return std::uint64_t(t);
     }
-    bool binding(std::size_t head) {
-        if (rd<std::int32_t>(head) == 0) return bad("unbound head");
-        auto t = rel(head);
-        if (!t || *t != 0) return bad("binding not payload base");
-        return true;
-    }
     bool string(std::size_t h, std::string* out = nullptr) {
         if (heads) heads->push_back(h);
-        if (!binding(h)) return false;
-        const auto cap = rd<std::uint32_t>(h + 12);
+        // V2.1 head {data rel32, size u32, capacity u32}; inline: bytes 0..10,
+        // byte 11 = 0x80 | length.
+        const auto cap = rd<std::uint32_t>(h + 8);
         if (cap & 0x80000000u) {
             const unsigned len = (cap >> 24) & 0x7fu;
             if (len > 10) return bad("inline length");
             for (unsigned i = len; i < 11; ++i)
-                if (p[h + 4 + i] != 0) return bad("inline padding");
-            if (out) out->assign(reinterpret_cast<const char*>(p + h + 4), len);
+                if (p[h + i] != 0) return bad("inline padding");
+            if (out) out->assign(reinterpret_cast<const char*>(p + h), len);
             return true;
         }
-        const auto size = rd<std::uint32_t>(h + 8);
+        const auto size = rd<std::uint32_t>(h + 4);
         if (size > cap || cap >= kMaxPayload) return bad("string size/cap");
         if (cap == 0) {
-            if (size != 0 || rd<std::int32_t>(h + 4) != 0) return bad("empty string payload");
+            if (size != 0 || rd<std::int32_t>(h) != 0) return bad("empty string payload");
             if (out) out->clear();
             return true;
         }
-        auto d = rel(h + 4);
+        auto d = rel(h);
         if (!d) return bad("string data out of bounds");
         if (*d % 8) return bad("string data misaligned");
         const std::uint64_t ext = (std::uint64_t(cap) + 1 + 7) & ~std::uint64_t(7);
@@ -218,14 +213,13 @@ struct OracleRun {
     template <class Elem, class Fn>
     bool vector(std::size_t h, Fn&& each) {
         if (heads) heads->push_back(h);
-        if (!binding(h)) return false;
-        const auto size = rd<std::uint32_t>(h + 8), cap = rd<std::uint32_t>(h + 12);
+        const auto size = rd<std::uint32_t>(h + 4), cap = rd<std::uint32_t>(h + 8);
         if (size > cap || cap > (kMaxPayload - 8u) / sizeof(Elem)) return bad("vector size/cap");
         if (cap == 0) {
-            if (size != 0 || rd<std::int32_t>(h + 4) != 0) return bad("empty vector payload");
+            if (size != 0 || rd<std::int32_t>(h) != 0) return bad("empty vector payload");
             return true;
         }
-        auto d = rel(h + 4);
+        auto d = rel(h);
         if (!d) return bad("vector data out of bounds");
         if (*d % 8) return bad("vector data misaligned");
         const std::uint64_t bytes = std::uint64_t(cap) * sizeof(Elem);
@@ -913,7 +907,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         const auto mapped = file_pos(w, heads[rng() % heads.size()]);
         if (!mapped) break;
         const auto head = *mapped;
-        const auto field = std::size_t(rng() % 4) * 4;
+        const auto field = std::size_t(rng() % 3) * 4; // data, size, capacity
         auto v = get32(w, head + field);
         switch (rng() % 4) {
         case 0: v = interesting[rng() % std::size(interesting)]; break;

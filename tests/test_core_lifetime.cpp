@@ -112,7 +112,7 @@ void owning_head_tail_reactivation_keeps_child_allocations() {
     need(r.words[0]=="earlier-one" && r.words[1]=="earlier-two" &&
          r.words[0].data()==payload0 && r.words[1].data()==payload1, "out-of-line ownership changed");
     need(allocator_snapshot(buffer)==free &&
-         offset_of(buffer,r.words.data())+19*sizeof(xo::XString)==buffer.arena()->used_end,
+         offset_of(buffer,r.words.data())+xo::fixed_detail::block_bytes_of(19*sizeof(xo::XString))==buffer.arena()->used_end,
          "prefix activation retired an owned child");
     r.words[0].assign("still-mutable");
     auto loaded=xo::XBuffer::load_verified<LifetimeRoot>(buffer.save_verified<LifetimeRoot>(), policy());

@@ -203,23 +203,21 @@ namespace detail {
     }
 
     // The head writers of DirectWriter (below), the one place the canonical
-    // head layout is written: a 16-byte container head at payload offset
-    // `at` (bound to the payload base), and the inline form of a string of
-    // 1..inline_max bytes (store_inline: bytes 4..14 the characters then
-    // zeros, byte 15 = 0x80 | length).
+    // head layout is written: a 12-byte container head at payload offset
+    // `at` (data_delta is relative to the head's own address), and the inline
+    // form of a string of 1..inline_max bytes (store_inline: bytes 0..10 the
+    // characters then zeros, byte 11 = 0x80 | length).
     XOFFSET_DETAIL_WIRE_INLINE void write_container_head(char* base, std::size_t at, std::int32_t data_delta,
                                                          std::uint32_t size, std::uint32_t capacity) noexcept {
-        const std::int32_t head[4] = {-static_cast<std::int32_t>(at), data_delta,
-                                      static_cast<std::int32_t>(size), static_cast<std::int32_t>(capacity)};
+        const std::int32_t head[3] = {data_delta, static_cast<std::int32_t>(size),
+                                      static_cast<std::int32_t>(capacity)};
         std::memcpy(base + at, head, sizeof(head));
     }
     XOFFSET_DETAIL_WIRE_INLINE void write_inline_string(char* base, std::size_t at, const char* text,
                                                         std::uint32_t n) noexcept {
-        char head[16] = {};
-        const std::int32_t delta = -static_cast<std::int32_t>(at);
-        std::memcpy(head, &delta, 4);
-        for (std::uint32_t i = 0; i < n; ++i) head[4 + i] = text[i];
-        head[15] = static_cast<char>(0x80u | n);
+        char head[12] = {};
+        for (std::uint32_t i = 0; i < n; ++i) head[i] = text[i];
+        head[11] = static_cast<char>(0x80u | n);
         std::memcpy(base + at, head, sizeof(head));
     }
 
@@ -247,10 +245,10 @@ namespace detail {
             return true;
         }
     };
-    static_assert(offsetof(XFixedString, arena_delta) == 0 && offsetof(XFixedString, data_delta) == 4 &&
-                  offsetof(XFixedString, size_) == 8 && offsetof(XFixedString, capacity_) == 12);
-    static_assert(offsetof(XFixedVector<int>, arena_delta) == 0 && offsetof(XFixedVector<int>, data_delta) == 4 &&
-                  offsetof(XFixedVector<int>, size_) == 8 && offsetof(XFixedVector<int>, capacity_) == 12);
+    static_assert(offsetof(XFixedString, data_delta) == 0 && offsetof(XFixedString, size_) == 4 &&
+                  offsetof(XFixedString, capacity_) == 8 && sizeof(XFixedString) == 12);
+    static_assert(offsetof(XFixedVector<int>, data_delta) == 0 && offsetof(XFixedVector<int>, size_) == 4 &&
+                  offsetof(XFixedVector<int>, capacity_) == 8 && sizeof(XFixedVector<int>) == 12);
 
     // Measures the subtree of the source value `src`.
     template <class U>
@@ -317,7 +315,7 @@ namespace detail {
 namespace detail {
     // ---- direct writer: the write pass of save_compact, write-only ------
     // Writes the canonical layout (see above) that CompactMeasure measures:
-    // one 16-byte store per head, small blocks copied in 8-byte words.
+    // one 12-byte store per head, small blocks copied in 8-byte words.
     // Plain: capacity == size (slack_div == 0), decided once per save.
     template <bool Plain>
     struct DirectWriter {
@@ -387,7 +385,7 @@ namespace detail {
         std::memcpy(&last, dst + padded - 8u, 8);
         last &= keep == 0 ? 0 : (~std::uint64_t(0) >> (64u - 8u * keep));
         std::memcpy(dst + padded - 8u, &last, 8);
-        write_container_head(w.base, at, static_cast<std::int32_t>(data - (at + 4u)), n, n);
+        write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, n);
     }
 
     template <class E, bool P>
@@ -408,7 +406,7 @@ namespace detail {
             std::memcpy(dst, from, live);
             std::memset(dst + live, 0, padded - live);
         }
-        write_container_head(w.base, at, static_cast<std::int32_t>(data - (at + 4u)), n, cap);
+        write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, cap);
         if constexpr (compact_has_heads<E>()) {
             for (std::uint32_t i = 0; i < n; ++i) direct_value(elements[i], data + std::size_t(i) * sizeof(E), w);
         }

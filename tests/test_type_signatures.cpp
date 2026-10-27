@@ -297,7 +297,7 @@ void test_container_signatures() {
     std::string str_sig = sig_string.value;
     std::string vec_sig = sig_vector.value;
     assert(str_sig == vec_sig);
-    assert(str_sig.find("@8:i32[s:4,a:4],@12:i32[s:4,a:4],@16:u32[s:4,a:4],@20:u32[s:4,a:4]") != std::string::npos);
+    assert(str_sig.find("@4:i32[s:4,a:4],@8:u32[s:4,a:4],@12:u32[s:4,a:4]") != std::string::npos);
     assert(std::string_view(wire_abi_signature<XString>()).find("xstring") != std::string_view::npos);
     assert(std::string_view(wire_abi_signature<XVector<int32_t>>()).find("xvector") != std::string_view::npos);
 
