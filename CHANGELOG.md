@@ -68,7 +68,15 @@ Release goals (roadmap O1-O7) and where this release stands:
   fixed lookup costs (2-3%). Together 9-16%, so reaching 1.0 depends on step
   (1).
 - O5 stability: changed to a one-time fuzz run on the release candidate
-  (susu, 2026-10-27); the seven-night runs move to 3.2. TBD-FUZZ.
+  (susu, 2026-10-27); the seven-night runs move to 3.2. On the RC
+  (`e913d22`): GCC 16 ASan+UBSan differential fuzz, 4 x 1,468,565 cases
+  (2700 s), 0 inconsistencies, and a clean replay of regressions and seeds;
+  libFuzzer (P2996 Clang, ASan+UBSan, `-fork=4`) 1800 s per target,
+  `fuzz_v2_wire` 1.26M and `fuzz_wire_schemas` 25.8M executions, 0 findings;
+  the 6504 inputs from the 3.0.0 corpora were all refused, the 6353 with the
+  2.0 magic with `wire format 2.0 is not supported`. Each job ran less than
+  the planned hour (a 30-minute outage). One finding before the RC, #130
+  (harness), fixed in #131. 0 open fuzz-crash issues.
 - O6 release procedure and documents: met in 3.0.0 (`docs/RELEASING.md`,
   `tools/prepare_release.py`, V1/VM documents out of the tree); 3.1.0 is the
   second release made with it.
