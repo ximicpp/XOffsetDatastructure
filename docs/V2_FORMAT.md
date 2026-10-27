@@ -4,8 +4,8 @@ V2 replaces the V1 fixed-schema storage format. It is not backward compatible:
 readers reject V1 input with `wire format 1 is not supported`, and there is no
 V1 reader or migration path in the library.
 
-This document describes wire format 2.1 (after 3.0.0): 12-byte container heads
-that name no owner, a 40-byte wire header, and no payload header on the wire.
+This document describes wire format 2.1 (after 3.0.0): a 40-byte wire header
+and no payload header on the wire.
 Format 2.0 (3.0.0 and earlier) is rejected with `wire format 2.0 is not
 supported; this build reads 2.1 (sender and receiver must upgrade together)`.
 Section 7 lists what changed.
@@ -46,44 +46,19 @@ both sides.
 
 ## 2. Container heads
 
-Every head is 12 bytes with 4-byte alignment: `data_delta` (i32), `size_`
-(u32), `capacity_` (u32). `data_delta` is a rel32 from the head to its block.
-(In C++ a vector's `size_` and `capacity_` are `char32_t`: 32-bit unsigned like
-a string's, but a type that int and unsigned element stores cannot alias, so a
-`push_back` loop keeps `capacity_` in a register. The bytes are the same.)
+Every head is 16 bytes with 8-byte alignment: `arena_delta` (i32), `data_delta`
+(i32), `size_` (u32), `capacity_` (u32).
+
+- `arena_delta` is a rel32 to the payload base.
+- `data_delta` is a rel32 to the block.
 
 **Inline strings.** A string of at most 10 bytes may be stored in head bytes
-0..10 instead of a block:
+4..14 instead of a block:
 
-- Bit 31 of `capacity_` (head byte 11) marks the inline form. A heap capacity is
+- Bit 31 of `capacity_` (head byte 15) marks the inline form. A heap capacity is
   below 2^31, so it never sets this bit.
 - Bits 24..30 hold the length.
 - The byte after the last character and every unused inline byte are 0.
-
-**Owner by address.** A head does not name the payload it belongs to; that is
-the payload it lies in. `detail::OwnerMap` keeps one byte per 4 MiB granule of
-the 48-bit address space: 0 for no XOffset region, otherwise bits 0..5 give k,
-the region's alignment exponent (the payload base is `address & ~(2^k - 1)`),
-and bit 7 marks a slot, whose payload starts 64 bytes in. Slot chunks register
-once; a VM payload is reserved as whole 4 MiB granules aligned to 2^k and sets
-its entries while it is mapped (a pooled mapping keeps them). On Windows the
-table is committed at the first registration.
-
-Lookups follow five rules:
-
-1. Only to allocate, grow or retire a block; reads and writes of existing
-   elements never look up.
-2. Never in relocation or SHIFT (elements move as bytes).
-3. The same-payload check of a move is one table read when both heads lie in
-   one granule.
-4. One lookup per operation, passed down to the regrow paths.
-5. A container that destroys its elements passes its owner down, so element
-   heads, and the heads nested in aggregate elements, retire their blocks
-   without a lookup each.
-
-A head outside every payload (a stack temporary) holds empty and inline values;
-an operation on it that needs a block throws. A head constructed in place in a
-payload is bound by its address, so a move into it takes the source block.
 
 ## 3. Wire
 
@@ -191,10 +166,9 @@ the payload.
   owner is then re-resolved through its registry record before the change is
   published.
 
-**Owner lookup.** A head's payload is found from its address (section 2); the
-current `XBufferCore*` is stored in a host page placed just before the payload,
-so allocation and retirement need no registry or thread-local lookup. That page
-is never part of the payload.
+**Owner lookup.** The current `XBufferCore*` is stored in a host page placed just
+before the payload, so allocation and retirement need no registry or
+thread-local lookup. That page is never part of the payload.
 
 ## 5. Validation
 
@@ -275,8 +249,7 @@ builds by default.
 Format 2.1 is a breaking change: 2.1 readers reject 2.0 wires and 2.0
 readers reject 2.1 wires, so senders and receivers upgrade together. Every
 message is 104 bytes shorter (56 bytes of wire header, the 48-byte payload
-header), and payloads are smaller where they hold containers (4 bytes per
-head).
+header). Container heads are unchanged (16 bytes, section 2).
 
 **Wire header.** `XWireHeaderV2` is the 40-byte layout of section 3. Removed
 fields: `header_size`, `format_major`, `format_minor`, `endian_tag`, `crc32c`,
@@ -286,9 +259,6 @@ accounts for every hole byte); `schema_hash_lo` is now `schema_hash`. Constants:
 `XWIRE_FLAGS` (0), `XWIRE_PAYLOAD_BEGIN` (48). Removed: `XWIRE_MAGIC_V1`,
 `XWIRE_MAGIC_V2`, `XWIRE_FORMAT_MAJOR_V2`, `XWIRE_FORMAT_MINOR_V2`,
 `XWIRE_ENDIAN_TAG_V2`, `XWIRE_FLAGS_V2`, `wire_magic_matches_v2`.
-
-**Heads.** 12 bytes without `arena_delta` (section 2). Removed:
-containers' `bind()`, `bind_like()` and `field_binding()`.
 
 **Direct receive and reload.** `begin_verified_receive<T>(used_bytes, ...)` and
 `begin_verified_reload<T>(used_bytes, ...)` still take `used_bytes`, but
