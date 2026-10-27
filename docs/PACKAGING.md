@@ -1,7 +1,6 @@
-# 0.2.0-alpha.1 源码包、安装包与外部消费
+# 源码包、安装包与外部消费
 
-本 alpha 面向能够固定实验性编译器、依赖与 schema 的试用者。核心功能已完成，
-但 alpha 之间不承诺源码 API、ABI 或任意工具链/layout 的长期 wire 兼容。
+本库面向能够固定实验性编译器、依赖与 schema 的使用者。版本之间不承诺源码 API、ABI 或任意工具链/layout 的长期 wire 兼容。
 先阅读 [兼容与输入边界](ALPHA_COMPATIBILITY.md)。本版本使用 V2 存储与 wire 格式，不读取 V1 wire；
 save/load 仍复制字节，不是零复制接口。
 
@@ -29,7 +28,7 @@ full/storage 及 package 验证，历史 wire fixture、日期专用 Windows/net
 
 完整目标传播 `cxx_std_26`、reflection、expansion statements、libc++ 与 Threads。
 消费项目自行设置 C++17 不会覆盖完整目标的要求；普通 C++26 编译器也不能替代 P2996。
-Windows 当前只对原生 storage 宣称已验证，完整 P2996 不在此 alpha 的已验证支持范围。
+Windows 当前只对原生 storage 宣称已验证，完整 P2996 不在本版本的已验证支持范围。
 
 ## Fixed inputs
 
@@ -233,5 +232,5 @@ WSL 或 Docker 可用于后续 Linux 性能工作，不要求独立物理机作�
 局部 anchor 和 drift 门槛，未建立 2% 比较能力，没有 D/F、ablation 或 adoption 结论。
 背景负载/平衡电源观测不构成因果归因，历史原记录不因此改写。
 
-本 alpha 不承诺 N7 三项 I/O 扩展、生产异步 transport 或业务网络整合。当前已验
+本版本不承诺 N7 三项 I/O 扩展、生产异步 transport 或业务网络整合。当前已验
 网络范围是同步 TCP 回环参考与独立生命周期模型；缺少真实业务前提仍保留 F。
