@@ -2629,6 +2629,13 @@ namespace XOffsetDatastructure {
         XFixedString(XFixedString&&) = delete;
         XFixedString& operator=(const XFixedString& other) {
             if (this == &other) return *this;
+            if (other.is_inline() && is_inline() && is_bound()) [[likely]] {
+                // Inline into a bound inline head: the 12 inline bytes are the
+                // whole value (characters, zero padding, length and flag), as
+                // store_inline would write them from other.view().
+                std::memcpy(inline_bytes(), other.inline_bytes(), 12);
+                return *this;
+            }
             if (!is_bound() && other.is_bound()) bind_like(other);
             ensure_bound();
             assign(other.view());
@@ -2810,6 +2817,19 @@ namespace XOffsetDatastructure {
                 size_ = new_size;
                 return;
             }
+            assign_general(rhs);
+        }
+
+    private:
+        // assign() off its two fast paths. Clang inlines assign() at the
+        // caller only with this part out of line. GCC and MSVC get back the
+        // one function they had before the split (inlined or not as they
+        // chose then).
+#if defined(__clang__)
+        XOFFSET_DETAIL_NOINLINE void assign_general(std::string_view rhs) {
+#else
+        XOFFSET_DETAIL_MOVE_INLINE void assign_general(std::string_view rhs) {
+#endif
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
@@ -2879,6 +2899,7 @@ namespace XOffsetDatastructure {
                 alloc, old_data, static_cast<std::uint32_t>(old_capacity + 1));
         }
 
+    public:
         XFixedString& operator=(std::string_view rhs) {
             assign(rhs);
             return *this;
@@ -3397,6 +3418,10 @@ namespace XOffsetDatastructure {
             }
             if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) push_back_general<T>(value);
             else push_back_general<const T&>(value);
+            // The general path appended exactly one element. Restating size_
+            // here makes it known on both paths, so a caller's push_back loop
+            // keeps it in a register instead of reloading it through memory.
+            size_ = n + 1u;
         }
 
         void push_back(T&& value) {

@@ -324,6 +324,84 @@ bool test_inline_reassign() {
     return true;
 }
 
+// assign() off its two fast paths (empty values, an inline head taking a
+// long value, a heap block too small): the content and a save/load round trip.
+bool test_assign_general_paths() {
+    std::cout << "\n[TEST] XString assign() general path\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    auto pattern = [](std::size_t length, unsigned seed) {
+        std::string out;
+        for (std::size_t i = 0; i < length; ++i) out.push_back(static_cast<char>(0x21 + (seed * 7 + i * 11) % 90));
+        return out;
+    };
+    std::cout << "Test 19: Empty, short and long values from inline and heap heads... ";
+    std::size_t cases = 0;
+    for (std::size_t before : {0u, 1u, 5u, 10u, 11u, 24u, 40u}) {
+        for (std::size_t length : {0u, 1u, 10u, 11u, 23u, 41u, 300u}) {
+            XBuffer xbuf(64 * 1024);
+            auto* data = xbuf.make<StringTestData>();
+            const std::string old_value = pattern(before, unsigned(before));
+            const std::string want = pattern(length, unsigned(length + 5));
+            data->name = std::string_view(old_value);
+            assert(data->name.view() == old_value);
+            data->name = std::string_view(want);
+            assert(data->name.view() == want);
+            assert(data->name.size() == want.size());
+            assert(data->name.c_str()[want.size()] == '\0');
+            if (want.empty()) assert(data->name.empty());
+            if (before <= 10 && length != 0 && length <= 10) assert(data->name.is_inline());
+            if (length > 10) assert(!data->name.is_inline());
+            const std::string binary = xbuf.save();
+            XBuffer loaded = XBuffer::load_unverified(binary);
+            assert(loaded.unsafe_root<StringTestData>().name.view() == want);
+            ++cases;
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+    return true;
+}
+
+// Copy assignment between XStrings of one buffer: an inline value into a
+// bound inline head copies the 12 inline bytes; the result must equal what
+// assigning the view writes, for every source and destination shape.
+bool test_copy_assign() {
+    std::cout << "\n[TEST] XString copy assignment\n";
+    std::cout << std::string(50, '-') << "\n";
+
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    auto image = [](const XString& s) {
+        return std::string(reinterpret_cast<const char*>(&s) + 4, 12);
+    };
+    std::cout << "Test 20: Every source and destination length... ";
+    std::size_t cases = 0;
+    for (std::size_t before = 0; before <= 14; ++before) {
+        for (std::size_t length = 0; length <= 14; ++length) {
+            XBuffer xbuf(64 * 1024);
+            auto* data = xbuf.make<StringTestData>();
+            data->name = std::string_view(chars).substr(0, before);
+            data->title = std::string_view(chars).substr(20, length);
+            data->names.emplace_back();
+            data->names.emplace_back();
+            data->names[0] = std::string_view(chars).substr(0, before);
+            data->name = data->title;
+            data->names[0] = data->title.view();
+            assert(data->name.view() == data->title.view());
+            assert(data->name.size() == length && data->name.c_str()[length] == '\0');
+            assert(data->name.is_inline() == data->names[0].is_inline());
+            if (data->name.is_inline()) assert(image(data->name) == image(data->names[0]));
+            data->names[1] = data->name;  // into a head bound after the copy above
+            assert(data->names[1].view() == data->title.view());
+            const std::string binary = xbuf.save();
+            XBuffer loaded = XBuffer::load_unverified(binary);
+            assert(loaded.unsafe_root<StringTestData>().name.view() == data->title.view());
+            ++cases;
+        }
+    }
+    std::cout << "[OK] " << cases << " cases\n";
+    return true;
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "  XString Direct Assignment Test\n";
@@ -336,6 +414,8 @@ int main() {
     all_passed &= test_player_direct_assign();
     all_passed &= test_heap_reassign_in_place();
     all_passed &= test_inline_reassign();
+    all_passed &= test_assign_general_paths();
+    all_passed &= test_copy_assign();
 
     std::cout << "\n========================================\n";
     if (all_passed) {
