@@ -185,11 +185,43 @@ consteval bool shift_relocate_supported() {
 // Heads live in one bounded arena, so a rebased delta stays in rel32 range;
 // an impossible overflow ends the program as set_rel32 in a noexcept relocation does.
 // A null delta stays null; otherwise the exact int32 sum, without a branch on
-// null (heads mix bound and empty containers).
-inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept {
-    const std::int32_t step = delta != 0 ? shift : 0;
+// null (heads mix bound and empty containers). One moved run shares one shift.
+// Clang vectorizes the run when the overflow test is a compare against fixed
+// bounds (a non-null delta outside [low, high] would overflow), collected and
+// checked once after the run, so the wrapped sums are never used. GCC and MSVC
+// keep scalar code, where a checked add per delta is shorter.
+#if defined(__clang__)
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 1
+#else
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 0
+#endif
+
+struct ShiftRun {
+    std::int32_t shift;
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    std::int32_t low;
+    std::int32_t high;
+    bool overflow = false;
+
+    explicit ShiftRun(std::int32_t by) noexcept
+        : shift(by),
+          low(by < 0 ? (std::numeric_limits<std::int32_t>::min)() - by : (std::numeric_limits<std::int32_t>::min)()),
+          high(by > 0 ? (std::numeric_limits<std::int32_t>::max)() - by : (std::numeric_limits<std::int32_t>::max)()) {}
+#else
+    explicit ShiftRun(std::int32_t by) noexcept : shift(by) {}
+#endif
+};
+
+inline std::int32_t shift_rel32(std::int32_t delta, ShiftRun& run) noexcept {
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    // 0 lies in [low, high] for every shift.
+    run.overflow |= (delta < run.low) | (delta > run.high);
+    const std::uint32_t step = delta != 0 ? static_cast<std::uint32_t>(run.shift) : 0u;
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(delta) + step);
+#else
+    const std::int32_t step = delta != 0 ? run.shift : 0;
     std::int32_t moved;
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
     if (__builtin_add_overflow(delta, step, &moved)) [[unlikely]] std::terminate();
 #else
     const std::int64_t wide = std::int64_t(delta) + step;
@@ -198,16 +230,17 @@ inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept
     moved = static_cast<std::int32_t>(wide);
 #endif
     return moved;
+#endif
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept;
 
 // `shift` = old address - new address, so each delta grows by it. Forced
 // inline down to the heads: one moved element is a few loads and stores.
 template<class T>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftRun& run) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
         // Descriptor layout {arena_delta, data_delta, size_, capacity_} is
         // checked by raw_descriptor_layout<T>() in shift_rebase_domain.
@@ -217,43 +250,57 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, std::i
         std::memcpy(&data_delta, address + 4, 4);
         std::memcpy(&size, address + 8, 4);
         std::memcpy(&capacity, address + 12, 4);
-        auto* object = ::new (static_cast<void*>(address)) T;
         bool inline_bytes = false;
         if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XFixedString::inline_flag) != 0;
-        object->arena_delta = shift_rel32(arena_delta, shift);
-        object->data_delta = shift_rel32(data_delta, inline_bytes ? 0 : shift);
+        // The checked sums come first: with no call between the new head and
+        // its four stores, the default member initializers' zero stores are dead.
+        const std::int32_t moved_arena = shift_rel32(arena_delta, run);
+        // Inline string bytes are characters, not a delta: kept as they are.
+        const std::int32_t moved_data = inline_bytes ? data_delta : shift_rel32(data_delta, run);
+        auto* object = ::new (static_cast<void*>(address)) T;
+        object->arena_delta = moved_arena;
+        object->data_delta = moved_data;
         object->size_ = size;
         object->capacity_ = capacity;
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
         if constexpr (raw_needs_activation<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
-                shift_rebase_inline_value<E>(address + i * sizeof(E), shift);
+                shift_rebase_inline_value<E>(address + i * sizeof(E), run);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        shift_rebase_members<T>(address, shift, std::make_index_sequence<reflected_member_count<T>()>{});
+        shift_rebase_members<T>(address, run, std::make_index_sequence<reflected_member_count<T>()>{});
     }
 }
 
 template<class T, std::size_t I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, std::int32_t shift) noexcept {
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, ShiftRun& run) noexcept {
     constexpr auto member = std::meta::nonstatic_data_members_of(
         ^^T, std::meta::access_context::unchecked())[I];
     using M = [:std::meta::type_of(member):];
     if constexpr (raw_needs_activation<M>())
-        shift_rebase_inline_value<M>(address + std::meta::offset_of(member).bytes, shift);
+        shift_rebase_inline_value<M>(address + std::meta::offset_of(member).bytes, run);
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept {
-    (shift_rebase_member<T, I>(address, shift), ...);
+    (shift_rebase_member<T, I>(address, run), ...);
 }
 
+// Forced inline where the run vectorizes: a one-element insert or erase then
+// shifts by a constant.
 template<class T>
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+XOFFSET_DETAIL_SHIFT_INLINE
+#endif
 void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
     static_assert(shift_relocate_supported<T>());
+    ShiftRun run(shift);
     for (std::size_t i = 0; i < count; ++i)
-        shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), shift);
+        shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), run);
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    if (run.overflow) [[unlikely]] std::terminate();
+#endif
 }
 
 // The live slot a shift left behind still names the moved payloads. Empty its
