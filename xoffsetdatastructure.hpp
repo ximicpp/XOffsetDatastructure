@@ -7378,7 +7378,7 @@ namespace XOffsetDatastructure {
         // header checks exactly what admit_wire_header, parse_wire_layout and
         // the reinit admission check; any other wire, valid or not, takes the
         // general path, which reports the same first error.
-        static constexpr std::size_t small_reload_max = 4096;
+        static constexpr std::size_t small_reload_max = detail::WireGranuleIndex::inline_extent;
         static constexpr std::size_t wire_header_words = sizeof(XWireHeaderV2) / 8u;
 
         // The header fields that do not depend on the payload, as words;
