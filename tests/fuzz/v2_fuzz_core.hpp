@@ -494,7 +494,9 @@ bool direct_deliver(Buffer& target, const std::string& wire, DirectMode mode, st
 bool direct_accepts(Buffer& target, const std::string& wire, std::string* error,
                     DirectMode mode = DirectMode::Whole) {
     const bool ok = direct_deliver(target, wire, mode, error);
-    if (!ok) {
+    // A wire shorter than the header is refused by the transport before a
+    // reload begins, so the target keeps whatever it held (#130).
+    if (!ok && wire.size() >= kHeader) {
         bool refused = false;
         try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
         if (!refused) fail("root() succeeded after a rejected direct reload");
