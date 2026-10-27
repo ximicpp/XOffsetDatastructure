@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <compare>
+#include <iterator>
 #include <concepts>
 #include <functional>
 #include <cstdint>
@@ -3235,14 +3236,61 @@ namespace XOffsetDatastructure {
         }
     };
 
+    namespace fixed_detail {
+        // XFixedVector's iterator: a pointer whose operator* returns T&. The
+        // reference return tells the optimizer each element is dereferenceable,
+        // so a user loop over a container can load fields unconditionally
+        // (select, vectorization) as it does over std::vector or std::span; a
+        // raw T* iterator keeps every conditional field load behind a branch.
+        template <typename T>
+        class contiguous_iterator {
+            T* p_ = nullptr;
+
+        public:
+            using iterator_concept = std::contiguous_iterator_tag;
+            using iterator_category = std::random_access_iterator_tag;
+            using value_type = std::remove_cv_t<T>;
+            using element_type = T;
+            using difference_type = std::ptrdiff_t;
+            using pointer = T*;
+            using reference = T&;
+
+            contiguous_iterator() = default;
+            constexpr contiguous_iterator(T* p) noexcept : p_(p) {}
+            template <typename U>
+                requires(std::is_same_v<const U, T> && !std::is_same_v<U, T>)
+            constexpr contiguous_iterator(contiguous_iterator<U> other) noexcept : p_(other.operator->()) {}
+
+            constexpr T& operator*() const noexcept { return *p_; }
+            constexpr T* operator->() const noexcept { return p_; }
+            constexpr T& operator[](difference_type n) const noexcept { return p_[n]; }
+
+            constexpr contiguous_iterator& operator++() noexcept { ++p_; return *this; }
+            constexpr contiguous_iterator operator++(int) noexcept { auto t = *this; ++p_; return t; }
+            constexpr contiguous_iterator& operator--() noexcept { --p_; return *this; }
+            constexpr contiguous_iterator operator--(int) noexcept { auto t = *this; --p_; return t; }
+            constexpr contiguous_iterator& operator+=(difference_type n) noexcept { p_ += n; return *this; }
+            constexpr contiguous_iterator& operator-=(difference_type n) noexcept { p_ -= n; return *this; }
+
+            friend constexpr contiguous_iterator operator+(contiguous_iterator i, difference_type n) noexcept { return i.p_ + n; }
+            friend constexpr contiguous_iterator operator+(difference_type n, contiguous_iterator i) noexcept { return i.p_ + n; }
+            friend constexpr contiguous_iterator operator-(contiguous_iterator i, difference_type n) noexcept { return i.p_ - n; }
+            friend constexpr difference_type operator-(contiguous_iterator a, contiguous_iterator b) noexcept { return a.p_ - b.p_; }
+            friend constexpr bool operator==(contiguous_iterator a, contiguous_iterator b) noexcept { return a.p_ == b.p_; }
+            friend constexpr std::strong_ordering operator<=>(contiguous_iterator a, contiguous_iterator b) noexcept {
+                return a.p_ <=> b.p_;
+            }
+        };
+    } // namespace fixed_detail
+
     template <typename T>
     struct XFixedVector {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
         using value_type = T;
         using size_type = std::uint32_t;
-        using iterator = T*;
-        using const_iterator = const T*;
+        using iterator = fixed_detail::contiguous_iterator<T>;
+        using const_iterator = fixed_detail::contiguous_iterator<const T>;
 
         // size_ and capacity_ are char32_t (32-bit unsigned, converts like
         // std::uint32_t) because it is a distinct type for type-based alias
@@ -4454,8 +4502,9 @@ namespace XOffsetDatastructure {
 
         std::uint32_t index_from(typename Base::const_iterator pos) const noexcept {
             auto* begin = Base::data();
-            if (!begin || !pos) return 0;
-            return static_cast<std::uint32_t>(pos - begin);
+            const T* at = std::to_address(pos);
+            if (!begin || !at) return 0;
+            return static_cast<std::uint32_t>(at - begin);
         }
 
         template <typename Arg>
