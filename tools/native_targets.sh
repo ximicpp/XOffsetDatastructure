@@ -114,7 +114,12 @@ CXX=$(sed -n 's/^set(CMAKE_CXX_COMPILER "\(.*\)")$/\1/p' "$BUILD"/CMakeFiles/*/C
 {
     echo "# Native target $TARGET, C++$STD"
     echo
-    echo "- $(date -u +%Y-%m-%dT%H:%M:%SZ), $(git -C "$REPO" rev-parse HEAD 2>/dev/null)$(git -C "$REPO" diff --quiet 2>/dev/null || echo ' (dirty)')"
+    if REV=$(git -C "$REPO" rev-parse HEAD 2>/dev/null); then
+        git -C "$REPO" diff --quiet || REV="$REV (dirty)"
+    else
+        REV="source tree without .git (exported)"
+    fi
+    echo "- $(date -u +%Y-%m-%dT%H:%M:%SZ), $REV"
     echo "- compiler: \`$CXX\` — $("${CXX:-false}" --version 2>/dev/null | head -1)"
     echo "- CTest runner: ${EMU:-native}"
     echo "- extra CMake arguments: ${EXTRA[*]+${EXTRA[*]}}"
