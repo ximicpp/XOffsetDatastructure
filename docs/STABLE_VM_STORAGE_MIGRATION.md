@@ -201,5 +201,5 @@ On POSIX, a fresh, nonpooled load with input length exactly equal to its maximum
 capacity combines reservation and initial page enabling. Other loads retain the
 reserve/enable path, and all loads preserve validation and failure semantics.
 
-See [follow-up results](VM_MEMORY_REUSE_RESULTS.md) for current adoption evidence;
-[the A–D results](VM_STORAGE_IMPROVEMENTS_RESULTS.md) remain historical evidence.
+See follow-up results (`docs/VM_MEMORY_REUSE_RESULTS.md`, archived: [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)) for current adoption evidence;
+the A–D results (`docs/VM_STORAGE_IMPROVEMENTS_RESULTS.md`, archived: [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)) remain historical evidence.

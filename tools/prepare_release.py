@@ -56,7 +56,7 @@ OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cp
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
               "Dockerfile", "docker-compose.yml", ".dockerignore")
-DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/VM_PACKAGING.md", "docs/VM_VALIDATION_RUNNER.md")
+DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/PACKAGING.md", "docs/VALIDATION_RUNNER.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
 TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_signatures.cpp",
               "tools/check_compat.cpp", "tools/check_compat_baselines.hpp.in",

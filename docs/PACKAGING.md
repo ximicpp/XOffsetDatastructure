@@ -15,7 +15,7 @@ save/load 仍复制字节，不是零复制接口。
 
 源码包的依赖闭包可在没有 `.git` 的解压目录中通过内容锁检查。它不是完整 Boost
 发行版，也不是包含全部历史原始证据的离线研究档案。源码归档中的
-`VM_VALIDATION_RUNNER.md` 保留部分历史入口说明；本包包含的运行入口是 native
+`VALIDATION_RUNNER.md` 保留部分历史入口说明；本包包含的运行入口是 native
 full/storage 及 package 验证，历史 wire fixture、日期专用 Windows/network runner
 和实验工具不在发行范围内。
 

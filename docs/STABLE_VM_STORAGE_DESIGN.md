@@ -149,6 +149,6 @@ Actual validation results and migration examples are recorded in
 The 2026-10-13 review reproduced global-buffer shutdown and const-handle
 regressions that the initial suite did not cover. Both are fixed, with natural
 process-exit and type-access regressions. The reviewed sequence is preserved in
-[VM_STORAGE_IMPROVEMENT_PLAN.md](VM_STORAGE_IMPROVEMENT_PLAN.md); implementation,
+`docs/VM_STORAGE_IMPROVEMENT_PLAN.md` (archived: [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)); implementation,
 measurements, optional-policy decisions, and remaining platform limits are in
-[VM_STORAGE_IMPROVEMENTS_RESULTS.md](VM_STORAGE_IMPROVEMENTS_RESULTS.md).
+`docs/VM_STORAGE_IMPROVEMENTS_RESULTS.md` (archived: [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)).
