@@ -5005,16 +5005,14 @@ namespace XOffsetDatastructure {
 
         // I1: head bytes 4..15 of an inline string (byte 15 = 0x80 | length).
         inline void validate_inline_string_bytes(const char* head) {
-            unsigned char bytes[12];
-            std::memcpy(bytes, head + 4, sizeof(bytes));
-            const unsigned length = bytes[11] & 0x7fu;
+            std::uint64_t low;   // head bytes 4..11
+            std::uint32_t high;  // head bytes 12..15
+            std::memcpy(&low, head + 4, sizeof(low));
+            std::memcpy(&high, head + 12, sizeof(high));
+            const unsigned length = (high >> 24) & 0x7fu;
             if (length > XFixedString::inline_max)
                 wire_reject("wire validation failed: inline XFixedString length exceeds 10");
-            // bytes[length..10] must be zero.
-            std::uint64_t low;
-            std::uint32_t high;
-            std::memcpy(&low, bytes, sizeof(low));
-            std::memcpy(&high, bytes + 8, sizeof(high));
+            // String bytes [length, 11) must be zero.
             if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
                 wire_reject("wire validation failed: inline XFixedString has nonzero padding");
         }
