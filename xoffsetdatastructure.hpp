@@ -2822,12 +2822,14 @@ namespace XOffsetDatastructure {
 
     private:
         // assign() off its two fast paths. Clang inlines assign() at the
-        // caller only with this part out of line; GCC already inlines the
-        // whole of assign(), and keeps doing so.
+        // caller only with this part out of line. GCC and MSVC get back the
+        // one function they had before the split (inlined or not as they
+        // chose then).
 #if defined(__clang__)
-        XOFFSET_DETAIL_NOINLINE
+        XOFFSET_DETAIL_NOINLINE void assign_general(std::string_view rhs) {
+#else
+        XOFFSET_DETAIL_MOVE_INLINE void assign_general(std::string_view rhs) {
 #endif
-        void assign_general(std::string_view rhs) {
             ensure_bound();
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
             if (rhs.empty()) { clear(); return; }
