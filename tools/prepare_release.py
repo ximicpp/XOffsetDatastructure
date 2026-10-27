@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create, audit, or extract the local 0.2.0-alpha.1 source distribution.
+"""Create, audit, or extract the local source distribution of the XOFFSET_VERSION release.
 
 No Git command, network request, compiler, or package installer is executed.
 The source archive includes the exact dependency headers/licenses that CMake
@@ -20,11 +20,23 @@ import stat
 import tarfile
 import zlib
 
-VERSION = "0.2.0-alpha.1"
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.(0|[1-9][0-9]*))?")
+
+
+def read_version(source):
+    """The release identity is the XOFFSET_VERSION file of the tree this script belongs to."""
+    full = (source / "XOFFSET_VERSION").read_text(encoding="utf-8").strip()
+    match = VERSION_PATTERN.fullmatch(full)
+    if not match:
+        raise ValueError("XOFFSET_VERSION must be MAJOR.MINOR.PATCH with at most one prerelease identifier, without leading zeros")
+    return full, ".".join(match.group(1, 2, 3)), ".".join(match.group(4, 5)) if match.group(4) else ""
+
+
+VERSION, VERSION_NUMERIC, VERSION_PRERELEASE = read_version(Path(__file__).resolve().parents[1])
 PACKAGE_NAME = "xoffsetdatastructure-" + VERSION
 MANIFEST_NAME = "SOURCE_MANIFEST.json"
-SCHEMA = "xoffset-alpha-source/v1"
-INSTALL_SCHEMA = "xoffset-alpha-install/v1"
+SCHEMA = "xoffset-source/v1"
+INSTALL_SCHEMA = "xoffset-install/v1"
 INSTALL_MANIFEST_NAME = "INSTALL_MANIFEST.json"
 MAX_MEMBERS = 10000
 MAX_FILE_BYTES = 16 * 1024 * 1024
@@ -42,7 +54,7 @@ EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
 FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp')
 OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
-              "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp",
+              "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
               "Dockerfile", "docker-compose.yml", ".dockerignore")
 DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/VM_PACKAGING.md", "docs/VM_VALIDATION_RUNNER.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
@@ -53,17 +65,19 @@ TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_s
               "tools/signature_type_list.hpp", "tools/signature_type_names.hpp",
               "tools/validate_vm.py", "tools/validate_vm_package.py", "tools/prepare_vm_cmake.py",
               "tools/prepare_vm_linux_current.py", "tools/check_vm_toolchain.py",
-              "tools/prepare_alpha_release.py")
+              "tools/prepare_release.py")
 SIGNATURE_FILES = tuple("tools/sigs/" + name + ".sig.hpp" for name in (
     "arm64_android_clang", "arm64_ios_clang", "x86_64_linux_clang", "x86_64_windows_clang"))
 TOOL_TESTS = ("tools/tests/test_validate_vm_package.py", "tools/tests/test_prepare_vm_cmake.py",
-              "tools/tests/test_prepare_alpha_release.py")
+              "tools/tests/test_prepare_release.py")
 COPIED_TREES = ("cmake", "tests", "examples", "include")
 OPTIONAL_FILES = ("toolchains/build_tools.cmake",)
 ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES) + OPTIONAL_RUNTIME_SOURCES
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
 FORBIDDEN_PARTS = {".git", ".svn", "build", "dist", "__pycache__", ".pytest_cache"}
 GENERATED_HEADERS = {"check_compat_baselines.hpp"}
+# Developer-only subdirectories behind options that default to OFF (XOFFSET_BUILD_DEMOS).
+UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate"}
 SCOPE = {
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "included_python_tests": list(TOOL_TESTS),
@@ -210,7 +224,7 @@ def dependency_lock(payload):
             raise ValueError("dependency revision unavailable: " + key)
         revisions[key.lower()] = matches[0]
     if revisions != EXPECTED_REVISIONS:
-        raise ValueError("dependency revisions differ from the alpha release inputs")
+        raise ValueError("dependency revisions differ from the release inputs")
     return {"lock_sha256": sha(payload[path]), "revisions": revisions,
             "include_trees": trees, "licenses": licenses}
 
@@ -231,6 +245,8 @@ def check_cpp_and_cmake_closure(payload):
         if name.endswith((".cmake", "CMakeLists.txt")):
             parent = posixpath.dirname(name)
             for directory in re.findall(r"add_subdirectory\(\s*([A-Za-z0-9_./-]+)\s*\)", text):
+                if posixpath.normpath(posixpath.join(parent, directory)) in UNDISTRIBUTED_SUBDIRECTORIES:
+                    continue
                 if posixpath.normpath(posixpath.join(parent, directory, "CMakeLists.txt")) not in payload:
                     raise ValueError("CMake subdirectory missing: " + name + " -> " + directory)
             for source in re.findall(r"add_executable\(\s*[^\s)]+\s+([A-Za-z0-9_./-]+\.(?:cpp|cc|cxx))", text):
@@ -357,7 +373,8 @@ def create(source, out):
 def install_required(component):
     if component not in ("full", "storage"):
         raise ValueError("install component must be full or storage")
-    base = {"include/xoffset_virtual_memory.hpp", "share/XOffsetDatastructure/licenses/LICENSE",
+    base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp",
+            "share/XOffsetDatastructure/licenses/LICENSE",
             "share/XOffsetDatastructure/VERSION", "share/XOffsetDatastructure/CHANGELOG.md",
             "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md"}
     base.update("lib/cmake/XOffsetDatastructure/" + name for name in (
@@ -433,9 +450,9 @@ def validate_install_payload(payload, component):
     config = payload["lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake"].decode("utf-8").replace("\r\n", "\n")
     declarations = {
         "XOffsetDatastructure_VERSION": '"' + VERSION + '"',
-        "XOffsetDatastructure_VERSION_NUMERIC": '"0.2.0"',
-        "XOffsetDatastructure_VERSION_PRERELEASE": '"alpha.1"',
-        "XOffsetDatastructure_IS_PRERELEASE": "TRUE",
+        "XOffsetDatastructure_VERSION_NUMERIC": '"' + VERSION_NUMERIC + '"',
+        "XOffsetDatastructure_VERSION_PRERELEASE": '"' + VERSION_PRERELEASE + '"',
+        "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if VERSION_PRERELEASE else "FALSE",
         "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
         "XOffsetDatastructure_full_FOUND": "ON" if component == "full" else "OFF",
         "XOffsetDatastructure_storage_FOUND": "TRUE",
