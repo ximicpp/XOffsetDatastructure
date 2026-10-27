@@ -10,10 +10,10 @@
 #   README.md, scripts/  new
 # Formal M input wire (sc_xoffset encode of M/input.canonical.bin), R3 FREEZE.json:
 #   2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
-# Since wire format 2.1 (2026-10-27; scripts/smoke.py M_INPUT_WIRE, 8,649,368 bytes):
-#   89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+# Since wire format 2.1 (2026-10-27; scripts/smoke.py M_INPUT_WIRE, 9,435,800 bytes):
+#   c0e9d7421932b2d5587dcda5aac0cf6112f34602470940cf7ba0c019841e6bbc
 acf775534fefd8ef172ffc8b234ba203da28c389b34e8fdddbf3341d97c2c391  CMakeLists.txt
-664b6d46e14deb04993a1e74b0e4d7a6f9197592f33acd1c7f2de4786bee185b  README.md
+6f28a6f820bff2f1b2af1a47e113fff6a3e74aecaea7e3bb415fccaab399da5c  README.md
 b1dda21e057b36c4b295dfb37c40ee329eb163991f67b9a0d9aa69f699f547e7  adapters/xoffset/README.md
 bf246d895b16f542027022ee1b10291328f0c5c4a47d2992ad013e895f84b1d5  adapters/xoffset/adapter.hpp
 95aaf4c38920e99f46e14c5fb9fc005ae687a78eb161219a08efbf3a9fbeb52b  driver.cpp
@@ -26,7 +26,7 @@ b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727  include/sha256
 6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef  model/SPEC.md
 2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f  model/reference.py
 ef5f7a89747eb1ba979095209b8a31e50bd11f287dd56671809083b43a174bb4  scripts/make_fixtures.py
-a927fc55db1d816f256c9a306710469381c28c324b61ce04aeb71efdb9e8e171  scripts/smoke.py
+2ec6e8bf9d89d23ef8f498de7d2e764a0c43f85a25b196fb7f0252865150eaba  scripts/smoke.py
 5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a  tests/contracts/adapter_contract.cpp
 ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9  tests/contracts/model_contract.cpp
 e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908  tests/contracts/resource_failure.cpp
