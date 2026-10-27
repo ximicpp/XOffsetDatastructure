@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include "../xoffsetdatastructure.hpp"
@@ -174,6 +175,86 @@ void reload_scratch_survives_release_and_swap() {
     in.reload_verified<ReloadRoot>(good);
     need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
 }
+// root<T>() serves the root that make<T>() or a verified load admitted until
+// the epoch advances. After every operation that changes typed access, the
+// schema binding, the root or the payload address it must answer exactly as
+// its checked path would.
+void expect_root(XBuffer& b, std::uint64_t id, const char* what) {
+    auto& r = b.root<ReloadRoot>();
+    need(&r == &b.unsafe_root<ReloadRoot>() && r.id == id, what);
+}
+
+void root_cache_follows_epoch() {
+    const auto w2 = make_wire(2, 10), w3 = make_wire(3, 20, 2);
+    auto a = XBuffer::create<ReloadRoot>(4096, cap());
+    a.root<ReloadRoot>().id = 1;
+    expect_root(a, 1, "root after make");
+    a.reload_verified<ReloadRoot>(w2);
+    expect_root(a, 2, "root after reload");
+    const std::string trunc = w3.substr(0, 40);
+    const auto wrong = XBuffer::create<OtherRoot>(4096).save_verified<OtherRoot>();
+    const auto short_used = [&] {  // used_bytes one granule short: rejected after the copy
+        auto w = w3;
+        std::uint32_t used;
+        std::memcpy(&used, w.data() + 8, 4);
+        used -= 8;
+        std::memcpy(w.data() + 8, &used, 4);
+        return w;
+    }();
+    for (const std::string* w : {&trunc, &wrong, &short_used}) {
+        a.reload_verified<ReloadRoot>(w2);
+        expect_root(a, 2, "root before a failed reload");
+        bool threw = false;
+        try { a.reload_verified<ReloadRoot>(*w); } catch (const XException&) { threw = true; }
+        need(threw && root_refused(a), "root served after a failed reload");
+    }
+    a.reload_verified<ReloadRoot>(w3);
+    expect_root(a, 3, "root after recovery reload");
+    bool mismatch = false;
+    try { (void)a.root<OtherRoot>(); } catch (const XException&) { mismatch = true; }
+    need(mismatch, "root<U>() of another schema after a cached root<T>()");
+    expect_root(a, 3, "root after another type was refused");
+
+    // Move construction and both move assignments (to an empty and to a
+    // rooted target); the moved-from owner is rootless.
+    XBuffer b = std::move(a);
+    expect_root(b, 3, "root after move construction");
+    need(root_refused(a), "moved-from owner served a root");
+    auto c = XBuffer::create<ReloadRoot>(4096, cap());
+    c.root<ReloadRoot>().id = 7;
+    expect_root(c, 7, "root of the move target");
+    c = std::move(b);
+    expect_root(c, 3, "root after move assignment over a rooted owner");
+    need(root_refused(b), "moved-from owner served a root after move assignment");
+    a = std::move(c);
+    expect_root(a, 3, "root after move assignment into a moved-from owner");
+
+    auto d = XBuffer::load_verified<ReloadRoot>(w2, cap());
+    expect_root(d, 2, "root after load_verified");
+    swap(a, d);
+    expect_root(a, 2, "root after swap (a)");
+    expect_root(d, 3, "root after swap (d)");
+
+    d.reset<ReloadRoot>().id = 11;
+    expect_root(d, 11, "root after reset");
+    a.clone_into(d);
+    expect_root(d, 2, "root after clone_into");
+    auto e = a.clone();
+    expect_root(e, 2, "root after clone");
+    auto raw = XBuffer::load_unverified(std::as_bytes(std::span(a.data(), a.get_size())));
+    need(root_refused(raw), "root served for an unverified payload");
+
+    // A movable slot that outgrows its owner moves: new address, new epoch.
+    auto s = XBuffer::create<ReloadRoot>(1u << 16, XBuffer::maximum_capacity(kMax).with_growth(XGrowPolicy::Explicit));
+    need(s.storage_kind() == XStorageKind::MovableSlot, "fixture is not a movable slot");
+    s.root<ReloadRoot>().id = 5;
+    const auto* before = &s.root<ReloadRoot>();
+    const auto epoch = s.epoch();
+    need(s.grow(1u << 20), "movable slot did not grow");
+    need(s.epoch() != epoch && &s.unsafe_root<ReloadRoot>() != before, "slot storage did not move");
+    expect_root(s, 5, "root after the storage moved");
+}
+
 // The small dense path (payload <= 32 KiB, no extent table) is a shortcut of
 // the general reload: with it off, every outcome, first error and resulting
 // state must be the same, for every kind of target storage.
@@ -460,6 +541,7 @@ int main() {
         reset_equals_create();
         save_into_is_an_independent_copy();
         reload_scratch_survives_release_and_swap();
+        root_cache_follows_epoch();
         small_reload_matches_general_path();
         direct_reload_equals_reload();
         direct_reload_rejects_interrupted_input();
