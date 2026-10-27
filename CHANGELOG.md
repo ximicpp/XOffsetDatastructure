@@ -21,8 +21,9 @@ Release goals (roadmap O1-O7) and where this release stands:
   wire <= 0.94), cloud GCC 16: on the measure the targets were set with
   (M scale, cycle 20, mean per message) A.req 1508 -> 1253 B (0.831), A.res
   1743 -> 1488 (0.854), B 15657 -> 13667 (0.873), D 309 -> 197 (0.638), all
-  met; on the last cycle of the default two-cycle run A.req 0.820, A.res
-  0.902, B 0.857, D 824 -> 712 (0.864). TBD-D-WIRE. Formal M final wire
+  met. Report only, on the last cycle of the default two-cycle run: A.req
+  0.820, A.res 0.902, B 0.857, D 824 -> 712 (0.864; the same 112 bytes
+  saved on a larger report). Formal M final wire
   12,627,496 -> 11,182,856 B (0.886), met; formal M input wire 0.917.
   `emit_after` against cereal
   (target UB <= 0.20): met, upper bound 0.168 and 0.170 in two batches (3.0.0
