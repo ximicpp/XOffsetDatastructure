@@ -10,8 +10,9 @@
 set(CMAKE_SYSTEM_NAME iOS)
 set(CMAKE_OSX_SYSROOT iphonesimulator)
 set(CMAKE_OSX_ARCHITECTURES arm64)
+# A cache entry: project() would otherwise create an empty one over a plain variable.
 if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 17.0)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 17.0 CACHE STRING "Minimum iOS deployment version" FORCE)
 endif()
 # Plain executables, not app bundles, so simctl spawn can run them.
 set(CMAKE_MACOSX_BUNDLE OFF)
