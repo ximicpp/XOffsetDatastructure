@@ -11,7 +11,7 @@ set_target_properties(check_signature_matrix PROPERTIES
 if(XOFFSET_BUILD_TESTS)
 add_test(
     NAME check_signature_matrix
-    COMMAND $<TARGET_FILE:check_signature_matrix> "${PROJECT_SOURCE_DIR}/tools/sigs")
+    COMMAND check_signature_matrix "${PROJECT_SOURCE_DIR}/tools/sigs")
 set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
 endif()
 
@@ -98,7 +98,7 @@ target_include_directories(check_compat SYSTEM PRIVATE
 set_target_properties(check_compat PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
 if(XOFFSET_BUILD_TESTS)
-add_test(NAME check_compat COMMAND $<TARGET_FILE:check_compat>)
+add_test(NAME check_compat COMMAND check_compat)
 set_tests_properties(check_compat PROPERTIES LABELS "tooling")
 endif()
 
@@ -114,7 +114,7 @@ target_compile_definitions(describe_dump_slg PRIVATE
     "XOFFSET_DESCRIBE_DUMP_ROOTS=slg::xm::PlayerState, slg::xm::BattleMsg, slg::xm::ShardState")
 if(XOFFSET_BUILD_TESTS)
 add_test(NAME describe_dump_slg
-    COMMAND $<TARGET_FILE:describe_dump_slg> --check
+    COMMAND describe_dump_slg --check
         "${PROJECT_SOURCE_DIR}/bench/slg/include/slg/model_xoffset.hpp")
 set_tests_properties(describe_dump_slg PROPERTIES LABELS "tooling")
 endif()
@@ -128,7 +128,7 @@ target_compile_definitions(describe_dump_cases PRIVATE
     "XOFFSET_DESCRIBE_DUMP_ROOTS=sdc::CaseRoot, sdc::Overlap")
 if(XOFFSET_BUILD_TESTS)
 add_test(NAME describe_dump_cases
-    COMMAND $<TARGET_FILE:describe_dump_cases> --check
+    COMMAND describe_dump_cases --check
         "${PROJECT_SOURCE_DIR}/tests/schema_describe/dump_cases.hpp")
 set_tests_properties(describe_dump_cases PROPERTIES LABELS "tooling")
 endif()
