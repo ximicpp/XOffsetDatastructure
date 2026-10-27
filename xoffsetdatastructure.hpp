@@ -896,7 +896,11 @@ namespace XOffsetDatastructure {
         // freshly constructed one only in bin capacity, which no allocation
         // decision, hole table or wire byte depends on.
         static bool& free_table_cache_available() noexcept {
+#if XOFFSET_THREAD_CACHES
             static thread_local bool available = true; // trivial: outlives the cache
+#else
+            static bool available = false; // never set: see XOFFSET_THREAD_CACHES
+#endif
             return available;
         }
 
@@ -1321,7 +1325,11 @@ namespace XOffsetDatastructure {
         // This trivial TLS flag outlives the nontrivial cache. Late thread/global
         // destructors use the cold registry rather than a destroyed TLS object.
         static bool& owner_cache_available() noexcept {
+#if XOFFSET_THREAD_CACHES
             static thread_local bool available = true;
+#else
+            static bool available = false; // never set: see XOFFSET_THREAD_CACHES
+#endif
             return available;
         }
 
