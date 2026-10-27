@@ -1,0 +1,23 @@
+== 2026-10-27T02:28:32Z 0. tools
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+Apple clang version 21.0.0 (clang-2100.1.1.101)
+ProductName:		macOS ProductVersion:		26.3 BuildVersion:		25D125 
+== 2026-10-27T02:28:32Z 1. export
+/Volumes/XOffsetCS/perf-gate/src/xmodes/bench/slg/MANIFEST: 23 files match
+/Volumes/XOffsetCS/perf-gate/src/xmodes/bench/reloc/MANIFEST: 4 files match
+/Volumes/XOffsetCS/perf-gate/src/xmodes/bench/formal/MANIFEST: 19 files match
+commit 3e295e4b2bf20f13a7bcc4c633eee53828228a13 tree e00951869fbdd1e197adcc958121f1b1b5cbdd5c
+== 2026-10-27T02:28:33Z 2. build
++ local e=0
++ set +x
+pm26: slg f2ff1d7c07cd sc ab9d2c05dd25 reloc cb4ac43f96ac
++ local e=0
++ set +x
+pm23d: slg f2ff1d7c07cd sc ab9d2c05dd25 reloc cb4ac43f96ac
++ local e=0
++ set +x
+pm20d: slg de270e6ffcda sc 390907677884 reloc 1c391f307cda
++ local e=1
++ set +x
+STOP: build am23d failed (prep-xmodes/build_am23d.log)
+== 2026-10-27T02:29:20Z finish rc=2
