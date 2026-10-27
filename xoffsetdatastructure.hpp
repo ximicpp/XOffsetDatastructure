@@ -1158,9 +1158,11 @@ namespace XOffsetDatastructure {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
             std::vector<std::uint32_t> spare_bin;
-            std::multimap<std::uint32_t, std::uint32_t> spare_large;
+            // Constructed inside the try: the MSVC STL's map allocates its head
+            // node in the default constructor.
+            std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_large;
             try {
-                if (bytes > FreeTable::small_max) spare_large.emplace(bytes, offset);
+                if (bytes > FreeTable::small_max) spare_large.emplace().emplace(bytes, offset);
                 for (;;) {
                     XBufferCore* owner = identity ? record_owner(identity) : this;
                     if (!owner) return true; // the payload was released
@@ -1173,7 +1175,7 @@ namespace XOffsetDatastructure {
                     }
                     auto& table = *owner->free_table_;
                     if (bytes > FreeTable::small_max) {
-                        table.large.insert(spare_large.extract(spare_large.begin()));
+                        table.large.insert(spare_large->extract(spare_large->begin()));
                     } else {
                         const auto bin = bytes / 8u - 1u;
                         auto& slot = table.bins[bin];

@@ -35,17 +35,24 @@ struct StableScalar {
     std::int64_t value{};
 };
 
+// MSVC-ABI compilers (MSVC, clang-cl) cap alignas at 8192, the COFF section limit.
+#if defined(_MSC_VER)
+inline constexpr std::size_t kOveralignA = 4096, kOveralignB = 8192;
+#else
+inline constexpr std::size_t kOveralignA = 65536, kOveralignB = 131072;
+#endif
+
 template <std::size_t Alignment>
 struct alignas(Alignment) StableOveralignedRoot {
     std::int64_t value{};
 };
 XOFFSET_RECORD_DERIVED(StableItem, (), code, label)
 XOFFSET_RECORD_DERIVED(StableScalar, (), value)
-XOFFSET_RECORD_DERIVED(StableOveralignedRoot<131072>, (), value)
-XOFFSET_RECORD_DERIVED(StableOveralignedRoot<65536>, (), value)
+XOFFSET_RECORD_DERIVED(StableOveralignedRoot<kOveralignB>, (), value)
+XOFFSET_RECORD_DERIVED(StableOveralignedRoot<kOveralignA>, (), value)
 
-static_assert(is_byte_copy_safe_v<StableOveralignedRoot<65536>>);
-static_assert(is_byte_copy_safe_v<StableOveralignedRoot<131072>>);
+static_assert(is_byte_copy_safe_v<StableOveralignedRoot<kOveralignA>>);
+static_assert(is_byte_copy_safe_v<StableOveralignedRoot<kOveralignB>>);
 
 struct OtherStableRoot {
     std::int32_t id{};
@@ -338,8 +345,8 @@ void actual_addresses_honor_large_alignment() {
             assert(buffer.arena()->used_end == used_before && !has_hole(buffer, reused, 32));
             buffer.arena()->deallocate(reused, 32);
         }
-        if (instance % 2 == 0) check_overaligned_root<65536>(buffer, 1234 + instance);
-        else check_overaligned_root<131072>(buffer, 1234 + instance);
+        if (instance % 2 == 0) check_overaligned_root<kOveralignA>(buffer, 1234 + instance);
+        else check_overaligned_root<kOveralignB>(buffer, 1234 + instance);
     }
     // OS placement is not a portable guarantee. Check every pointer regardless,
     // and record whether this run also covered a non-aligned reservation base.
