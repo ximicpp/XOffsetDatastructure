@@ -185,13 +185,20 @@ consteval bool shift_relocate_supported() {
 // Heads live in one bounded arena, so a rebased delta stays in rel32 range;
 // an impossible overflow ends the program as set_rel32 in a noexcept relocation does.
 // A null delta stays null; otherwise the exact int32 sum, without a branch on
-// null (heads mix bound and empty containers). One run shares one shift, so
-// the overflow test is a compare against fixed bounds (a non-null delta
-// outside [low, high] would overflow), collected over the run and checked
-// once after it: the wrapped sums are never used. Plain compares and adds, so
-// the per-element work vectorizes.
+// null (heads mix bound and empty containers). One moved run shares one shift.
+// Clang vectorizes the run when the overflow test is a compare against fixed
+// bounds (a non-null delta outside [low, high] would overflow), collected and
+// checked once after the run, so the wrapped sums are never used. GCC and MSVC
+// keep scalar code, where a checked add per delta is shorter.
+#if defined(__clang__)
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 1
+#else
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 0
+#endif
+
 struct ShiftRun {
     std::int32_t shift;
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
     std::int32_t low;
     std::int32_t high;
     bool overflow = false;
@@ -200,13 +207,30 @@ struct ShiftRun {
         : shift(by),
           low(by < 0 ? (std::numeric_limits<std::int32_t>::min)() - by : (std::numeric_limits<std::int32_t>::min)()),
           high(by > 0 ? (std::numeric_limits<std::int32_t>::max)() - by : (std::numeric_limits<std::int32_t>::max)()) {}
+#else
+    explicit ShiftRun(std::int32_t by) noexcept : shift(by) {}
+#endif
 };
 
 inline std::int32_t shift_rel32(std::int32_t delta, ShiftRun& run) noexcept {
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
     // 0 lies in [low, high] for every shift.
     run.overflow |= (delta < run.low) | (delta > run.high);
     const std::uint32_t step = delta != 0 ? static_cast<std::uint32_t>(run.shift) : 0u;
     return static_cast<std::int32_t>(static_cast<std::uint32_t>(delta) + step);
+#else
+    const std::int32_t step = delta != 0 ? run.shift : 0;
+    std::int32_t moved;
+#if defined(__GNUC__)
+    if (__builtin_add_overflow(delta, step, &moved)) [[unlikely]] std::terminate();
+#else
+    const std::int64_t wide = std::int64_t(delta) + step;
+    if (wide < (std::numeric_limits<std::int32_t>::min)() ||
+        wide > (std::numeric_limits<std::int32_t>::max)()) [[unlikely]] std::terminate();
+    moved = static_cast<std::int32_t>(wide);
+#endif
+    return moved;
+#endif
 }
 
 template<class T, std::size_t... I>
@@ -263,13 +287,20 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& r
     (shift_rebase_member<T, I>(address, run), ...);
 }
 
+// Forced inline where the run vectorizes: a one-element insert or erase then
+// shifts by a constant.
 template<class T>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+XOFFSET_DETAIL_SHIFT_INLINE
+#endif
+void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
     static_assert(shift_relocate_supported<T>());
     ShiftRun run(shift);
     for (std::size_t i = 0; i < count; ++i)
         shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), run);
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
     if (run.overflow) [[unlikely]] std::terminate();
+#endif
 }
 
 // The live slot a shift left behind still names the moved payloads. Empty its

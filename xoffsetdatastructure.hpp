@@ -2792,7 +2792,9 @@ namespace XOffsetDatastructure {
             capacity_ = new_cap;
         }
 
-        void assign(std::string_view rhs) {
+        // Forced inline: GCC otherwise keeps assign() out of line even with
+        // the general path split off, and pays two calls.
+        XOFFSET_DETAIL_MOVE_INLINE void assign(std::string_view rhs) {
             if (is_inline()) {
                 // A nonempty short value into a bound inline head stays
                 // inline: the general path below would do the same after
