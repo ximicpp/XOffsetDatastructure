@@ -1,0 +1,26 @@
+-- The CXX compiler identification is AppleClang 21.0.0.21000101
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++20 with XOFFSET_RECORD field lists
+-- Full-library C++20 field-list compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 87 test programs + 13 subprocess scenarios + 1 tooling checks = 101; 3 configure checks listed separately
+-- C++20 build: 18 C++26-only tests not built (listed in test-inventory.json)
+-- Test inventory: /Volumes/XOffsetCS/native-d/a/test-inventory.json
+-- Configuring done (1.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Volumes/XOffsetCS/native-d/a
+[1/4] Building CXX object tests/CMakeFiles/test_basic_types.dir/test_basic_types.cpp.o
+[2/4] Linking CXX executable bin/Release/test_basic_types
+[3/4] Building CXX object tests/CMakeFiles/test_cross_compiler_wire.dir/test_cross_compiler_wire.cpp.o
+[4/4] Linking CXX executable bin/Release/test_cross_compiler_wire
+
+[TEST] Basic Types
+--------------------------------------------------
+[PASS] All basic type tests passed!

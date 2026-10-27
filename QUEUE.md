@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-10-27T02:36:32Z after 029-macos-deploy: running 2026-10-27T02:36:28Z
+Updated 2026-10-27T02:36:53Z after 029-macos-deploy: done 0 2026-10-27T02:36:50Z
 
 ```
 runner: pid 45762 (version 2)
@@ -33,5 +33,5 @@ free: 25 GB on /Volumes/XOffsetCS, 25 GB on /Users/ximi
 026-ckpt2b                               done 0 2026-10-27T02:28:08Z
 027-XMODES                               done 2 2026-10-27T02:29:21Z
 028-native-macos                         done 0 2026-10-27T02:31:19Z
-029-macos-deploy                         running 2026-10-27T02:36:28Z
+029-macos-deploy                         done 0 2026-10-27T02:36:50Z
 ```
