@@ -128,7 +128,7 @@ chmod +x build/xo-native
     -DCMAKE_BUILD_RPATH="$P2996_ROOT/lib/x86_64-unknown-linux-gnu" \
     -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT &&
   "$CMAKE" --build build/libfuzzer --parallel "$(nproc)" \
-    --target test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds; } > "$OUT/libfuzzer-build.log" 2>&1 ||
+    --target test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds fuzz_schema_evolution fuzz_schema_evolution_seeds; } > "$OUT/libfuzzer-build.log" 2>&1 ||
   { echo "libFuzzer build failed, see libfuzzer-build.log"; tail -n 20 "$OUT/libfuzzer-build.log"; exit 0; }
 BIN=build/libfuzzer/bin/Debug
 
@@ -140,6 +140,7 @@ for T in $TARGETS; do
   case "$T" in
     v2_wire) $BIN/test_v2_fuzz --write-corpus "$W/seeds" > "$R/seeds.log" 2>&1 ;;
     wire_schemas) $BIN/fuzz_wire_schemas_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
+    schema_evolution) $BIN/fuzz_schema_evolution_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
   esac
   SOURCE=none
   if [ -f "$CORPUS_STORE/$T.tar.gz" ] && tar -xzf "$CORPUS_STORE/$T.tar.gz" -C "$CORPUS" 2>> "$R/corpus-restore.log"; then

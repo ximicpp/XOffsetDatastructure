@@ -124,6 +124,13 @@ static_assert(wire_schema_hash_v<swap_a::S>() == wire_schema_hash_v<swap_b::S>()
 static_assert(schema_name_digest_v<swap_a::S> != schema_name_digest_v<swap_b::S>);
 static_assert(!detail::evolve::block_copy<swap_a::S, swap_b::S>());
 
+// String keys longer than an inline string (found by fuzz_schema_evolution:
+// a key copied outside every payload could not hold them).
+namespace keys_a { struct K { XMap<XString, std::int32_t> by_name; XSet<XString> names; }; }
+namespace keys_b { struct K { XSet<XString> names; std::int32_t extra; XMap<XString, std::int32_t> by_name; }; }
+XOFFSET_REGISTER_SCHEMA_NAME(keys_a::K, "test.evolution.Keys")
+XOFFSET_REGISTER_SCHEMA_NAME(keys_b::K, "test.evolution.Keys")
+
 namespace {
 
 void fill_v1(v1::Player& p) {
@@ -295,6 +302,20 @@ void swapped_fields_by_name() {
     CHECK(b.root().hp == 1 && b.root().mp == 2);
 }
 
+void long_string_keys() {
+    auto a = TypedXBuffer<keys_a::K>::create(4096, XBuffer::maximum_capacity(1 << 20).with_growth(XGrowPolicy::Automatic));
+    const std::string long_key(100, 'k');
+    a.root().by_name[long_key] = 7;
+    a.root().by_name["s"] = 1;
+    a.root().names.emplace((long_key + "!").c_str());
+    auto b = evolve<keys_b::K>(a);
+    CHECK(b.root().by_name.size() == 2 && b.root().by_name.find(long_key) != b.root().by_name.end());
+    CHECK(b.root().by_name.find(long_key)->second == 7);
+    CHECK(b.root().names.size() == 1 && b.root().names.begin()->view() == long_key + "!");
+    auto back = evolve<keys_a::K>(b);
+    CHECK(back.save_compact() == evolve<keys_a::K>(a).save_compact());
+}
+
 void plan_text() {
     const std::string plan = evolve_plan<v1::Player, v2::Player>();
     std::fputs(plan.c_str(), stdout);
@@ -323,6 +344,7 @@ int main() {
     identity_is_compact_copy();
     capacity_limit();
     swapped_fields_by_name();
+    long_string_keys();
     plan_text();
     if (failures) {
         std::fprintf(stderr, "test_schema_evolution: %d failure(s)\n", failures);

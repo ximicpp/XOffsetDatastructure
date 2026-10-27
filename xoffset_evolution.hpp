@@ -467,10 +467,10 @@ namespace XOffsetDatastructure {
             ~scratch() { if (built) std::destroy_at(&get()); }
         };
 
+        // Enum keys only; keys of the same type are inserted as they are.
         template <typename ToKey, typename FromKey>
         ToKey convert_key(const FromKey& key, XEvolveContext& ctx) {
-            if constexpr (std::is_same_v<ToKey, FromKey>) return key;
-            else return convert_enum<ToKey>(key, ctx);
+            return convert_enum<ToKey>(key, ctx);
         }
 
         template <typename From, typename To>
@@ -506,7 +506,12 @@ namespace XOffsetDatastructure {
             using TK = typename To::key_type;
             to.reserve(from.size());
             for (const auto& entry : from) {
-                auto [it, inserted] = to.try_emplace(convert_key<TK>(entry.first, ctx));
+                // A key of the same type goes in by reference: a copy of a
+                // string key outside every payload could not hold a long string.
+                auto [it, inserted] = [&] {
+                    if constexpr (std::is_same_v<TK, typename From::key_type>) return to.try_emplace(entry.first);
+                    else return to.try_emplace(convert_key<TK>(entry.first, ctx));
+                }();
                 if (!inserted) ctx.fail("duplicate map key after conversion");
                 convert(entry.second, it->second, ctx);
             }
