@@ -8,6 +8,7 @@ the harness built without libFuzzer, with that job's compiler and sanitizers
 | --- | --- | --- |
 | `v2_wire/` | `fuzz_v2_wire.cpp` (one V2 wire per file) | `fuzz_v2_wire_replay` |
 | `wire_schemas/` | `fuzz_wire_schemas.cpp` (first byte picks the schema, the rest is the wire) | `fuzz_wire_schemas_replay` |
+| `schema_evolution/` | `fuzz_schema_evolution.cpp` (first byte picks receive, send or handshake) | `fuzz_schema_evolution_replay` |
 
 Each file is the raw harness input, exactly as libFuzzer saved it (after
 `-minimize_crash`). Name it by the crash signature from the nightly report, so
