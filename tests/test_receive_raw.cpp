@@ -231,16 +231,21 @@ void need(bool ok, const char* text) {
 auto capacity() {
     return xo::XBuffer::maximum_capacity(4u << 20).with_growth(xo::XGrowPolicy::Automatic);
 }
-// V2 wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
+// V2.1 dense wire: [XWireHeaderV2][payload bytes 48..used_bytes][hole table:
+// hole_count x 8]. `image` is the payload a receiver builds from it: the
+// payload header it writes itself, then the wire's payload bytes.
 struct Wire {
     std::string bytes;
+    std::string image;
     xo::XWireHeaderV2 header() const {
         return rd::raw_wire_pod<xo::XWireHeaderV2>(bytes.data());
     }
-    const char* payload() const { return bytes.data() + sizeof(xo::XWireHeaderV2); }
-    char* payload() { return bytes.data() + sizeof(xo::XWireHeaderV2); }
+    const char* payload() const { return image.data(); }
+    char* payload() { return image.data(); }
     std::size_t extent() const { return std::size_t(header().used_bytes); }
-    const char* holes() const { return payload() + extent(); }
+    const char* holes() const {
+        return bytes.data() + sizeof(xo::XWireHeaderV2) + extent() - xo::XWIRE_PAYLOAD_BEGIN;
+    }
     std::size_t hole_count() const { return std::size_t(header().hole_count); }
     xo::XBufferCore::WireHole hole(std::size_t i) const {
         need(i < hole_count(), "test hole index");
@@ -271,10 +276,15 @@ struct Wire {
     }
 };
 template<class T> Wire wire_of(xo::XBuffer& source) {
-    Wire wire{source.save_verified<T>()};
+    Wire wire{source.save_verified<T>(), {}};
     const auto h = wire.header();
-    need(wire.bytes.size() == sizeof(xo::XWireHeaderV2) + h.used_bytes +
-         h.hole_count * sizeof(xo::XBufferCore::WireHole), "V2 wire size differs from header");
+    need(h.extent_count == 0 && wire.bytes.size() == sizeof(xo::XWireHeaderV2) + h.used_bytes -
+         xo::XWIRE_PAYLOAD_BEGIN + h.hole_count * sizeof(xo::XBufferCore::WireHole),
+         "V2.1 wire size differs from header");
+    wire.image.assign(std::size_t(h.used_bytes), '\0');
+    xo::XBufferCore::write_payload_header(wire.image.data(), h.root_offset, h.used_bytes);
+    std::memcpy(wire.image.data() + xo::XWIRE_PAYLOAD_BEGIN, wire.bytes.data() + sizeof(xo::XWireHeaderV2),
+                std::size_t(h.used_bytes) - xo::XWIRE_PAYLOAD_BEGIN);
     return wire;
 }
 template<class T>
@@ -305,7 +315,7 @@ Wire demo(bool large = false) {
     // Above 32 KiB the validator takes its bitmaps from the scratch resource.
     if (large) snapshot.records[1].payload.reserve(40000);
     auto wire = wire_of<model::Snapshot>(source);
-    need(wire.hole_count() != 0 && wire.header().hole_bytes != 0, "demo wire has no hole table entry");
+    need(wire.hole_count() != 0, "demo wire has no hole table entry");
     return wire;
 }
 class CountingResource : public std::pmr::memory_resource {
@@ -478,15 +488,12 @@ void hole_table_exact_coverage() {
     const auto wire = demo();
     using Hole = xo::XBufferCore::WireHole;
     const std::string table(wire.holes(), wire.hole_count() * sizeof(Hole));
-    std::uint64_t sum = 0;
     for (std::size_t i = 0; i < wire.hole_count(); ++i) {
         const auto hole = wire.hole(i);
         need(hole.offset % 8 == 0 && hole.bytes % 8 == 0 && hole.bytes != 0 &&
              hole.offset >= sizeof(rd::RawPayloadHeader) && hole.offset + hole.bytes <= wire.extent(),
              "writer emitted an unaligned/out-of-range hole");
-        sum += hole.bytes;
     }
-    need(sum == wire.header().hole_bytes, "writer hole_bytes differs from the table");
     // A dropped hole leaves an uncovered dead range.
     rejects_holes<model::Snapshot>(wire, table.substr(sizeof(Hole)),
         "wire validation failed: payload is not exactly covered by live blocks and holes");

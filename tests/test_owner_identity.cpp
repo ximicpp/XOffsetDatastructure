@@ -273,11 +273,13 @@ void transfers_and_deterministic_reused_payload_base() {
     std::memset(p, 0x57, 24); fd::retire_dynamic_bytes(again, p, 24);
     need(reused.free_block_count() == 1, "reused-base retirement reached a stale owner");
     // A frozen snapshot is immutable: its payload names no allocation owner.
+    // Its payload segment is the payload past the 48-byte payload header.
     auto typed = xo::TypedXBuffer<OwnerRoot>::create(4096, policy());
     typed.root().numbers.resize(2, 5u);
     const void* base = typed.data();
     auto frozen = xo::freeze_verified(std::move(typed));
-    need(static_cast<const void*>(frozen.segments()[1].data()) == base &&
+    need(static_cast<const void*>(frozen.segments()[1].data()) ==
+             static_cast<const char*>(base) + xo::XWIRE_PAYLOAD_BEGIN &&
          xo::XBufferCore::owner_from_arena_noexcept(base) == nullptr, "frozen payload still names an owner");
 }
 

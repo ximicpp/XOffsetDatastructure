@@ -114,8 +114,10 @@ static_assert(!xo::detail::receive_raw::future_supported_v<receive_custom_v2_exa
 static_assert(xo::detail::custom_future_contract::surface_complete<receive_custom_v2_examples::FutureOnlyChild>());
 static_assert(!xo::detail::receive_raw::future_supported_v<receive_custom_v2_examples::FutureOnlyChild>);
 
-// V2 wire framing: [XWireHeaderV2][extent table: extent_count x 8, sparse only]
-// [payload: used_bytes dense, or the concatenated extents][hole table: hole_count x 8].
+// V2.1 wire framing: [XWireHeaderV2][extent table: extent_count x 8, sparse only]
+// [payload bytes: [48, used_bytes) dense, or the concatenated extents][hole table: hole_count x 8].
+// Framing::payload is used_bytes; the wire carries payload bytes from kBegin.
+constexpr std::size_t kBegin=xo::XWIRE_PAYLOAD_BEGIN;
 struct Framing { std::size_t payload{},holes{},extents{}; };
 xo::XWireHeaderV2 header_of(const std::string& wire){
     need(wire.size()>=sizeof(xo::XWireHeaderV2),"bad fixture wire");
@@ -126,7 +128,7 @@ Extent extent_of(const std::string& wire,std::size_t i){
     Extent e{};std::memcpy(&e,wire.data()+sizeof(xo::XWireHeaderV2)+i*sizeof(e),sizeof(e));return e;
 }
 std::size_t stored_bytes(const std::string& wire,const Framing& f){
-    if(!f.extents)return f.payload;
+    if(!f.extents)return f.payload-kBegin;
     std::size_t stored=0;for(std::size_t i=0;i<f.extents;++i)stored+=extent_of(wire,i).bytes;return stored;
 }
 Framing framing_of(const std::string& wire){
@@ -138,7 +140,8 @@ Framing framing_of(const std::string& wire){
     return f;
 }
 // Byte stores model recv, not a memcpy implicit-object-creation shortcut. A
-// sparse wire's extents land at their payload offsets; gaps stay untouched.
+// sparse wire's extents land at their payload offsets (payload_bytes() starts
+// at offset 48); gaps stay untouched.
 template<class Operation>
 void write_parts(const Operation& operation,const std::string& wire,const Framing& f){
     auto header=operation.header_bytes(),body=operation.payload_bytes(),holes=operation.hole_bytes();
@@ -149,12 +152,12 @@ void write_parts(const Operation& operation,const std::string& wire,const Framin
     auto next=[&]{return cursor<wire.size()?std::byte(static_cast<unsigned char>(wire[cursor++])):std::byte{0};};
     for(std::size_t i=0;i<header.size();++i)header[i]=next();
     for(std::size_t i=0;i<table.size();++i)table[i]=next();
-    if(!f.extents){for(std::size_t i=0;i<f.payload;++i){const auto byte=next();if(i<body.size())body[i]=byte;}}
+    if(!f.extents){for(std::size_t i=0;i<f.payload-kBegin;++i){const auto byte=next();if(i<body.size())body[i]=byte;}}
     else for(std::size_t e=0;e<f.extents;++e){
         const auto extent=extent_of(wire,e);
         for(std::size_t i=0;i<extent.bytes;++i){
             const auto byte=next();
-            if(std::size_t(extent.offset)+i<body.size())body[extent.offset+i]=byte;
+            if(std::size_t(extent.offset)-kBegin+i<body.size())body[extent.offset-kBegin+i]=byte;
         }
     }
     for(std::size_t i=0;i<holes.size();++i)holes[i]=next();
@@ -182,7 +185,11 @@ Token receive(const std::string& wire,std::optional<xo::XBufferCore::MaximumCapa
               std::optional<Framing> framing=std::nullopt){
     return receive_as<ReceiveRoot>(wire,cap,framing);
 }
-std::string body_image(const Token& token){return std::string(static_cast<const char*>(token.payload_address()),token.payload_size());}
+// The received bytes (finish writes the payload header [0, 48) itself).
+template<class T>
+std::string body_image(const xo::VerifiedReceiveToken<T>& token){
+    return std::string(static_cast<const char*>(token.payload_address())+kBegin,token.payload_size()-kBegin);
+}
 void exercise_edit(xo::TypedXBuffer<ReceiveRoot>& buffer){
     check(buffer.root());need(buffer.grow(4096),"post-receive explicit grow failed");
     auto& r=buffer.root();r.name="mutated received";r.attrs[1].value.clear();r.attrs[1].value.resize(40);r.attrs[1].value[7]=99;
@@ -221,20 +228,21 @@ void direct_growth_and_lifetime(){
          token.received_length()==received && body_image(token)==before,"failed grow changed received prefix/metadata");
     xo::detail::clear_vm_failures();
     need(token.grow(payload-prefix) && token.payload_address()==base,"grow moved VM reservation");
-    need(std::memcmp(token.payload_address(),before.data(),before.size())==0,"successful grow lost old received bytes");
+    need(std::memcmp(static_cast<const char*>(token.payload_address())+kBegin,before.data(),before.size())==0,
+         "successful grow lost old received bytes");
     const auto* all=static_cast<const unsigned char*>(token.payload_address());
     for(auto i=prefix;i<payload;++i)need(all[i]==0,"new logical receive bytes not zero");
     {
         auto operation=token.acquire_operation();auto b=operation.payload_bytes();
-        for(auto i=prefix;i<payload;++i)b[i]=std::byte(static_cast<unsigned char>(wire[sizeof(xo::XWireHeaderV2)+i]));
+        for(auto i=prefix;i<payload;++i)b[i-kBegin]=std::byte(static_cast<unsigned char>(wire[sizeof(xo::XWireHeaderV2)+i-kBegin]));
         // Header and hole-table bytes from the first operation are retained.
-        operation.complete(sizeof(xo::XWireHeaderV2),payload,hole_bytes);
+        operation.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes);
     }
     auto output=xo::finish_verified(token);
     need(!token && output.get_address()==base,"finish copied payload or did not consume token");
     need(output.maximum_capacity()==payload+8192,"receive max capacity lost");
     need(output.free_table_complete() && output.free_block_count()==f.holes &&
-         output.free_block_bytes()==header_of(wire).hole_bytes,"received hole table not installed as the free table");
+         output.free_block_bytes()==source.free_block_bytes(),"received hole table not installed as the free table");
     check(output.root());need(output.save_verified()==wire,"activation changed V2 bytes");exercise_edit(output);
 }
 void completion_cancel_and_owner_lifetime(){
@@ -247,12 +255,12 @@ void completion_cancel_and_owner_lifetime(){
     auto h=operation.header_bytes(),b=operation.payload_bytes();
     write_parts(operation,wire,f);
     operation.complete(h.size(),b.size(),hole_bytes);rejects([&]{(void)xo::finish_verified(moved);}); // cancel != successful completion
-    {auto retry=moved.acquire_operation();retry.complete(sizeof(xo::XWireHeaderV2),payload,hole_bytes);}
+    {auto retry=moved.acquire_operation();retry.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes);}
     auto output=xo::finish_verified(moved);need(output.get_address()==base,"cancel/recomplete changed owner");check(output.root());
     auto orphan_operation=[&]{auto temporary=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,f.holes);return temporary.acquire_operation();}();
-    need(orphan_operation.payload_bytes().size()==payload && orphan_operation.hole_bytes().size()==hole_bytes,
+    need(orphan_operation.payload_bytes().size()==payload-kBegin && orphan_operation.hole_bytes().size()==hole_bytes,
          "destroying token released outstanding-operation mapping");
-    orphan_operation.cancel();need(orphan_operation.payload_bytes().size()==payload && orphan_operation.hole_bytes().size()==hole_bytes,
+    orphan_operation.cancel();need(orphan_operation.payload_bytes().size()==payload-kBegin && orphan_operation.hole_bytes().size()==hole_bytes,
          "cancel released outstanding mapping");
     orphan_operation.complete(0,0);need(orphan_operation.payload_bytes().empty() && orphan_operation.hole_bytes().empty(),
          "real completion retained operation lease");
@@ -261,14 +269,14 @@ void completion_cancel_and_owner_lifetime(){
     rejects([&]{(void)abandoned.grow(1);});rejects([&]{(void)xo::finish_verified(abandoned);});
     rejects([&]{(void)abandoned.acquire_operation();}); // destructor is not real completion
     auto short_input=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,f.holes);
-    {auto part=short_input.acquire_operation();write_parts(part,wire,f);part.complete(sizeof(xo::XWireHeaderV2)-1,payload,hole_bytes);}
+    {auto part=short_input.acquire_operation();write_parts(part,wire,f);part.complete(sizeof(xo::XWireHeaderV2)-1,payload-kBegin,hole_bytes);}
     rejects([&]{(void)xo::finish_verified(short_input);});
     // V2: a short hole table is incomplete input, as is a hole count that
     // differs from the received header's; neither consumes the token.
     auto short_holes=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,f.holes);
-    {auto part=short_holes.acquire_operation();write_parts(part,wire,f);part.complete(sizeof(xo::XWireHeaderV2),payload,hole_bytes-1);}
+    {auto part=short_holes.acquire_operation();write_parts(part,wire,f);part.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes-1);}
     rejects([&]{(void)xo::finish_verified(short_holes);});
-    {auto part=short_holes.acquire_operation();part.complete(sizeof(xo::XWireHeaderV2),payload,hole_bytes);}
+    {auto part=short_holes.acquire_operation();part.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes);}
     auto completed=xo::finish_verified(short_holes);check(completed.root());
     for(const auto count:{f.holes-1,f.holes+1}){
         auto token_count=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,count);
@@ -277,7 +285,7 @@ void completion_cancel_and_owner_lifetime(){
         auto hb=part.hole_bytes();auto hdr=part.header_bytes();auto body=part.payload_bytes();
         for(std::size_t i=0;i<hdr.size();++i)hdr[i]=std::byte(static_cast<unsigned char>(wire[i]));
         for(std::size_t i=0;i<body.size();++i)body[i]=std::byte(static_cast<unsigned char>(wire[hdr.size()+i]));
-        for(std::size_t i=0;i<hb.size()&&i<hole_bytes;++i)hb[i]=std::byte(static_cast<unsigned char>(wire[hdr.size()+payload+i]));
+        for(std::size_t i=0;i<hb.size()&&i<hole_bytes;++i)hb[i]=std::byte(static_cast<unsigned char>(wire[hdr.size()+body.size()+i]));
         part.complete(hdr.size(),body.size(),hb.size());
         const auto image=body_image(token_count);
         rejects([&]{(void)xo::finish_verified(token_count);});
@@ -296,7 +304,7 @@ void rollback_and_rejection(){
     for(unsigned point=0;point<2;++point){
         auto token=receive(wire,xo::XBuffer::maximum_capacity(n+4096));const auto before=body_image(token);const auto*base=token.payload_address();
         host::remaining=point;bool failed=false;try{(void)xo::finish_verified(token);}catch(const xo::XBadAlloc&){failed=true;}
-        host::remaining=-1;need(failed&&token.payload_address()==base&&token.received_length()==n&&token.maximum_capacity()==n+4096&&body_image(token)==before,"registry preparation failure lost token");
+        host::remaining=-1;need(failed&&token.payload_address()==base&&token.received_length()==n-kBegin&&token.maximum_capacity()==n+4096&&body_image(token)==before,"registry preparation failure lost token");
         auto out=xo::finish_verified(token);check(out.root());
     }
     // V2: every host allocation of finish (registry record/node, default raw
@@ -316,7 +324,7 @@ void rollback_and_rejection(){
             host::remaining=-1;
             if(finished)break;
             ++failures;
-            need(failed&&token&&token.payload_address()==base&&token.received_length()==n&&body_image(token)==before,
+            need(failed&&token&&token.payload_address()==base&&token.received_length()==n-kBegin&&body_image(token)==before,
                  "host allocation failure during finish lost or changed the token");
             auto out=xo::finish_verified(token);check(out.root());
             need(out.free_table_complete()&&out.free_block_count()==framing.holes,"retried finish lost the hole table");
@@ -332,38 +340,48 @@ void rollback_and_rejection(){
         need(big_n>32768,"large receive fixture is not above the inline scratch limit");
         auto token=receive(big);const auto before=body_image(token);const auto*base=token.payload_address();Resource resource(0);bool failed=false;
         try{(void)xo::finish_verified(token,&resource);}catch(const std::bad_alloc&){failed=true;}
-        need(failed&&resource.live==0&&token.payload_address()==base&&body_image(token)==before&&token.received_length()==big_n,"raw scratch OOM lost token/bytes");
+        need(failed&&resource.live==0&&token.payload_address()==base&&body_image(token)==before&&token.received_length()==big_n-kBegin,"raw scratch OOM lost token/bytes");
         auto out=xo::finish_verified(token);check(out.root());
     }
     auto token=receive(wire);const auto before=body_image(token);xo::detail::fail_next_registry_registration();
-    rejects([&]{(void)xo::finish_verified(token);});need(body_image(token)==before&&token.received_length()==n,"registry injection rewrote raw token");
+    rejects([&]{(void)xo::finish_verified(token);});need(body_image(token)==before&&token.received_length()==n-kBegin,"registry injection rewrote raw token");
     xo::detail::clear_registry_failures();auto out=xo::finish_verified(token);check(out.root());
     for(unsigned kind=0;kind<6;++kind){
         auto malformed=wire;const auto h=header_of(wire);
-        const auto hole_at=sizeof(h)+std::size_t(h.used_bytes);
+        const auto hole_at=sizeof(h)+std::size_t(h.used_bytes)-kBegin;
+        const auto root_at=sizeof(h)+std::size_t(h.root_offset)-kBegin; // dense: payload offset p is wire byte 40 + p - 48
         if(kind==0)malformed[0]^=1;
-        if(kind==1)malformed[sizeof(h)+h.root_offset+offsetof(ReceiveRoot,enabled)]=2;
-        if(kind==2){auto arena=xo::XBufferCore::arena_header{};std::memcpy(&arena,malformed.data()+sizeof(h),sizeof(arena));arena.used_end+=1;std::memcpy(malformed.data()+sizeof(h),&arena,sizeof(arena));}
+        if(kind==1)malformed[root_at+offsetof(ReceiveRoot,enabled)]=2;
+        // A vector capacity that no longer matches its block (exact coverage).
+        if(kind==2){std::uint32_t cap=0;const auto at=root_at+offsetof(ReceiveRoot,tail)+8;
+            std::memcpy(&cap,malformed.data()+at,4);cap+=8;std::memcpy(malformed.data()+at,&cap,4);}
         // An inline string longer than the 11 bytes inline storage holds.
-        if(kind==3)malformed[sizeof(h)+h.root_offset+offsetof(ReceiveRoot,name)+11]=char(0x80|15);
+        if(kind==3)malformed[root_at+offsetof(ReceiveRoot,name)+11]=char(0x80|15);
         // V2 hole table: a misaligned entry, and an entry moved onto the live root.
         xo::XBufferCore::WireHole hole{};std::memcpy(&hole,malformed.data()+hole_at,sizeof(hole));
         if(kind==4){hole.offset+=4;std::memcpy(malformed.data()+hole_at,&hole,sizeof(hole));}
         if(kind==5){hole.offset=std::uint32_t(h.root_offset);std::memcpy(malformed.data()+hole_at,&hole,sizeof(hole));}
         auto bad=receive(malformed);const auto image=body_image(bad);const auto*base=bad.payload_address();
-        rejects([&]{(void)xo::finish_verified(bad);});need(bad&&bad.payload_address()==base&&body_image(bad)==image&&bad.received_length()==n,"malformed rejection consumed or changed token");
+        rejects([&]{(void)xo::finish_verified(bad);});need(bad&&bad.payload_address()==base&&body_image(bad)==image&&bad.received_length()==n-kBegin,"malformed rejection consumed or changed token");
     }
-    for(unsigned field=0;field<17;++field){
+    // Every V2.1 header field, and the V1 / V2.0 headers, each with the message that names it.
+    const char* const expected_message[15]={"bad magic","wire format 3.1 is not supported","wire format 2.2 is not supported",
+        "unsupported wire flags 0x00000001","root type id mismatch","schema hash mismatch","used size mismatch",
+        "hole count mismatch","root offset out of bounds","root offset out of bounds",
+        "wire format 1 is not supported; this build reads 2.1",
+        "wire format 2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade together)",
+        "hole count mismatch","extent count mismatch","unsupported wire flags 0x80000000"};
+    for(unsigned field=0;field<15;++field){
         auto malformed=wire;auto h=header_of(wire);
         switch(field){
-        case 0:h.magic[0]^=1;break;case 1:++h.format_major;break;case 2:++h.format_minor;break;
-        case 3:++h.header_size;break;case 4:++h.endian_tag;break;case 5:++h.flags;break;
-        case 6:h.root_type_id^=1;break;case 7:h.schema_hash_lo^=1;break;case 8:h.schema_hash_hi=1;break;
-        case 9:++h.used_bytes;break;case 10:++h.hole_count;break;
-        case 11:h.crc32c=1;break;case 12:h.reserved0=1;break;
-        case 13:h.root_offset=n;break;case 14:h.hole_bytes+=8;break;
-        case 15:std::memcpy(h.magic,xo::XWIRE_MAGIC_V1,sizeof(h.magic));h.format_major=1;break; // V1 input
-        case 16:--h.hole_count;break;
+        case 0:h.magic^=1u;break;case 1:h.magic+=1u<<16;break;case 2:h.magic+=1u<<24;break;
+        case 3:h.flags=1;break;case 4:h.root_type_id^=1;break;case 5:h.schema_hash^=1;break;
+        case 6:h.used_bytes+=8;break;case 7:++h.hole_count;break;
+        case 8:h.root_offset=std::uint32_t(n);break;case 9:h.root_offset=8;break;
+        case 10:std::memcpy(&h,"XOFFV1\0\0",8);break; // V1 input
+        case 11:std::memcpy(&h,"XOFFV2\0\0",8);break; // V2.0 input
+        case 12:--h.hole_count;break;case 13:++h.extent_count;break;
+        case 14:h.flags=0x80000000u;break; // bit 31: kept for schema evolution, not accepted by 2.1
         }
         // The transport keeps the true framing; only the header bytes differ.
         std::memcpy(malformed.data(),&h,sizeof(h));auto bad=receive(malformed,std::nullopt,framing);
@@ -371,14 +389,14 @@ void rollback_and_rejection(){
         std::string message;
         try{(void)xo::finish_verified(bad);}catch(const xo::XException& e){message=e.what();}
         need(!message.empty(),"malformed wire header accepted");
-        if(field==15)need(message.find("unsupported wire format version 1")!=std::string::npos,
-                          "V1 wire header was not rejected as format version 1");
-        need(bad&&bad.payload_address()==base&&body_image(bad)==image&&bad.received_length()==n,
+        need(message.find(expected_message[field])!=std::string::npos,
+             ("wire header field "+std::to_string(field)+" rejected with \""+message+"\"").c_str());
+        need(bad&&bad.payload_address()==base&&body_image(bad)==image&&bad.received_length()==n-kBegin,
              "wire header rejection mutated/consumed token");
         auto observation=bad.acquire_operation();
         need(std::memcmp(observation.header_bytes().data(),malformed.data(),sizeof(h))==0,
              "wire header rejection changed retained header bytes");
-        observation.complete(sizeof(h),n,framing.holes*sizeof(xo::XBufferCore::WireHole),framing.extents*8u);
+        observation.complete(sizeof(h),n-kBegin,framing.holes*sizeof(xo::XBufferCore::WireHole),framing.extents*8u);
     }
 }
 // Zero-run elision skips the 12 KiB hole and the tail slack through an
@@ -394,7 +412,7 @@ void sparse_wire_receive(){
     const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
     const auto wire=source.save_verified(elide);const auto f=framing_of(wire);
     need(f.extents!=0&&f.holes!=0,"sparse fixture produced a dense wire");
-    need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload,"sparse wire did not skip its free run");
+    need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload-kBegin,"sparse wire did not skip its free run");
     auto token=receive(wire,xo::XBuffer::maximum_capacity(f.payload+65536).with_growth(xo::XGrowPolicy::Automatic));
     const auto* base=token.payload_address();
     auto output=xo::finish_verified(token);auto& o=output.root();
@@ -591,14 +609,14 @@ void custom_future_lifetimes(){
     auto malformed=wire;const auto h=header_of(wire);
     const auto head=h.root_offset+offsetof(CustomReceiveRoot,attrs);
     xo::detail::RawOwningDescriptor attrs{};
-    std::memcpy(&attrs,wire.data()+sizeof(h)+head,sizeof(attrs));
-    const auto offset=std::size_t(std::int64_t(head+4)+attrs.data_delta);
+    std::memcpy(&attrs,wire.data()+sizeof(h)+head-kBegin,sizeof(attrs));
+    const auto offset=std::size_t(std::int64_t(head)+attrs.data_delta); // the first element
     const std::int32_t invalid=0;
-    std::memcpy(malformed.data()+sizeof(h)+offset,&invalid,sizeof(invalid));
+    std::memcpy(malformed.data()+sizeof(h)+offset-kBegin,&invalid,sizeof(invalid));
     auto rejected=receive_as<CustomReceiveRoot>(malformed);
-    const auto before=std::string(static_cast<const char*>(rejected.payload_address()),rejected.payload_size());
+    const auto before=body_image(rejected);
     rejects([&]{(void)xo::finish_verified(rejected);});
-    need(rejected&&std::memcmp(rejected.payload_address(),before.data(),before.size())==0,
+    need(rejected&&body_image(rejected)==before,
          "custom canonical malformed-child failure changed raw bytes before publication");
 }
 #endif

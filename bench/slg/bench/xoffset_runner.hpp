@@ -334,13 +334,15 @@ private:
             };
             take(head.data(), head.size());
             take(table.data(), table.size());
-            if (extents == 0) take(body.data(), payload);
+            // payload_bytes() is payload [48, used): an extent at offset o lands at o - 48.
+            if (extents == 0) take(body.data(), body.size());
             else
                 for (std::size_t e = 0; e < extents; ++e) {
                     uint32_t ext[2];
                     std::memcpy(ext, table.data() + e * 8, 8);
-                    if (std::size_t(ext[0]) + ext[1] > body.size()) throw std::runtime_error("direct receive: extent bounds");
-                    take(body.data() + ext[0], ext[1]);
+                    if (ext[0] < XWIRE_PAYLOAD_BEGIN || std::size_t(ext[0]) - XWIRE_PAYLOAD_BEGIN + ext[1] > body.size())
+                        throw std::runtime_error("direct receive: extent bounds");
+                    take(body.data() + (ext[0] - XWIRE_PAYLOAD_BEGIN), ext[1]);
                 }
             take(hole.data(), hole.size());
             if (at != wire.size()) throw std::runtime_error("direct receive: trailing bytes");

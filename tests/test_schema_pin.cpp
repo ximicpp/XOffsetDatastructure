@@ -43,7 +43,7 @@ int main() {
     const auto wire = buffer.save_verified();
     xo::XWireHeaderV2 header{};
     std::memcpy(&header, wire.data(), sizeof(header));
-    if (header.schema_hash_lo != xo::wire_schema_hash_v<pin::Root>())
+    if (header.schema_hash != xo::wire_schema_hash_v<pin::Root>())
         fail("wire header does not carry wire_schema_hash_v");
     std::cout << line << "\n" << xo::schema_pin<pin::Inner>("pin::Inner") << "\n";
     std::cout << "schema pins: match compiles, generator reproduces the pin\n";

@@ -93,7 +93,9 @@ Parsed parse(std::string_view wire) {
         std::memcpy(e.data(), wire.data() + at, 8);
         p.extents.push_back(e);
     }
-    if (p.extents.empty()) p.extents.push_back({0, static_cast<std::uint32_t>(p.header.used_bytes)});
+    if (p.extents.empty())
+        p.extents.push_back({std::uint32_t(xo::XWIRE_PAYLOAD_BEGIN),
+                             static_cast<std::uint32_t>(p.header.used_bytes - xo::XWIRE_PAYLOAD_BEGIN)});
     p.stored = wire.data() + at;
     std::size_t stored = 0;
     for (const auto& e : p.extents) stored += e[1];
@@ -201,14 +203,13 @@ std::string inflate_sparse(const std::string& wire, std::uint64_t used) {
     std::memcpy(&h, wire.data(), sizeof(h));
     if (h.extent_count || h.hole_count) fail("inflate needs a dense wire without holes");
     const std::uint64_t u0 = h.used_bytes;
-    std::string payload = wire.substr(sizeof(h), u0);
-    std::memcpy(payload.data() + 24, &used, 8); // arena header used_end
-    h.used_bytes = used;
+    std::string payload = wire.substr(sizeof(h), u0 - xo::XWIRE_PAYLOAD_BEGIN);
+    h.used_bytes = static_cast<std::uint32_t>(used);
     h.hole_count = 1;
-    h.hole_bytes = used - u0;
     h.extent_count = 1;
     std::string out(reinterpret_cast<const char*>(&h), sizeof(h));
-    const std::uint32_t extent[2] = {0, static_cast<std::uint32_t>(u0)};
+    const std::uint32_t extent[2] = {std::uint32_t(xo::XWIRE_PAYLOAD_BEGIN),
+                                     static_cast<std::uint32_t>(u0 - xo::XWIRE_PAYLOAD_BEGIN)};
     out.append(reinterpret_cast<const char*>(extent), 8);
     out += payload;
     const std::uint32_t hole[2] = {static_cast<std::uint32_t>(u0), static_cast<std::uint32_t>(used - u0)};

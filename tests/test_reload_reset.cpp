@@ -172,8 +172,9 @@ void reload_scratch_survives_release_and_swap() {
     in.reload_verified<ReloadRoot>(good);
     need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
 }
-// Transport stand-in: header, extent table, each extent at its offset (or the
-// dense payload), hole table; `payload_limit` stops the payload early.
+// Transport stand-in: header, extent table, each extent at its payload offset
+// - 48 (or the dense payload bytes), hole table; `payload_limit` stops the
+// payload bytes early.
 template <class Token>
 void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MAX) {
     std::size_t at = 0;
@@ -187,7 +188,7 @@ void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MA
         for (std::size_t i = 0; i < table.size() / 8; ++i) {
             std::uint32_t e[2];
             std::memcpy(e, table.data() + i * 8, 8);
-            take(t.payload_bytes().data() + e[0], e[1]);
+            take(t.payload_bytes().data() + e[0] - XWIRE_PAYLOAD_BEGIN, e[1]);
         }
     }
     if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
@@ -317,7 +318,7 @@ void direct_reload_rejects_interrupted_input() {
     }, "hole_count mismatch accepted");
     rejects([&] {
         auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes + 8, h.hole_count, h.extent_count);
-        deliver(t, good, h.used_bytes);
+        deliver(t, good, h.used_bytes - XWIRE_PAYLOAD_BEGIN);
         t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
         t.finish();
     }, "used_bytes mismatch accepted");
