@@ -32,6 +32,13 @@
   `push_back` path returns the head fields it changed; a `push_back` loop keeps
   `capacity_` in a register instead of reloading it after every element store
   (G9 measured `vec.push_back` at 1.29x `std::vector` on the Mac M4).
+- Performance (Clang builds): an `XVector` insert of a trivially copyable
+  element before the end, into spare capacity, runs inline at the call site
+  and stores `size_` before moving the tail, and `erase` keeps the head in
+  registers across the move. The flat `XSet` / `XMap` inserts and erases use
+  the same paths. GCC and MSVC builds keep the previous code. (G9 measured
+  `vec.mid_insert` at 1.10x, `set.insert.fresh` at 1.12x and
+  `set.erase.fresh` at 1.14x their `std` baselines on the Mac M4.)
 - The formal M input wire changes with the format; `bench/formal` pins the new
   one.
 - Nightly libFuzzer without GitHub Actions or Docker (threat model F1, F2):
