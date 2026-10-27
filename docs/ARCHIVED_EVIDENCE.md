@@ -15,7 +15,7 @@
 | `accepted-generated/` | 5 | 282,840 |
 | **合计** | **1,651** | **253,859,267（约 254 MB）** |
 
-保留未动：`docs/validation/`（`tools/tests/test_validate_vm.py` 读取其中的 `2026-10-15-vm-followup`）、`experiments/`、`docs/perf/`、`docs/handoff-history/`、`openspec/`，以及 `tools/*.py`（含各 `verify_*handoff*` 脚本）。
+保留未动：`docs/validation/`（`tools/tests/test_validate_vm.py` 读取其中的 `2026-10-15-vm-followup`）、`experiments/`（2026-10-27 也已移出，见文末）、`docs/perf/`、`docs/handoff-history/`、`openspec/`，以及 `tools/*.py`（含各 `verify_*handoff*` 脚本）。
 
 ## 存放位置
 
@@ -47,3 +47,26 @@ git checkout archive/codex-mac-continuation-20261020 -- \
 - `tools/verify_vm_handoff.py`（`handoff/manifest.json`）
 
 各 `HANDOFF*.md` / `PROMPT_MAC_20261020.md` 中指向上述路径的链接同理，需恢复后才能打开。
+
+## 2026-10-27：V1/VM 时代文档、experiments/ 与根目录交接文件
+
+为 1.0.0 发版清理主干（v1.1 路线图 W5），以下内容从 `next_cpp26` 工作树移除。内容未修改，最后一次完整存在于提交 `87a0514b6fd76bdd130d1be1067232211ce78b24`（`next_cpp26` 上 #120 的合并提交），它在 `next_cpp26` 的第一父提交历史上，不需要 tag 就能取回。
+
+| 路径 | 文件数 | 字节 |
+| --- | ---: | ---: |
+| `docs/VM_*.md`（除下面两个改名的）、`docs/V1_*`、`docs/BOOST_*` | 32 | 347,471 |
+| `experiments/`（vm_coordination、vm_io_candidates、vm_network、vm_network_measurement、vm_observability、vm_owner_measurement、vm_owner_scaling、vm_platform_validation、vm_windows） | 126 | 1,990,030 |
+| `HANDOFF.md`、`HANDOFF_GITHUB_20261019.md`、`HANDOFF_MAC_20261020.md`、`PROMPT_MAC_20261020.md` | 4 | 40,863 |
+| **合计** | **162** | **2,378,364** |
+
+仍在用的两个打包文档只改名、不移出：`docs/VM_PACKAGING.md` → `docs/PACKAGING.md`，`docs/VM_VALIDATION_RUNNER.md` → `docs/VALIDATION_RUNNER.md`（`tools/prepare_release.py` 的 DOC_FILES 同步改名）。
+
+取回（只恢复文件到工作树，不切换分支）：
+
+```sh
+git fetch origin next_cpp26
+git checkout 87a0514b6fd76bdd130d1be1067232211ce78b24 -- experiments HANDOFF.md HANDOFF_GITHUB_20261019.md HANDOFF_MAC_20261020.md PROMPT_MAC_20261020.md
+git checkout 87a0514b6fd76bdd130d1be1067232211ce78b24 -- $(git ls-tree --name-only 87a0514b6fd76bdd130d1be1067232211ce78b24 docs/ | grep -E '^docs/(VM_|V1_|BOOST_)' | grep -vE '^docs/VM_(PACKAGING|VALIDATION_RUNNER)\.md$')
+```
+
+仍然指向这些路径的只有历史材料：`openspec/changes/` 的设计与任务、`docs/handoff-history/`、`docs/validation/`、`docs/perf/` 里的旧记录，以及 `docs/STABLE_VM_STORAGE_*.md` 中标为 archived 的几处引用。这些文件不改，读到时按上面的命令取回。

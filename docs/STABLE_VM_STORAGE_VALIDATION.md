@@ -8,7 +8,7 @@ triggered.
 **Follow-up implementation:** the review found global-buffer shutdown and
 const-root handle regressions outside the initial suite. Both are now repaired,
 and transport, owner indexing and bounded container-tail expansion are
-implemented. See [the final improvement report](VM_STORAGE_IMPROVEMENTS_RESULTS.md)
+implemented. See the final improvement report (`docs/VM_STORAGE_IMPROVEMENTS_RESULTS.md`, archived: [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md))
 for current validation and measurements. The original 33-test evidence below
 is retained as history; it does not validate code added after that run.
 

@@ -22,7 +22,7 @@ storage 消费改用 `COMPONENTS storage` 和 `XOffset::storage`。
 源码构建中的完整版本变量是 `XOFFSET_VERSION_FULL`。
 
 完整库要求 64-bit little-endian、P2996 Clang 与匹配 libc++；普通 C++26 不是替代品。
-固定配方与依赖来源见源码分发中的 `docs/VM_PACKAGING.md`、`toolchains/README.md`
+固定配方与依赖来源见源码分发中的 `docs/PACKAGING.md`、`toolchains/README.md`
 及 `toolchains/vm-validation.json`；这些配方不随安装 prefix 复制。
 支持结论按具体 profile 给出，不能从 OS API 存在推导完整编译器支持。Windows 上 MSVC 只验
 storage；MinGW-w64 GCC 16 的完整库由 CI 验证（`docs/CLIENT_TARGETS.md`）。WSL、Docker 的结果必须保留实际虚拟化/仿真类别。
