@@ -106,9 +106,11 @@ M1）在预留前拒绝，R1、R2 的放大被约束在默认上限内；超限�
 - P3：库构造或搬移的容器元素（含 map 条目）填充字节清零（M6）。调用方直接赋值的
   带隐式填充的记录，库无法触及：用 `XOFFSET_REQUIRE_NO_PADDING(T)` 或
   `XOFFSET_REJECT_IMPLICIT_PADDING` 在编译期发现，改成显式字段。
-- 转发：load 进来的 wire 里的空洞保留发送方字节，load 后直接 save 会原样转发。
-  这不是接收方自己的内存，但恶意发送方可借此给下游夹带字节；需要时先修改再保存，
-  或在转发前重建。
+- 转发：load 进来的 wire 里的空洞和容器余量（`[size, capacity)`）保留发送方字节，
+  校验不要求它们是 0，load 后直接 save 会原样转发。这不是接收方自己的内存，但恶意
+  发送方可借此给下游夹带字节。转发前用 `save_compact` 重建：它不写空洞、余量重写为 0、
+  字符串尾部清零；记录的隐式填充仍按字节复制，所以转发的类型要没有隐式填充
+  （[DEPLOYMENT.md](DEPLOYMENT.md) 4.2 节）。
 
 回归测试：`test_wire_hole_zeroing`（P1、P2、转发、M1/M2）、`test_implicit_padding`（P3）。
 

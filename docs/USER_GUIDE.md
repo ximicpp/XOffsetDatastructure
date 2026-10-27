@@ -227,7 +227,8 @@ const Profile& r = in.root<Profile>();
 std::string_view who = r.name.view();
 ```
 
-- wire 由 96 字节头、payload 和空洞表组成。默认只跳过「不短于 4 KiB、由不小于 256 B 的
+- wire 由 40 字节头、payload 和空洞表组成（稀疏 wire 在头后多一张段表，见
+  [V2_FORMAT.md](V2_FORMAT.md) 第 3 节）。默认只跳过「不短于 4 KiB、由不小于 256 B 的
   空闲块连成」的段（例如一次删掉大量记录留下的空洞），其余 payload 一次拷贝。
   `XSaveOptions{.emission = XWireEmission::dense}` 强制整段拷贝。
 - 跨机器发送时可以打开零段省略：
@@ -243,6 +244,10 @@ std::string_view who = r.name.view();
   只读或归档的接收方传 `XCompactOptions{.slack_div = 0}`：容量等于长度、wire 最小，
   与 `XCompactor::compact<Profile>(b).save_verified<Profile>()` 逐字节相同，
   但接收方第一次增长任何容器都要搬家。
+- 把收到的数据转发给第三方（例如服务端把客户端 A 的上行消息转给客户端 B）时，用
+  `save_compact` 重建后再发，不要 `load_verified` 之后直接 `save_verified`：后者会把
+  A 写在空洞和容器余量里的字节原样带给 B。规则和 `save_compact` 管不到的部分见
+  [DEPLOYMENT.md](DEPLOYMENT.md) 4.2 节。
 - 把几段现有状态拼成一条消息时，用 `save_compact_into` 的组合写出重载，不必先赋值：
 
   ```cpp
@@ -383,8 +388,9 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
   任何改了 schema 的服务端更新都必须和客户端同时发版。
 - schema 演进是 TODO，并且是客户端场景规模化之前必须完成的前置项。
 - 需要长期保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
-- 不同编译器之间的 wire 兼容目前只在固定工具链内成立；`tools/sigs/` 的签名基线
-  用于发现布局变化，不构成任意平台的兼容保证。
+- 不同编译器、不同平台之间的 wire 兼容只在已验证的工具链上成立（见第 8 节 K7）。
+  用 `XOFFSET_PIN_SCHEMA` 固定自己的 schema（[SCHEMA_PINS.md](SCHEMA_PINS.md)），
+  任一构建算出的布局和固定文本不一致时编译失败；它发现布局变化，但不提供演进。
 
 ## 8. 核心承诺与 API 稳定性
 
@@ -400,19 +406,26 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 | K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `load_verified<T>`、`XException` |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
 | K6 | schema 指纹精确匹配，不同就拒绝 | wire 头 `schema_hash` |
-| K7 | 跨编译器、跨平台的对象表示一致 | `tools/sigs/` 签名基线与跨目标比对 |
+| K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
 
 K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
 buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
 压缩；`XHandle` 用 epoch 在搬动后重新定位。同 ABI、已信任的数据可以用 `load_unverified`
 省掉校验，不可信输入走 K4。
 
-K7 的现状与目标：
+K7 的现状：
 
-- **现状**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标上，库自带的
-  3 个测试类型的签名在 CTest 里核对（`check_compat`、`check_signature_regeneration`）。
-  这不会让用户自己的构建失败。
-- **目标**：构建时为用户 schema 导出签名，任一目标不一致就构建失败；GCC 16 并入同一门禁。
+- **用户 schema**：`XOFFSET_PIN_SCHEMA` 把类型的 wire 布局固定成一段签名文本，每个包含
+  固定文件的构建都由它自己的编译器求值，不一致就编译失败，GCC 16 和 P2996 Clang 都一样
+  （[SCHEMA_PINS.md](SCHEMA_PINS.md)，CTest `schema_pin_mismatch` 确认确实会失败）。
+- **库自带类型**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标的签名
+  基线在 `tools/sigs/`，在 CTest 里核对（`check_compat`、
+  `check_signature_regeneration`）。
+- **跨编译器 wire**：3.1.0 RC 的本地平台矩阵里，Linux x86-64（GCC 16、P2996）、
+  Linux arm64（GCC 16、P2996）和 Windows x64（MinGW-w64 GCC 16）写出的 2.1 语料逐字节
+  一致，互相接受（[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
+- **边界**：只覆盖能编译本库的工具链。3.1.0 下 Android、iOS 和 MSVC 编不了，K7 在这些
+  目标上无从谈起。
 
 K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
 （约 2 GiB）的数据，让接收方复制并做全图校验，造成资源耗尽。默认上限建议见
@@ -421,9 +434,12 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 校验的承诺边界：对不可信输入保证内存安全和 schema 一致，**不保证内容完整性**。
 只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
 
-**目标（尚未承诺）K8**：客户端与服务端用同一套库，客户端用 clang-p2996 交叉编译
-Windows、Android、iOS，能接收、读写、校验、再发。三个客户端目标都交叉编译跑通、
-跨目标 wire 一致之后，再加入核心承诺。
+**目标（尚未承诺）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
+库、同一份 schema，客户端能接收、读写、校验、再发。3.1.0 的现状：Windows x64 用
+MinGW-w64 GCC 16 已通过全量测试、wire 与服务端一致；Android 和 iOS 没有能编译本库的
+工具链（NDK 和 Xcode 自带的 Clang 都没有反射），MSVC 也编不了。客户端的构建方式在
+3.2 里补，不在 3.1.0 中。三个客户端目标都原生编译跑通、跨目标 wire 一致、有真机数据
+之后，再加入核心承诺。详见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
 
 以下接口提供但属于可选或实验性质，可能在后续版本中改变：
 
