@@ -63,8 +63,7 @@ A、B 剩下的差距在对已解码数据做业务修改的阶段，原因见
 | reset | 0.21 | 满足 |
 
 其余项（map、set 的 fresh find，vec.iterate，nested.build.ord）都满足。`hero.*.plain`
-（不声明 ordinary 的写法）约 4.6×，只报。M4 上从窄存储转发到 `ldp` 读要 7 个周期，
-`vec.push_back` 的差距与此有关。
+（不声明 ordinary 的写法）约 4.6×，只报。
 
 ## 3. 3.1.0
 
@@ -103,8 +102,8 @@ head 和 anchor 交替进程（ABBA×3）测的 head÷anchor，几何均值和 9
 
 | 项（÷std） | 3.0.0 | 3.1.0 几何均值 / 上界 | 结论 |
 | --- | --- | --- | --- |
-| vec.push_back | 1.287 | 1.128 / 1.136 | 未满足（M4 存储转发） |
-| set.erase.fresh（÷flat_set） | 1.130 | 1.092 / 1.102 | 未满足（`memmove` 后重读 head） |
+| vec.push_back | 1.287 | 1.128 / 1.136 | 未满足（每存一个元素都要从 `data_delta` 重算数据指针） |
+| set.erase.fresh（÷flat_set） | 1.130 | 1.092 / 1.102 | 未满足（删除这一步的边界重查、判空和清槽） |
 | vec.mid_insert | 1.092 | 0.954 | 满足（新过） |
 | set.insert.fresh（÷flat_set） | 1.111 | 0.995 | 满足（新过） |
 
