@@ -70,8 +70,35 @@ Changes:
   `push_back` path returns the head fields it changed; a `push_back` loop keeps
   `capacity_` in a register instead of reloading it after every element store
   (G9 measured `vec.push_back` at 1.29x `std::vector` on the Mac M4).
+- Performance (Clang builds): an `XVector` insert of a trivially copyable
+  element before the end, into spare capacity, runs inline at the call site
+  and stores `size_` before moving the tail, and `erase` keeps the head in
+  registers across the move. The flat `XSet` / `XMap` inserts and erases use
+  the same paths. GCC and MSVC builds keep the previous code. (G9 measured
+  `vec.mid_insert` at 1.10x, `set.insert.fresh` at 1.12x and
+  `set.erase.fresh` at 1.14x their `std` baselines on the Mac M4.)
 - The formal M input wire changes with the format; `bench/formal` pins the new
   one.
+- Performance: `reload_verified<T>()` of a dense wire (no extent table) whose
+  payload is at most 32 KiB, into a buffer whose storage already holds it,
+  takes a straight path: one pass over the header words, the copy in place,
+  and no free table when the wire has no holes. Admission, verification,
+  errors and the loaded state are those of the general path (SLG D read:
+  -32% instructions, P2996).
+- Nightly libFuzzer without GitHub Actions or Docker (threat model F1, F2):
+  `tools/fuzz_libfuzzer.sh` builds `fuzz_v2_wire` and `fuzz_wire_schemas` with
+  the P2996 toolchain's own libFuzzer runtime (ASan+UBSan) and runs the steps
+  of `fuzz.yml`'s libfuzzer job on the host: corpus replay, `-fork=4` fuzzing,
+  merge, then `tools/fuzz_findings.py` findings and summary. The corpus is kept
+  across nights as a tarball; debug paths map to `/workspace`, so signatures
+  match the Docker jobs. Its `libfuzzer` result joins `tools/fuzz_nightly.sh`'s
+  needs.json for one `tools/fuzz_report.py` report. `fuzz_report.py` now files
+  the issue when GitHub refuses the `fuzz-crash/<signature>` branch push, and
+  writes inputs up to 4 KiB into the issue as base64.
+- Fuzz harness: a wire shorter than the V2 header no longer fails the
+  direct-reload check. The transport refuses it before a reload begins, so the
+  target keeps its root; the check required the root to be gone (#130, found
+  by the first libFuzzer night; input in `tests/fuzz/regressions/v2_wire/`).
 
 ## 3.0.0: first release of the C++26 line
 

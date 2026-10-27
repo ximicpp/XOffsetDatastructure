@@ -142,9 +142,14 @@ GCC 16 ASan+UBSan 差分 fuzz 代替。
   追加评论，已关闭的重新打开并标注回归），并把输入推到 `fuzz-crash/<签名>` 分支，作为
   `tests/fuzz/regressions/<target>/<签名>`。修复 PR 带上这个输入，issue 由修复关闭。没有发现
   却失败的运行记在唯一的 `fuzz-infra` issue 上。结果同时写进项目文件。
-- **缺口**：libFuzzer 覆盖率引导 fuzz（F1、F2）要用 P2996 Clang，云端主机编译不了，
-  所以目前没有定期运行。每日长跑只覆盖差分 fuzz 和回放；`fuzz.yml` 的 libFuzzer 作业
-  只能在 Actions 恢复后手动触发。
+- libFuzzer 覆盖率引导 fuzz（F1、F2，2026-10-27 起）：同一晚接着执行
+  `tools/fuzz_libfuzzer.sh`，用云端自编的 P2996 工具链（clang-p2996 d77eff1，带
+  compiler-rt 的 libFuzzer 运行库）在主机上原生构建 `fuzz_v2_wire` 和 `fuzz_wire_schemas`
+  （ASan+UBSan），步骤与 `fuzz.yml` 的 libfuzzer 作业相同：先单进程回放已有语料和种子，
+  再 `-fork=4` 跑约 20 分钟，然后合并语料、复现并最小化发现。语料以 tar 包跨夜保存在
+  项目文件里；调试信息里的路径映射为 `/workspace`，签名与 Docker 作业一致。首晚即发现
+  #130（harness 对短于头部的输入检查过严，已修复，输入入回归目录）。
+- 仍有的缺口：没有 PR 短跑（PR 的合并证据是 `tools/local_validate.sh`）。
 
 - **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为
   `load_verified`、`finish_verified`、`receive_raw::validate`，用 P2996 Clang 和 CI 里已经

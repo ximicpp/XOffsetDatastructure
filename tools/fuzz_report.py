@@ -50,6 +50,8 @@ REGRESSION_DIR = 'tests/fuzz/regressions'
 BRANCH_PREFIX = 'fuzz-crash/'
 MAX_LOG_CHARS = 6000
 MAX_INPUT_BYTES = 1 << 20
+# Inputs up to this size are also written into the issue, base64-encoded.
+MAX_INLINE_BYTES = 4096
 
 SIGNATURE_RE = re.compile(r'^[0-9a-f]{10}$')
 TARGET_RE = re.compile(r'^[A-Za-z0-9_]{1,64}$')
@@ -255,6 +257,11 @@ def finding_details(ctx, finding, count, branch_note):
         'Reproduce:',
         fence('\n'.join(reproduce_lines(ctx, finding))),
     ]
+    if finding['input_path'] is not None:
+        data = finding['input_path'].read_bytes()
+        if len(data) <= MAX_INLINE_BYTES:
+            lines += ['', f'Input ({len(data)} bytes, base64; `base64 -d > {finding["input_path"].name}`):',
+                      fence(base64.b64encode(data).decode('ascii') or '(empty input)')]
     return '\n'.join(lines)
 
 
@@ -272,7 +279,12 @@ def regression_branch(gh, ctx, finding, actions):
     message = (f'fuzz: regression input {finding["target"]}/{finding["signature"]}\n\n'
                f'Found by the {ctx.mode} fuzz run {ctx.run_url}\n'
                f'Fix on this branch and keep {path} so CTest replays it.\n')
-    gh.create_branch_with_file(branch, ctx.sha, path, finding['input_path'].read_bytes(), message)
+    try:
+        gh.create_branch_with_file(branch, ctx.sha, path, finding['input_path'].read_bytes(), message)
+    except GhError as error:
+        # The cloud proxy refuses git data writes; the issue still gets filed.
+        actions.append(f'could not push `{branch}`: {error}')
+        return f'Regression branch: not pushed (GitHub refused the write, HTTP {error.status}); add `{path}` by hand'
     actions.append(f'pushed `{branch}` with `{path}`')
     return f'Regression branch: `{branch}` adds `{path}` on top of {ctx.sha[:10]}'
 

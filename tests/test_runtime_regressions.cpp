@@ -90,6 +90,36 @@ void strings_and_aliases() {
     assert(compacted.root<RuntimeRoot>().map.find("key")->second == 1);
 }
 
+// Inserts and erases in the middle of a vector of trivially copyable
+// elements with spare capacity (inline under Clang): a value that aliases a
+// moved element, order, the zeroed vacated slots (M4), and the general path
+// once the vector is full.
+void mid_insert_erase() {
+    auto buf = XBuffer::create<RuntimeRoot>(65536);
+    auto& v = buf.root<RuntimeRoot>().first;
+    v.reserve(16);
+    for (int i = 0; i < 8; ++i) v.push_back(i * 10);
+    v.insert(v.begin() + 3, v[5]);
+    auto it = v.insert(v.begin() + 8, -1);
+    assert(*it == -1 && v.capacity() == 16);
+    const int32_t inserted[] = {0, 10, 20, 50, 30, 40, 50, 60, -1, 70};
+    assert(v.size() == 10);
+    for (std::uint32_t i = 0; i < 10; ++i) assert(v[i] == inserted[i]);
+    v.erase(v.begin() + 1);
+    v.erase(v.begin() + 4);
+    const int32_t erased[] = {0, 20, 50, 30, 50, 60, -1, 70};
+    assert(v.size() == 8 && v.capacity() == 16);
+    for (std::uint32_t i = 0; i < 8; ++i) assert(v[i] == erased[i]);
+    assert(v.data()[8] == 0 && v.data()[9] == 0);
+    while (v.size() < v.capacity()) v.push_back(7);
+    v.insert(v.begin() + 1, v[2]);
+    assert(v.size() == 17 && v[0] == 0 && v[1] == 50 && v[2] == 20 && v[16] == 7);
+    auto loaded = XBuffer::load_verified<RuntimeRoot>(buf.save_verified<RuntimeRoot>());
+    const auto& w = loaded.root<RuntimeRoot>().first;
+    assert(w.size() == 17);
+    for (std::uint32_t i = 0; i < 17; ++i) assert(w[i] == v[i]);
+}
+
 void limits_and_schema() {
     auto buf = XBuffer::create<RuntimeRoot>(4096);
     auto& r = buf.root<RuntimeRoot>();
@@ -116,6 +146,7 @@ int main() {
     free_block_sizes();
     move_ownership();
     strings_and_aliases();
+    mid_insert_erase();
     limits_and_schema();
     std::cout << "Runtime regressions passed\n";
 }
