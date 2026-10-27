@@ -1,0 +1,4 @@
+1321b320306f6e1379416b7b6fb4039b46951b6a|#133 L wire V2.1 R4 (owner by address, 12-byte heads)
+6de6286a7f6e485bd88e831f929c99c8d7826df7|#134 L wire V2.1 R7 (40-byte header); the next range also holds #135 docs and two next_cpp26 merges (library unchanged)
+71ccc9037c46a8d1db5bc6ab5002b03b5aa2b2f0|#139 L D small dense reload fast path
+2f17ca980cc7828d82fd66e02c0d5821deee52aa|#140 S G9 L10/L11 inline mid insert/erase; the last range is #138 R4 follow-ups (owner map atomics, move-assign)

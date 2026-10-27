@@ -1,0 +1,6 @@
+INT4 0
+anchor e383aef (v3.0.0; library identical to 30af216, CKPT3 pass)
+screen watcher: 42 calls (dark.log)
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 107 (rc 0)
+arm64 rc 0 (0 pass, 2 setup, 3 build/ctest/corpus; arm64/RESULT.md)

@@ -1,0 +1,6 @@
+PROFILE    STATUS     ARCH       CPUS    MEMORY    DISK     RUNTIME    ADDRESS
+h1         Running    aarch64    4       6GiB      40GiB    docker     
+Ubuntu 24.04.4 LTS aarch64 NCPU=4 Mem=6197440512
+Linux 6.8.0-117-generic aarch64
+PAGESIZE 4096
+nproc 4

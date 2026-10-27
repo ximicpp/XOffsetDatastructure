@@ -1,0 +1,98 @@
+== 2026-10-27T10:28:45Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: e383aef (v3.0.0; library identical to 30af216, CKPT3 pass)
+== 2026-10-27T10:29:03Z 1. export
+head e913d220d1f42bf90883396e63286651ba50a352 tree 71354565c4268712a16b8dcdc2a30214b3993f93 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc e383aef51d6983a753d86f6840308c01c45b5a2e tree fca89ecb77a98211402c702e1c4a82561f79ef4e typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+/Volumes/XOffsetCS/perf-gate/src/int4/head-e913d22/bench/slg/MANIFEST: 23 files match
+== 2026-10-27T10:29:04Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+sc head: bincache sc-71354565c426-metar3-p2996-d77eff1-8ba92475
+slg head: bincache slg-71354565c426-0dd0a31ed104-p2996-d77eff1-5afc2985
+sc anc: bincache sc-fca89ecb77a9-metar3-p2996-d77eff1-8ba92475
+slg anc: bincache slg-fca89ecb77a9-0dd0a31ed104-p2996-d77eff1-5afc2985
+== 2026-10-27T10:29:04Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	e913d220d1f42bf90883396e63286651ba50a352	a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3	671c18b27b019d73230be58c83abdcfc8ae194195eba047e4ecfc63bf3efa66d	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	e383aef51d6983a753d86f6840308c01c45b5a2e	328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9	8de2ed6446045d50dfebcfff9030df73a86be894780c7508c019792085118e76	2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1422 2614 15119 862360 824]
+default bytes head [1166 2358 12964 842240 712] anchor [1422 2614 15119 862360 824]
+== 2026-10-27T10:29:29Z 5. INT4 L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-int4-e913d22-smoke
+  head         a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3
+  head_aa      a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3
+  anchor       328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+  bisect 1321b320306f #133 L wire V2.1 R4 (owner by address, 12-byte heads): deferred (built when the bisection reaches it)
+  bisect 6de6286a7f6e #134 L wire V2.1 R7 (40-byte header); the next range also holds #135 docs and two next_cpp26 merges (library unchanged): deferred (built when the bisection reaches it)
+  bisect 71ccc9037c46 #139 L D small dense reload fast path: deferred (built when the bisection reaches it)
+  bisect 2f17ca980cc7 #140 S G9 L10/L11 inline mid insert/erase; the last range is #138 R4 follow-ups (owner map atomics, move-assign): deferred (built when the bisection reaches it)
+== formal-1 start 2026-10-27T10:29:30+00:00 {'waited_s': 10.1, 'load1': 1.85, 'quiet_s': 10.1, 'screen': {'WindowServer': 3.7, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.1873, A/A ok False, old 10/12, cpu {'samples': 20, 'other_busy_samples': 4, 'compile_samples': 0, 'other_busy_top': {'XprotectService': 2, 'syspolicyd': 1, 'Codex (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.55}  (the gate verdict needs the pooled batches: run analyze)
+== slg start 2026-10-27T10:30:20+00:00 {'waited_s': 10.1, 'load1': 2.39, 'quiet_s': 10.1, 'screen': {'WindowServer': 3.6, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 4.0 s rc=0
+run 2/12 anch: 0.7 s rc=0
+run 3/12 anch: 0.5 s rc=0
+run 4/12 head: 0.5 s rc=0
+run 5/12 head: 0.5 s rc=0
+run 6/12 anch: 0.5 s rc=0
+run 7/12 anch: 0.5 s rc=0
+run 8/12 head: 0.5 s rc=0
+run 9/12 head: 0.5 s rc=0
+run 10/12 anch: 0.5 s rc=0
+run 11/12 anch: 0.5 s rc=0
+run 12/12 head: 0.5 s rc=0
+slg: A 1.0265 [0.9957, 1.0582]  B 0.9263 [0.8360, 1.0264]  C 0.9735 [0.9039, 1.0486]  D 0.9011 [0.8643, 0.9396]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-int4-e913d22
+  head         a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3
+  head_aa      a643ae2d45967052d794be48d59dc3bfea4325259ebedc3213914eafeca076c3
+  anchor       328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  r3           6d4a33ba1f8547dcbc656f4397332e0dcb63cf80ec7b9f6b459610185364b49d
+  cista        13bf74996c1723ce7a68f22f3b14798d04df2828e09894fac378920829ed4d31
+  flatbuffers  684f7be86bd7b628f6380de53ba437f0c1b4b6988be0a906ef2d921e7b09aade
+  capnproto    5a7625c96f0a3e7bce15d1ed6eba2a706960c1d9e0f1d258f41a1e26a2c89e4a
+  cereal       c897ba0d1a11a0e871c944faa41eed8aedf417c1b20ed6dd73a1c50c644a2565
+  bisect 1321b320306f #133 L wire V2.1 R4 (owner by address, 12-byte heads): deferred (built when the bisection reaches it)
+  bisect 6de6286a7f6e #134 L wire V2.1 R7 (40-byte header); the next range also holds #135 docs and two next_cpp26 merges (library unchanged): deferred (built when the bisection reaches it)
+  bisect 71ccc9037c46 #139 L D small dense reload fast path: deferred (built when the bisection reaches it)
+  bisect 2f17ca980cc7 #140 S G9 L10/L11 inline mid insert/erase; the last range is #138 R4 follow-ups (owner map atomics, move-assign): deferred (built when the bisection reaches it)
+== formal-1 start 2026-10-27T10:30:41+00:00 {'waited_s': 241.0, 'load1': 1.76, 'quiet_s': 241.0, 'screen': {'WindowServer': 3.0, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 0.9863, A/A ok True, old 11/12, cpu {'samples': 213, 'other_busy_samples': 5, 'compile_samples': 0, 'other_busy_top': {'XprotectService': 3, 'runningboardd': 1, 'PerfPowerServices': 1, 'Claude Helper (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.57}  (the gate verdict needs the pooled batches: run analyze)
+== formal-2 start 2026-10-27T10:41:55+00:00 {'waited_s': 241.0, 'load1': 1.87, 'quiet_s': 241.0, 'screen': {'WindowServer': 3.1, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-2: this batch alone: max UB head/anchor 0.9826, A/A ok True, old 11/12, cpu {'samples': 243, 'other_busy_samples': 8, 'compile_samples': 0, 'other_busy_top': {'XprotectService': 5, 'Codex (Renderer)': 1, 'searchpartyd': 1, 'launchd': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.88}  (the gate verdict needs the pooled batches: run analyze)
+RESULT.json / RESULT.md written: verdict incomplete
+== slg start 2026-10-27T10:54:11+00:00 {'waited_s': 241.0, 'load1': 1.74, 'quiet_s': 240.9, 'screen': {'WindowServer': 3.0, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 6.7 s rc=0
+run 2/12 anch: 5.0 s rc=0
+run 3/12 anch: 4.3 s rc=0
+run 4/12 head: 4.3 s rc=0
+run 5/12 head: 4.3 s rc=0
+run 6/12 anch: 4.3 s rc=0
+run 7/12 anch: 4.4 s rc=0
+run 8/12 head: 4.3 s rc=0
+run 9/12 head: 4.3 s rc=0
+run 10/12 anch: 4.4 s rc=0
+run 11/12 anch: 4.4 s rc=0
+run 12/12 head: 4.4 s rc=0
+slg: A 0.9913 [0.9776, 1.0052]  B 0.9513 [0.9416, 0.9612]  C 0.9503 [0.9418, 0.9588]  D 0.8455 [0.8318, 0.8594]  verdict pass (1 group(s) pooled)
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict pass
+AUTO /Volumes/XOffsetCS/perf-gate/runs/2026-10-27-int4-e913d22: verdict pass
+INT4 L2 rc=0 (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, other = stopped)
+== 2026-10-27T10:59:09Z 6. G9R
+G9R: rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+screen watcher: 42 calls (dark.log)
+== 2026-10-27T11:11:56Z 7. ctest
+head: 100% tests passed out of 107 (rc 0)
+== 2026-10-27T11:15:06Z 8. arm64
+arm64: rc 0 (0 pass, 2 setup, 3 build/ctest/corpus; arm64/RESULT.md)
+== 2026-10-27T11:18:04Z finish rc=0

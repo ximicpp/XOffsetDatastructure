@@ -1,0 +1,19 @@
+t0 e383aef51d6983a753d86f6840308c01c45b5a2e tree fca89ecb77a98211402c702e1c4a82561f79ef4e typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.0.0, next_cpp26 e383aef (#124; code of 30af216))
+t1 e913d220d1f42bf90883396e63286651ba50a352 tree 71354565c4268712a16b8dcdc2a30214b3993f93 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (INT4 integration head)
+t1: diff over t0 sha256 fa85d169751b2eb9752876c497410ec5cbb85a68c13f2e72f4f9772522be5981 ( 90 files changed, 3226 insertions(+), 1694 deletions(-))
+t1: library header diff over t0:  2 files changed, 722 insertions(+), 381 deletions(-)
+t1: first-parent commits over t0:
+  e913d220 Merge #138: wire V2.1 R4 follow-ups (owner map atomics for TSan, move-assign without 2.0 range checks)
+  2f17ca98 Merge #140: G9 L10/L11, inline mid insert and erase of trivially copyable elements under Clang
+  71ccc903 Merge #139: small dense reload fast path (SLG D read)
+  d9bce7ca Merge next_cpp26 (2e30bdf8) into claude/wire-v21
+  923a6109 Merge next_cpp26 (5ae91c54) into claude/wire-v21
+  db766505 Merge #135: wire V2.1 (d) docs and formal M re-pin
+  6de6286a Merge #134: wire V2.1 R7 (40-byte header, payload header off the wire)
+  1321b320 Merge #133: wire V2.1 R4 (owner by address, 12-byte heads)
+  4ebe7e1c Merge release 3.0.0 (next_cpp26 e383aef5, #124) into claude/wire-v21
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 feaaeab71a10b25a2345694eb865b6c7661c4b9b5c37aee92a5b484c1dd14afe
+reloc_bench t1 sha256 51f8059c3aa00ecbbb9df13a2af11f0a268a5ac3979a0c624ebad8401996db84
+reloc_bench t0a sha256 cd9c4fc0cdddec416dd134d60c7ef5f9649eb3b29a3fdc58d53359a85c511b64
+reloc_bench t1a sha256 680b0019da57ca2656d6463dcaab74b78da29ea841f7909933f9ffca08dbfd24

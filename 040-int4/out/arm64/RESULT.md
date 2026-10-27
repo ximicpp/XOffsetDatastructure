@@ -1,0 +1,10 @@
+# Linux arm64 platform column, e913d220d1f42bf90883396e63286651ba50a352
+
+- 2026-10-27T11:18:01Z, colima profile h1, image gcc@sha256:325784a7e64cece62cc2ba202f8ee9e9b6e09dbcecabe98697a79a41148b177a
+- VM: Linux 6.8.0-117-generic aarch64; PAGESIZE 4096
+- exit 0
+
+| compiler | result | ctest | corpus files |
+| --- | --- | --- | --- |
+| gcc16 | passed | 100% tests passed, 0 tests failed out of 107 | 6 |
+| p2996 | passed | 100% tests passed, 0 tests failed out of 107 | 6 |
