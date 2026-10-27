@@ -10,7 +10,7 @@
 #include <cassert>
 #include <cstring>
 #include <vector>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
@@ -47,11 +47,13 @@ struct Report {
 
 // --- Equipment slot ---
 struct EquipSlot {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> EquipSlot(A a) 
         : item_id(0), enchant_level(0), name(a) {}
     template<typename A> EquipSlot(EquipSlot&& o, A a) 
         : item_id(o.item_id), enchant_level(o.enchant_level), name(std::move(o.name), a) {}
+#endif
     int32_t item_id;
     int32_t enchant_level;
     XString name;
@@ -59,11 +61,13 @@ struct EquipSlot {
 
 // --- Skill entry ---
 struct Skill {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> Skill(A a) 
         : skill_id(0), level(0), cooldown(0), name(a) {}
     template<typename A> Skill(Skill&& o, A a) 
         : skill_id(o.skill_id), level(o.level), cooldown(o.cooldown), name(std::move(o.name), a) {}
+#endif
     int32_t skill_id;
     int32_t level;
     float   cooldown;
@@ -72,12 +76,14 @@ struct Skill {
 
 // --- Quest progress ---
 struct QuestProgress {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> QuestProgress(A a) 
         : quest_id(0), stage(0), completed(0), title(a), objectives(a) {}
     template<typename A> QuestProgress(QuestProgress&& o, A a) 
         : quest_id(o.quest_id), stage(o.stage), completed(o.completed),
           title(std::move(o.title), a), objectives(std::move(o.objectives), a) {}
+#endif
     int32_t quest_id;
     int32_t stage;
     int32_t completed;
@@ -87,11 +93,13 @@ struct QuestProgress {
 
 // --- Inventory item ---
 struct InventoryItem {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> InventoryItem(A a) 
         : item_id(0), quantity(0), slot(0), name(a) {}
     template<typename A> InventoryItem(InventoryItem&& o, A a) 
         : item_id(o.item_id), quantity(o.quantity), slot(o.slot), name(std::move(o.name), a) {}
+#endif
     int32_t item_id;
     int32_t quantity;
     int32_t slot;
@@ -100,11 +108,13 @@ struct InventoryItem {
 
 // --- Social entry ---
 struct FriendEntry {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> FriendEntry(A a)
         : player_id(0), friendship_level(0), name(a) {}
     template<typename A> FriendEntry(FriendEntry&& o, A a)
         : player_id(o.player_id), friendship_level(o.friendship_level), name(std::move(o.name), a) {}
+#endif
     int32_t player_id;
     int32_t friendship_level;
     XString name;
@@ -112,11 +122,13 @@ struct FriendEntry {
 
 // --- Achievement ---
 struct Achievement {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     using allocator_type = XAllocator;
     template<typename A> Achievement(A a)
         : ach_id(0), progress(0), unlocked(0), name(a) {}
     template<typename A> Achievement(Achievement&& o, A a)
         : ach_id(o.ach_id), progress(o.progress), unlocked(o.unlocked), name(std::move(o.name), a) {}
+#endif
     int32_t ach_id;
     int32_t progress;
     int32_t unlocked;
@@ -127,11 +139,13 @@ struct Achievement {
 // Profile 1: Minimal character (new player, just created)
 // ================================================================
 struct CharacterMinimal {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template<typename A> CharacterMinimal(A a) 
         : player_id(0), level(1), experience(0),
           health(100.0f), mana(50.0f), stamina(100.0f),
           pos_x(0), pos_y(0), pos_z(0),
           name(a), guild_name(a) {}
+#endif
 
     int32_t player_id;
     int32_t level;
@@ -150,6 +164,7 @@ struct CharacterMinimal {
 // Profile 2: Mid-game character
 // ================================================================
 struct CharacterMidGame {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template<typename A> CharacterMidGame(A a) 
         : player_id(0), level(0), experience(0),
           health(0), max_health(0), mana(0), max_mana(0),
@@ -159,6 +174,7 @@ struct CharacterMidGame {
           name(a), guild_name(a), title(a),
           inventory(a), equipment(a), skills(a),
           quests(a), friends(a) {}
+#endif
 
     // --- Identity ---
     int32_t player_id;
@@ -196,6 +212,7 @@ struct CharacterMidGame {
 // Profile 3: End-game veteran character (max everything)
 // ================================================================
 struct CharacterEndGame {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template<typename A> CharacterEndGame(A a) 
         : player_id(0), level(0), experience(0),
           health(0), max_health(0), mana(0), max_mana(0),
@@ -210,6 +227,7 @@ struct CharacterEndGame {
           friends(a), blocked(a),
           achievements(a),
           settings(a), chat_log(a) {}
+#endif
 
     // --- Identity ---
     int32_t player_id;
@@ -246,6 +264,33 @@ struct CharacterEndGame {
     XVector<XString>       settings;        // 30 key=value strings
     XVector<XString>       chat_log;        // 50 recent messages
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(EquipSlot, (), item_id, enchant_level, name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(Skill, (), skill_id, level, cooldown, name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(QuestProgress, (), quest_id, stage, completed, title, objectives)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(InventoryItem, (), item_id, quantity, slot, name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(FriendEntry, (), player_id, friendship_level, name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(Achievement, (), ach_id, progress, unlocked, name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(CharacterMinimal, (), player_id, level, experience, health, mana, stamina, pos_x, pos_y, pos_z, name, guild_name)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(CharacterMidGame, (), player_id, level, experience, health, max_health, mana, max_mana, stamina, strength, dexterity, intelligence, pos_x, pos_y, pos_z, rotation, gold, playtime_seconds, name, guild_name, title, inventory, equipment, skills, quests, friends)
+#endif
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(CharacterEndGame, (), player_id, level, experience, health, max_health, mana, max_mana, stamina, strength, dexterity, intelligence, wisdom, charisma, luck, pos_x, pos_y, pos_z, rotation, gold, premium_currency, playtime_seconds, pvp_rating, arena_wins, arena_losses, name, guild_name, title, bio, inventory, equipment, skills, quests, completed_quests, friends, blocked, achievements, settings, chat_log)
+#endif
 
 // ============================================================================
 // Populate helpers
@@ -281,7 +326,7 @@ void populate_midgame(CharacterMidGame& c) {
     auto alloc = c.inventory.get_stored_allocator();
     // 30 inventory items
     for (int i = 0; i < 30; i++) {
-        c.inventory.emplace_back(alloc);
+        emplace_with_allocator(c.inventory, alloc);
         auto& item = c.inventory.back();
         item.item_id = 1000 + i; item.quantity = 1 + (i % 5); item.slot = i;
         item.name = ("Item_" + std::to_string(i)).c_str();
@@ -291,20 +336,20 @@ void populate_midgame(CharacterMidGame& c) {
                            "Flaming Sword +5", "Oak Shield +3", "Ring of Power",
                            "Amulet of Speed", "Cloak of Shadows"};
     for (int i = 0; i < 8; i++) {
-        c.equipment.emplace_back(alloc);
+        emplace_with_allocator(c.equipment, alloc);
         auto& eq = c.equipment.back();
         eq.item_id = 2000 + i; eq.enchant_level = i % 4; eq.name = slots[i];
     }
     // 15 skills
     for (int i = 0; i < 15; i++) {
-        c.skills.emplace_back(alloc);
+        emplace_with_allocator(c.skills, alloc);
         auto& sk = c.skills.back();
         sk.skill_id = 3000 + i; sk.level = 1 + (i % 10); sk.cooldown = 0.5f * i;
         sk.name = ("Skill_" + std::to_string(i)).c_str();
     }
     // 5 quests with objectives
     for (int i = 0; i < 5; i++) {
-        c.quests.emplace_back(alloc);
+        emplace_with_allocator(c.quests, alloc);
         auto& q = c.quests.back();
         q.quest_id = 4000 + i; q.stage = i % 3; q.completed = 0;
         q.title = ("Quest: The Lost " + std::to_string(i)).c_str();
@@ -312,7 +357,7 @@ void populate_midgame(CharacterMidGame& c) {
     }
     // 20 friends
     for (int i = 0; i < 20; i++) {
-        c.friends.emplace_back(alloc);
+        emplace_with_allocator(c.friends, alloc);
         auto& f = c.friends.back();
         f.player_id = 10000 + i; f.friendship_level = 1 + (i % 5);
         f.name = ("Friend_" + std::to_string(i)).c_str();
@@ -343,28 +388,28 @@ void populate_endgame(CharacterEndGame& c) {
     auto alloc = c.inventory.get_stored_allocator();
     // 200 inventory items
     for (int i = 0; i < 200; i++) {
-        c.inventory.emplace_back(alloc);
+        emplace_with_allocator(c.inventory, alloc);
         auto& item = c.inventory.back();
         item.item_id = 1000+i; item.quantity = 1+(i%99); item.slot = i%60;
         item.name = ("Item_" + std::to_string(i)).c_str();
     }
     // 12 equipment slots
     for (int i = 0; i < 12; i++) {
-        c.equipment.emplace_back(alloc);
+        emplace_with_allocator(c.equipment, alloc);
         auto& eq = c.equipment.back();
         eq.item_id = 5000+i; eq.enchant_level = 5+(i%3);
         eq.name = ("Mythic_Gear_Slot_" + std::to_string(i)).c_str();
     }
     // 40 skills
     for (int i = 0; i < 40; i++) {
-        c.skills.emplace_back(alloc);
+        emplace_with_allocator(c.skills, alloc);
         auto& sk = c.skills.back();
         sk.skill_id = 3000+i; sk.level = 10; sk.cooldown = 1.0f+0.5f*i;
         sk.name = ("MasterSkill_" + std::to_string(i)).c_str();
     }
     // 10 active quests
     for (int i = 0; i < 10; i++) {
-        c.quests.emplace_back(alloc);
+        emplace_with_allocator(c.quests, alloc);
         auto& q = c.quests.back();
         q.quest_id = 9000+i; q.stage = i%5; q.completed = 0;
         q.title = ("Epic Quest Chain Part " + std::to_string(i+1)).c_str();
@@ -374,7 +419,7 @@ void populate_endgame(CharacterEndGame& c) {
     for (int i = 0; i < 500; i++) c.completed_quests.push_back(i);
     // 100 friends
     for (int i = 0; i < 100; i++) {
-        c.friends.emplace_back(alloc);
+        emplace_with_allocator(c.friends, alloc);
         auto& f = c.friends.back();
         f.player_id = 10000+i; f.friendship_level = 1+(i%10);
         f.name = ("Player_" + std::to_string(10000+i)).c_str();
@@ -383,7 +428,7 @@ void populate_endgame(CharacterEndGame& c) {
     for (int i = 0; i < 20; i++) c.blocked.push_back(90000 + i);
     // 150 achievements
     for (int i = 0; i < 150; i++) {
-        c.achievements.emplace_back(alloc);
+        emplace_with_allocator(c.achievements, alloc);
         auto& a = c.achievements.back();
         a.ach_id = 7000+i; a.progress = 100; a.unlocked = 1;
         a.name = ("Achievement_" + std::to_string(i)).c_str();

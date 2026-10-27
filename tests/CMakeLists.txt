@@ -1,4 +1,40 @@
+# Tests that ask P2996 reflection or TypeLayout themselves (std::meta in the
+# test, TypeLayout signatures, member counts or safety levels, zero-boilerplate
+# records), or whose records all need it (user constructors with custom
+# lifetimes): built only with the C++26 reflection schema backend. The other
+# builds (C++20/C++23, and C++26 with XOFFSET_SCHEMA_BACKEND=describe) list them
+# in test-inventory.json as cxx26_only_not_built.
+if(XOFFSET_CXX_STANDARD STREQUAL "26" AND NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe")
+    set(XOFFSET_TESTS_REFLECTION ON)
+else()
+    set(XOFFSET_TESTS_REFLECTION OFF)
+endif()
+set(XOFFSET_CXX26_ONLY_TESTS
+    test_admission_typelayout
+    test_canonical_cold_no_callback
+    test_canonical_zero_target
+    test_custom_future_lifetime
+    test_enum_support
+    test_field_limit_fix
+    test_reflection_advanced
+    test_reflection_core
+    test_subtree_copy
+    test_type_safety
+    test_type_signatures
+    test_zero_boilerplate
+)
+
+function(xoffset_cxx26_only name)
+    set_property(GLOBAL APPEND PROPERTY XOFFSET_CXX26_ONLY_NOT_BUILT ${name})
+endfunction()
+
+# Tests name their target as COMMAND (not $<TARGET_FILE:...>): only then does CTest
+# prefix CMAKE_CROSSCOMPILING_EMULATOR (qemu-aarch64, wine) in cross builds.
 function(add_xoffset_test test_name test_label)
+    if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+        xoffset_cxx26_only(${test_name})
+        return()
+    endif()
     add_executable(${test_name} ${test_name}.cpp)
     configure_xoffset_target(${test_name})
     xoffset_enable_test_assertions(${test_name})
@@ -55,6 +91,7 @@ set(REFLECTION_TESTS
     test_type_signatures
     test_field_limit_fix
     test_type_safety
+    test_admission_typelayout
     test_wire_admission
     test_enum_support
     test_xstring_direct_assign
@@ -81,6 +118,7 @@ set(REFLECTION_TESTS
     test_stable_storage
     test_slot_storage
     test_ordinary_records
+    test_schema_describe
     test_vm_lifecycle
     test_vm_transport
     test_owner_identity
@@ -216,18 +254,74 @@ set_tests_properties(require_no_padding_fail PROPERTIES
     PASS_REGULAR_EXPRESSION "has implicit padding bytes")
 
 # XOFFSET_ORDINARY_RECORDS on a record that is not ordinary must fail the build.
-foreach(variant overlap base bit_field)
-    add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
-    configure_xoffset_target(ordinary_records_${variant}_fail)
-    add_test(NAME ordinary_records_${variant}_fail
-        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ordinary_records_${variant}_fail --config $<CONFIG>)
+# The macro is the C++26 zero-boilerplate declaration; XOFFSET_RECORD carries
+# the same promises in the C++20/C++23 builds.
+if(XOFFSET_TESTS_REFLECTION)
+    foreach(variant overlap base bit_field)
+        add_executable(ordinary_records_${variant}_fail EXCLUDE_FROM_ALL ordinary_records/${variant}_fail.cpp)
+        configure_xoffset_target(ordinary_records_${variant}_fail)
+        add_test(NAME ordinary_records_${variant}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ordinary_records_${variant}_fail --config $<CONFIG>)
+    endforeach()
+    set_tests_properties(ordinary_records_overlap_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "has overlapping members")
+    set_tests_properties(ordinary_records_base_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
+    set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
+        LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
+else()
+    foreach(variant overlap base bit_field)
+        xoffset_cxx26_only(ordinary_records_${variant}_fail)
+    endforeach()
+endif()
+
+# XOFFSET_RECORD lists that are wrong, and uses the field-list backend cannot
+# serve, must fail the build with these diagnostics. promise_fail needs
+# reflection to see the destructor, so a forced field-list build skips it.
+set(XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
+    "omitted|the list does not name every non-static data member"
+    "order|list every member once, in declaration order"
+    "duplicate|list every member once, in declaration order"
+    "array|the list does not name every non-static data member"
+    "padding|the list does not name every non-static data member"
+    "enum|the enumerators of an enum without a fixed underlying type are unknown"
+    "undescribed|this record has no field list")
+if(NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe" AND
+   (NOT DEFINED XOFFSET_CXX_STANDARD OR XOFFSET_CXX_STANDARD STREQUAL "26"))
+    list(APPEND XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
+        "promise|declares a destructor, copy/move constructor or assignment")
+endif()
+foreach(entry IN LISTS XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS)
+    string(REGEX REPLACE "\\|.*$" "" variant "${entry}")
+    string(REGEX REPLACE "^[^|]*\\|" "" diagnostic "${entry}")
+    add_executable(schema_describe_${variant}_fail EXCLUDE_FROM_ALL schema_describe/${variant}_fail.cpp)
+    configure_xoffset_target(schema_describe_${variant}_fail)
+    add_test(NAME schema_describe_${variant}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_describe_${variant}_fail --config $<CONFIG>)
+    set_tests_properties(schema_describe_${variant}_fail PROPERTIES
+        LABELS "schema" PASS_REGULAR_EXPRESSION "${diagnostic}")
 endforeach()
-set_tests_properties(ordinary_records_overlap_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "has overlapping members")
-set_tests_properties(ordinary_records_base_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have base classes")
-set_tests_properties(ordinary_records_bit_field_fail PROPERTIES
-    LABELS "reflection" PASS_REGULAR_EXPRESSION "must not have bit-fields")
+# MSVC stops at the duplicate's redefinition of the generated field type,
+# before the static assertion; that error names the duplicated member.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set_tests_properties(schema_describe_duplicate_fail PROPERTIES PASS_REGULAR_EXPRESSION
+        "list every member once, in declaration order;fields<sdf::Neg>::field_a': 'struct' type redefinition")
+endif()
+
+# Without reflection, raw receive of an enum without a fixed underlying type
+# must fail the build clearly (test_receive_raw runs these enums only in C++26).
+if(NOT XOFFSET_TESTS_REFLECTION)
+    foreach(enum Nonfixed Negative Zero EmptyEnum Wide UnsignedWide)
+        add_executable(receive_raw_nonfixed_${enum}_fail EXCLUDE_FROM_ALL receive_raw/nonfixed_enum_fail.cpp)
+        configure_xoffset_target(receive_raw_nonfixed_${enum}_fail)
+        target_compile_definitions(receive_raw_nonfixed_${enum}_fail PRIVATE XOFFSET_TEST_ENUM=${enum})
+        add_test(NAME receive_raw_nonfixed_${enum}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receive_raw_nonfixed_${enum}_fail --config $<CONFIG>)
+        set_tests_properties(receive_raw_nonfixed_${enum}_fail PROPERTIES
+            LABELS "schema" PASS_REGULAR_EXPRESSION
+            "the enumerators of an enum without a fixed underlying type are unknown")
+    endforeach()
+endif()
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")

@@ -39,6 +39,7 @@ struct TransportRoot {
     XString name;
     XVector<std::uint8_t> bytes;
 };
+XOFFSET_RECORD_DERIVED(TransportRoot, (), marker, enabled, name, bytes)
 XOFFSET_REGISTER_SCHEMA_NAME(TransportRoot, "test.TransportRoot")
 
 namespace {

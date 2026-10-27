@@ -50,6 +50,12 @@ inline std::size_t attr_lower(const Record& r, std::string_view key) {
 }
 } // namespace sc::xo_detail
 
+// Field lists for builds without reflection (no ordinary declaration, as before).
+#if defined(XOFFSET_RECORD_DERIVED)
+XOFFSET_RECORD_DERIVED(sc::xo_detail::Attr, (), key, value)
+XOFFSET_RECORD_DERIVED(sc::xo_detail::Record, (), id, revision, score, name, samples, payload, attrs)
+XOFFSET_RECORD_DERIVED(sc::xo_detail::Snapshot, (), schema_version, epoch, records)
+#endif
 XOFFSET_REGISTER_SCHEMA_NAME(sc::xo_detail::Snapshot, "competitor.value-snapshot.v1")
 
 namespace sc {

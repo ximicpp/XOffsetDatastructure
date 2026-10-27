@@ -16,6 +16,7 @@
 #define HAS_CHRONO 0
 #endif
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 #include "game_data.hpp"
 
 using namespace XOffsetDatastructure;

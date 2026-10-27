@@ -11,7 +11,7 @@
 // wire header, so the wire format and schema_hash are unchanged.
 //
 //   record          {name:offset<field>,name:offset<field>}
-//   array           [element]
+//   array           [element]   (also std::array)
 //   vector, set     <element>
 //   map             <key,value>
 //   scalar, enum, string: empty
@@ -21,30 +21,46 @@
 
 #include "xoffsetdatastructure.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace XOffsetDatastructure {
     namespace detail::schema_names {
         template <typename T>
         consteval void append_signature(std::string& out);
 
+        template <typename T> struct is_std_array : std::false_type {};
+        template <typename E, std::size_t N> struct is_std_array<std::array<E, N>> : std::true_type {};
+
+        consteval void append_decimal(std::string& out, std::size_t value) {
+            char digits[20];
+            std::size_t n = 0;
+            do {
+                digits[n++] = static_cast<char>('0' + value % 10);
+                value /= 10;
+            } while (value != 0);
+            while (n != 0) out += digits[--n];
+        }
+
+        template <typename U, std::size_t I>
+        consteval void append_member(std::string& out) {
+            using member = schema::member_t<U, I>;
+            if (I != 0) out += ',';
+            out += member::name;
+            out += ':';
+            append_decimal(out, member::offset);
+            append_signature<typename member::type>(out);
+        }
+
         template <typename U, std::size_t... Is>
         consteval void append_record(std::string& out, std::index_sequence<Is...>) {
-            using namespace std::meta;
             out += '{';
-            auto field = [&]<std::size_t I>() {
-                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
-                using FieldType = [:type_of(member):];
-                if (I != 0) out += ',';
-                out += identifier_of(member);
-                out += ':';
-                out += std::string_view(::boost::typelayout::to_fixed_string<offset_of(member).bytes>());
-                append_signature<FieldType>(out);
-            };
-            (field.template operator()<Is>(), ...);
+            (append_member<U, Is>(out), ...);
             out += '}';
         }
 
@@ -55,6 +71,12 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_array_v<U>) {
                 out += '[';
                 append_signature<std::remove_extent_t<U>>(out);
+                out += ']';
+            } else if constexpr (is_std_array<U>::value) {
+                // Like a built-in array: the member's name is the standard
+                // library's (__elems_, _M_elems, _Elems), not the schema's.
+                out += '[';
+                append_signature<typename U::value_type>(out);
                 out += ']';
             } else if constexpr (is_fixed_flat_map_v<U>) {
                 out += '<';
@@ -67,9 +89,9 @@ namespace XOffsetDatastructure {
                 append_signature<typename U::value_type>(out);
                 out += '>';
             } else if constexpr (std::is_class_v<U>) {
-                static_assert(reflected_base_count<U>() == 0,
+                static_assert(schema::base_count_v<U> == 0,
                     "schema name signature: wire records have no base classes");
-                append_record<U>(out, std::make_index_sequence<reflected_member_count<U>()>{});
+                append_record<U>(out, std::make_index_sequence<schema::member_count_v<U>>{});
             } else {
                 static_assert(sizeof(U) == 0, "schema name signature: non-admitted wire type");
             }

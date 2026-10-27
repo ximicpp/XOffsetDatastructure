@@ -15,11 +15,9 @@
     #define XOFFSET_LITTLE_ENDIAN 0
 #endif
 
-#if __has_include(<meta>)
-#include <meta>
-#else
-#include <experimental/meta>
-#endif
+#include "xoffset_schema.hpp"
+#include "xoffset_admission.hpp"
+#include "xoffset_fixed_string.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <compare>
@@ -57,20 +55,43 @@
 #endif
 #include "xoffset_virtual_memory.hpp"
 
-// TypeLayout library — the authoritative byte-copy-safety engine.
-// XOffset uses TypeLayout for recursive admission and safety checks.
-// Verified-wire schema hashing and frozen-container ABI signatures are owned by XOffset.
-//   - is_byte_copy_safe_v<T>    — recursive domain admission predicate
-#include <boost/typelayout.hpp>
-
 // Platform: 64-bit little-endian only.
-// Type safety: delegated to TypeLayout (see boost::typelayout::is_byte_copy_safe_v<T>).
+// Type safety: K0 admission is XOffset's own (xoffset_admission.hpp, is_byte_copy_safe_v<T>).
 #ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == 8,
     "XOffsetDatastructure requires 64-bit platform (sizeof(void*) must be 8)");
 static_assert(XOFFSET_LITTLE_ENDIAN,
     "XOffsetDatastructure requires little-endian platform");
 #endif // XOFFSET_DISABLE_PLATFORM_CHECKS
+
+// Apple: load_verified, ValidationScratch and receive_raw use std::pmr from the
+// system libc++, which Apple ships from macOS 14 / iOS 17 / tvOS 17 / watchOS 10.
+// The SDK does not mark those symbols with availability, so an older
+// deployment target compiles and links, then fails at launch on the old
+// system. Fail the build instead. Only the system libc++ is checked: its
+// headers are configured with vendor availability annotations, while a
+// toolchain's own libc++ (P2996 Clang, linked with its rpath) and libstdc++
+// carry std::pmr themselves.
+#if defined(__APPLE__)
+#include <version>
+#if defined(_LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS)
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS
+#elif defined(_LIBCPP_VERSION) && !defined(_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS)
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 1
+#else
+#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 0
+#endif
+#if !XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX
+#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 140000
+#error "XOffset needs macOS 14 or newer (std::pmr in the system libc++): build with -mmacosx-version-min=14.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=14.0)"
+#elif defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 170000
+#error "XOffset needs iOS 17 or newer (std::pmr in the system libc++): build with -miphoneos-version-min=17.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=17.0)"
+#elif defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 170000
+#error "XOffset needs tvOS 17 or newer (std::pmr in the system libc++): raise the deployment target to 17.0"
+#elif defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 100000
+#error "XOffset needs watchOS 10 or newer (std::pmr in the system libc++): raise the deployment target to 10.0"
+#endif
+#endif
 
 namespace XOffsetDatastructure {
     class XException : public std::runtime_error {
@@ -244,6 +265,15 @@ namespace XOffsetDatastructure {
 #else
 #define XOFFSET_DETAIL_MOVE_INLINE inline
 #define XOFFSET_DETAIL_MOVE_COLD
+#endif
+// Inlining that GCC 16 does on its own in C++26 mode but not in C++23 (it
+// keeps these out of line in push_back: +7% instructions on reloc.hero
+// push_back_grow). Forced only for GCC below C++26: C++26 machine code is
+// unchanged, and Clang inlines less around them when they are forced.
+#if __cplusplus <= 202302L && defined(__GNUC__) && !defined(__clang__)
+#define XOFFSET_DETAIL_PRE26_INLINE XOFFSET_DETAIL_MOVE_INLINE
+#else
+#define XOFFSET_DETAIL_PRE26_INLINE
 #endif
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_NOINLINE __declspec(noinline)
@@ -1135,9 +1165,11 @@ namespace XOffsetDatastructure {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
             std::vector<std::uint32_t> spare_bin;
-            std::multimap<std::uint32_t, std::uint32_t> spare_large;
+            // Constructed inside the try: the MSVC STL's map allocates its head
+            // node in the default constructor.
+            std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_large;
             try {
-                if (bytes > FreeTable::small_max) spare_large.emplace(bytes, offset);
+                if (bytes > FreeTable::small_max) spare_large.emplace().emplace(bytes, offset);
                 for (;;) {
                     XBufferCore* owner = identity ? record_owner(identity) : this;
                     if (!owner) return true; // the payload was released
@@ -1150,7 +1182,7 @@ namespace XOffsetDatastructure {
                     }
                     auto& table = *owner->free_table_;
                     if (bytes > FreeTable::small_max) {
-                        table.large.insert(spare_large.extract(spare_large.begin()));
+                        table.large.insert(spare_large->extract(spare_large->begin()));
                     } else {
                         const auto bin = bytes / 8u - 1u;
                         auto& slot = table.bins[bin];
@@ -2113,24 +2145,12 @@ namespace XOffsetDatastructure {
             }
         }
 
-        template <typename T>
-        consteval std::size_t reflected_base_count() {
-            using namespace std::meta;
-            return bases_of(^^T, access_context::unchecked()).size();
-        }
-
-        template <typename T>
-        consteval std::size_t reflected_member_count() {
-            using namespace std::meta;
-            return nonstatic_data_members_of(^^T, access_context::unchecked()).size();
-        }
-
         template <typename T, typename BaseFn, typename MemberFn>
         void for_each_reflected_subobject(BaseFn&& on_base, MemberFn&& on_member) {
-            static_for<reflected_base_count<T>()>([&](auto index) {
+            static_for<schema::base_count_v<T>>([&](auto index) {
                 on_base(index);
             });
-            static_for<reflected_member_count<T>()>([&](auto index) {
+            static_for<schema::member_count_v<T>>([&](auto index) {
                 on_member(index);
             });
         }
@@ -2440,9 +2460,7 @@ namespace XOffsetDatastructure {
                           std::is_trivially_destructible_v<T>) {
                 return false;
             } else {
-                for (auto member : std::meta::members_of(^^T, std::meta::access_context::unchecked()))
-                    if (std::meta::is_destructor(member) && std::meta::is_user_provided(member)) return false;
-                return true;
+                return schema::implicit_lifetime_aggregate<T>();
             }
         }
 
@@ -2458,16 +2476,13 @@ namespace XOffsetDatastructure {
                 for (auto& item : value) release_in(alloc, item);
             } else if constexpr (release_walk_supported<T>()) {
                 detail::for_each_reflected_subobject<T>([&](auto index) {
-                    constexpr auto base = std::meta::bases_of(^^T,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    using Base = [:std::meta::type_of(base):];
+                    using Base = schema::base_t<T, decltype(index)::value>;
                     release_in(alloc, static_cast<Base&>(value));
                 }, [&](auto index) {
-                    constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    if constexpr (!std::meta::is_reference_type(std::meta::type_of(member)) &&
-                                  !std::meta::is_bit_field(member)) {
-                        release_in(alloc, value.[:member:]);
+                    using member = schema::member_t<T, decltype(index)::value>;
+                    if constexpr (!std::is_reference_v<typename member::type> &&
+                                  !member::is_bit_field) {
+                        release_in(alloc, member::get(value));
                     }
                 });
             }
@@ -4710,6 +4725,77 @@ namespace XOffsetDatastructure {
     using XBlob = XVector<std::byte>;
     template <typename T> using XFlatSet = XSet<T>;
     template <typename K, typename V> using XFlatMap = XMap<K, V>;
+} // namespace XOffsetDatastructure
+
+// Field lists of the library's own types, for the field-list backend (a C++26
+// build compares them with reflection in test_schema_describe). The containers
+// are not aggregates, so they carry no completeness proof; XKeyValue and
+// std::array keep the XOFFSET_RECORD promise, as reflection finds.
+namespace XOffsetDatastructure::schema {
+    namespace describe_detail {
+        template <class H>
+        struct head_fields {
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, data_delta)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, size_)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(H, capacity_)
+        };
+        template <class H, class F = head_fields<H>>
+        using head_record = record<H, false, bases<>,
+                                   typename F::field_data_delta, typename F::field_size_,
+                                   typename F::field_capacity_>;
+
+        template <class K, class V>
+        struct key_value_fields {
+            using C = XKeyValue<K, V>;
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, first)
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, second)
+        };
+    } // namespace describe_detail
+
+    template <> struct description<XFixedString> : describe_detail::head_record<XFixedString> {};
+    template <> struct description<XString>
+        : describe_detail::record<XString, false, describe_detail::bases<XFixedString>> {};
+    template <class T> struct description<XFixedVector<T>> : describe_detail::head_record<XFixedVector<T>> {};
+    template <class T> struct description<XVector<T>>
+        : describe_detail::record<XVector<T>, false, describe_detail::bases<XFixedVector<T>>> {};
+    template <class T> struct description<XFixedFlatSet<T>>
+        : describe_detail::record<XFixedFlatSet<T>, false, describe_detail::bases<XFixedVector<T>>> {};
+    template <class T> struct description<XSet<T>>
+        : describe_detail::record<XSet<T>, false, describe_detail::bases<XFixedFlatSet<T>>> {};
+    template <class K, class V> struct description<XFixedFlatMap<K, V>>
+        : describe_detail::record<XFixedFlatMap<K, V>, false,
+                                  describe_detail::bases<XFixedVector<XKeyValue<K, V>>>> {};
+    template <class K, class V> struct description<XMap<K, V>>
+        : describe_detail::record<XMap<K, V>, false, describe_detail::bases<XFixedFlatMap<K, V>>> {};
+    template <class K, class V> struct description<XKeyValue<K, V>>
+        : describe_detail::record<XKeyValue<K, V>, true, describe_detail::bases<>,
+              typename describe_detail::key_value_fields<K, V>::field_first,
+              typename describe_detail::key_value_fields<K, V>::field_second> {};
+
+    // std::array<E, N>: its one member, under the standard library's name.
+#if defined(_LIBCPP_VERSION)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS __elems_
+#elif defined(__GLIBCXX__)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS _M_elems
+#elif defined(_MSC_VER)
+#define XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS _Elems
+#endif
+#ifdef XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS
+    namespace describe_detail {
+        template <class E, std::size_t N>
+        struct array_fields {
+            using C = std::array<E, N>;
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS)
+        };
+    } // namespace describe_detail
+    template <class E, std::size_t N> struct description<std::array<E, N>>
+        : describe_detail::record<std::array<E, N>, true, describe_detail::bases<>,
+              typename describe_detail::array_fields<E, N>::field_XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS> {};
+#undef XOFFSET_SCHEMA_DETAIL_ARRAY_ELEMS
+#endif
+} // namespace XOffsetDatastructure::schema
+
+namespace XOffsetDatastructure {
 
     namespace detail {
         template <typename T>
@@ -4756,17 +4842,15 @@ namespace XOffsetDatastructure {
 
         template <typename T, std::size_t N>
         consteval bool reflected_member_wire_admitted() {
-            using namespace std::meta;
-            constexpr auto member =
-                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
-            using ReflectedMemberType = [:type_of(member):];
+            using member = schema::member_t<T, N>;
+            using ReflectedMemberType = typename member::type;
             using MemberType = std::remove_cv_t<ReflectedMemberType>;
             return is_v1_wire_admitted_impl<MemberType>::value;
         }
 
         template <typename T, std::size_t N = 0>
         consteval bool reflected_members_wire_admitted_impl() {
-            if constexpr (N >= reflected_member_count<T>()) {
+            if constexpr (N >= schema::member_count_v<T>) {
                 return true;
             } else {
                 return reflected_member_wire_admitted<T, N>() &&
@@ -4779,49 +4863,53 @@ namespace XOffsetDatastructure {
             return reflected_members_wire_admitted_impl<T>();
         }
 
+        // A function template rather than a lambda in the static member's
+        // initializer: MSVC instantiates the discarded if-constexpr branches of
+        // a non-generic lambda (C2825 on CleanT::key_type for CleanT = char).
+        template <typename CleanT>
+        consteval bool compute_v1_wire_admitted() {
+            if constexpr (!is_byte_copy_safe_v<CleanT>) {
+                return false;
+            } else if constexpr (std::is_reference_v<CleanT> ||
+                                 std::is_pointer_v<CleanT> ||
+                                 std::is_member_pointer_v<CleanT> ||
+                                 std::is_union_v<CleanT>) {
+                return false;
+            } else if constexpr (std::is_array_v<CleanT>) {
+                return is_v1_wire_admitted_impl<std::remove_extent_t<CleanT>>::value;
+            } else if constexpr (fixed_size_scalar<CleanT>) {
+                return true;
+            } else if constexpr (std::is_enum_v<CleanT>) {
+                return fixed_size_scalar<std::underlying_type_t<CleanT>>;
+            } else if constexpr (is_fixed_string_v<CleanT>) {
+                return std::is_same_v<CleanT, XFixedString> || std::is_same_v<CleanT, XString>;
+            } else if constexpr (is_fixed_flat_map_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedFlatMap<typename CleanT::key_type, typename CleanT::mapped_type>> ||
+                        std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::key_type>::value &&
+                    is_v1_wire_admitted_impl<typename CleanT::mapped_type>::value;
+            } else if constexpr (is_fixed_flat_set_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedFlatSet<typename CleanT::value_type>> ||
+                        std::is_same_v<CleanT, XSet<typename CleanT::value_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
+            } else if constexpr (is_fixed_vector_v<CleanT>) {
+                return (std::is_same_v<CleanT, XFixedVector<typename CleanT::value_type>> ||
+                        std::is_same_v<CleanT, XVector<typename CleanT::value_type>>) &&
+                    is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
+            } else if constexpr (std::is_class_v<CleanT>) {
+                return alignof(CleanT) <= 8 &&
+                    std::is_standard_layout_v<CleanT> &&
+                    !std::is_polymorphic_v<CleanT> &&
+                    schema::base_count_v<CleanT> == 0 &&
+                    reflected_members_wire_admitted<CleanT>();
+            } else {
+                return false;
+            }
+        }
+
         template <typename T>
         struct is_v1_wire_admitted_impl {
-            using CleanT = std::remove_cv_t<T>;
-
-            static constexpr bool value = []() consteval {
-                if constexpr (!boost::typelayout::is_byte_copy_safe_v<CleanT>) {
-                    return false;
-                } else if constexpr (std::is_reference_v<CleanT> ||
-                                     std::is_pointer_v<CleanT> ||
-                                     std::is_member_pointer_v<CleanT> ||
-                                     std::is_union_v<CleanT>) {
-                    return false;
-                } else if constexpr (std::is_array_v<CleanT>) {
-                    return is_v1_wire_admitted_impl<std::remove_extent_t<CleanT>>::value;
-                } else if constexpr (fixed_size_scalar<CleanT>) {
-                    return true;
-                } else if constexpr (std::is_enum_v<CleanT>) {
-                    return fixed_size_scalar<std::underlying_type_t<CleanT>>;
-                } else if constexpr (is_fixed_string_v<CleanT>) {
-                    return std::is_same_v<CleanT, XFixedString> || std::is_same_v<CleanT, XString>;
-                } else if constexpr (is_fixed_flat_map_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedFlatMap<typename CleanT::key_type, typename CleanT::mapped_type>> ||
-                            std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::key_type>::value &&
-                        is_v1_wire_admitted_impl<typename CleanT::mapped_type>::value;
-                } else if constexpr (is_fixed_flat_set_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedFlatSet<typename CleanT::value_type>> ||
-                            std::is_same_v<CleanT, XSet<typename CleanT::value_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
-                } else if constexpr (is_fixed_vector_v<CleanT>) {
-                    return (std::is_same_v<CleanT, XFixedVector<typename CleanT::value_type>> ||
-                            std::is_same_v<CleanT, XVector<typename CleanT::value_type>>) &&
-                        is_v1_wire_admitted_impl<typename CleanT::value_type>::value;
-                } else if constexpr (std::is_class_v<CleanT>) {
-                    return alignof(CleanT) <= 8 &&
-                        std::is_standard_layout_v<CleanT> &&
-                        !std::is_polymorphic_v<CleanT> &&
-                        reflected_base_count<CleanT>() == 0 &&
-                        reflected_members_wire_admitted<CleanT>();
-                } else {
-                    return false;
-                }
-            }();
+            static constexpr bool value = compute_v1_wire_admitted<std::remove_cv_t<T>>();
         };
 
         template <typename T>
@@ -4830,7 +4918,7 @@ namespace XOffsetDatastructure {
         }
 
         // Validation errors leave the hot path through one out-of-line call.
-        [[noreturn, gnu::cold, gnu::noinline]] inline void wire_reject(const char* what) {
+        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void wire_reject(const char* what) {
             throw XException(what);
         }
 
@@ -4969,7 +5057,10 @@ namespace XOffsetDatastructure {
             }
 
             bool member(bool free, std::size_t granule) const noexcept {
-                return ((free ? free_ : owned_)[granule / 64u] >> (granule % 64u)) & 1u;
+                // The pointer is chosen first: GCC 13 at -O0 with UBSan
+                // miscompiles the conditional used directly as the array.
+                const std::uint64_t* bits = free ? free_ : owned_;
+                return (bits[granule / 64u] >> (granule % 64u)) & 1u;
             }
 
         private:
@@ -5283,39 +5374,40 @@ namespace XOffsetDatastructure {
 
         template <typename T, std::size_t N = 0>
         consteval bool reflected_member_needs_validation() {
-            if constexpr (N >= reflected_member_count<T>()) {
+            if constexpr (N >= schema::member_count_v<T>) {
                 return false;
             } else {
-                using namespace std::meta;
-                constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[N];
-                using Member = [:type_of(member):];
+                using member = schema::member_t<T, N>;
+                using Member = typename member::type;
                 return wire_value_needs_validation<Member>::value ||
                     reflected_member_needs_validation<T, N + 1>();
             }
         }
+        // See compute_v1_wire_admitted.
+        template <typename CleanT>
+        consteval bool compute_wire_value_needs_validation() {
+            if constexpr (!v1_wire_admitted<CleanT>()) {
+                return true; // conservative for non-admitted/detail callers
+            } else if constexpr (std::is_same_v<CleanT, bool>) {
+                return true; // representation bytes must still be checked
+            } else if constexpr (std::is_array_v<CleanT>) {
+                return wire_value_needs_validation<std::remove_extent_t<CleanT>>::value;
+            } else if constexpr (fixed_size_scalar<CleanT> || std::is_enum_v<CleanT>) {
+                return false; // enum values were not range-checked by V1
+            } else if constexpr (is_fixed_string_v<CleanT> || is_fixed_vector_v<CleanT> ||
+                                 is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT>) {
+                return true; // also covers sorted-key checks and empty bindings
+            } else if constexpr (std::is_class_v<CleanT>) {
+                // Admitted classes have no bases. Non-admitted classes took
+                // the conservative branch above, retaining their old walk.
+                return reflected_member_needs_validation<CleanT>();
+            } else {
+                return true;
+            }
+        }
         template <typename T>
         struct wire_value_needs_validation {
-            using CleanT = std::remove_cv_t<T>;
-            static constexpr bool value = []() consteval {
-                if constexpr (!v1_wire_admitted<CleanT>()) {
-                    return true; // conservative for non-admitted/detail callers
-                } else if constexpr (std::is_same_v<CleanT, bool>) {
-                    return true; // representation bytes must still be checked
-                } else if constexpr (std::is_array_v<CleanT>) {
-                    return wire_value_needs_validation<std::remove_extent_t<CleanT>>::value;
-                } else if constexpr (fixed_size_scalar<CleanT> || std::is_enum_v<CleanT>) {
-                    return false; // enum values were not range-checked by V1
-                } else if constexpr (is_fixed_string_v<CleanT> || is_fixed_vector_v<CleanT> ||
-                                     is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT>) {
-                    return true; // also covers sorted-key checks and empty bindings
-                } else if constexpr (std::is_class_v<CleanT>) {
-                    // Admitted classes have no bases. Non-admitted classes took
-                    // the conservative branch above, retaining their old walk.
-                    return reflected_member_needs_validation<CleanT>();
-                } else {
-                    return true;
-                }
-            }();
+            static constexpr bool value = compute_wire_value_needs_validation<std::remove_cv_t<T>>();
         };
         template <typename T>
         inline constexpr bool wire_value_needs_validation_v = wire_value_needs_validation<T>::value;
@@ -5424,20 +5516,16 @@ namespace XOffsetDatastructure {
 
         template <typename T, std::size_t N>
         void validate_base_at(const T& value, WireValidationContext& ctx) {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            using BaseType = [:type_of(base_info):];
+            using BaseType = schema::base_t<T, N>;
             validate_wire_value(static_cast<const BaseType&>(value), ctx);
         }
 
         template <typename T, std::size_t N>
         void validate_member_at(const T& value, WireValidationContext& ctx) {
-            using namespace std::meta;
-            constexpr auto member =
-                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
-            using Member = [:type_of(member):];
+            using member = schema::member_t<T, N>;
+            using Member = typename member::type;
             if constexpr (wire_value_needs_validation_v<Member>)
-                validate_wire_value(value.[:member:], ctx);
+                validate_wire_value(member::get(value), ctx);
         }
 
         template <typename T>
@@ -5597,18 +5685,17 @@ namespace XOffsetDatastructure {
 
         template <typename T, std::size_t I>
         consteval bool member_can_relocate() {
-            constexpr auto member = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[I];
-            if constexpr (std::meta::is_bit_field(member)) return false;
+            using member = schema::member_t<T, I>;
+            if constexpr (member::is_bit_field) return false;
             else {
-                using Member = [:std::meta::type_of(member):];
+                using Member = typename member::type;
                 return can_relocate_without_allocation<Member>();
             }
         }
 
         template <typename T, std::size_t I>
         consteval bool base_can_relocate() {
-            constexpr auto base = std::meta::bases_of(^^T, std::meta::access_context::unchecked())[I];
-            using Base = [:std::meta::type_of(base):];
+            using Base = schema::base_t<T, I>;
             return can_relocate_without_allocation<Base>();
         }
 
@@ -5618,9 +5705,9 @@ namespace XOffsetDatastructure {
             else if constexpr (detail::future_custom_lifetime_supported<T>()) return true;
             else if constexpr (std::is_array_v<T>) return can_relocate_without_allocation<std::remove_extent_t<T>>();
             else if constexpr (std::is_trivially_copyable_v<T> || is_owning_head<T>::value) return true;
-            else if constexpr (std::is_class_v<T> && boost::typelayout::is_byte_copy_safe_v<T>) {
-                constexpr auto bases = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
-                constexpr auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
+            else if constexpr (std::is_class_v<T> && is_byte_copy_safe_v<T>) {
+                constexpr auto bases = schema::base_count_v<T>;
+                constexpr auto members = schema::member_count_v<T>;
                 return []<std::size_t... I>(std::index_sequence<I...>) {
                     return (base_can_relocate<T, I>() && ...);
                 }(std::make_index_sequence<bases>{}) && []<std::size_t... I>(std::index_sequence<I...>) {
@@ -5660,19 +5747,16 @@ namespace XOffsetDatastructure {
                     return false;
                 }
             } else if constexpr (std::is_class_v<CleanT> &&
-                                 boost::typelayout::is_byte_copy_safe_v<CleanT>) {
+                                 is_byte_copy_safe_v<CleanT>) {
                 bool found = false;
                 detail::for_each_reflected_subobject<CleanT>([&](auto index) {
-                    constexpr auto base = std::meta::bases_of(^^CleanT,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    using Base = [:std::meta::type_of(base):];
+                    using Base = schema::base_t<CleanT, decltype(index)::value>;
                     if (!found) found = move_assignment_owns_address(
                         static_cast<const Base&>(value), address);
                 }, [&](auto index) {
-                    constexpr auto member = std::meta::nonstatic_data_members_of(^^CleanT,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    if constexpr (!std::meta::is_bit_field(member)) {
-                        if (!found) found = move_assignment_owns_address(value.[:member:], address);
+                    using member = schema::member_t<CleanT, decltype(index)::value>;
+                    if constexpr (!member::is_bit_field) {
+                        if (!found) found = move_assignment_owns_address(member::get(value), address);
                     }
                 });
                 return found;
@@ -5706,12 +5790,11 @@ namespace XOffsetDatastructure {
             } else {
                 dst = detail::begin_relocated_ordinary_outer<T>(dst, src);
                 detail::for_each_reflected_subobject<T>([&](auto index) {
-                    constexpr auto base = std::meta::bases_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-                    using Base = [:std::meta::type_of(base):];
+                    using Base = schema::base_t<T, decltype(index)::value>;
                     relocate_construct(static_cast<Base*>(dst), static_cast<Base&>(src));
                 }, [&](auto index) {
-                    constexpr auto member = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked())[decltype(index)::value];
-                    relocate_construct(&((*dst).[:member:]), src.[:member:]);
+                    using member = schema::member_t<T, decltype(index)::value>;
+                    relocate_construct(&(member::get(*dst)), member::get(src));
                 });
                 detail::zero_implicit_padding(dst);
             }
@@ -5737,28 +5820,27 @@ namespace XOffsetDatastructure {
     namespace detail {
         template <typename T>
         consteval bool ordinary_record_has_no_bases() {
-            return std::meta::bases_of(^^T, std::meta::access_context::unchecked()).empty();
+            return schema::base_count_v<T> == 0;
         }
         template <typename T>
         consteval bool ordinary_record_has_no_bit_fields() {
-            for (auto member : std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()))
-                if (std::meta::is_bit_field(member)) return false;
-            return true;
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                return (!schema::member_t<T, I>::is_bit_field && ...);
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
         }
         // Every pair of [offset, offset + sizeof) member ranges is disjoint.
         template <typename T>
         consteval bool ordinary_record_members_disjoint() {
-            const auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked());
-            for (std::size_t i = 0; i < members.size(); ++i) {
-                const auto a = std::meta::offset_of(members[i]).bytes;
-                const auto a_end = a + std::meta::size_of(std::meta::type_of(members[i]));
-                for (std::size_t j = i + 1; j < members.size(); ++j) {
-                    const auto b = std::meta::offset_of(members[j]).bytes;
-                    const auto b_end = b + std::meta::size_of(std::meta::type_of(members[j]));
-                    if (a < b_end && b < a_end) return false;
-                }
-            }
-            return true;
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                constexpr std::size_t count = sizeof...(I);
+                const std::size_t begin[] = {schema::member_t<T, I>::offset..., 0};
+                const std::size_t end[] = {
+                    (schema::member_t<T, I>::offset + sizeof(schema::member_type_t<T, I>))..., 0};
+                for (std::size_t i = 0; i < count; ++i)
+                    for (std::size_t j = i + 1; j < count; ++j)
+                        if (begin[i] < end[j] && begin[j] < end[i]) return false;
+                return true;
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
         }
     } // namespace detail
 
@@ -5766,28 +5848,51 @@ namespace XOffsetDatastructure {
         // [class.prop]: an aggregate whose destructor is not user-provided is
         // implicit-lifetime, even when that destructor is nontrivial because a
         // member owns storage. This independent standard branch does not
-        // specialize std traits or alter V1/TypeLayout admission. The fixed
+        // specialize std traits or alter V1/K0 admission. The fixed
         // SDK's std trait is not used as a necessary condition for this branch.
+        // Without std::is_implicit_lifetime (C++23) or the compiler's builtin
+        // (C++20 on GCC 13, Clang 18): scalars, arrays, and classes with a
+        // trivial destructor and a trivial default, copy or move constructor.
+        // Callers handle aggregates with an implicit nontrivial destructor.
+        template<class T> consteval bool cxx20_implicit_lifetime() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_scalar_v<U> || std::is_array_v<U>) return true;
+            else if constexpr (std::is_class_v<U>)
+                return std::is_trivially_destructible_v<U> &&
+                       (std::is_trivially_default_constructible_v<U> ||
+                        std::is_trivially_copy_constructible_v<U> ||
+                        std::is_trivially_move_constructible_v<U>);
+            else return false;
+        }
+        template<class T> consteval bool std_implicit_lifetime() {
+#if defined(__cpp_lib_is_implicit_lifetime)
+            return std::is_implicit_lifetime_v<T>;
+#elif defined(__clang__)
+#if __has_builtin(__builtin_is_implicit_lifetime)
+            return __builtin_is_implicit_lifetime(T);
+#elif __has_builtin(__is_implicit_lifetime)
+            return __is_implicit_lifetime(T);
+#else
+            return cxx20_implicit_lifetime<T>();
+#endif
+#else
+            return cxx20_implicit_lifetime<T>();
+#endif
+        }
         template<class T> consteval bool stable_erase_implicit_lifetime() {
             if constexpr (std::is_const_v<T> || std::is_volatile_v<T>) return false;
-            else if constexpr (std::is_implicit_lifetime_v<T>) return true;
+            else if constexpr (std_implicit_lifetime<T>()) return true;
             else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> &&
                                StableEraseOrdinaryMembers<T>::value) {
-                for (auto member : std::meta::members_of(^^T, std::meta::access_context::unchecked())) {
-                    if (std::meta::is_destructor(member)) {
-                        if (std::meta::is_user_provided(member)) return false;
-                    }
-                }
-                return true;
+                return schema::implicit_lifetime_aggregate<T>();
             } else return false;
         }
         template<class T> consteval bool stable_erase_supported();
         template<class T, std::size_t I> consteval bool stable_erase_member_supported() {
-            constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
-                std::meta::access_context::unchecked())[I];
-            if constexpr (std::meta::is_bit_field(member)) return false;
+            using member = schema::member_t<T, I>;
+            if constexpr (member::is_bit_field) return false;
             else {
-                using Member = [:std::meta::type_of(member):];
+                using Member = typename member::type;
                 return stable_erase_supported<Member>();
             }
         }
@@ -5805,9 +5910,9 @@ namespace XOffsetDatastructure {
             else if constexpr (std::is_class_v<T> &&
                                StableEraseOrdinaryMembers<T>::value &&
                                std::is_aggregate_v<T> && std::is_standard_layout_v<T> &&
-                               (std::is_trivially_copyable_v<T> || boost::typelayout::is_byte_copy_safe_v<T>)) {
-                constexpr auto bases = std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size();
-                constexpr auto members = std::meta::nonstatic_data_members_of(^^T, std::meta::access_context::unchecked()).size();
+                               (std::is_trivially_copyable_v<T> || is_byte_copy_safe_v<T>)) {
+                constexpr auto bases = schema::base_count_v<T>;
+                constexpr auto members = schema::member_count_v<T>;
                 // A placement into an owning base is not by itself a proof of
                 // a base-subobject lifetime in a newly begun enclosing T.
                 if constexpr (bases != 0) return false;
@@ -5827,11 +5932,10 @@ namespace XOffsetDatastructure {
                 for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                     stable_erase_rebase_subobjects(&(*destination)[i], source[i]);
             } else if constexpr (!std::is_trivially_copyable_v<T> && std::is_class_v<T>) {
-                static_assert(std::meta::bases_of(^^T, std::meta::access_context::unchecked()).size() == 0);
+                static_assert(schema::base_count_v<T> == 0);
                 detail::for_each_reflected_subobject<T>([&](auto) {}, [&](auto index) {
-                    constexpr auto member = std::meta::nonstatic_data_members_of(^^T,
-                        std::meta::access_context::unchecked())[decltype(index)::value];
-                    stable_erase_rebase_subobjects(&((*destination).[:member:]), source.[:member:]);
+                    using member = schema::member_t<T, decltype(index)::value>;
+                    stable_erase_rebase_subobjects(&(member::get(*destination)), member::get(source));
                 });
             }
         }
@@ -6343,10 +6447,8 @@ namespace XOffsetDatastructure {
         }
     }
 
-    // Type admission — delegated to TypeLayout. XOffset's frozen containers
-    // provide direct safety specializations and no longer rely on opaque
-    // registration.
-    using boost::typelayout::is_byte_copy_safe_v;
+    // Type admission: is_byte_copy_safe_v (xoffset_admission.hpp); XOffset's
+    // frozen containers are specialized at the end of this header.
 
     template <typename T>
     inline constexpr bool is_v1_wire_admitted_v = detail::v1_wire_admitted<T>();
@@ -6355,7 +6457,7 @@ namespace XOffsetDatastructure {
     // Reflection-based construction and transfer (C++26 P2996).
     // ========================================================================
     namespace detail {
-        namespace tl = ::boost::typelayout;
+        namespace ft = ::XOffsetDatastructure::fixed_text;
 
         consteval std::uint64_t fnv1a_append(std::uint64_t seed, std::string_view sv) {
             constexpr std::uint64_t prime = 1099511628211ull;
@@ -6392,62 +6494,60 @@ namespace XOffsetDatastructure {
         consteval auto wire_scalar_signature() {
             using U = std::remove_cv_t<T>;
             if constexpr (std::is_same_v<U, bool>) {
-                return tl::FixedString{"bool"};
+                return ft::FixedString{"bool"};
             } else if constexpr (std::is_same_v<U, char>) {
-                return tl::FixedString{"char"};
+                return ft::FixedString{"char"};
             } else if constexpr (std::is_same_v<U, signed char>) {
-                return tl::FixedString{"i8char"};
+                return ft::FixedString{"i8char"};
             } else if constexpr (std::is_same_v<U, unsigned char>) {
-                return tl::FixedString{"u8char"};
+                return ft::FixedString{"u8char"};
             } else if constexpr (std::is_same_v<U, std::byte>) {
-                return tl::FixedString{"byte"};
+                return ft::FixedString{"byte"};
             } else if constexpr (std::is_same_v<U, int8_t>) {
-                return tl::FixedString{"i8"};
+                return ft::FixedString{"i8"};
             } else if constexpr (std::is_same_v<U, uint8_t>) {
-                return tl::FixedString{"u8"};
+                return ft::FixedString{"u8"};
             } else if constexpr (std::is_same_v<U, int16_t>) {
-                return tl::FixedString{"i16"};
+                return ft::FixedString{"i16"};
             } else if constexpr (std::is_same_v<U, uint16_t>) {
-                return tl::FixedString{"u16"};
+                return ft::FixedString{"u16"};
             } else if constexpr (std::is_same_v<U, int32_t>) {
-                return tl::FixedString{"i32"};
+                return ft::FixedString{"i32"};
             } else if constexpr (std::is_same_v<U, uint32_t>) {
-                return tl::FixedString{"u32"};
+                return ft::FixedString{"u32"};
             } else if constexpr (std::is_same_v<U, int64_t>) {
-                return tl::FixedString{"i64"};
+                return ft::FixedString{"i64"};
             } else if constexpr (std::is_same_v<U, uint64_t>) {
-                return tl::FixedString{"u64"};
+                return ft::FixedString{"u64"};
             } else if constexpr (std::is_same_v<U, float>) {
-                return tl::FixedString{"f32"};
+                return ft::FixedString{"f32"};
             } else if constexpr (std::is_same_v<U, double>) {
-                return tl::FixedString{"f64"};
+                return ft::FixedString{"f64"};
             } else {
                 static_assert(sizeof(U) == 0, "unsupported v1 scalar in wire_abi_signature()");
             }
         }
 
         template <typename T, std::size_t N>
-        consteval auto fixed_sequence_header_signature(const tl::FixedString<N>& tag) {
+        consteval auto fixed_sequence_header_signature(const ft::FixedString<N>& tag) {
             return tag +
-                   tl::FixedString{"[s:"} +
-                   tl::to_fixed_string<sizeof(std::remove_cv_t<T>)>() +
-                   tl::FixedString{",a:"} +
-                   tl::to_fixed_string<alignof(std::remove_cv_t<T>)>() +
-                   tl::FixedString{"]{data:rel32,size:u32,capacity:u32}"};
+                   ft::FixedString{"[s:"} +
+                   ft::to_fixed_string<sizeof(std::remove_cv_t<T>)>() +
+                   ft::FixedString{",a:"} +
+                   ft::to_fixed_string<alignof(std::remove_cv_t<T>)>() +
+                   ft::FixedString{"]{data:rel32,size:u32,capacity:u32}"};
         }
 
         template <typename T, std::size_t Index>
         consteval auto wire_record_field_signature() {
-            using namespace std::meta;
             using U = std::remove_cv_t<T>;
-            constexpr auto member =
-                nonstatic_data_members_of(^^U, access_context::unchecked())[Index];
-            static_assert(!is_bit_field(member),
+            using member = schema::member_t<U, Index>;
+            static_assert(!member::is_bit_field,
                 "wire_abi_signature() does not support bit-fields in v1");
-            using FieldType = [:type_of(member):];
-            return tl::FixedString{"@"} +
-                   tl::to_fixed_string<offset_of(member).bytes>() +
-                   tl::FixedString{":"} +
+            using FieldType = typename member::type;
+            return ft::FixedString{"@"} +
+                   ft::to_fixed_string<member::offset>() +
+                   ft::FixedString{":"} +
                    wire_abi_signature<FieldType>();
         }
 
@@ -6456,14 +6556,14 @@ namespace XOffsetDatastructure {
             if constexpr (Index == 0) {
                 return wire_record_field_signature<T, Index>();
             } else {
-                return tl::FixedString{","} + wire_record_field_signature<T, Index>();
+                return ft::FixedString{","} + wire_record_field_signature<T, Index>();
             }
         }
 
         template <typename T, std::size_t... Is>
         consteval auto wire_record_fields(std::index_sequence<Is...>) {
             if constexpr (sizeof...(Is) == 0) {
-                return tl::FixedString{""};
+                return ft::FixedString{""};
             } else {
                 return (wire_record_field_signature_with_sep<T, Is>() + ...);
             }
@@ -6472,16 +6572,16 @@ namespace XOffsetDatastructure {
         template <typename T>
         consteval auto wire_record_signature() {
             using U = std::remove_cv_t<T>;
-            static_assert(reflected_base_count<U>() == 0,
+            static_assert(schema::base_count_v<U> == 0,
                 "wire_abi_signature() does not support base classes in v1");
-            constexpr std::size_t field_count = reflected_member_count<U>();
-            return tl::FixedString{"record[s:"} +
-                   tl::to_fixed_string<sizeof(U)>() +
-                   tl::FixedString{",a:"} +
-                   tl::to_fixed_string<alignof(U)>() +
-                   tl::FixedString{"]{"} +
+            constexpr std::size_t field_count = schema::member_count_v<U>;
+            return ft::FixedString{"record[s:"} +
+                   ft::to_fixed_string<sizeof(U)>() +
+                   ft::FixedString{",a:"} +
+                   ft::to_fixed_string<alignof(U)>() +
+                   ft::FixedString{"]{"} +
                    wire_record_fields<U>(std::make_index_sequence<field_count>{}) +
-                   tl::FixedString{"}"};
+                   ft::FixedString{"}"};
         }
 
         template <typename T>
@@ -6490,49 +6590,49 @@ namespace XOffsetDatastructure {
             if constexpr (detail::fixed_size_scalar<U>) {
                 return wire_scalar_signature<U>();
             } else if constexpr (std::is_enum_v<U>) {
-                return tl::FixedString{"enum<"} +
+                return ft::FixedString{"enum<"} +
                        wire_abi_signature<std::underlying_type_t<U>>() +
-                       tl::FixedString{">"};
+                       ft::FixedString{">"};
             } else if constexpr (std::is_array_v<U>) {
-                return tl::FixedString{"array["} +
-                       tl::to_fixed_string<std::extent_v<U>>() +
-                       tl::FixedString{"]<"} +
+                return ft::FixedString{"array["} +
+                       ft::to_fixed_string<std::extent_v<U>>() +
+                       ft::FixedString{"]<"} +
                        wire_abi_signature<std::remove_extent_t<U>>() +
-                       tl::FixedString{">"};
+                       ft::FixedString{">"};
             } else if constexpr (is_fixed_string_v<U>) {
-                return fixed_sequence_header_signature<U>(tl::FixedString{"xstring"}) +
-                       tl::FixedString{"{inline:10}"};
+                return fixed_sequence_header_signature<U>(ft::FixedString{"xstring"}) +
+                       ft::FixedString{"{inline:10}"};
             } else if constexpr (is_fixed_flat_map_v<U>) {
-                return fixed_sequence_header_signature<U>(tl::FixedString{"xflatmap"}) +
-                       tl::FixedString{"<"} +
+                return fixed_sequence_header_signature<U>(ft::FixedString{"xflatmap"}) +
+                       ft::FixedString{"<"} +
                        wire_abi_signature<typename U::key_type>() +
-                       tl::FixedString{","} +
+                       ft::FixedString{","} +
                        wire_abi_signature<typename U::mapped_type>() +
-                       tl::FixedString{">"};
+                       ft::FixedString{">"};
             } else if constexpr (is_fixed_flat_set_v<U>) {
-                return fixed_sequence_header_signature<U>(tl::FixedString{"xflatset"}) +
-                       tl::FixedString{"<"} +
+                return fixed_sequence_header_signature<U>(ft::FixedString{"xflatset"}) +
+                       ft::FixedString{"<"} +
                        wire_abi_signature<typename U::value_type>() +
-                       tl::FixedString{">"};
+                       ft::FixedString{">"};
             } else if constexpr (is_fixed_vector_v<U>) {
                 if constexpr (std::is_same_v<typename U::value_type, std::byte>) {
-                    return fixed_sequence_header_signature<U>(tl::FixedString{"xblob"});
+                    return fixed_sequence_header_signature<U>(ft::FixedString{"xblob"});
                 } else {
-                    return fixed_sequence_header_signature<U>(tl::FixedString{"xvector"}) +
-                           tl::FixedString{"<"} +
+                    return fixed_sequence_header_signature<U>(ft::FixedString{"xvector"}) +
+                           ft::FixedString{"<"} +
                            wire_abi_signature<typename U::value_type>() +
-                           tl::FixedString{">"};
+                           ft::FixedString{">"};
                 }
             } else if constexpr (is_xkeyvalue_v<U>) {
-                return tl::FixedString{"xkv[s:"} +
-                       tl::to_fixed_string<sizeof(U)>() +
-                       tl::FixedString{",a:"} +
-                       tl::to_fixed_string<alignof(U)>() +
-                       tl::FixedString{"]<"} +
+                return ft::FixedString{"xkv[s:"} +
+                       ft::to_fixed_string<sizeof(U)>() +
+                       ft::FixedString{",a:"} +
+                       ft::to_fixed_string<alignof(U)>() +
+                       ft::FixedString{"]<"} +
                        wire_abi_signature<typename U::first_type>() +
-                       tl::FixedString{","} +
+                       ft::FixedString{","} +
                        wire_abi_signature<typename U::second_type>() +
-                       tl::FixedString{">"};
+                       ft::FixedString{">"};
             } else if constexpr (std::is_class_v<U>) {
                 return wire_record_signature<U>();
             } else {
@@ -6563,37 +6663,31 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         void destroy_reflected_prefix(void* raw, std::size_t built) noexcept {
-            using namespace std::meta;
-            constexpr auto base_count = bases_of(^^T, access_context::unchecked()).size();
-            constexpr auto member_count = nonstatic_data_members_of(^^T, access_context::unchecked()).size();
+            constexpr auto base_count = schema::base_count_v<T>;
+            constexpr auto member_count = schema::member_count_v<T>;
             auto* obj = reinterpret_cast<T*>(raw);
             static_for<member_count>([&](auto index) {
                 constexpr auto i = member_count - 1 - decltype(index)::value;
-                constexpr auto member = nonstatic_data_members_of(^^T, access_context::unchecked())[i];
-                if (base_count + i < built) std::destroy_at(&((*obj).[:member:]));
+                using member = schema::member_t<T, i>;
+                if (base_count + i < built) std::destroy_at(&(member::get(*obj)));
             });
             static_for<base_count>([&](auto index) {
                 constexpr auto i = base_count - 1 - decltype(index)::value;
-                constexpr auto base = bases_of(^^T, access_context::unchecked())[i];
-                using Base = [:type_of(base):];
+                using Base = schema::base_t<T, i>;
                 if (i < built) std::destroy_at(static_cast<Base*>(obj));
             });
         }
 
         template <typename T, std::size_t N, typename Alloc>
         void reflect_init_nth(void* raw, Alloc alloc) {
-            using namespace std::meta;
-            constexpr auto member =
-                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+            using member = schema::member_t<T, N>;
             T& obj = *reinterpret_cast<T*>(raw);
-            fixed_detail::default_construct(&(obj.[:member:]), alloc);
+            fixed_detail::default_construct(&(member::get(obj)), alloc);
         }
 
         template <typename T, std::size_t N, typename Alloc>
         void reflect_init_base_nth(void* raw, Alloc alloc) {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            using BaseType = [:type_of(base_info):];
+            using BaseType = schema::base_t<T, N>;
             T* obj = reinterpret_cast<T*>(raw);
             reflect_init_all_impl<BaseType>(static_cast<void*>(static_cast<BaseType*>(obj)), alloc);
         }
@@ -6639,18 +6733,14 @@ namespace XOffsetDatastructure {
 
         template <typename T, std::size_t N, typename Src, typename Alloc>
         void reflect_transfer_init_nth(void* dst, Src&& src, Alloc alloc) {
-            using namespace std::meta;
-            constexpr auto member =
-                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
+            using member = schema::member_t<T, N>;
             T& d = *reinterpret_cast<T*>(dst);
-            fixed_detail::transfer_construct(&(d.[:member:]), src.[:member:], alloc);
+            fixed_detail::transfer_construct(&(member::get(d)), member::get(src), alloc);
         }
 
         template <typename T, std::size_t N, typename Src, typename Alloc>
         void reflect_transfer_base_nth(void* dst, Src&& src, Alloc alloc) {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            using BaseType = [:type_of(base_info):];
+            using BaseType = schema::base_t<T, N>;
             T* dst_obj = reinterpret_cast<T*>(dst);
             BaseType* dst_base = static_cast<BaseType*>(dst_obj);
             if constexpr (std::is_lvalue_reference_v<Src&&>) {
@@ -6787,14 +6877,13 @@ namespace XOffsetDatastructure {
 
         template <typename U, std::size_t... Is>
         consteval bool record_has_implicit_padding(std::index_sequence<Is...>) {
-            using namespace std::meta;
             std::size_t covered = 0;
             bool padded = false;
-            auto field = [&]<std::size_t I>() {
-                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
-                using FieldType = [:type_of(member):];
-                if (offset_of(member).bytes != covered) padded = true;
-                covered = offset_of(member).bytes + sizeof(FieldType);
+            auto field = [&]<std::size_t I>() consteval {
+                using member = schema::member_t<U, I>;
+                using FieldType = typename member::type;
+                if (member::offset != covered) padded = true;
+                covered = member::offset + sizeof(FieldType);
                 if (has_implicit_padding<FieldType>()) padded = true;
             };
             (field.template operator()<Is>(), ...);
@@ -6814,10 +6903,10 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_xkeyvalue_v<U>) {
                 return record_has_implicit_padding<U>(std::make_index_sequence<2>{});
             } else if constexpr (std::is_class_v<U>) {
-                static_assert(reflected_base_count<U>() == 0,
+                static_assert(schema::base_count_v<U> == 0,
                     "has_implicit_padding_v does not support base classes");
                 return record_has_implicit_padding<U>(
-                    std::make_index_sequence<reflected_member_count<U>()>{});
+                    std::make_index_sequence<schema::member_count_v<U>>{});
             } else {
                 static_assert(sizeof(U) == 0, "has_implicit_padding_v: non-admitted wire type");
             }
@@ -6847,12 +6936,11 @@ namespace XOffsetDatastructure {
         template <typename U, std::size_t... Is>
         consteval void collect_record_padding(std::vector<PaddingRange>& out, std::size_t base,
                                               std::index_sequence<Is...>) {
-            using namespace std::meta;
             std::size_t covered = 0;
-            auto field = [&]<std::size_t I>() {
-                constexpr auto member = nonstatic_data_members_of(^^U, access_context::unchecked())[I];
-                using FieldType = [:type_of(member):];
-                constexpr std::size_t offset = offset_of(member).bytes;
+            auto field = [&]<std::size_t I>() consteval {
+                using member = schema::member_t<U, I>;
+                using FieldType = typename member::type;
+                constexpr std::size_t offset = member::offset;
                 if (offset > covered) out.push_back({base + covered, offset - covered, 0, 1});
                 collect_padding<FieldType>(out, base + offset);
                 if (offset + sizeof(FieldType) > covered) covered = offset + sizeof(FieldType);
@@ -6882,9 +6970,9 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_class_v<U> && !is_fixed_string_v<U> && !is_fixed_vector_v<U>) {
                 // Records with bases are left alone (layout of base subobjects
                 // is not walked here).
-                if constexpr (reflected_base_count<U>() == 0)
+                if constexpr (schema::base_count_v<U> == 0)
                     collect_record_padding<U>(out, base,
-                        std::make_index_sequence<reflected_member_count<U>()>{});
+                        std::make_index_sequence<schema::member_count_v<U>>{});
             }
         }
 
@@ -6903,16 +6991,19 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        inline constexpr auto padding_ranges = [] {
+        consteval auto padding_range_array() {
             constexpr std::size_t n = merged_padding<T>().size();
             std::array<PaddingRange, n> ranges{};
             const auto v = merged_padding<T>();
             for (std::size_t i = 0; i < n; ++i) ranges[i] = v[i];
             return ranges;
-        }();
+        }
+
+        template <typename T>
+        inline constexpr auto padding_ranges = padding_range_array<T>();
 
         template <class T>
-        void zero_implicit_padding(T* object) noexcept {
+        XOFFSET_DETAIL_PRE26_INLINE void zero_implicit_padding(T* object) noexcept {
             if constexpr (!std::is_class_v<std::remove_cv_t<T>> && !std::is_array_v<std::remove_cv_t<T>>) {
                 (void)object;
             } else if constexpr (padding_ranges<T>.size() == 0) {
@@ -7990,7 +8081,7 @@ namespace XOffsetDatastructure {
         template<typename T>
         static consteval MigrateStrategy resolve_strategy() {
             using CleanT = std::remove_cv_t<T>;
-            static_assert(boost::typelayout::is_byte_copy_safe_v<CleanT>,
+            static_assert(is_byte_copy_safe_v<CleanT>,
                 "XCompactor: type is not byte-copy safe and cannot be migrated.");
             if constexpr (migrate_as<CleanT>::value != MigrateStrategy::NotRegistered) {
                 return migrate_as<CleanT>::value;
@@ -8091,9 +8182,7 @@ namespace XOffsetDatastructure {
         template<typename T, std::size_t N>
         static void migrate_base_at(const T& old_obj, T& new_obj,
                                     XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
-            using namespace std::meta;
-            constexpr auto base_info = bases_of(^^T, access_context::unchecked())[N];
-            using BaseType = [:type_of(base_info):];
+            using BaseType = schema::base_t<T, N>;
             migrate_members(static_cast<const BaseType&>(old_obj),
                             static_cast<BaseType&>(new_obj), old_xbuf, new_xbuf);
         }
@@ -8101,11 +8190,9 @@ namespace XOffsetDatastructure {
         template<typename T, std::size_t N>
         static void migrate_member_at(const T& old_obj, T& new_obj,
                                       XBufferCore& old_xbuf, XBufferCore& new_xbuf) {
-            using namespace std::meta;
-            constexpr auto member =
-                nonstatic_data_members_of(^^T, access_context::unchecked())[N];
-            using MemberType = [:type_of(member):];
-            migrate_member<MemberType>(old_obj.[:member:], new_obj.[:member:],
+            using member = schema::member_t<T, N>;
+            using MemberType = typename member::type;
+            migrate_member<MemberType>(member::get(old_obj), member::get(new_obj),
                                        old_xbuf, new_xbuf);
         }
 
@@ -8125,8 +8212,7 @@ namespace XOffsetDatastructure {
     };
 }
 
-namespace boost::typelayout {
-inline namespace v1 {
+namespace XOffsetDatastructure {
 
 template <typename T>
 struct is_byte_copy_safe<XOffsetDatastructure::XFixedVector<T>>
@@ -8152,8 +8238,7 @@ template <typename K, typename V>
 struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
     : std::bool_constant<is_byte_copy_safe_v<K> && is_byte_copy_safe_v<V>> {};
 
-} // inline namespace v1
-} // namespace boost::typelayout
+} // namespace XOffsetDatastructure
 
 // ============================================================================
 // Registration macros: XCompactor migration strategy registration.
@@ -8178,10 +8263,21 @@ struct _XOffset_NS_Sentinel {};
 
 // K7: compile-time pin of a type's wire layout (see schema_pin<T>()). Valid at
 // namespace or block scope. Use an alias for a type name containing commas.
+// The diagnostic shows the computed layout where static_assert takes a
+// computed message (C++26); otherwise schema_pin<T>() prints it.
+#if defined(__cpp_static_assert) && __cpp_static_assert >= 202306L
 #define XOFFSET_PIN_SCHEMA(Type, signature)                                    \
     static_assert(                                                             \
         ::XOffsetDatastructure::detail::schema_pin_matches<Type>(signature),   \
         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+#else
+#define XOFFSET_PIN_SCHEMA(Type, signature)                                    \
+    static_assert(                                                             \
+        ::XOffsetDatastructure::detail::schema_pin_matches<Type>(signature),   \
+        "XOffset schema pin mismatch (K7): this compiler and target lay " #Type \
+        " out differently; schema_pin<T>() prints the layout; update the pin " \
+        "only for an intended schema change")
+#endif
 
 #define XOFFSET_REGISTER_MIGRATION_TYPE(Type, strategy)                        \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_MIGRATION_TYPE")         \
@@ -8235,6 +8331,10 @@ struct _XOffset_NS_Sentinel {};
     static_assert(::XOffsetDatastructure::detail::ordinary_record_members_disjoint<Type>(), \
         "XOFFSET_ORDINARY_RECORDS: " #Type " has overlapping members "       \
         "([[no_unique_address]]?); it is not an ordinary record");           \
+    XOFFSET_SCHEMA_DETAIL_ORDINARY(Type)
+
+// The declaration part, shared with XOFFSET_RECORD.
+#define XOFFSET_SCHEMA_DETAIL_ORDINARY(Type)                                   \
     template<> struct XOffsetDatastructure::wire_record_layout<Type> {        \
         static constexpr bool ordinary_members = true;                         \
     };                                                                         \
@@ -8255,8 +8355,8 @@ struct _XOffset_NS_Sentinel {};
     __VA_OPT__(XOFFSET_DETAIL_FOR_EACH_AGAIN XOFFSET_DETAIL_PARENS (macro, __VA_ARGS__))
 #define XOFFSET_DETAIL_FOR_EACH_AGAIN() XOFFSET_DETAIL_FOR_EACH_HELPER
 
-// Compatibility wrappers. `name` is ignored now that XOffset no longer registers
-// its own containers through TypeLayout's opaque mechanism.
+// Compatibility wrappers. `name` is ignored: admission and signatures no longer
+// need a registered name.
 #define XOFFSET_REGISTER_TYPE(Type, name, strategy)                            \
     XOFFSET_REGISTER_MIGRATION_TYPE(Type, strategy)
 

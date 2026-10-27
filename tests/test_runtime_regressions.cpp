@@ -13,6 +13,8 @@ struct RuntimeRoot {
     XMap<XString, int32_t> map;
 };
 struct OtherRoot { int32_t id{}; };
+XOFFSET_RECORD_DERIVED(RuntimeRoot, (), id, name, first, guard, second, strings, map)
+XOFFSET_RECORD_DERIVED(OtherRoot, (), id)
 XOFFSET_REGISTER_SCHEMA_NAME(RuntimeRoot, "test.RuntimeRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(OtherRoot, "test.OtherRoot")
 

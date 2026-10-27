@@ -21,6 +21,7 @@ struct OwnerRoot {
     xo::XString name;
     xo::XVector<std::uint32_t> values;
 };
+XOFFSET_RECORD_DERIVED(OwnerRoot, (), name, values)
 XOFFSET_REGISTER_SCHEMA_NAME(OwnerRoot, "test.v21.owner-map")
 
 namespace {

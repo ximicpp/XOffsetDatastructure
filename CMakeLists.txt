@@ -15,6 +15,14 @@ option(XOFFSET_BUILD_DEMOS "Build the map state demo (demo/mapstate)" OFF)
 option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_BUILD_FUZZERS "Build libFuzzer targets (needs clang -fsanitize=fuzzer)" OFF)
 option(XOFFSET_FUZZ_INJECT_CRASH "Fuzz drill builds only: inputs starting with XOFFSET-INJECT crash the fuzz harnesses" OFF)
+# 26: P2996 reflection describes every record (no boilerplate). 20 and 23: one
+# XOFFSET_RECORD line per record; no <meta>, no -freflection, no TypeLayout.
+set(XOFFSET_CXX_STANDARD 26 CACHE STRING "C++ standard of the full library targets: 20, 23 or 26")
+set_property(CACHE XOFFSET_CXX_STANDARD PROPERTY STRINGS 20 23 26)
+# describe: XOFFSET_RECORD field lists under every standard, also C++26 (the
+# same-compiler control M26D); auto: reflection whenever the compiler has it.
+set(XOFFSET_SCHEMA_BACKEND auto CACHE STRING "Schema backend of the full library: auto or describe")
+set_property(CACHE XOFFSET_SCHEMA_BACKEND PROPERTY STRINGS auto describe)
 
 if(XOFFSET_BUILD_TESTS)
     enable_testing()
@@ -40,24 +48,19 @@ target_include_directories(xoffset_storage INTERFACE
 
 # This branch precedes compiler-family checks, reflection flags and dependencies.
 if(NOT XOFFSET_STORAGE_ONLY)
-    if(CMAKE_VERSION VERSION_LESS 3.30)
-        message(FATAL_ERROR "The full XOffset C++26 target requires CMake 3.30 or newer")
-    endif()
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16)
-            message(FATAL_ERROR "The full XOffset target requires GCC 16 or newer for P2996 reflection")
-        endif()
-    elseif(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        message(FATAL_ERROR "This project requires GCC 16+ or Clang with P2996 reflection support")
-    endif()
-    message(STATUS "Using C++26 with reflection")
+    xoffset_check_full_toolchain()
     get_filename_component(CLANG_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
     get_filename_component(CLANG_INSTALL_DIR "${CLANG_BIN_DIR}" DIRECTORY)
 
     # Build-tree convenience only. Installed consumers locate their toolchain
     # explicitly; these directories are never exported.
-    if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS deployment version")
+    # Apple clang builds use the system libc++, whose std::pmr symbols exist from
+    # macOS 14; an older target links but fails at load. project() has already made
+    # CMAKE_OSX_DEPLOYMENT_TARGET an empty cache entry, so the default needs FORCE.
+    # The C++26 build keeps the compiler's default (P2996 Clang ships its own libc++).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET
+       AND NOT XOFFSET_CXX_STANDARD STREQUAL "26")
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS deployment version" FORCE)
     endif()
     include(cmake/XOffsetDependencies.cmake)
     xoffset_validate_dependencies()
@@ -69,7 +72,11 @@ if(NOT XOFFSET_STORAGE_ONLY)
     # An imported interface transfers the real settings to try_compile().
     add_library(xoffset_probe_settings INTERFACE IMPORTED)
     xoffset_configure_full_interface(xoffset_probe_settings)
-    xoffset_require_reflection()
+    if(XOFFSET_CXX_STANDARD STREQUAL "26")
+        xoffset_require_reflection()
+    else()
+        xoffset_require_field_lists()
+    endif()
 
     function(configure_xoffset_target target_name)
         target_link_libraries(${target_name} PRIVATE xoffset_common)

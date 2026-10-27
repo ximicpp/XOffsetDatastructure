@@ -9,6 +9,7 @@ struct StableExample {
     XString name;
     XVector<std::int32_t> values;
 };
+XOFFSET_RECORD_DERIVED(StableExample, (), sequence, name, values)
 
 XOFFSET_REGISTER_SCHEMA_NAME(StableExample, "example.StableStorage")
 

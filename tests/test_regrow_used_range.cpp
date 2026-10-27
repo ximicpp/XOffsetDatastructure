@@ -17,6 +17,7 @@ struct RegrowRoot {
     XVector<std::uint64_t> values;
     XVector<std::uint64_t> other;
 };
+XOFFSET_RECORD_DERIVED(RegrowRoot, (), values, other)
 XOFFSET_REGISTER_SCHEMA_NAME(RegrowRoot, "test.RegrowRoot")
 
 namespace {

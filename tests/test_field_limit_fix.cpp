@@ -4,6 +4,7 @@
 // ============================================================================
 
 #include "../xoffsetdatastructure.hpp"
+#include <boost/typelayout.hpp>
 #include <iostream>
 #include <cassert>
 

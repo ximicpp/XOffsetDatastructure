@@ -138,7 +138,7 @@ void digest(const T& value, std::string& out) {
     } else {
         [&]<std::size_t... I>(std::index_sequence<I...>) {
             (digest_member<T, I>(value, out), ...);
-        }(std::make_index_sequence<xd::reflected_member_count<T>()>{});
+        }(std::make_index_sequence<XOffsetDatastructure::schema::member_count_v<T>>{});
     }
 }
 
@@ -201,7 +201,7 @@ void hygiene(const T& value, const std::string& where, bool padding) {
     } else if constexpr (std::is_class_v<T>) {
         [&]<std::size_t... I>(std::index_sequence<I...>) {
             (hygiene_member<T, I>(value, where, padding), ...);
-        }(std::make_index_sequence<xd::reflected_member_count<T>()>{});
+        }(std::make_index_sequence<XOffsetDatastructure::schema::member_count_v<T>>{});
     }
 }
 
