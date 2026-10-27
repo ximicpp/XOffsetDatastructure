@@ -114,6 +114,32 @@ endforeach()
 find_package(Threads REQUIRED)
 target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
 
+# Schema evolution (xoffset_evolution.hpp, server side).
+set(EVOLUTION_TESTS
+    test_schema_evolution
+)
+foreach(test_name ${EVOLUTION_TESTS})
+    add_xoffset_test(${test_name} "reflection;evolution")
+endforeach()
+
+# Schema evolution: conversions the default rules do not cover, and hooks that
+# name a field neither version has, must fail the build with the field's name.
+foreach(variant type_change container_kind unknown_handle)
+    add_executable(schema_evolution_${variant}_fail EXCLUDE_FROM_ALL schema_evolution/${variant}_fail.cpp)
+    configure_xoffset_target(schema_evolution_${variant}_fail)
+    add_test(NAME schema_evolution_${variant}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_evolution_${variant}_fail --config $<CONFIG>)
+endforeach()
+set_tests_properties(schema_evolution_type_change_fail PROPERTIES
+    LABELS "reflection;evolution"
+    PASS_REGULAR_EXPRESSION "field 'gold' changed type from int to long")
+set_tests_properties(schema_evolution_container_kind_fail PROPERTIES
+    LABELS "reflection;evolution"
+    PASS_REGULAR_EXPRESSION "field 'items' changed type from [A-Za-z:]*XVector<int> to [A-Za-z:]*XSet<int>")
+set_tests_properties(schema_evolution_unknown_handle_fail PROPERTIES
+    LABELS "reflection;evolution"
+    PASS_REGULAR_EXPRESSION "handles names 'glod', which neither version has")
+
 # G5/F4: the two libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
 #   fuzz_<target>_replay          replays fuzz/regressions/<target>/: crash
