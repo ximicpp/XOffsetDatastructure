@@ -387,6 +387,20 @@
       "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L3，XString assign(string_view) 保留两条快路径（短值写入已绑定的 inline 头、放得进堆块的值），其余移到 assign_general：Clang 下 noinline，使 Clang 在调用点内联 assign()；GCC/MSVC 下强制内联回去，与拆分前同一个函数（GCC Ir 全部 1.0000）。只改 xoffsetdatastructure.hpp；tests/test_xstring_direct_assign.cpp 加空串/短串/长串从 inline 与堆头赋值并 save/load 往返（旧库也通过）。试合点 4（ab92e590，对点 3）local_validate 8/8（106/106），两种 Ir 无警告：P2996 str.assign_short.view 0.7246、assign_short 0.7506、assign_long 0.8338、.copy 0.8809；GCC 16 全部 1.0000；最高 P2996 reloc.hero.push_back_grow.ord 1.0020（max_ratio）。",
       "evidence": "PR #128 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p4_*.md、ir_{gcc16,p2996}_p4.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
       "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 3 个 S 类，CKPT3（对 3549272）单列二分点"
+    },
+    {
+      "id": "s-class-pr129",
+      "pr": 129,
+      "metric": "*",
+      "compiler": "*",
+      "max_ratio": 1.0016,
+      "record_only": true,
+      "class": "S",
+      "head": "ad3873480b4e",
+      "base": "87a0514b6fd7",
+      "reason": "S 类合并（MERGE_RULES_V2 第 1 节）：G9 L4，XString 拷贝赋值：inline 值写入已绑定的 inline 头时直接拷 12 个 inline 字节（字符、零填充、长度与标志），与 store_inline 由 other.view() 写出的字节相同。只改 xoffsetdatastructure.hpp 7 行；tests/test_xstring_direct_assign.cpp 加 0..14 长度两两组合的拷贝赋值测试，与按 view 赋值的 inline 映像逐字节比较并 save/load 往返（旧库也通过）。试合点 5（ad387348，对点 4）local_validate 8/8（106/106），两种 Ir 无警告：str.assign_short.copy P2996 0.5433、GCC 16 0.6486，其余基本持平，最高 P2996 reloc.hero.mid_insert.ord 1.0016（max_ratio）。",
+      "evidence": "PR #129 描述；/mnt/project-files/g9-reloc-20261027/impl/（LOCAL_VALIDATE_p5_*.md、ir_{gcc16,p2996}_p5.json）；设计 /mnt/project-files/g9-reloc-20261027/G9_RELOC_DESIGN_20261027.md（https://claude.ai/artifact/NY1ZPYBmSzzLKa3XP5HMYn），原型 8d56776",
+      "approved_by": "「访问与拷贝」按 MERGE_RULES_V2 判 S 类（susu 16:54Z 10-26 授权按推荐自动执行；协调者 03:16Z 交办 L1–L5 按 S 类顺序合并，「性能优化」03:24Z 确认中间不停）；3549272 以来第 4 个 S 类，CKPT3（对 3549272）单列二分点"
     }
   ]
 }
