@@ -1,0 +1,4 @@
+ABC: pass (max upper bound 1.0125; A 1.0043, B 1.0061, C 1.0125; 24 / 24 processes)
+GATE_D: head D÷flatbuffers 1.131 / 1.140 (O4 upper bound <= 1.0: not met), D÷zpp_bits 1.320 / 1.331, D.read 82.1 µs; ctl D÷flatbuffers 1.129 / 1.138, D÷zpp_bits 1.318 / 1.328, D.read 82.7 µs
+G8 met
+ctest 100% tests passed out of 108 (rc 0)
