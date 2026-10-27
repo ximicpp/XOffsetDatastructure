@@ -55,8 +55,9 @@ std::size_t payload_offset(const XBuffer& xbuf, const Member* member) {
     return static_cast<std::size_t>(ptr - base);
 }
 
-// Payload offsets below index a dense V2 wire (extent_count == 0): header
-// followed by used_bytes contiguous payload bytes.
+// Payload offsets below index a dense V2.1 wire (extent_count == 0): header
+// followed by payload bytes [48, used_bytes), so payload offset p is wire
+// byte sizeof(XWireHeaderV2) + p - XWIRE_PAYLOAD_BEGIN.
 static bool dense_wire(const std::string& data) {
     XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
@@ -79,7 +80,7 @@ bool verified_load_rejects(const std::string& data) {
 template <typename Root>
 bool rejects_inline_length(const XBuffer& xbuf, std::string data, const XFixedString& value) {
     assert(value.is_inline() && dense_wire(data));
-    const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) + 11;
+    const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 11;
     data[length_byte] = static_cast<char>(0x80 | (XFixedString::inline_max + 1));
     return verified_load_rejects<Root>(data);
 }
@@ -258,7 +259,7 @@ bool test_verified_rejects_corrupt_fixed_string() {
     root = &xbuf.root<FixedRoot>();
     assert(!root->name.is_inline());
     const std::size_t size_offset = sizeof(XWireHeaderV2) +
-        payload_offset(xbuf, &root->name.size_);
+        payload_offset(xbuf, &root->name.size_) - XWIRE_PAYLOAD_BEGIN;
     assert(dense_wire(data));
     std::uint32_t bad_size = root->name.capacity_ + 1;
     std::memcpy(data.data() + size_offset, &bad_size, sizeof(bad_size));
@@ -299,7 +300,7 @@ bool test_verified_rejects_corrupt_nested_record() {
     assert(!root->items[2].label.is_inline());
     auto* nested_size = &root->items[2].label.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV2) + payload_offset(xbuf, nested_size);
+        sizeof(XWireHeaderV2) + payload_offset(xbuf, nested_size) - XWIRE_PAYLOAD_BEGIN;
     assert(dense_wire(data));
     std::uint32_t bad_size = root->items[2].label.capacity_ + 5;
     std::memcpy(data.data() + size_offset, &bad_size, sizeof(bad_size));
@@ -428,7 +429,7 @@ bool test_verified_rejects_corrupt_fixed_flat_map() {
     assert(!root->by_id.begin()[1].second.is_inline());
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV2) + payload_offset(xbuf, bad_size);
+        sizeof(XWireHeaderV2) + payload_offset(xbuf, bad_size) - XWIRE_PAYLOAD_BEGIN;
     assert(dense_wire(data));
     std::uint32_t corrupted = root->by_id.begin()[1].second.capacity_ + 9;
     std::memcpy(data.data() + size_offset, &corrupted, sizeof(corrupted));

@@ -155,9 +155,9 @@ int main(int argc, char** argv) {
     // V1 input is rejected explicitly.
     {
         auto v1 = in.pool.front();
-        std::memcpy(v1.data(), xo::XWIRE_MAGIC_V1, 8);
+        std::memcpy(v1.data(), "XOFFV1\0\0", 8);
         std::string error;
-        if (typed_load(v1, &error) || error.find("version 1") == std::string::npos)
+        if (typed_load(v1, &error) || error.find("wire format 1 is not supported") == std::string::npos)
             fail("V1 magic not rejected as format version 1: " + error);
     }
     Counts c;
