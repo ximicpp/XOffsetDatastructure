@@ -7403,6 +7403,9 @@ namespace XOffsetDatastructure {
             static_assert(sizeof(XWireHeaderV2) == 96 && offsetof(XWireHeaderV2, used_bytes) == 16 &&
                           offsetof(XWireHeaderV2, hole_bytes) == 40 && offsetof(XWireHeaderV2, root_type_id) == 48);
             if (!detail::small_reload_fast_path || data.size_bytes() < sizeof(XWireHeaderV2)) return false;
+            std::uint64_t used = 0;
+            std::memcpy(&used, data.data() + offsetof(XWireHeaderV2, used_bytes), sizeof(used));
+            if (used > small_reload_max) return false; // before the copy: larger wires lose nothing
             std::memcpy(&header, data.data(), sizeof(header));
             constexpr auto image = small_wire_image<T>();
             const auto words = std::bit_cast<std::array<std::uint64_t, wire_header_words>>(header);
@@ -7410,9 +7413,8 @@ namespace XOffsetDatastructure {
             const std::uint64_t diff = (words[0] ^ image[0]) | (words[1] ^ image[1]) | (words[6] ^ image[6]) |
                                        (words[7] ^ image[7]) | (words[8] ^ image[8]) | (words[9] ^ image[9]) |
                                        (words[10] ^ image[10]) | (words[11] ^ image[11]);
-            const std::uint64_t used = header.used_bytes;
             const std::uint64_t body = data.size_bytes() - sizeof(XWireHeaderV2);
-            if (diff != 0 || used < sizeof(XArena) || used > small_reload_max || used > body ||
+            if (diff != 0 || used < sizeof(XArena) || used > body ||
                 header.root_offset >= used || ((body - used) & 7u) != 0 || header.hole_count != (body - used) / 8u)
                 return false;
             const char* holes = reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2) + used;
