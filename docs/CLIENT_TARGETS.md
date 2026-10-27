@@ -18,14 +18,14 @@
 
 | 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
 | --- | --- | --- | --- | --- |
-| Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | NDK_R29_RESULT |
-| Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | NDK_R30_RESULT |
-| Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | MSVC_RESULT |
-| Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 105/105；语料全部接受，逐字节一致 |
-| Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 105/105；语料全部接受，逐字节一致 |
+| Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | 106/106；语料全部接受，逐字节一致 |
+| Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | 106/106；语料全部接受，逐字节一致 |
+| Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | 两种标准都是 106/106；语料全部接受，逐字节一致 |
+| Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 106/106；语料全部接受，逐字节一致 |
+| Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 106/106；语料全部接受，逐字节一致 |
 | macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行（探索分支，wire 2.0） | 两种标准都是 101/101；语料逐字节一致 |
 | iOS 模拟器 | Apple clang + iOS SDK | C++20 | 工具链文件已写（`ios-simulator.cmake`，经 `simctl spawn` 跑） | **阻塞：需要 Xcode**，Mac 上只有 Command Line Tools |
-| Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 105/105；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
+| Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
 
 各目标需要注意的地方：
 
