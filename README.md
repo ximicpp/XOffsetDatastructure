@@ -41,7 +41,7 @@ Full installed packages include the same dependency headers. Neither package
 includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
 recipes are in [toolchains/README.md](toolchains/README.md),
 [toolchains/vm-validation.json](toolchains/vm-validation.json), and the
-[package guide](docs/VM_PACKAGING.md#fixed-inputs).
+[package guide](docs/PACKAGING.md#fixed-inputs).
 
 ## Minimal full-library example
 
@@ -85,7 +85,7 @@ See `examples/helloworld.cpp`, `examples/stable_storage.cpp` and
 
 Extract the versioned source archive; it already contains the required dependency
 headers. In a Git checkout, first initialize the exact submodules using the
-[LF-preserving recipe](docs/VM_PACKAGING.md#fixed-inputs).
+[LF-preserving recipe](docs/PACKAGING.md#fixed-inputs).
 
 For a full source build with an already prepared P2996 toolchain:
 
@@ -154,10 +154,10 @@ Results are profile-specific, not a promise for every compiler on each OS.
 | Native Windows x64, MSVC | storage only (V1-era record) | MSVC full P2996 unverified |
 
 V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
-ASan+UBSan) with zero disagreements. Earlier V1-era platform records are kept in
-[VM_FINAL_DELIVERY.md](docs/VM_FINAL_DELIVERY.md) and
-[VM_VALIDATION_RUNNER.md](docs/VM_VALIDATION_RUNNER.md); they do not describe
-the V2 format.
+ASan+UBSan) with zero disagreements. Earlier V1-era platform records
+(`docs/VM_FINAL_DELIVERY.md` and the other `VM_`/`V1_` documents) were moved out
+of the tree on 2026-10-27; [ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)
+says how to retrieve them. They do not describe the V2 format.
 
 ## Performance
 

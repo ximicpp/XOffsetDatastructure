@@ -11,7 +11,7 @@ SPEC = importlib.util.spec_from_file_location(
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
-# The generators target the frozen F header (docs/VM_STAGE3_RESULTS.md), not the live one.
+# The generators target the frozen F header (docs/VM_STAGE3_RESULTS.md, archived, see docs/ARCHIVED_EVIDENCE.md), not the live one.
 FROZEN_F_ARCHIVE = (Path(__file__).resolve().parents[2]
                     / "docs/validation/2026-10-15-vm-followup/wire-inputs-and-versions.tar.gz")
 FROZEN_F_SHA256 = "9bc8f1f533bee83a9e111e05d67319383775dbca1844ef33b1aa717047640bb2"
