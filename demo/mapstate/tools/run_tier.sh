@@ -7,8 +7,14 @@
 # Environment: MAPDEMO_PORT_A / MAPDEMO_PORT_B (default 47701 / 47702),
 # MAPDEMO_SEED (default 1), MAPDEMO_BUFFERS (reuse | fresh, default reuse;
 # passed to all three processes), MAPDEMO_CLIENT_ARGS (extra client arguments),
-# MAPDEMO_NO_CLIENT=1 (servers only), MAPDEMO_A_LIMIT_S (A's wall-clock
-# limit; default STEPS/5 + 60 s, i.e. 4x slower than 20 Hz plus start-up).
+# MAPDEMO_A_ARGS (extra arguments of A, e.g. --corpus-dir DIR),
+# MAPDEMO_A_HOST (A --host: the address A listens on for clients, e.g.
+# 0.0.0.0 for a client in an emulator),
+# MAPDEMO_CLIENT (the client command, default BIN_DIR/mapdemo_client; e.g.
+# "wine64 /x/mapdemo_client.exe" or "qemu-aarch64-static /x/mapdemo_client"
+# for a client built for another platform), MAPDEMO_NO_CLIENT=1 (servers
+# only), MAPDEMO_A_LIMIT_S (A's wall-clock limit; default STEPS/5 + 60 s,
+# i.e. 4x slower than 20 Hz plus start-up).
 #
 # Writes OUT_DIR/{a,b,client}.log, the CSV files of INTERFACES.md section 6,
 # OUT_DIR/meta.txt and OUT_DIR/exit_codes.txt. Exit 0 only when all three
@@ -28,8 +34,11 @@ PORT_B=${MAPDEMO_PORT_B:-47702}
 SEED=${MAPDEMO_SEED:-1}
 BUFFERS=${MAPDEMO_BUFFERS:-reuse}
 CLIENT_ARGS=${MAPDEMO_CLIENT_ARGS:-}
+A_ARGS=${MAPDEMO_A_ARGS:-}
+[ -n "${MAPDEMO_A_HOST:-}" ] && A_ARGS="--host $MAPDEMO_A_HOST $A_ARGS"
+CLIENT=${MAPDEMO_CLIENT:-$BIN/mapdemo_client}
 
-for exe in mapdemo_a mapdemo_b mapdemo_client; do
+for exe in mapdemo_a mapdemo_b; do
     if [ ! -x "$BIN/$exe" ]; then
         echo "error: $BIN/$exe not found" >&2
         exit 2
@@ -68,6 +77,8 @@ wait_for() {
     echo "steps=$STEPS"
     echo "seed=$SEED"
     echo "buffers=$BUFFERS"
+    echo "client_cmd=$CLIENT"
+    echo "client_args=$CLIENT_ARGS"
     echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "host=$(uname -srm)"
     echo "load_before=$(uptime | sed 's/.*load average[s]*: //')"
@@ -78,13 +89,14 @@ wait_for() {
 
 "$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --buffers "$BUFFERS" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &
 B_PID=$!
+# shellcheck disable=SC2086 # A_ARGS is a word list on purpose
 "$BIN/mapdemo_a" --units "$UNITS" --seed "$SEED" --steps "$STEPS" --check --buffers "$BUFFERS" \
-    --port "$PORT_A" --b-port "$PORT_B" --csv-dir "$OUT" > "$OUT/a.log" 2>&1 &
+    --port "$PORT_A" --b-port "$PORT_B" --csv-dir "$OUT" $A_ARGS > "$OUT/a.log" 2>&1 &
 A_PID=$!
 C_PID=
 if [ "${MAPDEMO_NO_CLIENT:-0}" != 1 ]; then
-    # shellcheck disable=SC2086 # CLIENT_ARGS is a word list on purpose
-    "$BIN/mapdemo_client" --headless --check --buffers "$BUFFERS" --port "$PORT_A" --csv-dir "$OUT" \
+    # shellcheck disable=SC2086 # CLIENT and CLIENT_ARGS are word lists on purpose
+    $CLIENT --headless --check --buffers "$BUFFERS" --port "$PORT_A" --csv-dir "$OUT" \
         $CLIENT_ARGS > "$OUT/client.log" 2>&1 &
     C_PID=$!
 fi
