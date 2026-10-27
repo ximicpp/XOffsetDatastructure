@@ -17,8 +17,8 @@ XOFFSET_RECORD_DERIVED(Forest, (), left, right, opaque)
 namespace {
 void need(bool b,const char* why){if(!b)throw std::runtime_error(why);}
 template<class H> auto descriptor(const H& head){
-    static_assert(sizeof(H)==16);std::array<std::byte,16> bytes{};
-    std::memcpy(bytes.data(),&head,16);return bytes;
+    static_assert(sizeof(H)==12);std::array<std::byte,12> bytes{};
+    std::memcpy(bytes.data(),&head,12);return bytes;
 }
 void ancestor_change_without_local_witness_change(){
     auto buffer=xo::XBuffer::create<Forest>(65536,

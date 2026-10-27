@@ -92,6 +92,30 @@ void compare_cursor_off(const std::string& w, const std::string& id) {
     ++cursor_compared;
 }
 
+// The small dense reload path is a shortcut of the general reload: with it
+// off, the outcome, the first error and an accepted buffer's state must be
+// the same.
+std::size_t small_reload_compared = 0, small_reload_eligible = 0;
+std::string reload_state(const std::string& w) {
+    std::string err;
+    if (!reload_accepts(w, &err)) return "rejected: " + err;
+    auto& b = reloader();
+    const auto bytes = b.get_buffer();
+    return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size()) + "|" +
+           std::to_string(b.free_block_count()) + "|" + std::to_string(b.free_block_bytes()) + "|" + b.save_verified();
+}
+void compare_small_reload_off(const std::string& w, const std::string& id) {
+    const auto on = reload_state(w);
+    xo::detail::small_reload_fast_path = false;
+    const auto off = reload_state(w);
+    xo::detail::small_reload_fast_path = true;
+    if (on != off) fail("case " + id + ": small reload path on and off differ");
+    std::uint32_t used = 0, extents = 0;
+    if (w.size() >= 40) { std::memcpy(&used, w.data() + 8, 4); std::memcpy(&extents, w.data() + 20, 4); }
+    small_reload_eligible += w.size() >= 40 && used <= 32768 && extents == 0;
+    ++small_reload_compared;
+}
+
 // Case `id` (a number, or b<k> for page boundary case k).
 Outcome run_case(const Inputs& in, std::uint64_t seed, const std::string& id) {
     const bool boundary = id.front() == 'b';
@@ -116,6 +140,7 @@ Outcome run_case(const Inputs& in, std::uint64_t seed, const std::string& id) {
     g_fail.tag = "v2fuzz-s" + std::to_string(seed) + "-c" + id;
     g_fail.replay = "test_v2_fuzz --replay " + std::to_string(seed) + " " + id;
     compare_cursor_off(w, id);
+    compare_small_reload_off(w, id);
     const auto outcome = check_case(w, rng, id);
     g_fail.wire = nullptr;
     return outcome;
@@ -155,9 +180,9 @@ int main(int argc, char** argv) {
     // V1 input is rejected explicitly.
     {
         auto v1 = in.pool.front();
-        std::memcpy(v1.data(), xo::XWIRE_MAGIC_V1, 8);
+        std::memcpy(v1.data(), "XOFFV1\0\0", 8);
         std::string error;
-        if (typed_load(v1, &error) || error.find("version 1") == std::string::npos)
+        if (typed_load(v1, &error) || error.find("wire format 1 is not supported") == std::string::npos)
             fail("V1 magic not rejected as format version 1: " + error);
     }
     Counts c;
@@ -174,6 +199,7 @@ int main(int argc, char** argv) {
               << " header_rejects=" << c.header_rejects << " payload_rejects=" << c.payload_rejects
               << " sparse_vs_dense=" << inflated_comparisons << " composed=" << composed_comparisons
               << " cursor_off_compared=" << cursor_compared
+              << " small_reload_compared=" << small_reload_compared << " small_reload_eligible=" << small_reload_eligible
               << " inconsistencies=0\n";
     return 0;
 }

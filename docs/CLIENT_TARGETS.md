@@ -1,6 +1,8 @@
 # 客户端目标可行性（K8）
 
-服务端与客户端必须用同一 schema、同时发布（见产品定位）。库有两条构建路径：
+最核心的场景是服务端之间、服务端到客户端：服务端 Linux，客户端 Windows / iOS / Android，
+都是 64 位小端，不依赖具体的客户端引擎。服务端与客户端必须用同一 schema、同时发布（见产品定位）。
+库有两条构建路径，wire 逐字节相同：
 
 - **C++26**：P2996 反射描述每个记录，需要 clang-p2996 或带反射的 GCC。
 - **C++20 / C++23**：每个记录写一行 `XOFFSET_RECORD` 字段表（`-DXOFFSET_CXX_STANDARD=20|23`），
@@ -64,9 +66,26 @@ Windows 上需要注意的三点（都已在仓库里处理）：
   测试和工具，不进入导出的接口。
 - 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
 
-C++26 路径下 Android 和 iOS 不可行：NDK Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC；
-P2996 工具链只有 macOS 版 libc++ 和 `*_osx` compiler-rt，没有 iOS / iOS 模拟器版。这两个目标
-只能走 C++20 / C++23 字段表构建。
+## 本地平台矩阵（v1.1 起，代替 GitHub CI）
+
+`tools/platform_matrix.sh TARGET` 构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
+`--read` 和 `diff -r`，结果写进构建目录的 `PLATFORM_RESULT.md`。
+
+| 目标 | 在哪跑 | 编译器 | 最近结果 |
+| --- | --- | --- | --- |
+| Windows x64 | 云端 Linux，CTest 经 wine 运行 | 自建 MinGW-w64 GCC 16.2.0（`tools/build_mingw_toolchain.sh`，`cmake/toolchains/mingw-w64-x86_64.cmake`） | 3.1.0 RC（e913d22）：107 项 105 过、2 项跳过，V2.1 语料逐字节一致 |
+| Linux arm64 | Mac M4 的 colima Linux 虚拟机（Linux 6.8 aarch64，4 KiB 页），随 Mac 检查点批次 | GCC 16（gcc:16 arm64 镜像按 digest 固定）、P2996 d77eff1 | 3.1.0 RC（e913d22）：两者都 107/107，V2.1 语料逐字节一致 |
+| Linux x86-64 | 云端 | GCC 16（写参照语料）、P2996 | 3.1.0 RC（e913d22）：两者都 107/107，P2996 语料与参照逐字节一致 |
+
+Windows 上跳过的两项是 `test_canonical_cold_no_callback` 和 `test_canonical_zero_target`：它们测的是
+每线程 owner 缓存，而 GCC 在 MinGW 上用 emutls，线程退出时访问 `thread_local` 会拿到新块，所以这类
+缓存在 MinGW GCC 上整体关闭（`XOFFSET_THREAD_CACHES=0`），这两项以退出码 77 报跳过。
+
+## C++26 路径下的 Android 和 iOS
+
+NDK Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC；P2996 工具链只有 macOS 版 libc++ 和
+`*_osx` compiler-rt，没有 iOS / iOS 模拟器版。所以这两个目标只走 C++20 / C++23 字段表构建
+（上面第一节）。
 
 ## 范围
 

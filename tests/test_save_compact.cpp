@@ -52,8 +52,8 @@ std::size_t slack_cases = 0;
 void check_common(Buffer& b, const std::string& wire, xo::XCompactOptions options, const std::string& semantics,
                   const std::string& where) {
     xo::XWireHeaderV2 h; std::memcpy(&h, wire.data(), kHeader);
-    need(h.hole_count == 0 && h.hole_bytes == 0 && h.extent_count == 0 && h.root_offset == 48 &&
-         wire.size() == kHeader + h.used_bytes, where + ": not a compact dense wire");
+    need(h.hole_count == 0 && h.extent_count == 0 && h.root_offset == 48 &&
+         wire.size() == kHeader + h.used_bytes - xo::XWIRE_PAYLOAD_BEGIN, where + ": not a compact dense wire");
     const auto o = oracle(wire);
     need(o.ok, where + ": oracle rejects the compact wire: " + o.why);
     auto loaded = typed_load(wire);

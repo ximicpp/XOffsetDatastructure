@@ -7,7 +7,8 @@
 # builds (default and RELOC_IR_COUNT) and --mode verify agrees across sides; the formal
 # driver builds (default and SC_IR_COUNT), its contracts pass, fixtures S and M
 # equal the committed references, validate S/M passes and the M input wire is
-# the formal candidate wire 2bf0c071...
+# the pinned formal input wire (89fd02d2... since wire format 2.1; see
+# bench/formal/scripts/smoke.py)
 set -euo pipefail
 CXX=$1; CEREAL=$2; VALGRIND_PARENT=$3; OUT=$4
 mkdir -p "$OUT"

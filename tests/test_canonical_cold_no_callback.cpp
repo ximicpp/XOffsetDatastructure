@@ -85,13 +85,13 @@ std::string wire(){
     for(unsigned i=0;i<8;++i)r.values[i]=200+i;
     return b.save_verified();
 }
-// V2 dense wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
+// V2.1 dense wire: [XWireHeaderV2][payload bytes [48, used_bytes)][hole table: hole_count x 8].
 Buffer received(const std::string& bytes){
     xo::XWireHeaderV2 header{};need(bytes.size()>=sizeof(header),"fixture wire too small");
     std::memcpy(&header,bytes.data(),sizeof(header));
     const auto body=std::size_t(header.used_bytes);const auto holes=std::size_t(header.hole_count);
-    need(header.extent_count==0&&bytes.size()==sizeof(header)+body+holes*sizeof(xo::XBufferCore::WireHole),
-         "fixture is not a dense V2 wire");
+    need(header.extent_count==0&&bytes.size()==sizeof(header)+body-xo::XWIRE_PAYLOAD_BEGIN+
+             holes*sizeof(xo::XBufferCore::WireHole),"fixture is not a dense V2.1 wire");
     auto token=xo::begin_verified_receive<Root>(body,policy(),holes);
     {auto op=token.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes(),table=op.hole_bytes();
      for(std::size_t i=0;i<h.size();++i)h[i]=std::byte(static_cast<unsigned char>(bytes[i]));
@@ -228,8 +228,14 @@ void real_free_table_growth_has_no_callback(const std::string& bytes){
 }
 }
 
+// Both cases drive the per-thread owner cache; GCC on MinGW/Cygwin builds without it
+// (XOFFSET_THREAD_CACHES=0), so there is nothing to test: CTest reports a skip (77).
+#if !XOFFSET_THREAD_CACHES
+int main(){std::cout<<"skipped: no per-thread owner cache (XOFFSET_THREAD_CACHES=0)\n";return 77;}
+#else
 int main(){try{const auto bytes=test::wire();
     test::direct_cold_has_no_eviction(bytes);test::real_free_table_growth_has_no_callback(bytes);
     std::cout<<"canonical-v4: cold no-eviction/no-C++-allocation; real free-table growth and exact terminal-delete owner-move controls passed\n";
     return 0;
 }catch(const std::exception& e){host::disarm();std::set_new_handler(nullptr);std::cerr<<e.what()<<'\n';return 1;}}
+#endif

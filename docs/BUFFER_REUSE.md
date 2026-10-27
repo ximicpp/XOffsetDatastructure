@@ -1,4 +1,4 @@
-# 复用同一个 XBuffer（0.3.0-beta.1，实验接口）
+# 复用同一个 XBuffer（3.1.0，实验接口）
 
 大量 KB 级消息逐条收发时，每条消息都新建、销毁一个 `XBuffer` 的固定开销（映射、owner
 登记、空闲表）会超过序列化本身。除了用 `XBufferPool` 复用映射，还可以让收发两端各自
@@ -35,7 +35,7 @@ XWireHeaderV2 h = read_header(conn);         // 先收 wire 头，拿到三个�
 auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.hole_count, h.extent_count);
 std::memcpy(t.header_bytes().data(), &h, sizeof h);
 recv_exact(conn, t.extent_bytes());          // 稀疏 wire 的 extent 表
-recv_exact(conn, t.payload_bytes());         // 稠密：整段；稀疏：每个 extent 写到它的偏移
+recv_exact(conn, t.payload_bytes());         // payload [48, used)：稠密整段；稀疏 extent o 写到 o - 48
 recv_exact(conn, t.hole_bytes());            // 空洞表
 t.complete(t.header_bytes().size(), t.payload_bytes().size(),
            t.hole_bytes().size(), t.extent_bytes().size());
@@ -44,8 +44,11 @@ handle(in.root<Msg>());
 ```
 
 - 接纳、校验、拒绝集合和结果与对同一条 wire 调用 `reload_verified<T>()` 完全相同。
+- `payload_bytes()` 是 payload 的 `[48, used_bytes)`：48 字节的 payload 头不在 wire 上，
+  由库在 `finish()` 时写入。extent 表里的偏移是 payload 偏移，偏移 `o` 的 extent 写到
+  `payload_bytes()` 的 `o - 48` 处。
 - `complete()` 报的是实际写入的字节数；稀疏 wire 的 payload 计数包括 gap，即全部 extent
-  落地后的逻辑长度。消息比头里声明的短或长、没有调用 `complete()`、计数不符、声明的
+  落地后的逻辑长度（`used_bytes - 48`）。消息比头里声明的短或长、没有调用 `complete()`、计数不符、声明的
   长度与头不符，都拒绝。
 - token 在 `finish()` 之前被销毁（例如连接中途断开）等同于一次失败的 reload：buffer
   变成空的，没有可用的根。

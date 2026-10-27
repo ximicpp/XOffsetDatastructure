@@ -23,6 +23,7 @@
 //
 // XOFFSET_SLOT_MAX_BYTES=0 disables slots: every owner is VM.
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -51,6 +52,23 @@
 #  include <sanitizer/asan_interface.h>
 #endif
 
+// Per-thread caches (this slab's free lists, the free-table cache and the
+// owner cache in xoffsetdatastructure.hpp). Each keeps a trivial thread_local
+// flag that its nontrivial cache clears on thread exit, so late destructors
+// take the global path. GCC on MinGW and Cygwin emulates TLS (emutls): a
+// thread's TLS blocks can be freed before its thread_local destructors run,
+// and a TLS access from such a destructor gets a fresh block, so neither the
+// cache nor the flag is reliable there. Those targets get no per-thread
+// caches; every path uses the global structures. Clang on MinGW uses native
+// TLS and keeps them.
+#ifndef XOFFSET_THREAD_CACHES
+#  if (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(__GNUC__) && !defined(__clang__)
+#    define XOFFSET_THREAD_CACHES 0
+#  else
+#    define XOFFSET_THREAD_CACHES 1
+#  endif
+#endif
+
 #ifndef XOFFSET_SLOT_MAX_BYTES
 #  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
 #endif
@@ -59,12 +77,143 @@
 #endif
 
 namespace XOffsetDatastructure {
+// Owner-table lookups sit on every allocate, grow and retire; GCC stops
+// inlining them once the table reads are atomic, so force it.
+#if defined(__GNUC__) || defined(__clang__)
+#  define XOFFSET_DETAIL_OWNER_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define XOFFSET_DETAIL_OWNER_INLINE __forceinline
+#else
+#  define XOFFSET_DETAIL_OWNER_INLINE inline
+#endif
+
 namespace detail {
 
 constexpr std::size_t slot_log2(std::size_t value) noexcept {
     std::size_t shift = 0;
     while ((std::size_t(1) << shift) < value) ++shift;
     return shift;
+}
+
+// V2.1 owner lookup: the payload base of an address (a head names no owner).
+// One byte per 4 MiB granule of a 48-bit address space. 0: no XOffset region.
+// Otherwise bits 0..5 are k, the region's alignment exponent (the region, or
+// the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
+// payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
+// is aligned to 2^k and sets the entries of its granules while it is mapped.
+// Entries change only while no head lives in the region. One granule's entry
+// can still be written by two threads: one clears it and unmaps the range,
+// another maps the range again and sets it. The kernel orders the two, C++
+// does not, so every access is a relaxed atomic (a plain byte load or store).
+struct OwnerMap {
+    static constexpr std::size_t granule_shift = 22;
+    static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
+    static constexpr std::size_t address_bits = 48;
+    static constexpr std::size_t entries = std::size_t(1) << (address_bits - granule_shift);
+    static constexpr std::uint8_t slot_bit = 0x80;
+
+    static std::size_t index(std::uintptr_t address) noexcept {
+        return (address >> granule_shift) & (entries - 1);
+    }
+    // Makes the table usable before a region registers; false when it cannot
+    // be allocated (only on Windows, where it is allocated at run time).
+    static bool ready() noexcept;
+    static std::uint8_t entry(std::uintptr_t address) noexcept;
+    // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
+    XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+        return __atomic_load_n(&e, __ATOMIC_RELAXED);
+#else
+        return *static_cast<const volatile std::uint8_t*>(&e);
+#endif
+    }
+    XOFFSET_DETAIL_OWNER_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+        __atomic_store_n(&e, value, __ATOMIC_RELAXED);
+#else
+        *static_cast<volatile std::uint8_t*>(&e) = value;
+#endif
+    }
+    static char* payload_of(const void* p) noexcept;
+    // The payload of a if b lies in the same payload, else null. One table
+    // read when both are in one granule (granules are never shared).
+    static char* same_payload(const void* a, const void* b) noexcept;
+    // Sets (or with entry 0 clears) the entries of [begin, begin + bytes).
+    static void set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept;
+    static bool reachable(const void* begin, std::size_t bytes) noexcept {
+        const auto a = reinterpret_cast<std::uintptr_t>(begin);
+        return bytes != 0 && (a >> address_bits) == 0 &&
+               bytes <= (std::uintptr_t(1) << address_bits) - a;
+    }
+};
+
+#if defined(_WIN32)
+// A PE image stores zero-initialized COMDAT data in the file (MinGW GCC puts
+// this table in .data: a 64 MiB executable), so on Windows the table is
+// committed at the first registration. While it is null no region exists and
+// every lookup finds no owner. The pointer is set once and never changes; a
+// thread that holds a head in a region has synchronized with the region's
+// registration, so relaxed loads see it.
+inline std::atomic<std::uint8_t*> owner_map_table{nullptr};
+
+inline bool OwnerMap::ready() noexcept {
+    if (owner_map_table.load(std::memory_order_acquire)) return true;
+    auto* fresh = static_cast<std::uint8_t*>(
+        ::VirtualAlloc(nullptr, entries, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    if (!fresh) return false;
+    std::uint8_t* expected = nullptr;
+    if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel))
+        ::VirtualFree(fresh, 0, MEM_RELEASE);
+    return true;
+}
+
+XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+    const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
+    return table ? load(table[index(address)]) : std::uint8_t(0);
+}
+#else
+// Zero-initialized (BSS): pages the program never touches cost no memory.
+inline std::uint8_t owner_map_table[OwnerMap::entries];
+
+inline bool OwnerMap::ready() noexcept { return true; }
+
+XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+    return load(owner_map_table[index(address)]);
+}
+#endif
+
+XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
+    const auto a = reinterpret_cast<std::uintptr_t>(p);
+    const std::uint8_t e = entry(a);
+    if (e == 0) return nullptr;
+    const auto base = a & (~std::uintptr_t(0) << (e & 63u));
+    return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
+}
+
+XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
+    const auto ua = reinterpret_cast<std::uintptr_t>(a);
+    const auto ub = reinterpret_cast<std::uintptr_t>(b);
+    const std::uint8_t e = entry(ua);
+    if (e == 0) return nullptr;
+    char* const pa = reinterpret_cast<char*>(
+        (ua & (~std::uintptr_t(0) << (e & 63u))) + ((e & slot_bit) >> 1));
+    if (index(ua) == index(ub)) return ((ua ^ ub) >> (e & 63u)) == 0 ? pa : nullptr;
+    return payload_of(b) == pa ? pa : nullptr;
+}
+
+inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept {
+    if (bytes == 0) return;
+#if defined(_WIN32)
+    std::uint8_t* const table = owner_map_table.load(std::memory_order_acquire);
+    if (!table) return;  // entry 0 before any registration: nothing to clear
+#else
+    std::uint8_t* const table = owner_map_table;
+#endif
+    const auto a = reinterpret_cast<std::uintptr_t>(begin);
+    for (std::size_t i = index(a), last = index(a + bytes - 1); ; ++i) {
+        store(table[i], value);
+        if (i == last) break;
+    }
 }
 
 struct SlotGeometry {
@@ -246,7 +395,11 @@ private:
     // Same pattern as the free-table cache: this trivial flag outlives the
     // cache, so late thread and static destructors use the global lists.
     static bool& cache_available() noexcept {
+#if XOFFSET_THREAD_CACHES
         static thread_local bool available = true;
+#else
+        static bool available = false; // never set: see XOFFSET_THREAD_CACHES
+#endif
         return available;
     }
     static ThreadCache& thread_cache() noexcept {
@@ -287,8 +440,12 @@ private:
         }
         const auto bytes = SlotGeometry::slot_bytes(cls);
         if (state.carve[cls] == state.carve_end[cls]) {
+            if (!OwnerMap::ready()) return nullptr;
             char* chunk = map_chunk();
             if (!chunk) return nullptr;
+            if (!OwnerMap::reachable(chunk, SlotGeometry::chunk_bytes)) return nullptr;
+            OwnerMap::set(chunk, SlotGeometry::chunk_bytes, static_cast<std::uint8_t>(
+                OwnerMap::slot_bit | (SlotGeometry::min_shift + cls)));
             state.carve[cls] = chunk;
             state.carve_end[cls] = chunk + SlotGeometry::chunk_bytes;
             ++state.stats.chunks;

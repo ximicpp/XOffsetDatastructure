@@ -47,13 +47,13 @@ namespace{
 void need(bool p,const char* why){if(!p)throw std::runtime_error(why);}
 auto policy(){return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic);}
 std::string wire(){auto b=Buffer::create(32768,policy());auto& r=b.root();r.marker=0xa1200345;r.label="canonical registry";r.values.resize(5);for(unsigned i=0;i<5;++i)r.values[i]=101+i;return b.save_verified();}
-// V2 dense wire: [XWireHeaderV2][payload: used_bytes][hole table: hole_count x 8].
+// V2.1 dense wire: [XWireHeaderV2][payload bytes [48, used_bytes)][hole table: hole_count x 8].
 Token receive(const std::string& bytes){
     xo::XWireHeaderV2 header{};need(bytes.size()>=sizeof(header),"fixture wire too small");
     std::memcpy(&header,bytes.data(),sizeof(header));
     const auto body=std::size_t(header.used_bytes);const auto holes=std::size_t(header.hole_count);
-    need(header.extent_count==0&&bytes.size()==sizeof(header)+body+holes*sizeof(xo::XBufferCore::WireHole),
-         "fixture is not a dense V2 wire");
+    need(header.extent_count==0&&bytes.size()==sizeof(header)+body-xo::XWIRE_PAYLOAD_BEGIN+
+             holes*sizeof(xo::XBufferCore::WireHole),"fixture is not a dense V2.1 wire");
     auto t=xo::begin_verified_receive<CanonicalRegistryRoot>(body,policy(),holes);
     auto op=t.acquire_operation();auto h=op.header_bytes(),p=op.payload_bytes(),table=op.hole_bytes();
     for(std::size_t i=0;i<h.size();++i)h[i]=std::byte(static_cast<unsigned char>(bytes[i]));

@@ -368,7 +368,9 @@ void typed_head_checks() {
     const auto original = buffer.save_verified<GranuleRoot>();
     const auto h = read_at<xo::XWireHeaderV2>(original, 0);
     need(h.extent_count == 0 && h.hole_count == 0, "fixture wire must be dense without holes");
-    const std::size_t rp = sizeof(h) + h.root_offset;
+    // Dense V2.1: payload offset p is file position payload_at + p.
+    const std::int64_t payload_at = std::int64_t(sizeof(h)) - std::int64_t(xo::XWIRE_PAYLOAD_BEGIN);
+    const std::size_t rp = std::size_t(payload_at + h.root_offset);
     const std::size_t used = h.used_bytes;
     (void)xo::XBuffer::load_verified<GranuleRoot>(original);
     auto field = [&](std::size_t member, std::size_t head_field) { return rp + member + head_field; };
@@ -378,25 +380,16 @@ void typed_head_checks() {
         const auto origin = field(member, offsetof(xo::XFixedVector<std::uint32_t>, data_delta));
         return std::size_t(std::int64_t(origin) + read_at<std::int32_t>(w, origin));
     };
-    // Points a head's data_delta at payload offset `to` (file position sizeof(h) + to).
+    // Points a head's data_delta at payload offset `to` (file position payload_at + to).
     auto point = [&](std::string& w, std::size_t member, std::int64_t to) {
         const auto origin = field(member, offsetof(xo::XFixedVector<std::uint32_t>, data_delta));
-        write_at(w, origin, std::int32_t(std::int64_t(sizeof(h)) + to - std::int64_t(origin)));
+        write_at(w, origin, std::int32_t(payload_at + to - std::int64_t(origin)));
     };
-    {   // bool check precedes a later bad binding.
+    {   // bool check precedes a later bad pointer.
         auto bad = original;
         write_at(bad, rp + offsetof(GranuleRoot, flags) + 2, std::uint8_t{2});
-        write_at(bad, field(name, offsetof(xo::XFixedString, arena_delta)), INT32_MAX);
+        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, data_delta)), INT32_MAX);
         reject<GranuleRoot>(bad, "wire validation: invalid bool representation");
-    }
-    {
-        auto bad = original;
-        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), std::int32_t{0});
-        reject<GranuleRoot>(bad, "wire validation: invalid allocator binding");
-        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), INT32_MAX);
-        reject<GranuleRoot>(bad, "wire validation: relative pointer out of bounds");
-        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, arena_delta)), std::int32_t{-8});
-        reject<GranuleRoot>(bad, "wire validation: invalid allocator binding");
     }
     {   // Data address outside the payload, at its end, payload past the end,
         // only the rounded block past the end, element and block misalignment.
@@ -410,9 +403,9 @@ void typed_head_checks() {
         write_at(odd, field(words, offsetof(xo::XFixedVector<std::uint32_t>, capacity_)), std::uint32_t{5});
         point(odd, words, std::int64_t(used) - 20); // payload fits, round8 block does not, and 4-aligned only
         reject<GranuleRoot>(odd, "wire validation: allocation out of bounds");
-        auto mis = original; point(mis, words, std::int64_t(data_of(original, words)) - std::int64_t(sizeof(h)) + 1);
+        auto mis = original; point(mis, words, std::int64_t(data_of(original, words)) - payload_at + 1);
         reject<GranuleRoot>(mis, "wire validation failed: XFixedVector payload out of bounds");
-        auto mis4 = original; point(mis4, words, std::int64_t(data_of(original, words)) - std::int64_t(sizeof(h)) - 4);
+        auto mis4 = original; point(mis4, words, std::int64_t(data_of(original, words)) - payload_at - 4);
         reject<GranuleRoot>(mis4, "wire validation: allocation out of bounds");
     }
     {   // String: data outside, payload past the end, misaligned block.
@@ -426,7 +419,7 @@ void typed_head_checks() {
         reject<GranuleRoot>(mis, "wire validation: allocation out of bounds");
     }
     {   // Live block onto another live block, and a map order error.
-        auto bad = original; point(bad, words, std::int64_t(data_of(original, offsetof(GranuleRoot, name))) - std::int64_t(sizeof(h)));
+        auto bad = original; point(bad, words, std::int64_t(data_of(original, offsetof(GranuleRoot, name))) - payload_at);
         reject<GranuleRoot>(bad, live_live);
         using Pair = xo::XKeyValue<std::uint32_t, bool>;
         auto order = original;
@@ -441,12 +434,13 @@ void typed_head_checks() {
         r.left.reserve(32);
         const auto valid = retired.save_verified<PairRoot>();
         const auto header = read_at<xo::XWireHeaderV2>(valid, 0);
-        need(header.hole_count == 1 && header.hole_bytes == 16, "fixture must hold one retired block");
-        const auto hole = read_at<xo::XBufferCore::WireHole>(valid, sizeof(header) + header.used_bytes);
+        const auto at = sizeof(header) - xo::XWIRE_PAYLOAD_BEGIN; // + payload offset: file position
+        const auto hole = read_at<xo::XBufferCore::WireHole>(valid, at + header.used_bytes);
+        need(header.hole_count == 1 && hole.bytes == 16, "fixture must hold one retired block");
         auto bad = valid;
-        const auto origin = sizeof(header) + header.root_offset + offsetof(PairRoot, right) +
+        const auto origin = at + header.root_offset + offsetof(PairRoot, right) +
                             offsetof(xo::XFixedVector<std::uint8_t>, data_delta);
-        write_at(bad, origin, std::int32_t(std::int64_t(sizeof(header) + hole.offset) - std::int64_t(origin)));
+        write_at(bad, origin, std::int32_t(std::int64_t(at + hole.offset) - std::int64_t(origin)));
         reject<PairRoot>(bad, live_free);
         (void)xo::XBuffer::load_verified<PairRoot>(valid);
     }

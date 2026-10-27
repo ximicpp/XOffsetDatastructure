@@ -375,9 +375,9 @@ void transport_and_graph_admission() {
     // the head: shrinking or growing capacity_ must break exact coverage.
     XWireHeaderV2 header{};
     std::memcpy(&header, wire.data(), sizeof(header));
-    assert(header.extent_count == 0 && header.hole_count == 0); // dense: payload = bytes [96, 96 + used)
+    assert(header.extent_count == 0 && header.hole_count == 0); // dense: payload [48, used) = bytes [40, used - 8)
     auto& live = valid.root<TailExpansionRoot>();
-    const auto head = sizeof(XWireHeaderV2) + offset_of(valid, &live.values);
+    const auto head = sizeof(XWireHeaderV2) + offset_of(valid, &live.values) - XWIRE_PAYLOAD_BEGIN;
     const auto size_at = head + offsetof(XFixedVector<std::int32_t>, size_);
     const auto capacity_at = head + offsetof(XFixedVector<std::int32_t>, capacity_);
     std::uint32_t capacity = 0;

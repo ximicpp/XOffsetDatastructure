@@ -187,11 +187,43 @@ consteval bool shift_relocate_supported() {
 // Heads live in one bounded arena, so a rebased delta stays in rel32 range;
 // an impossible overflow ends the program as set_rel32 in a noexcept relocation does.
 // A null delta stays null; otherwise the exact int32 sum, without a branch on
-// null (heads mix bound and empty containers).
-inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept {
-    const std::int32_t step = delta != 0 ? shift : 0;
+// null (heads mix bound and empty containers). One moved run shares one shift.
+// Clang vectorizes the run when the overflow test is a compare against fixed
+// bounds (a non-null delta outside [low, high] would overflow), collected and
+// checked once after the run, so the wrapped sums are never used. GCC and MSVC
+// keep scalar code, where a checked add per delta is shorter.
+#if defined(__clang__)
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 1
+#else
+#define XOFFSET_DETAIL_SHIFT_RUN_BOUNDS 0
+#endif
+
+struct ShiftRun {
+    std::int32_t shift;
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    std::int32_t low;
+    std::int32_t high;
+    bool overflow = false;
+
+    explicit ShiftRun(std::int32_t by) noexcept
+        : shift(by),
+          low(by < 0 ? (std::numeric_limits<std::int32_t>::min)() - by : (std::numeric_limits<std::int32_t>::min)()),
+          high(by > 0 ? (std::numeric_limits<std::int32_t>::max)() - by : (std::numeric_limits<std::int32_t>::max)()) {}
+#else
+    explicit ShiftRun(std::int32_t by) noexcept : shift(by) {}
+#endif
+};
+
+inline std::int32_t shift_rel32(std::int32_t delta, ShiftRun& run) noexcept {
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    // 0 lies in [low, high] for every shift.
+    run.overflow |= (delta < run.low) | (delta > run.high);
+    const std::uint32_t step = delta != 0 ? static_cast<std::uint32_t>(run.shift) : 0u;
+    return static_cast<std::int32_t>(static_cast<std::uint32_t>(delta) + step);
+#else
+    const std::int32_t step = delta != 0 ? run.shift : 0;
     std::int32_t moved;
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
     if (__builtin_add_overflow(delta, step, &moved)) [[unlikely]] std::terminate();
 #else
     const std::int64_t wide = std::int64_t(delta) + step;
@@ -200,61 +232,73 @@ inline std::int32_t shift_rel32(std::int32_t delta, std::int32_t shift) noexcept
     moved = static_cast<std::int32_t>(wide);
 #endif
     return moved;
+#endif
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept;
 
 // `shift` = old address - new address, so each delta grows by it. Forced
 // inline down to the heads: one moved element is a few loads and stores.
 template<class T>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, std::int32_t shift) noexcept {
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftRun& run) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
-        // Descriptor layout {arena_delta, data_delta, size_, capacity_} is
-        // checked by raw_descriptor_layout<T>() in shift_rebase_domain.
-        std::int32_t arena_delta, data_delta;
+        // Descriptor layout {data_delta, size_, capacity_} is checked by
+        // raw_descriptor_layout<T>() in shift_rebase_domain.
+        std::int32_t data_delta;
         std::uint32_t size, capacity;
-        std::memcpy(&arena_delta, address, 4);
-        std::memcpy(&data_delta, address + 4, 4);
-        std::memcpy(&size, address + 8, 4);
-        std::memcpy(&capacity, address + 12, 4);
-        auto* object = ::new (static_cast<void*>(address)) T;
+        std::memcpy(&data_delta, address, 4);
+        std::memcpy(&size, address + 4, 4);
+        std::memcpy(&capacity, address + 8, 4);
         bool inline_bytes = false;
         if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XFixedString::inline_flag) != 0;
-        object->arena_delta = shift_rel32(arena_delta, shift);
-        object->data_delta = shift_rel32(data_delta, inline_bytes ? 0 : shift);
+        // The checked sum comes first: with no call between the new head and
+        // its three stores, the default member initializers' zero stores are dead.
+        // Inline string bytes are characters, not a delta: kept as they are.
+        const std::int32_t moved_data = inline_bytes ? data_delta : shift_rel32(data_delta, run);
+        auto* object = ::new (static_cast<void*>(address)) T;
+        object->data_delta = moved_data;
         object->size_ = size;
         object->capacity_ = capacity;
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
         if constexpr (raw_needs_activation<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
-                shift_rebase_inline_value<E>(address + i * sizeof(E), shift);
+                shift_rebase_inline_value<E>(address + i * sizeof(E), run);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
-        shift_rebase_members<T>(address, shift, std::make_index_sequence<schema::member_count_v<T>>{});
+        shift_rebase_members<T>(address, run, std::make_index_sequence<schema::member_count_v<T>>{});
     }
 }
 
 template<class T, std::size_t I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, std::int32_t shift) noexcept {
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, ShiftRun& run) noexcept {
     using member = schema::member_t<T, I>;
     using M = typename member::type;
     if constexpr (raw_needs_activation<M>())
-        shift_rebase_inline_value<M>(address + member::offset, shift);
+        shift_rebase_inline_value<M>(address + member::offset, run);
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, std::int32_t shift,
+XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept {
-    (shift_rebase_member<T, I>(address, shift), ...);
+    (shift_rebase_member<T, I>(address, run), ...);
 }
 
+// Forced inline where the run vectorizes: a one-element insert or erase then
+// shifts by a constant.
 template<class T>
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+XOFFSET_DETAIL_SHIFT_INLINE
+#endif
 void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
     static_assert(shift_relocate_supported<T>());
+    ShiftRun run(shift);
     for (std::size_t i = 0; i < count; ++i)
-        shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), shift);
+        shift_rebase_inline_value<T>(reinterpret_cast<char*>(first + i), run);
+#if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
+    if (run.overflow) [[unlikely]] std::terminate();
+#endif
 }
 
 // The live slot a shift left behind still names the moved payloads. Empty its
@@ -394,18 +438,18 @@ inline std::int32_t subtree_rel32(const void* origin, const void* target) noexce
     return static_cast<std::int32_t>(delta);
 }
 
-template<class T> void subtree_fix_value(char* address, XArena* arena) noexcept;
+template<class T> void subtree_fix_value(char* address) noexcept;
 
 // The memcpy created the arrays, ordinary outers and scalars of the copy.
-// Restart each live head (nonimplicit lifetime) and rebind it to the
-// destination arena; data_delta moves with its block and is kept. Live
-// elements get the M6 padding zeroing of the element-wise path.
+// Restart each live head (nonimplicit lifetime); data_delta moves with its
+// block and is kept, and the head belongs to the destination by its address.
+// Live elements get the M6 padding zeroing of the element-wise path.
 template<class E>
-void subtree_fix_elements(char* data, std::uint32_t size, XArena* arena) noexcept {
+void subtree_fix_elements(char* data, std::uint32_t size) noexcept {
     if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
         for (std::uint32_t i = 0; i < size; ++i) {
             char* element = data + std::size_t(i) * sizeof(E);
-            if constexpr (raw_needs_activation<E>()) subtree_fix_value<E>(element, arena);
+            if constexpr (raw_needs_activation<E>()) subtree_fix_value<E>(element);
             if constexpr (padding_ranges<E>.size() != 0)
                 zero_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
         }
@@ -413,34 +457,33 @@ void subtree_fix_elements(char* data, std::uint32_t size, XArena* arena) noexcep
 }
 
 template<class T>
-void subtree_fix_value(char* address, XArena* arena) noexcept {
+void subtree_fix_value(char* address) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
         // Descriptor layout is checked by raw_descriptor_layout<T>().
         std::int32_t data_delta;
         std::uint32_t size, capacity;
-        std::memcpy(&data_delta, address + 4, 4);
-        std::memcpy(&size, address + 8, 4);
-        std::memcpy(&capacity, address + 12, 4);
+        std::memcpy(&data_delta, address, 4);
+        std::memcpy(&size, address + 4, 4);
+        std::memcpy(&capacity, address + 8, 4);
         auto* object = ::new (static_cast<void*>(address)) T;
-        object->arena_delta = subtree_rel32(&object->arena_delta, arena);
         object->data_delta = data_delta;
         object->size_ = size;
         object->capacity_ = capacity;
         if constexpr (!is_fixed_string_v<T>) {
             if (data_delta != 0 && capacity != 0)
-                subtree_fix_elements<typename T::value_type>(address + 4 + data_delta, size, arena);
+                subtree_fix_elements<typename T::value_type>(address + data_delta, size);
         }
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
         if constexpr (raw_needs_activation<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
-                subtree_fix_value<E>(address + i * sizeof(E), arena);
+                subtree_fix_value<E>(address + i * sizeof(E));
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
-                subtree_fix_value<M>(address + member::offset, arena);
+                subtree_fix_value<M>(address + member::offset);
         });
     }
 }
@@ -473,15 +516,14 @@ void subtree_release(fixed_detail::allocator_ref alloc, T* old, std::uint32_t si
 // shape, packed with no holes. The segment's bytes were zero (fresh tail or a
 // hole zeroed on retirement), so block tails need no clearing.
 template<class E>
-char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* arena,
+char* subtree_compact_elements(const E* source, std::uint32_t size,
                                char*& cursor) noexcept;
 
 template<class T>
-void subtree_compact_value(char* address, const T& source, XArena* arena, char*& cursor) noexcept {
+void subtree_compact_value(char* address, const T& source, char*& cursor) noexcept {
     if constexpr (is_fixed_string_v<T>) {
         const XFixedString& from = source;
         auto* head = ::new (static_cast<void*>(address)) T;
-        head->arena_delta = subtree_rel32(&head->arena_delta, arena);
         const auto view = from.view();
         const auto size = static_cast<std::uint32_t>(view.size());
         if (size == 0) {
@@ -489,12 +531,12 @@ void subtree_compact_value(char* address, const T& source, XArena* arena, char*&
             head->size_ = 0;
             head->capacity_ = 0;
         } else if (size <= XFixedString::inline_max) {
-            // Inline layout of store_inline: bytes 4..14 characters then
-            // zeros, byte 15 = 0x80 | length.
+            // Inline layout of store_inline: bytes 0..10 characters then
+            // zeros, byte 11 = 0x80 | length.
             char bytes[12] = {};
             std::memcpy(bytes, view.data(), size);
             bytes[11] = static_cast<char>(0x80u | size);
-            std::memcpy(address + 4, bytes, sizeof(bytes));
+            std::memcpy(address, bytes, sizeof(bytes));
         } else {
             char* block = cursor;
             cursor += fixed_detail::block_bytes_of(size + 1u);
@@ -508,13 +550,12 @@ void subtree_compact_value(char* address, const T& source, XArena* arena, char*&
         const XFixedVector<E>& from = source;
         const auto size = from.size_;
         auto* head = ::new (static_cast<void*>(address)) T;
-        head->arena_delta = subtree_rel32(&head->arena_delta, arena);
         if (size == 0) {
             head->data_delta = 0;
             head->size_ = 0;
             head->capacity_ = 0;
         } else {
-            char* block = subtree_compact_elements<E>(from.data(), size, arena, cursor);
+            char* block = subtree_compact_elements<E>(from.data(), size, cursor);
             head->data_delta = subtree_rel32(&head->data_delta, block);
             head->size_ = size;
             head->capacity_ = size;
@@ -523,14 +564,14 @@ void subtree_compact_value(char* address, const T& source, XArena* arena, char*&
         using E = std::remove_extent_t<T>;
         if constexpr (raw_needs_activation<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
-                subtree_compact_value<E>(address + i * sizeof(E), source[i], arena, cursor);
+                subtree_compact_value<E>(address + i * sizeof(E), source[i], cursor);
     } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
             if constexpr (raw_needs_activation<M>())
                 subtree_compact_value<M>(address + member::offset,
-                                         member::get(source), arena, cursor);
+                                         member::get(source), cursor);
         });
     }
 }
@@ -538,7 +579,7 @@ void subtree_compact_value(char* address, const T& source, XArena* arena, char*&
 // The memcpy of the live prefix creates the array, ordinary outers and
 // scalars; heads are then restarted and pointed at their compacted children.
 template<class E>
-char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* arena,
+char* subtree_compact_elements(const E* source, std::uint32_t size,
                                char*& cursor) noexcept {
     char* block = cursor;
     const auto live = static_cast<std::uint32_t>(size * sizeof(E));
@@ -547,7 +588,7 @@ char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* aren
     if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
         for (std::uint32_t i = 0; i < size; ++i) {
             char* element = block + std::size_t(i) * sizeof(E);
-            if constexpr (raw_needs_activation<E>()) subtree_compact_value<E>(element, source[i], arena, cursor);
+            if constexpr (raw_needs_activation<E>()) subtree_compact_value<E>(element, source[i], cursor);
             if constexpr (padding_ranges<E>.size() != 0)
                 zero_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
         }
@@ -567,7 +608,7 @@ char* subtree_compact_elements(const E* source, std::uint32_t size, XArena* aren
 template<class T>
 bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     static_assert(subtree_copy_supported<T>() && !std::is_trivially_copyable_v<T>);
-    XArena* arena = dst.arena();
+    XArena* const arena = dst.arena();
     if (!arena || src.size_ == 0) return false;
     SubtreeExtent extent;
     subtree_measure_elements<T>(src.data(), src.size_, src.capacity_, extent);
@@ -582,7 +623,7 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     const auto total = whole ? extent.sum : extent.exact;
     if (total > XBufferCore::MAX_PAYLOAD) return false;
     const auto bytes = static_cast<std::uint32_t>(total);
-    const auto alloc = dst.binding();
+    const typename XFixedVector<T>::allocator_type alloc{arena};
     const auto size = src.size_;
     char* fresh = nullptr;
     try {
@@ -598,11 +639,11 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
         std::memcpy(fresh, first, bytes);
         top = fresh + (reinterpret_cast<const char*>(src.data()) - first);
         capacity = src.capacity_;
-        subtree_fix_elements<T>(top, size, arena);
+        subtree_fix_elements<T>(top, size);
         XOFFSET_DETAIL_SUBTREE_COUNT(whole_hits, 1);
     } else {
         char* cursor = fresh;
-        top = subtree_compact_elements<T>(src.data(), size, arena, cursor);
+        top = subtree_compact_elements<T>(src.data(), size, cursor);
         capacity = size;
         if (cursor != fresh + bytes) [[unlikely]] std::terminate();  // measure/compact disagree
         XOFFSET_DETAIL_SUBTREE_COUNT(compact_hits, 1);

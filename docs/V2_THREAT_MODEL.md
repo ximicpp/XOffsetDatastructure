@@ -1,4 +1,4 @@
-# V2 威胁模型（0.3.0-beta.1）
+# V2 威胁模型（3.1.0；文中「0.3.0-beta.1」指该版起的状态）
 
 本文说明 XOffset V2 在接收**不可信 wire** 时防住了什么、没防住什么，以及调用方必须
 在外层补上什么。格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，接入要求见
@@ -38,7 +38,7 @@
 | 编号 | 威胁 | 现状 | 依据 / 缺口 |
 | --- | --- | --- | --- |
 | T1 | 构造的 wire 让接收方越界读写 | **已防住** | 完整校验（V2_FORMAT 第 5 节）；Clang 与 GCC 16 的 ASan+UBSan CI；每个 PR 上的 libFuzzer（多 schema，第 5 节）；发布前 GCC 16 ASan+UBSan 差分 fuzz 480 万例无分歧。缺口：每日长时间 fuzz 尚未运行（第 5 节 F4） |
-| T2 | 篡改字段值（A3） | **不防** | 只改标量值的 wire 能通过校验；`crc32c` 固定为 0，没有 MAC。外层必须用 TLS 或消息签名 |
+| T2 | 篡改字段值（A3） | **不防** | 只改标量值的 wire 能通过校验；wire 头没有校验和（格式 2.1 删除了固定为 0 的 `crc32c`），没有 MAC。外层必须用 TLS 或消息签名 |
 | T3 | 伪造 schema 身份 | 不构成越权 | schema 指纹（64 位 FNV-1a）是一致性检查，不是认证：攻击者照抄指纹也只能让接收方按**接收方自己的类型**做完整校验 |
 | T4 | 资源耗尽 | **默认有界**（M1：不传上限时默认 64 MiB） | 见 3.1；服务端接收客户端数据仍应设更小的上限（DEPLOYMENT 第 5 节） |
 | T5 | 已删除数据的旧字节随 wire 发出（A4） | **已防住，有两处调用方责任** | P1、P2 由 M3、M4 清零；P3 由 M6 处理库构造的元素。调用方直接赋值的带填充记录、以及 load 进来的空洞原样转发，见 3.2 |
@@ -142,9 +142,14 @@ GCC 16 ASan+UBSan 差分 fuzz 代替。
   追加评论，已关闭的重新打开并标注回归），并把输入推到 `fuzz-crash/<签名>` 分支，作为
   `tests/fuzz/regressions/<target>/<签名>`。修复 PR 带上这个输入，issue 由修复关闭。没有发现
   却失败的运行记在唯一的 `fuzz-infra` issue 上。结果同时写进项目文件。
-- **缺口**：libFuzzer 覆盖率引导 fuzz（F1、F2）要用 P2996 Clang，云端主机编译不了，
-  所以目前没有定期运行。每日长跑只覆盖差分 fuzz 和回放；`fuzz.yml` 的 libFuzzer 作业
-  只能在 Actions 恢复后手动触发。
+- libFuzzer 覆盖率引导 fuzz（F1、F2，2026-10-27 起）：同一晚接着执行
+  `tools/fuzz_libfuzzer.sh`，用云端自编的 P2996 工具链（clang-p2996 d77eff1，带
+  compiler-rt 的 libFuzzer 运行库）在主机上原生构建 `fuzz_v2_wire` 和 `fuzz_wire_schemas`
+  （ASan+UBSan），步骤与 `fuzz.yml` 的 libfuzzer 作业相同：先单进程回放已有语料和种子，
+  再 `-fork=4` 跑约 20 分钟，然后合并语料、复现并最小化发现。语料以 tar 包跨夜保存在
+  项目文件里；调试信息里的路径映射为 `/workspace`，签名与 Docker 作业一致。首晚即发现
+  #130（harness 对短于头部的输入检查过严，已修复，输入入回归目录）。
+- 仍有的缺口：没有 PR 短跑（PR 的合并证据是 `tools/local_validate.sh`）。
 
 - **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为
   `load_verified`、`finish_verified`、`receive_raw::validate`，用 P2996 Clang 和 CI 里已经

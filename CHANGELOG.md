@@ -2,6 +2,215 @@
 
 ## Unreleased
 
+## 3.1.0: wire format 2.1
+
+Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade
+together; 3.0.0 readers reject 2.1 and 3.1.0 readers reject 2.0). Same
+toolchains as 3.0.0. Mac M4 at the INT4 checkpoint against `v3.0.0`
+(`docs/PERFORMANCE.md` section 3): SLG A 0.991, B 0.951, C 0.950, D 0.846;
+formal read_sum 0.950, mutate 0.970, emit_after 0.869 (largest upper bound
+0.981). Known gaps: D is still slower than FlatBuffers (1.117, upper bound
+1.156), two G9 items are still over 1.05 (`vec.push_back`, `set.erase.fresh`), schema
+evolution is not supported, and iOS, Android and MSVC full builds are not verified (`docs/CLIENT_TARGETS.md`).
+
+Release goals (roadmap O1-O7) and where this release stands:
+
+- O1 wire 2.1, frozen for 3.x: R7 (40-byte header, no payload header on the
+  wire) and R4 (12-byte container heads) are both in. Bytes per message
+  against 3.0.0 (target A.req, A.res, B <= 0.92, D <= 0.70, formal M final
+  wire <= 0.94), cloud GCC 16: on the measure the targets were set with
+  (M scale, cycle 20, mean per message) A.req 1508 -> 1253 B (0.831), A.res
+  1743 -> 1488 (0.854), B 15657 -> 13667 (0.873), D 309 -> 197 (0.638), all
+  met. Report only, on the last cycle of the default two-cycle run: A.req
+  0.820, A.res 0.902, B 0.857, D 824 -> 712 (0.864; the same 112 bytes
+  saved on a larger report). Formal M final wire
+  12,627,496 -> 11,182,856 B (0.886), met; formal M input wire 0.917.
+  `emit_after` against cereal
+  (target UB <= 0.20): met, upper bound 0.168 and 0.170 in two batches (3.0.0
+  in the same batches: median 0.188 and 0.194). 2.0 wires are rejected with
+  the version named.
+- O2 no regression against `v3.0.0`, G1-G3 and G8 still met: met for the
+  regression check (INT4 L2 pass, see above) and G1-G3 (A, B, C upper bound
+  <= 0.50 against cereal, protobuf and FlatBuffers; largest A against
+  FlatBuffers 0.318). G8 (zpp_bits, cista) was not measured in INT4; it is
+  inferred from 3.0.0 (met) and the A/B/C ratios above, not measured.
+- O3 G9 relocation tax (target 19/19 items UB <= 1.05; floor: no item worse
+  than 3.0.0, each open item with a measured root cause): floor met, 17/19
+  (3.0.0 in the same batch: 15/19). No item is slower than 3.0.0 by code;
+  `vec.mid_insert` (1.092 -> 0.954) and `set.insert.fresh` (1.111 -> 0.995)
+  now pass. Still open, with the cause measured on the Mac:
+  `vec.push_back` 1.128, upper bound 1.136 (3.0.0: 1.287): `capacity_` now
+  stays in a register, but the loop re-derives the data pointer from
+  `data_delta` after every element store, because `data_delta` is an
+  `int32_t` that an int store may alias (two more instructions per element
+  than `std::vector`, 0.28 against 0.24 ns). `set.erase.fresh` 1.092, upper
+  bound 1.102 (3.0.0: 1.130): keeping the head in registers across the move
+  took 1.0 ns off each erase; the remaining 2.4 ns is in the erase step
+  (bounds re-check, `begin()`/`end()` null checks, zeroing the vacated slot),
+  not the lookup (`set.find.fresh` 0.755). Rejected levers: writing the
+  whole head back or at one width (a narrow load after a 16-byte store
+  forwards in 18.4 cycles on the M4), aligning large data blocks (at most
+  1.5%), fusing the SHIFT `memmove` with the relocation pass, dropping the
+  SHIFT overflow check. 19/19 moves to 3.2.
+- O4 D against FlatBuffers (target UB <= 1.0, no API change, full validation
+  kept): not met. D against FlatBuffers is 1.117, upper bound 1.156 (3.0.0:
+  1.355 / 1.383), and D is 0.846 of 3.0.0. As decided by susu (2026-10-27),
+  this release ships these speedups and the target moves to 3.2. At the
+  upper bound D needs about 14% more (8.6 µs per cycle, about 4 ns per
+  read). The gap is not instruction count (619 Ir per read on the cloud, 786
+  for FlatBuffers) but stalls on the M4; the 619 Ir split: structure
+  validation 30%, lookup and `root<T>()` 22%, copy and reinit 21%, root and
+  free-table lookup 11%, header admission 6%. Plan for 3.2: (1) check on the
+  Mac whether the narrow validation reads right after the payload copy hit
+  the M4 store-forwarding stall, and if so change the copy shape for small
+  payloads (5-10%, not yet verified, the largest unknown); (2) cache the
+  validated root pointer (2-3%); (3) trim the validation context set-up and
+  fixed lookup costs (2-3%). Together 9-16%, so reaching 1.0 depends on step
+  (1).
+- O5 stability: changed to a one-time fuzz run on the release candidate
+  (susu, 2026-10-27); the seven-night runs move to 3.2. On the RC
+  (`e913d22`): GCC 16 ASan+UBSan differential fuzz, 4 x 1,468,565 cases
+  (2700 s), 0 inconsistencies, and a clean replay of regressions and seeds;
+  libFuzzer (P2996 Clang, ASan+UBSan, `-fork=4`) 1800 s per target,
+  `fuzz_v2_wire` 1.26M and `fuzz_wire_schemas` 25.8M executions, 0 findings;
+  the 6504 inputs from the 3.0.0 corpora were all refused, the 6353 with the
+  2.0 magic with `wire format 2.0 is not supported`. Each job ran less than
+  the planned hour (a 30-minute outage). One finding before the RC, #130
+  (harness), fixed in #131. 0 open fuzz-crash issues.
+- O6 release procedure and documents: met in 3.0.0 (`docs/RELEASING.md`,
+  `tools/prepare_release.py`, V1/VM documents out of the tree); 3.1.0 is the
+  second release made with it.
+- O7 platform matrix: on 3.0.0 code, full CTest passes on Linux x86-64 (GCC
+  16, P2996), Linux arm64 (GCC 16, P2996), macOS arm64 (P2996) and Windows
+  x64 MinGW-w64 GCC 16 (104 pass, 2 thread-cache tests skipped), and the
+  2.0 corpus is byte-identical across them. On the release candidate
+  (`e913d22`): met. Linux x86-64 GCC 16 and P2996 107/107, Linux arm64 GCC
+  16 and P2996 107/107, Windows x64 MinGW-w64 GCC 16 105 pass and the same 2
+  skipped, and the six 2.1 corpus files are byte-identical across all five.
+  macOS arm64 (P2996) 107/107 at INT4. iOS was not done.
+
+Changes:
+
+- Documentation: `docs/PERFORMANCE.md` holds each release's Mac numbers, the
+  protocol and the limits; README and `docs/USER_GUIDE.md` section 9 point to
+  it instead of the round-3 report.
+- Wire format 2.1 (breaking; `docs/V2_FORMAT.md` section 7). Senders and
+  receivers upgrade together: a 2.1 reader rejects 2.0 wires with `wire format
+  2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade
+  together)`, and a 3.0.0 reader rejects 2.1 wires.
+  - The wire header is 40 bytes instead of 96: magic `'X' 'O' 2 1`, flags,
+    `used_bytes`, `root_offset`, `hole_count`, `extent_count` (u32 each),
+    `schema_hash`, `root_type_id`. `header_size`, the format fields,
+    `endian_tag`, `crc32c`, `reserved0`, `schema_hash_hi` and `hole_bytes` are
+    gone.
+  - The 48-byte payload header is no longer sent; the receiver writes it from
+    `used_bytes` and `root_offset`. The wire carries payload bytes from offset
+    48, and every offset on it stays a payload offset. Every message is 104
+    bytes shorter.
+  - Container heads are 12 bytes (`data_delta`, `size_`, `capacity_`) instead
+    of 16: a head no longer stores its payload (`arena_delta`); the owner is
+    found from the head's address through a table with one byte per 4 MiB of
+    address space, and only to allocate, grow or retire a block. Inline
+    strings keep up to 10 bytes. `bind()`, `bind_like()` and `field_binding()`
+    are removed.
+  - Direct receive and reload: `payload_bytes()` spans payload
+    `[48, used_bytes)`, so a sparse extent at payload offset `o` lands at
+    `o - 48` and `complete()` reports `used_bytes - 48` payload bytes;
+    `VerifiedSnapshot::segments()[1]` starts at offset 48.
+  - Readers check the version before anything else and say which format they
+    got (1, 2.0, or M.m).
+- Performance: `XVector`'s `size_` and `capacity_` are `char32_t` (same bytes),
+  a type that int and unsigned element stores cannot alias, and the general
+  `push_back` path returns the head fields it changed; a `push_back` loop keeps
+  `capacity_` in a register instead of reloading it after every element store
+  (G9 measured `vec.push_back` at 1.29x `std::vector` on the Mac M4).
+- Performance (Clang builds): an `XVector` insert of a trivially copyable
+  element before the end, into spare capacity, runs inline at the call site
+  and stores `size_` before moving the tail, and `erase` keeps the head in
+  registers across the move. The flat `XSet` / `XMap` inserts and erases use
+  the same paths. GCC and MSVC builds keep the previous code. (G9 measured
+  `vec.mid_insert` at 1.10x, `set.insert.fresh` at 1.12x and
+  `set.erase.fresh` at 1.14x their `std` baselines on the Mac M4.)
+- The formal M input wire changes with the format; `bench/formal` pins the new
+  one.
+- Performance: `reload_verified<T>()` of a dense wire (no extent table) whose
+  payload is at most 32 KiB, into a buffer whose storage already holds it,
+  takes a straight path: one pass over the header words, the copy in place,
+  and no free table when the wire has no holes. Admission, verification,
+  errors and the loaded state are those of the general path (SLG D read:
+  -32% instructions, P2996).
+- Nightly libFuzzer without GitHub Actions or Docker (threat model F1, F2):
+  `tools/fuzz_libfuzzer.sh` builds `fuzz_v2_wire` and `fuzz_wire_schemas` with
+  the P2996 toolchain's own libFuzzer runtime (ASan+UBSan) and runs the steps
+  of `fuzz.yml`'s libfuzzer job on the host: corpus replay, `-fork=4` fuzzing,
+  merge, then `tools/fuzz_findings.py` findings and summary. The corpus is kept
+  across nights as a tarball; debug paths map to `/workspace`, so signatures
+  match the Docker jobs. Its `libfuzzer` result joins `tools/fuzz_nightly.sh`'s
+  needs.json for one `tools/fuzz_report.py` report. `fuzz_report.py` now files
+  the issue when GitHub refuses the `fuzz-crash/<signature>` branch push, and
+  writes inputs up to 4 KiB into the issue as base64.
+- Fuzz harness: a wire shorter than the V2 header no longer fails the
+  direct-reload check. The transport refuses it before a reload begins, so the
+  target keeps its root; the check required the root to be gone (#130, found
+  by the first libFuzzer night; input in `tests/fuzz/regressions/v2_wire/`).
+
+## 3.0.0: first release of the C++26 line
+
+The tags `v1.0.0` (2024) and `v2.0-*` belong to the two earlier
+implementations. This release is `next_cpp26` at the G8 checkpoint plus the
+G9 fixes merged after it; the changes since 0.3.0-beta.1 are listed below.
+Same V2 wire format as 0.3.0-beta.1 (its receivers accept the default
+`save_verified` emission; `zero_runs` wires need 3.0.0 receivers), same
+toolchains (P2996 Clang with libc++, or GCC 16 with libstdc++). Mac M4 at
+the G8 checkpoint (SLG M scale, six formats in one process, upper bound of
+the geometric mean, XOffset ÷ zpp_bits): A 0.778, B 0.261, C 0.365; D
+(read-only report, tracked, not a goal) 1.589, and 1.383 against
+FlatBuffers. The Mac checkpoint after the G9 fixes (CKPT3, 30af216 against
+the G8 checkpoint 3549272) found no regression: formal upper bound 1.0074,
+SLG A 0.979, B 0.970, C 0.990 (upper bound 1.009), P2996 CTest 106/106 on
+macOS. Known gaps: the G9 relocation tax is not closed, the D scenario
+is slower than zpp_bits and FlatBuffers, schema evolution is not supported,
+and iOS, Android and MSVC full builds are not verified
+(`docs/CLIENT_TARGETS.md`).
+
+- Performance (G9 relocation tax; same wire bytes, same behavior):
+  `XVector::push_back` restates `size_` after the general path; under Clang,
+  the SHIFT rebase checks overflow once per moved run and the general path of
+  `XString::assign` is out of line; copy-assigning an inline `XString` into a
+  bound inline head copies 12 bytes. `bench/reloc` reports
+  `str.assign_short.view` and `str.assign_short.copy`.
+- Documentation: `docs/RELEASING.md` is the fixed release procedure (Mac
+  checkpoint, local validation with TSan, the release PR, the three tag
+  commands); `docs/USER_GUIDE.md` 4.3 explains the two conventions behind the
+  A.apply / A.simulate gaps (one arena and free table per buffer; capacity
+  ships in the wire and is allocated exactly) and what callers can do about
+  them. `tools/local_validate.sh` gains a `tsan` step (GCC 16
+  RelWithDebInfo, `-fsanitize=thread`, full CTest), run by `--release` and
+  not by default.
+- Repository: the V1/VM-era documents (`docs/VM_*`, `docs/V1_*`,
+  `docs/BOOST_*`, 32 files), `experiments/` (126 files) and the root
+  `HANDOFF*.md` / `PROMPT_MAC_20261020.md` left the tree;
+  `docs/ARCHIVED_EVIDENCE.md` names the commit that still has them and the
+  command that restores them. `docs/VM_PACKAGING.md` and
+  `docs/VM_VALIDATION_RUNNER.md` are still current and became
+  `docs/PACKAGING.md` and `docs/VALIDATION_RUNNER.md`.
+- Release tooling: `XOFFSET_VERSION` may now hold a final version
+  (`MAJOR.MINOR.PATCH`) as well as a prerelease (`-alpha|beta|rc.N`); the
+  package config sets `XOffsetDatastructure_IS_PRERELEASE` to match and still
+  refuses numeric, `EXACT` and range requests. `tools/prepare_alpha_release.py`
+  is now `tools/prepare_release.py` and reads the version from the
+  `XOFFSET_VERSION` of its own tree instead of a fixed `0.2.0-alpha.1`; its
+  manifests use the schemas `xoffset-source/v1` and `xoffset-install/v1`. The
+  source and install inventories (also in `tools/validate_vm_package.py`) now
+  include `xoffset_slot_storage.hpp`, and the source closure no longer requires
+  the off-by-default `demo/mapstate` subdirectory, so both tools work on the
+  current tree again.
+- GCC on MinGW and Cygwin (emulated TLS): the per-thread caches (slot free
+  lists, free-table cache, owner cache) are off, because emutls can free a
+  thread's TLS before its `thread_local` destructors run; threads that
+  created buffers crashed or hung at exit. `XOFFSET_THREAD_CACHES` (0 there,
+  1 elsewhere) selects this; Clang on MinGW keeps the caches. Other targets
+  are unchanged.
 - Owner registration: an ordinary owner (created, loaded or reloaded) keeps
   only its identity record and no longer enters the process-wide index or
   takes its mutex. Only direct-receive owners, the ones

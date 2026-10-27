@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**0.3.0-beta.1** is an experimental C++26/P2996 library for reflected objects
+**3.1.0** is a C++26/P2996 library for reflected objects
 and offset containers stored in one contiguous, position-independent arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
 The independent OS storage header can also be used with C++17.
@@ -17,7 +17,7 @@ reader or migration path. Start with the [user guide](docs/USER_GUIDE.md) and
 the [deployment guide](docs/DEPLOYMENT.md), then read the
 [compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
 persisting or accepting wire data. [CHANGELOG.md](CHANGELOG.md) records each
-prerelease.
+release; [RELEASING.md](docs/RELEASING.md) is how one is made.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ Full installed packages include the same dependency headers. Neither package
 includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
 recipes are in [toolchains/README.md](toolchains/README.md),
 [toolchains/vm-validation.json](toolchains/vm-validation.json), and the
-[package guide](docs/VM_PACKAGING.md#fixed-inputs).
+[package guide](docs/PACKAGING.md#fixed-inputs).
 
 ## Minimal full-library example
 
@@ -85,7 +85,7 @@ See `examples/helloworld.cpp`, `examples/stable_storage.cpp` and
 
 Extract the versioned source archive; it already contains the required dependency
 headers. In a Git checkout, first initialize the exact submodules using the
-[LF-preserving recipe](docs/VM_PACKAGING.md#fixed-inputs).
+[LF-preserving recipe](docs/PACKAGING.md#fixed-inputs).
 
 For a full source build with an already prepared P2996 toolchain:
 
@@ -121,8 +121,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.3.0-beta.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.3.0-beta.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.1.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.1.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -130,8 +130,9 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 
 Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
 same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
-`XOffset::storage`, and use CMake 3.13+. Prerelease packages reject numeric, `EXACT`
-and range version requests; check the complete version string as above.
+`XOffset::storage`, and use CMake 3.13+. Packages reject numeric, `EXACT` and
+range version requests (no release promises compatibility with another one);
+check the complete version string as above.
 
 For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
 and link the same target. Subprojects default tests, tools, examples and install
@@ -153,18 +154,20 @@ Results are profile-specific, not a promise for every compiler on each OS.
 | Native Windows x64, MSVC | storage only (V1-era record) | MSVC full P2996 unverified |
 
 V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
-ASan+UBSan) with zero disagreements. Earlier V1-era platform records are kept in
-[VM_FINAL_DELIVERY.md](docs/VM_FINAL_DELIVERY.md) and
-[VM_VALIDATION_RUNNER.md](docs/VM_VALIDATION_RUNNER.md); they do not describe
-the V2 format.
+ASan+UBSan) with zero disagreements. Earlier V1-era platform records
+(`docs/VM_FINAL_DELIVERY.md` and the other `VM_`/`V1_` documents) were moved out
+of the tree on 2026-10-27; [ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)
+says how to retrieve them. They do not describe the V2 format.
 
 ## Performance
 
-The only formal measurement is one Apple M4 machine running one demo workload
-against cista, FlatBuffers, Cap'n Proto and cereal; see
-[the round-3 report](docs/perf/round3-20261021/REPORT.md) for the protocol, raw
-data and adapter notes. Treat those numbers as specific to that machine,
-workload and adapter set. No Linux or Windows performance figures are claimed.
+All timing claims come from one Apple M4 running one game-server workload
+(`bench/slg`) against zpp_bits, cista, cereal, protobuf and FlatBuffers in the
+same process. [docs/PERFORMANCE.md](docs/PERFORMANCE.md) has the numbers for
+each release, the protocol and the limits. Treat them as specific to that
+machine, workload and adapter set. No Linux or Windows timing figures are
+claimed; the cloud instruction-count gate ([docs/PERF_GATE.md](docs/PERF_GATE.md))
+only blocks regressions.
 
 ## Storage and ownership rules
 
@@ -211,7 +214,7 @@ workload and adapter set. No Linux or Windows performance figures are claimed.
 
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
-The alpha does not promise stable source API, ABI or arbitrary cross-toolchain
+A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
 core guarantees (K0–K7, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to

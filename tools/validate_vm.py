@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible VM validation; see docs/VM_VALIDATION_RUNNER.md for examples."""
+"""Reproducible VM validation; see docs/VALIDATION_RUNNER.md for examples."""
 from __future__ import annotations
 
 import argparse
