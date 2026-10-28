@@ -98,6 +98,7 @@ HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
 # Recorded only when a snapshot was zstd-compressed; checked per encoding.
 ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us")
 ENCODINGS = ("dense", "compact", "zstd")
+EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
 DESTROY_METRICS = ("a.destroy_us", "b.destroy_us", "a.snap_destroy_us", "c.destroy_us")
 REQUIRED_METRICS = tuple(k for k, _ in BATCH_METRICS + VIEW_METRICS
                          if k not in HEADLESS_OPTIONAL + ENCODING_OPTIONAL) + ("a.units_count", "a.ticks_per_s")
@@ -229,6 +230,81 @@ def exit_code_verdicts(v, scope, codes, names):
         v.add(scope, n + " exit 0", codes.get(n) == "0", "exit " + codes.get(n, "missing"))
 
 
+def client_events_mode(meta):
+    """The client's --events mode from meta.txt, or None when it did not subscribe."""
+    words = meta.get("client_args", "").split()
+    if "--evil" in words or "--events" not in words:
+        return None
+    i = words.index("--events")
+    mode = words[i + 1] if i + 1 < len(words) else ""
+    return None if mode == "off" else mode
+
+
+def summarize_events(v, scope, d, meta):
+    """Event stream (INTERFACES.md section 6): every Events frame A sent
+    arrived, decoded to the same wires (digest) and passed the client's
+    checks. None when the client did not subscribe."""
+    mode = client_events_mode(meta)
+    if mode is None:
+        return None
+    a_ev = read_csv(os.path.join(d, "a_events.csv"))
+    c_ev = read_csv(os.path.join(d, "client_events.csv"))
+    v.add(scope, "a_events.csv and client_events.csv present", a_ev is not None and c_ev is not None,
+          "A {} client {}".format("ok" if a_ev is not None else "missing",
+                                  "ok" if c_ev is not None else "missing"))
+    a_ev = a_ev or []
+    c_ev = c_ev or []
+
+    def key(r):
+        return (r.get("tick"), r.get("part"), r.get("encoding"))
+
+    a_by = {key(r): r for r in a_ev}
+    c_by = {key(r): r for r in c_ev}
+    matched = mismatched = 0
+    examples = []
+    for k, ar in a_by.items():
+        cr = c_by.get(k)
+        if cr is None:
+            continue
+        diffs = [f for f in ("count", "wire_bytes", "net_bytes", "digest") if ar.get(f) != cr.get(f)]
+        if diffs:
+            mismatched += 1
+            if len(examples) < 5:
+                examples.append("{}: {}".format("/".join(k), ", ".join(
+                    "{} A={} C={}".format(f, ar.get(f), cr.get(f)) for f in diffs)))
+        else:
+            matched += 1
+    a_only = len(set(a_by) - set(c_by))
+    c_only = len(set(c_by) - set(a_by))
+    dups = len(a_ev) - len(a_by) + len(c_ev) - len(c_by)
+    v.add(scope, "A and client event logs agree (count, sizes, digest per frame)",
+          matched > 0 and mismatched == 0 and a_only == 0 and c_only == 0 and dups == 0,
+          "matched {} mismatched {} A-only {} client-only {} duplicates {}{}".format(
+              matched, mismatched, a_only, c_only, dups, ("; " + "; ".join(examples)) if examples else ""))
+    bad = sum(1 for r in c_ev if r.get("check_ok") != "1")
+    v.add(scope, "client event check_ok all 1", c_ev and bad == 0,
+          "{} rows, {} with check_ok != 1".format(len(c_ev), bad))
+    wanted = EVENT_ENCODINGS if mode == "cycle" else (mode,)
+    per = {}
+    for enc in EVENT_ENCODINGS:
+        rows = [r for r in c_ev if r.get("encoding") == enc]
+        n = sum(num(r.get("count")) for r in rows)
+        wire = sum(num(r.get("wire_bytes")) for r in rows)
+        net = sum(num(r.get("net_bytes")) for r in rows)
+        per[enc] = {
+            "frames": len(rows), "events": int(n) if rows else 0,
+            "wire_per_event": wire / n if rows and n else float("nan"),
+            "net_per_event": net / n if rows and n else float("nan"),
+            "a.encode_us": stats([num(r.get("encode_us")) for r in a_ev if r.get("encoding") == enc]),
+            "c.decode_us": stats([num(r.get("decode_us")) for r in rows]),
+            "c.verify_us": stats([num(r.get("verify_us")) for r in rows]),
+        }
+    missing = [e for e in wanted if not per[e]["frames"]]
+    v.add(scope, "every event encoding sampled (--events {})".format(mode), not missing,
+          ", ".join("{} {}".format(e, per[e]["frames"]) for e in wanted))
+    return {"mode": mode, "per_encoding": per, "frames": len(c_ev)}
+
+
 def summarize_tier(root, name, min_steps):
     d = os.path.join(root, name)
     scope = name
@@ -328,6 +404,8 @@ def summarize_tier(root, name, min_steps):
         v.add(scope, "every encoding sampled (--encoding cycle)", not missing_enc,
               ", ".join("{} {}/{}".format(e, per_enc[e]["a_count"], per_enc[e]["client_count"]) for e in ENCODINGS))
 
+    events = summarize_events(v, scope, d, meta)
+
     per_cat = {}
     for cat in CATEGORIES:
         ar = [r for r in a_snap if r.get("category") == cat]
@@ -381,7 +459,7 @@ def summarize_tier(root, name, min_steps):
                          "destroy_us", "free_blocks", "free_bytes")},
         "metrics": metrics,
         "checks": {"a": a_checks or [], "client": c_checks or []},
-        "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "verdicts": v,
+        "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "events": events, "verdicts": v,
     }
 
 
@@ -479,6 +557,29 @@ def render_tier(lines, t):
         erow("client round trip (us)", lambda c: mean_p95(c["c.rtt_us"]))
         erow("client zstd decompress (us)", lambda c: mean_p95(c["c.decompress_us"]))
         erow("client verify snapshot (us)", lambda c: mean_p95(c["c.load_us"]))
+        lines.append("")
+    ev = t.get("events")
+    if ev:
+        lines.append("### Event stream (--events {}; per Events frame of up to 128 events)".format(ev["mode"]))
+        lines.append("")
+        lines.append("wire = the UnitEvent wires per event; net = the frame payload per event "
+                     "(raw: count + lengths + wires; zstd: one frame per wire; zdict: dictionary frame "
+                     "per wire; batch: one dictionary frame for the whole Events frame).")
+        lines.append("")
+        pv = ev["per_encoding"]
+        encs = [e for e in EVENT_ENCODINGS if pv[e]["frames"]]
+        lines.append("| | " + " | ".join(encs) + " |")
+        lines.append("| --- | " + " | ".join("---:" for _ in encs) + " |")
+
+        def vrow(label, f):
+            lines.append("| {} | {} |".format(label, " | ".join(f(pv[e]) for e in encs)))
+
+        vrow("frames / events", lambda c: "{} / {}".format(c["frames"], c["events"]))
+        vrow("wire bytes per event", lambda c: fmt(c["wire_per_event"]))
+        vrow("net bytes per event", lambda c: fmt(c["net_per_event"]))
+        vrow("A encode per frame (us)", lambda c: mean_p95(c["a.encode_us"]))
+        vrow("client decode per frame (us)", lambda c: mean_p95(c["c.decode_us"]))
+        vrow("client verify per frame (us)", lambda c: mean_p95(c["c.verify_us"]))
         lines.append("")
     lines.append("### View path, whole run (process metrics)")
     lines.append("")

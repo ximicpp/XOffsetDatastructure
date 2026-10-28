@@ -76,6 +76,22 @@ struct ViewSnapshot {
     XVector<VisibleUnit> units;
 };
 
+// A unit right after one of its events (rules: every kEventPeriodTicks ticks,
+// the units with id % kEventIdModulo == 0), pushed to clients that subscribe
+// to the event stream. Small messages (about 120-200 bytes): the demo's
+// small-message traffic for the zstd dictionary and batching options
+// (codec.hpp). Added 10-28; the four types above and Hello are unchanged.
+struct UnitEvent {
+    std::uint64_t tick{};
+    std::uint32_t unit_id{};
+    std::int32_t hp{};
+    Point pos;
+    Behavior behavior{};
+    std::uint32_t next_waypoint{};
+    XString name;
+    XVector<Point> path;
+};
+
 // ---- fixed defaults (requirements section 5) --------------------------------
 inline constexpr std::uint32_t kSceneId = 1;
 inline constexpr float kSceneSize = 4096.0f;      // scene bounds [0, 4096) x [0, 4096)
@@ -94,6 +110,8 @@ inline constexpr std::size_t kCapBatch = std::size_t(64) << 20;
 inline constexpr std::size_t kCapSnapshot = std::size_t(16) << 20;
 inline constexpr std::size_t kCapCatalog = std::size_t(1) << 20;
 inline constexpr std::size_t kCapViewRequest = std::size_t(4) << 10;
+inline constexpr std::size_t kCapEvent = std::size_t(4) << 10;           // one UnitEvent wire
+inline constexpr std::size_t kMaxEventsPerFrame = 128;                   // A splits larger event ticks
 
 inline Rect scene_bounds() { return Rect{{0.0f, 0.0f}, {kSceneSize, kSceneSize}}; }
 // Legal, non-empty-area rect that is empty by construction (positions <= kMaxCoord).
@@ -112,6 +130,9 @@ inline XBuffer::MaximumCapacity cap_catalog() {
 }
 inline XBuffer::MaximumCapacity cap_view_request() {
     return XBuffer::maximum_capacity(kCapViewRequest).with_growth(XGrowPolicy::Automatic);
+}
+inline XBuffer::MaximumCapacity cap_event() {
+    return XBuffer::maximum_capacity(kCapEvent).with_growth(XGrowPolicy::Automatic);
 }
 
 } // namespace mapdemo
@@ -134,11 +155,13 @@ XOFFSET_RECORD(mapdemo::UnitStateBatch, tick, reserved0, units)
 XOFFSET_RECORD(mapdemo::ViewRequest, request_id, scene_id, reserved0, rect)
 XOFFSET_RECORD(mapdemo::VisibleUnit, id, hp, pos, behavior, name)
 XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units)
+XOFFSET_RECORD(mapdemo::UnitEvent, tick, unit_id, hp, pos, behavior, next_waypoint, name, path)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitStateBatch, "mapdemo.UnitStateBatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::ViewRequest, "mapdemo.ViewRequest.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::ViewSnapshot, "mapdemo.ViewSnapshot.v1")
+XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitEvent, "mapdemo.UnitEvent.v1")
 
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::SceneData);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::SiteData);
@@ -148,9 +171,11 @@ XOFFSET_REQUIRE_NO_PADDING(mapdemo::UnitStateBatch);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewRequest);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::VisibleUnit);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewSnapshot);
+XOFFSET_REQUIRE_NO_PADDING(mapdemo::UnitEvent);
 static_assert(sizeof(mapdemo::UnitState) == 56);
 static_assert(sizeof(mapdemo::VisibleUnit) == 32);
 static_assert(sizeof(mapdemo::ViewSnapshot) == 48);
 static_assert(sizeof(mapdemo::UnitStateBatch) == 24);
 static_assert(sizeof(mapdemo::ViewRequest) == 32);
+static_assert(sizeof(mapdemo::UnitEvent) == 56);
 static_assert(XOffsetDatastructure::detail::shift_relocate_supported<mapdemo::UnitState>());
