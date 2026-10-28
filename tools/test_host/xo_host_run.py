@@ -25,6 +25,16 @@ Backends (the app's data directory is <container>/Documents/xo):
   local   the command-line host (tools/test_host/host_cli.cpp) on this computer, with
           the data directory under --state: checks the same flow without a phone
 
+Serving (--serve 1 or XO_HOST_SERVE=1; not yet the default: on an iPhone every program
+library loaded into one process keeps its 64 MiB table, and about 50 of them fill the
+process's address space): the app is started once ("xoserve") and
+stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, and the app runs the
+programs one after another in its process (it shows the totals meanwhile). A state stamp
+keeps the serving process id; when it is gone (a crash, a reinstall, a timeout) the next
+run starts the app again. --fresh (XO_HOST_FRESH=1) starts it again before this run (timed
+runs and memory probes: a process that ran nothing else). --serve 0 starts the app for each
+run ("xorun").
+
 Exit status: the program's exit code; 128+N when signal N ended it; 125 when the run
 left no status (killed by the system, e.g. out of memory, or timed out: the output
 says which); 124 for a problem of this script or the device connection.
@@ -76,6 +86,7 @@ def hexs(s):
 class Backend:
     def __init__(self, a):
         self.a = a
+        self.pid = None
 
     def ensure_installed(self):
         pass
@@ -102,12 +113,26 @@ class LocalBackend(Backend):
         return True
 
     def launch(self, args):
-        # synchronous: the host process ends when the run ends
-        self.proc = subprocess.run([self.a.app, "--root", self.root] + args)
+        if args[0] != "xoserve":
+            # synchronous: the host process ends when the run ends
+            self.proc = subprocess.run([self.a.app, "--root", self.root] + args)
+            self.pid = None
+            return True
+        # the serving host outlives this script; it must not inherit the variables that
+        # requests pass on, and its own output (between runs) goes to a log
+        env = {k: v for k, v in os.environ.items() if not k.startswith(FORWARD_PREFIXES)}
+        with open(os.path.join(self.a.state, "serve.log"), "ab") as logf:
+            proc = subprocess.Popen([self.a.app, "--root", self.root, "xoserve"], stdin=subprocess.DEVNULL,
+                                    stdout=logf, stderr=logf, env=env, start_new_session=True)
+        self.pid = proc.pid
         return True
 
     def alive(self):
-        return False
+        return bool(self.pid) and pid_alive(self.pid, "xoserve")
+
+    def stop(self):
+        if self.pid and pid_alive(self.pid, "xoserve"):
+            os.kill(self.pid, 9)
 
 
 class SimBackend(Backend):
@@ -160,13 +185,10 @@ class SimBackend(Backend):
     def alive(self):
         if not self.pid:
             return True
-        try:
-            os.kill(self.pid, 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
+        return pid_alive(self.pid, "")
+
+    def stop(self):
+        pass   # the next launch terminates the running app
 
 
 class DeviceBackend(Backend):
@@ -234,6 +256,29 @@ class DeviceBackend(Backend):
         procs = data.get("result", {}).get("runningProcesses", [])
         return any(p.get("processIdentifier") == self.pid for p in procs)
 
+    def stop(self):
+        pass   # the next launch terminates the running app
+
+
+def pid_alive(pid, marker):
+    """A process of this computer with this id runs (not a zombie) and its command line
+    contains marker (a reused id belongs to some other program)."""
+    try:
+        os.waitpid(pid, os.WNOHANG)   # reaps it when it is a child of this script
+    except ChildProcessError:
+        pass
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    r = subprocess.run(["ps", "-o", "stat=", "-o", "command=", "-p", str(pid)], capture_output=True, text=True)
+    line = r.stdout.strip()
+    if r.returncode != 0 or not line or line.startswith("Z"):
+        return False
+    return marker in line
+
 
 def read_stamp(state, key):
     try:
@@ -250,11 +295,36 @@ def write_stamp(state, key, value):
 
 
 def clear_input_stamps(state):
-    """After an install the app's data directory may be new: send every input again."""
+    """After an install the app's data directory may be new: send every input again (and
+    the app that served is gone)."""
     d = os.path.join(state, "stamps")
     for name in os.listdir(d) if os.path.isdir(d) else []:
-        if name.startswith("input-"):
+        if name.startswith(("input-", "serve-")):
             os.unlink(os.path.join(d, name))
+
+
+def ensure_serving(a, backend):
+    """Starts the serving app unless the one this state directory started still runs."""
+    key = "serve-%s-%s" % (a.backend, a.device or "")
+    stamp = (read_stamp(a.state, key) or "").split()
+    pid = int(stamp[0]) if stamp and stamp[0].isdigit() else None
+    same_app = len(stamp) > 1 and stamp[1] == a.bundle_digest
+    if pid and same_app and not a.fresh:
+        backend.pid = pid
+        if backend.alive():
+            return True
+    elif pid:
+        backend.pid = pid
+        backend.stop()   # device, sim: the launch below terminates it
+    write_stamp(a.state, key, "")
+    if not backend.launch(["xoserve"]):
+        return False
+    write_stamp(a.state, key, "%s %s" % (backend.pid or "", a.bundle_digest))
+    return True
+
+
+def forget_serving(a):
+    write_stamp(a.state, "serve-%s-%s" % (a.backend, a.device or ""), "")
 
 
 def bundle_digest(app):
@@ -341,7 +411,14 @@ def run(a):
         backend.push(inbox, "%sinbox/%s.tar" % (prefix, run_id))
         result = os.path.join(work, "out.tar")
         rel_out = "%soutbox/%s.tar" % (prefix, run_id)
-        if not backend.launch(["xorun", run_id]):
+        if a.serve:
+            if not ensure_serving(a, backend):
+                return 124
+            ready = os.path.join(work, "ready")
+            with open(ready, "wb") as f:
+                f.write(b"1\n")   # devicectl failed on some empty files (iPhone run 6, CoreDeviceError 7000)
+            backend.push(ready, "%sinbox/%s.ready" % (prefix, run_id))
+        elif not backend.launch(["xorun", run_id]):
             return 124
         deadline = time.time() + a.timeout
         got = backend.pull(rel_out, result)
@@ -361,6 +438,9 @@ def run(a):
                     break
         if not got:
             log(why + "; packing what the run left")
+            if a.serve:
+                backend.stop()
+                forget_serving(a)
             if not backend.launch(["xopack", run_id, reason]):
                 return 124
             end = time.time() + 120
@@ -417,18 +497,25 @@ def main():
     p.add_argument("--install", action="store_true", default=os.environ.get("XO_HOST_INSTALL", "") == "1",
                    help="device: install --app when it changed (default: the caller installed the signed app)")
     p.add_argument("--timeout", type=int, default=int(os.environ.get("XO_HOST_TIMEOUT", "1500")))
-    p.add_argument("--poll", type=float, default=float(os.environ.get("XO_HOST_POLL", "1")))
+    p.add_argument("--poll", type=float, default=float(os.environ.get("XO_HOST_POLL", "0")),
+                   help="seconds between two looks for the result (default 1 on a phone, 0.1 otherwise)")
     p.add_argument("--state", default=os.environ.get("XO_HOST_STATE", os.path.join(tempfile.gettempdir(), "xo-host-state")))
     p.add_argument("--status-file", help="also write the run's status lines here")
+    p.add_argument("--serve", type=int, choices=(0, 1), default=int(os.environ.get("XO_HOST_SERVE", "0")),
+                   help="1: run in the app that stays up (started when needed); 0 (default): start the app for each run")
     p.add_argument("--output-flags", default=os.environ.get("XO_HOST_OUTPUT_FLAGS", "--csv-dir,--write,--out"),
                    help="options whose path argument is an output even when it exists (a directory there gets "
                         "the run's files added)")
+    p.add_argument("--fresh", action="store_true", default=os.environ.get("XO_HOST_FRESH", "") == "1",
+                   help="serving: start the app again before this run")
     p.add_argument("program")
     p.add_argument("args", nargs=argparse.REMAINDER)
     a = p.parse_args()
     a.sent_stamps = []
+    if a.poll <= 0:
+        a.poll = 1.0 if a.backend == "device" else 0.1
     os.makedirs(a.state, exist_ok=True)
-    # one run at a time per state directory (the app runs one program per launch)
+    # one run at a time per state directory (the app runs one program at a time)
     with open(os.path.join(a.state, "lock"), "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
