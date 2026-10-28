@@ -421,6 +421,35 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         "list every member once, in declaration order;fields<sdf::Neg>::field_a': 'struct' type redefinition")
 endif()
 
+# Wire schemas whose meaning differs between 64-bit little-endian platforms
+# fail the build: a set or map key ordered by plain char, an enum without a
+# fixed underlying type. The portable spellings must build.
+foreach(entry
+        "set_char|a set or map key orders by plain char"
+        "map_char|a set or map key orders by plain char"
+        "char_enum|a set or map key orders by plain char"
+        "record_member|a set or map key orders by plain char"
+        "array_member|a set or map key orders by plain char"
+        "unfixed_enum|an enum without a fixed underlying type has a compiler-chosen representation"
+        "portable|")
+    string(REGEX REPLACE "\\|.*$" "" case "${entry}")
+    string(REGEX REPLACE "^[^|]*\\|" "" diagnostic "${entry}")
+    set(name portable_schema_${case}_fail)
+    if(case STREQUAL "portable")
+        set(name portable_schema_portable_build)
+    endif()
+    add_executable(${name} EXCLUDE_FROM_ALL portable_schema/key_fail.cpp)
+    configure_xoffset_target(${name})
+    target_compile_definitions(${name} PRIVATE XOFFSET_TEST_CASE_${case})
+    add_test(NAME ${name}
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target ${name} --config $<CONFIG>)
+    if(diagnostic)
+        set_tests_properties(${name} PROPERTIES LABELS "schema" PASS_REGULAR_EXPRESSION "${diagnostic}")
+    else()
+        set_tests_properties(${name} PROPERTIES LABELS "schema")
+    endif()
+endforeach()
+
 # Without reflection, raw receive of an enum without a fixed underlying type
 # must fail the build clearly (test_receive_raw runs these enums only in C++26).
 if(NOT XOFFSET_TESTS_REFLECTION)
