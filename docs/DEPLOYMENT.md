@@ -18,9 +18,10 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
   客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
-  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 未测；
-  步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
-- 客户端上没有任何性能数据，现有计时都来自 Apple M4。
+  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 15 Pro Max
+  （iOS 26.6.2）上 CTest、参照语料和两个 demo 客户端全部通过；步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
+- 客户端性能只有 iPhone 15 Pro Max 一台的 slg 数据（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节：A、B、C
+  场景 xoffset 用时是 FlatBuffers 的 0.18 到 0.31，D 战报只读 0.86），其余计时来自 Apple M4。
 
 ## 2. 同版本发布
 
