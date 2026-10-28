@@ -41,6 +41,22 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(adb_wire_runner.main(),0)
         self.assertTrue(out.is_dir())
         self.assertTrue(any("pull" in c for c in calls))
+    def test_android_calls_share_one_budget_and_still_clean_up(self):
+        timeouts=[]
+        clock=[0.0]
+        def invoke(cmd,**kwargs):
+            timeouts.append((cmd,kwargs["timeout"]))
+            clock[0]+=30
+            return SimpleNamespace(returncode=0,stdout="",stderr="")
+        argv=["adb_wire_runner.py","--serial","device1","--timeout","50","--",str(self.binary),"--xsg-identify"]
+        with mock.patch.object(sys,"argv",argv), \
+             mock.patch.object(adb_wire_runner.time,"monotonic",side_effect=lambda:clock[0]), \
+             mock.patch.object(adb_wire_runner.subprocess,"run",side_effect=invoke), \
+             contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(adb_wire_runner.main(),1)
+        self.assertEqual([t for _,t in timeouts[:2]],[50,20])
+        self.assertEqual(timeouts[-1][0][-3:-1],["rm","-rf"])
+        self.assertEqual(timeouts[-1][1],10)
     def test_docker_mounts_fixture_and_corpus_parent(self):
         path=self.root/"corpus"
         argv=["docker_wire_runner.py","--image","image@sha256:"+"a"*64,

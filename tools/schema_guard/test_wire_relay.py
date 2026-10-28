@@ -72,6 +72,33 @@ class RelayTests(unittest.TestCase):
         self.assertEqual((destination / "case.xwire").read_bytes(), b"wire")
         self.assertEqual(list(self.queue.iterdir()), [])
 
+    def test_partially_transferred_response_is_read_again(self):
+        def process():
+            until = time.monotonic() + 5
+            while time.monotonic() < until:
+                pending = list(self.queue.glob("*.request.json"))
+                if pending:
+                    request = json.loads(pending[0].read_text())
+                    response = self.execute(request, lambda *a, **k: SimpleNamespace(
+                        returncode=0, stdout="identity\n", stderr=""))
+                    raw = json.dumps(response)
+                    target = self.queue / (request["id"] + ".response.json")
+                    target.write_text(raw[:len(raw) // 2])
+                    time.sleep(0.5)
+                    target.write_text(raw)
+                    return
+                time.sleep(0.01)
+        thread = threading.Thread(target=process)
+        thread.start()
+        args = ["relay_wire_runner.py", "--queue", str(self.queue), "--timeout", "5",
+                "--", str(self.binary), "--xsg-identify"]
+        output = io.StringIO()
+        with mock.patch.object(sys, "argv", args), contextlib.redirect_stdout(output):
+            self.assertEqual(relay.main(), 0)
+        thread.join()
+        self.assertEqual(output.getvalue(), "identity\n")
+        self.assertEqual(list(self.queue.iterdir()), [])
+
     def test_absent_worker_fails_closed(self):
         args = ["relay_wire_runner.py", "--queue", str(self.queue), "--timeout", "0",
                 "--", str(self.binary), "--xsg-identify"]

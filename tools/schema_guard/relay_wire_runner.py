@@ -71,14 +71,24 @@ def main():
             f.write(raw)
         os.replace(temporary, request)
         deadline = time.monotonic() + a.timeout
-        while not response.is_file():
-            if time.monotonic() >= deadline:
+        # A nodecli transfer may create the response file before all bytes have
+        # arrived, so an unparsable response is polled again until the deadline.
+        while True:
+            if response.is_file():
+                raw = response.read_bytes()
+                if len(raw) > MAX_PAYLOAD:
+                    raise ValueError("response too large")
+                try:
+                    data = json.loads(raw)
+                    break
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    if time.monotonic() >= deadline:
+                        raise ValueError("incomplete worker response")
+            elif time.monotonic() >= deadline:
                 raise TimeoutError("worker did not respond")
             time.sleep(0.2)
-        raw = response.read_bytes()
-        if len(raw) > MAX_PAYLOAD:
-            raise ValueError("response too large")
-        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("invalid worker response")
         if data.get("version") != 1 or data.get("id") != request_id or data.get("binary_sha256") != payload["binary_sha256"]:
             raise ValueError("response identity mismatch")
         if not isinstance(data.get("stdout"), str) or not isinstance(data.get("stderr"), str):
