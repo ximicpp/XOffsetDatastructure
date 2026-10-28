@@ -620,6 +620,7 @@ Result<bool> Session::install_pending() {
     if (decompress_us >= 0) rec_.add("c.decompress_us", decompress_us);
     rec_.add("c.visible_count", double(cur_.visible));
     ++snapshots_;
+    net_bytes_total_ += cur_.net_bytes;
     ++by_encoding_[static_cast<int>(p.encoding)];
     // Outside the timed region: digests (compared with A's log) and checks.
     cur_.digest = checks::snapshot_digest(s);
@@ -956,10 +957,10 @@ Result<int> run_headless(const Options& opt) {
             next_print += 1000000000ull;
             const ViewSnapshot* v = s.holder().empty() ? nullptr : &s.holder().view();
             std::fprintf(stdout, "client snaps=%" PRIu64 " tick=%" PRIu64 " visible=%zu snap_bytes=%zu net_bytes=%zu (%s) "
-                                 "view_rtt_us=%.0f load_us=%.1f\n",
+                                 "view_rtt_us=%.0f load_us=%.1f net_total=%" PRIu64 "\n",
                          s.snapshots(), v ? std::uint64_t(v->tick) : 0, v ? std::size_t(v->units.size()) : 0,
                          s.last_wire_bytes(), s.last_net_bytes(), codec::encoding_name(s.last_encoding()),
-                         s.last_rtt_us(), s.last_load_us());
+                         s.last_rtt_us(), s.last_load_us(), s.net_bytes_total());
             std::fflush(stdout);
         }
     }
@@ -982,7 +983,8 @@ Result<int> run_headless(const Options& opt) {
     if (opt.edits != 0)
         s.recorder().print_line(stdout, {"c.edit_us", "c.edit_save_us", "c.edit_bytes", "c.edit_rtt_us", "c.forward_load_us"});
     s.checks().print(stdout);
-    std::fprintf(stdout, "client: Bye received after %" PRIu64 " snapshots (%" PRIu64 ")\n", s.snapshots(), sink % 2);
+    std::fprintf(stdout, "client: Bye received after %" PRIu64 " snapshots, %" PRIu64 " bytes (%" PRIu64 ")\n", s.snapshots(),
+                 s.net_bytes_total(), sink % 2);
     return *ok ? 0 : 1;
 }
 

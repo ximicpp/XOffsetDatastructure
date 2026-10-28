@@ -53,7 +53,7 @@ public:
             players_.push_back(std::move(b));
         }
         const stdm::ShardState src = make_shard(seed, sc);
-        shard_.emplace(XBuffer::create<ShardState>(kShardInitial, cap()));
+        shard_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
         copy_shard(shard_->root<ShardState>(), src);
         if (reuse_mode()) {
             a_req_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
@@ -61,7 +61,7 @@ public:
             a_r_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
             b_m_.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
             b_r_.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
-            c_r_.emplace(XBuffer::create<ShardState>(kShardInitial, cap()));
+            c_r_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
             d_.emplace(XBuffer::create<Report>(kReportInitial, cap()));
         }
     }
@@ -136,7 +136,7 @@ public:
             std::string snap, snap2;
             std::optional<XBuffer> r;
             timed(st, "C.snapshot", [&] { snap = shard_->save_verified<ShardState>(); });
-            timed(st, "C.restore", [&] { r.emplace(XBuffer::load_verified<ShardState>(snap, cap())); });
+            timed(st, "C.restore", [&] { r.emplace(XBuffer::load_verified<ShardState>(snap, cap(true))); });
             timed(st, "C.ticks", [&] { shard_ticks(r->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { snap2 = r->save_verified<ShardState>(); });
             timed(st, "C.replace", [&] { *shard_ = std::move(*r); });
@@ -146,7 +146,7 @@ public:
             timed(st, "C.cleanup", [&] { r.reset(); std::string().swap(snap); std::string().swap(snap2); });
             {
                 // Untimed copy of the current shard for the middle-erase stress item.
-                auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap());
+                auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap(true));
                 timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
@@ -245,7 +245,7 @@ public:
             timed(st, "C.cleanup", [] {});
             {
                 // Untimed copy of the current shard for the middle-erase stress item.
-                auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap());
+                auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap(true));
                 timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
@@ -289,9 +289,19 @@ private:
     static constexpr std::size_t kShardInitial = 4 * 1024 * 1024;
     static constexpr std::size_t kReportInitial = 4 * 1024;
 
-    static XOffsetDatastructure::XBuffer::MaximumCapacity cap() {
+    // Every buffer reserves 256 MiB of address space. SLG_XOFFSET_CAP_MIB=N reserves N MiB
+    // for each player, battle and report buffer instead (the shard keeps 256 MiB): an
+    // iPhone gives a process about 3.4 GiB of address space, less than the 64 players of
+    // scale S reserve at 256 MiB each (docs/DEPLOYMENT.md, SC-12).
+    static XOffsetDatastructure::XBuffer::MaximumCapacity cap(bool shard = false) {
         using XOffsetDatastructure::XBuffer;
-        auto c = XBuffer::maximum_capacity(std::size_t(256) << 20).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
+        static const std::size_t small = [] {
+            const char* v = std::getenv("SLG_XOFFSET_CAP_MIB");
+            const long mib = v ? std::strtol(v, nullptr, 10) : 0;
+            return mib > 0 ? std::size_t(mib) << 20 : std::size_t(256) << 20;
+        }();
+        auto c = XBuffer::maximum_capacity(shard ? std::size_t(256) << 20 : small)
+                     .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
         return use_pool() || reuse_mode() ? c.with_pool(pool()) : c;
     }
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
