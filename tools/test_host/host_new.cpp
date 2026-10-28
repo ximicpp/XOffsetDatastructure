@@ -16,9 +16,14 @@
 namespace {
 
 std::atomic<const void*> g_program[XOFFSET_HOST_NEW_COUNT];
+// The host's own threads (the UIKit main thread, the command-line host's main thread)
+// keep the default functions: a program that counts allocations process-wide would
+// otherwise count the app's user interface too.
+thread_local bool t_host_thread = false;
 
 template <typename F>
 F program(int index) noexcept {
+    if (t_host_thread) return nullptr;
     return reinterpret_cast<F>(const_cast<void*>(g_program[index].load(std::memory_order_acquire)));
 }
 
@@ -154,6 +159,8 @@ void operator delete[](void* p, std::size_t n, std::align_val_t a) noexcept {
 namespace xoffset_test_host {
 
 const void* const host_new_functions[XOFFSET_HOST_NEW_COUNT] = {XOFFSET_HOST_NEW_FUNCTIONS(XOFFSET_HOST_NEW_ADDRESS)};
+
+void keep_host_allocations_on_this_thread() noexcept { t_host_thread = true; }
 
 void set_new_functions(const void* const* program_functions) {
     for (int i = 0; i < XOFFSET_HOST_NEW_COUNT; ++i) {
