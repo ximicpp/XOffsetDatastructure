@@ -1,4 +1,4 @@
-# XOffsetDatastructure 部署指南（3.1.0）
+# XOffsetDatastructure 部署指南（3.2.0-rc.1）
 
 本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
 API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
@@ -10,13 +10,14 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，对外不宣传。3.1.0 的现状（详见
+服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0-rc.1 的现状（详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
-- Windows x64 客户端用 MinGW-w64 GCC 16 编译，全量测试通过，wire 与 Linux 服务端逐字节
-  一致；MSVC 和 clang-cl 编不了。
-- Android、iOS 客户端编译不了：NDK 和 Xcode 自带的 Clang 都没有反射。客户端的构建
-  方式在 3.2 里补。
+- 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
+  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）和 Android arm64
+  （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
+- 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
+  客户端都已跑通；**真机未测**，步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
 - 客户端上没有任何性能数据，现有计时都来自 Apple M4。
 
 ## 2. 同版本发布
@@ -31,7 +32,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   报错。可以把 `wire_schema_hash_v<T>()` 作为握手的一部分，在建立会话时比较。
 - 服务端之间滚动升级时，新旧版本不能混用同一类数据。可以分批切换（同一时间只让
   同版本的服务端互相通信），或在切换期间用旧版本程序导出、新版本程序导入。
-- schema 演进（新旧版本互通）在 3.2 加入（`next_cpp26`，未发布），见下面 2.1 节。
+- schema 演进（新旧版本互通）从 3.2.0-rc.1 起提供，见下面 2.1 节。
 
 ### 2.1 3.2 起：版本链与三条发版规则
 
@@ -56,11 +57,11 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 | --- | --- | --- |
 | 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
 | 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
-| 客户端 | Android、iOS | 3.1.0 无可用工具链 |
+| 客户端 | Android、iOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0-rc.1 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
   `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
-  MSVC、clang-cl 不支持。
+  MSVC、clang-cl 没有反射，只能用 C++20 字段表构建。
 - MinGW 和 MSVC 的 C++ ABI 不同：MinGW 编的 XOffset 模块只能通过 C 接口给 MSVC 编的
   引擎使用。
 - 同一可执行文件内，所有翻译单元的头文件版本、编译选项和依赖必须一致。
@@ -172,8 +173,35 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 - **客户端链路（尤其移动网络）建议在外层加 zstd 压缩**，或 lz4（更快、压缩率较低）。
   压缩在 `save_verified` 之后、`load_verified` 之前做，不影响库的校验。解压时同样
   要限制解压后的长度，防止压缩炸弹。
-- 压缩后的大小、压缩耗时没有测过，接入时按实际数据实测并选择压缩级别。
 - 数据只能整块发送，没有增量同步；需要增量时由上层协议拆分 schema。
+
+### 6.1 压缩怎么选
+
+压缩不在库里，库只管 wire 的生成和校验。按消息大小选：
+
+| 消息 | 选择 | 依据（云上 x86-64 实测） |
+| --- | --- | --- |
+| 大快照（KB 级以上：整场景、视野、全量状态） | **zstd level 3**，标准帧 | demo 整场景 321 KB → 123 KB（0.38），视野 15.1 KB → 6.4 KB（0.42）；`save_compact` + `XCompactOptions{0}` 再加 zstd-3，SLG A/B/C 比 FlatBuffers 原始大小小 7–9% |
+| 小消息（几十到几百字节：事件、战报、指令） | **zstd 字典**；同一时刻要发多条时**再批量**（多条一帧） | 不用字典时 zstd 对小消息几乎没用：SLG 战报（D 类，XOffset 197 B、FlatBuffers 158 B）压缩后 XOffset 135.9 B、FlatBuffers 114.0 B（1.19 倍）；用 16 KB 字典：单条 56.2 B 对 56.3 B（1.00），每批 8 / 32 / 128 条平均 40.4 / 37.2 / 34.5 B 对 41.9 / 38.1 / 35.3 B（0.96 / 0.98 / 0.98）。编码约 1.2–1.5 µs、解码约 0.5–0.7 µs 每条 |
+| CPU 紧张（低端手机、每帧预算很小） | **lz4** | 压缩率比 zstd 低、速度快；本项目没有测 lz4 的数字，接入时实测 |
+
+小消息的字典压缩用 `contrib/zstd_dict`（独立组件，C++17，要链接 zstd 1.5.x，不进库）：
+
+- **字典从服务端样本训练**：`xoffset_zstd_dict train --id N --binding auto INPUT...`，样本是真实的
+  XOffset wire（几千条以上）。训练是确定的，同样的样本得到同样的字典。
+- **两端都带字典版本**：字典 id 就是版本号，写在每一帧的帧头里。客户端订阅时报自己的字典 id，
+  服务端不一致就拒绝订阅；解码端遇到别的 id 的帧在解码前就拒绝（`dict_id_mismatch`）。
+  换字典 = 换 id，新旧字典同时在服务端保留到旧客户端升级完。
+- **字典绑定 schema**：`--binding auto` 把字典绑到样本 wire 头里的 schema 指纹，编码端拒绝别的
+  schema 的 wire；绑定后每帧省掉 wire 头里固定的 24 字节，解码端补回。改 schema 就要重训字典。
+- **限长**：解码前按帧头声明的长度和调用方给的上限拒绝，不先分配；批量帧限制条数和每条长度。
+  解出来的仍是未校验的 wire，照常走 `load_verified`。
+- 帧不带校验和，完整性交给传输层（TCP/TLS）和 `load_verified`。
+
+`demo/mapstate` 的事件流是完整例子：A 每 20 tick 推送一批 UnitEvent（每条 144–168 B），
+客户端按 `--events raw|zstd|zdict|batch` 订阅。10000 单位档每条平均网络字节：
+raw 146、zstd 152、字典 68、每帧 100 条批量 52。
+
 
 ## 7. 接入检查清单
 
@@ -188,4 +216,5 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 - [ ] 客户端用较小的 `maximum_capacity` 或 `XBufferPool`
 - [ ] 外层有认证（TLS 或签名）和业务字段检查
 - [ ] 限制了并发 buffer 数和总内存预算
-- [ ] 客户端链路评估过 zstd/lz4 压缩，并限制了解压后长度
+- [ ] 客户端链路按 6.1 节选了压缩（大快照 zstd-3，小消息字典或批量，CPU 紧张用 lz4），并限制了解压后长度
+- [ ] 用字典时：两端比较字典 id，字典绑定 schema，改 schema 时重训并换 id

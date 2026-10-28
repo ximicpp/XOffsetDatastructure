@@ -486,7 +486,8 @@ void test_frame_limits() {
            net::max_payload(MsgType::StepReq) == kCapBatch && net::max_payload(MsgType::StepRes) == kCapBatch &&
            net::max_payload(MsgType::Catalog) == kCapCatalog && net::max_payload(MsgType::Hello) == 32 &&
            net::max_payload(MsgType::HelloOk) == 0 && net::max_payload(MsgType::Bye) == 0 &&
-           net::max_payload(MsgType::Error) == 4096,
+           net::max_payload(MsgType::Error) == 4096 && net::max_payload(MsgType::Subscribe) == 24 &&
+           net::max_payload(MsgType::SubscribeOk) == 0 && net::max_payload(MsgType::Events) == (1u << 20),
        "max_payload table differs from INTERFACES section 4");
     for (bool nb : {false, true}) {
         detail += nb ? "nonblocking: " : "blocking: ";
@@ -496,6 +497,8 @@ void test_frame_limits() {
         detail += frame_case(ex, "bad_magic", hdr(MsgType::ViewReq, 16, 0x12345678u), nb, {MsgType::ViewReq}) + " ";
         detail += frame_case(ex, "unexpected_type", hdr(MsgType::StepReq, 16), nb, {MsgType::ViewReq}) + " ";
         detail += frame_case(ex, "unknown_type", hdr(MsgType(77), 16), nb, {MsgType::ViewReq}) + " ";
+        detail += frame_case(ex, "events_1GiB", hdr(MsgType::Events, 1u << 30), nb, {MsgType::Events}) + " ";
+        detail += frame_case(ex, "subscribe_25B", hdr(MsgType::Subscribe, 25), nb, {MsgType::Subscribe}) + " ";
     }
     // Exactly-at-limit and an Error frame from the peer.
     {

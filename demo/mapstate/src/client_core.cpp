@@ -21,6 +21,7 @@ namespace mapdemo::client {
 const char* usage_text() {
     return "usage: mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check | --no-check]\n"
            "                      [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]\n"
+           "                      [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]\n"
            "                      [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]\n"
            "       mapdemo_client --self-check [--csv-dir DIR]\n"
            "       mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]\n";
@@ -39,8 +40,9 @@ static std::optional<long> parse_long(const char* text, long lo, long hi) {
 }
 
 Result<Options> parse_options(int argc, char** argv) {
-    static constexpr std::string_view kWithValue[] = {"--host",     "--port",     "--csv-dir",      "--replay",
-                                                      "--encoding", "--buffers", "--screenshot-at"};
+    static constexpr std::string_view kWithValue[] = {"--host",     "--port",   "--csv-dir",       "--replay",
+                                                      "--encoding", "--buffers", "--screenshot-at", "--events",
+                                                      "--events-dict"};
     Options o;
     for (int i = 1; i < argc; ++i) {
         std::string_view a = argv[i];
@@ -73,6 +75,16 @@ Result<Options> parse_options(int argc, char** argv) {
                 o.cycle_encodings = false;
             }
         }
+        else if (a == "--events") {
+            if (std::string_view(v) == "off") {
+                o.events = Options::kEventsOff;
+            } else {
+                const auto m = codec::parse_event_mode(v);
+                if (!m) return bad_value(a, v);
+                o.events = *m;
+            }
+        }
+        else if (a == "--events-dict") o.events_dict = v;
         else if (a == "--buffers") {
             const auto m = parse_buffer_mode(v);
             if (!m) return bad_value(a, v);
@@ -306,11 +318,107 @@ Status Session::connect() {
         checks_.fail("catalog", why);
     }
 
+    if (opt_.events != Options::kEventsOff) MAPDEMO_TRY(subscribe());
+
     MAPDEMO_TRY(conn_.try_set_nonblocking(true));
     if (!opt_.csv_dir.empty()) {
         snap_csv_open_ = snap_csv_.open(join_path(opt_.csv_dir, "client_snapshots.csv"), kSnapshotCsvHeader);
         if (!snap_csv_open_) return Error{"cannot write client_snapshots.csv in " + opt_.csv_dir};
+        if (opt_.events != Options::kEventsOff) {
+            events_csv_open_ = events_csv_.open(join_path(opt_.csv_dir, "client_events.csv"), kEventsCsvHeader);
+            if (!events_csv_open_) return Error{"cannot write client_events.csv in " + opt_.csv_dir};
+        }
     }
+    return {};
+}
+
+// Subscribe (still blocking, before the first ViewReq): the client names its
+// event encoding and the dictionary version it holds; A refuses a dictionary
+// encoding when its own dictionary has another id.
+Status Session::subscribe() {
+    std::uint32_t dict_id = 0;
+    if (codec::event_mode_uses_dictionary(opt_.events) || !opt_.events_dict.empty()) {
+        Result<std::string> dict = codec::load_event_dictionary(opt_.events_dict, &dict_id);
+        if (!dict) return std::move(dict).error();
+        MAPDEMO_TRY(events_dec_.set_dictionary(*dict));
+    }
+    MAPDEMO_TRY(conn_.try_send(net::MsgType::Subscribe, 0, codec::subscribe_payload(dict_id), opt_.events));
+    Result<net::Frame> ok = conn_.try_recv({net::MsgType::SubscribeOk, net::MsgType::Error});
+    if (!ok) return std::move(ok).error();
+    if (ok->type == net::MsgType::Error) return Error{"A refused the event subscription: " + ok->payload};
+    checks_.pass("events_subscribed");
+    checks_.note("events_subscribed", std::string("mode=") + codec::event_mode_name(opt_.events) +
+                                          " dictionary=" + std::to_string(dict_id));
+    return {};
+}
+
+// One Events frame: decode, verify every UnitEvent wire, check its content
+// and log the digest of the wires (compared with A's a_events.csv).
+Status Session::on_events(net::Frame& frame) {
+    if (opt_.events == Options::kEventsOff) return Error{"Events frame without a subscription"};
+    const std::optional<codec::EventEncoding> enc = codec::parse_event_flags(frame.flags);
+    if (!enc || (opt_.events != codec::kEventCycle && frame.flags != opt_.events))
+        return Error{"Events frame with encoding flags " + std::to_string(frame.flags) + " for mode " +
+                     codec::event_mode_name(opt_.events)};
+    const std::uint64_t tick = frame.correlation;
+    event_part_ = (events_ != 0 && tick == last_event_tick_) ? event_part_ + 1 : 0;
+    last_event_tick_ = tick;
+
+    metrics::Stopwatch sw;
+    MAPDEMO_TRY(events_dec_.decode(*enc, frame.payload, event_wires_));
+    const double decode_us = sw.us();
+    sw.restart();
+    const bool reuse = opt_.buffers == BufferMode::Reuse;
+    std::size_t wire_bytes = 0;
+    std::string why;
+    std::uint32_t prev_id = 0;
+    for (std::size_t i = 0; i < event_wires_.size(); ++i) {
+        const std::string_view w = event_wires_[i];
+        wire_bytes += w.size();
+        if (reuse && event_buf_) {
+            XStatus r = event_buf_->try_reload_verified<UnitEvent>(std::as_bytes(std::span<const char>(w.data(), w.size())));
+            if (!r) return Error{"events: " + r.error().message};
+        } else {
+            XResult<XBuffer> b =
+                XBuffer::try_load_verified<UnitEvent>(std::as_bytes(std::span<const char>(w.data(), w.size())), cap_event());
+            if (!b) return Error{"events: " + b.error().message};
+            event_buf_.emplace(std::move(*b));
+        }
+        if (!opt_.check_on() || !why.empty()) continue;
+        const UnitEvent& e = event_buf_->root<UnitEvent>();
+        const std::string_view name = e.name.view();
+        if (e.tick != tick) why = "tick " + std::to_string(e.tick) + " in a frame for tick " + std::to_string(tick);
+        else if (e.unit_id % kEventIdModulo != 0) why = "unit " + std::to_string(e.unit_id) + " has no events";
+        else if (i > 0 && e.unit_id <= prev_id) why = "unit ids not ascending";
+        else if (e.hp < 50 || e.hp > 100) why = "hp " + std::to_string(e.hp);
+        else if (static_cast<std::uint32_t>(e.behavior) > 2) why = "behavior out of range";
+        else if (name.empty() || name.substr(0, 1) != "U") why = "name '" + std::string(name) + "'";
+        else if (e.path.size() == 0 || e.next_waypoint >= e.path.size()) why = "path or next_waypoint";
+        else if (!rules::contains(scene_bounds(), e.pos)) why = "position outside the scene";
+        prev_id = e.unit_id;
+    }
+    if (!reuse) event_buf_.reset();
+    const double verify_us = sw.us();
+    rec_.add("c.event_decode_us", decode_us);
+    rec_.add("c.event_verify_us", verify_us);
+    rec_.add(std::string("c.event_net_bytes_per_event.") + codec::event_encoding_name(*enc),
+             double(frame.payload.size()) / double(event_wires_.size()));
+    MAPDEMO_TRY(events_raw_.encode(codec::EventEncoding::Raw, event_wires_, event_raw_));
+    const std::uint64_t digest = checks::wire_digest(event_raw_);
+    if (opt_.check_on()) {
+        if (why.empty()) checks_.pass("event_content", event_wires_.size());
+        else checks_.fail("event_content", "tick " + std::to_string(tick) + ": " + why);
+    }
+    ++event_frames_[static_cast<int>(*enc)];
+    events_ += event_wires_.size();
+    if (events_csv_open_) {
+        char line[256];
+        std::snprintf(line, sizeof line, "%" PRIu64 ",%" PRIu64 ",%s,%zu,%zu,%zu,%016" PRIx64 ",%.3f,%.3f,%d", tick,
+                      event_part_, codec::event_encoding_name(*enc), event_wires_.size(), wire_bytes, frame.payload.size(),
+                      digest, decode_us, verify_us, why.empty() ? 1 : 0);
+        events_csv_.row(line);
+    }
+    if (reuse) conn_.recycle_rx(std::move(frame.payload));
     return {};
 }
 
@@ -356,12 +464,14 @@ Status Session::pump(int timeout_ms) {
     if (!p.readable) return {};
     while (!bye_) {
         Result<std::optional<net::Frame>> got =
-            conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Bye, net::MsgType::Error});
+            conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Events, net::MsgType::Bye, net::MsgType::Error});
         if (!got) return std::move(got).error();
         std::optional<net::Frame>& f = *got;
         if (!f) break;
         if (f->type == net::MsgType::Bye) {
             bye_ = true;
+        } else if (f->type == net::MsgType::Events) {
+            MAPDEMO_TRY(on_events(*f));
         } else if (f->type == net::MsgType::Error) {
             return Error{"A rejected a view request: " + f->payload};
         } else {
@@ -537,6 +647,16 @@ Result<bool> Session::finish() {
                                                    " compact=" + std::to_string(by_encoding_[1]) +
                                                    " zstd=" + std::to_string(by_encoding_[2]));
         }
+        if (opt_.events != Options::kEventsOff) {
+            const std::string detail = "frames raw=" + std::to_string(event_frames_[0]) + " zstd=" +
+                                       std::to_string(event_frames_[1]) + " zdict=" + std::to_string(event_frames_[2]) +
+                                       " batch=" + std::to_string(event_frames_[3]) + " events=" + std::to_string(events_);
+            if (events_ == 0) checks_.fail("events_received", "no event received");
+            else {
+                checks_.pass("events_received", events_);
+                checks_.note("events_received", detail);
+            }
+        }
     }
     bool ok = checks_.all_ok();
     if (!opt_.csv_dir.empty()) {
@@ -671,7 +791,8 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
         for (;;) {
             if (c.want_write()) MAPDEMO_TRY(c.try_flush());
             Result<std::optional<net::Frame>> f = c.try_recv_nowait(
-                {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloOk});
+                {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloOk,
+                 net::MsgType::SubscribeOk, net::MsgType::Events});
             if (!f) return std::move(f).error();
             if (*f) {
                 a.outcome = Outcome::Frame;
@@ -790,6 +911,27 @@ Result<int> run_evil(const Options& opt) {
         MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 9, view_request_wire(9, normal),
                                static_cast<std::uint16_t>(codec::view_flags(net::ViewCategory::Normal, codec::Encoding::Compact) | 0x1000u)));
         expect_rejected(log, "evil_reserved_flag", "ViewReq with reserved flag bit 12", c);
+    }
+    {   // (7)-(9) Subscribe: a dictionary version A does not hold, the wrong
+        // UnitEvent schema, an unknown event encoding. A answers Error each time.
+        std::uint32_t id = 0;
+        Result<std::string> dict = codec::load_event_dictionary(std::string(), &id);
+        const std::uint32_t other = dict ? id + 1 : 999;
+        const auto zdict = static_cast<std::uint16_t>(codec::EventEncoding::Dict);
+        net::Conn c7;
+        MAPDEMO_TRY(handshake(c7, opt));
+        MAPDEMO_TRY(c7.try_send(net::MsgType::Subscribe, 0, codec::subscribe_payload(other), zdict));
+        expect_rejected(log, "evil_subscribe_dict_version", "Subscribe holding another dictionary version", c7);
+        net::Conn c8;
+        MAPDEMO_TRY(handshake(c8, opt));
+        std::string wrong = codec::subscribe_payload(0);
+        wrong[3] = static_cast<char>(wrong[3] ^ 1);
+        MAPDEMO_TRY(c8.try_send(net::MsgType::Subscribe, 0, wrong, static_cast<std::uint16_t>(codec::EventEncoding::Raw)));
+        expect_rejected(log, "evil_subscribe_schema", "Subscribe with another UnitEvent schema", c8);
+        net::Conn c9;
+        MAPDEMO_TRY(handshake(c9, opt));
+        MAPDEMO_TRY(c9.try_send(net::MsgType::Subscribe, 0, codec::subscribe_payload(0), 7));
+        expect_rejected(log, "evil_subscribe_encoding", "Subscribe asking for event encoding 7", c9);
     }
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty
