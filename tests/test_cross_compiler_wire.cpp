@@ -2,17 +2,32 @@
 //
 // Builds a fixed set of V2 wires from deterministic inputs: every container
 // kind, inline and heap strings, holes left by mutation, a zero-run-elided
-// (sparse) wire, enum keys ordered only by operator<=>, nested records,
-// arrays, bool and floating point fields. The same source must produce byte-identical wires with every
-// supported compiler (P2996 Clang with libc++, GCC 16 with libstdc++), and each
-// compiler must accept the other's wires through load_verified.
+// (sparse) wire, compact wires (save_compact, slack 0 and 8), enum keys
+// ordered only by operator<=>, nested records, arrays, bool and floating point
+// fields. The same source must produce byte-identical wires with every
+// supported compiler (P2996 Clang with libc++, GCC 16 with libstdc++, the
+// client compilers), and each compiler must accept the other's wires through
+// load_verified.
+//
+// Each case also has two edited wires: the case's wire loaded, changed by the
+// fixed steps of edit() (scalars, container inserts and erases, short strings
+// made long), then saved with save_verified (<case>.edit.xwire) and with
+// save_compact, slack 0 (<case>.edit-compact.xwire). A receiver that edits a
+// wire written elsewhere must write the same bytes as the writer would.
 //
 // usage:
 //   test_cross_compiler_wire                  write and read in memory
-//   test_cross_compiler_wire --write <dir>    write <dir>/<case>.xwire
+//   test_cross_compiler_wire --write <dir>    write <dir>/<case>.xwire and the
+//                                             two edited wires of each case
 //   test_cross_compiler_wire --read <dir>     load each case from <dir>, then
 //                                             require it to equal this build's
-//                                             wire byte for byte
+//                                             wire byte for byte; edit the
+//                                             loaded wire and require both
+//                                             results to equal <dir>'s
+//   test_cross_compiler_wire --mutate-ref <ref> <out>
+//                                             load each case from <ref>, edit
+//                                             it and write the two edited
+//                                             wires to <out> (diff with <ref>)
 //
 // Inputs come from std::mt19937_64 raw output only: its sequence is fixed by
 // the standard, while the distributions differ between standard libraries.
@@ -150,9 +165,53 @@ void churn(cw::Root& r, Source& in) {
     r.units.reserve(r.units.capacity() * 2 + 1); // relocates: old block becomes a hole
 }
 
+// Fixed edits of a received wire: scalars, inserts and erases in every
+// container kind, a short (inline) string made long (heap), a new map key.
+void edit(cw::Root& r) {
+    Source in(0x5eed00ed);
+    fill(r, in, 3); // appends (and sets epoch and title, edited again below)
+    r.epoch ^= 0x00ff00ff00ff00ffull;
+    r.title = "a title edited by the receiver, long enough for a heap block";
+    if (!r.items.empty()) {
+        auto& first = r.items.front();
+        first.weight = first.weight * 2.0 + 0.25;
+        first.equipped = !first.equipped;
+        first.name = "renamed by the receiver to need a heap block";
+        first.stats.push_back(0xbeef);
+    }
+    if (r.items.size() > 2) r.items.erase(r.items.begin() + 2);
+    if (!r.units.empty()) {
+        r.units.back().hp = -1;
+        r.units.back().tag = "u";
+    }
+    if (!r.labels.empty()) r.labels.pop_back();
+    r.keys.insert(-7);
+    if (r.keys.size() > 1) r.keys.erase(*std::next(r.keys.begin()));
+    r.attrs.insert_or_assign(std::string("edited-key"), std::uint64_t{42});
+    r.ranks.insert_or_assign(cw::Rank::r3, "rank three, edited");
+    r.rank_set.erase(cw::Rank::r1);
+}
+
+constexpr xo::XCompactOptions kTight{.slack_div = 0};
+constexpr xo::XCompactOptions kSlack8{.slack_div = 8};
+
+struct Edited {
+    std::string verified;
+    std::string compact;
+};
+
+Edited edited(const std::string& wire) {
+    auto b = Buffer::load(wire, cap());
+    edit(b.root());
+    return {b.save_verified(), b.save_compact(kTight)};
+}
+
 struct Case {
     const char* name;
     std::function<std::string()> make;
+    // Re-save of a loaded wire that must give the same bytes; empty: the
+    // default emission, or zero-run elision for a wire it cannot be.
+    std::function<std::string(Buffer&)> resave;
 };
 
 std::vector<Case> cases() {
@@ -204,6 +263,20 @@ std::vector<Case> cases() {
             r.items.reserve(r.items.size() * 4); // zero slack outside holes too
             return b.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
         }},
+        {"compact_slack0", [] {
+            Source in(0x5eed0006);
+            auto b = Buffer::create(1u << 20, cap());
+            fill(b.root(), in, 120);
+            churn(b.root(), in);
+            return b.save_compact(kTight);
+        }, [](Buffer& b) { return b.save_compact(kTight); }},
+        {"compact_slack8", [] {
+            Source in(0x5eed0007);
+            auto b = Buffer::create(1u << 20, cap());
+            fill(b.root(), in, 120);
+            churn(b.root(), in);
+            return b.save_compact(kSlack8);
+        }, [](Buffer& b) { return b.save_compact(kSlack8); }},
     };
 }
 
@@ -213,26 +286,57 @@ std::string read_file(const std::filesystem::path& path) {
     return std::string((std::istreambuf_iterator<char>(f)), {});
 }
 
-void check_wire(const char* name, const std::string& wire, const std::string& expected) {
+void require_same(const std::string& name, const std::string& wire, const std::string& expected) {
+    if (wire != expected) {
+        std::size_t at = 0;
+        while (at < wire.size() && at < expected.size() && wire[at] == expected[at]) ++at;
+        fail(name + ": accepted, but differs from this build's wire at byte " +
+             std::to_string(at) + " (sizes " + std::to_string(wire.size()) + " vs " +
+             std::to_string(expected.size()) + ")");
+    }
+}
+
+void check_wire(const Case& c, const std::string& wire, const std::string& expected) {
+    const std::string name = c.name;
     try {
         xo::XWireHeaderV2 header{};
         std::memcpy(&header, wire.data(), sizeof(header));
         auto loaded = Buffer::load(wire, cap());
-        // The default emission, or zero-run elision for a wire it cannot be.
-        if (loaded.save_verified() != wire &&
-            (header.extent_count == 0 ||
-             loaded.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != wire))
-            fail(std::string(name) + ": load_verified -> save_verified is not byte-identical");
+        if (c.resave) {
+            if (c.resave(loaded) != wire)
+                fail(name + ": load_verified -> save_compact is not byte-identical");
+        } else if (loaded.save_verified() != wire &&
+                   (header.extent_count == 0 ||
+                    loaded.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != wire)) {
+            fail(name + ": load_verified -> save_verified is not byte-identical");
+        }
     } catch (const std::exception& e) {
-        fail(std::string(name) + ": load_verified rejected the wire: " + e.what());
+        fail(name + ": load_verified rejected the wire: " + e.what());
     }
-    if (wire != expected) {
-        std::size_t at = 0;
-        while (at < wire.size() && at < expected.size() && wire[at] == expected[at]) ++at;
-        fail(std::string(name) + ": accepted, but differs from this build's wire at byte " +
-             std::to_string(at) + " (sizes " + std::to_string(wire.size()) + " vs " +
-             std::to_string(expected.size()) + ")");
+    require_same(name, wire, expected);
+}
+
+// The edited wires of a received case must load and equal `expected`.
+void check_edited(const Case& c, const Edited& got, const Edited& expected) {
+    const std::string name = c.name;
+    try {
+        (void)Buffer::load(got.verified, cap());
+        (void)Buffer::load(got.compact, cap());
+    } catch (const std::exception& e) {
+        fail(name + ": an edited wire does not load: " + e.what());
     }
+    require_same(name + ".edit", got.verified, expected.verified);
+    require_same(name + ".edit-compact", got.compact, expected.compact);
+}
+
+void write_file(const std::filesystem::path& path, const std::string& wire) {
+    std::ofstream f(path, std::ios::binary);
+    f.write(wire.data(), static_cast<std::streamsize>(wire.size()));
+    if (!f) fail("cannot write " + path.string());
+}
+
+std::filesystem::path edit_path(const std::filesystem::path& dir, const Case& c, bool compact) {
+    return dir / (std::string(c.name) + (compact ? ".edit-compact.xwire" : ".edit.xwire"));
 }
 } // namespace
 
@@ -243,27 +347,48 @@ int main(int argc, char** argv) {
         std::filesystem::create_directories(dir);
         for (const auto& c : all) {
             const auto wire = c.make();
-            std::ofstream f(dir / (std::string(c.name) + ".xwire"), std::ios::binary);
-            f.write(wire.data(), static_cast<std::streamsize>(wire.size()));
-            if (!f) fail(std::string("cannot write ") + c.name);
-            std::cout << c.name << " " << wire.size() << " bytes\n";
+            const auto e = edited(wire);
+            write_file(dir / (std::string(c.name) + ".xwire"), wire);
+            write_file(edit_path(dir, c, false), e.verified);
+            write_file(edit_path(dir, c, true), e.compact);
+            std::cout << c.name << " " << wire.size() << " bytes, edited " << e.verified.size()
+                      << " / compact " << e.compact.size() << " bytes\n";
         }
         return 0;
     }
     if (argc == 3 && std::string_view(argv[1]) == "--read") {
         const std::filesystem::path dir = argv[2];
         for (const auto& c : all) {
-            check_wire(c.name, read_file(dir / (std::string(c.name) + ".xwire")), c.make());
-            std::cout << c.name << " accepted and byte-identical\n";
+            const auto wire = read_file(dir / (std::string(c.name) + ".xwire"));
+            check_wire(c, wire, c.make());
+            check_edited(c, edited(wire),
+                         {read_file(edit_path(dir, c, false)), read_file(edit_path(dir, c, true))});
+            std::cout << c.name << " accepted and byte-identical, edits byte-identical\n";
         }
         return 0;
     }
-    if (argc != 1) fail("usage: test_cross_compiler_wire [--write <dir> | --read <dir>]");
+    if (argc == 4 && std::string_view(argv[1]) == "--mutate-ref") {
+        const std::filesystem::path ref = argv[2], out = argv[3];
+        std::filesystem::create_directories(out);
+        for (const auto& c : all) {
+            const auto e = edited(read_file(ref / (std::string(c.name) + ".xwire")));
+            write_file(edit_path(out, c, false), e.verified);
+            write_file(edit_path(out, c, true), e.compact);
+            std::cout << c.name << " edited " << e.verified.size() << " / compact " << e.compact.size()
+                      << " bytes\n";
+        }
+        return 0;
+    }
+    if (argc != 1)
+        fail("usage: test_cross_compiler_wire [--write <dir> | --read <dir> | --mutate-ref <ref> <out>]");
     int sparse_seen = 0;
     for (const auto& c : all) {
         const auto wire = c.make();
         if (wire != c.make()) fail(std::string(c.name) + ": generation is not deterministic");
-        check_wire(c.name, wire, wire);
+        check_wire(c, wire, wire);
+        const auto e = edited(wire);
+        check_edited(c, edited(wire), e);
+        if (e.verified == wire) fail(std::string(c.name) + ": edit() changed nothing");
         xo::XWireHeaderV2 header{};
         std::memcpy(&header, wire.data(), sizeof(header));
         const std::string_view name(c.name);

@@ -19,8 +19,11 @@ K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺�
 
 运行入口：`tools/native_targets.sh TARGET --std 20|23 --ref <参照语料>`（工具链文件在
 `cmake/toolchains/`）。每个目标都跑 Release 全量 CTest，然后做 wire 语料检查：写出本机语料，
-读入参照 wire（必须全部接受），再与参照语料 `diff -r`。参照语料由 Linux x86-64 GCC 16 C++26
-（反射）写出，共 6 个：elided、empty、medium_holes、reloaded_mutated、small、sparse。
+读入参照 wire（必须全部接受，重存逐字节相同），把参照 wire 按固定步骤改过后再存（`save_verified`
+和 `save_compact` 各一份），必须与参照端改出的字节相同，最后与参照语料 `diff -r`。参照语料由 Linux
+x86-64 GCC 16 C++26（反射）写出：8 个用例（elided、empty、medium_holes、reloaded_mutated、small、
+sparse，以及 `save_compact` 存出的 compact_slack0、compact_slack8），每个再带改过的两份
+（`<用例>.edit.xwire`、`<用例>.edit-compact.xwire`），共 24 个文件。3.2.0-rc.1 及以前只有前 6 个。
 
 防止回退：`tools/local_validate.sh` 带这些列（`msvc-c++20`、`msvc-c++23`、`clang-cl-c++20`、
 `mingw-c++20`、`ndk29-c++20`、`ndk30-c++20`），参照语料由同一提交的 GCC 16 C++26 构建现写。
