@@ -5,8 +5,9 @@
 // error codes, close, non-blocking mode, gathered send and poll. Every
 // receive path validates the header (magic, reserved, allowed type, per-type
 // length limit) before the payload buffer is sized. An Error frame that the
-// caller did not list in `allowed` is turned into a ProtocolError carrying
-// the peer's text.
+// caller did not list in `allowed` is turned into an Error carrying the
+// peer's text. The bodies never throw; the throwing calls at the end of the
+// file (servers) wrap the try_* ones.
 #include "mapdemo/net.hpp"
 
 #include <algorithm>
@@ -70,12 +71,13 @@ std::string error_text(const char* what, int e) {
 }
 
 // Winsock needs WSAStartup before the first call; it stays up for the process.
-void ensure_sockets() {
+Status ensure_sockets() {
     static const int rc = [] {
         WSADATA data;
         return ::WSAStartup(MAKEWORD(2, 2), &data);
     }();
-    if (rc != 0) throw ProtocolError("WSAStartup failed: " + std::to_string(rc));
+    if (rc != 0) return Error{"WSAStartup failed: " + std::to_string(rc)};
+    return {};
 }
 
 void close_socket(Socket s) noexcept { ::closesocket(NativeSocket(s)); }
@@ -101,7 +103,7 @@ bool accept_retry(int e) noexcept { return e == EINTR || e == ECONNABORTED; }
 
 std::string error_text(const char* what, int e) { return std::string(what) + ": " + std::strerror(e); }
 
-void ensure_sockets() {}
+Status ensure_sockets() { return {}; }
 
 void close_socket(Socket s) noexcept { ::close(NativeSocket(s)); }
 
@@ -141,10 +143,10 @@ long long recv_some(Socket fd, char* dst, std::size_t n) noexcept {
     return ::recv(NativeSocket(fd), dst, IoSize(n), 0);
 }
 
-FrameHeader make_header(MsgType type, std::uint64_t correlation, std::size_t length, std::uint16_t flags) {
+Result<FrameHeader> make_header(MsgType type, std::uint64_t correlation, std::size_t length, std::uint16_t flags) {
     if (length > max_payload(type))
-        throw ProtocolError(std::string("send: ") + type_name(type) + " payload of " + std::to_string(length) +
-                            " bytes exceeds the limit of " + std::to_string(max_payload(type)));
+        return Error{std::string("send: ") + type_name(type) + " payload of " + std::to_string(length) +
+                     " bytes exceeds the limit of " + std::to_string(max_payload(type))};
     FrameHeader h{};
     h.magic = kMagic;
     h.type = static_cast<std::uint16_t>(type);
@@ -159,25 +161,27 @@ bool is_known(std::uint16_t raw) noexcept {
     return raw >= static_cast<std::uint16_t>(MsgType::Hello) && raw <= static_cast<std::uint16_t>(MsgType::Bye);
 }
 
-// Header checks shared by recv() and try_recv(). Runs before any payload allocation.
-void validate_header(const FrameHeader& h, std::initializer_list<MsgType> allowed) {
-    if (h.magic != kMagic) throw ProtocolError("bad frame magic");
-    if (h.reserved != 0) throw ProtocolError("bad frame header: reserved field is not zero");
-    if (!is_known(h.type)) throw ProtocolError("unknown frame type " + std::to_string(h.type));
+Error peer_closed(std::string message) { return Error{std::move(message), true}; }
+
+// Header checks shared by recv() and recv_nowait(). Runs before any payload allocation.
+Status validate_header(const FrameHeader& h, std::initializer_list<MsgType> allowed) {
+    if (h.magic != kMagic) return Error{"bad frame magic"};
+    if (h.reserved != 0) return Error{"bad frame header: reserved field is not zero"};
+    if (!is_known(h.type)) return Error{"unknown frame type " + std::to_string(h.type)};
     const auto type = static_cast<MsgType>(h.type);
     const bool listed = std::find(allowed.begin(), allowed.end(), type) != allowed.end();
-    if (!listed && type != MsgType::Error)
-        throw ProtocolError(std::string("unexpected frame type ") + type_name(type));
+    if (!listed && type != MsgType::Error) return Error{std::string("unexpected frame type ") + type_name(type)};
     if (h.length > max_payload(type))
-        throw ProtocolError(std::string(type_name(type)) + " frame declares " + std::to_string(h.length) +
-                            " payload bytes, limit " + std::to_string(max_payload(type)));
+        return Error{std::string(type_name(type)) + " frame declares " + std::to_string(h.length) +
+                     " payload bytes, limit " + std::to_string(max_payload(type))};
+    return {};
 }
 
-// Completed frame -> Frame, or ProtocolError for an Error frame the caller did not expect.
-Frame finish_frame(const FrameHeader& h, std::string payload, std::initializer_list<MsgType> allowed) {
+// Completed frame -> Frame, or an Error for an Error frame the caller did not expect.
+Result<Frame> finish_frame(const FrameHeader& h, std::string payload, std::initializer_list<MsgType> allowed) {
     const auto type = static_cast<MsgType>(h.type);
     if (type == MsgType::Error && std::find(allowed.begin(), allowed.end(), type) == allowed.end())
-        throw ProtocolError("peer error: " + payload);
+        return Error{"peer error: " + payload};
     Frame f;
     f.type = type;
     f.flags = h.flags;
@@ -186,17 +190,20 @@ Frame finish_frame(const FrameHeader& h, std::string payload, std::initializer_l
     return f;
 }
 
-void wait_fd(Socket fd, bool for_write) {
+Status wait_fd(Socket fd, bool for_write) {
     PollItem p;
     p.fd = fd;
     p.want_read = !for_write;
     p.want_write = for_write;
-    while (poll(&p, 1, -1) == 0) {
+    for (;;) {
+        Result<int> n = try_poll(&p, 1, -1);
+        if (!n) return std::move(n).error();
+        if (*n != 0) return {};
     }
 }
 
 // Blocking read of exactly n bytes (waits when the socket is non-blocking).
-void read_exact(Socket fd, char* dst, std::size_t n, std::uint64_t& counter) {
+Status read_exact(Socket fd, char* dst, std::size_t n, std::uint64_t& counter) {
     std::size_t got = 0;
     while (got < n) {
         const long long r = recv_some(fd, dst + got, n - got);
@@ -206,20 +213,21 @@ void read_exact(Socket fd, char* dst, std::size_t n, std::uint64_t& counter) {
             continue;
         }
         if (r == 0) {
-            if (got == 0) throw PeerClosed("connection closed by peer");
-            throw ProtocolError("connection closed mid-frame");
+            if (got == 0) return peer_closed("connection closed by peer");
+            return Error{"connection closed mid-frame"};
         }
         const int e = last_error();
         if (interrupted(e)) continue;
-        if (would_block(e)) wait_fd(fd, false);
-        else if (conn_reset(e) && got == 0) throw PeerClosed(error_text("recv", e));
-        else throw ProtocolError(error_text("recv", e));
+        if (would_block(e)) MAPDEMO_TRY(wait_fd(fd, false));
+        else if (conn_reset(e) && got == 0) return peer_closed(error_text("recv", e));
+        else return Error{error_text("recv", e)};
     }
+    return {};
 }
 
 // One gathered send over the unsent tail of header + payload. Returns bytes
-// written, 0 when the socket would block; throws on a broken connection.
-std::size_t send_some(Socket fd, const FrameHeader& h, std::string_view payload, std::size_t written) {
+// written, 0 when the socket would block; an error on a broken connection.
+Result<std::size_t> send_some(Socket fd, const FrameHeader& h, std::string_view payload, std::size_t written) {
     const char* part[2];
     std::size_t len[2];
     int n = 0;
@@ -247,7 +255,7 @@ std::size_t send_some(Socket fd, const FrameHeader& h, std::string_view payload,
         }
         DWORD sent = 0;
         if (::WSASend(NativeSocket(fd), buf, DWORD(n), &sent, 0, nullptr, nullptr) == 0)
-            return static_cast<std::size_t>(sent);
+            return std::size_t(sent);
 #else
         iovec iov[2];
         for (int i = 0; i < n; ++i) {
@@ -258,12 +266,12 @@ std::size_t send_some(Socket fd, const FrameHeader& h, std::string_view payload,
         msg.msg_iov = iov;
         msg.msg_iovlen = static_cast<decltype(msg.msg_iovlen)>(n);
         const ssize_t w = ::sendmsg(NativeSocket(fd), &msg, kSendFlags);
-        if (w >= 0) return static_cast<std::size_t>(w);
+        if (w >= 0) return std::size_t(w);
 #endif
         const int e = last_error();
         if (interrupted(e)) continue;
-        if (would_block(e)) return 0;
-        throw ProtocolError(error_text("send", e));
+        if (would_block(e)) return std::size_t(0);
+        return Error{error_text("send", e)};
     }
 }
 
@@ -339,15 +347,15 @@ Conn& Conn::operator=(Conn&& other) noexcept {
     return *this;
 }
 
-Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
-    ensure_sockets();
+Result<Conn> Conn::try_connect(const std::string& host, std::uint16_t port, int retry_ms) {
+    MAPDEMO_TRY(ensure_sockets());
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     addrinfo* res = nullptr;
     const std::string service = std::to_string(port);
     const int gai = ::getaddrinfo(host.c_str(), service.c_str(), &hints, &res);
-    if (gai != 0) throw ProtocolError("resolve " + host + ": " + ::gai_strerror(gai));
+    if (gai != 0) return Error{"resolve " + host + ": " + ::gai_strerror(gai)};
 
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(retry_ms);
     std::string last = "no address";
@@ -373,8 +381,7 @@ Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     ::freeaddrinfo(res);
-    throw ProtocolError("connect " + host + ":" + service + " failed after " + std::to_string(retry_ms) +
-                        " ms (" + last + ")");
+    return Error{"connect " + host + ":" + service + " failed after " + std::to_string(retry_ms) + " ms (" + last + ")"};
 }
 
 void Conn::close() noexcept {
@@ -388,27 +395,62 @@ void Conn::close() noexcept {
     tx_.clear();
 }
 
-void Conn::send(MsgType type, std::uint64_t correlation, std::string_view payload, std::uint16_t flags) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("send on a closed connection");
-    // Frames already queued by enqueue() go first so the stream stays ordered.
-    while (!flush()) wait_fd(fd_, true);
-    const FrameHeader h = make_header(type, correlation, payload.size(), flags);
-    const std::size_t total = sizeof h + payload.size();
-    std::size_t written = 0;
-    while (written < total) {
-        const std::size_t w = send_some(fd_, h, payload, written);
-        if (w == 0) {
-            wait_fd(fd_, true);
-            continue;
-        }
-        written += w;
-        bytes_sent_ += w;
+void Conn::shutdown_send() noexcept {
+    if (fd_ == kInvalidSocket) return;
+#if defined(_WIN32)
+    ::shutdown(NativeSocket(fd_), SD_SEND);
+#else
+    ::shutdown(NativeSocket(fd_), SHUT_WR);
+#endif
+}
+
+bool Conn::discard_input() noexcept {
+    if (fd_ == kInvalidSocket) return false;
+    char buf[4096];
+    for (;;) {
+        const long long got = recv_some(fd_, buf, sizeof buf);
+        if (got > 0) continue;
+        if (got == 0) return false;   // the peer closed
+        const int e = last_error();
+        if (interrupted(e)) continue;
+        return would_block(e);        // false on an error
     }
 }
 
-void Conn::send_raw(std::string_view bytes) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("send on a closed connection");
-    while (!flush()) wait_fd(fd_, true);
+// Frames already queued by enqueue() go out first so the stream stays ordered.
+Status Conn::drain_queue() {
+    for (;;) {
+        Result<bool> done = try_flush();
+        if (!done) return std::move(done).error();
+        if (*done) return {};
+        MAPDEMO_TRY(wait_fd(fd_, true));
+    }
+}
+
+Status Conn::try_send(MsgType type, std::uint64_t correlation, std::string_view payload, std::uint16_t flags) {
+    if (fd_ == kInvalidSocket) return Error{"send on a closed connection"};
+    MAPDEMO_TRY(drain_queue());
+    Result<FrameHeader> header = make_header(type, correlation, payload.size(), flags);
+    if (!header) return std::move(header).error();
+    const FrameHeader h = *header;
+    const std::size_t total = sizeof h + payload.size();
+    std::size_t written = 0;
+    while (written < total) {
+        Result<std::size_t> w = send_some(fd_, h, payload, written);
+        if (!w) return std::move(w).error();
+        if (*w == 0) {
+            MAPDEMO_TRY(wait_fd(fd_, true));
+            continue;
+        }
+        written += *w;
+        bytes_sent_ += *w;
+    }
+    return {};
+}
+
+Status Conn::try_send_raw(std::string_view bytes) {
+    if (fd_ == kInvalidSocket) return Error{"send on a closed connection"};
+    MAPDEMO_TRY(drain_queue());
     std::size_t written = 0;
     while (written < bytes.size()) {
         const auto w = ::send(NativeSocket(fd_), bytes.data() + written, IoSize(bytes.size() - written), kSendFlags);
@@ -419,50 +461,56 @@ void Conn::send_raw(std::string_view bytes) {
         }
         const int e = last_error();
         if (interrupted(e)) continue;
-        if (would_block(e)) wait_fd(fd_, true);
-        else throw ProtocolError(error_text("send", e));
+        if (would_block(e)) MAPDEMO_TRY(wait_fd(fd_, true));
+        else return Error{error_text("send", e)};
     }
+    return {};
 }
 
-Frame Conn::recv(std::initializer_list<MsgType> allowed) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("recv on a closed connection");
+Result<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
+    if (fd_ == kInvalidSocket) return Error{"recv on a closed connection"};
     if (rx_header_got_ != 0 || rx_have_header_)
-        throw ProtocolError("recv: a non-blocking receive is in progress on this connection");
+        return Error{"recv: a non-blocking receive is in progress on this connection"};
     FrameHeader h{};
-    read_exact(fd_, reinterpret_cast<char*>(&h), sizeof h, bytes_received_);
-    validate_header(h, allowed);
+    MAPDEMO_TRY(read_exact(fd_, reinterpret_cast<char*>(&h), sizeof h, bytes_received_));
+    MAPDEMO_TRY(validate_header(h, allowed));
     // A recycled buffer keeps its capacity; its old bytes are overwritten.
     std::string payload;
     if (h.length != 0) {
         payload = std::exchange(rx_spare_, std::string());
         payload.resize(h.length);
-        read_exact(fd_, payload.data(), h.length, bytes_received_);
+        MAPDEMO_TRY(read_exact(fd_, payload.data(), h.length, bytes_received_));
     }
     return finish_frame(h, std::move(payload), allowed);
 }
 
-void Conn::set_nonblocking(bool on) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("set_nonblocking on a closed connection");
-    if (!set_socket_nonblocking(fd_, on)) throw ProtocolError(errno_text("set_nonblocking"));
+Status Conn::try_set_nonblocking(bool on) {
+    if (fd_ == kInvalidSocket) return Error{"set_nonblocking on a closed connection"};
+    if (!set_socket_nonblocking(fd_, on)) return Error{errno_text("set_nonblocking")};
+    return {};
 }
 
-void Conn::enqueue(MsgType type, std::uint64_t correlation, std::string payload, std::uint16_t flags) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("enqueue on a closed connection");
+Status Conn::try_enqueue(MsgType type, std::uint64_t correlation, std::string payload, std::uint16_t flags) {
+    if (fd_ == kInvalidSocket) return Error{"enqueue on a closed connection"};
+    Result<FrameHeader> header = make_header(type, correlation, payload.size(), flags);
+    if (!header) return std::move(header).error();
     Pending p;
-    p.header = make_header(type, correlation, payload.size(), flags);
+    p.header = *header;
     p.payload = std::move(payload);
     tx_.push_back(std::move(p));
+    return {};
 }
 
-bool Conn::flush() {
+Result<bool> Conn::try_flush() {
     while (!tx_.empty()) {
-        if (fd_ == kInvalidSocket) throw ProtocolError("flush on a closed connection");
+        if (fd_ == kInvalidSocket) return Error{"flush on a closed connection"};
         Pending& p = tx_.front();
         const std::size_t total = sizeof p.header + p.payload.size();
-        const std::size_t w = send_some(fd_, p.header, p.payload, p.written);
-        if (w == 0) return false;
-        p.written += w;
-        bytes_sent_ += w;
+        Result<std::size_t> w = send_some(fd_, p.header, p.payload, p.written);
+        if (!w) return std::move(w).error();
+        if (*w == 0) return false;
+        p.written += *w;
+        bytes_sent_ += *w;
         if (p.written == total) {
             if (p.payload.capacity() > tx_spare_.capacity()) tx_spare_ = std::move(p.payload);
             tx_.pop_front();
@@ -471,8 +519,8 @@ bool Conn::flush() {
     return true;
 }
 
-std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
-    if (fd_ == kInvalidSocket) throw ProtocolError("try_recv on a closed connection");
+Result<std::optional<Frame>> Conn::try_recv_nowait(std::initializer_list<MsgType> allowed) {
+    if (fd_ == kInvalidSocket) return Error{"recv_nowait on a closed connection"};
     for (;;) {
         char* dst;
         std::size_t want;
@@ -487,15 +535,15 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
             const long long r = recv_some(fd_, dst, want);
             const bool mid = rx_header_got_ != 0;
             if (r == 0) {
-                if (!mid) throw PeerClosed("connection closed by peer");
-                throw ProtocolError("connection closed mid-frame");
+                if (!mid) return peer_closed("connection closed by peer");
+                return Error{"connection closed mid-frame"};
             }
             if (r < 0) {
                 const int e = last_error();
                 if (interrupted(e)) continue;
-                if (would_block(e)) return std::nullopt;
-                if (conn_reset(e) && !mid) throw PeerClosed(error_text("recv", e));
-                throw ProtocolError(error_text("recv", e));
+                if (would_block(e)) return std::optional<Frame>();
+                if (conn_reset(e) && !mid) return peer_closed(error_text("recv", e));
+                return Error{error_text("recv", e)};
             }
             bytes_received_ += static_cast<std::uint64_t>(r);
             if (!rx_have_header_) rx_header_got_ += static_cast<std::size_t>(r);
@@ -503,7 +551,7 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
         }
         if (!rx_have_header_) {
             if (rx_header_got_ < sizeof rx_header_) continue;
-            validate_header(rx_header_, allowed);   // before the payload is sized
+            MAPDEMO_TRY(validate_header(rx_header_, allowed));   // before the payload is sized
             rx_have_header_ = true;
             rx_payload_.clear();
             if (rx_header_.length != 0) rx_payload_ = std::exchange(rx_spare_, std::string());
@@ -518,7 +566,9 @@ std::optional<Frame> Conn::try_recv(std::initializer_list<MsgType> allowed) {
         rx_header_got_ = 0;
         rx_have_header_ = false;
         rx_payload_got_ = 0;
-        return finish_frame(h, std::move(payload), allowed);
+        Result<Frame> f = finish_frame(h, std::move(payload), allowed);
+        if (!f) return std::move(f).error();
+        return std::optional<Frame>(std::move(*f));
     }
 }
 
@@ -548,8 +598,8 @@ Listener& Listener::operator=(Listener&& other) noexcept {
     return *this;
 }
 
-Listener Listener::bind(const std::string& host, std::uint16_t port) {
-    ensure_sockets();
+Result<Listener> Listener::try_bind(const std::string& host, std::uint16_t port) {
+    MAPDEMO_TRY(ensure_sockets());
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -557,7 +607,7 @@ Listener Listener::bind(const std::string& host, std::uint16_t port) {
     addrinfo* res = nullptr;
     const std::string service = std::to_string(port);
     const int gai = ::getaddrinfo(host.empty() ? nullptr : host.c_str(), service.c_str(), &hints, &res);
-    if (gai != 0) throw ProtocolError("resolve " + host + ": " + ::gai_strerror(gai));
+    if (gai != 0) return Error{"resolve " + host + ": " + ::gai_strerror(gai)};
     std::string last = "no address";
     for (addrinfo* ai = res; ai != nullptr; ai = ai->ai_next) {
         const Socket fd = open_socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
@@ -575,18 +625,17 @@ Listener Listener::bind(const std::string& host, std::uint16_t port) {
             ::freeaddrinfo(res);
             Listener l;
             l.fd_ = fd;
-            return l;
+            return Result<Listener>(std::move(l));
         }
         last = errno_text("bind/listen");
         close_socket(fd);
     }
     ::freeaddrinfo(res);
-    throw ProtocolError("listen on " + host + ":" + service + " failed (" + last + ")");
+    return Error{"listen on " + host + ":" + service + " failed (" + last + ")"};
 }
 
-// On a non-blocking listener with nothing pending, returns a closed Conn.
-Conn Listener::accept() {
-    if (fd_ == kInvalidSocket) throw ProtocolError("accept on a closed listener");
+Result<Conn> Listener::try_accept() {
+    if (fd_ == kInvalidSocket) return Error{"accept on a closed listener"};
     for (;;) {
         const NativeSocket raw = ::accept(NativeSocket(fd_), nullptr, nullptr);
 #if defined(_WIN32)
@@ -601,13 +650,13 @@ Conn Listener::accept() {
         const int e = last_error();
         if (accept_retry(e)) continue;
         if (would_block(e)) return Conn();
-        throw ProtocolError(error_text("accept", e));
+        return Error{error_text("accept", e)};
     }
 }
 
 // ---- poll ----------------------------------------------------------------------
 
-int poll(PollItem* items, std::size_t count, int timeout_ms) {
+Result<int> try_poll(PollItem* items, std::size_t count, int timeout_ms) {
 #if defined(_WIN32)
     using PollFd = WSAPOLLFD;
 #else
@@ -629,7 +678,7 @@ int poll(PollItem* items, std::size_t count, int timeout_ms) {
     if (rc < 0) {
         const int e = last_error();
         if (interrupted(e)) return 0;
-        throw ProtocolError(error_text("poll", e));
+        return Error{error_text("poll", e)};
     }
     for (std::size_t i = 0; i < count; ++i) {
         const short rev = fds[i].revents;
@@ -664,5 +713,44 @@ std::uint64_t now_ns() noexcept {
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
             .count());
 }
+
+// ---- throwing calls (servers) -------------------------------------------------
+
+#if MAPDEMO_EXCEPTIONS
+namespace {
+[[noreturn]] void raise(Error&& e) {
+    if (e.peer_closed) throw PeerClosed(e.message);
+    throw ProtocolError(e.message);
+}
+void value_or_throw(Status&& s) {
+    if (!s) raise(std::move(s).error());
+}
+template <class T>
+T value_or_throw(Result<T>&& r) {
+    if (!r) raise(std::move(r).error());
+    return std::move(*r);
+}
+} // namespace
+
+Conn Conn::connect(const std::string& host, std::uint16_t port, int retry_ms) {
+    return value_or_throw(try_connect(host, port, retry_ms));
+}
+void Conn::send(MsgType type, std::uint64_t correlation, std::string_view payload, std::uint16_t flags) {
+    value_or_throw(try_send(type, correlation, payload, flags));
+}
+Frame Conn::recv(std::initializer_list<MsgType> allowed) { return value_or_throw(try_recv(allowed)); }
+void Conn::send_raw(std::string_view bytes) { value_or_throw(try_send_raw(bytes)); }
+void Conn::set_nonblocking(bool on) { value_or_throw(try_set_nonblocking(on)); }
+void Conn::enqueue(MsgType type, std::uint64_t correlation, std::string payload, std::uint16_t flags) {
+    value_or_throw(try_enqueue(type, correlation, std::move(payload), flags));
+}
+bool Conn::flush() { return value_or_throw(try_flush()); }
+std::optional<Frame> Conn::recv_nowait(std::initializer_list<MsgType> allowed) {
+    return value_or_throw(try_recv_nowait(allowed));
+}
+Listener Listener::bind(const std::string& host, std::uint16_t port) { return value_or_throw(try_bind(host, port)); }
+Conn Listener::accept() { return value_or_throw(try_accept()); }
+int poll(PollItem* items, std::size_t count, int timeout_ms) { return value_or_throw(try_poll(items, count, timeout_ms)); }
+#endif
 
 } // namespace mapdemo::net

@@ -3,9 +3,12 @@
 
 Reads OUT_ROOT/<NAME>/{selfcheck,replay}/ and OUT_ROOT/<NAME>/summary.json
 (run_all_tiers.sh) for every target NAME and writes OUT_ROOT/E2E_RESULT.md
-and OUT_ROOT/e2e_summary.json. Exit 0 only when every target passed and
-every target's replay produced the same wire and content digests, row by
-row, as A wrote into the corpus. Python 3.9 compatible.
+and OUT_ROOT/e2e_summary.json. Exit 0 only when every target passed, every
+target's replay produced the same wire and content digests, row by row, as
+A wrote into the corpus, and every target's self-check gave the same
+outcomes with the same refusal texts (so builds with and without
+exceptions, and every platform, refuse the same inputs the same way).
+Python 3.9 compatible.
 """
 import argparse
 import csv
@@ -94,6 +97,11 @@ def offline(root, name):
             "passed": passed, "ok": bool(ok), "meta": read_kv(os.path.join(d, "meta.txt"))}
 
 
+def outcomes(path):
+    """(check, result, detail) rows of a client_checks.csv; line endings do not matter."""
+    return sorted((r.get("check"), r.get("result"), r.get("detail")) for r in (read_csv(path) or []))
+
+
 def target_summary(out_root, name, corpus_rows):
     root = os.path.join(out_root, name)
     t = {"name": name, "root": root, "problems": []}
@@ -120,6 +128,10 @@ def target_summary(out_root, name, corpus_rows):
     t["replay_same"] = len(corpus_rows) - differ
     t["replay_by_encoding"] = enc_count
     t["replay_digests"] = sorted((r["request_id"], r.get("wire_digest"), r.get("digest")) for r in replay)
+    t["selfcheck_outcomes"] = outcomes(os.path.join(root, "selfcheck", "client_checks.csv"))
+    t["evil_outcomes"] = sorted((d, outcomes(os.path.join(root, d, "client_checks.csv")))
+                                for d in (os.listdir(root) if os.path.isdir(root) else [])
+                                if d.startswith("evil_"))
     if not corpus_rows or differ:
         t["problems"].append("replay: {} of {} corpus snapshots differ or missing".format(differ, len(corpus_rows)))
     if not t["selfcheck"]["ok"]:
@@ -187,7 +199,14 @@ def main():
     # Every platform verified the same snapshots to the same digests.
     ref = targets[0]["replay_digests"] if targets else []
     same_everywhere = bool(ref) and all(t["replay_digests"] == ref for t in targets)
-    passed = bool(targets) and all(t["ok"] for t in targets) and same_everywhere
+    # ... and refused the same self-check inputs with the same texts. Evil
+    # outcomes carry A's answers and the platform's socket error text, so
+    # they are reported, not required.
+    ref_self = targets[0]["selfcheck_outcomes"] if targets else []
+    same_selfcheck = bool(ref_self) and all(t["selfcheck_outcomes"] == ref_self for t in targets)
+    ref_evil = targets[0]["evil_outcomes"] if targets else []
+    same_evil = bool(ref_evil) and all(t["evil_outcomes"] == ref_evil for t in targets)
+    passed = bool(targets) and all(t["ok"] for t in targets) and same_everywhere and same_selfcheck
 
     lines = ["# Map state demo: end-to-end result", ""]
     lines.append("- label: {}".format(args.label or "-"))
@@ -200,6 +219,10 @@ def main():
         if corpus_meta else "",
         sha256(corpus_csv) if os.path.isfile(corpus_csv) else "-"))
     lines.append("- same replay digests on every target: **{}**".format("yes" if same_everywhere else "NO"))
+    lines.append("- same self-check outcomes and refusal texts on every target: **{}**".format(
+        "yes" if same_selfcheck else "NO"))
+    lines.append("- same evil outcomes and texts on every target: {}".format(
+        "yes" if same_evil else "no (see each target's evil_*/client_checks.csv)"))
     lines.append("")
     lines.append("## Targets")
     lines.append("")
@@ -250,14 +273,18 @@ def main():
     with open(os.path.join(args.root, "E2E_RESULT.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
     js = {"label": args.label, "passed": passed, "same_replay_digests": same_everywhere,
+          "same_selfcheck_outcomes": same_selfcheck, "same_evil_outcomes": same_evil,
           "corpus": {"dir": args.corpus, "rows": len(corpus_rows), "bytes": corpus_bytes, "meta": corpus_meta},
-          "targets": [{k: v for k, v in t.items() if k != "replay_digests"} for t in targets]}
+          "targets": [{k: v for k, v in t.items() if k not in ("replay_digests", "selfcheck_outcomes", "evil_outcomes")}
+                      for t in targets]}
     with open(os.path.join(args.root, "e2e_summary.json"), "w") as f:
         json.dump(js, f, indent=1, sort_keys=True, default=str)
     for name, p in problems:
         print("FAIL {}: {}".format(name, p), file=sys.stderr)
     if not same_everywhere:
         print("FAIL: replay digests differ between targets", file=sys.stderr)
+    if not same_selfcheck:
+        print("FAIL: self-check outcomes differ between targets", file=sys.stderr)
     print("e2e_report: {} ({} targets)".format("PASS" if passed else "FAIL", len(targets)), file=sys.stderr)
     return 0 if passed else 1
 

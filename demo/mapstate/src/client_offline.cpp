@@ -13,9 +13,9 @@
 // this way.
 #include "client_core.hpp"
 
+#include <charconv>
 #include <cinttypes>
 #include <cstdio>
-#include <exception>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -61,21 +61,17 @@ std::string request_wire() {
 // it was refused. *digest gets the content digest of an accepted snapshot.
 std::string try_accept(codec::Decompressor& unzstd, const std::string& payload, bool zstd,
                        std::uint64_t* digest = nullptr) {
-    try {
-        std::string plain;
-        const std::string* wire = &payload;
-        if (zstd) {
-            unzstd.decompress(payload, kCapSnapshot, plain);
-            wire = &plain;
-        }
-        XBuffer b = XBuffer::load_verified<ViewSnapshot>(*wire, cap_snapshot());
-        if (digest != nullptr) *digest = checks::snapshot_digest(b.root<ViewSnapshot>());
-        return std::string();
-    } catch (const codec::DecodeError& e) {
-        return std::string("codec: ") + e.what();
-    } catch (const std::exception& e) {
-        return std::string("verify: ") + e.what();
+    std::string plain;
+    const std::string* wire = &payload;
+    if (zstd) {
+        if (Status decoded = unzstd.decompress(payload, kCapSnapshot, plain); !decoded)
+            return "codec: " + decoded.error().message;
+        wire = &plain;
     }
+    XResult<XBuffer> b = XBuffer::try_load_verified<ViewSnapshot>(*wire, cap_snapshot());
+    if (!b) return "verify: " + b.error().message;
+    if (digest != nullptr) *digest = checks::snapshot_digest(b->root<ViewSnapshot>());
+    return std::string();
 }
 
 void expect_refused(CheckLog& log, codec::Decompressor& unzstd, const char* name, const std::string& payload,
@@ -142,14 +138,24 @@ bool read_file(const std::string& path, std::string& out) {
     return !f.bad();
 }
 
+// A whole decimal field; nullopt for anything else.
+template <class T>
+std::optional<T> parse_uint(const std::string& text) {
+    T v{};
+    const char* end = text.data() + text.size();
+    const auto [ptr, ec] = std::from_chars(text.data(), end, v);
+    if (ec != std::errc() || ptr != end || text.empty()) return std::nullopt;
+    return v;
+}
+
 }   // namespace
 
-int run_self_check(const Options& opt) {
+Result<int> run_self_check(const Options& opt) {
     CheckLog log;
     if (!codec::zstd_available()) {
         log.fail("zstd_available", "built without zstd (MAPDEMO_WITH_ZSTD=OFF)");
         log.print(stdout);
-        write_results(opt, log, nullptr);
+        if (!write_results(opt, log, nullptr)) return Error{"cannot write client CSV files in " + opt.csv_dir};
         return 1;
     }
     log.pass("zstd_available");
@@ -161,7 +167,7 @@ int run_self_check(const Options& opt) {
     const std::string dense = sample.save_verified<ViewSnapshot>();
     const std::string compact = sample.save_compact<ViewSnapshot>(XCompactOptions{0});
     std::string frame;
-    zstd.compress(compact, frame);
+    MAPDEMO_TRY(zstd.compress(compact, frame));
 
     // Positive controls: every encoding verifies and reads the same content.
     expect_same(log, unzstd, "accept_dense", dense, false, want);
@@ -169,8 +175,9 @@ int run_self_check(const Options& opt) {
     expect_same(log, unzstd, "accept_zstd", frame, true, want);
     {
         std::string plain;
-        unzstd.decompress(frame, kCapSnapshot, plain);
-        if (plain == compact) log.pass("zstd_round_trip_bytes");
+        Status decoded = unzstd.decompress(frame, kCapSnapshot, plain);
+        if (!decoded) log.fail("zstd_round_trip_bytes", decoded.error().message);
+        else if (plain == compact) log.pass("zstd_round_trip_bytes");
         else log.fail("zstd_round_trip_bytes", "decompressed bytes differ from the compact wire");
     }
     if (compact.size() <= dense.size() && frame.size() < compact.size()) {
@@ -184,21 +191,22 @@ int run_self_check(const Options& opt) {
     {   // One kept buffer through every encoding, and through a rejected wire.
         SnapshotHolder h;
         std::string plain;
-        unzstd.decompress(frame, kCapSnapshot, plain);
         std::string why;
+        if (Status decoded = unzstd.decompress(frame, kCapSnapshot, plain); !decoded) why = decoded.error().message;
         const std::string* order[] = {&dense, &compact, &plain, &dense};
         for (const std::string* w : order) {
-            h.reload(*w);
-            if (checks::snapshot_digest(h.view()) != want) why = "digest differs after reload";
+            if (!why.empty()) break;
+            if (Status loaded = h.reload(*w); !loaded) why = "reload refused a valid wire: " + loaded.error().message;
+            else if (checks::snapshot_digest(h.view()) != want) why = "digest differs after reload";
         }
-        try {
-            h.reload(drop_last(compact));
-            why = "truncated wire accepted by reload";
-        } catch (const std::exception&) {
+        if (why.empty()) {
+            if (h.reload(drop_last(compact))) why = "truncated wire accepted by reload";
+            else if (!h.empty()) why = "holder not empty after a rejected reload";
+            else if (Status loaded = h.reload(compact); !loaded)
+                why = "reload after a rejection refused a valid wire: " + loaded.error().message;
+            else if (checks::snapshot_digest(h.view()) != want)
+                why = "digest differs after the reload that followed a rejection";
         }
-        if (!h.empty()) why = "holder not empty after a rejected reload";
-        h.reload(compact);
-        if (checks::snapshot_digest(h.view()) != want) why = "digest differs after the reload that followed a rejection";
         if (why.empty()) log.pass("reload_across_encodings");
         else log.fail("reload_across_encodings", why);
     }
@@ -231,28 +239,32 @@ int run_self_check(const Options& opt) {
     expect_refused(log, unzstd, "zstd_bad_magic", flip(frame, 0), true);
     expect_refused(log, unzstd, "zstd_trailing_byte", frame + std::string(1, '\0'), true);
     expect_refused(log, unzstd, "zstd_two_frames", frame + frame, true);
-    expect_refused(log, unzstd, "zstd_no_content_size", codec::zstd_frame_without_size(compact), true);
+    {
+        Result<std::string> unsized = codec::zstd_frame_without_size(compact);
+        if (!unsized) return std::move(unsized).error();
+        expect_refused(log, unzstd, "zstd_no_content_size", *unsized, true);
+    }
     expect_refused(log, unzstd, "zstd_skippable_frame", codec::skippable_frame(compact), true);
     expect_refused(log, unzstd, "zstd_dense_wire_unwrapped", dense, true);
     {
         std::string over;
-        zstd.compress(std::string(kCapSnapshot + 1, '\0'), over);
+        MAPDEMO_TRY(zstd.compress(std::string(kCapSnapshot + 1, '\0'), over));
         expect_refused(log, unzstd, "zstd_over_cap", over, true);
     }
     {
         std::string inner;
-        zstd.compress(drop_last(compact), inner);
+        MAPDEMO_TRY(zstd.compress(drop_last(compact), inner));
         expect_refused(log, unzstd, "zstd_of_truncated_wire", inner, true);
-        zstd.compress(request_wire(), inner);
+        MAPDEMO_TRY(zstd.compress(request_wire(), inner));
         expect_refused(log, unzstd, "zstd_of_wrong_schema", inner, true);
     }
 
     log.print(stdout);
-    if (!write_results(opt, log, nullptr)) throw std::runtime_error("cannot write client CSV files in " + opt.csv_dir);
+    if (!write_results(opt, log, nullptr)) return Error{"cannot write client CSV files in " + opt.csv_dir};
     return log.all_ok() ? 0 : 1;
 }
 
-int run_replay(const Options& opt) {
+Result<int> run_replay(const Options& opt) {
     CheckLog log;
     metrics::Recorder rec("c");
     codec::Decompressor unzstd;
@@ -260,7 +272,7 @@ int run_replay(const Options& opt) {
     std::string payload, plain;
 
     std::ifstream index(join_path(opt.replay_dir, "corpus.csv"));
-    if (!index) throw std::runtime_error("cannot read " + join_path(opt.replay_dir, "corpus.csv"));
+    if (!index) return Error{"cannot read " + join_path(opt.replay_dir, "corpus.csv")};
     std::string line;
     std::getline(index, line);
     std::map<std::string, std::size_t> col;
@@ -270,61 +282,76 @@ int run_replay(const Options& opt) {
     }
     for (const char* need : {"request_id", "flags", "category", "encoding", "file", "net_bytes", "wire_bytes",
                              "wire_digest", "digest", "visible"})
-        if (col.find(need) == col.end()) throw std::runtime_error(std::string("corpus.csv has no column ") + need);
+        if (col.find(need) == col.end()) return Error{std::string("corpus.csv has no column ") + need};
 
     metrics::CsvFile out;
     const bool csv = !opt.csv_dir.empty();
     if (csv && !out.open(join_path(opt.csv_dir, "client_replay.csv"),
                          "request_id,category,encoding,net_bytes,wire_bytes,wire_digest,digest,decompress_us,load_us,result"))
-        throw std::runtime_error("cannot write client_replay.csv in " + opt.csv_dir);
+        return Error{"cannot write client_replay.csv in " + opt.csv_dir};
 
     std::uint64_t rows = 0, matched = 0;
     std::uint64_t by_enc[codec::kEncodingCount] = {};
     while (std::getline(index, line)) {
         if (line.empty()) continue;
         const std::vector<std::string> f = split_csv(line);
-        auto at = [&](const char* name) -> const std::string& { return f.at(col[name]); };
+        static const std::string kMissing;
+        // A short row reads as empty fields, which then fail their checks.
+        auto at = [&](const char* name) -> const std::string& {
+            const std::size_t i = col[name];
+            return i < f.size() ? f[i] : kMissing;
+        };
         ++rows;
         const std::string tag = "request " + at("request_id");
         std::string why;
         double unzstd_us = -1, load_us = 0;
         std::uint64_t got_wire = 0, got_digest = 0;
         std::size_t wire_bytes = 0;
-        const auto vf = codec::parse_view_flags(static_cast<std::uint16_t>(std::stoul(at("flags"))));
+        const auto flags = parse_uint<std::uint16_t>(at("flags"));
+        const auto vf = flags ? codec::parse_view_flags(*flags) : std::nullopt;
         if (!vf) why = "flags " + at("flags") + " not understood";
         else if (at("encoding") != codec::encoding_name(vf->encoding)) why = "encoding column disagrees with flags";
         else if (!read_file(join_path(opt.replay_dir, at("file").c_str()), payload)) why = "cannot read " + at("file");
         else if (std::to_string(payload.size()) != at("net_bytes")) why = "file size differs from net_bytes";
-        if (why.empty()) {
-            try {
-                const std::string* wire = &payload;
-                if (vf->encoding == codec::Encoding::Zstd) {
-                    metrics::Stopwatch zw;
-                    unzstd.decompress(payload, kCapSnapshot, plain);
-                    unzstd_us = zw.us();
-                    rec.add("c.decompress_us", unzstd_us);
-                    wire = &plain;
-                }
-                wire_bytes = wire->size();
-                got_wire = checks::wire_digest(*wire);
-                double destroy_us = -1;
-                load_us = holder.install(*wire, opt.buffers, &destroy_us);
-                rec.add("c.load_us", load_us);
-                const ViewSnapshot& s = holder.view();
-                got_digest = checks::snapshot_digest(s);
-                char hex[2][17];
-                std::snprintf(hex[0], sizeof hex[0], "%016" PRIx64, got_wire);
-                std::snprintf(hex[1], sizeof hex[1], "%016" PRIx64, got_digest);
-                if (std::to_string(wire_bytes) != at("wire_bytes")) why = "wire_bytes differ";
-                else if (at("wire_digest") != hex[0]) why = "wire digest differs";
-                else if (at("digest") != hex[1]) why = "content digest differs";
-                else if (std::to_string(s.request_id) != at("request_id")) why = "request_id not echoed";
-                else if (std::to_string(s.units.size()) != at("visible")) why = "visible count differs";
-                else if (vf->category == net::ViewCategory::Empty && s.units.size() != 0) why = "empty view has units";
-                ++by_enc[static_cast<int>(vf->encoding)];
-            } catch (const std::exception& e) {
-                why = std::string("refused: ") + e.what();
+        // Decode and verify; a refusal reads "refused: " + the codec's or load_verified's text.
+        bool installed = false;
+        const std::string* wire = &payload;
+        if (why.empty() && vf->encoding == codec::Encoding::Zstd) {
+            metrics::Stopwatch zw;
+            if (Status decoded = unzstd.decompress(payload, kCapSnapshot, plain); !decoded) {
+                why = "refused: " + decoded.error().message;
+            } else {
+                unzstd_us = zw.us();
+                rec.add("c.decompress_us", unzstd_us);
+                wire = &plain;
             }
+        }
+        if (why.empty()) {
+            wire_bytes = wire->size();
+            got_wire = checks::wire_digest(*wire);
+            double destroy_us = -1;
+            Result<double> loaded = holder.install(*wire, opt.buffers, &destroy_us);
+            if (!loaded) {
+                why = "refused: " + loaded.error().message;
+            } else {
+                load_us = *loaded;
+                rec.add("c.load_us", load_us);
+                installed = true;
+            }
+        }
+        if (installed) {
+            const ViewSnapshot& s = holder.view();
+            got_digest = checks::snapshot_digest(s);
+            char hex[2][17];
+            std::snprintf(hex[0], sizeof hex[0], "%016" PRIx64, got_wire);
+            std::snprintf(hex[1], sizeof hex[1], "%016" PRIx64, got_digest);
+            if (std::to_string(wire_bytes) != at("wire_bytes")) why = "wire_bytes differ";
+            else if (at("wire_digest") != hex[0]) why = "wire digest differs";
+            else if (at("digest") != hex[1]) why = "content digest differs";
+            else if (std::to_string(s.request_id) != at("request_id")) why = "request_id not echoed";
+            else if (std::to_string(s.units.size()) != at("visible")) why = "visible count differs";
+            else if (vf->category == net::ViewCategory::Empty && s.units.size() != 0) why = "empty view has units";
+            ++by_enc[static_cast<int>(vf->encoding)];
         }
         if (why.empty()) ++matched;
         else log.fail("replay_snapshots", tag + ": " + why);
@@ -348,7 +375,7 @@ int run_replay(const Options& opt) {
     std::fprintf(stdout, "replay: %" PRIu64 " of %" PRIu64 " snapshots verified with A's digests (%s)\n", matched, rows,
                  opt.replay_dir.c_str());
     log.print(stdout);
-    if (!write_results(opt, log, &rec)) throw std::runtime_error("cannot write client CSV files in " + opt.csv_dir);
+    if (!write_results(opt, log, &rec)) return Error{"cannot write client CSV files in " + opt.csv_dir};
     return log.all_ok() ? 0 : 1;
 }
 

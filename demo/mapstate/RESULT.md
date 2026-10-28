@@ -29,6 +29,7 @@ it. Both run the same validator and send the same bytes.
 | End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
 | Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
 | End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
+| End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
 | End to end, iOS Simulator | Mac M4, A/B in colima | pending (Mac, waiting for Xcode) |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
@@ -237,6 +238,65 @@ zstd, decoded in 463 us and verified in 34 us. Output:
 `mobile_sim_android_out.tar.gz` in the project folder (sha256
 `dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
 table `out-android/android/demo/E2E_RESULT.md`.
+
+Clients without exceptions (10-28): every client build also makes
+`mapdemo_client_noexc` from the same sources (`-fno-exceptions`; MSVC and
+clang-cl `/EHs-c- /D_HAS_EXCEPTIONS=0`). Its failures are values
+(`include/mapdemo/result.hpp`), and snapshots go through `try_load_verified` /
+`try_reload_verified` (SC-8, #148). Each run covered the six targets of
+`full3`, each with and without exceptions, against the corpus and step wires
+of `full1`. The final run `noexc3` (next_cpp26 c928334 with the MinGW fix
+#155, and A's close below) passed on all 12 targets: self-check 23 / 23,
+replay 60 / 60, the three tiers and evil, and step wires equal at 500 / 500
+ticks. `e2e_report.py` found the same self-check outcomes and refusal texts,
+and the same evil outcomes, on all 12 targets. Further runs on the same tree:
+- ASan+UBSan, both GCC 16 C++26 clients in both buffer modes (`noexc_asan2`):
+  151 / 151 and 149 / 149 verdicts, no sanitizer report.
+- The window client without exceptions under Xvfb: 10000 units, all three
+  encodings, `direct_read` 68 / 68.
+- `noexc1` (next_cpp26 579ca44 with the same MinGW fix) also passed on all 12
+  targets.
+
+The Linux client without exceptions references none of `__cxa_throw`,
+`__cxa_begin_catch` and `__gxx_personality_v0`.
+
+MinGW needed a library fix. With two translation units that include
+`xoffset_error.hpp`, MinGW GCC 16 failed to link. `detail::pending_error`
+was a namespace-scope `inline thread_local`; #155 makes it function-local.
+
+End of a session on Windows. In `noexc2` (before A's close changed) the
+clang-cl client with exceptions failed at the end of the 10000-unit tier:
+"recv: Connection reset by peer", and A's last snapshot never logged. A had
+closed the connection with one request still unread, so the close sent a
+reset. Windows drops received data that the program has not read yet, the
+last snapshot and the `Bye` included; Linux keeps it readable. A two-file
+probe shows both behaviours (`reset_probe/`: the Linux client reads `BYE`,
+the same client under wine gets WSA 10054). A now shuts down its sending side
+after the `Bye` and reads each client until the client closes, 2 s at most,
+before closing (INTERFACES.md). With that change `noexc3` passed, and so did
+30 short runs of the clang-cl client (all client exits 0).
+
+Cost: verification without exceptions is slower. In that build the
+library's receive path returns a status from every check (`XOFFSET_VTRY`).
+On `noexc1`'s binaries, the two clients replayed the 60-snapshot corpus in
+alternation (28 rounds each on Linux, 18 under wine). Per-snapshot medians,
+summed, give this ratio without / with exceptions (full scenes, then
+viewports):
+
+| Build | Full scenes | Viewports |
+| --- | --- | --- |
+| GCC 16 | 1.10x | 1.17x |
+| GCC 13 | 1.24x | 1.29x |
+| MSVC | 1.08x | 1.08x |
+| clang-cl | 1.10x | 1.15x |
+| MinGW | 1.16x | 1.09x |
+
+That is at most about 10 us more per full scene and under 1 us per viewport.
+Output in the project folder `mapdemo-noexc-20261028/`:
+`mapdemo_e2e_cloud_noexc{1,2,3}.tgz`, `mapdemo_e2e_cloud_noexc_asan{1,2}.tgz`,
+`mapdemo_noexc_ab_replay.tgz`, `mapdemo_noexc_xvfb_shots{,2}.tgz` (the window
+runs with their screenshots), `reset_probe/` and the `E2E_RESULT_*.md`
+files, with sha256 in `SHA256SUMS`.
 
 The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
 the Mac's screen was asleep); the client now exits 2 with "cannot open a
