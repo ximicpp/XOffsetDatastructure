@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 49350,
+      "bytes": 49705,
       "mode": 420,
-      "sha256": "e28a102a61b3c72036bb69c4da397285d8100e16b5e0aaed4b8d76ac44c88f73"
+      "sha256": "9d3eacd2ee0afc0e1b5c59ca71d189ea811ac8a47ccc7019af4da43e3202652b"
     },
     "CMakeLists.txt": {
       "bytes": 7058,
