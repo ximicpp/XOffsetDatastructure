@@ -2,7 +2,7 @@
 // OWNER: network thread (demo/mesh/INTERFACES.md section 6).
 //
 //   xo_peer (--hub HOST:PORT | --join URL) [--name NAME] [--evil] [--out DIR] [--timeout-s 600]
-//   xo_peer --mailbox IN_DIR OUT_DIR --name NAME --id N      (phase 4; not yet)
+//   xo_peer --mailbox IN_DIR OUT_DIR --id N [--name NAME] [--list] [--out DIR]
 //
 // One TCP connection to the hub: Hello, Register, then one message at a
 // time in arrival order. A Job is answered with start_job, a Hop with
@@ -13,13 +13,26 @@
 //
 // Exit: 0 after Bye; 1 on a handshake, protocol or network failure (or
 // --timeout-s passing first); 2 on a usage error.
+//
+// Mailbox mode (cross-site runs without a live link, INTERFACES.md 6):
+// the same start_job / handle_hop on files instead of frames. It answers
+// every Job and Hop file in IN_DIR addressed to --id that has no report in
+// IN_DIR or OUT_DIR yet, writes the next hop and the report into OUT_DIR
+// (file names: src/peer/mailbox.hpp), and repeats until nothing is left.
+// --list prints those files instead. Exit 0 unless a file could not be
+// read or written; the verdicts are the hub's to score (xo_hub --mailbox-score).
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <vector>
 #include "peer/control.hpp"
+#include "peer/mailbox.hpp"
 #include "xmesh/hop.hpp"
 #include "xmesh/net.hpp"
 #include "xmesh/protocol.hpp"
@@ -40,13 +53,16 @@ struct Options {
     int timeout_s = 600;
     int connect_s = 30;
     bool mailbox = false;
+    std::string mailbox_in, mailbox_out;
+    std::uint32_t id = 0;
+    bool list = false;
 };
 
 void usage() {
     std::fprintf(stderr,
                  "usage: xo_peer (--hub HOST:PORT | --join URL) [--name NAME] [--evil] [--out DIR]\n"
                  "               [--timeout-s 600] [--connect-s 30]\n"
-                 "       xo_peer --mailbox IN_DIR OUT_DIR --name NAME --id N   (phase 4, not yet)\n"
+                 "       xo_peer --mailbox IN_DIR OUT_DIR --id N [--name NAME] [--list] [--out DIR]\n"
                  "  --join takes the hub's join link, http://HOST:47802/join?hub=HOST:47801&run=LABEL\n");
 }
 
@@ -151,8 +167,15 @@ int parse_args(int argc, char** argv, Options& o) {
             if (!value(v) || !parse_int(v, 0, 3600, n)) return 2;
             o.connect_s = int(n);
         } else if (a == "--mailbox") {
+            if (i + 2 >= argc) return 2;
             o.mailbox = true;
-            i = argc;   // the rest belongs to mailbox mode
+            o.mailbox_in = argv[++i];
+            o.mailbox_out = argv[++i];
+        } else if (a == "--id") {
+            if (!value(v) || !parse_int(v, 1, 0xffffffffll, n)) return 2;
+            o.id = std::uint32_t(n);
+        } else if (a == "--list") {
+            o.list = true;
         } else if (a == "-h" || a == "--help") {
             usage();
             std::exit(0);
@@ -161,8 +184,11 @@ int parse_args(int argc, char** argv, Options& o) {
             return 2;
         }
     }
-    if (o.mailbox) return 0;
-    if (o.hub_host.empty()) {
+    if (o.mailbox && o.id == 0) {
+        std::fprintf(stderr, "error: --mailbox needs --id N (the device id the plan gave this device)\n");
+        return 2;
+    }
+    if (!o.mailbox && o.hub_host.empty()) {
         std::fprintf(stderr, "error: give --hub HOST:PORT or --join URL\n");
         return 2;
     }
@@ -337,6 +363,158 @@ struct Peer {
     }
 };
 
+// ---- mailbox mode ------------------------------------------------------------------------
+
+namespace fs = std::filesystem;
+
+// Reads a whole file of at most `limit` bytes.
+Status read_file(const fs::path& path, std::uint64_t limit, std::string& out) {
+    std::FILE* f = std::fopen(path.string().c_str(), "rb");
+    if (f == nullptr) return Error{"cannot open " + path.string()};
+    out.clear();
+    char buf[65536];
+    for (;;) {
+        const std::size_t n = std::fread(buf, 1, sizeof buf, f);
+        if (n == 0) break;
+        if (out.size() + n > limit) {
+            std::fclose(f);
+            return Error{path.filename().string() + " is over " + std::to_string(limit) + " bytes"};
+        }
+        out.append(buf, n);
+    }
+    const bool failed = std::ferror(f) != 0;
+    std::fclose(f);
+    if (failed) return Error{"cannot read " + path.string()};
+    return {};
+}
+
+// Writes `<dir>/<name>.tmp`, then renames it to `<dir>/<name>`.
+Status write_file(const fs::path& dir, const std::string& name, std::string_view data) {
+    const fs::path tmp = dir / (name + ".tmp");
+    std::FILE* f = std::fopen(tmp.string().c_str(), "wb");
+    if (f == nullptr) return Error{"cannot write " + tmp.string()};
+    const bool ok = std::fwrite(data.data(), 1, data.size(), f) == data.size();
+    const bool closed = std::fclose(f) == 0;
+    if (!ok || !closed) return Error{"cannot write " + tmp.string()};
+    std::error_code ec;
+    fs::rename(tmp, dir / name, ec);
+    if (ec) return Error{"cannot rename " + tmp.string() + ": " + ec.message()};
+    return {};
+}
+
+bool file_exists(const fs::path& p) {
+    std::error_code ec;
+    return fs::exists(p, ec);
+}
+
+struct MailItem {
+    mailbox::FileName name;
+    std::uint32_t pos = 0;
+    fs::path path;
+};
+
+// The Job and Hop files in IN addressed to this device without a report
+// (or error file) in IN or OUT, by job and position.
+Result<std::vector<MailItem>> pending(const Options& o) {
+    const fs::path in(o.mailbox_in), out(o.mailbox_out);
+    std::vector<MailItem> items;
+    std::error_code ec;
+    fs::directory_iterator it(in, ec);
+    if (ec) return Error{"cannot list " + in.string() + ": " + ec.message()};
+    for (const fs::directory_iterator end; it != end; it.increment(ec)) {
+        if (ec) return Error{"cannot list " + in.string() + ": " + ec.message()};
+        const std::string file = it->path().filename().string();
+        const std::optional<mailbox::FileName> n = mailbox::parse(file);
+        if (!n || n->device != o.id) continue;
+        if (n->kind != mailbox::FileKind::Job && n->kind != mailbox::FileKind::Hop) continue;
+        MailItem m{*n, n->kind == mailbox::FileKind::Job ? 0u : n->number + 1, it->path()};
+        const std::string rep = mailbox::report_file(n->job, m.pos, o.id);
+        const std::string err = mailbox::error_file(n->job, m.pos, o.id);
+        if (file_exists(in / rep) || file_exists(in / err) || file_exists(out / rep) || file_exists(out / err)) continue;
+        items.push_back(std::move(m));
+    }
+    std::sort(items.begin(), items.end(), [](const MailItem& a, const MailItem& b) {
+        return a.name.job != b.name.job ? a.name.job < b.name.job : a.pos < b.pos;
+    });
+    return items;
+}
+
+int run_mailbox(const Options& o, Log& log) {
+    const fs::path out(o.mailbox_out);
+    if (o.list) {
+        Result<std::vector<MailItem>> items = pending(o);
+        if (!items) {
+            log.line("error: " + items.error().message);
+            return 1;
+        }
+        for (const MailItem& m : *items) log.line(m.path.filename().string());
+        return 0;
+    }
+    std::error_code ec;
+    fs::create_directories(out, ec);
+    if (Status s = write_file(out, mailbox::build_file(o.id), control::build_info() + "\n"); !s) {
+        log.line("error: " + s.error().message);
+        return 1;
+    }
+    std::set<std::string> done;   // handled in this run (also when writing its answer failed)
+    std::uint64_t handled = 0, ok = 0, refused = 0, io_errors = 0;
+    for (;;) {
+        Result<std::vector<MailItem>> items = pending(o);
+        if (!items) {
+            log.line("error: " + items.error().message);
+            return 1;
+        }
+        std::size_t this_pass = 0;
+        for (const MailItem& m : *items) {
+            const std::string file = m.path.filename().string();
+            if (!done.insert(file).second) continue;
+            ++this_pass;
+            ++handled;
+            std::string payload;
+            HopOutcome res;
+            if (Status s = read_file(m.path, protocol::max_payload(protocol::MsgType::Hop), payload); !s) {
+                res.verdict = protocol::HopVerdict::BadEnvelope;
+                res.error = s.error().message;
+            } else if (m.name.kind == mailbox::FileKind::Job) {
+                res = start_job(payload, o.id);
+            } else {
+                res = handle_hop(payload, o.id);
+            }
+            Status written;
+            if (!res.next_payload.empty())
+                written = write_file(out, mailbox::hop_file(m.name.job, m.pos, res.next_device), res.next_payload);
+            // The report goes last: it marks the file as answered.
+            if (written) {
+                if (!res.report.empty()) {
+                    written = write_file(out, mailbox::report_file(m.name.job, m.pos, o.id), res.report);
+                } else {
+                    std::string text = file + ": " + protocol::verdict_name(res.verdict) + ": " + res.error;
+                    if (text.size() > 4000) text.resize(4000);
+                    written = write_file(out, mailbox::error_file(m.name.job, m.pos, o.id), text + "\n");
+                }
+            }
+            if (!written) {
+                ++io_errors;
+                log.line("error: " + written.error().message);
+                continue;
+            }
+            if (res.verdict == protocol::HopVerdict::Ok) ++ok;
+            else ++refused;
+            std::string line = "job " + std::to_string(m.name.job) + " position " + std::to_string(m.pos) + " " +
+                               protocol::verdict_name(res.verdict);
+            if (!res.next_payload.empty()) line += " -> device " + std::to_string(res.next_device);
+            if (!res.summary.empty()) line += " | " + res.summary;
+            if (!res.error.empty()) line += " | " + res.error;
+            log.line(line);
+        }
+        if (this_pass == 0) break;
+    }
+    log.line("mailbox: device " + std::to_string(o.id) + " handled " + std::to_string(handled) + " (" +
+             std::to_string(ok) + " ok, " + std::to_string(refused) + " refused, " + std::to_string(io_errors) +
+             " not written)");
+    return io_errors == 0 ? 0 : 1;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -345,14 +523,20 @@ int main(int argc, char** argv) {
         usage();
         return 2;
     }
-    if (opt.mailbox) {
-        std::fprintf(stderr, "xo_peer --mailbox: not implemented yet (phase 4, demo/mesh/INTERFACES.md 6)\n");
-        return 1;
+    if (!opt.out_dir.empty()) {
+        std::error_code ec;
+        fs::create_directories(opt.out_dir, ec);
     }
     Log log(opt.out_dir);
     if (!log.ok(opt.out_dir)) {
         std::fprintf(stderr, "error: cannot write %s/peer.log\n", opt.out_dir.c_str());
         return 2;
+    }
+    if (opt.mailbox) {
+        if (!opt.list)
+            log.line("xo_peer " + opt.name + " (mailbox, device " + std::to_string(opt.id) + "): " +
+                     control::build_info() + "; in " + opt.mailbox_in + ", out " + opt.mailbox_out);
+        return run_mailbox(opt, log);
     }
     const std::string build = control::build_info();
     if (!opt.out_dir.empty()) write_text(opt.out_dir + "/build.txt", build);
