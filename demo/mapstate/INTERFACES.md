@@ -15,18 +15,27 @@ force-push. The skeleton builds at every commit: replace stubs, do not delete th
 Review iteration (10-24, branch `claude/demo-review-20261024` from next_cpp26
 d58781e, one thread): adds `--buffers reuse|fresh` to every process, step wire
 digests in `a_steps.csv`, `net::PeerClosed`, payload recycling in `net::Conn`,
-a fourth `--evil` case and cross-run digest comparison. The sections below
-describe the result.
+a fourth `--evil` case and cross-run digest comparison.
+
+End-to-end iteration (10-27, branch `claude/mapdemo-e2e-20261027` from
+next_cpp26 83c21b9, one thread): Linux A and B serve clients built for other
+platforms. The schema drops its filler fields for the V2.1 wire and is
+declared with `XOFFSET_RECORD` field lists, so the client builds as C++20
+(MinGW, MSVC, Android NDK, iOS Simulator) while A and B keep C++26
+reflection; the network layer runs on Winsock too; snapshots travel dense,
+compact or zstd-compressed (`codec.hpp`); the client gains `--self-check`
+and `--replay`; `tools/run_e2e.sh` runs every client target. The sections
+below describe the result.
 
 | Owner thread | Files |
 | --- | --- |
-| Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/selftest.cpp` |
+| Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/codec.cpp`, `src/selftest.cpp` |
 | Servers | `src/server_a.cpp`, `src/server_b.cpp` (+ optional `src/server_*.hpp`) |
-| Client | `src/client_main.cpp`, `src/client_core.cpp`, `src/client_core.hpp`, `src/client_gui.cpp` |
+| Client | `src/client_main.cpp`, `src/client_core.cpp`, `src/client_core.hpp`, `src/client_offline.cpp`, `src/client_gui.cpp` |
 | Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files |
 
 Frozen headers (`schema.hpp`, `std_model.hpp`, `rules.hpp`, `net.hpp`,
-`metrics.hpp`, `checks.hpp`) change only with a note to every demo thread
+`metrics.hpp`, `checks.hpp`, `codec.hpp`) change only with a note to every demo thread
 (through the coordinator); additive helpers are fine.
 
 Priority for the common-library thread: `src/net.cpp` first (everything else
@@ -40,7 +49,16 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
   Binaries land in `<build>/bin/<Config>/` and must run inside the container.
 - Mac: clang-p2996 d77eff1, same options, plus `-DCMAKE_PREFIX_PATH=<raylib 5.5 prefix>`
   for the window client (design section 9).
-- All demo code is built with `-ffp-contract=off` (set on `mapdemo_common`).
+- Client targets: `-DMAPDEMO_CLIENT_ONLY=ON -DXOFFSET_CXX_STANDARD=20` with a
+  toolchain file from `cmake/toolchains/` (MinGW-w64, Android arm64, iOS
+  Simulator) or a native compiler (MSVC, Apple Clang); the schema then comes
+  from the `XOFFSET_RECORD` field lists, which C++26 builds check against
+  reflection. The Hello schema hash is the same in both builds.
+- zstd 1.5.7 is built from its release tarball (SHA-256 pinned;
+  `-DMAPDEMO_ZSTD_URL=<local copy>` builds offline; `-DMAPDEMO_WITH_ZSTD=OFF`
+  leaves dense and compact only).
+- All demo code is built with `-ffp-contract=off` (set on `mapdemo_common`;
+  MSVC does not contract by default).
 - Write conservative C++ for clang-p2996 d77eff1: explicit includes (`<span>`,
   `<optional>`, ...), no deduced return types used before their definition.
 
@@ -49,13 +67,35 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
 ```
 mapdemo_b      [--port 47702] [--seed 1] [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_a      [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
-               [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
+               [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
                [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
+               [--corpus-dir DIR [--corpus-max 60]]
 mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check]
-               [--buffers reuse|fresh] [--csv-dir DIR] [--auto-drag]
-               [--screenshot-at F1,F2,...] [--evil]
+               [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]
+               [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]
+mapdemo_client --self-check [--csv-dir DIR]
+mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_selftest [--csv-dir DIR]
 ```
+
+- A `--host`: the address A listens on for clients (`0.0.0.0` when the client
+  is in an emulator or another machine; B stays on 127.0.0.1).
+- A `--corpus-dir`: keeps the first `--corpus-max` snapshot payloads exactly
+  as sent (`snap_<request_id>.<encoding>`) and `corpus.csv` with A's digests.
+- Client `--encoding` (default `zstd`, or `compact` without zstd): the
+  snapshot encoding asked for in every `ViewReq`; `cycle` takes
+  `request_id % 3` (dense, compact, zstd), so one run covers all three.
+- Client `--self-check`: no network; builds sample snapshots and checks that
+  every encoding verifies and that the refusal cases are refused (truncated
+  and bit-flipped wires, wrong schema, malformed zstd frames, over-cap
+  sizes). Exit 0 when all pass.
+- Client `--replay DIR`: no network; verifies every corpus snapshot and
+  compares wire bytes, wire digest, content digest, request id and visible
+  count with A's row, so every platform shows it reads the same bytes the
+  same way. Exit 0 when all match.
+- Every client run prints `client: build <compiler, os, arch, C++ standard,
+  schema backend, zstd>` and writes it to `client_build.txt` in `--csv-dir`;
+  A and B print the same line for themselves.
 
 - `--buffers` (default `reuse`, `include/mapdemo/buffer_mode.hpp`):
   - `fresh`: every received batch, request and snapshot is a new `XBuffer`
@@ -84,7 +124,7 @@ mapdemo_selftest [--csv-dir DIR]
 | A connects to B | A `Hello(hello_payload())` → B `HelloOk` (mismatch: `Error`, exit 2) |
 | Each step | A `StepReq(corr = tick T, UnitStateBatch wire)` → B `StepRes(corr = T+1, wire)`; at most one in flight |
 | Client connects to A | client `Hello` → A `HelloOk`, then A `Catalog(MapCatalog wire)` |
-| View | client `ViewReq(corr = request_id, flags = ViewCategory, ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot wire)`; at most one outstanding per client |
+| View | client `ViewReq(corr = request_id, flags = codec::view_flags(category, encoding), ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot payload in that encoding)`; at most one outstanding per client |
 | Illegal / malformed request | A answers `Error(text)` (bad wire or illegal rect) or closes the connection (bad header, oversize length), logs `rejected: ...`, keeps running |
 | End | A `Bye` to B and client |
 
@@ -101,13 +141,33 @@ mapdemo_selftest [--csv-dir DIR]
   fully written `enqueue()`, cleared, to save the next message into. Lengths
   are still checked against the per-type limit before any allocation.
 
+`ViewReq` flags (`codec.hpp`): bits 0-7 the `ViewCategory`, bits 8-11 the
+snapshot encoding, bits 12-15 zero. A refuses an unknown category, an
+unknown encoding (3 is reserved for lz4), a set reserved bit, or zstd when it
+was built without it. Encodings of the `ViewSnapshot` payload:
+
+| Encoding | Payload |
+| --- | --- |
+| 0 `dense` | `save_verified` wire |
+| 1 `compact` | `save_compact` wire (`XCompactOptions{0}`: no spare capacity) |
+| 2 `zstd` | the compact wire as one zstd frame, level 3 |
+
+The client decodes a zstd payload only when it is exactly one standard zstd
+frame (no skippable frame, no trailing bytes) whose header declares a content
+size no larger than the snapshot cap (16 MiB), with a 16 MiB window limit,
+and the output has exactly that size; then it verifies the wire like any
+other (`load_verified` / `reload_verified`). zstd removes no check.
+
 Receivers verify every wire with the caps in `schema.hpp`: `load_verified<T>(payload,
 cap_*())` in `fresh` mode, `reload_verified<T>(payload)` on a buffer created with
 the same cap in `reuse` mode. There is no `XBufferPool`.
 
-Every schema struct is declared an ordinary record with `XOFFSET_ORDINARY_RECORDS`
-(`USER_GUIDE.md` section 3.1): the declaration does not change a wire byte (the
-self-test digests equal those of d58781e, which had no declaration).
+Every schema struct is declared with `XOFFSET_RECORD(Type, fields...)` in
+declaration order: C++20 builds take the layout from these lists, C++26
+builds check them against reflection. The V2.1 wire (12-byte container heads)
+left padding in the old layouts, so the filler fields went: `UnitState` is
+56 bytes, `VisibleUnit` 32, `ViewSnapshot` 48, all without padding. Step and
+snapshot wire bytes differ from runs before 10-27.
 
 ## 5. Behaviour fixed for all threads
 
@@ -130,9 +190,10 @@ self-test digests equal those of d58781e, which had no declaration).
   `ViewRequest` wire, a `ViewSnapshot` wire as `ViewReq` (wrong schema), a header
   declaring a 1 GiB `ViewReq`; (4) on one connection: a valid request, a
   truncated one, another valid one (a rejected wire on a kept receive buffer
-  must not break the next request on that connection). Expects `Error` or a
-  close for each bad request; exit 0 when all four were rejected and A answered
-  every valid request. A logs four `rejected:` lines.
+  must not break the next request on that connection); (5) a `ViewReq` asking
+  for encoding 3; (6) a `ViewReq` with reserved flag bit 12 set. Expects
+  `Error` or a close for each bad request; exit 0 when all six were rejected
+  and A answered every valid request. A logs six `rejected:` lines.
 
 ## 6. Metrics (metrics.hpp names) and CSV files
 
@@ -140,9 +201,9 @@ Units: `_us` microseconds (process-local steady clock), `_bytes`, `_count`.
 
 | Process | Metric names |
 | --- | --- |
-| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes`, `a.visible_count`, `a.check_us` |
+| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes` (XOffset wire), `a.snap_net_bytes` (payload sent), `a.snap_compress_us` (zstd only), `a.visible_count`, `a.check_us` |
 | B | `b.load_us`, `b.modify_us`, `b.save_us`, `b.send_us`, `b.destroy_us`, `b.in_bytes`, `b.out_bytes` |
-| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes`, `c.visible_count`, `c.catalog_load_us` |
+| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes` (XOffset wire), `c.snap_net_bytes` (payload received), `c.decompress_us` (zstd only), `c.visible_count`, `c.catalog_load_us` |
 
 The four destroy metrics (`a.destroy_us`, `a.snap_destroy_us`, `b.destroy_us`,
 `c.destroy_us`) exist only with `--buffers fresh`; `reuse` destroys nothing per
@@ -155,8 +216,11 @@ Files in `--csv-dir` (comma separated, header row first):
 | --- | --- |
 | `a_metrics.csv`, `b_metrics.csv`, `client_metrics.csv` | `role,metric,count,mean,p50,p95,max` |
 | `a_steps.csv` | `tick,req_bytes,res_bytes,ab_rtt_us,save_us,load_us,destroy_us,free_blocks,free_bytes,check_ok,req_digest,res_digest` |
-| `a_snapshots.csv` | `request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,req_load_us,filter_us,build_us,save_us,destroy_us,check_ok` |
-| `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok` |
+| `a_snapshots.csv` | `request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us` |
+| `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,decompress_us` |
+| `corpus.csv` (A `--corpus-dir`) | `request_id,flags,category,encoding,file,net_bytes,wire_bytes,wire_digest,digest,visible` |
+| `client_replay.csv` (client `--replay`) | `request_id,category,encoding,net_bytes,wire_bytes,wire_digest,digest,decompress_us,load_us,result` |
+| `client_build.txt` | one line: how the client was built |
 | `a_checks.csv`, `client_checks.csv`, `selftest_checks.csv` | `check,result,detail` (`result` is `pass` or `fail`; coverage counts go in `detail`) |
 
 `a_checks.csv` rows, in this order: `batch_roundtrip`, `reference_model`,
@@ -167,7 +231,10 @@ of `checks::snapshot_digest`; `check_ok` is `1` or `0`. `req_digest` and
 `res_digest` are 16 lowercase hex digits of `checks::wire_digest` over the exact
 `StepReq` / `StepRes` payload bytes (empty without `--check`): equal digests per
 tick across runs mean the same bytes, whatever the buffer mode, compiler or
-platform that produced them.
+platform that produced them. In the snapshot files `wire_bytes` and
+`wire_digest` describe the XOffset wire after any decompression and
+`net_bytes` the payload on the network; A and the client must agree on all of
+them per request id.
 
 ## 7. Done criteria per thread
 
@@ -177,3 +244,4 @@ platform that produced them.
 | Servers | A and B run 500 steps at 1 / 100 / 10000 units with `--check` all passing, with the headless client attached |
 | Client | headless sampling and `--evil` pass against A; window client builds on the Mac and shows units moving, state changes and other areas after a drag (screenshots) |
 | Integration | `tools/run_all_tiers.sh` runs the three tiers + `--evil` and `tools/summarize.py` writes the result tables; local validation (GitHub CI is not used); Mac step file; `RESULT.md`; PR to next_cpp26 |
+| End to end (10-27) | `tools/run_e2e.sh` passes for every client target (Linux, Windows MinGW and MSVC, Android emulator, iOS Simulator): self-check, replay of one corpus, the three tiers with `--encoding cycle`, evil; `tools/e2e_report.py` writes `E2E_RESULT.md` |

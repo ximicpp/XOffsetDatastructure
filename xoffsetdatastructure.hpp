@@ -95,17 +95,6 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
 #endif
 
 namespace XOffsetDatastructure {
-    class XException : public std::runtime_error {
-    public:
-        using std::runtime_error::runtime_error;
-    };
-
-    class XBadAlloc : public XException {
-    public:
-        XBadAlloc() : XException("XOffset arena allocation failed") {}
-        explicit XBadAlloc(const std::string& what) : XException(what) {}
-    };
-
     template <typename T> struct XFixedVector;
 
     namespace detail {
@@ -196,9 +185,9 @@ namespace XOffsetDatastructure {
 
         T* allocate(std::size_t n) {
             if (!arena_) {
-                throw XException("allocator has no arena");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "allocator has no arena"));
             }
-            if (n > 0x7ffffff8u / sizeof(T)) throw XBadAlloc();
+            if (n > 0x7ffffff8u / sizeof(T)) XOFFSET_THROW(XBadAlloc());
             if (n == 0) return nullptr;
             return detail::begin_dynamic_array<T>(
                 arena_->allocate_aligned(
@@ -506,7 +495,7 @@ namespace XOffsetDatastructure {
         // like grow(); it throws XBadAlloc on failure and changes nothing.
         void set_growth_policy(XGrowPolicy policy) {
             if (policy == XGrowPolicy::Automatic && buffer_.movable() &&
-                !replace_storage(buffer_.size(), true, true)) throw XBadAlloc();
+                !replace_storage(buffer_.size(), true, true)) XOFFSET_THROW(XBadAlloc());
             growth_policy_ = policy;
         }
         XStorageKind storage_kind() const noexcept {
@@ -522,7 +511,7 @@ namespace XOffsetDatastructure {
 
         // Numeric reservation parameters are legacy minimum hints, not hard limits.
         static size_type capacity_from_hint(size_type size, size_type hint = 0) {
-            if (size > MAX_PAYLOAD || hint > MAX_PAYLOAD) throw XBadAlloc();
+            if (size > MAX_PAYLOAD || hint > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             return std::max({size, hint, DEFAULT_MAXIMUM_CAPACITY});
         }
 
@@ -539,27 +528,27 @@ namespace XOffsetDatastructure {
         }
 
         explicit XBufferCore(size_type size) {
-            init_fresh(size, capacity_from_hint(size));
+            XOFFSET_VREQUIRE(init_fresh(size, capacity_from_hint(size)));
         }
 
         XBufferCore(size_type size, size_type max_reserved) {
-            init_fresh(size, capacity_from_hint(size, max_reserved));
+            XOFFSET_VREQUIRE(init_fresh(size, capacity_from_hint(size, max_reserved)));
         }
 
         XBufferCore(size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_fresh(size, cap.value, cap.pool, cap.storage);
+            XOFFSET_VREQUIRE(init_fresh(size, cap.value, cap.pool, cap.storage));
         }
 
         XBufferCore(const char* data, size_type size) {
-            init_from_bytes(data, size, capacity_from_hint(size));
+            XOFFSET_VREQUIRE(init_from_bytes(data, size, capacity_from_hint(size)));
         }
 
         XBufferCore(const char* data, size_type size, size_type max_reserved) {
-            init_from_bytes(data, size, capacity_from_hint(size, max_reserved));
+            XOFFSET_VREQUIRE(init_from_bytes(data, size, capacity_from_hint(size, max_reserved)));
         }
 
         XBufferCore(const char* data, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_from_bytes(data, size, cap.value, cap.pool, cap.storage);
+            XOFFSET_VREQUIRE(init_from_bytes(data, size, cap.value, cap.pool, cap.storage));
         }
 
         // The payload of an admitted wire (see XWireHeaderV2): the payload
@@ -572,7 +561,7 @@ namespace XOffsetDatastructure {
             std::size_t extent_count;
         };
         XBufferCore(WirePayload wire, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            init_from_wire(wire, size, cap.value, cap.pool, cap.storage);
+            XOFFSET_VREQUIRE(init_from_wire(wire, size, cap.value, cap.pool, cap.storage));
         }
 
         uint64_t epoch() const noexcept { return m_epoch; }
@@ -712,7 +701,7 @@ namespace XOffsetDatastructure {
         // in the host page preceding the payload; no registry or TLS lookup.
         static XBufferCore& owner_from_arena(const void* arena) {
             auto* owner = owner_from_arena_noexcept(arena);
-            if (!owner) throw XException("arena owner lookup failed");
+            if (!owner) XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
             return *owner;
         }
         static XBufferCore* owner_from_arena_noexcept(const void* arena) noexcept {
@@ -874,20 +863,20 @@ namespace XOffsetDatastructure {
         // table is built off to the side (host allocation may run
         // new_handler); the payload's current owner is re-resolved and the
         // old table is destroyed only after publication.
-        XOFFSET_DETAIL_MOVE_INLINE void load_free_blocks(const void* holes, std::size_t count) {
+        XOFFSET_DETAIL_MOVE_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
             // No holes, no table to replace, this owner current: the general
             // path would only publish an absent table.
             if (count == 0 && !free_table_ && (!owner_record_ || record_owner(owner_record_) == this)) [[likely]] {
                 free_table_lost_ = false;
-                return;
+                return detail::vok();
             }
-            load_free_blocks_general(holes, count);
+            return load_free_blocks_general(holes, count);
         }
 
-        XOFFSET_DETAIL_NOINLINE void load_free_blocks_general(const void* holes, std::size_t count) {
+        XOFFSET_DETAIL_NOINLINE detail::vstatus load_free_blocks_general(const void* holes, std::size_t count) {
             const auto identity = owner_record_;
             FreeTablePtr table; // no holes: an absent table is an exact, empty one
-            try {
+            XOFFSET_TRY {
                 if (count != 0) table = make_free_table();
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
@@ -905,19 +894,20 @@ namespace XOffsetDatastructure {
                     table->bytes += hole.bytes;
                     ++table->count;
                 }
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
+            } XOFFSET_CATCH(const std::bad_alloc&) {
+                XOFFSET_THROW(XBadAlloc());
             }
             auto* owner = identity ? record_owner(identity) : this;
-            if (!owner) throw XException("arena owner lookup failed");
+            if (!owner) XOFFSET_VFAIL(XException, XErrc::invalid_state, "arena owner lookup failed");
             owner->free_table_.swap(table);
             owner->free_table_lost_ = false;
+            return detail::vok();
         }
 
         // Replaces the free table with an exact recomputation (used after an
         // unverified load or when a host allocation failure lost an entry).
         void replace_free_blocks(const std::vector<WireHole>& holes) {
-            load_free_blocks(holes.data(), holes.size());
+            XOFFSET_VREQUIRE(load_free_blocks(holes.data(), holes.size()));
         }
 
     private:
@@ -1089,7 +1079,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE void* allocate_block_general(std::uint32_t bytes, std::size_t alignment,
                                                              bool allow_growth) {
             if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
-                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) throw XBadAlloc();
+                (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             if (alignment <= 8 && free_table_) {
                 FreeSplit split;
                 if (void* reused = take_free_block(*free_table_, bytes, split)) {
@@ -1169,7 +1159,7 @@ namespace XOffsetDatastructure {
             // Constructed inside the try: the MSVC STL's map allocates its head
             // node in the default constructor.
             std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_large;
-            try {
+            XOFFSET_TRY {
                 if (bytes > FreeTable::small_max) spare_large.emplace().emplace(bytes, offset);
                 for (;;) {
                     XBufferCore* owner = identity ? record_owner(identity) : this;
@@ -1207,7 +1197,7 @@ namespace XOffsetDatastructure {
                     ++table.count;
                     return true;
                 }
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 if (auto* owner = identity ? record_owner(identity) : this) owner->free_table_lost_ = true;
                 return false;
             }
@@ -1246,7 +1236,7 @@ namespace XOffsetDatastructure {
             const auto identity = owner_record_;
             { auto released = std::move(split.node); }
             if (split.bytes) push_free_block(split.offset, split.bytes);
-            if (identity && !record_owner(identity)) throw XException("arena owner lookup failed");
+            if (identity && !record_owner(identity)) XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
         }
 
         void* take_free_block(FreeTable& table, std::uint32_t bytes, FreeSplit& split) noexcept {
@@ -1311,10 +1301,10 @@ namespace XOffsetDatastructure {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto limit = (std::numeric_limits<std::uintptr_t>::max)();
             const auto align = std::max<std::size_t>(alignment, 8u);
-            if (current_end > limit - base || align - 1u > limit - base - current_end) throw XBadAlloc();
+            if (current_end > limit - base || align - 1u > limit - base - current_end) XOFFSET_THROW(XBadAlloc());
             const size_type start = align_up(base + current_end, align) - base;
-            if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) throw XBadAlloc();
-            if (!ensure_allocation_extent(start + bytes, allow_growth)) throw XBadAlloc();
+            if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) XOFFSET_THROW(XBadAlloc());
+            if (!ensure_allocation_extent(start + bytes, allow_growth)) XOFFSET_THROW(XBadAlloc());
             // Publish the allocation before any host callback can observe it.
             sm->used_end = start + bytes;
             void* result = payload_byte_address(start);
@@ -1323,7 +1313,7 @@ namespace XOffsetDatastructure {
                 const auto identity = owner_record_;
                 push_free_block(static_cast<std::uint32_t>(current_end),
                                 static_cast<std::uint32_t>(start - current_end));
-                if (identity && !record_owner(identity)) throw XException("arena owner lookup failed");
+                if (identity && !record_owner(identity)) XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
             }
             return result;
         }
@@ -1445,7 +1435,7 @@ namespace XOffsetDatastructure {
         static XBufferCore& require_record_owner(const OwnerRecordPtr& record) {
             detail::owner_lookup_count(&detail::OwnerLookupStats::slow_revalidations);
             if (auto* owner = record_owner(record)) return *owner;
-            throw XException("arena owner lookup failed");
+            XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
         }
 
         static size_type min_payload_size() noexcept {
@@ -1460,48 +1450,94 @@ namespace XOffsetDatastructure {
             std::size_t slot_class; // SlotGeometry::classes: VM
             bool movable;
         };
-        static StoragePlan plan_storage(size_type initial, size_type maximum, XGrowPolicy growth,
-                                        bool pooled, XStorage request) {
+        static detail::vstatus plan_storage(size_type initial, size_type maximum, XGrowPolicy growth,
+                                            bool pooled, XStorage request, StoragePlan& plan) {
             using Geometry = detail::SlotGeometry;
             constexpr StoragePlan vm{Geometry::classes, false};
-            if (request == XStorage::Pinned) return vm;
-            auto refuse = [&] {
+            plan = vm;
+            if (request == XStorage::Pinned) return detail::vok();
+            auto refuse = [&]() -> detail::vstatus {
                 if (request == XStorage::Movable)
-                    throw std::invalid_argument(
+                    XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
                         "XStorage::Movable needs slot storage: no pool, initial size <= SLOT_MAX, "
                         "and Explicit growth or maximum <= SLOT_MAX");
-                return vm;
+                return detail::vok();
             };
             if (!Geometry::enabled || pooled) return refuse();
-            if (maximum <= Geometry::max_payload) return {Geometry::class_for(maximum), false};
+            if (maximum <= Geometry::max_payload) {
+                plan = {Geometry::class_for(maximum), false};
+                return detail::vok();
+            }
             if (growth == XGrowPolicy::Automatic || initial > Geometry::max_payload) return refuse();
-            return {Geometry::class_for(initial), true};
+            plan = {Geometry::class_for(initial), true};
+            return detail::vok();
+        }
+
+        // Storage work in which std::bad_alloc and std::length_error mean
+        // that the arena could not get memory: they become XBadAlloc (code
+        // out_of_storage) with or without exceptions.
+        template <typename Step>
+        static detail::vstatus as_arena_failure(Step&& step) {
+#if XOFFSET_NO_EXCEPTIONS
+            if (step()) return true;
+            const auto code = detail::pending_error.code;
+            if (code == XErrc::host_allocation_failed || code == XErrc::length_error)
+                return detail::record_failure(XErrc::out_of_storage, "XOffset arena allocation failed");
+            return false;
+#else
+            try {
+                step();
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            } catch (const std::length_error&) {
+                throw XBadAlloc();
+            }
+#endif
+        }
+
+        // as_arena_failure for std::bad_alloc only.
+        template <typename Step>
+        static detail::vstatus as_arena_alloc_failure(Step&& step) {
+#if XOFFSET_NO_EXCEPTIONS
+            if (step()) return true;
+            if (detail::pending_error.code == XErrc::host_allocation_failed)
+                return detail::record_failure(XErrc::out_of_storage, "XOffset arena allocation failed");
+            return false;
+#else
+            try {
+                step();
+            } catch (const std::bad_alloc&) {
+                throw XBadAlloc();
+            }
+#endif
         }
 
         static bool plans_slot(const StoragePlan& plan) noexcept {
             return plan.slot_class != detail::SlotGeometry::classes;
         }
 
-        void init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
-                        XStorage request = XStorage::Auto) {
-            if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
+        detail::vstatus init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
+                                   XStorage request = XStorage::Auto) {
+            if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD)
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             size = std::max(size, min_payload_size());
-            if (size > max_reserved) throw XBadAlloc();
-            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
-            try {
+            if (size > max_reserved) XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
+            StoragePlan plan;
+            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
                 free_table_.reset();
                 free_table_lost_ = false;
+                detail::VirtualMemoryStorage owner;
                 if (plans_slot(plan)) {
-                    buffer_ = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
-                    if (!buffer_.grow_to(size)) throw std::bad_alloc();
+                    XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
+                                                                          plan.movable));
+                    if (!owner.grow_to(size)) XOFFSET_VFAIL_BAD_ALLOC();
                 } else {
-                    buffer_ = detail::VirtualMemoryStorage(size, max_reserved, pool);
+                    XOFFSET_VTRY(detail::VirtualMemoryStorage::create_v(owner, size, max_reserved, pool));
                 }
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
-            } catch (const std::length_error&) {
-                throw XBadAlloc();
-            }
+                buffer_ = std::move(owner);
+                return detail::vok();
+            }));
             auto* sm = arena();
             std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
             sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
@@ -1511,76 +1547,81 @@ namespace XOffsetDatastructure {
             sm->reserved0 = 0;
             sm->reserved1 = 0;
             publish_host_owner();
-            register_registry();
+            return register_registry();
         }
 
-        void init_from_bytes(const char* data, size_type size, size_type max_reserved, const XBufferPool& pool = {},
-                             XStorage request = XStorage::Auto) {
-            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
-            init_from_storage(data, size, max_reserved, [&] {
+        detail::vstatus init_from_bytes(const char* data, size_type size, size_type max_reserved,
+                                        const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
+            StoragePlan plan;
+            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            return init_from_storage(data, size, max_reserved, [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
                 if (!plans_slot(plan) || size > max_reserved)
-                    return detail::VirtualMemoryStorage::from_bytes(data, size, max_reserved, pool);
-                auto owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
-                owner.assign_bytes(data, size);
-                return owner;
+                    return detail::VirtualMemoryStorage::from_bytes_v(owner, data, size, max_reserved, pool);
+                XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
+                                                                      plan.movable));
+                return owner.assign_bytes_v(data, size);
             });
         }
 
         // Wire payload: extents and sizes validated by the caller.
-        void init_from_wire(const WirePayload& wire, size_type size, size_type max_reserved,
-                            const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
-            const auto plan = plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request);
-            init_from_storage(wire.stored, size, max_reserved, [&] {
-                detail::VirtualMemoryStorage owner;
+        detail::vstatus init_from_wire(const WirePayload& wire, size_type size, size_type max_reserved,
+                                       const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
+            StoragePlan plan;
+            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            return init_from_storage(wire.stored, size, max_reserved,
+                                     [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
                 if (!plans_slot(plan) || size > max_reserved) {
-                    owner = wire.extent_count == 0
-                        ? detail::VirtualMemoryStorage::from_bytes(wire.stored, size, max_reserved, pool,
-                                                                   sizeof(arena_header))
-                        : detail::VirtualMemoryStorage::from_extents(wire.stored, wire.extents, wire.extent_count,
-                                                                     size, max_reserved, pool);
+                    if (wire.extent_count == 0)
+                        XOFFSET_VTRY(detail::VirtualMemoryStorage::from_bytes_v(owner, wire.stored, size, max_reserved,
+                                                                                pool, sizeof(arena_header)));
+                    else
+                        XOFFSET_VTRY(detail::VirtualMemoryStorage::from_extents_v(owner, wire.stored, wire.extents,
+                                                                                  wire.extent_count, size,
+                                                                                  max_reserved, pool));
                 } else {
-                    owner = detail::VirtualMemoryStorage::for_slot(plan.slot_class, max_reserved, plan.movable);
-                    if (wire.extent_count == 0) owner.assign_bytes(wire.stored, size, sizeof(arena_header));
-                    else owner.assign_extents(wire.stored, wire.extents, wire.extent_count, size);
+                    XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
+                                                                          plan.movable));
+                    if (wire.extent_count == 0)
+                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
+                    else
+                        XOFFSET_VTRY(owner.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
                 }
                 write_payload_header(owner.data(), wire.root_offset, size);
-                return owner;
+                return detail::vok();
             });
         }
 
+        // `make` fills an empty owner (returning detail::vstatus).
         template <typename Make>
-        void init_from_storage(const char* data, size_type size, size_type max_reserved, Make&& make) {
-            if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD) throw XBadAlloc();
+        detail::vstatus init_from_storage(const char* data, size_type size, size_type max_reserved, Make&& make) {
+            if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD)
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             if (!data || size < sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload too small");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload too small");
             }
-            if (size > max_reserved) throw XBadAlloc();
-            try {
+            if (size > max_reserved) XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
+            XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
                 free_table_.reset();
                 // Holes of an unverified payload are unknown until a verified
                 // load supplies its hole table (or a typed walk recomputes it).
                 free_table_lost_ = true;
-                buffer_ = make();
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
-            } catch (const std::length_error&) {
-                throw XBadAlloc();
-            }
+                detail::VirtualMemoryStorage owner;
+                XOFFSET_VTRY(make(owner));
+                buffer_ = std::move(owner);
+                return detail::vok();
+            }));
             typed_root_access_allowed_ = false;
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload header mismatch");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload header mismatch");
             }
             if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
-                throw XException(
-                    "XBufferCore: payload used_end out of range");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload used_end out of range");
             }
             zero_past_used_end();
             publish_host_owner();
-            register_registry();
+            return register_registry();
         }
 
         // Out of line: inlining the short path into every move site changes
@@ -1668,13 +1709,15 @@ namespace XOffsetDatastructure {
 
         // The only allocation, including any new_handler reentry, precedes
         // publication of the record.
-        PreparedOwner prepare_owner(const detail::VirtualMemoryStorage& storage) {
-            if (std::exchange(detail::pending_registry_failure, false)) throw XBadAlloc();
-            try {
-                return {std::make_shared<OwnerRecord>(storage.data(), this)};
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
+        detail::vstatus prepare_owner(const detail::VirtualMemoryStorage& storage, PreparedOwner& prepared) {
+            if (std::exchange(detail::pending_registry_failure, false))
+                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+            XOFFSET_TRY {
+                prepared.record = std::make_shared<OwnerRecord>(storage.data(), this);
+            } XOFFSET_CATCH(const std::bad_alloc&) {
+                XOFFSET_THROW(XBadAlloc());
             }
+            return detail::vok();
         }
 
         // Publishes a prepared record as this owner's.
@@ -1684,9 +1727,11 @@ namespace XOffsetDatastructure {
             detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
         }
 
-        void register_registry() {
-            auto prepared = prepare_owner(buffer_);
+        detail::vstatus register_registry() {
+            PreparedOwner prepared;
+            XOFFSET_VTRY(prepare_owner(buffer_, prepared));
             insert_owner(prepared);
+            return detail::vok();
         }
 
         // Moves this owner to new storage of at least `logical` bytes: a
@@ -1701,19 +1746,20 @@ namespace XOffsetDatastructure {
             if (logical > maximum) return false;
             detail::VirtualMemoryStorage next;
             PreparedOwner prepared;
-            try {
+            XOFFSET_TRY {
                 const auto cls = pin ? detail::SlotGeometry::classes : detail::SlotGeometry::class_for(logical);
                 if (cls != detail::SlotGeometry::classes) {
-                    next = detail::VirtualMemoryStorage::for_slot(cls, maximum, true);
-                    if (copy) next.assign_bytes(buffer_.data(), used_end_clamped());
+                    XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::for_slot_v(next, cls, maximum, true));
+                    if (copy) XOFFSET_VTRY_OR(false, next.assign_bytes_v(buffer_.data(), used_end_clamped()));
                 } else if (copy) {
-                    next = detail::VirtualMemoryStorage::from_bytes(buffer_.data(), used_end_clamped(), maximum);
+                    XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::from_bytes_v(
+                        next, buffer_.data(), used_end_clamped(), maximum, {}));
                 } else {
-                    next = detail::VirtualMemoryStorage(0, maximum);
+                    XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::create_v(next, 0, maximum));
                 }
                 if (copy && !next.grow_to(logical)) return false;
-                prepared = prepare_owner(next);
-            } catch (...) {
+                XOFFSET_VTRY_OR(false, prepare_owner(next, prepared));
+            } XOFFSET_CATCH(...) {
                 return false;
             }
             insert_owner_keeping(prepared);
@@ -1738,16 +1784,18 @@ namespace XOffsetDatastructure {
         // An owner without storage (default-constructed or moved-from) gets
         // one for a reload of `size` bytes, as load_verified would without a
         // maximum: DEFAULT_MAXIMUM_CAPACITY, this owner's growth policy.
-        void ensure_storage(size_type size) {
-            if (!buffer_.data()) create_storage(size);
+        detail::vstatus ensure_storage(size_type size) {
+            if (!buffer_.data()) return create_storage(size);
+            return detail::vok();
         }
 
         // Cold half of ensure_storage, out of line so the inlined reinit
         // admission stays small.
-        XOFFSET_DETAIL_NOINLINE void create_storage(size_type size) {
-            if (size > DEFAULT_MAXIMUM_CAPACITY) throw XBadAlloc();
+        XOFFSET_DETAIL_NOINLINE detail::vstatus create_storage(size_type size) {
+            if (size > DEFAULT_MAXIMUM_CAPACITY)
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             const auto initial = std::max(size, min_payload_size());
-            init_fresh(initial, DEFAULT_MAXIMUM_CAPACITY);
+            return init_fresh(initial, DEFAULT_MAXIMUM_CAPACITY);
         }
 
         size_type used_end_clamped() const noexcept {
@@ -1802,19 +1850,18 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename... Args>
         T* construct_object_at_slot(std::uint64_t& slot, Args&&... args) {
-            if constexpr (sizeof(T) > MAX_PAYLOAD) throw XBadAlloc();
+            if constexpr (sizeof(T) > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             if (slot != 0) {
-                throw XException(
-                    "XBufferCore: object slot already populated");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "XBufferCore: object slot already populated"));
             }
             const auto block = arena_header::block_size(static_cast<std::uint32_t>(sizeof(T)));
             void* raw = allocate_block(block, alignof(T));
             T* obj;
-            try {
+            XOFFSET_TRY {
                 obj = std::construct_at(reinterpret_cast<T*>(raw), std::forward<Args>(args)...);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 retire_block(raw, block);
-                throw;
+                XOFFSET_RETHROW;
             }
             slot = static_cast<std::uint64_t>(
                 reinterpret_cast<std::uintptr_t>(obj) - reinterpret_cast<std::uintptr_t>(buffer_.data()));
@@ -1841,11 +1888,18 @@ namespace XOffsetDatastructure {
                 target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + regrow_step));
             // Throw on an OS/preparation failure. In particular, a container's
             // failed tail expansion must not silently retry via a new allocation.
-            if (!buffer_.grow_to(target)) throw XBadAlloc();
+            if (!buffer_.grow_to(target)) XOFFSET_THROW(XBadAlloc());
             return true;
         }
 
     protected:
+        // The WirePayload constructor's body, for a default-constructed
+        // buffer: the non-throwing load entries report failure instead.
+        detail::vstatus init_wire_v(const WirePayload& wire, size_type size, MaximumCapacity cap) {
+            growth_policy_ = cap.growth;
+            return init_from_wire(wire, size, cap.value, cap.pool, cap.storage);
+        }
+
         // In-place reload/reset (XBuffer::reload_verified / reset). The
         // mapping, the payload address and therefore the owner registration
         // are kept; every typed pointer into the old content is invalidated
@@ -1875,60 +1929,55 @@ namespace XOffsetDatastructure {
         // The two halves are forced inline so that reload_verified compiles
         // as it did before begin_verified_reload shared them.
         template <typename Assign>
-        void reinit_from_storage(const char* data, size_type size, Assign&& assign) {
-            admit_reinit(size, data != nullptr);
-            try {
-                assign();
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
-            } catch (const std::length_error&) {
-                throw XBadAlloc();
-            }
-            check_reinit_payload();
+        detail::vstatus reinit_from_storage(const char* data, size_type size, Assign&& assign) {
+            XOFFSET_VTRY(admit_reinit(size, data != nullptr));
+            XOFFSET_VTRY(as_arena_failure(assign));
+            return check_reinit_payload();
         }
 
-        XOFFSET_DETAIL_MOVE_INLINE void admit_reinit(size_type size, bool has_source = true) {
-            if (has_source && size >= sizeof(arena_header) && size <= MAX_PAYLOAD) ensure_storage(size);
+        XOFFSET_DETAIL_MOVE_INLINE detail::vstatus admit_reinit(size_type size, bool has_source = true) {
+            if (has_source && size >= sizeof(arena_header) && size <= MAX_PAYLOAD) XOFFSET_VTRY(ensure_storage(size));
             if (buffer_.empty() && buffer_.maximum_capacity() == 0)
-                throw XException("XBufferCore: buffer has no storage");
+                XOFFSET_VFAIL(XException, XErrc::invalid_state, "XBufferCore: buffer has no storage");
             begin_reinit();
-            if (size > MAX_PAYLOAD) throw XBadAlloc();
+            if (size > MAX_PAYLOAD) XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             if (!has_source || size < sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload too small");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload too small");
             }
-            if (size > buffer_.maximum_capacity()) throw XBadAlloc();
+            if (size > buffer_.maximum_capacity())
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             // A movable slot too small for the new content moves first; the
             // old content is discarded anyway, so nothing is copied.
             if (buffer_.is_slot() && size > buffer_.accessible_bytes() && !replace_storage(size, false))
-                throw XBadAlloc();
+                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             // Holes are unknown until verification supplies the hole table.
             free_table_lost_ = true;
+            return detail::vok();
         }
 
-        XOFFSET_DETAIL_MOVE_INLINE void check_reinit_payload() {
+        XOFFSET_DETAIL_MOVE_INLINE detail::vstatus check_reinit_payload() {
             auto* sm = arena();
             if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
                 sm->header_size != sizeof(arena_header)) {
-                throw XException(
-                    "XBufferCore: payload header mismatch");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload header mismatch");
             }
             if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
-                throw XException(
-                    "XBufferCore: payload used_end out of range");
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload used_end out of range");
             }
             zero_past_used_end();
+            return detail::vok();
         }
 
-        void reinit_from_bytes(const char* data, size_type size) {
-            reinit_from_storage(data, size, [&] { buffer_.assign_bytes(data, size); });
+        detail::vstatus reinit_from_bytes(const char* data, size_type size) {
+            return reinit_from_storage(data, size, [&] { return buffer_.assign_bytes_v(data, size); });
         }
 
-        void reinit_from_wire(const WirePayload& wire, size_type size) {
-            reinit_from_storage(wire.stored, size, [&] {
-                if (wire.extent_count == 0) buffer_.assign_bytes(wire.stored, size, sizeof(arena_header));
-                else buffer_.assign_extents(wire.stored, wire.extents, wire.extent_count, size);
+        detail::vstatus reinit_from_wire(const WirePayload& wire, size_type size) {
+            return reinit_from_storage(wire.stored, size, [&]() -> detail::vstatus {
+                if (wire.extent_count == 0) XOFFSET_VTRY(buffer_.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
+                else XOFFSET_VTRY(buffer_.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
                 write_payload_header(buffer_.data(), wire.root_offset, size);
+                return detail::vok();
             });
         }
 
@@ -1936,31 +1985,30 @@ namespace XOffsetDatastructure {
         // `size` bytes in place (a reload into a buffer of sufficient size):
         // every admission check of admit_reinit holds, so only its state
         // changes remain.
-        XOFFSET_DETAIL_MOVE_INLINE void reinit_from_dense_wire_in_place(const char* stored, std::uint64_t root_offset,
-                                                                        size_type size) {
+        XOFFSET_DETAIL_MOVE_INLINE detail::vstatus reinit_from_dense_wire_in_place(const char* stored,
+                                                                                   std::uint64_t root_offset,
+                                                                                   size_type size) {
             if (size < sizeof(arena_header) || !buffer_.can_assign_in_place(size)) [[unlikely]] {
-                reinit_from_wire({root_offset, stored, nullptr, 0}, size);
-                return;
+                return reinit_from_wire({root_offset, stored, nullptr, 0}, size);
             }
             begin_reinit();
             free_table_lost_ = true;
-            if (!buffer_.assign_in_place(stored, size, sizeof(arena_header))) throw XBadAlloc();
+            if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
+                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             // check_reinit_payload() holds by construction: the header was
             // just written with used_end == size == the logical size, so its
             // checks pass and nothing lies past used_end to zero.
             write_payload_header(buffer_.data(), root_offset, size);
+            return detail::vok();
         }
 
         // In-place direct receive (XBuffer::begin_verified_reload): the
         // admission of reinit, then [0, size) exposed to the writer without
-        // clearing. Returns the offset from which bytes are still zero.
-        std::size_t reinit_for_overwrite(size_type size) {
-            admit_reinit(size);
-            try {
-                return buffer_.expose_for_overwrite(size);
-            } catch (const std::bad_alloc&) {
-                throw XBadAlloc();
-            }
+        // clearing. Sets `clean_from` to the offset from which bytes are
+        // still zero.
+        detail::vstatus reinit_for_overwrite(size_type size, std::size_t& clean_from) {
+            XOFFSET_VTRY(admit_reinit(size));
+            return as_arena_alloc_failure([&] { return buffer_.expose_for_overwrite_v(size, clean_from); });
         }
 
         // clone()/clone_into(): the host state that travels with a payload
@@ -1975,14 +2023,14 @@ namespace XOffsetDatastructure {
             const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
             if (logical > buffer_.size() && !buffer_.grow_to(logical) &&
                 !(buffer_.movable() && replace_storage(logical, true)))
-                throw XBadAlloc();
+                XOFFSET_THROW(XBadAlloc());
             if (!src.free_table_lost_) {
-                try {
+                XOFFSET_TRY {
                     free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
-                } catch (const std::bad_alloc&) {
-                    throw XBadAlloc();
-                } catch (const std::length_error&) {
-                    throw XBadAlloc();
+                } XOFFSET_CATCH(const std::bad_alloc&) {
+                    XOFFSET_THROW(XBadAlloc());
+                } XOFFSET_CATCH(const std::length_error&) {
+                    XOFFSET_THROW(XBadAlloc());
                 }
                 free_table_lost_ = false;
             }
@@ -1997,15 +2045,16 @@ namespace XOffsetDatastructure {
         // place, like reload_verified (same mapping, address and registration;
         // epoch advances). On any failure this owner is left an empty arena.
         void clone_state_from(const XBufferCore& src) {
-            if (this == &src) throw XException("clone_into(): source and destination are the same buffer");
-            try {
+            if (this == &src) XOFFSET_THROW(XException(XErrc::invalid_state, "clone_into(): source and destination are the same buffer"));
+            XOFFSET_TRY {
                 const auto* sm = src.arena();
-                if (!sm) throw XException("clone_into(): source buffer has no arena");
-                reinit_from_bytes(reinterpret_cast<const char*>(sm), static_cast<size_type>(sm->used_end));
+                if (!sm) XOFFSET_THROW(XException(XErrc::invalid_state, "clone_into(): source buffer has no arena"));
+                XOFFSET_VREQUIRE(reinit_from_bytes(reinterpret_cast<const char*>(sm),
+                                                   static_cast<size_type>(sm->used_end)));
                 copy_clone_state(src);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 reset_arena(0);
-                throw;
+                XOFFSET_RETHROW;
             }
         }
 
@@ -2156,6 +2205,22 @@ namespace XOffsetDatastructure {
             });
         }
 
+        // for_each_reflected_subobject for callbacks returning vstatus: without
+        // exceptions the walk stops at the first false.
+        template <typename T, typename BaseFn, typename MemberFn>
+        vstatus for_each_reflected_subobject_v(BaseFn&& on_base, MemberFn&& on_member) {
+#if XOFFSET_NO_EXCEPTIONS
+            const bool bases = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return (bool(on_base(std::integral_constant<std::size_t, Is>{})) && ...);
+            }(std::make_index_sequence<schema::base_count_v<T>>{});
+            return bases && [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                return (bool(on_member(std::integral_constant<std::size_t, Is>{})) && ...);
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
+#else
+            for_each_reflected_subobject<T>(on_base, on_member);
+#endif
+        }
+
         template <typename T>
         concept fixed_size_scalar =
             std::is_same_v<T, bool> ||
@@ -2222,11 +2287,11 @@ namespace XOffsetDatastructure {
             void validate() const {
                 auto* owner = XBufferCore::record_owner(record);
                 if (!owner || owner->buffer_.data() != record->payload)
-                    throw XException("stable_erase_if owner is no longer live");
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if owner is no longer live"));
                 if (head_in_payload &&
                     (head_offset > owner->buffer_.size() ||
                      head_bytes > owner->buffer_.size() - head_offset))
-                    throw XException("stable_erase_if target is no longer in storage");
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if target is no longer in storage"));
             }
         };
 
@@ -2338,8 +2403,7 @@ namespace XOffsetDatastructure {
         }
 
         [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void throw_rel32_range() {
-            throw XException(
-                "relative offset exceeds rel32 range");
+            XOFFSET_THROW(XException(XErrc::capacity_exceeded, "relative offset exceeds rel32 range"));
         }
 
         // True when target is within rel32 range of origin.
@@ -2385,13 +2449,12 @@ namespace XOffsetDatastructure {
                                             std::size_t alignment) {
             auto* arena = alloc_ref.segment;
             if (!arena) {
-                throw XException(
-                    "allocator binding has no arena");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "allocator binding has no arena"));
             }
             if (alignment == 0 || (alignment & (alignment - 1)) != 0 ||
                 alignment > XBufferCore::MAX_PAYLOAD ||
                 bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u)) {
-                throw XBadAlloc();
+                XOFFSET_THROW(XBadAlloc());
             }
             return XBufferCore::owner_from_arena(arena).allocate_block(block_bytes_of(bytes), alignment);
         }
@@ -2556,11 +2619,11 @@ namespace XOffsetDatastructure {
                 detail::future_default_construct<T>(dst, alloc);
             } else if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
-                try {
+                XOFFSET_TRY {
                     for (; built < std::extent_v<T>; ++built) default_construct(&(*dst)[built], alloc);
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     destroy_n(*dst, built);
-                    throw;
+                    XOFFSET_RETHROW;
                 }
             } else if constexpr (requires(const Alloc& value) { T(value); }) {
                 std::construct_at(dst, alloc);
@@ -2581,11 +2644,11 @@ namespace XOffsetDatastructure {
                 detail::future_transfer_construct<T>(dst, static_cast<const CleanSrc&>(src), alloc);
             } else if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
-                try {
+                XOFFSET_TRY {
                     for (; built < std::extent_v<T>; ++built) transfer_construct(&(*dst)[built], src[built], alloc);
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     destroy_n(*dst, built);
-                    throw;
+                    XOFFSET_RETHROW;
                 }
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 std::construct_at(dst, static_cast<const CleanSrc&>(src));
@@ -2619,11 +2682,11 @@ namespace XOffsetDatastructure {
             } else if constexpr (sizeof...(Args) == 1 && requires { T(alloc); } &&
                                  (std::is_assignable_v<T&, Args&&> && ...)) {
                 std::construct_at(dst, alloc);
-                try {
+                XOFFSET_TRY {
                     ((*dst = std::forward<Args>(args)), ...);
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     std::destroy_at(dst);
-                    throw;
+                    XOFFSET_RETHROW;
                 }
             } else {
                 std::construct_at(dst, std::forward<Args>(args)...);
@@ -2858,7 +2921,7 @@ namespace XOffsetDatastructure {
             return {a};
         }
         [[noreturn]] XOFFSET_DETAIL_MOVE_COLD static void throw_unbound() {
-            throw XException("XFixedString needs a block but lies outside every XOffset payload");
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedString needs a block but lies outside every XOffset payload"));
         }
 
         XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
@@ -2915,7 +2978,7 @@ namespace XOffsetDatastructure {
         }
 
         void reserve(std::size_t requested) {
-            if (requested >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
+            if (requested >= XBufferCore::MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             auto new_cap = static_cast<std::uint32_t>(requested);
             if (new_cap <= capacity()) return;
 
@@ -2987,7 +3050,7 @@ namespace XOffsetDatastructure {
 #else
         XOFFSET_DETAIL_MOVE_INLINE void assign_general(std::string_view rhs) {
 #endif
-            if (rhs.size() >= XBufferCore::MAX_PAYLOAD) throw XBadAlloc();
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             if (rhs.empty()) { clear(); return; }
             const auto new_size = static_cast<std::uint32_t>(rhs.size());
             if (is_inline() || data_delta == 0) {
@@ -3036,12 +3099,12 @@ namespace XOffsetDatastructure {
             auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
                 alloc, static_cast<std::uint32_t>(new_size + 1), alignof(char)), std::size_t(new_size) + 1u);
             std::int32_t incoming_delta = 0;
-            try {
+            XOFFSET_TRY {
                 fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 fixed_detail::retire_dynamic_bytes(
                     alloc, fresh, static_cast<std::uint32_t>(new_size + 1));
-                throw;
+                XOFFSET_RETHROW;
             }
             // rhs may alias the old allocation, including its terminator.
             // Read it completely before the old bytes become a free-list node.
@@ -3175,7 +3238,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE void append_general(std::string_view rhs) {
             if (rhs.empty()) return;
             const std::size_t old_size = size();
-            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) throw XBadAlloc();
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) XOFFSET_THROW(XBadAlloc());
             const auto new_size = static_cast<std::uint32_t>(old_size + rhs.size());
             if (new_size <= inline_max && (is_inline() || data_delta == 0)) {
                 char bytes[inline_max];
@@ -3208,12 +3271,12 @@ namespace XOffsetDatastructure {
             auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
                 alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)), std::size_t(new_cap) + 1u);
             std::int32_t incoming_delta = 0;
-            try {
+            XOFFSET_TRY {
                 fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 fixed_detail::retire_dynamic_bytes(
                     alloc, fresh, static_cast<std::uint32_t>(new_cap + 1));
-                throw;
+                XOFFSET_RETHROW;
             }
             if (count != 0) std::memmove(fresh, src, count);
             fresh[count] = '\0';
@@ -3438,7 +3501,7 @@ namespace XOffsetDatastructure {
             return {a};
         }
         [[noreturn]] XOFFSET_DETAIL_MOVE_COLD static void throw_unbound() {
-            throw XException("XFixedVector needs a block but lies outside every XOffset payload");
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedVector needs a block but lies outside every XOffset payload"));
         }
 
         // Elements without heads never use the binding, so building one does
@@ -3524,7 +3587,7 @@ namespace XOffsetDatastructure {
         // reserve into a fresh block for relocatable T; out of line, so the
         // paths above keep their size at the caller.
         XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap, allocator_type alloc) {
-            if (new_cap > max_size()) throw XBadAlloc();
+            if (new_cap > max_size()) XOFFSET_THROW(XBadAlloc());
             bool published = false;
             fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                                                static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T),
@@ -3684,7 +3747,7 @@ namespace XOffsetDatastructure {
                 witness.validate();
                 if (data_delta != original_data_delta ||
                     size_ != original_size || capacity_ != original_capacity)
-                    throw XException("stable_erase_if target changed during decisions");
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if target changed during decisions"));
             };
             validate_target();
             size_type removed = 0;
@@ -3757,7 +3820,7 @@ namespace XOffsetDatastructure {
         }
 
         static size_type checked_count(std::size_t count) {
-            if (count > max_size()) throw XBadAlloc();
+            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
             return static_cast<size_type>(count);
         }
 
@@ -3766,7 +3829,7 @@ namespace XOffsetDatastructure {
         }
 
         size_type grown_capacity() const {
-            if (size_ == max_size()) throw XBadAlloc();
+            if (size_ == max_size()) XOFFSET_THROW(XBadAlloc());
             return std::max(size_ + 1u, static_cast<size_type>(
                 std::min<std::uint64_t>(max_size(), capacity_ ? std::uint64_t(capacity_) * 2u : 4u)));
         }
@@ -3782,20 +3845,20 @@ namespace XOffsetDatastructure {
         template <typename Construct>
         void rebuild(size_type count, size_type cap, Construct&& construct) {
             const auto alloc = bound_binding();
-            if (cap > max_size() || count > cap) throw XBadAlloc();
+            if (cap > max_size() || count > cap) XOFFSET_THROW(XBadAlloc());
             if (cap == 0) { clear(); return; }
             auto bytes = static_cast<std::uint32_t>(cap * sizeof(T));
             auto* fresh = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, bytes, alignof(T)), cap);
             size_type constructed = 0;
             std::int32_t delta = 0;
-            try {
+            XOFFSET_TRY {
                 fixed_detail::set_rel32(delta, &data_delta, fresh);
                 for (; constructed < count; ++constructed) construct(fresh + constructed, constructed);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 fixed_detail::destroy_n(fresh, constructed);
                 fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
-                throw;
+                XOFFSET_RETHROW;
             }
             auto* old = data();
             auto old_size = size_;
@@ -3880,7 +3943,7 @@ namespace XOffsetDatastructure {
 
         template <bool GrowOutOfLine, typename Construct>
         XOFFSET_DETAIL_MOVE_INLINE iterator insert_body(size_type index, Construct& construct) {
-            if (index > size_ || size_ == max_size()) throw XBadAlloc();
+            if (index > size_ || size_ == max_size()) XOFFSET_THROW(XBadAlloc());
             if (index == size_ && append_grow(construct)) {
                 // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
@@ -4023,12 +4086,12 @@ namespace XOffsetDatastructure {
                 auto* fresh = detail::begin_dynamic_array<T>(
                     fixed_detail::allocate_dynamic_bytes(alloc, new_bytes, alignof(T)), new_cap);
                 std::int32_t delta = 0;
-                try {
+                XOFFSET_TRY {
                     fixed_detail::set_rel32(delta, &data_delta, fresh);
                     construct(fresh + size_);
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     fixed_detail::retire_dynamic_bytes(alloc, fresh, new_bytes);
-                    throw;
+                    XOFFSET_RETHROW;
                 }
                 auto* old = data();
                 const auto old_cap = capacity_;
@@ -4068,14 +4131,14 @@ namespace XOffsetDatastructure {
             auto* staged = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
             bool built = false;
-            try {
+            XOFFSET_TRY {
                 construct(staged);
                 built = true;
                 commit(*staged);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 if (built) std::destroy_at(staged);
                 fixed_detail::retire_dynamic_bytes(alloc, staged, sizeof(T));
-                throw;
+                XOFFSET_RETHROW;
             }
             std::destroy_at(staged);
             fixed_detail::retire_dynamic_bytes(alloc, staged, sizeof(T));
@@ -4085,7 +4148,7 @@ namespace XOffsetDatastructure {
         // T{} and destruction cannot run user code; fill/custom construction
         // keeps the general transactional path below.
         void resize_default_scalar(size_type count) requires std::is_scalar_v<T> {
-            if (count > max_size()) throw XBadAlloc();
+            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
             if (count <= size_) {
                 const auto old_size = size_;
                 size_ = count;
@@ -4118,16 +4181,16 @@ namespace XOffsetDatastructure {
 
         template <typename Construct>
         void resize_construct(size_type count, Construct&& construct) {
-            if (count > max_size()) throw XBadAlloc();
+            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
             if (count <= size_) {
                 truncate(count);
             } else if (count <= capacity_) {
                 auto old_size = size_;
-                try {
+                XOFFSET_TRY {
                     while (size_ < count) { construct(data() + size_); ++size_; }
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     while (size_ > old_size) pop_back();
-                    throw;
+                    XOFFSET_RETHROW;
                 }
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 // Stage every potentially throwing operation before touching the
@@ -4142,14 +4205,14 @@ namespace XOffsetDatastructure {
                     alloc, bytes, alignof(T)), count);
                 size_type tail_built = 0;
                 std::int32_t delta = 0;
-                try {
+                XOFFSET_TRY {
                     fixed_detail::set_rel32(delta, &data_delta, fresh);
                     for (; tail_built < count - old_size; ++tail_built)
                         construct(fresh + old_size + tail_built);
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     fixed_detail::destroy_n(fresh + old_size, tail_built);
                     fixed_detail::retire_dynamic_bytes(alloc, fresh, bytes);
-                    throw;
+                    XOFFSET_RETHROW;
                 }
                 // Existing bounded-arena relocation rebases inline heads,
                 // retains their bindings, and empties source ownership. Its
@@ -4198,15 +4261,15 @@ namespace XOffsetDatastructure {
             const auto alloc = element_binding();
             reserve(other.size_);
             size_type constructed = 0;
-            try {
+            XOFFSET_TRY {
                 for (; constructed < other.size_; ++constructed) {
                     fixed_detail::transfer_construct(
                         data() + constructed, other.data()[constructed], alloc);
                 }
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 fixed_detail::destroy_n(data(), constructed);
                 size_ = 0;
-                throw;
+                XOFFSET_RETHROW;
             }
             size_ = other.size_;
         }
@@ -4318,17 +4381,17 @@ namespace XOffsetDatastructure {
                 auto* staged = detail::begin_dynamic_array<T>(
                 fixed_detail::allocate_dynamic_bytes(alloc, sizeof(T), alignof(T)), 1u);
                 bool constructed = false;
-                try {
+                XOFFSET_TRY {
                     fixed_detail::construct_bound(staged, alloc, std::forward<Args>(args)...);
                     constructed = true;
                     auto result = insert(*staged);
                     std::destroy_at(staged);
                     fixed_detail::retire_dynamic_bytes(alloc, staged, sizeof(T));
                     return result;
-                } catch (...) {
+                } XOFFSET_CATCH(...) {
                     if (constructed) std::destroy_at(staged);
                     fixed_detail::retire_dynamic_bytes(alloc, staged, sizeof(T));
-                    throw;
+                    XOFFSET_RETHROW;
                 }
             }
         }
@@ -4445,11 +4508,11 @@ namespace XOffsetDatastructure {
         void construct_entry(value_type* dst, KeyArg&& key, Args&&... args) {
             auto alloc = value_base::binding();
             fixed_detail::construct_bound(&dst->first, alloc, std::forward<KeyArg>(key));
-            try {
+            XOFFSET_TRY {
                 fixed_detail::construct_bound(&dst->second, alloc, std::forward<Args>(args)...);
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 std::destroy_at(&dst->first);
-                throw;
+                XOFFSET_RETHROW;
             }
             detail::zero_implicit_padding(dst);  // between key and value (M6)
         }
@@ -4967,8 +5030,8 @@ namespace XOffsetDatastructure {
         }
 
         // Validation errors leave the hot path through one out-of-line call.
-        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void wire_reject(const char* what) {
-            throw XException(what);
+        XOFFSET_VNORETURN XOFFSET_DETAIL_MOVE_COLD inline vstatus wire_reject(const char* what) {
+            XOFFSET_VFAIL(XException, XErrc::invalid_payload, what);
         }
 
         // Retained validation words of one long-lived reload buffer: the
@@ -5056,7 +5119,7 @@ namespace XOffsetDatastructure {
                 } else if (retained) {
                     storage = retained->words(2 * words);
                 } else {
-                    if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+                    if (!upstream) XOFFSET_THROW(std::invalid_argument("validation scratch: null upstream"));
                     storage = static_cast<std::uint64_t*>(
                         upstream->allocate(2 * words * sizeof(std::uint64_t), alignof(std::uint64_t)));
                     block_ = storage;
@@ -5227,31 +5290,32 @@ namespace XOffsetDatastructure {
 #else
 #define XOFFSET_DETAIL_V4_INLINE inline
 #endif
-        XOFFSET_DETAIL_V4_INLINE void validate_storage_range(const void* ptr, std::size_t bytes,
+        XOFFSET_DETAIL_V4_INLINE vstatus validate_storage_range(const void* ptr, std::size_t bytes,
                                            std::size_t alignment,
                                            const WireValidationContext& ctx,
                                            const char* what) {
-            if (bytes == 0) return;
+            if (bytes == 0) return vok();
             if (!ptr) {
-                wire_reject(what);
+                return wire_reject(what);
             }
             auto begin = reinterpret_cast<std::uintptr_t>(ptr);
             auto base = reinterpret_cast<std::uintptr_t>(ctx.base);
             auto end = reinterpret_cast<std::uintptr_t>(ctx.end);
             if (begin < base || begin > end || bytes > end - begin) {
-                wire_reject(what);
+                return wire_reject(what);
             }
             if ((reinterpret_cast<std::uintptr_t>(ptr) % alignment) != 0) {
-                wire_reject(what);
+                return wire_reject(what);
             }
+            return vok();
         }
 
-        void register_owned_bitmap(std::size_t begin, std::size_t bytes, WireValidationContext& ctx);
+        vstatus register_owned_bitmap(std::size_t begin, std::size_t bytes, WireValidationContext& ctx);
 
         // Registers granules [begin, begin + bytes) of a range that is already
         // known to lie in the payload on 8-byte granules.
-        XOFFSET_DETAIL_V4_INLINE void register_owned_granules(std::size_t begin, std::size_t bytes,
-                                                              WireValidationContext& ctx) {
+        XOFFSET_DETAIL_V4_INLINE vstatus register_owned_granules(std::size_t begin, std::size_t bytes,
+                                                                 WireValidationContext& ctx) {
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
             if (begin < ctx.stats_end) {
                 if (ctx.stats_first == WireValidationContext::no_cursor) ctx.stats_first = begin;
@@ -5262,79 +5326,85 @@ namespace XOffsetDatastructure {
             if (begin == ctx.cursor) [[likely]] {
                 ctx.cursor += bytes;
                 ctx.owned_bytes += bytes;
-                return;
+                return vok();
             }
-            register_owned_bitmap(begin, bytes, ctx);
+            return register_owned_bitmap(begin, bytes, ctx);
         }
 
         // Bitmap registration, kept out of line so that the validators the
         // cursor path inlines into stay small.
-        [[gnu::noinline]] inline void register_owned_bitmap(std::size_t begin, std::size_t bytes,
-                                                            WireValidationContext& ctx) {
+        [[gnu::noinline]] inline vstatus register_owned_bitmap(std::size_t begin, std::size_t bytes,
+                                                               WireValidationContext& ctx) {
             auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
             const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
-                wire_reject(
+                return wire_reject(
                     "wire validation detected overlapping dynamic ranges");
             }
             if (overlap == 2) {
-                wire_reject("wire validation detected live/free overlap");
+                return wire_reject("wire validation detected live/free overlap");
             }
             index.mark(false, g0, g1);
             ctx.owned_bytes += bytes;
             /* XBV3: owned-registered */
+            return vok();
         }
 
         // Offset of a range that passed validate_storage_range; a range that
         // is not on 8-byte granules is rejected with `what` (the validator
         // never registers one: see WireGranuleIndex).
-        inline std::size_t granule_range_offset(const void* ptr, std::size_t bytes,
-                                                const WireValidationContext& ctx,
-                                                const char* what) {
-            const auto begin = static_cast<std::size_t>(
+        inline vstatus granule_range_offset(const void* ptr, std::size_t bytes,
+                                            const WireValidationContext& ctx,
+                                            const char* what, std::size_t& begin) {
+            begin = static_cast<std::size_t>(
                 reinterpret_cast<std::uintptr_t>(ptr) -
                 reinterpret_cast<std::uintptr_t>(ctx.base));
-            if (((begin | bytes) & 7u) != 0) wire_reject(what);
-            return begin;
+            if (((begin | bytes) & 7u) != 0) return wire_reject(what);
+            return vok();
         }
 
-        inline void register_owned_range(const void* ptr, std::size_t bytes,
-                                         WireValidationContext& ctx,
-                                         const char* what) {
-            if (bytes == 0 || !ptr) return;
-            validate_storage_range(ptr, bytes, 1, ctx, what);
-            register_owned_granules(granule_range_offset(ptr, bytes, ctx, what), bytes, ctx);
+        inline vstatus register_owned_range(const void* ptr, std::size_t bytes,
+                                            WireValidationContext& ctx,
+                                            const char* what) {
+            if (bytes == 0 || !ptr) return vok();
+            XOFFSET_VTRY(validate_storage_range(ptr, bytes, 1, ctx, what));
+            std::size_t begin;
+            XOFFSET_VTRY(granule_range_offset(ptr, bytes, ctx, what, begin));
+            return register_owned_granules(begin, bytes, ctx);
         }
 
-        inline void register_free_range(const void* ptr, std::size_t bytes,
-                                        WireValidationContext& ctx,
-                                        const char* what) {
-            if (bytes == 0 || !ptr) return;
-            validate_storage_range(ptr, bytes, 1, ctx, what);
-            const auto begin = granule_range_offset(ptr, bytes, ctx, what);
+        inline vstatus register_free_range(const void* ptr, std::size_t bytes,
+                                           WireValidationContext& ctx,
+                                           const char* what) {
+            if (bytes == 0 || !ptr) return vok();
+            XOFFSET_VTRY(validate_storage_range(ptr, bytes, 1, ctx, what));
+            std::size_t begin;
+            XOFFSET_VTRY(granule_range_offset(ptr, bytes, ctx, what, begin));
             auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
             const auto overlap = index.overlap(g0, g1);
             if (overlap == 1) {
-                wire_reject(
+                return wire_reject(
                     "wire validation detected free-list overlap with live ranges");
             }
             if (overlap == 2) {
-                wire_reject(
+                return wire_reject(
                     "wire validation detected overlapping free-list ranges");
             }
             index.mark(true, g0, g1);
             ctx.free_bytes += bytes;
             /* XBV3: free-registered */
+            return vok();
         }
 
-        XOFFSET_DETAIL_V4_INLINE const char* checked_relative(const std::int32_t& delta,
-                                            const WireValidationContext& ctx) {
+        XOFFSET_DETAIL_V4_INLINE vstatus checked_relative(const std::int32_t& delta,
+                                                          const WireValidationContext& ctx,
+                                                          const char*& ptr) {
             auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
-            auto* ptr = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(address));
-            validate_storage_range(ptr, 1, 1, ctx, "wire validation: relative pointer out of bounds");
-            return ptr; // W9: flat (validated range), no canonical lookup
+            ptr = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(address));
+            // W9: flat (validated range), no canonical lookup
+            return validate_storage_range(ptr, 1, 1, ctx, "wire validation: relative pointer out of bounds");
         }
 
         // One check for a head's out-of-line block: data_delta resolves to an
@@ -5342,38 +5412,41 @@ namespace XOffsetDatastructure {
         // (block >= 1 is the head's 8-rounded extent). When it holds, every
         // check of the full sequence (checked_relative, the payload range,
         // register_allocation's block range) passes, so the block is
-        // registered directly; `full` returns nullptr and the caller runs that
-        // sequence, which throws its own first error.
-        XOFFSET_DETAIL_V4_INLINE const char* checked_block(const std::int32_t& delta, std::size_t block,
-                                                           WireValidationContext& ctx) {
+        // registered directly; otherwise `data` is nullptr and the caller runs
+        // that sequence, which rejects with its own first error.
+        XOFFSET_DETAIL_V4_INLINE vstatus checked_block(const std::int32_t& delta, std::size_t block,
+                                                       WireValidationContext& ctx, const char*& data) {
             const auto address = static_cast<std::uintptr_t>(
                 static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta);
             const auto base = reinterpret_cast<std::uintptr_t>(ctx.base);
             const auto end = reinterpret_cast<std::uintptr_t>(ctx.end);
             if (address < base || address > end || block > end - address || (address & 7u) != 0 ||
-                ((address - base) & 7u) != 0) [[unlikely]]
-                return nullptr;
-            register_owned_granules(static_cast<std::size_t>(address - base), block, ctx);
-            return reinterpret_cast<const char*>(address);
+                ((address - base) & 7u) != 0) [[unlikely]] {
+                data = nullptr;
+                return vok();
+            }
+            XOFFSET_VTRY(register_owned_granules(static_cast<std::size_t>(address - base), block, ctx));
+            data = reinterpret_cast<const char*>(address);
+            return vok();
         }
 
 #undef XOFFSET_DETAIL_V4_INLINE
 
         // V2: a block has no header. Its extent is derived from its owner:
         // 8-byte aligned, length rounded up to a multiple of 8.
-        inline void register_allocation(const void* ptr, std::size_t bytes,
-                                         std::size_t alignment, WireValidationContext& ctx,
-                                         bool free = false) {
+        inline vstatus register_allocation(const void* ptr, std::size_t bytes,
+                                           std::size_t alignment, WireValidationContext& ctx,
+                                           bool free = false) {
             const auto block = (bytes + 7u) & ~std::size_t(7u);
-            validate_storage_range(ptr, block, std::max<std::size_t>(alignment, 8u), ctx,
-                                   "wire validation: allocation out of bounds");
-            if (free) register_free_range(ptr, block, ctx, "wire validation: invalid free block");
-            else register_owned_range(ptr, block, ctx, "wire validation: invalid live block");
+            XOFFSET_VTRY(validate_storage_range(ptr, block, std::max<std::size_t>(alignment, 8u), ctx,
+                                                "wire validation: allocation out of bounds"));
+            if (free) return register_free_range(ptr, block, ctx, "wire validation: invalid free block");
+            else return register_owned_range(ptr, block, ctx, "wire validation: invalid live block");
         }
 
         // V2 wire hole table: each entry is a free block of the payload.
-        inline void register_wire_holes(const void* holes, std::size_t count,
-                                        WireValidationContext& ctx) {
+        inline vstatus register_wire_holes(const void* holes, std::size_t count,
+                                           WireValidationContext& ctx) {
             const auto used = static_cast<std::uint64_t>(ctx.end - ctx.base);
             for (std::size_t i = 0; i < count; ++i) {
                 XBufferCore::WireHole hole;
@@ -5381,18 +5454,20 @@ namespace XOffsetDatastructure {
                 if (hole.bytes == 0 || (hole.bytes & 7u) != 0 || (hole.offset & 7u) != 0 ||
                     hole.offset < sizeof(XArena) || hole.offset > used ||
                     hole.bytes > used - hole.offset) {
-                    wire_reject("wire validation failed: invalid hole table entry");
+                    return wire_reject("wire validation failed: invalid hole table entry");
                 }
-                register_free_range(ctx.base + hole.offset, hole.bytes, ctx,
-                                    "wire validation failed: invalid hole table entry");
+                XOFFSET_VTRY(register_free_range(ctx.base + hole.offset, hole.bytes, ctx,
+                                                 "wire validation failed: invalid hole table entry"));
             }
+            return vok();
         }
 
-        inline void require_exact_coverage(const WireValidationContext& ctx) {
+        inline vstatus require_exact_coverage(const WireValidationContext& ctx) {
             if (ctx.owned_bytes + ctx.free_bytes != static_cast<std::uint64_t>(ctx.end - ctx.base)) {
-                wire_reject(
+                return wire_reject(
                     "wire validation failed: payload is not exactly covered by live blocks and holes");
             }
+            return vok();
         }
 
         // Calls fn(begin, end) for each maximal run of payload bytes in no
@@ -5415,7 +5490,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        void validate_wire_value(const T& value, WireValidationContext& ctx);
+        vstatus validate_wire_value(const T& value, WireValidationContext& ctx);
         // True means that visiting a value can reject wire bytes or validate a
         // binding/range. False is permitted only for an admitted representation
         // whose old recursive validator has no observable checks at all.
@@ -5481,155 +5556,164 @@ namespace XOffsetDatastructure {
         }();
 
         // I1: head bytes 0..11 of an inline string (byte 11 = 0x80 | length).
-        inline void validate_inline_string_bytes(const char* head) {
+        inline vstatus validate_inline_string_bytes(const char* head) {
             std::uint64_t low;   // head bytes 0..7
             std::uint32_t high;  // head bytes 8..11
             std::memcpy(&low, head, sizeof(low));
             std::memcpy(&high, head + 8, sizeof(high));
             const unsigned length = (high >> 24) & 0x7fu;
             if (length > XFixedString::inline_max)
-                wire_reject("wire validation failed: inline XFixedString length exceeds 10");
+                return wire_reject("wire validation failed: inline XFixedString length exceeds 10");
             // String bytes [length, 11) must be zero.
             if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
-                wire_reject("wire validation failed: inline XFixedString has nonzero padding");
+                return wire_reject("wire validation failed: inline XFixedString has nonzero padding");
+            return vok();
         }
 
-        inline void validate_wire_value(const XFixedString& value,
-                                        WireValidationContext& ctx) {
+        inline vstatus validate_wire_value(const XFixedString& value,
+                                           WireValidationContext& ctx) {
             if (value.is_inline()) {
-                validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
-                return;
+                return validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
             }
             if (value.size_ > value.capacity_ || value.capacity_ >= XBufferCore::MAX_PAYLOAD) {
-                wire_reject(
+                return wire_reject(
                     "wire validation failed: XFixedString size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    wire_reject(
+                    return wire_reject(
                         "wire validation failed: empty XFixedString has invalid payload");
                 }
-                return;
+                return vok();
             }
 
             const auto block = fixed_detail::round_up_to_alignment(value.capacity_ + 1, 8);
-            auto* data = checked_block(value.data_delta, block, ctx);
+            const char* data;
+            XOFFSET_VTRY(checked_block(value.data_delta, block, ctx, data));
             if (!data) [[unlikely]] {
-                data = checked_relative(value.data_delta, ctx);
-                validate_storage_range(data, static_cast<std::size_t>(value.capacity_) + 1,
-                                       alignof(char), ctx,
-                                       "wire validation failed: XFixedString payload out of bounds");
-                register_allocation(data, block, 8, ctx);
+                XOFFSET_VTRY(checked_relative(value.data_delta, ctx, data));
+                XOFFSET_VTRY(validate_storage_range(data, static_cast<std::size_t>(value.capacity_) + 1,
+                                                    alignof(char), ctx,
+                                                    "wire validation failed: XFixedString payload out of bounds"));
+                XOFFSET_VTRY(register_allocation(data, block, 8, ctx));
             }
             if (data[value.size_] != '\0') {
-                wire_reject(
+                return wire_reject(
                     "wire validation failed: XFixedString missing terminator");
             }
+            return vok();
         }
 
         template <typename T>
-        void validate_wire_value(const XFixedVector<T>& value,
-                                 WireValidationContext& ctx) {
+        vstatus validate_wire_value(const XFixedVector<T>& value,
+                                    WireValidationContext& ctx) {
             if (value.size_ > value.capacity_ ||
                 value.capacity_ > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(T)) {
-                wire_reject(
+                return wire_reject(
                     "wire validation failed: XFixedVector size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
-                    wire_reject(
+                    return wire_reject(
                         "wire validation failed: empty XFixedVector has invalid payload");
                 }
-                return;
+                return vok();
             }
 
             const auto bytes = static_cast<std::size_t>(value.capacity_) * sizeof(T);
             const auto block = (bytes + 7u) & ~std::size_t(7u);
-            auto* data = alignof(T) <= 8
-                ? reinterpret_cast<const T*>(checked_block(value.data_delta, block, ctx)) : nullptr;
-            if (!data) [[unlikely]] {
-                data = reinterpret_cast<const T*>(checked_relative(value.data_delta, ctx));
-                validate_storage_range(data, bytes, alignof(T), ctx,
-                                       "wire validation failed: XFixedVector payload out of bounds");
-                register_allocation(data, block, std::max<std::size_t>(alignof(T), 8), ctx);
+            const char* raw = nullptr;
+            if constexpr (alignof(T) <= 8) XOFFSET_VTRY(checked_block(value.data_delta, block, ctx, raw));
+            if (!raw) [[unlikely]] {
+                XOFFSET_VTRY(checked_relative(value.data_delta, ctx, raw));
+                XOFFSET_VTRY(validate_storage_range(raw, bytes, alignof(T), ctx,
+                                                    "wire validation failed: XFixedVector payload out of bounds"));
+                XOFFSET_VTRY(register_allocation(raw, block, std::max<std::size_t>(alignof(T), 8), ctx));
             }
+            auto* data = reinterpret_cast<const T*>(raw);
             if constexpr (wire_value_needs_validation_v<T>) {
                 for (std::uint32_t i = 0; i < value.size_; ++i) {
                     /* XV4: checked-element-visited */
-                    validate_wire_value(data[i], ctx);
+                    XOFFSET_VTRY(validate_wire_value(data[i], ctx));
                 }
             } else {
                 /* XV4: no-op-elements-elided */
+                (void)data;
             }
+            return vok();
         }
 
         template <typename T, std::size_t N>
-        void validate_base_at(const T& value, WireValidationContext& ctx) {
+        vstatus validate_base_at(const T& value, WireValidationContext& ctx) {
             using BaseType = schema::base_t<T, N>;
-            validate_wire_value(static_cast<const BaseType&>(value), ctx);
+            return validate_wire_value(static_cast<const BaseType&>(value), ctx);
         }
 
         template <typename T, std::size_t N>
-        void validate_member_at(const T& value, WireValidationContext& ctx) {
+        vstatus validate_member_at(const T& value, WireValidationContext& ctx) {
             using member = schema::member_t<T, N>;
             using Member = typename member::type;
             if constexpr (wire_value_needs_validation_v<Member>)
-                validate_wire_value(member::get(value), ctx);
+                return validate_wire_value(member::get(value), ctx);
+            else
+                return vok();
         }
 
         template <typename T>
-        void validate_wire_value(const T& value, WireValidationContext& ctx) {
+        vstatus validate_wire_value(const T& value, WireValidationContext& ctx) {
             using CleanT = std::remove_cv_t<T>;
             if constexpr (std::is_same_v<CleanT, bool>) {
                 unsigned char bits;
                 std::memcpy(&bits, &value, 1);
-                if (bits > 1) wire_reject("wire validation: invalid bool representation");
+                if (bits > 1) return wire_reject("wire validation: invalid bool representation");
             } else if constexpr (std::is_array_v<CleanT>) {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
-                    for (const auto& elem : value) validate_wire_value(elem, ctx);
+                    for (const auto& elem : value) XOFFSET_VTRY(validate_wire_value(elem, ctx));
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                validate_wire_value(static_cast<const XFixedString&>(value), ctx);
+                return validate_wire_value(static_cast<const XFixedString&>(value), ctx);
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
-                validate_wire_value(
-                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
+                XOFFSET_VTRY(validate_wire_value(
+                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx));
                 // No early exit: one error, and the loop vectorizes.
                 bool unordered = false;
                 for (std::uint32_t i = 1; i < value.size(); ++i)
                     unordered |= !fixed_detail::ordered_less(value.data()[i - 1], value.data()[i]);
-                if (unordered) wire_reject("wire validation: set keys not strictly ordered");
+                if (unordered) return wire_reject("wire validation: set keys not strictly ordered");
             } else if constexpr (is_fixed_flat_map_v<CleanT>) {
-                validate_wire_value(
-                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
+                XOFFSET_VTRY(validate_wire_value(
+                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx));
                 // No early exit: one error, and the loop vectorizes.
                 bool unordered = false;
                 for (std::uint32_t i = 1; i < value.size(); ++i)
                     unordered |= !fixed_detail::ordered_less(value.data()[i - 1].first, value.data()[i].first);
-                if (unordered) wire_reject("wire validation: map keys not strictly ordered");
+                if (unordered) return wire_reject("wire validation: map keys not strictly ordered");
             } else if constexpr (is_fixed_vector_v<CleanT>) {
-                validate_wire_value(
+                return validate_wire_value(
                     static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
             } else if constexpr (std::is_class_v<CleanT> && wire_value_needs_validation_v<CleanT>) {
-                for_each_reflected_subobject<CleanT>(
+                return for_each_reflected_subobject_v<CleanT>(
                     [&](auto index) {
-                        validate_base_at<CleanT, decltype(index)::value>(value, ctx);
+                        return validate_base_at<CleanT, decltype(index)::value>(value, ctx);
                     },
                     [&](auto index) {
-                        validate_member_at<CleanT, decltype(index)::value>(value, ctx);
+                        return validate_member_at<CleanT, decltype(index)::value>(value, ctx);
                 });
             }
+            return vok();
         }
 
         // V2: holes == nullptr && check_coverage == false walks the graph
         // without the hole table (used to recompute holes from the live set).
         template <typename T>
-        void verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
-                                          std::pmr::memory_resource* upstream,
-                                          const void* holes,
-                                          std::size_t hole_count,
-                                          bool check_coverage = true,
-                                          std::vector<XBufferCore::WireHole>* recomputed = nullptr,
-                                          WireValidationScratch* retained = nullptr) {
-            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
+        vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
+                                             std::pmr::memory_resource* upstream,
+                                             const void* holes,
+                                             std::size_t hole_count,
+                                             bool check_coverage = true,
+                                             std::vector<XBufferCore::WireHole>* recomputed = nullptr,
+                                             WireValidationScratch* retained = nullptr) {
+            if (!upstream)
+                XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
             // W9: flat end for every storage kind. The extent check that R1+M2
             // applied only to canonical (receive) storage now applies to all;
@@ -5637,7 +5721,7 @@ namespace XOffsetDatastructure {
             // allocator/load invariant), so it only turns a corrupted extent
             // into this error instead of an out-of-bounds validation context.
             if (used > xbuf.segment_size())
-                wire_reject("wire validation: payload extent out of bounds");
+                return wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             // Default-initialized, then assigned: the granule index's inline
             // words are written by prepare() before any read. GCC 16 zeroes
@@ -5651,13 +5735,13 @@ namespace XOffsetDatastructure {
             ctx.upstream = upstream;
             ctx.retained = retained;
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
-                wire_reject("wire validation: unsupported arena header flags");
+                return wire_reject("wire validation: unsupported arena header flags");
             }
-            register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header");
-            if (holes) register_wire_holes(holes, hole_count, ctx);
-            register_allocation(&root, sizeof(T), alignof(T), ctx);
-            validate_wire_value(root, ctx);
-            if (check_coverage) require_exact_coverage(ctx);
+            XOFFSET_VTRY(register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
+            if (holes) XOFFSET_VTRY(register_wire_holes(holes, hole_count, ctx));
+            XOFFSET_VTRY(register_allocation(&root, sizeof(T), alignof(T), ctx));
+            XOFFSET_VTRY(validate_wire_value(root, ctx));
+            if (check_coverage) XOFFSET_VTRY(require_exact_coverage(ctx));
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
             auto& stats = wire_layout_stats<T>();
             if (ctx.cursor != WireValidationContext::no_cursor) {
@@ -5683,11 +5767,12 @@ namespace XOffsetDatastructure {
                         }
                     });
             }
+            return vok();
         }
 
         template <typename T>
-        void verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
-                                          std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+        vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
+                                             std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
             // A live buffer's own free table is its hole table.
             std::vector<XBufferCore::WireHole> holes;
             const bool complete = xbuf.free_table_complete();
@@ -5695,7 +5780,7 @@ namespace XOffsetDatastructure {
                 holes.reserve(xbuf.free_block_count());
                 xbuf.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
             }
-            verify_structural_wire_graph(root, xbuf, upstream,
+            return verify_structural_wire_graph(root, xbuf, upstream,
                 complete ? holes.data() : nullptr, holes.size(), complete);
         }
     } // namespace detail
@@ -6109,45 +6194,50 @@ namespace XOffsetDatastructure {
     static_assert(sizeof(XBufferCore::arena_header) == XWIRE_PAYLOAD_BEGIN);
 
     namespace detail {
-        [[noreturn]] inline void wire_reject(const char* who, const char* what) {
-            throw XException(std::string(who) + what);
+        XOFFSET_VNORETURN inline vstatus wire_reject(XErrc code, const char* who, const char* what) {
+            XOFFSET_VFAIL(XException, code, std::string(who) + what);
         }
 
         // Reads the header at the front of a wire of `size` bytes and checks
         // its version and flags. The version is told apart first, so a short
         // or older wire gets the message that names it. V1 and V2.0 wires
         // begin "XOFFV1" / "XOFFV2"; 'F' is no 2.x version byte.
-        inline XWireHeaderV2 read_wire_header(const void* data, std::size_t size, const char* who) {
+        inline vstatus read_wire_header(const void* data, std::size_t size, const char* who,
+                                        XWireHeaderV2& header) {
             const auto* b = static_cast<const unsigned char*>(data);
-            if (size < 4 || b[0] != 'X' || b[1] != 'O') wire_reject(who, ": not an XOffset wire (bad magic)");
+            if (size < 4 || b[0] != 'X' || b[1] != 'O')
+                return wire_reject(XErrc::bad_magic, who, ": not an XOffset wire (bad magic)");
             if (b[2] != XWIRE_FORMAT_MAJOR || b[3] != XWIRE_FORMAT_MINOR) {
                 if (size >= 6 && std::memcmp(b, "XOFFV1", 6) == 0)
-                    wire_reject(who, ": wire format 1 is not supported; this build reads 2.1");
+                    return wire_reject(XErrc::unsupported_version, who,
+                                       ": wire format 1 is not supported; this build reads 2.1");
                 if (size >= 6 && std::memcmp(b, "XOFFV2", 6) == 0)
-                    wire_reject(who, ": wire format 2.0 is not supported; this build reads 2.1 "
-                                     "(sender and receiver must upgrade together)");
-                throw XException(std::string(who) + ": wire format " + std::to_string(b[2]) + "." +
-                                 std::to_string(b[3]) + " is not supported; this build reads 2.1");
+                    return wire_reject(XErrc::unsupported_version, who,
+                                       ": wire format 2.0 is not supported; this build reads 2.1 "
+                                       "(sender and receiver must upgrade together)");
+                XOFFSET_VFAIL(XException, XErrc::unsupported_version, std::string(who) + ": wire format " +
+                              std::to_string(b[2]) + "." + std::to_string(b[3]) +
+                              " is not supported; this build reads 2.1");
             }
-            if (size < sizeof(XWireHeaderV2)) wire_reject(who, ": truncated wire header");
-            XWireHeaderV2 header;
+            if (size < sizeof(XWireHeaderV2)) return wire_reject(XErrc::truncated, who, ": truncated wire header");
             std::memcpy(&header, data, sizeof(header));
             if (header.flags != XWIRE_FLAGS) {
                 std::string hex = "0x";
                 for (int shift = 28; shift >= 0; shift -= 4) hex += "0123456789abcdef"[(header.flags >> shift) & 15u];
-                throw XException(std::string(who) + ": unsupported wire flags " + hex);
+                XOFFSET_VFAIL(XException, XErrc::unsupported_flags, std::string(who) + ": unsupported wire flags " + hex);
             }
-            return header;
+            return vok();
         }
 
         // used_bytes and root_offset: the payload holds at least its header,
         // ends on a word, and the root starts past the header inside it.
-        inline void check_wire_extent(const XWireHeaderV2& header, const char* who) {
+        inline vstatus check_wire_extent(const XWireHeaderV2& header, const char* who) {
             if (header.used_bytes < XWIRE_PAYLOAD_BEGIN || header.used_bytes > XBufferCore::MAX_PAYLOAD ||
                 header.used_bytes % 8u != 0)
-                wire_reject(who, ": used size mismatch");
+                return wire_reject(XErrc::size_mismatch, who, ": used size mismatch");
             if (header.root_offset < XWIRE_PAYLOAD_BEGIN || header.root_offset >= header.used_bytes)
-                wire_reject(who, ": root offset out of bounds");
+                return wire_reject(XErrc::root_offset_out_of_bounds, who, ": root offset out of bounds");
+            return vok();
         }
 
         static_assert(sizeof(XBufferCore::arena_header) == XWIRE_PAYLOAD_BEGIN);
@@ -6164,20 +6254,24 @@ namespace XOffsetDatastructure {
         };
 
         // Validates an extent table (count entries at `table`, unaligned) for
-        // a payload of `used` bytes; appends the gaps and returns the payload
-        // bytes on the wire.
-        inline std::uint64_t parse_extent_table(const char* table, std::size_t count,
-                                                std::uint64_t used, const char* who,
-                                                std::vector<XBufferCore::WireHole>& gaps) {
-            if (count == 0) return used - XWIRE_PAYLOAD_BEGIN;
-            std::uint64_t stored = 0, end = 0;
+        // a payload of `used` bytes; appends the gaps and sets `stored` to the
+        // payload bytes on the wire.
+        inline vstatus parse_extent_table(const char* table, std::size_t count,
+                                          std::uint64_t used, const char* who,
+                                          std::vector<XBufferCore::WireHole>& gaps, std::uint64_t& stored) {
+            stored = 0;
+            if (count == 0) {
+                stored = used - XWIRE_PAYLOAD_BEGIN;
+                return vok();
+            }
+            std::uint64_t end = 0;
             for (std::size_t i = 0; i < count; ++i) {
                 std::uint32_t e[2];
                 std::memcpy(e, table + i * 8u, sizeof(e));
                 if (e[1] == 0 || (e[0] & 7u) != 0 || (e[1] & 7u) != 0 ||
                     (i == 0 ? e[0] != XWIRE_PAYLOAD_BEGIN : e[0] <= end) ||
                     std::uint64_t(e[0]) + e[1] > used)
-                    throw XException(std::string(who) + ": invalid extent table");
+                    return wire_reject(XErrc::invalid_extent_table, who, ": invalid extent table");
                 if (i != 0) gaps.push_back({static_cast<std::uint32_t>(end),
                                             static_cast<std::uint32_t>(e[0] - end)});
                 end = std::uint64_t(e[0]) + e[1];
@@ -6185,42 +6279,43 @@ namespace XOffsetDatastructure {
             }
             if (end < used) gaps.push_back({static_cast<std::uint32_t>(end),
                                             static_cast<std::uint32_t>(used - end)});
-            if (gaps.empty()) throw XException(std::string(who) + ": invalid extent table");
-            return stored;
+            if (gaps.empty()) return wire_reject(XErrc::invalid_extent_table, who, ": invalid extent table");
+            return vok();
         }
 
         // M2: names the limit a wire exceeds, before any reservation.
-        inline void require_wire_within_capacity(std::size_t used, std::size_t limit,
-                                                 bool explicit_limit, const char* who) {
-            if (used <= limit) return;
-            throw XBadAlloc(std::string(who) + ": wire used_bytes " + std::to_string(used) +
-                            " exceeds " + (explicit_limit ? "maximum_capacity " :
-                                           "the default maximum_capacity ") +
-                            std::to_string(limit) +
-                            (explicit_limit ? "" : "; pass XBuffer::maximum_capacity() for larger wires"));
+        inline vstatus require_wire_within_capacity(std::size_t used, std::size_t limit,
+                                                    bool explicit_limit, const char* who) {
+            if (used <= limit) return vok();
+            XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded,
+                          std::string(who) + ": wire used_bytes " + std::to_string(used) +
+                          " exceeds " + (explicit_limit ? "maximum_capacity " :
+                                         "the default maximum_capacity ") +
+                          std::to_string(limit) +
+                          (explicit_limit ? "" : "; pass XBuffer::maximum_capacity() for larger wires"));
         }
 
         // Validates used_bytes, root_offset, the extent table and the length
         // of a wire whose header passed read_wire_header and the fingerprint
         // check. `body` follows the header. Does not touch the payload.
-        inline WireLayout parse_wire_layout(const XWireHeaderV2& header,
-                                            const char* body, std::size_t body_size,
-                                            const char* who) {
-            check_wire_extent(header, who);
-            WireLayout layout;
-            if (header.extent_count > body_size / 8u) wire_reject(who, ": used size mismatch");
+        inline vstatus parse_wire_layout(const XWireHeaderV2& header,
+                                         const char* body, std::size_t body_size,
+                                         const char* who, WireLayout& layout) {
+            XOFFSET_VTRY(check_wire_extent(header, who));
+            if (header.extent_count > body_size / 8u) return wire_reject(XErrc::size_mismatch, who, ": used size mismatch");
             const auto table = std::size_t(header.extent_count) * 8u;
             layout.extent_count = std::size_t(header.extent_count);
             if (layout.extent_count) layout.extents = body;
-            const auto stored = parse_extent_table(body, layout.extent_count, header.used_bytes, who, layout.gaps);
-            if (stored > body_size - table) wire_reject(who, ": used size mismatch");
+            std::uint64_t stored;
+            XOFFSET_VTRY(parse_extent_table(body, layout.extent_count, header.used_bytes, who, layout.gaps, stored));
+            if (stored > body_size - table) return wire_reject(XErrc::size_mismatch, who, ": used size mismatch");
             const auto rest = body_size - table - std::size_t(stored);
             if (header.hole_count > rest / 8u || std::size_t(header.hole_count) * 8u != rest)
-                wire_reject(who, ": used size mismatch");
+                return wire_reject(XErrc::size_mismatch, who, ": used size mismatch");
             layout.stored = body + table;
             layout.holes = body + table + stored;
             layout.hole_count = std::size_t(header.hole_count);
-            return layout;
+            return vok();
         }
 
         // E1 (N8): on Darwin, outputs of at least 1 MiB are copied in 256 KiB
@@ -6312,7 +6407,7 @@ namespace XOffsetDatastructure {
             const std::uint64_t total = sizeof(XWireHeaderV2) + (header.used_bytes - XWIRE_PAYLOAD_BEGIN) +
                 std::uint64_t(header.hole_count) * sizeof(XBufferCore::WireHole);
             if (total > (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error(std::string(who) + ": output size exceeds string limit");
+                XOFFSET_THROW(std::length_error(std::string(who) + ": output size exceeds string limit"));
             return static_cast<std::size_t>(total);
         }
 
@@ -6747,7 +6842,7 @@ namespace XOffsetDatastructure {
                 future_default_construct<T>(raw, alloc);
             } else {
             std::size_t built = 0;
-            try {
+            XOFFSET_TRY {
                 for_each_reflected_subobject<T>(
                 [&](auto index) {
                     reflect_init_base_nth<T, decltype(index)::value>(raw, alloc);
@@ -6757,9 +6852,9 @@ namespace XOffsetDatastructure {
                     reflect_init_nth<T, decltype(index)::value>(raw, alloc);
                     ++built;
                 });
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 destroy_reflected_prefix<T>(raw, built);
-                throw;
+                XOFFSET_RETHROW;
             }
             }
         }
@@ -6809,7 +6904,7 @@ namespace XOffsetDatastructure {
                 future_transfer_construct<T>(dst, std::forward<Src>(src), alloc);
             } else {
             std::size_t built = 0;
-            try {
+            XOFFSET_TRY {
                 for_each_reflected_subobject<T>(
                 [&](auto index) {
                     reflect_transfer_base_nth<T, decltype(index)::value>(dst, std::forward<Src>(src), alloc);
@@ -6819,9 +6914,9 @@ namespace XOffsetDatastructure {
                     reflect_transfer_init_nth<T, decltype(index)::value>(dst, std::forward<Src>(src), alloc);
                     ++built;
                 });
-            } catch (...) {
+            } XOFFSET_CATCH(...) {
                 destroy_reflected_prefix<T>(dst, built);
-                throw;
+                XOFFSET_RETHROW;
             }
             }
         }
@@ -7206,6 +7301,9 @@ namespace XOffsetDatastructure {
 
     // XBuffer::begin_verified_reload / VerifiedReloadToken are available.
 #define XOFFSET_VERIFIED_RELOAD_API 1
+    // The non-throwing receive entries (try_load_verified, try_reload_verified,
+    // try_begin_verified_reload, VerifiedReloadToken::try_finish) are available.
+#define XOFFSET_TRY_ENTRIES_API 1
     template <typename T> class VerifiedReloadToken;
 
     class XBuffer : public XBufferCore {
@@ -7278,11 +7376,10 @@ namespace XOffsetDatastructure {
                 "Type is not byte-copy safe. "
                 "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
                 "or structs composed of these.");
-            if (!arena()) throw XException("make<T>(): buffer has no arena");
+            if (!arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "make<T>(): buffer has no arena"));
             if (arena()->root_offset != 0) {
-                throw XException(
-                    "make<T>(): root object already exists. "
-                    "Call root<T>() to access the existing object.");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "make<T>(): root object already exists. "
+                    "Call root<T>() to access the existing object."));
             }
             auto* result = detail::construct_root<T>(*this);
             typed_root_access_allowed_ = true;
@@ -7301,9 +7398,8 @@ namespace XOffsetDatastructure {
             require_schema_match<T>("root<T>(): schema mismatch for requested root type");
             T* ptr = detail::find_root<T>(*this);
             if (!ptr) {
-                throw XException(
-                    "root<T>(): no root object in buffer. "
-                    "Call make<T>() first or check with has_root<T>().");
+                XOFFSET_THROW(XException(XErrc::no_root, "root<T>(): no root object in buffer. "
+                    "Call make<T>() first or check with has_root<T>()."));
             }
             return *ptr;
         }
@@ -7318,8 +7414,7 @@ namespace XOffsetDatastructure {
         T& unsafe_root() {
             T* ptr = detail::find_root<T>(*this);
             if (!ptr) {
-                throw XException(
-                    "unsafe_root<T>(): no root object in buffer");
+                XOFFSET_THROW(XException(XErrc::no_root, "unsafe_root<T>(): no root object in buffer"));
             }
             return *ptr;
         }
@@ -7408,7 +7503,7 @@ namespace XOffsetDatastructure {
             require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
             if (!detail::find_root<T>(*this))
-                throw XException("save_compact<T>(): no root object of requested type");
+                XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
             detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
         }
 
@@ -7422,14 +7517,14 @@ namespace XOffsetDatastructure {
         template <typename T, typename A0, typename... A>
         void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
                                const XAssign<A>&... rest) {
-            try {
+            XOFFSET_TRY {
                 require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
                 require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
                 if (!detail::find_root<T>(*this))
-                    throw XException("save_compact<T>(): no root object of requested type");
-            } catch (...) {
+                    XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
+            } XOFFSET_CATCH(...) {
                 out.clear();
-                throw;
+                XOFFSET_RETHROW;
             }
             detail::VerifiedPathsAccess::save_composed_into<T>(*this, out, options, first, rest...);
         }
@@ -7447,8 +7542,8 @@ namespace XOffsetDatastructure {
         void ensure_hole_table(const T& root) {
             if (this->free_table_complete()) return;
             std::vector<WireHole> holes;
-            detail::verify_structural_wire_graph(root, *this, std::pmr::new_delete_resource(),
-                                                 nullptr, 0, false, &holes);
+            XOFFSET_VREQUIRE(detail::verify_structural_wire_graph(root, *this, std::pmr::new_delete_resource(),
+                                                                  nullptr, 0, false, &holes));
             this->replace_free_blocks(holes);
         }
 
@@ -7472,8 +7567,7 @@ namespace XOffsetDatastructure {
             this->shrink_to_fit();
             auto* root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) {
-                throw XException(
-                    "save_verified<T>(): no root object of requested type");
+                XOFFSET_THROW(XException(XErrc::no_root, "save_verified<T>(): no root object of requested type"));
             }
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
@@ -7485,7 +7579,7 @@ namespace XOffsetDatastructure {
                 : detail::wire_free_run_size(header, gaps, "save_verified<T>()");
             std::string out;
             if (output_size > out.max_size())
-                throw std::length_error("save_verified<T>(): output size exceeds string limit");
+                XOFFSET_THROW(std::length_error("save_verified<T>(): output size exceeds string limit"));
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
                 return detail::write_wire(output, header, base, *this, options.emission, gaps);
@@ -7548,21 +7642,43 @@ namespace XOffsetDatastructure {
         static XBuffer load_verified_with_resource(std::span<const std::byte> data,
                                                   std::optional<MaximumCapacity> cap,
                                                   std::pmr::memory_resource* upstream) {
-            constexpr const char* who = "load_verified<T>()";
-            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
-            XWireHeaderV2 header{};
-            const auto layout = admit_wire_header<T>(data, header, who);
-            const auto used = static_cast<std::size_t>(header.used_bytes);
-            // M1: without an explicit limit a wire may claim at most the
-            // default maximum; a sparse wire of a few hundred bytes could
-            // otherwise make the receiver reserve up to MAX_PAYLOAD.
-            const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
-            detail::require_wire_within_capacity(used, capacity.value, cap.has_value(),
-                                                 "load_verified<T>()");
-            XBuffer xbuf(WirePayload{header.root_offset, layout.stored, layout.extents, layout.extent_count},
-                         used, capacity);
-            xbuf.finish_verified_load<T>(header, layout, upstream, who);
+            XBuffer xbuf;
+            XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
             return xbuf;
+        }
+
+        /// load_verified without exceptions: the buffer, or the code and
+        /// message load_verified would have thrown. Admission and
+        /// verification are exactly those of load_verified. Also available
+        /// in builds without exceptions (-fno-exceptions, /EHs-c-).
+        template <typename T>
+        static XResult<XBuffer> try_load_verified(std::span<const std::byte> data,
+                                                  std::optional<MaximumCapacity> cap = std::nullopt) {
+            return try_load_verified_with_resource<T>(data, cap, std::pmr::new_delete_resource());
+        }
+
+        template <typename T>
+        static XResult<XBuffer> try_load_verified(const std::string& data,
+                                                  std::optional<MaximumCapacity> cap = std::nullopt) {
+            return try_load_verified<T>(std::span<const std::byte>(
+                reinterpret_cast<const std::byte*>(data.data()), data.size()), cap);
+        }
+
+        template <typename T>
+        static XResult<XBuffer> try_load_verified_with_resource(std::span<const std::byte> data,
+                                                                std::optional<MaximumCapacity> cap,
+                                                                std::pmr::memory_resource* upstream) {
+#if XOFFSET_NO_EXCEPTIONS
+            XBuffer xbuf;
+            if (!xbuf.load_verified_v<T>(data, cap, upstream)) return detail::take_pending_error();
+            return XResult<XBuffer>(std::move(xbuf));
+#else
+            try {
+                return XResult<XBuffer>(load_verified_with_resource<T>(data, cap, upstream));
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
         }
 
         /// Verified load INTO this buffer, reusing its mapping, maximum
@@ -7581,7 +7697,7 @@ namespace XOffsetDatastructure {
         /// payloads need none.
         template <typename T>
         void reload_verified(std::span<const std::byte> data) {
-            reload_into<T>(data, nullptr);
+            XOFFSET_VREQUIRE(reload_into<T>(data, nullptr));
         }
 
         template <typename T>
@@ -7593,8 +7709,51 @@ namespace XOffsetDatastructure {
         template <typename T>
         void reload_verified_with_resource(std::span<const std::byte> data,
                                            std::pmr::memory_resource* upstream) {
-            if (!upstream) throw std::invalid_argument("validation scratch: null upstream");
-            reload_into<T>(data, upstream);
+            if (!upstream) XOFFSET_THROW(std::invalid_argument("validation scratch: null upstream"));
+            XOFFSET_VREQUIRE(reload_into<T>(data, upstream));
+        }
+
+        /// reload_verified without exceptions: ok, or the code and message
+        /// reload_verified would have thrown. The buffer is left exactly as
+        /// reload_verified leaves it (empty, without typed root access, after
+        /// a failure).
+        template <typename T>
+        XStatus try_reload_verified(std::span<const std::byte> data) {
+#if XOFFSET_NO_EXCEPTIONS
+            if (!reload_into<T>(data, nullptr)) return detail::take_pending_error();
+            return {};
+#else
+            try {
+                reload_verified<T>(data);
+                return {};
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
+        }
+
+        template <typename T>
+        XStatus try_reload_verified(const std::string& data) {
+            return try_reload_verified<T>(std::span<const std::byte>(
+                reinterpret_cast<const std::byte*>(data.data()), data.size()));
+        }
+
+        template <typename T>
+        XStatus try_reload_verified_with_resource(std::span<const std::byte> data,
+                                                  std::pmr::memory_resource* upstream) {
+#if XOFFSET_NO_EXCEPTIONS
+            if (!upstream)
+                return XError{XErrc::invalid_argument, "validation scratch: null upstream"};
+            if (!reload_into<T>(data, upstream)) return detail::take_pending_error();
+            return {};
+#else
+            try {
+                reload_verified_with_resource<T>(data, upstream);
+                return {};
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
         }
 
         /// Returns the retained reload scratch words to the host allocator.
@@ -7606,26 +7765,24 @@ namespace XOffsetDatastructure {
     private:
         // upstream == nullptr: this buffer's own reload scratch.
         template <typename T>
-        void reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
+        detail::vstatus reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             XWireHeaderV2 header;
             if (admit_small_wire<T>(data, header)) [[likely]] {
                 // Payload <= small_reload_max: the inline bitmaps suffice, so
                 // neither upstream nor the retained scratch is touched.
-                try {
+                XOFFSET_ROLLBACK_BEGIN
                     const char* stored = reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2);
                     const auto used = static_cast<std::size_t>(header.used_bytes);
-                    reinit_from_dense_wire_in_place(stored, header.root_offset, used);
-                    finish_verified_load<T>(header, stored + (used - XWIRE_PAYLOAD_BEGIN),
-                                            static_cast<std::size_t>(header.hole_count),
-                                            upstream ? upstream : detail::default_wire_upstream(), who, nullptr);
-                } catch (...) {
-                    reset_arena(0);
-                    throw;
-                }
-                return;
+                    XOFFSET_VTRY(reinit_from_dense_wire_in_place(stored, header.root_offset, used));
+                    XOFFSET_VTRY(finish_verified_load<T>(header, stored + (used - XWIRE_PAYLOAD_BEGIN),
+                                                         static_cast<std::size_t>(header.hole_count),
+                                                         upstream ? upstream : detail::default_wire_upstream(),
+                                                         who, nullptr));
+                XOFFSET_ROLLBACK_END(reset_arena(0))
+                return detail::vok();
             }
-            try {
+            XOFFSET_ROLLBACK_BEGIN
                 detail::WireValidationScratch* retained = nullptr;
                 if (!upstream) {
                     if (!reload_scratch_) reload_scratch_ = std::make_unique<detail::WireValidationScratch>();
@@ -7633,14 +7790,36 @@ namespace XOffsetDatastructure {
                     upstream = detail::default_wire_upstream();
                 }
                 header = XWireHeaderV2{};
-                const auto layout = admit_wire_header<T>(data, header, who);
-                reinit_from_wire({header.root_offset, layout.stored, layout.extents, layout.extent_count},
-                                 header.used_bytes);
-                finish_verified_load<T>(header, layout, upstream, who, retained);
-            } catch (...) {
-                reset_arena(0);
-                throw;
-            }
+                detail::WireLayout layout;
+                XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
+                XOFFSET_VTRY(reinit_from_wire({header.root_offset, layout.stored, layout.extents, layout.extent_count},
+                                              header.used_bytes));
+                XOFFSET_VTRY(finish_verified_load<T>(header, layout, upstream, who, retained));
+            XOFFSET_ROLLBACK_END(reset_arena(0))
+            return detail::vok();
+        }
+
+        // load_verified into this default-constructed buffer.
+        template <typename T>
+        detail::vstatus load_verified_v(std::span<const std::byte> data, std::optional<MaximumCapacity> cap,
+                                        std::pmr::memory_resource* upstream) {
+            constexpr const char* who = "load_verified<T>()";
+            if (!upstream)
+                XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
+            XWireHeaderV2 header{};
+            detail::WireLayout layout;
+            XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
+            const auto used = static_cast<std::size_t>(header.used_bytes);
+            // M1: without an explicit limit a wire may claim at most the
+            // default maximum; a sparse wire of a few hundred bytes could
+            // otherwise make the receiver reserve up to MAX_PAYLOAD.
+            const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
+            XOFFSET_VTRY(detail::require_wire_within_capacity(used, capacity.value, cap.has_value(),
+                                                              "load_verified<T>()"));
+            XOFFSET_VTRY(init_wire_v(WirePayload{header.root_offset, layout.stored, layout.extents,
+                                                 layout.extent_count},
+                                     used, capacity));
+            return finish_verified_load<T>(header, layout, upstream, who);
         }
 
         detail::WireValidationScratch& retained_reload_scratch() {
@@ -7673,26 +7852,58 @@ namespace XOffsetDatastructure {
         VerifiedReloadToken<T> begin_verified_reload(std::size_t payload_bytes,
                                                      std::size_t holes = 0,
                                                      std::size_t extents = 0) {
+            std::byte* tables = nullptr;
+            std::size_t clean_from = 0;
+            XOFFSET_VREQUIRE(begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from));
+            return VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from);
+        }
+
+        /// begin_verified_reload without exceptions: the token, or the code
+        /// and message begin_verified_reload would have thrown.
+        template <typename T>
+        XResult<VerifiedReloadToken<T>> try_begin_verified_reload(std::size_t payload_bytes,
+                                                                  std::size_t holes = 0,
+                                                                  std::size_t extents = 0) {
+#if XOFFSET_NO_EXCEPTIONS
+            std::byte* tables = nullptr;
+            std::size_t clean_from = 0;
+            if (!begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from))
+                return detail::take_pending_error();
+            return XResult<VerifiedReloadToken<T>>(
+                VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from));
+#else
+            try {
+                return XResult<VerifiedReloadToken<T>>(begin_verified_reload<T>(payload_bytes, holes, extents));
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
+        }
+
+    private:
+        template <typename T>
+        detail::vstatus begin_verified_reload_v(std::size_t payload_bytes, std::size_t holes, std::size_t extents,
+                                                std::byte*& tables, std::size_t& clean_from) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "begin_verified_reload<T>() requires an admitted fixed-schema wire type.");
             if (direct_reload_open_)
-                throw XException("begin_verified_reload<T>(): a direct reload is already open");
-            try {
+                XOFFSET_VFAIL(XException, XErrc::invalid_state,
+                              "begin_verified_reload<T>(): a direct reload is already open");
+            XOFFSET_ROLLBACK_BEGIN
                 // Holes and extents are disjoint, non-empty 8-byte multiples
                 // inside the payload, so larger counts never verify; they
                 // are refused before the tables are sized.
                 if (holes > payload_bytes / 8u || extents > payload_bytes / 8u)
-                    throw XException("reload_verified<T>(): used size mismatch");
-                const auto clean_from = reinit_for_overwrite(payload_bytes);
-                auto* tables = retained_reload_scratch().tables(
+                    XOFFSET_VFAIL(XException, XErrc::size_mismatch, "reload_verified<T>(): used size mismatch");
+                XOFFSET_VTRY(reinit_for_overwrite(payload_bytes, clean_from));
+                tables = retained_reload_scratch().tables(
                     sizeof(XWireHeaderV2) + extents * 8u + holes * sizeof(WireHole));
                 direct_reload_open_ = true;
-                return VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from);
-            } catch (...) {
-                reset_arena(0);
-                throw;
-            }
+            XOFFSET_ROLLBACK_END(reset_arena(0))
+            return detail::vok();
         }
+
+    public:
 
         /// Empties this buffer and constructs a fresh root of type T in it,
         /// reusing the mapping and owner registration; equivalent to
@@ -7702,7 +7913,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         T& reset() {
             reset_arena(this->get_size());
-            if (!this->arena()) throw XException("reset<T>(): buffer has no arena");
+            if (!this->arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "reset<T>(): buffer has no arena"));
             return *this->template make<T>();
         }
 
@@ -7716,7 +7927,7 @@ namespace XOffsetDatastructure {
         /// owner cannot be created; this buffer is never modified.
         XBuffer clone() const {
             const auto* sm = this->arena();
-            if (!sm) throw XException("clone(): buffer has no arena");
+            if (!sm) XOFFSET_THROW(XException(XErrc::invalid_state, "clone(): buffer has no arena"));
             XBuffer out(reinterpret_cast<const char*>(sm), static_cast<std::size_t>(sm->used_end),
                         this->clone_capacity());
             out.copy_clone_state(*this);
@@ -7791,60 +8002,61 @@ namespace XOffsetDatastructure {
 
         // Wire admission shared by load_verified and reload_verified.
         template <typename T>
-        static detail::WireLayout admit_wire_header(std::span<const std::byte> data,
-                                                    XWireHeaderV2& header, const char* who) {
+        static detail::vstatus admit_wire_header(std::span<const std::byte> data, XWireHeaderV2& header,
+                                                 const char* who, detail::WireLayout& layout) {
             static_assert(is_v1_wire_admitted_v<T>,
                 "load_verified<T>() requires an admitted fixed-schema wire type.");
-            header = detail::read_wire_header(data.data(), data.size_bytes(), who);
+            XOFFSET_VTRY(detail::read_wire_header(data.data(), data.size_bytes(), who, header));
             if (header.root_type_id != detail::wire_root_type_id<T>()) {
-                throw XException(std::string(who) + ": root type id mismatch");
+                XOFFSET_VFAIL(XException, XErrc::root_type_mismatch, std::string(who) + ": root type id mismatch");
             }
             if (header.schema_hash != detail::wire_schema_hash<T>()) {
-                throw XException(std::string(who) + ": schema hash mismatch");
+                XOFFSET_VFAIL(XException, XErrc::schema_mismatch, std::string(who) + ": schema hash mismatch");
             }
             return detail::parse_wire_layout(
                 header, reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2),
-                data.size_bytes() - sizeof(XWireHeaderV2), who);
+                data.size_bytes() - sizeof(XWireHeaderV2), who, layout);
         }
 
         // Post-copy verification shared by load_verified and reload_verified.
         template <typename T>
-        void finish_verified_load(const XWireHeaderV2& header, const detail::WireLayout& layout,
-                                  std::pmr::memory_resource* upstream, const char* who,
-                                  detail::WireValidationScratch* retained = nullptr) {
-            finish_verified_load<T>(header, layout.holes, layout.hole_count, upstream, who, retained);
+        detail::vstatus finish_verified_load(const XWireHeaderV2& header, const detail::WireLayout& layout,
+                                             std::pmr::memory_resource* upstream, const char* who,
+                                             detail::WireValidationScratch* retained = nullptr) {
+            return finish_verified_load<T>(header, layout.holes, layout.hole_count, upstream, who, retained);
         }
 
         template <typename T>
-        void finish_verified_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
-                                  std::pmr::memory_resource* upstream, const char* who,
-                                  detail::WireValidationScratch* retained) {
+        detail::vstatus finish_verified_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
+                                             std::pmr::memory_resource* upstream, const char* who,
+                                             detail::WireValidationScratch* retained) {
             if (this->arena()->used_end != header.used_bytes) {
-                throw XException(std::string(who) + ": non-normalized payload extent");
+                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": non-normalized payload extent");
             }
             // Every caller wrote the payload header from `header`: its root
             // offset is header.root_offset.
             auto* root_ptr = detail::find_root_at<T>(*this, header.root_offset);
             if (!root_ptr) {
-                throw XException(std::string(who) + ": root not found");
+                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
             auto actual_offset = static_cast<std::uint64_t>(
                 reinterpret_cast<std::uintptr_t>(root_ptr) -
                 reinterpret_cast<std::uintptr_t>(this->get_address()));
             if (actual_offset != header.root_offset) {
-                throw XException(std::string(who) + ": root offset mismatch");
+                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root offset mismatch");
             }
-            detail::verify_structural_wire_graph(*root_ptr, *this, upstream, holes, hole_count,
-                                                 true, nullptr, retained);
-            this->load_free_blocks(holes, hole_count);
+            XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream, holes, hole_count,
+                                                              true, nullptr, retained));
+            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);
+            return detail::vok();
         }
 
         void require_typed_root_access(const char* message) const {
             if (!typed_root_access_allowed_) {
-                throw XException(message);
+                XOFFSET_THROW(XException(XErrc::no_root, message));
             }
         }
 
@@ -7868,7 +8080,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         void require_schema_match(const char* message) const {
             if (schema_bound_ && !matches_schema<T>()) {
-                throw XException(message);
+                XOFFSET_THROW(XException(XErrc::schema_mismatch, message));
             }
         }
 
@@ -7916,30 +8128,54 @@ namespace XOffsetDatastructure {
 
         /// Verifies and publishes the received wire; consumes the token.
         void finish() {
+            XOFFSET_VREQUIRE(finish_v());
+        }
+
+        /// finish() without exceptions: ok, or the code and message finish()
+        /// would have thrown. Consumes the token either way.
+        XStatus try_finish() {
+#if XOFFSET_NO_EXCEPTIONS
+            if (!finish_v()) return detail::take_pending_error();
+            return {};
+#else
+            try {
+                finish();
+                return {};
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
+        }
+
+    private:
+        detail::vstatus finish_v() {
             constexpr const char* who = "reload_verified<T>()";
             auto* buffer = std::exchange(buffer_, nullptr);
-            if (!buffer) throw XException("verified reload: token consumed");
+            if (!buffer) XOFFSET_VFAIL(XException, XErrc::invalid_state, "verified reload: token consumed");
             struct Close { XBuffer& b; ~Close() { b.direct_reload_open_ = false; } } close{*buffer};
-            try {
+            XOFFSET_ROLLBACK_BEGIN
                 if (!complete_ || received_[0] != sizeof(XWireHeaderV2) ||
                     received_[1] != payload_ - XWIRE_PAYLOAD_BEGIN ||
                     received_[2] != holes_ * sizeof(XBufferCore::WireHole) || received_[3] != extents_ * 8u)
-                    throw XException("verified reload: incomplete input");
+                    XOFFSET_VFAIL(XException, XErrc::incomplete_input, "verified reload: incomplete input");
                 // admit_wire_header and parse_wire_layout, with the section
                 // lengths fixed by begin instead of read from one wire.
-                const auto header = detail::read_wire_header(tables_, sizeof(XWireHeaderV2), who);
+                XWireHeaderV2 header;
+                XOFFSET_VTRY(detail::read_wire_header(tables_, sizeof(XWireHeaderV2), who, header));
                 if (header.root_type_id != detail::wire_root_type_id<T>())
-                    throw XException(std::string(who) + ": root type id mismatch");
+                    XOFFSET_VFAIL(XException, XErrc::root_type_mismatch, std::string(who) + ": root type id mismatch");
                 if (header.schema_hash != detail::wire_schema_hash<T>())
-                    throw XException(std::string(who) + ": schema hash mismatch");
-                detail::check_wire_extent(header, who);
+                    XOFFSET_VFAIL(XException, XErrc::schema_mismatch, std::string(who) + ": schema hash mismatch");
+                XOFFSET_VTRY(detail::check_wire_extent(header, who));
                 if (header.used_bytes != payload_ || header.extent_count != extents_ ||
                     header.hole_count != holes_)
-                    throw XException(std::string(who) + ": used size mismatch");
+                    XOFFSET_VFAIL(XException, XErrc::size_mismatch, std::string(who) + ": used size mismatch");
                 detail::WireLayout layout;
                 layout.extent_count = extents_;
                 if (extents_) layout.extents = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2));
-                (void)detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps);
+                std::uint64_t stored;
+                XOFFSET_VTRY(detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps,
+                                                        stored));
                 layout.holes = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u);
                 layout.hole_count = holes_;
                 // Gaps read as zero, as in assign_extents: clear what an
@@ -7950,16 +8186,13 @@ namespace XOffsetDatastructure {
                     if (gap.offset < end) std::memset(base + gap.offset, 0, end - gap.offset);
                 }
                 XBufferCore::write_payload_header(base, header.root_offset, header.used_bytes);
-                buffer->check_reinit_payload();
-                buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(), who,
-                                                         &buffer->retained_reload_scratch());
-            } catch (...) {
-                buffer->reset_arena(0);
-                throw;
-            }
+                XOFFSET_VTRY(buffer->check_reinit_payload());
+                XOFFSET_VTRY(buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(),
+                                                                      who, &buffer->retained_reload_scratch()));
+            XOFFSET_ROLLBACK_END(buffer->reset_arena(0))
+            return detail::vok();
         }
 
-    private:
         friend class XBuffer;
         VerifiedReloadToken(XBuffer& buffer, std::byte* tables, std::size_t payload, std::size_t holes,
                             std::size_t extents, std::size_t clean_from) noexcept
@@ -8069,6 +8302,23 @@ namespace XOffsetDatastructure {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
+        /// load_verified / reload_verified without exceptions (see XBuffer).
+        static XResult<TypedXBuffer> try_load_verified(std::span<const std::byte> data,
+                                                       std::optional<MaximumCapacity> cap = std::nullopt) {
+            auto loaded = XBuffer::try_load_verified<T>(data, cap);
+            if (!loaded) return loaded.error();
+            return XResult<TypedXBuffer>(TypedXBuffer(std::move(*loaded)));
+        }
+
+        static XResult<TypedXBuffer> try_load_verified(const std::string& data,
+                                                       std::optional<MaximumCapacity> cap = std::nullopt) {
+            return try_load_verified(std::span<const std::byte>(
+                reinterpret_cast<const std::byte*>(data.data()), data.size()), cap);
+        }
+
+        XStatus try_reload_verified(std::span<const std::byte> data) { return XBuffer::try_reload_verified<T>(data); }
+        XStatus try_reload_verified(const std::string& data) { return XBuffer::try_reload_verified<T>(data); }
+
         /// Construct from an existing XBuffer (e.g., after compaction).
         TypedXBuffer(XBuffer&& other) noexcept
             : XBuffer(std::move(other)) {}
@@ -8105,7 +8355,7 @@ namespace XOffsetDatastructure {
                 std::size_t new_size = static_cast<std::size_t>(stats.used_size * mult);
                 if (new_size < 4096) new_size = 4096;
 
-                try {
+                XOFFSET_TRY {
                     XBuffer new_xbuf(new_size);
                     if (!old_obj) {
                         return new_xbuf;
@@ -8114,14 +8364,13 @@ namespace XOffsetDatastructure {
                     migrate_member(*old_obj, *new_obj, old_xbuf, new_xbuf);
                     new_xbuf.shrink_to_fit();
                     return new_xbuf;
-                } catch (const XBadAlloc&) {
+                } XOFFSET_CATCH(const XBadAlloc&) {
                     // Not enough headroom — try next multiplier
                     continue;
                 }
             }
             // All multipliers exhausted — should not happen in practice
-            throw XException(
-                "XCompactor::compact failed: insufficient memory even at 4x multiplier");
+            XOFFSET_THROW(XException(XErrc::out_of_storage, "XCompactor::compact failed: insufficient memory even at 4x multiplier"));
         }
 
     private:

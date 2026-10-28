@@ -16,7 +16,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/CHANGELOG.md"
 target_include_directories(xoffset_storage INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 install(TARGETS xoffset_storage EXPORT XOffsetTargets)
 install(FILES "${PROJECT_SOURCE_DIR}/xoffset_virtual_memory.hpp"
-    "${PROJECT_SOURCE_DIR}/xoffset_slot_storage.hpp" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    "${PROJECT_SOURCE_DIR}/xoffset_slot_storage.hpp" "${PROJECT_SOURCE_DIR}/xoffset_error.hpp" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION "${XOFFSET_LICENSE_DIR}")
 if(NOT XOFFSET_STORAGE_ONLY)
     set(XOFFSET_HAS_FULL ON)
