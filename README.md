@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**3.2.0-rc.1** (a preview of 3.2 for device testing; the latest release is
+**3.2.0-rc.2** (a preview of 3.2 for device testing; the latest release is
 3.1.0) is a C++26/P2996 library for reflected objects
 and offset containers stored in one contiguous, position-independent arena. It is
 for users who can pin an experimental compiler and validate their own schemas.
@@ -128,8 +128,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "3.2.0-rc.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.2.0-rc.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.2.0-rc.2")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.2.0-rc.2")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
