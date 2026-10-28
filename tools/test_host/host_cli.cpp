@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
 #else
     o.module_suffix = ".so";
 #endif
+    xoffset_test_host::keep_host_allocations_on_this_thread();
     xoffset_test_host::start_command_thread(argc - 3, argv + 3, o);
     // the command ends the process
     for (;;) pause();

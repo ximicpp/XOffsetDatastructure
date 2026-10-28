@@ -22,7 +22,7 @@ if [ "$(cat "$STAMPS/$name" 2>/dev/null)" != "$sum" ]; then
     echo "$sum" > "$STAMPS/$name"
 fi
 cmd="cd $DEV && "
-for v in $(env | sed -n 's/^\(XOFFSET_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(MAPDEMO_[A-Za-z0-9_]*\)=.*/\1/p'); do
+for v in $(env | sed -n 's/^\(XOFFSET_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(MAPDEMO_[A-Za-z0-9_]*\)=.*/\1/p; s/^\(SLG_[A-Za-z0-9_]*\)=.*/\1/p'); do
     eval "val=\${$v}"; cmd="$cmd$v=$(q "$val") "
 done
 cmd="$cmd$DEV/bin/$name"

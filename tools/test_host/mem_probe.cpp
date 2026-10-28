@@ -72,6 +72,9 @@ int probe_va(std::size_t cap_mib, std::size_t max_count) {
     while (live.size() < max_count) {
         try {
             live.emplace_back(64 * 1024, vm_cap(cap_mib * MiB));
+            // flushed progress: when the address space runs out the C library's allocator
+            // may abort the process (Android's scudo does) before the summary is printed
+            if (live.size() % 8 == 0) std::cout << "va_progress " << live.size() << std::endl;
         } catch (const std::exception& e) {
             why = e.what();
             break;

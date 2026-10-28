@@ -19,7 +19,7 @@ set(XOFFSET_CXX26_ONLY_TESTS
     test_reflection_advanced
     test_reflection_core
     test_schema_evolution
-    test_schema_guard_slg_values   # compares values field by field with std::meta
+    test_schema_guard_slg_values
     test_schema_lineage
     test_subtree_copy
     test_type_safety
