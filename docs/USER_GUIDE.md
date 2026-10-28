@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.1.0，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.2.0-rc.1，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -465,7 +465,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 
 ## 7. schema 变更
 
-3.1.0 **不支持 schema 演进**：
+3.1.0 及更早版本**不支持 schema 演进**：
 
 - wire 头里的 schema 身份必须与读取方类型完全一致。增加、删除、重排或改变任何
   一个字段，旧 wire 都会被拒绝。
@@ -473,7 +473,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
   任何改了 schema 的服务端更新都必须和客户端同时发版。
 - 需要长期保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
 
-3.2（未发布，在 `next_cpp26` 上）加入 schema 演进：服务端保存一条版本链，收到旧版本
+3.2.0-rc.1 起加入 schema 演进：服务端保存一条版本链，收到旧版本
 的 wire 先按旧版本完整校验再按字段名升级，发给旧客户端时降级后写出；客户端只多一次
 握手。用法、发版规则和代价见 [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)。wire 格式不变。
 - 不同编译器、不同平台之间的 wire 兼容只在已验证的工具链上成立（见第 8 节 K7）。
@@ -513,7 +513,7 @@ K7 的现状：
   `check_signature_regeneration`）。
 - **跨编译器 wire**：3.1.0 RC 的本地平台矩阵里，Linux x86-64（GCC 16、P2996）、
   Linux arm64（GCC 16、P2996）和 Windows x64（MinGW-w64 GCC 16）写出的 2.1 语料逐字节
-  一致，互相接受。字段表构建合入后（3.2，未发布），Android arm64（NDK r29/r30）和
+  一致，互相接受。字段表构建合入后（3.2.0-rc.1 起），Android arm64（NDK r29/r30）和
   Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）都读入服务端
   C++26 反射构建写出的参照语料并全部接受，写出的语料与它逐字节一致
   （[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
@@ -531,7 +531,7 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 **目标（尚未承诺，实现中）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
 库、同一份 schema 和同一 wire，客户端能接收、读写、校验、再发。客户端用字段表后端
 （第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
-编译器），服务端照旧用 C++26 反射。现状（3.2，未发布）：字段表后端已合入；Android
+编译器），服务端照旧用 C++26 反射。现状（3.2.0-rc.1）：字段表后端已合入；Android
 （NDK r29/r30）和 Windows（MSVC 19.44、clang-cl 19、MinGW）全量 CTest 都是 106/106，语料与
 服务端逐字节一致；iOS 模拟器（Xcode 27.1，部署目标 iOS 17.0）全量 CTest 129/129，
 语料同样逐字节一致，真机待测。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
