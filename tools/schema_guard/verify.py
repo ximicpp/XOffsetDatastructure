@@ -143,7 +143,7 @@ def execute(target, config, catalog, out, pull):
         status = "BLOCKED_EXECUTION"
     elif config.get("kind") == "docker" and rc == 125:
         status = "BLOCKED_TOOLCHAIN"
-    elif any(x in output.lower() for x in ("schema field names/order mismatch", "schema root field list missing")):
+    elif any(x in output.lower() for x in ("schema field names/order mismatch", "schema root field list missing", "schema reachable record field list missing")):
         status = "FAIL_SEMANTIC"
     elif any(x in output.lower() for x in ("schema pin mismatch", "typelayout signature mismatch")):
         status = "FAIL_LAYOUT"

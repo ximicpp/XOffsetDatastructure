@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import build_evidence
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -34,8 +35,18 @@ def main():
         binary = out / (name + ".exe")
         command = [a.clang, "--target=" + triple, "--sysroot=" + str(root),
                    "-resource-dir=" + str(resource_dir), "-fuse-ld=lld", "-rtlib=compiler-rt",
-                   "-nostdlib++", str(obj), *(str(root / "lib" / lib) for lib in
+                   "-nostdlib++", "-static", str(obj), *(str(root / "lib" / lib) for lib in
                    ("libc++.a", "libc++abi.a", "libunwind.a")), "-o", str(binary)]
+        receipt=objs/(name+".object.manifest.json")
+        if not receipt.is_file():
+            result[name]={"status":"BLOCKED_BUILD","reason":"frontend manifest missing"}
+            continue
+        front=json.loads(receipt.read_text())
+        if front["build_id"]!=build_evidence.digest(front["spec"]) or front["binary_sha256"]!=sha(obj):
+            result[name]={"status":"BLOCKED_BUILD","reason":"frontend object mismatch"}
+            continue
+        evidence=build_evidence.prepare(name,front["spec"]["source_fingerprint"],[command],
+            [Path(a.clang).resolve().parent,root,obj],frontend=front)
         try:
             run = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=300)
             rc, log = run.returncode, run.stdout + run.stderr
@@ -43,6 +54,7 @@ def main():
             rc, log = None, str(exc)
         (out / (name + ".log")).write_text(log, encoding="utf-8")
         passed = rc == 0 and binary.is_file()
+        if passed: build_evidence.finish(evidence,binary,str(binary)+".manifest.json")
         result[name] = {"status": "PASS_LINK" if passed else "FAIL_LINK", "exit_code": rc,
                         "object_sha256": sha(obj), "binary_sha256": sha(binary) if passed else None,
                         "command": command}

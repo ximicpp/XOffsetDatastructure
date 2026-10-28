@@ -91,8 +91,10 @@ Android/iOS target libc++ ABI, linking, binary execution, or shipping support.
 
 ## Pre-run gate
 
-The repository's build.sh invokes the complete compile matrix and runtime/wire
-matrix before CTest and before the subsequent signature tools. A failed, unavailable or missing target
+The release entry point is build.sh --schema-gate full. It invokes the complete
+compile matrix and runtime/wire matrix before CTest and signature tools.
+The default build.sh --schema-gate local runs platform CTest and signature checks
+so existing Linux CI can run without a Mac SDK or cross-machine runners. A failed, unavailable or missing target
 stops that entry point. Each invocation produces a new report directory under
 $BUILD_DIR/schema-guard-runs (override with XSG_REPORTS).
 
@@ -111,7 +113,7 @@ To gate another application or test entry point:
         --wire-profiles /path/to/wire-profiles.json \
         --reports /path/to/report-parent -- /path/to/program arguments...
 
-Only invocations routed through build.sh or run_checked.py are guarded.
+Only build.sh --schema-gate full and run_checked.py enforce the complete matrix.
 Direct execution of a built binary or direct ctest bypasses this integration.
 Report directories and logs are retained, including on failure. The compile and runtime reports describe distinct checks; every runtime target
 must pass before the command runs. Runtime coverage is limited to the fixture
@@ -142,7 +144,7 @@ includes the profile manifest when it is next to profiles.json.
 The runtime fixture contains the six existing cross-compiler corpus cases plus
 four populated SLG benchmark roots (PlayerState, BattleMsg, ShardState, Report).
 Each target reports its compiled OS, architecture, pointer width, endianness
-and source fingerprint. The matrix requires the current fingerprint, an exact
+and source fingerprint and build ID. The matrix requires the current fingerprint, an exact
 10-file corpus, a passing reference self-check, and each target reading the
 reference corpus while the reference reads that target's corpus. The two
 corpora must be byte-identical. This covers those benchmark fixtures, not
@@ -321,8 +323,10 @@ blocked until the complete live matrix actually passes on a suitable guest.
 Every Windows runtime profile must explicitly set "runtime_kind": "windows"
 for an actual Windows host or guest, or "runtime_kind": "wine" for Wine.
 A missing or invalid declaration is BLOCKED_CONFIG. This is a trusted profile
-declaration, not automatic proof of the host OS; reviewers must check the
-runner environment. Wine can report PASS_WIRE_WINE after both reads and byte
+declaration. The V2 fixture also detects wine_get_version inside ntdll and
+reports the actual Windows/Wine environment; a conflicting declaration fails
+identity verification. This checks honest execution environments, not hostile
+replacement binaries or malicious runner scripts. Wine can report PASS_WIRE_WINE after both reads and byte
 comparison, but that status never satisfies the native Windows gate.
 
 For Wine on Linux ARM64, wine_wire_runner.py accepts an immutable local Docker
@@ -347,3 +351,63 @@ current source. A passing Windows job means Windows read the Mac corpus and
 produced matching bytes; Mac must freshly read the returned artifact before
 claiming bidirectional verification. This diagnostic workflow does not bypass
 run_checked.py or satisfy its live native Windows runtime profile.
+
+
+## V2 fixture migration and build evidence
+
+Regenerate runtime fixtures after this change. Historical V1 reports remain
+historical evidence; V1 executables and profiles without build manifests are
+blocked. A fixture now reports:
+
+    XSG_RUNTIME_V2 <target> 64 le <source-fingerprint> <environment> <compile-id>
+
+The Apple/Linux builders emit a manifest and add build_manifest and
+expected_build_id to their runtime profiles. Manifests bind source fingerprint,
+canonical build commands (before injecting the build-ID macro), compiler
+executables, wrapper-delegated compiler and header/resource paths, SDK trees,
+and pinned Docker images. The gate rehashes current file/tree inputs and the
+fixture binary. A changed SDK, tool, build flag policy, binary or expected ID
+requires a rebuild. For additional custom compiler-wrapper inputs, ensure they
+are included in the input list; arbitrary wrapper logic is not automatically
+discoverable. A manifest is build provenance within a trusted toolchain and
+runner configuration, not remote attestation.
+
+Windows compilation emits TARGET.object.manifest.json. Transfer it together
+with the matching object. The linker emits BINARY.exe.manifest.json, retaining
+the frontend compile ID and adding the linker/runtime inputs. Copy the final
+binary and manifest back to Mac. The Mac gate checks frontend inputs locally;
+the Windows worker checks linker/runtime inputs on Windows.
+
+For each Windows runtime entry, configure the live build check separately from
+the execution runner:
+
+    {
+      "binary": "/mac/path/windows-x64.exe",
+      "runtime_kind": "windows",
+      "runner": ["python3", "/path/relay_wire_runner.py", "--queue", "/private/queue", "--"],
+      "build_manifest": "/mac/path/windows-x64.exe.manifest.json",
+      "expected_build_id": "<final manifest build_id>",
+      "build_input_verifier": ["python3", "/path/relay_wire_runner.py", "--queue", "/private/queue", "--",
+                               "/mac/path/windows-x64.exe", "--xsg-check-build"]
+    }
+
+Update the Windows worker copy together with build_evidence.py, and keep its
+manifest next to each allowlisted executable. The build check performs no
+ARM64 execution, so it also works for an ARM64 binary linked on x64 Windows.
+A missing worker, missing input, changed runtime library or mismatched receipt
+blocks verification. Transport errors before publishing a response are retried.
+
+probe.cpp now requires field-name declarations recursively through reachable
+records, container keys/values/elements and arrays. The SLG read path traverses
+loaded root fields, strings, container elements and map lookups before checking
+canonical bytes. tests/test_schema_guard_slg_values.cpp is registered in CTest
+and injects nested field/query differences into all four SLG root types.
+
+runtime_matrix.py --step-timeout N gives each operation N seconds. Each
+four-operation wire exchange gets 4*N+30 seconds at the orchestration layer.
+The default remains 180 seconds per operation; the total wrapper can no longer
+cancel an otherwise valid exchange at the first operation's time limit.
+
+The checked-in GitHub ARM64 input snapshot is historical and must be regenerated
+with V2 binaries and compile_id before use. The workflow is diagnostic and is
+not a substitute for the complete live release gate.

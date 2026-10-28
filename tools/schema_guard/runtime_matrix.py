@@ -7,6 +7,7 @@ import subprocess
 import sys
 import verify
 import wire_inputs
+import build_evidence
 
 HERE = Path(__file__).resolve().parent
 EXPECTED_CORPUS = {"empty.xwire", "small.xwire", "medium_holes.xwire", "reloaded_mutated.xwire",
@@ -19,9 +20,9 @@ def exchange_ok(path, status):
     result = json.loads(path.read_text())
     return result.get("status") == status and set(result.get("corpus_files", [])) == EXPECTED_CORPUS
 
-def invoke(cmd):
+def invoke(cmd, timeout=180):
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=180)
+        p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout)
         return p.returncode, p.stdout, p.stderr
     except (OSError, subprocess.TimeoutExpired) as exc:
         return None, "", str(exc)
@@ -30,7 +31,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--profiles", help="JSON mapping target names to binary and runner argv")
     p.add_argument("--out", required=True, help="new result directory")
+    p.add_argument("--step-timeout", type=int, default=180, help="seconds for each wire operation (1..600)")
     a = p.parse_args()
+    if not 1 <= a.step_timeout <= 600: p.error("invalid step timeout")
     out=Path(a.out).resolve()
     out.mkdir(parents=True,exist_ok=False)
     profile = json.loads(Path(a.profiles).read_text()) if a.profiles else {}
@@ -56,20 +59,34 @@ def main():
             return None,"BLOCKED_CONFIG","Expected binary path and runner argv list"
         binary=Path(binary).resolve()
         if not binary.is_file(): return None,"BLOCKED_RUNTIME","Runtime binary does not exist"
+        try:
+            if not isinstance(item.get("build_manifest"),str) or not isinstance(item.get("expected_build_id"),str):
+                raise ValueError("V2 build manifest and expected_build_id required; rebuild fixture")
+            checker=item.get("build_input_verifier")
+            if checker is not None and (not isinstance(checker,list) or not checker or not all(isinstance(v,str) for v in checker)):
+                raise ValueError("build_input_verifier must be argv")
+            manifest=build_evidence.validate(item["build_manifest"], binary, name, fingerprint, item["expected_build_id"],check_inputs=not checker)
+            if checker:
+                check_rc,check_out,check_err=invoke(checker,a.step_timeout)
+                if check_rc!=0 or check_out.strip()!="XSG_BUILD_INPUTS_V1 "+manifest["build_id"]+" "+manifest["binary_sha256"]:
+                    raise ValueError("live build input check failed: "+check_err[-300:])
+        except (KeyError, OSError, ValueError) as exc:
+            return None,"BLOCKED_BUILD",str(exc)
         cmd=[*runner,str(binary),"--xsg-identify"]
-        rc, stdout, stderr=invoke(cmd)
+        rc, stdout, stderr=invoke(cmd, a.step_timeout)
         (out/(name+".identity.log")).write_text(stdout+stderr)
-        expected=f"XSG_RUNTIME_V1 {name} 64 le {fingerprint}"
+        environment = kind if name.startswith("windows-") else ("ios-simulator" if name.startswith("ios-simulator-") else name.rsplit("-",1)[0])
+        expected=f"XSG_RUNTIME_V2 {name} 64 le {fingerprint} {environment} {manifest.get('compile_id',manifest['build_id'])}"
         if rc!=0: return None,"FAIL_RUNTIME","Identity process failed; see identity log"
         if stdout.strip()!=expected: return None,"FAIL_IDENTITY","Target identity or source fingerprint mismatch"
-        return {"binary":str(binary),"runner":runner,"sha256":verify.sha(binary),"identity":stdout.strip(),"runtime_kind":kind},None,None
+        return {"binary":str(binary),"runner":runner,"sha256":verify.sha(binary),"identity":stdout.strip(),"runtime_kind":kind,"build_id":manifest["build_id"]},None,None
 
     ref,code,detail=identify(refname)
     if ref:
         command=[sys.executable,str(HERE/"wire_check.py"),"--reference-binary",ref["binary"],
                  "--target-binary",ref["binary"],"--reference-runner",json.dumps(ref["runner"]),
-                 "--target-runner",json.dumps(ref["runner"]),"--out",str(out/refname)]
-        rc,stdout,stderr=invoke(command)
+                 "--target-runner",json.dumps(ref["runner"]),"--out",str(out/refname),"--step-timeout",str(a.step_timeout)]
+        rc,stdout,stderr=invoke(command, 4*a.step_timeout+30)
         (out/(refname+".matrix.log")).write_text(stdout+stderr)
         result=out/refname/"result.json"
         ok=rc==0 and exchange_ok(result, "PASS_SELF_TEST")
@@ -90,8 +107,8 @@ def main():
         else:
             command=[sys.executable,str(HERE/"wire_check.py"),"--reference-binary",ref["binary"],
                      "--target-binary",target["binary"],"--reference-runner",json.dumps(ref["runner"]),
-                     "--target-runner",json.dumps(target["runner"]),"--out",str(out/name)]
-            rc,stdout,stderr=invoke(command)
+                     "--target-runner",json.dumps(target["runner"]),"--out",str(out/name),"--step-timeout",str(a.step_timeout)]
+            rc,stdout,stderr=invoke(command, 4*a.step_timeout+30)
             (out/(name+".matrix.log")).write_text(stdout+stderr)
             result=out/name/"result.json"
             ok=rc==0 and exchange_ok(result, "PASS")

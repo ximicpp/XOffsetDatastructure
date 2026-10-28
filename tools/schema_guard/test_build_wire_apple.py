@@ -21,7 +21,7 @@ class AppleBuildTests(unittest.TestCase):
             def run(cmd, **kwargs):
                 Path(cmd[cmd.index("-o")+1]).write_text("fake")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
-            with mock.patch.object(sys, "argv", args), mock.patch.object(build_wire_apple.wire_inputs, "fingerprint", return_value=("f"*64, {})), mock.patch.object(build_wire_apple.verify, "includes", return_value=[]), mock.patch.object(build_wire_apple.subprocess, "check_output", side_effect=lambda cmd, **kwargs: "/sdk/" + cmd[2]), mock.patch.object(build_wire_apple.subprocess, "run", side_effect=run), contextlib.redirect_stdout(io.StringIO()):
+            with mock.patch.object(sys, "argv", args), mock.patch.object(build_wire_apple.wire_inputs, "fingerprint", return_value=("f"*64, {})), mock.patch.object(build_wire_apple.build_evidence, "tool_inputs", return_value=[]), mock.patch.object(build_wire_apple.build_evidence, "prepare", return_value={"format":1,"build_id":"b"*64,"spec":{}}), mock.patch.object(build_wire_apple.verify, "includes", return_value=[]), mock.patch.object(build_wire_apple.subprocess, "check_output", side_effect=lambda cmd, **kwargs: "/sdk/" + cmd[2]), mock.patch.object(build_wire_apple.subprocess, "run", side_effect=run), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(build_wire_apple.main(), 0)
             profiles = json.loads((out / "profiles.json").read_text())
             target = profiles["targets"]["ios-simulator-x64"]

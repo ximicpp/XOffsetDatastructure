@@ -1,6 +1,12 @@
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #include <bit>
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +18,9 @@
 #error "XSG_WIRE_INPUT_HASH must identify the current wire fixture sources"
 #endif
 
+#ifndef XSG_BUILD_ID
+#error "XSG_BUILD_ID must bind the fixture build manifest"
+#endif
 #define main xsg_original_wire_main
 #include "../../tests/test_cross_compiler_wire.cpp"
 #undef main
@@ -63,6 +72,34 @@ template<> void fill(xm::ShardState& r) {
     auto& t=march.troops.emplace_back(); t.type=3; t.count=222; t.wounded=5;
 }
 template<> void fill(xm::Report& r) { report(r); }
+template<class T> bool values_equal(const T& a, const T& b);
+template<class T, std::size_t I> bool one_field_equal(const T& a, const T& b) {
+    using namespace std::meta;
+    constexpr auto member=nonstatic_data_members_of(^^T, access_context::unchecked())[I];
+    return values_equal(a.[:member:],b.[:member:]);
+}
+template<class T, std::size_t... I>
+bool fields_equal(const T& a, const T& b, std::index_sequence<I...>) {
+    return (one_field_equal<T,I>(a,b) && ...);
+}
+template<class T> bool values_equal(const T& a, const T& b) {
+    namespace d=xo::detail;
+    if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) return a==b;
+    else if constexpr (d::is_fixed_string_v<T>) return std::string_view(a.data(),a.size())==std::string_view(b.data(),b.size());
+    else if constexpr (d::is_fixed_flat_map_v<T>) {
+        if(a.size()!=b.size()) return false;
+        for(const auto& entry:a) {
+            auto it=b.find(entry.first);
+            if(it==b.end() || !values_equal(entry.second,it->second)) return false;
+        }
+        return true;
+    } else if constexpr (d::is_fixed_vector_v<T> || d::is_fixed_flat_set_v<T>) {
+        if(a.size()!=b.size()) return false;
+        auto i=a.begin(), j=b.begin();
+        for(;i!=a.end();++i,++j) if(!values_equal(*i,*j)) return false;
+        return true;
+    } else return fields_equal(a,b,std::make_index_sequence<d::reflected_member_count<T>()>{});
+}
 template<class T> void run(const std::filesystem::path& dir, const char* name, bool write) {
     using Buffer=xo::TypedXBuffer<T>;
     auto b=Buffer::create(1u<<20,cap()); fill(b.root());
@@ -74,6 +111,7 @@ template<class T> void run(const std::filesystem::path& dir, const char* name, b
     } else {
         const auto wire=read_file(path);
         auto loaded=Buffer::load(wire,cap());
+        if(!values_equal(b.root(),loaded.root())) fail(std::string(name)+": loaded field values mismatch");
         if(wire!=expected || loaded.save_verified()!=wire) fail(std::string(name)+": SLG wire mismatch");
     }
     std::cout << name << (write ? " written" : " accepted and byte-identical") << std::endl;
@@ -141,7 +179,20 @@ int main(int argc, char** argv) {
         const char* target = "unsupported";
 #endif
         const char* endian = std::endian::native == std::endian::little ? "le" : "other";
-        std::printf("XSG_RUNTIME_V1 %s %zu %s %s\n", target, sizeof(void*) * 8, endian, XSG_WIRE_INPUT_HASH);
+        #if defined(_WIN32)
+        const char* environment = GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "wine_get_version") ? "wine" : "windows";
+#elif defined(__ANDROID__)
+        const char* environment = "android";
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+        const char* environment = TARGET_OS_SIMULATOR ? "ios-simulator" : "ios";
+#elif defined(__APPLE__)
+        const char* environment = "macos";
+#elif defined(__linux__)
+        const char* environment = "linux";
+#else
+        const char* environment = "unsupported";
+#endif
+        std::printf("XSG_RUNTIME_V2 %s %zu %s %s %s %s\n", target, sizeof(void*) * 8, endian, XSG_WIRE_INPUT_HASH, environment, XSG_BUILD_ID);
         return 0;
     }
     const int rc=xsg_original_wire_main(argc, argv);

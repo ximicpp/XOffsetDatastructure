@@ -17,7 +17,9 @@ def main():
     p.add_argument("--reference-runner", default="[]", help="JSON argv prefix, e.g. [\"wine\"]")
     p.add_argument("--target-runner", default="[]", help="JSON argv prefix")
     p.add_argument("--out", required=True, help="new output directory")
+    p.add_argument("--step-timeout", type=int, default=180)
     a = p.parse_args()
+    if not 1 <= a.step_timeout <= 600: p.error("invalid step timeout")
     ref = Path(a.reference_binary).resolve()
     target = Path(a.target_binary).resolve()
     if not ref.is_file() or not target.is_file():
@@ -35,7 +37,7 @@ def main():
               "reference_runner":rr, "target_runner":tr, "steps":[]}
     def step(name, cmd):
         try:
-            q = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=180)
+            q = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=a.step_timeout)
             rc, text = q.returncode, q.stdout + q.stderr
         except (OSError, subprocess.TimeoutExpired) as exc:
             rc, text = None, str(exc)
