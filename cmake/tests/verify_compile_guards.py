@@ -47,7 +47,8 @@ def main():
     for case, expected in expected_messages.items():
         fixture = output / case / "source"
         (fixture / "tests").mkdir(parents=True)
-        for name in ("xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp"):
+        for name in ("xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
+                     "xoffset_error.hpp"):
             shutil.copyfile(source / name, fixture / name)
         for name in ("test_polymorphic_positive.cpp", "test_polymorphic_rejection.cpp"):
             shutil.copyfile(source / "tests" / name, fixture / "tests" / name)

@@ -13,26 +13,29 @@ struct Point { float x{}; float y{}; };
 struct Rect { Point min; Point max; };   // half-open: min inclusive, max exclusive
 enum class Behavior : std::uint32_t { Patrol = 0, Hold = 1, Alert = 2 };
 
-struct alignas(8) SceneData {
+// Container heads (XString, XVector) are 12 bytes aligned to 4 (wire format
+// 2.1). Records without an 8-byte member are therefore 4-aligned, and every
+// record below is laid out without implicit padding (checked at the end of
+// this file); a reserved field fills the gap where one would remain.
+struct SceneData {
     std::uint32_t id{};
-    std::uint32_t reserved0{};
     XString name;
     Rect bounds;
 };
 
-struct alignas(8) SiteData {
+struct SiteData {
     std::uint32_t id{};
     std::uint32_t scene_id{};
     Point pos;
     XString name;
 };
 
-struct alignas(8) MapCatalog {
+struct MapCatalog {
     XVector<SceneData> scenes;
     XVector<SiteData> sites;
 };
 
-struct alignas(8) UnitState {
+struct UnitState {
     std::uint32_t id{};
     std::uint32_t scene_id{};
     Point pos;
@@ -44,32 +47,31 @@ struct alignas(8) UnitState {
     XVector<Point> path;
 };
 
-struct alignas(8) UnitStateBatch {
+struct UnitStateBatch {
     std::uint64_t tick{};
+    std::uint32_t reserved0{};      // 0; fills the 8-byte record alignment
     XVector<UnitState> units;
 };
 
-struct alignas(8) ViewRequest {
+struct ViewRequest {
     std::uint64_t request_id{};
     std::uint32_t scene_id{};
-    std::uint32_t reserved0{};
+    std::uint32_t reserved0{};      // 0
     Rect rect;
 };
 
-struct alignas(8) VisibleUnit {
+struct VisibleUnit {
     std::uint32_t id{};
     std::int32_t hp{};
     Point pos;
     Behavior behavior{};
-    std::uint32_t reserved0{};
     XString name;
 };
 
-struct alignas(8) ViewSnapshot {
+struct ViewSnapshot {
     std::uint64_t request_id{};
     std::uint64_t tick{};
     std::uint32_t scene_id{};
-    std::uint32_t reserved0{};
     Rect rect;
     XVector<VisibleUnit> units;
 };
@@ -114,13 +116,24 @@ inline XBuffer::MaximumCapacity cap_view_request() {
 
 } // namespace mapdemo
 
-// Ordinary records (docs/USER_GUIDE.md section 3.1): every type above has
-// plain non-static members only (no bases, unions, bit-fields or
-// [[no_unique_address]]), so the library may move record elements with one
-// memmove and rebuild only their inline heads. Wire bytes are unchanged.
-XOFFSET_ORDINARY_RECORDS(mapdemo::Point, mapdemo::Rect, mapdemo::SceneData, mapdemo::SiteData,
-                         mapdemo::MapCatalog, mapdemo::UnitState, mapdemo::UnitStateBatch,
-                         mapdemo::ViewRequest, mapdemo::VisibleUnit, mapdemo::ViewSnapshot)
+// Field lists, in declaration order. The C++20/23 client builds (field-list
+// backend: MinGW, MSVC, Android NDK, Apple clang) read the schema from these
+// lines; the C++26 build checks them against reflection, so both backends
+// describe the same records and compute the same wire_schema_hash_v (the
+// Hello handshake compares it). XOFFSET_RECORD also declares each type an
+// ordinary record (no bases, unions, bit-fields or [[no_unique_address]]), so
+// the library may move record elements with one memmove and rebuild only
+// their inline heads.
+XOFFSET_RECORD(mapdemo::Point, x, y)
+XOFFSET_RECORD(mapdemo::Rect, min, max)
+XOFFSET_RECORD(mapdemo::SceneData, id, name, bounds)
+XOFFSET_RECORD(mapdemo::SiteData, id, scene_id, pos, name)
+XOFFSET_RECORD(mapdemo::MapCatalog, scenes, sites)
+XOFFSET_RECORD(mapdemo::UnitState, id, scene_id, pos, speed, hp, behavior, next_waypoint, name, path)
+XOFFSET_RECORD(mapdemo::UnitStateBatch, tick, reserved0, units)
+XOFFSET_RECORD(mapdemo::ViewRequest, request_id, scene_id, reserved0, rect)
+XOFFSET_RECORD(mapdemo::VisibleUnit, id, hp, pos, behavior, name)
+XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::UnitStateBatch, "mapdemo.UnitStateBatch.v1")
@@ -135,7 +148,9 @@ XOFFSET_REQUIRE_NO_PADDING(mapdemo::UnitStateBatch);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewRequest);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::VisibleUnit);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewSnapshot);
-static_assert(sizeof(mapdemo::UnitState) == 64);
-static_assert(sizeof(mapdemo::VisibleUnit) == 40);
+static_assert(sizeof(mapdemo::UnitState) == 56);
+static_assert(sizeof(mapdemo::VisibleUnit) == 32);
+static_assert(sizeof(mapdemo::ViewSnapshot) == 48);
+static_assert(sizeof(mapdemo::UnitStateBatch) == 24);
 static_assert(sizeof(mapdemo::ViewRequest) == 32);
 static_assert(XOffsetDatastructure::detail::shift_relocate_supported<mapdemo::UnitState>());
