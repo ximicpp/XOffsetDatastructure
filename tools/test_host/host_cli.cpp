@@ -1,7 +1,7 @@
 // Command-line test host: the same flow as the iOS app (host_core.hpp), for checking
 // the hosted program libraries and xo_host_run.py on Linux and macOS.
 //
-//   xoffset_test_host --root DIR xorun ID | xopack ID REASON
+//   xoffset_test_host --root DIR xorun ID | xopack ID REASON | xoserve
 //
 // The libraries are looked up in the hosted/ directory next to this program.
 #include "host_core.hpp"
@@ -39,7 +39,7 @@ std::string program_dir() {
 
 int main(int argc, char** argv) {
     if (argc < 4 || std::strcmp(argv[1], "--root") != 0) {
-        std::cerr << "usage: " << argv[0] << " --root DIR xorun ID | xopack ID REASON\n";
+        std::cerr << "usage: " << argv[0] << " --root DIR xorun ID | xopack ID REASON | xoserve\n";
         return 2;
     }
     xoffset_test_host::Options o;

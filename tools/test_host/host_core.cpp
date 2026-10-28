@@ -2,18 +2,23 @@
 #include "host_core.hpp"
 #include "xoffset_test_host.h"
 
+#include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <cerrno>
 #include <chrono>
+#include <csetjmp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <dirent.h>
@@ -205,6 +210,19 @@ std::atomic<int> g_exit_code{-1000};
 std::chrono::steady_clock::time_point g_start;
 char g_io[1 << 16];
 
+// Serving (xoserve): one process runs request after request, each program on its own thread.
+std::atomic<bool> g_serving{false};
+pthread_t g_program_thread;                // the running program's main thread
+std::mutex g_run_mu;
+std::condition_variable g_run_cv;
+bool g_run_done = false;                   // under g_run_mu
+std::atomic<bool> g_run_active{false};
+thread_local sigjmp_buf* t_exit_jump = nullptr;   // set on the program's main thread
+pid_t g_host_pid = 0;   // the process that runs the command; a program's fork() child is not it
+
+// A process the program forked: it reports nothing (its parent's run does).
+bool forked_child() { return g_host_pid != 0 && ::getpid() != g_host_pid; }
+
 void cat3(char* out, const char* a, const char* b, const char* c) {
     std::snprintf(out, kPath, "%s%s%s", a, b, c);
 }
@@ -360,6 +378,7 @@ void finalize(const char* status, bool flush) {
 // ---------------------------------------------------------------- ending the process
 
 void at_exit_final() {
+    if (forked_child() || (g_serving && !g_run_active)) return;
     char status[64];
     const int code = g_exit_code.load();
     if (code == -1000) std::snprintf(status, sizeof status, "exit unknown");
@@ -368,6 +387,11 @@ void at_exit_final() {
 }
 
 void on_signal(int sig) {
+    if (forked_child()) {
+        std::signal(sig, SIG_DFL);
+        std::raise(sig);
+        return;
+    }
     char status[64];
     std::snprintf(status, sizeof status, "signal %d", sig);
     finalize(status, false);
@@ -375,8 +399,34 @@ void on_signal(int sig) {
     std::raise(sig);
 }
 
+void end_served_run() {
+    std::lock_guard<std::mutex> lock(g_run_mu);
+    g_run_done = true;
+    g_run_cv.notify_all();
+}
+
 [[noreturn]] void program_exit(int code, int quick) {
+    if (forked_child()) {
+        // a serving host's copy cannot run exit handlers (the copied host threads are gone)
+        if (!g_serving) std::exit(code);
+        if (!quick) {
+            std::cout.flush();
+            std::cerr.flush();
+            std::fflush(nullptr);
+        }
+        std::_Exit(code);
+    }
     g_exit_code = code;
+    if (g_serving) {
+        char status[64];
+        std::snprintf(status, sizeof status, "exit %d", code);
+        finalize(status, true);
+        // Back to the start of the program's main thread (no unwinding, as in a process
+        // exit) and on to the next request. Any other thread of the program that ends it
+        // leaves state behind: the process ends and the driver starts a new one.
+        if (t_exit_jump) siglongjmp(*t_exit_jump, 1);
+        std::_Exit(code);
+    }
     if (quick) {
         char status[64];
         std::snprintf(status, sizeof status, "exit %d", code);
@@ -553,6 +603,7 @@ void set_run_paths(const std::string& root, const std::string& id) {
         ::dup2(fd, 2);
         ::close(fd);
     }
+    g_host_pid = ::getpid();
     install_signal_handlers();
     std::atexit(at_exit_final);
 
@@ -620,6 +671,357 @@ void set_run_paths(const std::string& root, const std::string& id) {
     program_exit(rc, 0);
 }
 
+// ---------------------------------------------------------------- serving
+
+// Programs whose run is timed or measures the process: the screen does not change while
+// they run (the app's timer skips its update), and the run starts only after the screen
+// has shown that it is paused.
+bool quiet_program(const std::string& name) {
+    return name.rfind("xo_slg_bench", 0) == 0 || name.rfind("xo_mem_probe", 0) == 0;
+}
+bool demo_client(const std::string& name) { return name.rfind("mapdemo_client", 0) == 0; }
+
+std::mutex g_dash_mu;
+std::atomic<bool> g_quiet{false};  // g_dash.quiet, readable without the lock
+Dashboard g_dash;                  // under g_dash_mu
+std::string g_current_out;         // the running program's out.txt, under g_dash_mu
+std::chrono::steady_clock::time_point g_current_start;
+
+// The last "client snaps=N ... net_total=B" progress line (or the final "Bye received after
+// N snapshots, B bytes") in the tail of a demo client's output.
+bool demo_progress(const std::string& path, unsigned long long& snaps, unsigned long long& bytes) {
+    const int fd = ::open(path.c_str(), O_RDONLY);
+    if (fd < 0) return false;
+    struct stat st;
+    std::string tail;
+    if (::fstat(fd, &st) == 0) {
+        const off_t from = st.st_size > 4096 ? st.st_size - 4096 : 0;
+        tail.resize(static_cast<std::size_t>(st.st_size - from));
+        const ssize_t n = ::pread(fd, tail.data(), tail.size(), from);
+        tail.resize(n > 0 ? static_cast<std::size_t>(n) : 0);
+    }
+    ::close(fd);
+    bool found = false;
+    std::istringstream lines(tail);
+    for (std::string line; std::getline(lines, line);) {
+        unsigned long long a = 0, b = 0;
+        const std::size_t total = line.find("net_total=");
+        if (line.rfind("client snaps=", 0) == 0 && total != std::string::npos &&
+            std::sscanf(line.c_str(), "client snaps=%llu", &a) == 1 &&
+            std::sscanf(line.c_str() + total, "net_total=%llu", &b) == 1) {
+            snaps = a, bytes = b, found = true;
+        } else if (std::sscanf(line.c_str(), "client: Bye received after %llu snapshots, %llu bytes", &a, &b) == 2) {
+            snaps = a, bytes = b, found = true;
+        }
+    }
+    return found;
+}
+
+std::string ledger_path(const Options& o) { return o.root + "/ledger.txt"; }
+
+void save_ledger(const Options& o) {
+    std::ostringstream s;
+    {
+        std::lock_guard<std::mutex> lock(g_dash_mu);
+        s << "runs " << g_dash.runs << "\npassed " << g_dash.passed << "\nfailed " << g_dash.failed
+          << "\nbytes_in " << g_dash.bytes_in << "\nbytes_out " << g_dash.bytes_out << "\ndemo_runs " << g_dash.demo_runs
+          << "\ndemo_snapshots " << g_dash.demo_snapshots << "\ndemo_bytes " << g_dash.demo_bytes
+          << "\nrestarts " << g_dash.restarts << '\n';
+        for (const auto& r : g_dash.recent) s << "recent " << r << '\n';
+    }
+    write_file(ledger_path(o) + ".tmp", s.str());
+    ::rename((ledger_path(o) + ".tmp").c_str(), ledger_path(o).c_str());
+}
+
+void load_ledger(const Options& o) {
+    std::string text;
+    Dashboard d;
+    if (read_file(ledger_path(o), text)) {
+        std::istringstream s(text);
+        for (std::string line; std::getline(s, line);) {
+            const std::size_t sp = line.find(' ');
+            if (sp == std::string::npos) continue;
+            const std::string k = line.substr(0, sp), v = line.substr(sp + 1);
+            const unsigned long long n = std::strtoull(v.c_str(), nullptr, 10);
+            if (k == "runs") d.runs = n;
+            else if (k == "passed") d.passed = n;
+            else if (k == "failed") d.failed = n;
+            else if (k == "bytes_in") d.bytes_in = n;
+            else if (k == "bytes_out") d.bytes_out = n;
+            else if (k == "demo_runs") d.demo_runs = n;
+            else if (k == "demo_snapshots") d.demo_snapshots = n;
+            else if (k == "demo_bytes") d.demo_bytes = n;
+            else if (k == "restarts") d.restarts = n;
+            else if (k == "recent" && d.recent.size() < Dashboard::kRecent) d.recent.push_back(v);
+        }
+        ++d.restarts;   // this process continues an earlier one's ledger
+    }
+    std::lock_guard<std::mutex> lock(g_dash_mu);
+    g_dash = std::move(d);
+}
+
+unsigned long long file_size(const std::string& p) {
+    struct stat st;
+    return ::stat(p.c_str(), &st) == 0 ? static_cast<unsigned long long>(st.st_size) : 0;
+}
+
+// Global state a program may change and the next one must not inherit.
+struct ProcessState {
+    std::ios cout_fmt{nullptr}, cerr_fmt{nullptr};
+    std::terminate_handler terminate = nullptr;
+    std::new_handler new_handler = nullptr;
+    int out_fd = -1, err_fd = -1;
+    void save() {
+        cout_fmt.copyfmt(std::cout);
+        cerr_fmt.copyfmt(std::cerr);
+        terminate = std::get_terminate();
+        new_handler = std::get_new_handler();
+        out_fd = ::dup(1);
+        err_fd = ::dup(2);
+    }
+    void restore() {
+        std::cout.flush();
+        std::cerr.flush();
+        std::fflush(nullptr);
+        if (out_fd >= 0) ::dup2(out_fd, 1);
+        if (err_fd >= 0) ::dup2(err_fd, 2);
+        std::cout.copyfmt(cout_fmt);
+        std::cerr.copyfmt(cerr_fmt);
+        std::cout.clear();
+        std::cerr.clear();
+        std::set_terminate(terminate);
+        std::set_new_handler(new_handler);
+        install_signal_handlers();
+    }
+};
+
+void* program_thread_main(void* p) {
+    auto* call = static_cast<std::pair<int (*)(int, char**), std::vector<char*>*>*>(p);
+    sigjmp_buf jump;
+    if (sigsetjmp(jump, 1) == 0) {
+        t_exit_jump = &jump;
+        const int rc = call->first(static_cast<int>(call->second->size()) - 1, call->second->data());
+        program_exit(rc, 0);   // finalizes and jumps back here
+    }
+    t_exit_jump = nullptr;
+    end_served_run();
+    return nullptr;
+}
+
+// One request, as cmd_run, in this process; returns when the program has ended.
+void serve_one(const std::string& id, const Options& o, ProcessState& saved) {
+    const std::string& root = o.root;
+    for (const auto& n : list_dir(root + "/outbox")) remove_tree(root + "/outbox/" + n);
+    for (const auto& n : list_dir(root + "/runs"))
+        if (n != id) remove_tree(root + "/runs/" + n);
+    mkdirs(root + "/runs/" + id);
+    set_run_paths(root, id);
+    static std::vector<std::string> outputs;
+    outputs.clear();
+    g_outputs = &outputs;
+    g_finalized = 0;
+    g_exit_code = -1000;
+    {
+        std::lock_guard<std::mutex> lock(g_run_mu);
+        g_run_done = false;
+    }
+
+    std::string tar, request_text;
+    const std::string inbox = root + "/inbox/" + id + ".tar";
+    const unsigned long long in_bytes = file_size(inbox);
+    const bool have = read_file(inbox, tar);
+    Request req;
+    if (have && untar(tar, root, [](const std::string&) { return false; }, &request_text) && !request_text.empty())
+        req = parse_request(request_text);
+    const std::string name = req.program.empty() ? std::string("?") : req.program;
+    const bool quiet = quiet_program(name);
+    const std::string out_txt = root + "/runs/" + id + "/out.txt";
+    {
+        std::lock_guard<std::mutex> lock(g_dash_mu);
+        g_dash.current = name;
+        g_dash.quiet = quiet;
+        g_quiet = quiet;
+        g_dash.live_snapshots = g_dash.live_bytes = 0;
+        g_current_out = demo_client(name) ? out_txt : std::string();
+        g_current_start = std::chrono::steady_clock::now();
+    }
+    // a timed run starts once the screen has drawn its paused state (the app's timer: 1 s)
+    if (quiet) std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
+    g_start = std::chrono::steady_clock::now();
+    const int fd = ::open(out_txt.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        std::fflush(nullptr);
+        ::dup2(fd, 1);
+        ::dup2(fd, 2);
+        ::close(fd);
+    }
+    g_run_active = true;
+    std::vector<std::string> env_keys;
+    auto finish = [&](int rc, const char* problem) {
+        if (problem) std::cerr << "xoffset test host: " << problem << '\n';
+        char status[64];
+        std::snprintf(status, sizeof status, "exit %d", rc);
+        finalize(status, true);
+    };
+    if (!have) {
+        finish(125, ("no " + inbox).c_str());
+    } else if (request_text.empty()) {
+        finish(125, ("damaged request archive " + inbox).c_str());
+    } else {
+        write_file(root + "/runs/" + id + "/request", request_text);
+        for (const auto& p : req.clears) remove_tree(root + "/fs" + p);
+        for (const auto& p : req.outputs) {
+            remove_tree(root + "/fs" + p);
+            outputs.push_back(p);
+        }
+        const bool inputs_ok = untar(tar, root, [](const std::string& n) { return n.compare(0, 3, "fs/") == 0; }, nullptr);
+        ::unlink(inbox.c_str());
+        for (const auto& p : req.outputs) {
+            const std::string full = root + "/fs" + p;
+            mkdirs(full.substr(0, full.rfind('/')));
+        }
+        for (const auto& p : req.output_dirs) mkdirs(root + "/fs" + p);
+        const std::string fs_root = root + "/fs";
+        auto expand = [&](std::string a) {
+            for (std::size_t at; (at = a.find("@XOFS@")) != std::string::npos;) a.replace(at, 6, fs_root);
+            return a;
+        };
+        for (const auto& kv : req.env) {
+            const std::size_t eq = kv.find('=');
+            if (eq == std::string::npos) continue;
+            env_keys.push_back(kv.substr(0, eq));
+            ::setenv(env_keys.back().c_str(), expand(kv.substr(eq + 1)).c_str(), 1);
+        }
+        std::vector<std::string> args;
+        for (const auto& a : req.args) args.push_back(expand(a));
+        const std::string lib = o.modules_dir + "/libxoh_" + req.program + o.module_suffix;
+        void* h = nullptr;
+        if (!inputs_ok) {
+            finish(125, ("damaged input archive " + inbox).c_str());
+        } else if (::chdir((root + "/work").c_str()) != 0) {
+            finish(125, "chdir work failed");
+        } else if (req.program == "@info") {
+            finish(builtin_info(o), nullptr);
+        } else if (req.program == "@net") {
+            finish(builtin_net(args), nullptr);
+        } else if (req.program == "@sleep") {
+            std::this_thread::sleep_for(std::chrono::seconds(args.empty() ? 1 : std::atoi(args[0].c_str())));
+            finish(0, nullptr);
+        } else if (req.program == "@reset") {
+            {
+                std::lock_guard<std::mutex> lock(g_dash_mu);
+                g_dash = Dashboard{};
+                g_dash.serving = true;
+            }
+            std::cout << "ledger reset\n";
+            finish(0, nullptr);
+        } else if (req.program == "@quit") {
+            std::cout << "the host ends after this run\n";
+            finish(0, nullptr);
+        } else if (req.program.empty() || !safe_relative(req.program) || req.program.find('/') != std::string::npos) {
+            finish(125, ("bad program name '" + req.program + "'").c_str());
+        } else if (!(h = ::dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL))) {
+            finish(127, (std::string("dlopen ") + lib + ": " + ::dlerror()).c_str());
+        } else {
+            auto set_api = reinterpret_cast<xoffset_hosted_set_api_fn>(::dlsym(h, XOFFSET_HOSTED_SET_API));
+            auto main_fn = reinterpret_cast<int (*)(int, char**)>(::dlsym(h, "main"));
+            if (!set_api || !main_fn) {
+                finish(127, (lib + " has no hosted entry (main, " XOFFSET_HOSTED_SET_API ")").c_str());
+            } else {
+                reset_new_functions();
+                set_api(&g_api);
+                std::vector<std::string> argv_store{req.program};
+                argv_store.insert(argv_store.end(), args.begin(), args.end());
+                std::vector<char*> argv;
+                for (auto& a : argv_store) argv.push_back(a.data());
+                argv.push_back(nullptr);
+                std::pair<int (*)(int, char**), std::vector<char*>*> call{main_fn, &argv};
+                pthread_attr_t attr;
+                pthread_attr_init(&attr);
+                pthread_attr_setstacksize(&attr, std::size_t(64) << 20);
+                if (pthread_create(&g_program_thread, &attr, program_thread_main, &call) != 0) {
+                    finish(125, "cannot start the program's thread");
+                } else {
+                    std::unique_lock<std::mutex> lock(g_run_mu);
+                    g_run_cv.wait(lock, [] { return g_run_done; });
+                    lock.unlock();
+                    pthread_join(g_program_thread, nullptr);
+                }
+                pthread_attr_destroy(&attr);
+                reset_new_functions();
+            }
+            // not closed: a library with thread-local variables cannot be unloaded anyway, and
+            // the next run of the same program finds its static data as a new process would
+            // only if the library is never shared between runs (most programs run once)
+        }
+    }
+    g_run_active = false;
+    saved.restore();
+    for (const auto& k : env_keys) ::unsetenv(k.c_str());
+
+    std::string status;
+    read_file(root + "/runs/" + id + "/status", status);
+    long long ms = 0;
+    const std::size_t at = status.find("elapsed_ms ");
+    if (at != std::string::npos) ms = std::atoll(status.c_str() + at + 11);
+    status = status.substr(0, status.find('\n'));
+    unsigned long long snaps = 0, bytes = 0;
+    const bool demo = demo_client(name) && demo_progress(out_txt, snaps, bytes);
+    const bool counted = req.program != "@reset";   // the totals start after it
+    {
+        std::lock_guard<std::mutex> lock(g_dash_mu);
+        if (counted) ++g_dash.runs;
+        if (counted) {
+            (status == "exit 0" ? g_dash.passed : g_dash.failed) += 1;
+            g_dash.bytes_in += in_bytes;
+            g_dash.bytes_out += file_size(g_outbox);
+        }
+        if (demo) {
+            ++g_dash.demo_runs;
+            g_dash.demo_snapshots += snaps;
+            g_dash.demo_bytes += bytes;
+        }
+        char line[256];
+        std::snprintf(line, sizeof line, "%s\t%s\t%lld", name.c_str(), status.c_str(), ms);
+        if (counted) g_dash.recent.insert(g_dash.recent.begin(), line);
+        if (g_dash.recent.size() > Dashboard::kRecent) g_dash.recent.resize(Dashboard::kRecent);
+        g_dash.current.clear();
+        g_dash.quiet = false;
+        g_quiet = false;
+        g_current_out.clear();
+    }
+    save_ledger(o);
+    if (req.program == "@quit") std::_Exit(0);
+}
+
+[[noreturn]] void cmd_serve(const Options& o) {
+    keep_host_allocations_on_this_thread();
+    for (const char* d : {"inbox", "outbox", "runs", "fs", "work"}) mkdirs(o.root + "/" + d);
+    load_ledger(o);
+    g_host_pid = ::getpid();
+    g_serving = true;
+    install_signal_handlers();
+    std::atexit(at_exit_final);
+    static ProcessState saved;
+    saved.save();
+    {
+        std::lock_guard<std::mutex> lock(g_dash_mu);
+        g_dash.serving = true;
+    }
+    for (;;) {
+        std::vector<std::string> ready;
+        for (const auto& n : list_dir(o.root + "/inbox"))
+            if (n.size() > 6 && n.compare(n.size() - 6, 6, ".ready") == 0) ready.push_back(n.substr(0, n.size() - 6));
+        std::sort(ready.begin(), ready.end());
+        for (const auto& id : ready) {
+            ::unlink((o.root + "/inbox/" + id + ".ready").c_str());
+            serve_one(id, o, saved);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+}
+
 [[noreturn]] void cmd_pack(const std::string& id, const std::string& why, const Options& o) {
     const std::string run = o.root + "/runs/" + id;
     mkdirs(run);
@@ -633,6 +1035,9 @@ void set_run_paths(const std::string& root, const std::string& id) {
     if (!read_file(run + "/status", status) || status.empty()) status = "none " + why;
     while (!status.empty() && status.back() == '\n') status.pop_back();
     if (!exists(run + "/out.txt")) write_file(run + "/out.txt", "");
+    // a request that never ran must not run in the next serving process
+    ::unlink((o.root + "/inbox/" + id + ".ready").c_str());
+    ::unlink((o.root + "/inbox/" + id + ".tar").c_str());
     finalize(status.substr(0, status.find('\n')).c_str(), true);
     std::_Exit(0);
 }
@@ -643,8 +1048,27 @@ void run_command(int argc, char** argv, const Options& options) {
     const std::string cmd = argc > 0 ? argv[0] : "";
     if (cmd == "xorun" && argc >= 2) cmd_run(argv[1], options);
     if (cmd == "xopack" && argc >= 3) cmd_pack(argv[1], argv[2], options);
-    std::cerr << "usage: xorun ID | xopack ID REASON\n";
+    if (cmd == "xoserve") cmd_serve(options);
+    std::cerr << "usage: xorun ID | xopack ID REASON | xoserve\n";
     std::_Exit(2);
+}
+
+bool timed_run() noexcept { return g_quiet.load(std::memory_order_relaxed); }
+
+Dashboard dashboard() {
+    Dashboard d;
+    std::string out;
+    double seconds = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_dash_mu);
+        d = g_dash;
+        out = g_current_out;
+        if (!d.current.empty())
+            seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - g_current_start).count();
+    }
+    d.current_seconds = seconds;
+    if (!out.empty() && !d.quiet) demo_progress(out, d.live_snapshots, d.live_bytes);
+    return d;
 }
 
 namespace {
