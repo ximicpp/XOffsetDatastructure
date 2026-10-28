@@ -1,13 +1,18 @@
 import copy
 import json
-from pathlib import Path
+import subprocess
+
+import wire_inputs
 import unittest
 
 import github_arm64_probe as probe
 
 class GithubArm64InputTests(unittest.TestCase):
     def setUp(self):
-        self.data = json.loads((Path(__file__).parent / "github_arm64_inputs.json").read_text())
+        fingerprint, inputs = wire_inputs.fingerprint()
+        gitlinks = {name: subprocess.check_output(["git", "rev-parse", "HEAD:" + name], cwd=probe.ROOT, text=True).strip()
+                    for name in ("external/boost", "external/typelayout")}
+        self.data = {"fingerprint": fingerprint, "inputs": inputs, "gitlinks": gitlinks}
 
     def test_current_source_inputs_are_valid(self):
         probe.verify_inputs(self.data)
