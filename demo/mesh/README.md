@@ -73,6 +73,35 @@ g++-aarch64-linux-gnu msitools clang-19 lld-19`; MSVC with
 `tools/msvc-wine/fetch_msvc.py /opt/msvc` and `case_links.py`; the Android NDK
 at `/opt/android-ndk-r29` (or `$ANDROID_NDK`).
 
+## Cross-site runs: the Mac and the mailbox
+
+The cloud and the Mac have no live link, so their devices meet through a
+mailbox (INTERFACES.md 6): the hub plans the cloud x Mac jobs with fixed
+device ids (`tools/mac_devices.txt`, Mac ids from 101), each site's devices
+answer the Job and Hop files addressed to them (`xo_peer --mailbox`), the
+sites swap files once, and the hub scores every job afterwards
+(`xo_hub --mailbox-score`).
+
+```bash
+T=demo/mesh/tools
+$T/run_mesh.sh --build-only                      # cloud programs (build/mesh)
+$T/run_mailbox.sh plan                           # cloud x Mac jobs: build/mesh-mailbox/plan
+$T/run_mailbox.sh pre                            # cloud devices answer; mac_inbox.tar.gz
+$T/pack_mesh_mac.sh . HEAD build/mesh-mailbox OUT_DIR   # Android programs + source + inbox for the Mac
+# on the Mac: XOQ_OUT=<out> bash run_mesh_mac.sh   (live mesh of the 8 Mac devices, then the mailbox)
+$T/run_mailbox.sh post MAC_OUT                   # Mac outbox in, cloud devices finish, score, CROSS_RESULT.md
+$T/run_mailbox.sh fake-mac                       # cloud dry run: linux-x64-gcc plays the Mac devices
+```
+
+`run_mesh_mac.sh` (macOS bash 3.2, unattended) runs the hub in colima
+(Linux arm64, ports 47801/47802 published on the Mac) and eight devices:
+macOS (Apple clang), the iOS Simulator (xo_peer inside the test host app,
+`libxoh_xo_peer`; the noexc build through `simctl spawn`), the Android
+emulator (NDK programs from the pack, hub at 10.0.2.2) and colima Linux
+arm64 (GCC 16), each with and without exceptions. Its output has the live
+mesh (`mesh/`, with `status.json` and `MESH_RESULT.md`) and the mailbox
+answers (`mailbox/outbox.tar.gz`).
+
 ## Files
 
 | Path | What |
@@ -82,4 +111,7 @@ at `/opt/android-ndk-r29` (or `$ANDROID_NDK`).
 | `src/net.cpp` | TCP framing, POSIX and Winsock, no exceptions |
 | `src/peer_main.cpp`, `src/peer/control.hpp` | the device program; control wires and the build line |
 | `src/hub_main.cpp`, `src/hub/` | the hub: relay loop and scoring (`hub.cpp`), HTTP pages (`http.cpp`), QR encoder (`qr.cpp`) |
-| `tools/run_mesh.sh`, `tools/mesh_report.py` | the cloud mesh run and its report |
+| `src/peer/mailbox.hpp`, `src/hub/mailbox.cpp`, `src/hub/score.cpp` | mailbox file names; offline plan and score; the scoring shared with the live hub |
+| `tools/run_mesh.sh`, `tools/mesh_columns.sh`, `tools/mesh_report.py` | the cloud mesh run, its device columns and the report (several runs merged with `--also`) |
+| `tools/run_mailbox.sh`, `tools/mac_devices.txt` | the cloud side of a cross-site mailbox run; the Mac devices and their ids |
+| `tools/pack_mesh_mac.sh`, `tools/run_mesh_mac.sh` | the Mac batch: its pack (cloud) and its script (Mac) |
