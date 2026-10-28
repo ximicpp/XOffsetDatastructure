@@ -198,6 +198,8 @@ next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 | android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios (Mac M4, separate run, 10-28) | iOS 27.0 Simulator (iPhone 17), arm64; A/B in colima, Linux arm64 | Apple clang 21, iPhoneSimulator 27.1 SDK, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the cloud x86-64 run |
+| android (Xiaomi M2102K1C, separate run, 10-28, v3.2.0-rc.1 39de636) | Android 11 phone (API 30), arm64-v8a, USB `adb reverse`; A/B in WSL2 Docker, Linux x86-64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | - |
+| android-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the reference host of that run |
 
 What this shows:
 - Server to server across architectures: A and B built by GCC 16 for Linux
@@ -243,6 +245,18 @@ zstd, decoded in 463 us and verified in 34 us. Output:
 `mobile_sim_android_out.tar.gz` in the project folder (sha256
 `dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
 table `out-android/android/demo/E2E_RESULT.md`.
+
+Android phone (10-28, v3.2.0-rc.1, commit 39de636 only): a Xiaomi
+M2102K1C on Android 11 ran both clients against A/B built by GCC 16.2 (C++26
+reflection) in WSL2 Docker, through Windows adb with `adb reverse`; on the
+same phone the library's CTest passed 114 / 114 and the 15 compile-failure
+tests passed on the host with the same NDK. Two earlier attempts are kept as
+they were: the first did not run the demo (`adb reverse tcp:48024` failed,
+the port lay in the phone's ephemeral range; the device script now starts at
+17800), the second failed only the replay (the Windows adb wrapper dropped the
+trailing `/.` and the corpus landed one directory too deep). Phone timings are
+one functional run, not device performance. Record and evidence index:
+`docs/validation/2026-10-28-rc1-platform/README.md`.
 
 Clients without exceptions (10-28): every client build also makes
 `mapdemo_client_noexc` from the same sources (`-fno-exceptions`; MSVC and

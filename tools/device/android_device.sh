@@ -6,7 +6,7 @@
 #      Linux GCC 16 C++26 reflection build are accepted and the phone writes the same bytes;
 #   2. game demo: Linux servers A/B (GCC 16, C++26 reflection) in a docker container on
 #      this host; the demo clients (with and without exceptions) run on the phone and
-#      reach A through `adb reverse` (the phone's 127.0.0.1:47800-48049 is this host).
+#      reach A through `adb reverse` (the phone's 127.0.0.1:17800-18049 is this host).
 #      demo/mapstate/tools/run_e2e.sh: self-check, replay, 1/100/10000 units x 500 steps
 #      with dense/compact/zstd snapshots, evil.
 #
@@ -31,6 +31,10 @@
 #   XO_SKIP        space-separated steps to skip: ctest corpus demo
 #   XO_STATIC=1    fully static programs (cloud dry run with a qemu adb stand-in only)
 #   XO_CMAKE_TOOL  a CMake root from tools/prepare_vm_cmake.py for the container (instead of downloading)
+#   XO_PORT_BASE   first demo port (default 17800; the demo uses base+0..49, +100..149, +200..249
+#                  on this host and, through adb reverse, on the phone). Keep it below 32768:
+#                  Android's ephemeral ports (32768-60999, some vendors 37000-50000) are taken by
+#                  the phone's own connections, and `adb reverse` fails on a busy port.
 #
 # Exit status: 0 everything that ran passed, 3 something failed (RESULT.md says what),
 # 2 host tools, inputs or the phone missing (nothing ran). macOS bash 3.2 compatible.
@@ -49,7 +53,9 @@ SDK=$XO_WORK/sdk
 NDK_REV=29.0.14206865          # NDK r29, the one the cloud and emulator runs used
 DEV=/data/local/tmp/xo
 RT=xo-device-srv-$SHA7
-PORTS="47800-47849 47900-47949 48000-48049"  # run_e2e.sh MAPDEMO_PORT_BASE=47800: the corpus run 47800+, target I 47800+100*(I+1)+
+PB=${XO_PORT_BASE:-17800}
+case $PB in *[!0-9]*|"") echo "XO_PORT_BASE must be a number" >&2; exit 2 ;; esac
+PORTS="$PB-$((PB + 49)) $((PB + 100))-$((PB + 149)) $((PB + 200))-$((PB + 249))"  # run_e2e.sh MAPDEMO_PORT_BASE=$PB: the corpus run $PB+, target I $PB+100*(I+1)+
 SKIP=" ${XO_SKIP:-} "
 case "$(uname -s)" in Darwin) HOSTOS=macosx; JOBS=${XO_JOBS:-$(sysctl -n hw.ncpu)} ;; *) HOSTOS=linux; JOBS=${XO_JOBS:-$(nproc)} ;; esac
 BOOST_LIBS="assert config container container_hash core intrusive move predef static_assert throw_exception type_traits winapi"
@@ -242,7 +248,9 @@ phone() {  # the one phone: ANDROID_SERIAL or the only attached device
     {
         echo "serial=$ANDROID_SERIAL"
         echo "model=$(gp ro.product.manufacturer) $(gp ro.product.model)"
-        echo "soc=$(gp ro.soc.manufacturer) $(gp ro.soc.model)"
+        soc="$(gp ro.soc.manufacturer) $(gp ro.soc.model)"   # ro.soc.* from Android 12 (API 31)
+        [ "$soc" = " " ] && soc="$(gp ro.board.platform) $(gp ro.hardware)"
+        echo "soc=$soc"
         echo "android=$(gp ro.build.version.release) (API $(gp ro.build.version.sdk))"
         echo "abi=$(gp ro.product.cpu.abi)"
         echo "fingerprint=$(gp ro.build.fingerprint)"
@@ -341,7 +349,7 @@ WRAP
     vm "pkill -x mapdemo_a; pkill -x mapdemo_b; true" > /dev/null 2>&1
     rm -rf "$W/demo"
     # shellcheck disable=SC2086
-    MAPDEMO_RUNS_UNDER="$unders" MAPDEMO_A_HOST=0.0.0.0 MAPDEMO_PORT_BASE=47800 \
+    MAPDEMO_RUNS_UNDER="$unders" MAPDEMO_A_HOST=0.0.0.0 MAPDEMO_PORT_BASE=$PB \
         MAPDEMO_LABEL="Android phone $model; Linux $(uname -m | sed 's/arm64/aarch64/') GCC 16 C++26 servers in docker; $VERSION $SHA7" \
         bash "$W/src/demo/mapstate/tools/run_e2e.sh" "$W/srv-bin" "$W/demo" $targets > "$XO_OUT/demo_run.log" 2>&1; e=$?
     cp -R "$W/demo" "$XO_OUT/demo"
