@@ -18,7 +18,10 @@
 # headless client on the same A at the same time, e.g. the client of the
 # other schema version; its requests are numbered from 3000001 so A's log
 # keeps one row per request id; CSV files in OUT_DIR/client2/) with
-# MAPDEMO_CLIENT2_ARGS (its extra arguments, default MAPDEMO_CLIENT_ARGS).
+# MAPDEMO_CLIENT2_ARGS (its extra arguments, default MAPDEMO_CLIENT_ARGS),
+# MAPDEMO_EDITS (default 10: each client writes back every 10th normal
+# snapshot, --edits 10, and A forwards each edit to the other client of the
+# same schema version; 0 = no write-back).
 #
 # Writes OUT_DIR/{a,b,client}.log (and client2.log), the CSV files of
 # INTERFACES.md section 6, OUT_DIR/meta.txt and OUT_DIR/exit_codes.txt. Exit
@@ -44,6 +47,11 @@ A_ARGS=${MAPDEMO_A_ARGS:-}
 CLIENT=${MAPDEMO_CLIENT:-$BIN/mapdemo_client}
 CLIENT2=${MAPDEMO_CLIENT2:-}
 CLIENT2_ARGS=${MAPDEMO_CLIENT2_ARGS-$CLIENT_ARGS}
+EDITS=${MAPDEMO_EDITS:-10}
+if [ "$EDITS" != 0 ]; then
+    CLIENT_ARGS="$CLIENT_ARGS --edits $EDITS"
+    CLIENT2_ARGS="$CLIENT2_ARGS --edits $EDITS"
+fi
 
 for exe in mapdemo_a mapdemo_b; do
     if [ ! -x "$BIN/$exe" ]; then

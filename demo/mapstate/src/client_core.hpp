@@ -53,6 +53,10 @@ struct Options {
     std::uint16_t events = kEventsOff;
     std::string events_dict;        // --events-dict FILE; empty: the built-in dictionary
     static constexpr std::uint16_t kEventsOff = 0xffff;
+    // --edits N: write back every Nth normal snapshot (headless; 0 = off).
+    // The client changes the snapshot in its own buffer, sends it to A with
+    // save_verified (Edit) and receives the other writers' edits (Forward).
+    std::uint32_t edits = 0;
 
     bool check_on() const { return check.value_or(headless); }
 };
@@ -87,6 +91,12 @@ public:
     // wire leaves a fresh holder as it was.
     Result<double> install(const std::string& wire, BufferMode mode, double* destroy_us);
     double clear();
+    // Write-back (--edits): the held snapshot, writable in place. A change
+    // may grow the buffer (up to cap_snapshot()); call edited() after it,
+    // before view() is read again.
+    ViewSnapshot& edit() noexcept { return buf_->root<ViewSnapshot>(); }
+    void edited() noexcept { root_ = &buf_->root<ViewSnapshot>(); }
+    void save_verified_into(std::string& out) { buf_->save_verified_into<ViewSnapshot>(out); }
 
 private:
     std::optional<XBuffer> buf_;
@@ -126,6 +136,23 @@ private:
     std::map<std::string, Entry> entries_;
 };
 
+// Write-back: the changes a client makes to a snapshot it received, in
+// place (the rect must have a non-zero area): the middle unit erased, the
+// first remaining unit's hp (kept in 50..100) and behavior changed, a unit
+// added at the rect centre (id kEditIdBase + seq, a 20-byte name, too long
+// to be stored inline) and the first short (inline) name made long. The
+// unit count stays the same (or grows by one from an empty view), and the
+// result passes checks::edit_sanity_of, the rules A applies to it.
+inline constexpr std::uint32_t kEditIdBase = 0x80000000u;
+struct EditSummary {
+    static constexpr std::uint32_t kNone = 0xffffffffu;   // no such unit in the snapshot
+    std::uint32_t erased_id = kNone;
+    std::uint32_t changed_id = kNone;   // hp and behavior
+    std::uint32_t added_id = 0;
+    std::uint32_t renamed_id = kNone;   // short name made long
+};
+EditSummary apply_client_edit(ViewSnapshot& snapshot, std::uint64_t seq);
+
 const char* category_name(net::ViewCategory c) noexcept;
 std::string join_path(const std::string& dir, const char* file);   // dir/file; file alone when dir is empty
 
@@ -138,6 +165,14 @@ inline constexpr const char* kEventsCsvHeader =
 inline constexpr const char* kSnapshotCsvHeader =
     "request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,"
     "encoding,net_bytes,wire_digest,decompress_us";
+// client_edits.csv (--edits): one row per write-back sent; edit_id is the
+// snapshot's request id, digest / wire_digest those of the edited snapshot
+// and of the Edit payload (A logs both in a_edits.csv), acked 1 when A's
+// EditAck came back. client_forwards.csv: one row per Forward received.
+inline constexpr const char* kEditsCsvHeader =
+    "edit_id,units,wire_bytes,digest,wire_digest,edit_us,save_us,rtt_us,acked,erased_id,changed_id,added_id,renamed_id";
+inline constexpr const char* kForwardsCsvHeader =
+    "edit_id,units,wire_bytes,digest,a_digest,wire_digest,load_us,check_ok";
 Rect clamp_view(Rect r, const Rect& scene) noexcept;
 
 // One connection to server A: handshake, catalog, at most one outstanding
@@ -172,6 +207,11 @@ public:
     const SnapshotHolder& holder() const noexcept { return holder_; }
     net::ViewCategory holder_category() const noexcept { return cur_.category; }
     const Rect& holder_request_rect() const noexcept { return cur_.rect; }
+
+    // --edits: after the snapshot's checks, every Nth normal snapshot is
+    // changed in place (apply_client_edit) and sent to A as an Edit; one
+    // edit is outstanding at a time.
+    Status maybe_edit();
 
     // Timing of field read + presentation data for the current snapshot.
     void note_read_present(double us);
@@ -214,6 +254,9 @@ private:
     void check_snapshot(const net::Frame& frame);
     Status subscribe();
     Status on_events(net::Frame& frame);
+    void on_edit_ack(const net::Frame& frame);
+    Status on_forward(net::Frame& frame);
+    void write_edit_row(bool acked, double rtt_us);
 
     const Options& opt_;
     net::Conn conn_;
@@ -265,6 +308,23 @@ private:
     std::uint64_t events_ = 0, last_event_tick_ = 0, event_part_ = 0;
     metrics::CsvFile events_csv_;
     bool events_csv_open_ = false;
+
+    // write-back (--edits)
+    struct EditRecord {
+        std::uint64_t edit_id = 0;
+        std::size_t units = 0, wire_bytes = 0;
+        std::uint64_t digest = 0, wire_digest = 0;
+        double edit_us = 0, save_us = 0;
+        EditSummary what;
+    };
+    std::uint64_t edit_counter_ = 0;          // normal snapshots seen with --edits
+    bool edit_inflight_ = false;
+    std::uint64_t edit_sent_ns_ = 0;
+    EditRecord edit_;
+    std::uint64_t edits_sent_ = 0, edits_acked_ = 0, forwards_ = 0;
+    std::optional<XBuffer> fwd_buf_;          // reuse: reloaded for every Forward
+    metrics::CsvFile edits_csv_, forwards_csv_;
+    bool edits_csv_open_ = false;
 };
 
 // Entry points (client_main.cpp dispatches). Return the process exit code
