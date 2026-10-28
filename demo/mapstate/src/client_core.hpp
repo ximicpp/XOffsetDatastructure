@@ -225,6 +225,7 @@ public:
     std::size_t last_net_bytes() const noexcept { return cur_.net_bytes; }
     codec::Encoding last_encoding() const noexcept { return cur_.encoding; }
     std::uint64_t snapshots() const noexcept { return snapshots_; }
+    std::uint64_t net_bytes_total() const noexcept { return net_bytes_total_; }   // every snapshot's frame payload
 
     metrics::Recorder& recorder() noexcept { return rec_; }
     CheckLog& checks() noexcept { return checks_; }
@@ -289,6 +290,7 @@ private:
     Record cur_;
     double last_rtt_us_ = 0, last_load_us_ = 0;
     std::uint64_t snapshots_ = 0;
+    std::uint64_t net_bytes_total_ = 0;
     std::uint64_t by_encoding_[codec::kEncodingCount] = {};
     std::optional<std::size_t> full_scene_visible_;
     std::uint64_t direct_units_ = 0, direct_names_ = 0;

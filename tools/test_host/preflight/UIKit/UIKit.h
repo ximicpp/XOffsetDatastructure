@@ -26,7 +26,11 @@ __attribute__((objc_root_class)) @interface NSObject <NSObject>
 @interface NSString : NSObject
 + (instancetype)stringWithUTF8String:(const char*)s; @property(readonly) const char* UTF8String;
 @end
-@interface NSArray<T> : NSObject @property(readonly) T firstObject; @end
+@interface NSArray<T> : NSObject @property(readonly) T firstObject;
++ (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)cnt; @end
+typedef double NSTimeInterval;
+@interface NSTimer : NSObject
++ (NSTimer*)scheduledTimerWithTimeInterval:(NSTimeInterval)ti target:(id)t selector:(SEL)s userInfo:(id)u repeats:(BOOL)r; @end
 @interface NSBundle : NSObject + (NSBundle*)mainBundle; @property(readonly) NSString* privateFrameworksPath; @end
 typedef NSInteger NSProcessInfoThermalState;
 @interface NSProcessInfo : NSObject + (NSProcessInfo*)processInfo; @property(readonly) NSProcessInfoThermalState thermalState;
@@ -34,7 +38,17 @@ typedef NSInteger NSProcessInfoThermalState;
 enum { NSDocumentDirectory = 9 }; enum { NSUserDomainMask = 1 };
 extern "C" NSArray<NSString*>* NSSearchPathForDirectoriesInDomains(NSUInteger, NSUInteger, BOOL);
 extern "C" NSString* NSStringFromClass(Class);
-@interface UIColor : NSObject @property(class, readonly) UIColor* systemBackgroundColor; @property(class, readonly) UIColor* labelColor; @end
+@interface UIColor : NSObject @property(class, readonly) UIColor* systemBackgroundColor; @property(class, readonly) UIColor* labelColor;
+@property(class, readonly) UIColor* secondaryLabelColor; @property(class, readonly) UIColor* systemOrangeColor;
+@property(class, readonly) UIColor* systemBlueColor; @end
+typedef CGFloat UIFontWeight;
+extern "C" const UIFontWeight UIFontWeightRegular, UIFontWeightSemibold, UIFontWeightBold;
+@interface UIFont : NSObject + (UIFont*)monospacedDigitSystemFontOfSize:(CGFloat)s weight:(UIFontWeight)w;
++ (UIFont*)monospacedSystemFontOfSize:(CGFloat)s weight:(UIFontWeight)w; @end
+@interface NSLayoutConstraint : NSObject + (void)activateConstraints:(NSArray*)a; @end
+@interface NSLayoutAnchor : NSObject - (NSLayoutConstraint*)constraintEqualToAnchor:(NSLayoutAnchor*)a constant:(CGFloat)c; @end
+@interface UILayoutGuide : NSObject @property(readonly) NSLayoutAnchor* leadingAnchor; @property(readonly) NSLayoutAnchor* trailingAnchor;
+@property(readonly) NSLayoutAnchor* topAnchor; @end
 @interface UIResponder : NSObject @end
 @interface UICoordinateSpaceObj : NSObject @property(readonly) CGRect bounds; @end
 @interface UIScene : UIResponder @end
@@ -42,10 +56,16 @@ extern "C" NSString* NSStringFromClass(Class);
 @interface UISceneSession : NSObject @property(readonly) NSString* role; @end
 @interface UISceneConnectionOptions : NSObject @end
 @interface UISceneConfiguration : NSObject - (instancetype)initWithName:(NSString*)n sessionRole:(NSString*)r; @property Class delegateClass; @end
-@interface UIView : UIResponder - (instancetype)initWithFrame:(CGRect)f; @property(strong) UIColor* backgroundColor; - (void)addSubview:(UIView*)v; @end
-@interface UILabel : UIView @property NSInteger numberOfLines; @property NSInteger textAlignment; @property(strong) UIColor* textColor; @property(copy) NSString* text; @end
+@interface UIView : UIResponder - (instancetype)initWithFrame:(CGRect)f; @property(strong) UIColor* backgroundColor; - (void)addSubview:(UIView*)v;
+@property BOOL translatesAutoresizingMaskIntoConstraints; @property(readonly) UILayoutGuide* safeAreaLayoutGuide;
+@property(readonly) NSLayoutAnchor* leadingAnchor; @property(readonly) NSLayoutAnchor* trailingAnchor; @property(readonly) NSLayoutAnchor* topAnchor; @end
+@interface UILabel : UIView @property NSInteger numberOfLines; @property NSInteger textAlignment; @property(strong) UIColor* textColor; @property(copy) NSString* text;
+@property(strong) UIFont* font; @property BOOL adjustsFontSizeToFitWidth; @property CGFloat minimumScaleFactor; @end
+enum { UILayoutConstraintAxisVertical = 1 };
+@interface UIStackView : UIView - (instancetype)initWithArrangedSubviews:(NSArray*)v; @property NSInteger axis; @property CGFloat spacing;
+- (void)setCustomSpacing:(CGFloat)s afterView:(UIView*)v; @end
 enum { NSTextAlignmentCenter = 1 };
-@interface UIViewController : UIResponder @property(strong) UIView* view; @end
+@interface UIViewController : UIResponder @property(strong) UIView* view; - (void)viewDidLoad; @end
 @interface UIWindow : UIView - (instancetype)initWithWindowScene:(UIWindowScene*)s; @property(strong) UIViewController* rootViewController; - (void)makeKeyAndVisible; @end
 @interface UIDevice : NSObject + (UIDevice*)currentDevice; @property(readonly) NSString* model; @property(readonly) NSString* systemName; @property(readonly) NSString* systemVersion; @end
 @interface UIApplication : UIResponder + (UIApplication*)sharedApplication; @property BOOL idleTimerDisabled; @end
