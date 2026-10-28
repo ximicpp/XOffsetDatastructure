@@ -343,14 +343,15 @@ host; see the Wine compatibility follow-up for diagnostic evidence.
 
 ## GitHub Windows ARM64 one-shot probe
 
-The schema-arm64-probe workflow fetches checksum-pinned synthetic Mac reference
-corpus and ARM64 fixture Git blobs and runs them on a GitHub Windows ARM64 VM.
-It verifies current source hashes, dependency lock evidence and gitlinks. The
-blob IDs are one-shot inputs and can expire; reruns must regenerate them for the
-current source. A passing Windows job means Windows read the Mac corpus and
-produced matching bytes; Mac must freshly read the returned artifact before
-claiming bidirectional verification. This diagnostic workflow does not bypass
-run_checked.py or satisfy its live native Windows runtime profile.
+github_arm64_probe.py runs a Mac reference corpus and an ARM64 fixture on a
+Windows ARM64 machine and checks current source hashes, dependency lock
+evidence and gitlinks. The repository no longer carries a workflow or recorded
+blob inputs for it: GitHub CI is off for this project and the old inputs named
+unreferenced Git objects that could be collected. Regenerate an input file for
+the current source and V2 binaries before any run. A passing probe means
+Windows read the Mac corpus and produced matching bytes; Mac must freshly read
+the returned corpus before claiming bidirectional verification. The probe does
+not bypass run_checked.py or satisfy its live native Windows runtime profile.
 
 
 ## V2 fixture migration and build evidence
@@ -408,6 +409,9 @@ four-operation wire exchange gets 4*N+30 seconds at the orchestration layer.
 The default remains 180 seconds per operation; the total wrapper can no longer
 cancel an otherwise valid exchange at the first operation's time limit.
 
-The checked-in GitHub ARM64 input snapshot is historical and must be regenerated
-with V2 binaries and compile_id before use. The workflow is diagnostic and is
-not a substitute for the complete live release gate.
+adb_wire_runner.py --timeout N (default 150) is one budget for all adb calls
+of an operation, plus up to 10 seconds to remove its device directory, so keep
+N + 10 below the step timeout. The Windows nodecli worker runs it with 75
+seconds inside its own 90-second limit. relay_wire_runner.py rereads a
+response that is not yet complete JSON (a nodecli transfer is not atomic) until
+its --timeout expires; keep that timeout below the step timeout as well.

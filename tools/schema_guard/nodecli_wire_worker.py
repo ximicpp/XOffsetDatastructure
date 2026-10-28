@@ -88,7 +88,8 @@ def execute(request, binaries, adapter, adb, serial, work):
         corpus = work / "corpus"
         if operation == "--read":
             unpack(request.get("files"), corpus)
-        command = ([sys.executable, str(adapter), "--adb", adb, "--serial", serial, "--", str(binary)]
+        # The adapter's budget plus its cleanup stays inside this 90 s limit.
+        command = ([sys.executable, str(adapter), "--adb", adb, "--serial", serial, "--timeout", "75", "--", str(binary)]
                    if kind == "android" else [str(binary)])
         command.append(operation)
         if operation != "--xsg-identify":

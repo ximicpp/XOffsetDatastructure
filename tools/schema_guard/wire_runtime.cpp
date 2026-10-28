@@ -84,7 +84,21 @@ bool fields_equal(const T& a, const T& b, std::index_sequence<I...>) {
 }
 template<class T> bool values_equal(const T& a, const T& b) {
     namespace d=xo::detail;
-    if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) return a==b;
+    // Floating values compare by representation so NaN payloads and -0.0 count.
+    if constexpr (std::is_floating_point_v<T>) {
+        if constexpr (sizeof(T)==sizeof(std::uint32_t)) return std::bit_cast<std::uint32_t>(a)==std::bit_cast<std::uint32_t>(b);
+        else if constexpr (sizeof(T)==sizeof(std::uint64_t)) return std::bit_cast<std::uint64_t>(a)==std::bit_cast<std::uint64_t>(b);
+        else return a==b || (a!=a && b!=b);
+    }
+    else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T> || std::is_same_v<T,std::byte>) return a==b;
+    else if constexpr (std::is_array_v<T>) {
+        for(std::size_t i=0;i<std::extent_v<T>;++i) if(!values_equal(a[i],b[i])) return false;
+        return true;
+    }
+    else if constexpr (requires { typename T::value_type; std::tuple_size<T>::value; }) {
+        for(std::size_t i=0;i<std::tuple_size_v<T>;++i) if(!values_equal(a[i],b[i])) return false;
+        return true;
+    }
     else if constexpr (d::is_fixed_string_v<T>) return std::string_view(a.data(),a.size())==std::string_view(b.data(),b.size());
     else if constexpr (d::is_fixed_flat_map_v<T>) {
         if(a.size()!=b.size()) return false;

@@ -25,6 +25,12 @@ def main(argv=None):
         command = command[1:]
     if not command:
         parser.error("provide a command after --")
+    # The runtime fixture is built from catalog_slg.hpp only; refuse a custom
+    # catalog before spending time on the compile matrix.
+    if Path(args.catalog).resolve() != (HERE / "catalog_slg.hpp").resolve():
+        print("Runtime wire fixture covers only catalog_slg.hpp; custom catalog cannot pass this gate.",
+              file=sys.stderr, flush=True)
+        return 2
     reports = Path(args.reports).resolve()
     reports.mkdir(parents=True, exist_ok=True)
     output = reports / ("schema-" + uuid.uuid4().hex)
@@ -39,10 +45,6 @@ def main(argv=None):
     if result.returncode != 0:
         print("Schema gate did not pass; command was not started.", file=sys.stderr, flush=True)
         return result.returncode if result.returncode > 0 else 1
-    if Path(args.catalog).resolve() != (HERE / "catalog_slg.hpp").resolve():
-        print("Runtime wire fixture covers only catalog_slg.hpp; custom catalog cannot pass this gate.",
-              file=sys.stderr, flush=True)
-        return 2
     runtime = [sys.executable, str(HERE / "runtime_matrix.py"), "--out", str(output / "runtime")]
     if args.wire_profiles:
         runtime += ["--profiles", args.wire_profiles]

@@ -46,7 +46,7 @@ class PreRunGateTests(TestCase):
         with mock.patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run:
             args = ["--catalog", "/different/catalog.hpp"] + self.args
             self.assertEqual(module.main(args), 2)
-        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_count, 0)
 
     def test_each_run_gets_new_report_directory(self):
         with mock.patch.object(module.subprocess, "run", return_value=SimpleNamespace(returncode=2)) as run:
