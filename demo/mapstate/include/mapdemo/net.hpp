@@ -29,8 +29,8 @@
 namespace mapdemo::net {
 
 enum class MsgType : std::uint16_t {
-    Hello = 1,         // A->B, client->A: hello_payload() (4 schema hashes, 32 B)
-    HelloOk = 2,       // B->A, A->client: empty
+    Hello = 1,         // A->B, client->A: XSchemaHello wire (handshake.hpp)
+    HelloAck = 2,      // B->A, A->client: XSchemaHelloAck wire; a rejection is followed by a close
     Catalog = 3,       // A->client: MapCatalog wire
     ViewReq = 4,       // client->A: ViewRequest wire; flags = codec::view_flags()
     ViewSnapshot = 5,  // A->client: ViewSnapshot in the requested encoding; flags echoed
@@ -66,7 +66,7 @@ struct FrameHeader {
 static_assert(sizeof(FrameHeader) == 24);
 
 // Per-type receive limit: Catalog 1 MiB, ViewReq 4 KiB, ViewSnapshot 16 MiB,
-// StepReq/StepRes 64 MiB, Hello 32 B, Error 4 KiB, HelloOk/Bye 0,
+// StepReq/StepRes 64 MiB, Hello / HelloAck 4 KiB, Error 4 KiB, Bye 0,
 // Subscribe 24 B, SubscribeOk 0, Events 1 MiB.
 std::uint32_t max_payload(MsgType type) noexcept;
 const char* type_name(MsgType type) noexcept;
@@ -217,10 +217,7 @@ Result<int> try_poll(PollItem* items, std::size_t count, int timeout_ms);
 int poll(PollItem* items, std::size_t count, int timeout_ms);   // throws ProtocolError
 #endif
 
-// Handshake: 4 x u64 wire_schema_hash_v<T>() for MapCatalog, UnitStateBatch,
-// ViewRequest, ViewSnapshot, in that order.
-std::string hello_payload();
-bool hello_matches(std::string_view payload);
+// Handshake payloads: handshake.hpp (the library's XSchemaHello / Ack).
 
 // steady_clock in nanoseconds (process-local; never compared across processes).
 std::uint64_t now_ns() noexcept;

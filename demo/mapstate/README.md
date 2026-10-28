@@ -17,7 +17,9 @@ XOffset paths with real processes and real TCP:
    verifies it the same way after decompression. The client code never
    throws, so the same sources also build without exceptions
    (`mapdemo_client_noexc`, `-fno-exceptions` / MSVC `/EHs-c-`), as engine
-   clients are usually built.
+   clients are usually built. Clients that have not updated keep working:
+   `mapdemo_client_v1` is built against the frozen version-1 schema, and A
+   converts every snapshot for it after the handshake (below).
 
 Every process takes `--buffers reuse|fresh`. `reuse` (the default) keeps one
 buffer per role and refills it in place (`reload_verified`, `reset`,
@@ -38,20 +40,25 @@ folder (`slg-demo-20261022/MAP_DEMO_DESIGN_20261022.md`). Results:
 
 | Path | Contents |
 | --- | --- |
-| `include/mapdemo/schema.hpp` | XOffset types (`UnitStateBatch`, `ViewSnapshot`, `MapCatalog`, ...), receive caps, no-padding asserts |
+| `include/mapdemo/schema.hpp` | XOffset types (`UnitStateBatch`, `ViewSnapshot`, `MapCatalog`, ...), receive caps, no-padding asserts; schema version 2 |
+| `include/mapdemo/schema_v1.hpp`, `schema.lock` | schema version 1 as frozen by `mapdemo_schema_freeze` (namespace `mapdemo_v1`; generated, never edited) and the lock the check compares against |
+| `include_v1/mapdemo/schema.hpp` | the version-1 schema header for `mapdemo_client_v1`: the frozen types under their usual names, version 1's constants |
+| `include/mapdemo/schema_lineage.hpp`, `include/mapdemo/handshake.hpp` | A's lineage (version 1 of `ViewSnapshot`, servers only); the client's Hello and ack reading, on both ends |
+| `include/mapdemo/schema_probes.hpp` | types for the evil handshake cases: a renamed field, a version A does not know |
 | `include/mapdemo/std_model.hpp` | the same fields in std types; reference model for checks only |
 | `include/mapdemo/rules.hpp`, `rules_impl.hpp` | deterministic generation and step rules, one template for both models |
 | `include/mapdemo/net.hpp`, `src/net.cpp` | 24-byte frame header, per-type length caps checked before allocation, handshake, payload recycling; POSIX sockets and Winsock |
 | `include/mapdemo/codec.hpp`, `src/codec.cpp` | `ViewReq` flags (category + snapshot encoding), zstd compression and the guarded decompression |
 | `dict/unit_event_v1.xozd` | the event dictionary (id 1, 16 KB, bound to `UnitEvent`), compiled into every binary at configure time; codec uses `contrib/zstd_dict` |
-| `include/mapdemo/build_info.hpp` | the `build` line each process prints (compiler, platform, C++ standard, schema backend, zstd) |
+| `include/mapdemo/build_info.hpp` | the `build` line each process prints (compiler, platform, C++ standard, schema backend, schema version, zstd) |
 | `include/mapdemo/buffer_mode.hpp` | the `--buffers` option (`reuse`, `fresh`) |
 | `include/mapdemo/metrics.hpp`, `src/metrics.cpp` | samples, mean / p50 / p95 / max, CSV |
 | `include/mapdemo/checks.hpp`, `src/checks.cpp` | invariants, reference comparison, snapshot comparison, snapshot and wire digests |
 | `src/server_a.cpp`, `src/server_b.cpp` | A (single-threaded `poll` loop) and B (blocking step loop) |
 | `src/client_core.*`, `src/client_main.cpp`, `src/client_gui.cpp` | client network, snapshot holder, headless sampling, `--evil`, raylib window |
 | `src/client_offline.cpp` | client `--self-check` (no network: every encoding verifies, refusal cases refused) and `--replay` (a snapshot corpus written by A, checked against A's digests) |
-| `src/selftest.cpp` | allocation / free / reuse across save + load and reload, both buffer modes byte for byte, independent output, failure inputs, rect rule |
+| `src/selftest.cpp` | allocation / free / reuse across save + load and reload, both buffer modes byte for byte, independent output, failure inputs, rect rule, handshake verdicts and the version-1 conversion |
+| `src/schema_freeze.cpp` | `mapdemo_schema_freeze`: `freeze` a release, `check` the lock (run by `run_all_tiers.sh`) |
 | `tools/run_tier.sh`, `tools/run_all_tiers.sh`, `tools/summarize.py` | one tier, all tiers + evil in both modes, result tables, cross-run digest comparison |
 | `tools/run_e2e.sh`, `tools/e2e_report.py` | one Linux A/B against several client builds (native, wine, qemu, emulator): self-check, corpus replay, tiers, evil; `E2E_RESULT.md` |
 
@@ -102,8 +109,9 @@ cmake --build build-demo -j
 
 A and B stay on Linux with C++26 reflection; the client alone builds with
 `-DMAPDEMO_CLIENT_ONLY=ON -DXOFFSET_CXX_STANDARD=20`. The schema's field
-lists give the same layout and the same Hello schema hash as reflection (a
-C++26 build checks the lists), so a mismatch fails the handshake.
+lists give the same layout and the same handshake fingerprints as
+reflection (a C++26 build checks the lists), so a mismatch fails the
+handshake.
 
 ```bash
 COMMON="-DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20 -DXOFFSET_BUILD_DEMOS=ON -DMAPDEMO_CLIENT_ONLY=ON \
@@ -121,7 +129,7 @@ cmake -S . -B build/client-msvc -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/to
 cmake -S . -B build/client-clang-cl -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/clang-cl-x86_64.cmake
 # Windows, MSVC on Windows (Developer Command Prompt)
 cmake -S . -B build/client-msvc %COMMON%
-cmake --build <dir> --target mapdemo_client mapdemo_client_noexc
+cmake --build <dir> --target mapdemo_client mapdemo_client_noexc mapdemo_client_v1
 ```
 
 Every build also makes `mapdemo_client_noexc`: the same client compiled
@@ -164,7 +172,7 @@ Automatic checks and the three tiers (no window, same types and network path):
 demo/mapstate/tools/run_all_tiers.sh build-demo/bin/Release mapdemo-results
 ```
 
-This runs `mapdemo_selftest`, then 1, 100 and 10000 units x 500 steps (seed 1,
+This runs `mapdemo_selftest` and `mapdemo_schema_freeze check`, then 1, 100 and 10000 units x 500 steps (seed 1,
 A and the headless client with `--check`) in both buffer modes, then the
 `--evil` online failure-input run (100 units, 200 steps) in both modes, each on
 its own port pair, and finally `tools/summarize.py`. Output:
@@ -174,7 +182,8 @@ section 6, process logs, `exit_codes.txt` and `meta.txt` (host, commit, buffer
 mode, load average before and after). Exit status 0 means every process exited
 0 and every verdict passed. Variables: `MAPDEMO_TIERS`, `MAPDEMO_STEPS`,
 `MAPDEMO_MODES` (default `fresh reuse`), `MAPDEMO_PORT_BASE`,
-`MAPDEMO_SKIP_EVIL`, `MAPDEMO_LABEL`, `MAPDEMO_COMPARE`. One tier alone:
+`MAPDEMO_SKIP_EVIL`, `MAPDEMO_LABEL`, `MAPDEMO_COMPARE`, `MAPDEMO_CLIENT2`
+(a second client in every tier, at the same time). One tier alone:
 `MAPDEMO_BUFFERS=reuse tools/run_tier.sh BIN_DIR UNITS OUT_DIR [STEPS]`.
 
 Same bytes on another compiler or platform: copy one results directory to the
@@ -186,15 +195,17 @@ built with `-ffp-contract=off`, so the bytes are expected to be identical).
 
 `summarize.py` verdicts per tier: exit codes; at least 500 steps with
 consecutive ticks, every step check passing and a wire digest on every step
-row; every row of `a_checks.csv` and `client_checks.csv` passing (A's six
+row; every row of `a_checks.csv` and `client_checks.csv` passing (A's seven
 fixed rows present); A's and the client's snapshot logs identical per request
-id (tick, category, visible count, wire bytes, digest); normal, full-scene and
+id (tick, category, visible count, wire bytes, digest), and each client sent
+snapshots of its own schema version (with `MAPDEMO_CLIENT2` the same for the
+second client); normal, full-scene and
 empty requests all sampled, empty ones with 0 units and full-scene ones with
 every unit; every metric name of INTERFACES.md section 6 present (no destroy
 metrics in `reuse`). Across tiers: `fresh` and `reuse` with the same unit
 count send identical step wires over at least 500 common ticks; with
 `--compare`, every tier matches the other run. Self-test: exit 0, every row
-passing. Evil: all three processes exit 0, A logged at least six `rejected:`
+passing; the schema lock check exits 0. Evil: all three processes exit 0, A logged at least twelve `rejected:`
 lines and every row of the evil client's `client_checks.csv` passes. Snapshot
 rows also agree on encoding, bytes sent and wire digest; a client run with
 `--encoding cycle` must have received every encoding.
@@ -249,6 +260,46 @@ xoffset_zstd_dict train --id 2 --size 16384 --binding auto \
 
 (`contrib/zstd_dict`), and reconfigure. A new dictionary takes a new id:
 clients holding the old id are refused at Subscribe.
+
+### Schema versions: the old-version client
+
+Version 1 of the schema is frozen in `include/mapdemo/schema_v1.hpp` and
+`schema.lock`; version 2 (`schema.hpp`) adds `scene_units` to
+`ViewSnapshot`, which the window client shows as "visible N of M". Every
+client starts with the library's handshake: its Hello lists its root
+types, and A answers per type with `same`, `convert`, `reject_names` or
+`reject_unknown` (INTERFACES.md section 4). `mapdemo_client_v1` gets
+`convert`: A builds the version-2 snapshot, converts it into a version-1
+buffer (`evolve_into`; `evolve<mapdemo_v1::ViewSnapshot>` with `--buffers
+fresh`) and sends that one, so the old client
+needs no change and does no conversion itself. A client with the same
+layout under other field names, or a version A does not know, is refused
+in the ack and disconnected; the evil run covers both.
+
+Both versions against one A at the same time:
+
+```bash
+MAPDEMO_CLIENT=BIN/mapdemo_client_v1 MAPDEMO_CLIENT2=BIN/mapdemo_client \
+    demo/mapstate/tools/run_all_tiers.sh BIN OUT_ROOT
+```
+
+and per client platform with `run_e2e.sh` and
+`MAPDEMO_CLIENT2_OF="NAME=<that platform's version-2 client>"`. The summary
+checks that each client got its own version (`a_snapshots.csv` column
+`schema`); A's `--check` loads every converted wire back as version 1 and
+compares its digest with the version-2 snapshot's.
+
+A release that changes a root type: freeze the released schema first, from
+`demo/mapstate/include`,
+
+```bash
+mapdemo_schema_freeze freeze v2 mapdemo_v2 mapdemo/schema_v2.hpp ../schema.lock
+```
+
+then change `schema.hpp`, add `mapdemo_v2::ViewSnapshot` to the lineage
+in `schema_lineage.hpp` and add an `include_v2/` client. `run_all_tiers.sh`
+runs `mapdemo_schema_freeze check` and fails when a root type changed
+without that.
 
 ## Deterministic generation (design section 3)
 
