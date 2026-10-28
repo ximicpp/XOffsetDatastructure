@@ -22,6 +22,7 @@
 #include <string_view>
 #include "mapdemo/buffer_mode.hpp"
 #include "mapdemo/build_info.hpp"
+#include "mapdemo/handshake.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
@@ -91,13 +92,22 @@ int run(const Options& opt) {
     net::Conn conn = listener.accept();
 
     {
+        // A's Hello lists UnitStateBatch; B accepts its own version only.
         net::Frame hello = conn.recv({MsgType::Hello});
-        if (!net::hello_matches(hello.payload)) {
-            send_error(conn, "schema hash mismatch");
-            std::fprintf(stderr, "error: hello: schema hash mismatch with A\n");
+        std::string ack;
+        const XSchemaHelloResult peer = accept_schema_hello<UnitStateBatch>(hello.payload, ack, "mapdemo_b");
+        if (!peer.valid) {
+            send_error(conn, "bad schema hello: " + peer.message);
+            std::fprintf(stderr, "error: hello: not a schema hello: %s\n", peer.message.c_str());
             return 2;
         }
-        conn.send(MsgType::HelloOk, 0, {});
+        conn.send(MsgType::HelloAck, 0, ack);
+        const XSchemaPeerEntry* batch = peer.find(wire_root_type_id_v<UnitStateBatch>());
+        if (!peer.accepted() || batch == nullptr) {
+            std::fprintf(stderr, "error: hello: A (%s) works in another UnitStateBatch schema (%s)\n",
+                         peer.label.c_str(), batch ? to_string(batch->verdict) : "not listed");
+            return 2;
+        }
     }
     std::fprintf(stderr, "b: A connected, buffers=%s\n", buffer_mode_name(opt.buffers));
 

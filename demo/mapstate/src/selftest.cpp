@@ -26,9 +26,12 @@
 #include <unistd.h>
 
 #include "mapdemo/checks.hpp"
+#include "mapdemo/handshake.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
+#include "mapdemo/schema_lineage.hpp"
+#include "mapdemo/schema_probes.hpp"
 #include "mapdemo/std_model.hpp"
 
 // ---- allocation probe -------------------------------------------------------
@@ -397,6 +400,7 @@ std::string snapshot_wire(const Batch& batch, std::uint64_t request_id, const Re
     v.tick = batch.tick;
     v.scene_id = kSceneId;
     v.rect = rect;
+    v.scene_units = std::uint32_t(batch.units.size());   // every unit is in the one scene
     v.units.reserve(std::uint32_t(hits.size()));
     for (std::size_t i : hits) {
         const auto& u = batch.units[i];
@@ -484,8 +488,8 @@ void test_frame_limits() {
     // Limits table.
     ex(net::max_payload(MsgType::ViewReq) == kCapViewRequest && net::max_payload(MsgType::ViewSnapshot) == kCapSnapshot &&
            net::max_payload(MsgType::StepReq) == kCapBatch && net::max_payload(MsgType::StepRes) == kCapBatch &&
-           net::max_payload(MsgType::Catalog) == kCapCatalog && net::max_payload(MsgType::Hello) == 32 &&
-           net::max_payload(MsgType::HelloOk) == 0 && net::max_payload(MsgType::Bye) == 0 &&
+           net::max_payload(MsgType::Catalog) == kCapCatalog && net::max_payload(MsgType::Hello) == 4096 &&
+           net::max_payload(MsgType::HelloAck) == 4096 && net::max_payload(MsgType::Bye) == 0 &&
            net::max_payload(MsgType::Error) == 4096 && net::max_payload(MsgType::Subscribe) == 24 &&
            net::max_payload(MsgType::SubscribeOk) == 0 && net::max_payload(MsgType::Events) == (1u << 20),
        "max_payload table differs from INTERFACES section 4");
@@ -682,11 +686,12 @@ void test_checks_detect_faults() {
     try {
         net::Conn c(fd);
         net::Frame h = c.recv({net::MsgType::Hello});
-        if (!net::hello_matches(h.payload)) {
+        std::string ack;
+        if (!accept_schema_hello<UnitStateBatch>(h.payload, ack, "selftest-b").accepted()) {
             c.send(net::MsgType::Error, 0, "schema mismatch");
             std::_Exit(2);
         }
-        c.send(net::MsgType::HelloOk, 0, {});
+        c.send(net::MsgType::HelloAck, 0, ack);
         for (;;) {
             net::Frame f = c.recv({net::MsgType::StepReq, net::MsgType::Bye});
             if (f.type == net::MsgType::Bye) break;
@@ -726,8 +731,8 @@ void test_net_two_process() {
     std::string detail;
     try {
         net::Conn c(fds[0]);
-        c.send(net::MsgType::Hello, 0, net::hello_payload());
-        (void)c.recv({net::MsgType::HelloOk});
+        c.send(net::MsgType::Hello, 0, make_server_schema_hello<UnitStateBatch>("selftest-a"));
+        if (!read_schema_ack<UnitStateBatch>(c.recv({net::MsgType::HelloAck}).payload)) ex(false, "B refused the hello");
         XB cur = XB::create<UnitStateBatch>(4096, cap_batch());
         rules::init_batch(cur.root<UnitStateBatch>(), units, kDefaultSeed);
         stdm::UnitStateBatch ref;
@@ -765,6 +770,66 @@ void test_net_two_process() {
     record("net_two_process", ex.ok(), ex.ok() ? detail : ex.first + " | " + detail);
 }
 
+// ---- 9. schema versions: handshake verdicts, conversion to version 1 ----------
+
+// A's verdict on the ViewSnapshot entry of a client Hello that works in
+// Snapshot (and in this build's other root types); `ack` gets A's answer.
+template <typename Snapshot>
+XSchemaVerdict snapshot_verdict(std::string& ack) {
+    const std::string hello = make_schema_hello<MapCatalog, ViewRequest, Snapshot, UnitEvent>("selftest-client");
+    const XPeerSchemas peer =
+        XPeerSchemas::accept<MapCatalog, ViewRequest, ViewSnapshot, UnitEvent>(hello, ack, "selftest-a");
+    const XSchemaPeerEntry* e = peer.find(wire_root_type_id_v<ViewSnapshot>());
+    return e != nullptr ? e->verdict : XSchemaVerdict::reject_unknown;
+}
+
+void test_schema_versions() {
+    Expect ex;
+    std::string ack;
+    ex(snapshot_verdict<ViewSnapshot>(ack) == XSchemaVerdict::same, "version-2 Hello is not same");
+    ex(bool(handshake::read_client_ack(ack)), "a version-2 client refuses A's ack");
+    ex(snapshot_verdict<mapdemo_v1::ViewSnapshot>(ack) == XSchemaVerdict::convert, "version-1 Hello is not convert");
+    ex(bool(read_schema_ack<mapdemo_v1::MapCatalog, mapdemo_v1::ViewRequest, mapdemo_v1::ViewSnapshot,
+                            mapdemo_v1::UnitEvent>(ack)),
+       "a version-1 client refuses A's ack");
+    ex(snapshot_verdict<probe::RenamedViewSnapshot>(ack) == XSchemaVerdict::reject_names,
+       "renamed fields are not reject_names");
+    const XSchemaAckResult renamed = read_schema_ack<MapCatalog, ViewRequest, probe::RenamedViewSnapshot, UnitEvent>(ack);
+    ex(!renamed && renamed.verdict == XSchemaVerdict::reject_names, "the renamed build does not read reject_names");
+    ex(snapshot_verdict<probe::FutureViewSnapshot>(ack) == XSchemaVerdict::reject_unknown,
+       "an unknown version is not reject_unknown");
+    {   // A and B: UnitStateBatch, exact version.
+        std::string b_ack;
+        const XSchemaHelloResult r =
+            accept_schema_hello<UnitStateBatch>(make_server_schema_hello<UnitStateBatch>("selftest-a"), b_ack, "b");
+        ex(r.accepted() && read_schema_ack<UnitStateBatch>(b_ack), "the A/B handshake was refused");
+    }
+
+    // A version-2 snapshot converted to version 1 keeps every field version 1 has.
+    XB bb = XB::load_verified<UnitStateBatch>(batch_wire(100), cap_batch());
+    const std::string w2 = snapshot_wire(bb.root<UnitStateBatch>(), 9, scene_bounds());
+    TypedXBuffer<ViewSnapshot> s2(XB::load_verified<ViewSnapshot>(w2, cap_snapshot()));
+    TypedXBuffer<mapdemo_v1::ViewSnapshot> s1 = evolve<mapdemo_v1::ViewSnapshot>(s2);
+    const std::string w1 = s1.save_compact(XCompactOptions{0});
+    XB back = XB::load_verified<mapdemo_v1::ViewSnapshot>(w1, cap_snapshot());
+    ex(checks::snapshot_digest_of(back.root<mapdemo_v1::ViewSnapshot>()) == checks::snapshot_digest(s2.root()),
+       "the conversion changed the content");
+    ex(back.root<mapdemo_v1::ViewSnapshot>().units.size() == 100, "the conversion lost units");
+    ex(peek_wire_fingerprint(w1).fingerprint == wire_fingerprint_v<mapdemo_v1::ViewSnapshot>,
+       "the converted wire is not version 1");
+    ex(!XB::try_load_verified<mapdemo_v1::ViewSnapshot>(w2, cap_snapshot()), "a version-1 load took a version-2 wire");
+    ex(!XB::try_load_verified<ViewSnapshot>(w1, cap_snapshot()), "a version-2 load took a version-1 wire");
+    const std::string plan = evolve_plan<ViewSnapshot, mapdemo_v1::ViewSnapshot>();
+    ex(plan.find("scene_units: drop (removed)") != std::string::npos &&
+           plan.find("reserved0: drop (removed)") != std::string::npos,
+       "evolve_plan does not drop exactly the version-2 fields: " + plan);
+    record("schema_versions", ex.ok(),
+           ex.ok() ? fmt("same, convert, reject_names, reject_unknown; 100 units: v2 dense wire %zu B, converted v1 "
+                             "compact wire %zu B, same content",
+                         w2.size(), w1.size())
+                   : ex.first);
+}
+
 void run_guarded(const char* name, void (*fn)()) {
     try {
         fn();
@@ -800,6 +865,7 @@ int main(int argc, char** argv) {
     run_guarded("rules_vs_reference_10000", [] { test_rules(10000, 200); });
     run_guarded("checks_detect_faults", test_checks_detect_faults);
     run_guarded("net_two_process", test_net_two_process);
+    run_guarded("schema_versions", test_schema_versions);
 
     metrics::CsvFile csv;
     const std::string path = csv_dir + "/selftest_checks.csv";

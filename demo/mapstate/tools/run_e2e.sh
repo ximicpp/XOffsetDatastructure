@@ -6,7 +6,8 @@
 #   replay/     client --replay of one snapshot corpus written by A, so every
 #               platform verifies the same bytes against A's digests;
 #   tiers       run_all_tiers.sh with that client (--encoding cycle: dense,
-#               compact and zstd snapshots), evil included.
+#               compact and zstd snapshots), evil included; with a second
+#               client at the same time when MAPDEMO_CLIENT2_OF names one.
 # Then e2e_report.py writes OUT_ROOT/E2E_RESULT.md, one row per target.
 #
 #   run_e2e.sh SERVER_BIN OUT_ROOT NAME=CLIENT_CMD [NAME=CLIENT_CMD ...]
@@ -29,7 +30,12 @@
 # targets after the first compare with the first), MAPDEMO_RUNS_UNDER
 # ("NAME=TEXT;NAME=TEXT": what each client runs on, for the report, e.g.
 # "android-emu=Android emulator (Mac M4)"; default: native, wine or qemu
-# from the command). The server self-test runs once, with the first target.
+# from the command), MAPDEMO_CLIENT2_OF ("NAME=CMD;NAME=CMD": a second
+# client that runs every tier of target NAME at the same time, e.g. the
+# client of the other schema version on the same platform; summarize.py
+# checks both). The server self-test runs once, with the first target.
+# The corpus holds snapshots of the schema version of the client that
+# wrote it: a run of old-version clients replays a corpus written for one.
 #
 # Exit 0 only when every target passed. Portable to macOS bash 3.2.
 set -u
@@ -59,12 +65,12 @@ mkdir -p "$OUT_ROOT"
 OUT_ROOT=$(cd "$OUT_ROOT" && pwd)
 FAILED=0
 
-# runs_under NAME: this target's entry of MAPDEMO_RUNS_UNDER, or nothing.
-runs_under() {
-    local entry rest=${MAPDEMO_RUNS_UNDER:-}
+# entry_of LIST NAME: the text after "NAME=" in a "NAME=TEXT;NAME=TEXT" list.
+entry_of() {
+    local entry rest=$1
     while [ -n "$rest" ]; do
         entry=${rest%%;*}
-        [ "${entry%%=*}" = "$1" ] && { echo "${entry#*=}"; return; }
+        [ "${entry%%=*}" = "$2" ] && { echo "${entry#*=}"; return; }
         [ "$rest" = "$entry" ] && break
         rest=${rest#*;}
     done
@@ -77,7 +83,7 @@ client_offline() {
     rm -f "$out"/*.csv "$out"/*.log "$out"/*.txt
     echo "client_cmd=$cmd" > "$out/meta.txt"
     echo "client_args=$args" >> "$out/meta.txt"
-    echo "runs_under=$(runs_under "$name")" >> "$out/meta.txt"
+    echo "runs_under=$(entry_of "${MAPDEMO_RUNS_UNDER:-}" "$name")" >> "$out/meta.txt"
     # shellcheck disable=SC2086 # cmd and args are word lists on purpose
     $cmd $args --csv-dir "$out" > "$out/client.log" 2>&1
     rc=$?
@@ -118,6 +124,7 @@ for t in "$@"; do
     SKIP_SELFTEST=1
     [ "$I" = 0 ] && SKIP_SELFTEST=0
     MAPDEMO_CLIENT="$CMD" MAPDEMO_CLIENT_ARGS="--encoding $ENCODING --events $EVENTS" MAPDEMO_MODES="$MODES" \
+        MAPDEMO_CLIENT2="$(entry_of "${MAPDEMO_CLIENT2_OF:-}" "$NAME")" MAPDEMO_CLIENT2_ARGS="--encoding $ENCODING" \
         MAPDEMO_SKIP_SELFTEST=$SKIP_SELFTEST MAPDEMO_COMPARE="$REF" \
         MAPDEMO_PORT_BASE=$(( PORT + 100 * (I + 1) )) \
         MAPDEMO_LABEL="${LABEL:+$LABEL; }client $NAME" \
