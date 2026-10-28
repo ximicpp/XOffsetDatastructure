@@ -39,6 +39,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -213,6 +214,7 @@ private:
     // shutdown
     void finish();
     void flush_all_blocking(std::uint64_t budget_ns);
+    void close_clients(std::uint64_t budget_ns);
     void write_results();
     void fail_check(const std::string& check, const std::string& detail);
 
@@ -502,7 +504,7 @@ void ServerA::on_client_readable(Client& c) {
     for (;;) {
         std::optional<net::Frame> f;
         try {
-            f = c.conn.try_recv({MsgType::Hello, MsgType::ViewReq});
+            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq});
         } catch (const net::PeerClosed&) {
             std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
             c.conn.close();
@@ -643,7 +645,7 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     double compress_us = -1;
     if (enc == codec::Encoding::Zstd) {
         sw.restart();
-        zstd_.compress(xwire, wire);
+        if (Status z = zstd_.compress(xwire, wire); !z) throw std::runtime_error(z.error().message);
         compress_us = sw.us();
         rec_.add("a.snap_compress_us", compress_us);
     }
@@ -769,11 +771,40 @@ void ServerA::flush_all_blocking(std::uint64_t budget_ns) {
     }
 }
 
+// A request that reached A after its last read is still unread at close, so
+// the close resets the connection and a Windows client drops the last
+// snapshot and the Bye it has not read yet. Ends A's side of each client
+// stream and reads until the client closes (or the budget runs out) first.
+void ServerA::close_clients(std::uint64_t budget_ns) {
+    for (auto& c : clients_)
+        if (c->conn.is_open()) c->conn.shutdown_send();
+    const std::uint64_t until = net::now_ns() + budget_ns;
+    for (;;) {
+        std::vector<net::PollItem> fds;
+        std::vector<net::Conn*> conns;
+        for (auto& c : clients_) {
+            if (!c->conn.is_open()) continue;
+            net::PollItem p;
+            p.fd = c->conn.fd();
+            p.want_read = true;
+            fds.push_back(p);
+            conns.push_back(&c->conn);
+        }
+        if (fds.empty()) return;
+        const std::uint64_t now = net::now_ns();
+        if (now >= until) return;
+        net::poll(fds.data(), fds.size(), int((until - now) / 1'000'000ull) + 1);
+        for (std::size_t i = 0; i < fds.size(); ++i)
+            if (fds[i].readable && !conns[i]->discard_input()) conns[i]->close();
+    }
+}
+
 void ServerA::finish() {
     if (b_.is_open()) b_.enqueue(MsgType::Bye, 0, std::string());
     for (auto& c : clients_)
         if (c->conn.is_open() && c->hello_done) c->conn.enqueue(MsgType::Bye, 0, std::string());
     flush_all_blocking(kByeFlushNs);
+    close_clients(kByeFlushNs);
 }
 
 void ServerA::write_results() {
@@ -900,7 +931,7 @@ int ServerA::run() {
             if (fds[1].writable) b_.flush();
             if (fds[1].readable) {
                 for (;;) {
-                    std::optional<net::Frame> f = b_.try_recv({MsgType::StepRes, MsgType::Error});
+                    std::optional<net::Frame> f = b_.recv_nowait({MsgType::StepRes, MsgType::Error});
                     if (!f) break;
                     on_step_result(std::move(*f));
                 }

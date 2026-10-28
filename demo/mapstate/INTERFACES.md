@@ -27,6 +27,17 @@ compact or zstd-compressed (`codec.hpp`); the client gains `--self-check`
 and `--replay`; `tools/run_e2e.sh` runs every client target. The sections
 below describe the result.
 
+No-exceptions iteration (10-28, branch `claude/mapdemo-noexc-20261028` from
+next_cpp26 92404a2, one thread, after the library's non-throwing receive
+entries, #148): the client side never throws. `result.hpp` adds `Error`,
+`Result<T>` and `Status`; every `net` call gets a non-throwing `try_*` form
+(the throwing forms remain for A, B and the self-test, in builds with
+exceptions; the old non-blocking `try_recv` is now `recv_nowait`); the
+codec returns `Status`; the client verifies with `try_load_verified` /
+`try_reload_verified`. CMake builds `mapdemo_client_noexc` from the same
+sources without exceptions, and `e2e_report.py` requires the same
+self-check outcomes and texts on every target.
+
 | Owner thread | Files |
 | --- | --- |
 | Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/codec.cpp`, `src/selftest.cpp` |
@@ -35,7 +46,7 @@ below describe the result.
 | Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files |
 
 Frozen headers (`schema.hpp`, `std_model.hpp`, `rules.hpp`, `net.hpp`,
-`metrics.hpp`, `checks.hpp`, `codec.hpp`) change only with a note to every demo thread
+`metrics.hpp`, `checks.hpp`, `codec.hpp`, `result.hpp`) change only with a note to every demo thread
 (through the coordinator); additive helpers are fine.
 
 Priority for the common-library thread: `src/net.cpp` first (everything else
@@ -94,8 +105,13 @@ mapdemo_selftest [--csv-dir DIR]
   count with A's row, so every platform shows it reads the same bytes the
   same way. Exit 0 when all match.
 - Every client run prints `client: build <compiler, os, arch, C++ standard,
-  schema backend, zstd>` and writes it to `client_build.txt` in `--csv-dir`;
-  A and B print the same line for themselves.
+  schema backend, exceptions on|off, zstd>` and writes it to
+  `client_build.txt` in `--csv-dir`; A and B print the same line for
+  themselves.
+- `mapdemo_client_noexc` takes the same options and behaves the same; it is
+  built without exceptions. A library failure it cannot get back as a value
+  (outside the receive path, e.g. an arena exhausted while building a
+  request) goes to the fatal handler: one `error:` line, exit 2.
 
 - `--buffers` (default `reuse`, `include/mapdemo/buffer_mode.hpp`):
   - `fresh`: every received batch, request and snapshot is a new `XBuffer`
@@ -111,6 +127,10 @@ mapdemo_selftest [--csv-dir DIR]
   03:19Z 10-22); a mismatch shows up as a `reference_model` check failure on A.
 - `--steps 0` and `--duration-s 0` mean unlimited. A stops after whichever limit
   is reached, sends `Bye` to B and the client, writes its CSV files, exits.
+  After the `Bye` A shuts down its sending side and reads each client
+  connection until the client closes (2 s at most) before closing it: a
+  request still unread at close would reset the connection, and a Windows
+  client then drops the snapshot and `Bye` it has not read yet (10-28).
 - `--check` defaults: on for A and the headless client, off for the window client.
 - Exit codes: 0 success, 1 a check failed, 2 usage / protocol / IO / capacity error.
   Every error prints one line starting with `error:` to stderr.
@@ -129,10 +149,20 @@ mapdemo_selftest [--csv-dir DIR]
 | End | A `Bye` to B and client |
 
 `net` behaviour (src/net.cpp):
-- `recv` / `try_recv` return an `Error` frame only when `Error` is in `allowed`;
-  otherwise an `Error` frame throws `ProtocolError("peer error: <text>")`.
-- A clean close or a reset between frames throws `PeerClosed` (derived from
-  `ProtocolError`); a close in the middle of a frame stays a `ProtocolError`.
+- Every call has a non-throwing form returning `Result<T>` / `Status`
+  (`result.hpp`): `Conn::try_connect`, `try_send`, `try_recv`,
+  `try_send_raw`, `try_set_nonblocking`, `try_enqueue`, `try_flush`,
+  `try_recv_nowait`, `Listener::try_bind`, `try_accept`, `net::try_poll`.
+  The client uses only these. In builds with exceptions the throwing forms
+  (`connect`, `send`, `recv`, `send_raw`, `set_nonblocking`, `enqueue`,
+  `flush`, `recv_nowait`, `bind`, `accept`, `poll`) wrap them and throw
+  `ProtocolError` with the same text, or `PeerClosed` where the `Error` has
+  `peer_closed` set.
+- `recv` / `recv_nowait` return an `Error` frame only when `Error` is in
+  `allowed`; otherwise an `Error` frame fails with `"peer error: <text>"`.
+- A clean close or a reset between frames is `PeerClosed` (`peer_closed`,
+  derived from `ProtocolError`); a close in the middle of a frame stays a
+  plain `ProtocolError`.
 - `Listener::bind` sets `SO_REUSEADDR`. On a non-blocking listener `accept()`
   returns a `Conn` that is not open when nobody is waiting; check `is_open()`.
 - Payload recycling (used by `--buffers reuse`): `recycle_rx(std::move(s))`
@@ -160,7 +190,9 @@ other (`load_verified` / `reload_verified`). zstd removes no check.
 
 Receivers verify every wire with the caps in `schema.hpp`: `load_verified<T>(payload,
 cap_*())` in `fresh` mode, `reload_verified<T>(payload)` on a buffer created with
-the same cap in `reuse` mode. There is no `XBufferPool`.
+the same cap in `reuse` mode. The client uses the non-throwing forms
+`try_load_verified` / `try_reload_verified` (same checks, same failure texts).
+There is no `XBufferPool`.
 
 Every schema struct is declared with `XOFFSET_RECORD(Type, fields...)` in
 declaration order: C++20 builds take the layout from these lists, C++26

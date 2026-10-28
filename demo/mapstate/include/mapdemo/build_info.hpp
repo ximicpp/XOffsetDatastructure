@@ -1,6 +1,7 @@
 // Map state demo: one line naming how this program was built, printed at
 // start-up and stored with the results (client_build.txt), so every result
-// row says which compiler, platform and schema backend produced it.
+// row says which compiler, platform, schema backend and exception mode
+// produced it.
 #pragma once
 #include <string>
 #if defined(__APPLE__)
@@ -58,6 +59,7 @@ inline std::string build_info() {
     s += " cxx=" + std::to_string(__cplusplus);
 #endif
     s += XOFFSET_SCHEMA_REFLECTION ? " schema=reflection" : " schema=field-lists";
+    s += MAPDEMO_EXCEPTIONS ? " exceptions=on" : " exceptions=off";
     s += codec::zstd_available() ? " zstd=1.5.7" : " zstd=no";
     return s;
 }
