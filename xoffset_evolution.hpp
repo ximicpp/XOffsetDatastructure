@@ -170,7 +170,7 @@ namespace XOffsetDatastructure {
                 if (i) out += '.';
                 out += path_[i];
             }
-            if (depth_ > max_depth) out += ".…";
+            if (depth_ > max_depth) out += "...";
             return out;
         }
 
