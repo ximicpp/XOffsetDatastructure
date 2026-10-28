@@ -100,6 +100,13 @@ public:
     Socket fd() const noexcept { return fd_; }
     bool is_open() const noexcept { return fd_ != kInvalidSocket; }
     void close() noexcept;
+    // Closing a socket that still has unread input resets the connection,
+    // and a Windows peer then drops what it has not read yet (a final Bye
+    // included). To end a session, a server calls shutdown_send() after its
+    // last frame, then discard_input() each time the socket is readable until
+    // it returns false (the peer closed), then close(). Non-blocking mode.
+    void shutdown_send() noexcept;
+    bool discard_input() noexcept;
 
     // ---- blocking mode (B; simple tools) ----
     // Header and payload go out in one gathered write; the payload is not copied.
