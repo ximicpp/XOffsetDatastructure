@@ -60,6 +60,17 @@ foreach(test_name ${STORAGE_TESTS})
     set_tests_properties(${test_name} PROPERTIES LABELS "storage")
 endforeach()
 
+# SC-8: the OS layer without exceptions (C++17, every platform).
+add_executable(test_vm_storage_noexc test_vm_storage_noexc.cpp)
+set_target_properties(test_vm_storage_noexc PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO
+    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
+target_link_libraries(test_vm_storage_noexc PRIVATE XOffset::storage)
+xoffset_enable_test_assertions(test_vm_storage_noexc)
+xoffset_disable_exceptions(test_vm_storage_noexc)
+add_test(NAME test_vm_storage_noexc COMMAND test_vm_storage_noexc)
+set_tests_properties(test_vm_storage_noexc PROPERTIES LABELS "storage;no-exceptions")
+
 if(XOFFSET_STORAGE_ONLY)
     xoffset_write_test_inventory()
     return()
@@ -202,6 +213,58 @@ else()
         xoffset_cxx26_only(schema_evolution_${variant}_fail)
     endforeach()
 endif()
+
+# SC-8: the library without exceptions. test_no_exceptions checks the
+# non-throwing receive entries against the throwing ones; it and every test
+# program that needs no exception of its own are built a second time with
+# exceptions off as <name>_noexc (test_v2_fuzz then runs typed load, reload
+# and direct reload through the non-throwing entries; raw and verified
+# receive have none yet).
+add_xoffset_test(test_no_exceptions reflection)
+set(NO_EXCEPTIONS_TESTS
+    test_no_exceptions
+    test_enum_support
+    test_free_run_emission
+    test_hot_path_constants
+    test_implicit_padding
+    test_inheritance
+    test_lower_bound_index
+    test_memory_efficiency
+    test_ordinary_records
+    test_reflection_advanced
+    test_reflection_core
+    test_regrow_used_range
+    test_save_compact
+    test_schema_pin
+    test_shift_relocate
+    test_stability_contract
+    test_string_append
+    test_type_safety
+    test_type_signatures
+    test_v2_fuzz
+    test_wire_populate
+    test_xhandle
+    test_xstring_direct_assign
+    test_schema_handshake
+)
+foreach(test_name ${NO_EXCEPTIONS_TESTS})
+    if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+        xoffset_cxx26_only(${test_name}_noexc)
+        continue()
+    endif()
+    add_executable(${test_name}_noexc ${test_name}.cpp)
+    configure_xoffset_target(${test_name}_noexc)
+    xoffset_enable_test_assertions(${test_name}_noexc)
+    xoffset_disable_exceptions(${test_name}_noexc)
+    add_test(NAME ${test_name}_noexc COMMAND ${test_name}_noexc)
+    set_tests_properties(${test_name}_noexc PROPERTIES LABELS "reflection;no-exceptions")
+endforeach()
+# A failure without a caller to return it to goes to the fatal handler.
+add_test(NAME test_no_exceptions_fatal COMMAND test_no_exceptions --fatal)
+add_test(NAME test_no_exceptions_noexc_fatal COMMAND test_no_exceptions_noexc --fatal)
+set_tests_properties(test_no_exceptions_fatal test_no_exceptions_noexc_fatal PROPERTIES
+    LABELS "reflection;no-exceptions"
+    PASS_REGULAR_EXPRESSION "fatal no_root: root<T>\\(\\): typed root access requires")
 
 # G5/F4: the libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).

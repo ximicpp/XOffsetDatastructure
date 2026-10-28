@@ -6,8 +6,16 @@
 // reading the current one are serialised by construction (no locks).
 //
 //   mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
-//             [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
+//             [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
 //             [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
+//             [--corpus-dir DIR [--corpus-max 60]]
+//
+// --host is the address A listens on for clients (0.0.0.0 inside a
+// container whose port the host forwards). Snapshots go out in the encoding
+// each ViewReq names (codec.hpp: dense, compact or compact + zstd).
+// --corpus-dir keeps the first --corpus-max snapshot payloads exactly as
+// sent, with their digests (corpus.csv), for mapdemo_client --replay on
+// targets that cannot reach this server.
 //
 // Each step: save(cur) -> StepReq to B -> StepRes -> verify into spare ->
 // (checks) -> spare becomes cur. At most one step is in flight; steps are
@@ -20,7 +28,6 @@
 //                    (cur/spare ping-pong), one request buffer per client,
 //                    one snapshot buffer refilled with reset<ViewSnapshot>().
 //                    Same validation and byte-identical wires.
-#include <poll.h>
 #include <csignal>
 #include <cerrno>
 #include <cinttypes>
@@ -36,7 +43,9 @@
 #include <string_view>
 #include <vector>
 #include "mapdemo/buffer_mode.hpp"
+#include "mapdemo/build_info.hpp"
 #include "mapdemo/checks.hpp"
+#include "mapdemo/codec.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
@@ -60,20 +69,24 @@ struct Options {
     std::uint64_t seed = kDefaultSeed;
     std::uint64_t steps = 0;        // 0 = unlimited
     double duration_s = 0;          // 0 = unlimited
+    std::string host = "127.0.0.1";
     std::uint16_t port = net::kDefaultPortA;
     std::string b_host = "127.0.0.1";
     std::uint16_t b_port = net::kDefaultPortB;
     bool check = true;
     BufferMode buffers = kDefaultBufferMode;
     std::string csv_dir;
+    std::string corpus_dir;
+    std::uint64_t corpus_max = 60;
 };
 
 [[noreturn]] void usage_error(const std::string& what) {
     std::fprintf(stderr,
         "error: %s\n"
         "usage: mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]\n"
-        "                 [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]\n"
-        "                 [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]\n", what.c_str());
+        "                 [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]\n"
+        "                 [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]\n"
+        "                 [--corpus-dir DIR [--corpus-max 60]]\n", what.c_str());
     std::exit(2);
 }
 
@@ -104,6 +117,7 @@ Options parse(int argc, char** argv) {
             if (end == t || *end != '\0' || !std::isfinite(o.duration_s) || o.duration_s < 0)
                 usage_error(std::string("bad value for --duration-s: ") + t);
         }
+        else if (a == "--host") o.host = value();
         else if (a == "--port") o.port = std::uint16_t(parse_u64("--port", value(), 65535));
         else if (a == "--b-host") o.b_host = value();
         else if (a == "--b-port") o.b_port = std::uint16_t(parse_u64("--b-port", value(), 65535));
@@ -116,6 +130,8 @@ Options parse(int argc, char** argv) {
             o.buffers = *m;
         }
         else if (a == "--csv-dir") o.csv_dir = value();
+        else if (a == "--corpus-dir") o.corpus_dir = value();
+        else if (a == "--corpus-max") o.corpus_max = parse_u64("--corpus-max", value(), 100000);
         else usage_error(std::string("unknown argument ") + argv[i]);
     }
     return o;
@@ -127,13 +143,13 @@ struct Fatal {
     std::string text;
 };
 
-const char* category_name(std::uint16_t flags) {
-    switch (static_cast<ViewCategory>(flags)) {
+const char* category_name(ViewCategory c) {
+    switch (c) {
     case ViewCategory::Normal: return "normal";
     case ViewCategory::FullScene: return "full";
     case ViewCategory::Empty: return "empty";
     }
-    return nullptr;
+    return "?";
 }
 
 std::string hex16(std::uint64_t v) {
@@ -191,6 +207,9 @@ private:
     void on_client_frame(Client& c, net::Frame frame);
     void serve_view(Client& c, net::Frame frame);
     void reject(Client& c, const std::string& why, bool close_conn);
+    void write_corpus(std::uint64_t request_id, std::uint16_t flags, const char* category, codec::Encoding enc,
+                      const std::string& payload, std::size_t wire_bytes, std::uint64_t wire_digest,
+                      std::uint64_t digest, std::size_t visible);
     // shutdown
     void finish();
     void flush_all_blocking(std::uint64_t budget_ns);
@@ -209,6 +228,8 @@ private:
     bool spare_ready_ = false;          // reuse: spare_ holds an arena to reload into
     XBuffer snap_buf_;                  // reuse: refilled for every snapshot
     bool snap_ready_ = false;
+    std::string compact_;               // zstd: the compact wire before compression
+    codec::Compressor zstd_;
     std::vector<std::uint32_t> hits_;   // filter output, capacity kept
     std::unique_ptr<stdm::UnitStateBatch> ref_;   // reference model (--check)
     checks::Coverage coverage_;
@@ -237,6 +258,7 @@ private:
     std::uint64_t step_checks_ = 0;
     std::uint64_t snap_checks_ = 0;
     std::uint64_t snaps_by_cat_[3] = {0, 0, 0};
+    std::uint64_t snaps_by_enc_[codec::kEncodingCount] = {};
     std::uint64_t snaps_nonempty_ = 0;
     std::uint64_t snaps_zero_ = 0;
     std::uint64_t category_mismatch_ = 0;
@@ -245,6 +267,8 @@ private:
     bool csv_ = false;
     metrics::CsvFile steps_csv_;
     metrics::CsvFile snaps_csv_;
+    metrics::CsvFile corpus_csv_;
+    std::uint64_t corpus_written_ = 0;
 };
 
 // ---------------------------------------------------------------- setup
@@ -260,7 +284,7 @@ void ServerA::open_csv() {
         throw Fatal{2, "cannot open " + steps_path};
     if (!snaps_csv_.open(snaps_path,
             "request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,"
-            "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok"))
+            "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us"))
         throw Fatal{2, "cannot open " + snaps_path};
 }
 
@@ -428,8 +452,10 @@ void ServerA::on_step_result(net::Frame frame) {
 
 void ServerA::accept_clients() {
     for (;;) {
-        pollfd p{listener_.fd(), POLLIN, 0};
-        if (::poll(&p, 1, 0) <= 0 || !(p.revents & POLLIN)) return;
+        net::PollItem p;
+        p.fd = listener_.fd();
+        p.want_read = true;
+        if (net::poll(&p, 1, 0) <= 0 || !p.readable) return;
         auto c = std::make_unique<Client>();
         c->id = next_client_id_++;
         c->conn = listener_.accept();
@@ -449,6 +475,27 @@ void ServerA::reject(Client& c, const std::string& why, bool close_conn) {
     }
     c.conn.enqueue(MsgType::Error, 0, why.substr(0, net::max_payload(MsgType::Error)));
     c.conn.flush();
+}
+
+// Corpus for mapdemo_client --replay: the payload exactly as sent, plus what
+// the client must get from it (OUT/corpus.csv). Not on a timed path.
+void ServerA::write_corpus(std::uint64_t request_id, std::uint16_t flags, const char* category, codec::Encoding enc,
+                           const std::string& payload, std::size_t wire_bytes, std::uint64_t wire_digest,
+                           std::uint64_t digest, std::size_t visible) {
+    if (corpus_written_ == 0 &&
+        !corpus_csv_.open(opt_.corpus_dir + "/corpus.csv",
+                          "request_id,flags,category,encoding,file,net_bytes,wire_bytes,wire_digest,digest,visible"))
+        throw Fatal{2, "cannot write " + opt_.corpus_dir + "/corpus.csv"};
+    const std::string file = "snap_" + std::to_string(request_id) + "." + codec::encoding_name(enc);
+    std::FILE* f = std::fopen((opt_.corpus_dir + "/" + file).c_str(), "wb");
+    const bool ok = f != nullptr && std::fwrite(payload.data(), 1, payload.size(), f) == payload.size();
+    if (f != nullptr && std::fclose(f) != 0) throw Fatal{2, "cannot write " + opt_.corpus_dir + "/" + file};
+    if (!ok) throw Fatal{2, "cannot write " + opt_.corpus_dir + "/" + file};
+    corpus_csv_.row(std::to_string(request_id) + "," + std::to_string(flags) + "," + category + "," +
+                    codec::encoding_name(enc) + "," + file + "," + std::to_string(payload.size()) + "," +
+                    std::to_string(wire_bytes) + "," + hex16(wire_digest) + "," + hex16(digest) + "," +
+                    std::to_string(visible));
+    ++corpus_written_;
 }
 
 void ServerA::on_client_readable(Client& c) {
@@ -492,11 +539,17 @@ void ServerA::on_client_frame(Client& c, net::Frame frame) {
 }
 
 void ServerA::serve_view(Client& c, net::Frame frame) {
-    const char* cat = category_name(frame.flags);
-    if (cat == nullptr) {
-        reject(c, "ViewReq: unknown category flags " + std::to_string(frame.flags), false);
+    const std::optional<codec::ViewFlags> vf = codec::parse_view_flags(frame.flags);
+    if (!vf) {
+        reject(c, "ViewReq: unknown flags " + std::to_string(frame.flags), false);
         return;
     }
+    if (vf->encoding == codec::Encoding::Zstd && !codec::zstd_available()) {
+        reject(c, "ViewReq: encoding zstd is not available (built without zstd)", false);
+        return;
+    }
+    const char* cat = category_name(vf->category);
+    const codec::Encoding enc = vf->encoding;
 
     metrics::Stopwatch sw;
     try {
@@ -572,19 +625,40 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     const double build_us = sw.us();
     rec_.add("a.snap_build_us", build_us);
 
+    // Save in the requested encoding. wire = the frame payload; xwire = the
+    // XOffset wire the client will verify (the payload itself, or for zstd
+    // the compact wire before compression).
     sw.restart();
-    std::string wire;
-    if (reuse()) {
-        wire = c.conn.take_tx_buffer();
-        snap_buf.save_verified_into<ViewSnapshot>(wire);
+    std::string wire = reuse() ? c.conn.take_tx_buffer() : std::string();
+    std::string& xwire = enc == codec::Encoding::Zstd ? compact_ : wire;
+    const XCompactOptions canonical{0};   // capacity == size: the smallest wire
+    if (enc == codec::Encoding::Dense) {
+        if (reuse()) snap_buf.save_verified_into<ViewSnapshot>(xwire);
+        else xwire = snap_buf.save_verified<ViewSnapshot>();
     } else {
-        wire = snap_buf.save_verified<ViewSnapshot>();
+        if (reuse()) snap_buf.save_compact_into<ViewSnapshot>(xwire, canonical);
+        else xwire = snap_buf.save_compact<ViewSnapshot>(canonical);
     }
     const double save_us = sw.us();
+    double compress_us = -1;
+    if (enc == codec::Encoding::Zstd) {
+        sw.restart();
+        zstd_.compress(xwire, wire);
+        compress_us = sw.us();
+        rec_.add("a.snap_compress_us", compress_us);
+    }
     rec_.add("a.snap_save_us", save_us);
-    const std::size_t wire_bytes = wire.size();
+    const std::size_t wire_bytes = xwire.size();
+    const std::size_t net_bytes = wire.size();
+    const std::uint64_t xwire_digest = checks::wire_digest(xwire);
     rec_.add("a.snap_bytes", double(wire_bytes));
+    rec_.add("a.snap_net_bytes", double(net_bytes));
     rec_.add("a.visible_count", double(hits.size()));
+    ++snaps_by_enc_[static_cast<int>(enc)];
+
+    if (!opt_.corpus_dir.empty() && corpus_written_ < opt_.corpus_max)
+        write_corpus(req.request_id, frame.flags, cat, enc, wire, wire_bytes, xwire_digest,
+                     checks::snapshot_digest(snap_buf.root<ViewSnapshot>()), hits.size());
 
     c.conn.enqueue(MsgType::ViewSnapshot, req.request_id, std::move(wire), frame.flags);
     c.conn.flush();
@@ -603,10 +677,9 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         ++snap_checks_;
         rec_.add("a.check_us", cw.us());
     }
-    const auto category = static_cast<std::size_t>(frame.flags);
-    ++snaps_by_cat_[category];
+    ++snaps_by_cat_[static_cast<std::size_t>(vf->category)];
     if (hits.empty()) ++snaps_zero_; else ++snaps_nonempty_;
-    const ViewCategory vc = static_cast<ViewCategory>(frame.flags);
+    const ViewCategory vc = vf->category;
     if ((vc == ViewCategory::Empty && !hits.empty()) ||
         (vc == ViewCategory::FullScene && hits.size() != std::size_t(opt_.units))) {
         ++category_mismatch_;
@@ -655,6 +728,11 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         if (destroy_us >= 0) row += fmt_us(destroy_us);
         row += ',';
         row += check_ok ? '1' : '0';
+        row += ',';
+        row += codec::encoding_name(enc); row += ',';
+        row += std::to_string(net_bytes); row += ',';
+        row += hex16(xwire_digest); row += ',';
+        if (compress_us >= 0) row += fmt_us(compress_us);
         snaps_csv_.row(row);
     }
     if (!check_ok) throw Fatal{1, "snapshot check failed for request " + std::to_string(request_id)};
@@ -670,20 +748,24 @@ void ServerA::fail_check(const std::string& check, const std::string& detail) {
 void ServerA::flush_all_blocking(std::uint64_t budget_ns) {
     const std::uint64_t until = net::now_ns() + budget_ns;
     for (;;) {
-        std::vector<pollfd> fds;
-        std::vector<net::Conn*> conns;
+        std::vector<net::PollItem> fds;
         auto add = [&](net::Conn& c) {
             if (!c.is_open()) return;
             bool done = false;
             try { done = c.flush(); } catch (const std::exception&) { c.close(); return; }
-            if (!done) { fds.push_back(pollfd{c.fd(), POLLOUT, 0}); conns.push_back(&c); }
+            if (!done) {
+                net::PollItem p;
+                p.fd = c.fd();
+                p.want_write = true;
+                fds.push_back(p);
+            }
         };
         add(b_);
         for (auto& c : clients_) add(c->conn);
         if (fds.empty()) return;
         const std::uint64_t now = net::now_ns();
         if (now >= until) return;
-        ::poll(fds.data(), fds.size(), int((until - now) / 1'000'000ull) + 1);
+        net::poll(fds.data(), fds.size(), int((until - now) / 1'000'000ull) + 1);
     }
 }
 
@@ -733,7 +815,9 @@ void ServerA::write_results() {
         add("view_snapshot", true,
             "compared=" + std::to_string(snap_checks_) + " normal=" + std::to_string(snaps_by_cat_[0]) +
             " full=" + std::to_string(snaps_by_cat_[1]) + " empty=" + std::to_string(snaps_by_cat_[2]) +
-            " nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_));
+            " nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_) +
+            " dense=" + std::to_string(snaps_by_enc_[0]) + " compact=" + std::to_string(snaps_by_enc_[1]) +
+            " zstd=" + std::to_string(snaps_by_enc_[2]));
         // Each served category hit its expected path: Empty -> zero units,
         // FullScene -> every unit. Whether a run covered both the non-empty
         // and the zero-visible path is judged per tier by tools/summarize.py
@@ -769,10 +853,10 @@ int ServerA::run() {
     build_initial_batch();
     if (!failures_.empty()) throw Fatal{1, "initial batch failed its checks"};
 
-    listener_ = net::Listener::bind("127.0.0.1", opt_.port);
-    std::fprintf(stderr, "a: listening on 127.0.0.1:%u, units=%u seed=%" PRIu64 " check=%s buffers=%s\n",
-                 unsigned(opt_.port), opt_.units, opt_.seed, opt_.check ? "on" : "off",
-                 buffer_mode_name(opt_.buffers));
+    listener_ = net::Listener::bind(opt_.host, opt_.port);
+    std::fprintf(stderr, "a: listening on %s:%u, units=%u seed=%" PRIu64 " check=%s buffers=%s\na: build %s\n",
+                 opt_.host.c_str(), unsigned(opt_.port), opt_.units, opt_.seed, opt_.check ? "on" : "off",
+                 buffer_mode_name(opt_.buffers), build_info().c_str());
     connect_b();
     std::fprintf(stderr, "a: connected to B at %s:%u\n", opt_.b_host.c_str(), unsigned(opt_.b_port));
 
@@ -790,11 +874,17 @@ int ServerA::run() {
             if (may_send_step(now)) send_step(now);
 
             // poll set: listener, B, clients
-            std::vector<pollfd> fds;
-            fds.push_back(pollfd{listener_.fd(), POLLIN, 0});
-            fds.push_back(pollfd{b_.fd(), short(POLLIN | (b_.want_write() ? POLLOUT : 0)), 0});
-            for (auto& c : clients_)
-                fds.push_back(pollfd{c->conn.fd(), short(POLLIN | (c->conn.want_write() ? POLLOUT : 0)), 0});
+            auto item = [](net::Socket fd, bool write) {
+                net::PollItem p;
+                p.fd = fd;
+                p.want_read = true;
+                p.want_write = write;
+                return p;
+            };
+            std::vector<net::PollItem> fds;
+            fds.push_back(item(listener_.fd(), false));
+            fds.push_back(item(b_.fd(), b_.want_write()));
+            for (auto& c : clients_) fds.push_back(item(c->conn.fd(), c->conn.want_write()));
 
             int timeout_ms = 1000;
             const std::uint64_t now2 = net::now_ns();
@@ -804,16 +894,11 @@ int ServerA::run() {
                 const int to_deadline = deadline_ns_ > now2 ? int((deadline_ns_ - now2 + 999'999) / 1'000'000) : 0;
                 if (to_deadline < timeout_ms) timeout_ms = to_deadline;
             }
-            const int rc = ::poll(fds.data(), fds.size(), timeout_ms);
-            if (rc < 0) {
-                if (errno == EINTR) continue;
-                throw Fatal{2, std::string("poll: ") + std::strerror(errno)};
-            }
+            net::poll(fds.data(), fds.size(), timeout_ms);
 
             // B
-            const short brev = fds[1].revents;
-            if (brev & POLLOUT) b_.flush();
-            if (brev & (POLLIN | POLLHUP | POLLERR)) {
+            if (fds[1].writable) b_.flush();
+            if (fds[1].readable) {
                 for (;;) {
                     std::optional<net::Frame> f = b_.try_recv({MsgType::StepRes, MsgType::Error});
                     if (!f) break;
@@ -824,20 +909,20 @@ int ServerA::run() {
             // clients (indices shift only after the sweep below)
             for (std::size_t i = 0; i < clients_.size(); ++i) {
                 Client& c = *clients_[i];
-                const short rev = fds[2 + i].revents;
+                const net::PollItem& ev = fds[2 + i];
                 if (!c.conn.is_open()) continue;
-                if (rev & POLLOUT) {
+                if (ev.writable) {
                     try { c.conn.flush(); } catch (const std::exception&) { c.conn.close(); continue; }
                 }
                 if (c.close_after_flush) {
                     if (!c.conn.want_write()) c.conn.close();
                     continue;
                 }
-                if (rev & (POLLIN | POLLHUP | POLLERR)) on_client_readable(c);
+                if (ev.readable) on_client_readable(c);
             }
             std::erase_if(clients_, [](const std::unique_ptr<Client>& c) { return !c->conn.is_open(); });
 
-            if (fds[0].revents & POLLIN) accept_clients();
+            if (fds[0].readable) accept_clients();
 
             const std::uint64_t t = net::now_ns();
             if (t - last_report >= 1'000'000'000ull) {
@@ -879,7 +964,9 @@ int main(int argc, char** argv) {
     Options opt = parse(argc, argv);
     std::signal(SIGINT, on_stop_signal);
     std::signal(SIGTERM, on_stop_signal);
+#ifdef SIGPIPE
     std::signal(SIGPIPE, SIG_IGN);
+#endif
     try {
         ServerA a(std::move(opt));
         return a.run();

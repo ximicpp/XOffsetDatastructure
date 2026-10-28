@@ -13,8 +13,8 @@ namespace detail {
             XBufferCore::RegistryOwners::node_type node;
         };
         static PendingOwner prepare_owner(XBufferCore& source) {
-            if (std::exchange(pending_registry_failure, false)) throw XBadAlloc();
-            try {
+            if (std::exchange(pending_registry_failure, false)) XOFFSET_THROW(XBadAlloc());
+            XOFFSET_TRY {
                 // Initialize process registry and allocate both objects before
                 // raw validation, but never expose an unactivated Core owner to
                 // new_handler through the global lookup namespace.
@@ -25,7 +25,7 @@ namespace detail {
                 prepared.emplace(record->payload, record);
                 auto node = prepared.extract(prepared.begin());
                 return {registry, std::move(record), std::move(node)};
-            } catch (const std::bad_alloc&) { throw XBadAlloc(); }
+            } XOFFSET_CATCH(const std::bad_alloc&) { XOFFSET_THROW(XBadAlloc()); }
         }
         static void publish_node(XBufferCore& source, PendingOwner& pending) {
             // Only canonical owners enter the index; unregister_registry
@@ -41,7 +41,7 @@ namespace detail {
                     inserted = true;
                 }
             }
-            if (!inserted) throw XException("duplicate arena owner registration");
+            if (!inserted) XOFFSET_THROW(XException(XErrc::invalid_state, "duplicate arena owner registration"));
             // The record remains unpublished (owner==nullptr) until every
             // owning head and typed/schema state is fully alive and initialized.
             owner_lookup_count(&OwnerLookupStats::registrations);
@@ -90,14 +90,17 @@ namespace detail {
                                              const std::byte* extents, std::size_t extent_count,
                                              std::vector<XBufferCore::WireHole>& gaps) {
         constexpr const char* who = "load_verified<T>()";
-        const auto h = read_wire_header(header, sizeof(XWireHeaderV2), who);
-        if (h.root_type_id != wire_root_type_id<T>()) throw XException("load_verified<T>(): root type id mismatch");
-        if (h.schema_hash != wire_schema_hash<T>()) throw XException("load_verified<T>(): schema hash mismatch");
-        check_wire_extent(h, who);
-        if (h.used_bytes != payload_bytes) throw XException("load_verified<T>(): used size mismatch");
-        if (h.extent_count != extent_count) throw XException("load_verified<T>(): extent count mismatch");
-        (void)parse_extent_table(reinterpret_cast<const char*>(extents), extent_count, h.used_bytes, who, gaps);
-        if (h.hole_count != hole_count) throw XException("load_verified<T>(): hole count mismatch");
+        XWireHeaderV2 h;
+        XOFFSET_VREQUIRE(read_wire_header(header, sizeof(XWireHeaderV2), who, h));
+        if (h.root_type_id != wire_root_type_id<T>()) XOFFSET_THROW(XException(XErrc::root_type_mismatch, "load_verified<T>(): root type id mismatch"));
+        if (h.schema_hash != wire_schema_hash<T>()) XOFFSET_THROW(XException(XErrc::schema_mismatch, "load_verified<T>(): schema hash mismatch"));
+        XOFFSET_VREQUIRE(check_wire_extent(h, who));
+        if (h.used_bytes != payload_bytes) XOFFSET_THROW(XException(XErrc::size_mismatch, "load_verified<T>(): used size mismatch"));
+        if (h.extent_count != extent_count) XOFFSET_THROW(XException(XErrc::size_mismatch, "load_verified<T>(): extent count mismatch"));
+        std::uint64_t stored;
+        XOFFSET_VREQUIRE(parse_extent_table(reinterpret_cast<const char*>(extents), extent_count, h.used_bytes, who,
+                                            gaps, stored));
+        if (h.hole_count != hole_count) XOFFSET_THROW(XException(XErrc::size_mismatch, "load_verified<T>(): hole count mismatch"));
         return h;
     }
 }
@@ -214,22 +217,22 @@ public:
     };
     [[nodiscard]] Operation acquire_operation() {
         auto state = owner_;
-        if (!state) throw XException("verified receive: empty token");
+        if (!state) XOFFSET_THROW(XException(XErrc::invalid_state, "verified receive: empty token"));
         auto expected = State::Phase::Idle;
         if (!state->phase.compare_exchange_strong(expected, State::Phase::Operation,
                 std::memory_order_acq_rel, std::memory_order_acquire))
-            throw XException("verified receive: token busy or consumed");
+            XOFFSET_THROW(XException(XErrc::invalid_state, "verified receive: token busy or consumed"));
         state->cancelled.store(false, std::memory_order_release);
         state->complete.store(false, std::memory_order_release);
         return Operation(std::move(state));
     }
     bool grow(std::size_t extra) {
         auto state = owner_;
-        if (!state) throw XException("verified receive: empty token");
+        if (!state) XOFFSET_THROW(XException(XErrc::invalid_state, "verified receive: empty token"));
         auto expected = State::Phase::Idle;
         if (!state->phase.compare_exchange_strong(expected, State::Phase::Finishing,
                 std::memory_order_acq_rel, std::memory_order_acquire))
-            throw XException("verified receive: token busy or consumed");
+            XOFFSET_THROW(XException(XErrc::invalid_state, "verified receive: token busy or consumed"));
         struct Reset { State& s; ~Reset(){s.phase.store(State::Phase::Idle,std::memory_order_release);} } reset{*state};
         if (extra > state->maximum - state->expected) return false;
         if (!extra) return true;
@@ -247,15 +250,15 @@ VerifiedReceiveToken<T> begin_verified_receive(std::size_t bytes,
     static_assert(detail::receive_raw::future_supported_v<T>, "T requires audited initial and recursive default future construction");
     // M1: without an explicit limit, the declared size may not exceed the
     // default maximum (the reservation still equals the declared size).
-    detail::require_wire_within_capacity(bytes,
+    XOFFSET_VREQUIRE(detail::require_wire_within_capacity(bytes,
         capacity ? capacity->value : XBufferCore::DEFAULT_MAXIMUM_CAPACITY,
-        capacity.has_value(), "begin_verified_receive<T>()");
-    if (bytes < XWIRE_PAYLOAD_BEGIN) throw XException("begin_verified_receive<T>(): used size mismatch");
+        capacity.has_value(), "begin_verified_receive<T>()"));
+    if (bytes < XWIRE_PAYLOAD_BEGIN) XOFFSET_THROW(XException(XErrc::size_mismatch, "begin_verified_receive<T>(): used size mismatch"));
     const auto cap = capacity.value_or(XBufferCore::maximum_capacity(bytes));
     if (bytes > XBufferCore::MAX_PAYLOAD || cap.value > XBufferCore::MAX_PAYLOAD || bytes > cap.value ||
         holes > XBufferCore::MAX_PAYLOAD / sizeof(XBufferCore::WireHole) ||
         extents > XBufferCore::MAX_PAYLOAD / 8u)
-        throw XBadAlloc();
+        XOFFSET_THROW(XBadAlloc());
     return VerifiedReceiveToken<T>(std::make_shared<typename VerifiedReceiveToken<T>::State>(bytes,cap,holes,extents));
 }
 
@@ -265,12 +268,12 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
     auto state = token.owner_;
     // This is the LAST access to the caller's Token object. Host callbacks below
     // may move, replace or destroy that object; the State pin remains sufficient.
-    if (!state || !scratch) throw XException("verified receive: empty token or null scratch");
+    if (!state || !scratch) XOFFSET_THROW(XException(XErrc::invalid_argument, "verified receive: empty token or null scratch"));
     using Phase = typename VerifiedReceiveToken<T>::State::Phase;
     auto expected = Phase::Idle;
     if (!state->phase.compare_exchange_strong(expected,Phase::Finishing,
             std::memory_order_acq_rel,std::memory_order_acquire))
-        throw XException("verified receive: token busy or consumed");
+        XOFFSET_THROW(XException(XErrc::invalid_state, "verified receive: token busy or consumed"));
     struct Reset { typename VerifiedReceiveToken<T>::State& s;
         bool armed=true;
         ~Reset(){if(armed)s.phase.store(Phase::Idle,std::memory_order_release);} } reset{*state};
@@ -278,7 +281,7 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
         state->received_header != sizeof(XWireHeaderV2) ||
         state->received_payload != state->expected - XWIRE_PAYLOAD_BEGIN ||
         state->received_holes != state->holes.size() || state->received_extents != state->extents.size())
-        throw XException("verified receive: incomplete or cancelled input");
+        XOFFSET_THROW(XException(XErrc::incomplete_input, "verified receive: incomplete or cancelled input"));
     std::vector<XBufferCore::WireHole> gaps;
     const auto header = detail::check_received_wire_header<T>(state->header.data(), state->expected,
         state->expected_holes, state->extents.data(), state->expected_extents, gaps);
@@ -291,17 +294,17 @@ TypedXBuffer<T> finish_verified(VerifiedReceiveToken<T>& token, std::pmr::memory
     XBufferCore::write_payload_header(reinterpret_cast<char*>(state->base), header.root_offset, header.used_bytes);
     const auto raw_arena=detail::read_raw_arena_header(reinterpret_cast<char*>(state->base),state->expected);
     if(raw_arena.used_end!=header.used_bytes)
-        throw XException("load_verified<T>(): non-normalized payload extent");
+        XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): non-normalized payload extent"));
     auto pending = detail::VerifiedReceiveAccess::prepare_owner(prepared);
     // Independent component does no VM/registry/typed publication. All its
     // throwing preparation finishes before the exact no-throw activation step.
     auto proof=detail::receive_raw::validate<T>(state->base,state->maximum,state->expected,
         header.root_offset,state->holes.data(),state->expected_holes,scratch,gaps.data(),gaps.size());
-    prepared.load_free_blocks(state->holes.data(),state->expected_holes);
+    XOFFSET_VREQUIRE(prepared.load_free_blocks(state->holes.data(),state->expected_holes));
     // Cancellation observed before the no-callback publication point aborts.
     // There is deliberately no post-callback read/write of the Token object.
     if (state->cancelled.load(std::memory_order_acquire))
-        throw XException("verified receive: cancelled during preparation");
+        XOFFSET_THROW(XException(XErrc::incomplete_input, "verified receive: cancelled during preparation"));
     detail::VerifiedReceiveAccess::publish_node(prepared,pending);
     (void)std::move(proof).activate();
     detail::VerifiedPathsAccess::publish_received<T>(prepared);

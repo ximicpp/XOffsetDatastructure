@@ -734,7 +734,7 @@ void test_net_two_process() {
             c.enqueue(net::MsgType::StepReq, t, cur.save_verified<UnitStateBatch>());
             std::optional<net::Frame> f;
             while (!f) {
-                pollfd p{c.fd(), short(POLLIN | (c.want_write() ? POLLOUT : 0)), 0};
+                pollfd p{int(c.fd()), short(POLLIN | (c.want_write() ? POLLOUT : 0)), 0};
                 ::poll(&p, 1, 5000);
                 if (c.want_write()) c.flush();
                 f = c.try_recv({net::MsgType::StepRes});
@@ -748,7 +748,7 @@ void test_net_two_process() {
         }
         c.enqueue(net::MsgType::Bye, 0, {});
         while (!c.flush()) {
-            pollfd p{c.fd(), POLLOUT, 0};
+            pollfd p{int(c.fd()), POLLOUT, 0};
             ::poll(&p, 1, 5000);
         }
         detail = fmt("units=%u steps=%llu bytes_sent=%llu bytes_received=%llu", units, (unsigned long long)steps,

@@ -17,7 +17,7 @@ struct Result {
     std::string detail;   // first failure, human readable
 };
 
-// Server A after each step: count, ids 0..N-1 in order, tick, finite positions
+// Server A after each step: count, ids 0..N-1 in order, tick, reserved0 == 0, finite positions
 // inside the scene, path size 4..8 with points inside the scene, next < size,
 // behavior in 0..2, hp in 50..100.
 Result batch_invariants(const UnitStateBatch& batch, std::uint32_t expected_units, std::uint64_t expected_tick);

@@ -24,29 +24,29 @@ namespace detail {
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
         if (!source.typed_root_access_allowed_)
-            throw XException("verified paths: typed source required");
+            XOFFSET_THROW(XException(XErrc::no_root, "verified paths: typed source required"));
         if (source.schema_bound_ &&
             (source.bound_root_type_id_ != wire_root_type_id<T>() ||
              source.bound_schema_hash_ != wire_schema_hash<T>()))
-            throw XException("verified paths: schema mismatch");
+            XOFFSET_THROW(XException(XErrc::schema_mismatch, "verified paths: schema mismatch"));
         const auto* arena = source.arena();
         if (!arena || std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
             arena->header_size != sizeof(XBufferCore::arena_header))
-            throw XException("verified paths: payload header mismatch");
+            XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
         if (arena->used_end < XBufferCore::min_payload_size() ||
             arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
-            throw XException("verified paths: payload used_end out of range");
+            XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
         // shrink_to_fit changes only the logical VM length: it does not
         // allocate, shrink host capacity or call T.
         if (normalize) source.shrink_to_fit();
         auto* root = find_root<T>(source);
-        if (!root) throw XException("verified paths: root not found");
+        if (!root) XOFFSET_THROW(XException(XErrc::root_mismatch, "verified paths: root not found"));
         // V2: the free table is the wire hole table; recompute it exactly if a
         // host allocation failure (or an unverified load) left it incomplete.
         if (!source.free_table_complete()) {
             std::vector<XBufferCore::WireHole> holes;
-            verify_structural_wire_graph(*root, source, std::pmr::new_delete_resource(),
-                                         nullptr, 0, false, &holes);
+            XOFFSET_VREQUIRE(verify_structural_wire_graph(*root, source, std::pmr::new_delete_resource(),
+                                                          nullptr, 0, false, &holes));
             source.replace_free_blocks(holes);
         }
         const auto* base = static_cast<const char*>(source.get_address());
@@ -63,10 +63,10 @@ namespace detail {
         auto* current = &owner(token);
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error("save_verified_into: output capacity overflows alias range");
+                XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
             if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
                 verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
-                throw XException("save_verified_into: output aliases source storage");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: output aliases source storage"));
         };
         check_alias(*current);
         // Host allocations (the free-run list, reserve) are the callback
@@ -102,7 +102,7 @@ namespace detail {
             final_header = header<T>(*current, true);
             if (final_header.used_bytes != used || final_header.hole_count != holes ||
                 current->free_block_bytes() != hole_bytes)
-                throw XException("save_verified_into: source changed while preparing the output");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: source changed while preparing the output"));
             final_size = size_of(final_header, gaps);
         }
         if (final_size == 0 || final_size > out.capacity()) {
@@ -111,7 +111,7 @@ namespace detail {
             gaps = gaps_of(*current, initial.used_bytes);
             const auto prepared_size = size_of(initial, gaps);
             if (prepared_size > out.max_size())
-                throw std::length_error("save_verified_into: output size exceeds string limit");
+                XOFFSET_THROW(std::length_error("save_verified_into: output size exceeds string limit"));
             out.reserve(prepared_size);
             current = &owner(token);
             check_alias(*current);
@@ -119,7 +119,7 @@ namespace detail {
             final_size = size_of(final_header, gaps);
             if (final_size > out.capacity() || final_size != prepared_size ||
                 !same_holes(initial, initial_hole_bytes, final_header, current->free_block_bytes()))
-                throw XException("save_verified_into: source changed beyond prepared output capacity");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: source changed beyond prepared output capacity"));
         }
         const auto* base = static_cast<const char*>(current->get_address());
         const auto& core = *current;
@@ -616,10 +616,10 @@ namespace detail {
         auto* current = &owner(token);
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error("save_compact_into: output capacity overflows alias range");
+                XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
             if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
                 verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
-                throw XException("save_compact_into: output aliases source storage");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
         };
         check_alias(*current);
         auto h = header<T>(*current, false);
@@ -659,11 +659,11 @@ namespace detail {
         if (options.slack_div != 0) {
             bound = measure_compact(*find_root<T>(*current), (std::numeric_limits<std::uint32_t>::max)(),
                                     options.slack_div);
-            if (bound == 0) throw XException("save_compact_into: compact payload exceeds the wire limit");
+            if (bound == 0) XOFFSET_THROW(XException(XErrc::capacity_exceeded, "save_compact_into: compact payload exceeds the wire limit"));
         }
         const auto size = sizeof(XWireHeaderV2) + bound - XWIRE_PAYLOAD_BEGIN;
         if (size > out.max_size())
-            throw std::length_error("save_compact_into: output size exceeds string limit");
+            XOFFSET_THROW(std::length_error("save_compact_into: output size exceeds string limit"));
         if (size > out.capacity()) {
             // Only output-allocation/callback boundary. With slack the next
             // save tries the existing capacity first: leave headroom.
@@ -673,10 +673,10 @@ namespace detail {
             const auto used = std::size_t(h.used_bytes);
             h = header<T>(*current, false);
             if (std::size_t(h.used_bytes) != used)
-                throw XException("save_compact_into: source changed beyond prepared output capacity");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: source changed beyond prepared output capacity"));
         }
         if (write(*current, out.capacity()) == 0)
-            throw XException("save_compact_into: source graph exceeds its payload");
+            XOFFSET_THROW(XException(XErrc::capacity_exceeded, "save_compact_into: source graph exceeds its payload"));
     }
 
     template<class T, class... M>
@@ -695,23 +695,23 @@ namespace detail {
         bool out_aliases = false;
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
-                throw std::length_error("save_compact_into: output capacity overflows alias range");
+                XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
             if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
                 verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size())) {
                 out_aliases = true;
-                throw XException("save_compact_into: output aliases source storage");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
             }
         };
-        try {
+        XOFFSET_TRY {
             check_alias(source);
             // Entry checks, before any byte is written.
             const auto* arena = source.arena();
             if (!arena || std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
                 arena->header_size != sizeof(XBufferCore::arena_header))
-                throw XException("verified paths: payload header mismatch");
+                XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
             if (arena->used_end < XBufferCore::min_payload_size() ||
                 arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
-                throw XException("verified paths: payload used_end out of range");
+                XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
             const T* root = find_root<T>(source);
             {
                 const auto* begin = reinterpret_cast<const char*>(root);
@@ -720,16 +720,16 @@ namespace detail {
                 for (std::size_t i = 0; i < sizeof...(M); ++i) {
                     const auto [p, n] = ranges[i];
                     if (p < begin || p > begin + sizeof(T) || n > std::size_t(begin + sizeof(T) - p))
-                        throw XException("save_compact_into: assignment target is not inside the root");
+                        XOFFSET_THROW(XException(XErrc::invalid_argument, "save_compact_into: assignment target is not inside the root"));
                     for (std::size_t j = 0; j < i; ++j)
                         if (verified_paths_intersect(p, n, ranges[j].first, ranges[j].second))
-                            throw XException("save_compact_into: assignment targets overlap");
+                            XOFFSET_THROW(XException(XErrc::invalid_argument, "save_compact_into: assignment targets overlap"));
                 }
             }
             const ComposeSet<M...> set{std::tuple<const XAssign<M>&...>(assigns...)};
             if (compose_count(*root, set) != sizeof...(M))
-                throw XException("save_compact_into: assignment target is not a member subobject of the root "
-                                 "(an element of a container cannot be a target)");
+                XOFFSET_THROW(XException(XErrc::invalid_argument, "save_compact_into: assignment target is not a member subobject of the root "
+                                 "(an element of a container cannot be a target)"));
 
             constexpr std::size_t kMaxLimit = XBufferCore::MAX_PAYLOAD;
             auto write = [&](const T& from, std::size_t capacity) -> std::size_t {
@@ -761,22 +761,22 @@ namespace detail {
             // addresses in the draft: if the draft moved, they are stale.
             const auto token = identity(source);
             const auto bound = measure_composed(*root, kMaxLimit, options.slack_div, set);
-            if (bound == 0) throw XException("save_compact_into: composed payload exceeds the wire limit");
+            if (bound == 0) XOFFSET_THROW(XException(XErrc::capacity_exceeded, "save_compact_into: composed payload exceeds the wire limit"));
             const auto size = sizeof(XWireHeaderV2) + bound - XWIRE_PAYLOAD_BEGIN;
             if (size > out.max_size())
-                throw std::length_error("save_compact_into: output size exceeds string limit");
+                XOFFSET_THROW(std::length_error("save_compact_into: output size exceeds string limit"));
             // Headroom, so a reused output takes the fast path again when the
             // next message is a little larger.
             out.reserve(size + (std::min)(size / 8, out.max_size() - size));
             auto* current = &owner(token);
             check_alias(*current);
             if (find_root<T>(*current) != root)
-                throw XException("save_compact_into: the draft moved while the output was allocated");
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: the draft moved while the output was allocated"));
             if (write(*root, out.capacity()) == 0)
-                throw XException("save_compact_into: source changed beyond prepared output capacity");
-        } catch (...) {
+                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: source changed beyond prepared output capacity"));
+        } XOFFSET_CATCH(...) {
             if (!out_aliases) out.clear();
-            throw;
+            XOFFSET_RETHROW;
         }
     }
 }
@@ -813,7 +813,7 @@ public:
     std::array<std::span<const std::byte>, 3> segments() const noexcept { return views(owner_); }
     explicit operator bool() const noexcept { return bool(owner_); }
     const T& root() const {
-        if (!owner_) throw XException("VerifiedSnapshot: empty snapshot");
+        if (!owner_) XOFFSET_THROW(XException(XErrc::invalid_state, "VerifiedSnapshot: empty snapshot"));
         return *owner_->source.template find_root_storage<T>();
     }
     class IoLease {
@@ -840,25 +840,25 @@ public:
 template<class T>
 VerifiedSnapshot<T> freeze_verified(TypedXBuffer<T>&& source, std::pmr::memory_resource* scratch) {
     static_assert(is_v1_wire_admitted_v<T>);
-    if (!scratch) throw XException("freeze_verified: null scratch resource");
+    if (!scratch) XOFFSET_THROW(XException(XErrc::invalid_argument, "freeze_verified: null scratch resource"));
     const auto identity = detail::VerifiedPathsAccess::identity(source);
     // Empty Control/default XBuffer do not initialize a reservation. Both the
     // control object and shared_ptr block exist before consuming source storage.
     auto owner = std::make_shared<typename VerifiedSnapshot<T>::Control>();
     auto& current = detail::VerifiedPathsAccess::owner(identity);
     if (&current != static_cast<XBufferCore*>(&source))
-        throw XException("freeze_verified: source moved during preparation");
+        XOFFSET_THROW(XException(XErrc::invalid_state, "freeze_verified: source moved during preparation"));
     const auto header = detail::VerifiedPathsAccess::header<T>(current, false);
     if (current.arena()->flags != 0 || current.arena()->reserved0 != 0 || current.arena()->reserved1 != 0)
-        throw XException("freeze_verified: unsupported payload flags");
+        XOFFSET_THROW(XException(XErrc::unsupported_flags, "freeze_verified: unsupported payload flags"));
     owner->holes.reserve(current.free_block_count());
     current.for_each_free_block([&](XBufferCore::WireHole hole) { owner->holes.push_back(hole); });
     auto* root = detail::find_root<T>(current);
     // Root supplies the additive third-argument verifier/scratch patch. Every
     // invocation creates fresh local membership indexes; no validation cache.
-    detail::verify_structural_wire_graph(*root, current, scratch);
+    XOFFSET_VREQUIRE(detail::verify_structural_wire_graph(*root, current, scratch));
     if (&detail::VerifiedPathsAccess::owner(identity) != &current)
-        throw XException("freeze_verified: source changed during validation");
+        XOFFSET_THROW(XException(XErrc::invalid_state, "freeze_verified: source changed during validation"));
     // All throwing control/validation work is over. Normalization now changes
     // only logical VM size and trivial host FreeBlock elements, then the move
     // publishes a complete immutable owner. Scratch/control OOM did not shrink.
