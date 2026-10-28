@@ -178,7 +178,7 @@ srv_cmake() {  # CMake for the container; XO_CMAKE_TOOL: one prepared with prepa
 cmd_build() {
     find_ndk || die "no NDK: run setup first (or set ANDROID_NDK)"
     mkdir -p "$W"; local L=$W/logs; mkdir -p "$L"
-    log "build 1/3: source of $SHA7 with the header-only submodules -> $W/src"
+    log "build 1/4: source of $SHA7 with the header-only submodules -> $W/src"
     git -C "$REPO" submodule update --init --depth 1 external/typelayout external/boost > "$L/submodules.log" 2>&1 || die "git submodule update failed ($L/submodules.log)"
     local l
     for l in $BOOST_LIBS; do
