@@ -10,7 +10,7 @@
   会和反射逐项核对。
 
 K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺，实现中：字段表后端已合入（#149，3.2.0-rc.1 起），
-下表 Android、Windows 和 iOS 模拟器各工具链已通过；3.2.0-rc.1 在 Android 真机、Windows 和 macOS 实机上
+下表 Android、Windows、macOS 和 iOS 模拟器各工具链已通过；3.2.0-rc.1 在 Android 真机、Windows 和 macOS 实机上
 也已通过（下一节），iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
 地址空间实测并定下最低部署目标）、跨目标 wire 语料一致、签名与 `tools/sigs/` 基线一致之后，才升为
 核心承诺（[USER_GUIDE.md](USER_GUIDE.md) 第 8 节，测试对照见 [STABILITY_TESTS.md](STABILITY_TESTS.md)）。
@@ -39,7 +39,7 @@ C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序�
 | Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | 两种标准都是 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
-| macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行（探索分支，wire 2.0） | 两种标准都是 101/101；语料逐字节一致 |
+| macOS arm64 | Apple clang 21.0.0（Xcode 27.1，MacOSX 27.0 SDK，系统 libc++），部署目标 macOS 14.0 | C++20、C++23 | M4 Mac（macOS 27.2）上原生运行，`tools/native_targets.sh macos` | 提交 1108193d：两种标准都是 137/137（含 21 个关异常测试）；24 个参照 wire 全部接受，改出的字节与 Linux 相同，`diff -r` 一致 |
 | iOS 模拟器 | Apple clang 21.0.0（Xcode 27.1，iPhoneSimulator 27.1 SDK），部署目标 iOS 17.0 | C++20 | M4 Mac 上的 iOS 27.0 模拟器（iPhone 17），`ios-simulator.cmake`，CTest 经 `simctl spawn` | 129/129；语料全部接受，逐字节一致。模拟器进程用的是 Mac 的地址空间，真机上的地址空间实测仍待做 |
 | Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
 
@@ -147,7 +147,8 @@ C++26 反射构建（P2996、GCC 16）和 C++20 字段表构建（GCC 16、P2996
 
 ## 范围
 
-只支持 64 位小端目标。32 位客户端、大端平台不在范围内。
+只支持 64 位小端目标。客户端目标是 Windows x64、Android arm64-v8a、iOS arm64（真机和模拟器）和 macOS arm64，
+服务端是 Linux x86-64 和 arm64。32 位客户端、大端平台不在范围内。
 
 ## 手机上运行：测试宿主（3.2）
 
