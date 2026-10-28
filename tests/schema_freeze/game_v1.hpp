@@ -26,6 +26,9 @@ struct alignas(4) Player {
 };
 } // namespace game_v1
 
+XOFFSET_RECORD(game_v1::Item, id, rarity, flags, label)
+XOFFSET_RECORD(game_v1::Player, name, level, slots, items, notes, seen)
+
 XOFFSET_REGISTER_SCHEMA_NAME(game_v1::Player, "test.freeze.Player")
 XOFFSET_PIN_SCHEMA(game_v1::Player, "record[s:76,a:4]{@0:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@12:i32,@16:array[2]<array[3]<i32>>,@40:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:20,a:4]{@0:i32,@4:enum<u8char>,@5:array[3]<u8char>,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@52:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}>,@64:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<enum<u8char>>}");
 

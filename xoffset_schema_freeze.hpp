@@ -21,6 +21,8 @@
 //       the previous one (using Item = game_v11::Item;), so a lineage never
 //       holds two copies of one type. Each root gets its schema name and an
 //       XOFFSET_PIN_SCHEMA line, so editing a frozen type fails the build.
+//       Each new record also gets its XOFFSET_RECORD line, so a client built
+//       without reflection (C++20 field lists) can include the snapshot.
 //       Then list the snapshot type in XOFFSET_SCHEMA_LINEAGE.
 //
 //   schema_freeze check <lock-file>
@@ -126,6 +128,7 @@ namespace XOffsetDatastructure {
             std::vector<const void*> done;        // emitted types
             std::map<std::string, const void*> names;  // snapshot-local name -> type
             std::string body;                     // definitions, dependencies first
+            std::string records;                  // XOFFSET_RECORD lines of the new records, same order
             std::vector<LockItem> items;          // lines for the lock file
             std::string error;
         };
@@ -265,6 +268,13 @@ namespace XOffsetDatastructure {
             s.body += "struct alignas(" + std::to_string(alignof(R)) + ") " + name + " {\n";
             for (const auto& f : fields) s.body += "    " + f + "\n";
             s.body += "};\n";
+            // The field list, so builds without reflection (C++20 clients) can
+            // use the snapshot; a C++26 build checks it against reflection.
+            s.records += "XOFFSET_RECORD(" + s.ns + "::" + name;
+            [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                ((s.records += ", " + std::string(ev::field_name_v<R, Is>)), ...);
+            }(std::make_index_sequence<ev::field_count<R>()>{});
+            s.records += ")\n";
             s.items.push_back({"", "record", s.ns + "::" + name, name, sig, names});
         }
 
@@ -369,6 +379,7 @@ namespace XOffsetDatastructure {
             if (s.previous) out += "#include \"" + s.previous->header + "\"\n";
             out += "\n#include <cstddef>\n#include <cstdint>\n\n";
             out += "namespace " + ns + " {\n" + s.body + "} // namespace " + ns + "\n\n";
+            if (!s.records.empty()) out += s.records + "\n";
             out += roots_text;
             out += "\n#endif\n";
             {
