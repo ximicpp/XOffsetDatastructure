@@ -124,3 +124,25 @@ C++26 反射构建（P2996、GCC 16）和 C++20 字段表构建（GCC 16、P2996
 ## 范围
 
 只支持 64 位小端目标。32 位客户端、大端平台不在范围内。
+
+## 手机上运行：测试宿主（3.2）
+
+iOS 不能运行命令行程序，Android 真机也不方便逐个推送测试。`-DXOFFSET_TEST_HOST=ON` 把每个测试、演示客户端和
+测量程序（`xo_slg_bench` SC-6、`xo_mem_probe` SC-12）各编成一个共享库（`cmake/XOffsetTestHost.cmake`），
+由一个宿主程序每次启动只运行其中一个：iOS 是 App（`tools/test_host/host_ios.mm`，库在 App 的
+`Frameworks/` 里），其他平台是命令行宿主。程序的 `exit`/`_Exit`、信号和输出都由宿主接住，结果写进宿主的
+数据目录（iOS 是 App 的 `Documents/xo`），电脑上的 `tools/test_host/xo_host_run.py` 负责安装、启动、
+传文件和取回结果：
+
+| backend | 目标 | 用的工具 |
+| --- | --- | --- |
+| `local` | Linux / macOS 上检查同一套流程 | 直接启动命令行宿主 |
+| `sim` | iOS 模拟器 | `xcrun simctl` |
+| `device` | iPhone（USB 或同一 Wi-Fi） | `xcrun devicectl`；签名用 `tools/test_host/sign_ios_app.sh` |
+
+`xo_host_run.py` 可以当 CTest 的 `CMAKE_CROSSCOMPILING_EMULATOR`（`ios-simulator.cmake` 在
+`XOFFSET_TEST_HOST=ON` 时就这样设，`ios-device.cmake` 用 `XO_HOST_DEVICE`），也可以给
+`demo/mapstate/tools/run_e2e.sh` 当客户端包装命令。它把输入文件和输出目录在电脑和设备之间来回拷贝，
+程序看到的路径和在电脑上一样；退出码是程序自己的，被信号杀掉时是 128+信号。
+云端 Linux 上用 `local` backend 检查过：129/129 个 CTest 通过，演示端到端（自检 23/23、语料回放 60/60、
+三档压力和恶意输入）全部通过。
