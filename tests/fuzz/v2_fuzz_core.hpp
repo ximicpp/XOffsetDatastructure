@@ -151,6 +151,36 @@ inline void inject_crash_drill([[maybe_unused]] const std::uint8_t* data, [[mayb
 #endif
 }
 
+// With XOFFSET_FUZZ_OUTCOMES set, the harnesses print one line per input to
+// stdout: the FNV-1a hash of the input, then each acceptor's outcome ("ok" or
+// the exact error message), tab separated:
+//   outcome <hash> T:<typed load> L:<reload> R:<raw> V:<verified receive>
+// (R and V only where the harness runs them; builds without exceptions have
+// neither). tools/fuzz_outcome_diff.sh replays one corpus through the
+// reflection, field-list and no-exceptions builds and compares the lines.
+inline const bool g_outcomes = [] {
+    const char* v = std::getenv("XOFFSET_FUZZ_OUTCOMES");
+    return v && *v;
+}();
+inline std::string g_outcome;
+inline void outcome_begin(const std::uint8_t* data, std::size_t size) {
+    if (!g_outcomes) return;
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    for (std::size_t i = 0; i < size; ++i) h = (h ^ data[i]) * 0x100000001b3ull;
+    char hex[17];
+    std::snprintf(hex, sizeof hex, "%016llx", static_cast<unsigned long long>(h));
+    g_outcome = std::string("outcome\t") + hex;
+}
+inline void outcome_add(const char* tag, bool ok, const std::string& error) {
+    if (!g_outcomes) return;
+    g_outcome += std::string("\t") + tag + ":";
+    if (ok) { g_outcome += "ok"; return; }
+    for (char c : error) g_outcome += c == '\n' ? std::string("\\n") : c == '\t' ? std::string("\\t") : std::string(1, c);
+}
+inline void outcome_end() {
+    if (g_outcomes) std::cout << g_outcome << "\n";
+}
+
 // Per-case random stream of test_v2_fuzz: case `id` of a run with `seed`
 // depends on nothing else, so `test_v2_fuzz --replay <seed> <id>` reruns it
 // alone (splitmix64 finalizer over both values).
@@ -1239,11 +1269,14 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     const auto o = oracle(w);
     std::string terr, rerr, verr;
     auto typed = typed_load(w, &terr);
+    outcome_add("T", bool(typed), terr);
     if (bool(typed) != o.ok)
         fail("case " + id + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
              " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
     std::string lerr;
-    if (reload_accepts(w, &lerr) != bool(typed))
+    const bool reload = reload_accepts(w, &lerr);
+    outcome_add("L", reload, lerr);
+    if (reload != bool(typed))
         fail("case " + id + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
@@ -1254,6 +1287,8 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
+        outcome_add("R", raw, rerr);
+        outcome_add("V", recv, verr);
         if (raw != o.ok)
             fail("case " + id + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
                  " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));

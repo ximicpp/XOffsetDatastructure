@@ -23,6 +23,15 @@
   schema_evolution), and the GCC 16 replay in `tools/fuzz_nightly.sh` replays
   `tests/fuzz/regressions/schema_evolution/` and its seed corpus through
   `fuzz_schema_evolution_replay`.
+- Nightly fuzz covers the client builds: `tools/fuzz_libfuzzer.sh --backend
+  fieldlist` fuzzes `v2_wire` and `wire_schemas` on the C++20 field-list build,
+  and `tools/fuzz_outcome_diff.sh` replays the kept corpora, regressions and
+  seeds through the C++26 reflection, C++20 field-list and no-exceptions
+  builds (ASan+UBSan), requiring the same outcome and error text for every
+  input (no-exceptions builds without the raw and receive columns). The
+  harnesses print those outcome lines when `XOFFSET_FUZZ_OUTCOMES` is set.
+  New CTest cases `fuzz_v2_wire_replay_noexc` and
+  `fuzz_wire_schemas_replay_noexc` (with `_corpus`) replay without exceptions.
 - MinGW GCC: a program with two translation units that include
   `xoffset_error.hpp` failed to link (`multiple definition of TLS init
   function for ...pending_error`), with or without exceptions. The pending
