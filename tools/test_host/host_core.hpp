@@ -38,5 +38,7 @@ void start_command_thread(int argc, char** argv, const Options& options);
 // program's replacements (xoffset_test_host.h).
 extern const void* const host_new_functions[];
 void set_new_functions(const void* const* program_functions);
+// Called on the host's own threads: their allocations keep the default functions.
+void keep_host_allocations_on_this_thread() noexcept;
 
 }  // namespace xoffset_test_host
