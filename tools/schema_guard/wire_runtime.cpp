@@ -1,0 +1,152 @@
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+#include <bit>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cstdint>
+#include "bench/slg/include/slg/model_xoffset.hpp"
+
+#ifndef XSG_WIRE_INPUT_HASH
+#error "XSG_WIRE_INPUT_HASH must identify the current wire fixture sources"
+#endif
+
+#define main xsg_original_wire_main
+#include "../../tests/test_cross_compiler_wire.cpp"
+#undef main
+
+
+namespace xsg_slg {
+namespace xm = slg::xm;
+namespace xo = XOffsetDatastructure;
+auto cap() { return xo::XBuffer::maximum_capacity(32u << 20).with_growth(xo::XGrowPolicy::Automatic); }
+void city(xm::City& c) {
+    c.city_id=100001; c.level=12;
+    c.buildings.insert_or_assign(5, 7); c.buildings.insert_or_assign(9, 2);
+    c.resources.insert_or_assign(1, 123456789); c.resources.insert_or_assign(3, 555);
+}
+void hero(xm::Hero& h, int i) {
+    h.id=100+i; h.level=20+i; h.star=3; h.name="Cross platform hero " + std::to_string(i);
+    auto& skill=h.skills.emplace_back(); skill.id=40+i; skill.level=6;
+    auto& buff=h.buffs.emplace_back(); buff.id=9+i; buff.stacks=2; buff.expire_ms=1234567+i;
+}
+void army(xm::Army& a, int n) {
+    a.army_id=1000+n; a.owner_id=2000+n; a.x=n; a.y=-n;
+    hero(a.heroes.emplace_back(), n); hero(a.heroes.emplace_back(), n+1);
+    auto& t=a.troops.emplace_back(); t.type=n+1; t.count=10000; t.wounded=37;
+    auto& b=a.buffs.emplace_back(); b.id=n+12; b.stacks=1; b.expire_ms=100000;
+}
+void report(xm::Report& r) {
+    r.battle_id=999111; r.summary="SLG cross-platform battle report";
+    for(int i=0;i<3;++i) {
+        auto& e=r.events.emplace_back();
+        e.round=i; e.hero_id=100+i; e.skill_id=40+i; e.target=200+i; e.damage=1000-i*3;
+    }
+}
+template<class T> void fill(T& r);
+template<> void fill(xm::PlayerState& r) {
+    r.player_id=201; r.name="SLG player across systems"; city(r.city);
+    army(r.armies.emplace_back(),1); hero(r.heroes.emplace_back(),4);
+    r.research.insert_or_assign(7,11); r.items.insert_or_assign(19,567890123);
+}
+template<> void fill(xm::BattleMsg& r) {
+    r.battle_id=999111; r.seed=20261028; r.winner=1;
+    army(r.attacker,1); army(r.defender,2); report(r.report);
+}
+template<> void fill(xm::ShardState& r) {
+    r.shard_id=3; r.tick=987654321; r.width=256;
+    auto& tile=r.tiles.emplace_back(); tile.x=8; tile.y=-4; tile.terrain=2; tile.level=5; tile.owner=201;
+    city(r.cities.emplace_back());
+    auto& march=r.marches.emplace_back(); march.march_id=99; march.owner=201;
+    march.from_x=1; march.from_y=2; march.to_x=3; march.to_y=4; march.eta=55;
+    auto& t=march.troops.emplace_back(); t.type=3; t.count=222; t.wounded=5;
+}
+template<> void fill(xm::Report& r) { report(r); }
+template<class T> void run(const std::filesystem::path& dir, const char* name, bool write) {
+    using Buffer=xo::TypedXBuffer<T>;
+    auto b=Buffer::create(1u<<20,cap()); fill(b.root());
+    const auto expected=b.save_verified();
+    const auto path=dir/(std::string(name)+".xwire");
+    if(write) {
+        std::ofstream f(path,std::ios::binary); f.write(expected.data(),static_cast<std::streamsize>(expected.size()));
+        if(!f) fail(std::string("cannot write ")+name);
+    } else {
+        const auto wire=read_file(path);
+        auto loaded=Buffer::load(wire,cap());
+        if(wire!=expected || loaded.save_verified()!=wire) fail(std::string(name)+": SLG wire mismatch");
+    }
+    std::cout << name << (write ? " written" : " accepted and byte-identical") << std::endl;
+}
+void run_all(const char* dir, bool write) {
+    const std::filesystem::path p(dir);
+    run<xm::PlayerState>(p,"slg_player",write);
+    run<xm::BattleMsg>(p,"slg_battle",write);
+    run<xm::ShardState>(p,"slg_shard",write);
+    run<xm::Report>(p,"slg_report",write);
+}
+} // namespace xsg_slg
+
+int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--xsg-identify") == 0) {
+#if defined(_WIN32)
+# if defined(__x86_64__) || defined(_M_X64)
+        const char* target = "windows-x64";
+# elif defined(__aarch64__) || defined(_M_ARM64)
+        const char* target = "windows-arm64";
+# else
+        const char* target = "unsupported";
+# endif
+#elif defined(__ANDROID__)
+# if defined(__x86_64__)
+        const char* target = "android-x64";
+# elif defined(__aarch64__)
+        const char* target = "android-arm64";
+# else
+        const char* target = "unsupported";
+# endif
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+# if TARGET_OS_SIMULATOR
+#  if defined(__x86_64__)
+        const char* target = "ios-simulator-x64";
+#  elif defined(__aarch64__)
+        const char* target = "ios-simulator-arm64";
+#  else
+        const char* target = "unsupported";
+#  endif
+        if (!std::getenv("SIMULATOR_UDID")) return 2;
+# elif defined(__aarch64__)
+        const char* target = "ios-arm64";
+# else
+        const char* target = "unsupported";
+# endif
+#elif defined(__APPLE__)
+# if defined(__x86_64__)
+        const char* target = "macos-x64";
+# elif defined(__aarch64__)
+        const char* target = "macos-arm64";
+# else
+        const char* target = "unsupported";
+# endif
+        if (std::getenv("SIMULATOR_UDID")) return 2;
+#elif defined(__linux__)
+# if defined(__x86_64__)
+        const char* target = "linux-x64";
+# elif defined(__aarch64__)
+        const char* target = "linux-arm64";
+# else
+        const char* target = "unsupported";
+# endif
+#else
+        const char* target = "unsupported";
+#endif
+        const char* endian = std::endian::native == std::endian::little ? "le" : "other";
+        std::printf("XSG_RUNTIME_V1 %s %zu %s %s\n", target, sizeof(void*) * 8, endian, XSG_WIRE_INPUT_HASH);
+        return 0;
+    }
+    const int rc=xsg_original_wire_main(argc, argv);
+    if (rc == 0 && argc == 3 &&
+        (std::strcmp(argv[1], "--write") == 0 || std::strcmp(argv[1], "--read") == 0))
+        xsg_slg::run_all(argv[2], std::strcmp(argv[1], "--write") == 0);
+    return rc;
+}

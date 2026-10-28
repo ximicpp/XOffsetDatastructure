@@ -48,9 +48,11 @@ Options:
   -j N              Use N parallel build jobs
   --help, -h        Show this help
 
-The script configures the project with CMake, builds it, runs CTest,
-exports the exact signature target matrix into tools/sigs/, validates the
-matrix inventory, and runs the compatibility self-check.
+The script configures and builds the project, then requires the full schema
+compile and runtime/wire matrices to pass before CTest and the signature tools. Configure
+the schema gate with XSG_PROFILES, XSG_WIRE_PROFILES, XSG_NDK, XSG_CATALOG,
+XSG_REPORTS, and XSG_PULL=1 when Docker images may be pulled. See
+tools/schema_guard/README.md.
 EOF
 }
 
@@ -288,7 +290,13 @@ if [[ "$VERBOSE" -eq 1 ]]; then
     ctest_args+=(-V)
 fi
 
-run_cmd ctest "${ctest_args[@]}"
+# Fresh full-target compile and runtime/wire checks must pass before CTest.
+# run_checked.py intentionally offers no target-selection or skip option.
+schema_gate_args=(--clang "$CXX_COMPILER" --reports "${XSG_REPORTS:-$BUILD_DIR/schema-guard-runs}")
+if [[ "${XSG_PULL:-0}" == "1" ]]; then
+    schema_gate_args+=(--pull)
+fi
+run_cmd python3 tools/schema_guard/run_checked.py "${schema_gate_args[@]}" -- ctest "${ctest_args[@]}"
 
 section "Signature Tools"
 
