@@ -1,0 +1,5 @@
+f0308ee75b002ee5663ec0da9104c0c2eb57a279|#147 L D root pointer cache + reload fixed costs (the range also holds #143 #144 #145, class 0)
+5af77d3421ff6a5d9e65645f11702c28da937728|#149 S field-table backend, not measured on the Mac (bench/slg and bench/reloc change here)
+92404a277c3ca3e2f217836473edaba4a28db909|#148 S no-exceptions build, not measured on the Mac (the range also holds #146 #150 #152, class 0)
+7680be4171a83a73bc35ac1acc67ede713222d23|#153 L XFixedVector iterator class (the range also holds #151 #154, class 0)
+7ddfcee3f8dafeeaee6258b3ba7bf8e1434a2652|#155 S MinGW TLS fix (the range also holds #156; the last range is #157 #158, class 0, library unchanged)

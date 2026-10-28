@@ -1,0 +1,26 @@
+t0 9ef5ce75d72a172660a97d9fb4e188da3945f6c6 tree deb8af3b0cadbd09c4f51e7917da8c3496dc62b8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.1.0 9ef5ce75 (library of the INT4 head e913d22))
+t1 af601ea0372e17333ff8a6d64cce0a409d815f7a tree 85696b57beb6e821f5acb4ca678e415f0f8384f9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT4 head (next_cpp26))
+t1: diff over t0 sha256 158d69655c484dd2bd367090e7c1b7ed7e72a3889bf1bd499291fc9645b68d5f ( 229 files changed, 15137 insertions(+), 2261 deletions(-))
+t1: library header diff over t0:  2 files changed, 1439 insertions(+), 900 deletions(-)
+t1: first-parent commits over t0:
+  af601ea0 Merge pull request #158 from ximicpp/claude/mapdemo-macos-window-20261028 (class 0)
+  bb7714cf Merge pull request #157 from ximicpp/claude/mapdemo-noexc-20261028 (class 0)
+  7ddfcee3 Merge pull request #155 from ximicpp/claude/mingw-tls-fix-20261028 (class S)
+  c928334d Merge pull request #156 from ximicpp/claude/ledger-153-20261028
+  7680be41 Merge pull request #153 from ximicpp/claude/d-iter-20261027 (class L)
+  579ca446 Merge pull request #154 from ximicpp/claude/mapdemo-android-emu-20261028 (class 0)
+  7599286a Merge pull request #151 from ximicpp/claude/fuzz-nightly-evolution-20261027 (class 0)
+  92404a27 Merge pull request #148 from ximicpp/claude/no-exceptions-20261027 (class S)
+  00b5d351 Merge pull request #152 from ximicpp/claude/mapdemo-e2e-20261027 (class 0)
+  ed1852ab Merge pull request #150 from ximicpp/claude/docs-k-field-table-20261027 (class 0)
+  43669586 Merge pull request #146 from ximicpp/claude/schema-evolution-20261027 (class 0)
+  5af77d34 Merge pull request #149 from ximicpp/claude/client-native-cpp20-20261027 (class S)
+  f0308ee7 Merge pull request #147 from ximicpp/claude/d-read-root-20261027 (class L)
+  431a7ee2 Merge pull request #145 from ximicpp/claude/schema-handshake-e1-20261027 (class 0)
+  c5968008 Merge pull request #144 from ximicpp/claude/client-docs-sc9-20261027 (class 0)
+  d2db6627 Merge pull request #143 from ximicpp/claude/anchor-v3.1.0-20261027 (class 0)
+bench/reloc of t1: tree a7e8b02792a9cf4258e012fe4881330c6c9d5e59 differs from t0 (aabaa1ed859747bc5237fe471e8107c6f92c642d): t0's is timed against both libraries
+reloc_bench t0 sha256 fccdef1448731cfe460f520e3fabc7ec825494ee4bb2be4bd2d4227ef3ffa41b
+reloc_bench t1 sha256 c0b285884fbce1dd049fbea2bec67e44b827e2f45501fb3b90f3eec209d45a62
+reloc_bench t0a sha256 b9a3d4539809de34cd94106c20b31517af5cb2a8a32a8fdeb48a7619be731810
+reloc_bench t1a sha256 af7211d3413f3e6fb9367c5012fa67052ecbe76f02c4c268705d424b266abeb7

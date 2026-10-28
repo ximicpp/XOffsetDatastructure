@@ -1,0 +1,8 @@
+CKPT4 0
+anchor 9ef5ce75 (v3.1.0; library identical to the INT4 head e913d22, INT4 pass)
+screen watcher: 60 calls (dark.log)
+ABC: pass (max upper bound 1.0143; A 1.0023, B 1.0143, C 1.0118; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.933 / 0.944 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.060 / 1.068, D.read 67.6 µs; anc D÷flatbuffers 1.159 / 1.177, D÷zpp_bits 1.318 / 1.340, D.read 82.6 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 158 (rc 0)
