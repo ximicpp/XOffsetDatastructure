@@ -31,7 +31,7 @@ it. Both run the same validator and send the same bytes.
 | End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
 | End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
 | Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
-| End to end, iOS Simulator | Mac M4, A/B in colima | pending: Xcode 27.1 installed 10-28; the run of next_cpp26 bb7714c (clients with and without exceptions) is queued |
+| End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -194,6 +194,8 @@ next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 | android-arm64 | qemu-aarch64 user mode | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | macos (Mac M4, separate run) | native; A/B in colima, Linux arm64 | Apple clang 21, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| ios (Mac M4, separate run, 10-28) | iOS 27.0 Simulator (iPhone 17), arm64; A/B in colima, Linux arm64 | Apple clang 21, iPhoneSimulator 27.1 SDK, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| ios-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the cloud x86-64 run |
 
 What this shows:
 - Server to server across architectures: A and B built by GCC 16 for Linux
@@ -308,8 +310,29 @@ A and B in colima: exit 0, three screenshots, `direct_read` 71 / 71. The frame
 6,666 B of zstd, view round trip 17 ms (frame-paced), `reload_verified` 8.0
 us, 59 fps. Output: `mobile_sim_macos_window_out.tar.gz` in the project folder
 (sha256 `0f71e100757c95f10ed2b62e04cb956763c75ec3cf208ce0a2e4e9af7dc87043`),
-screenshots under `out-macos-window/macos/shots/`. Still open for this
-section: the iOS Simulator run.
+screenshots under `out-macos-window/macos/shots/`.
+
+iOS Simulator (10-28): the pack was next_cpp26 af601ea plus #160, which
+changes only tests. The clients built with and without exceptions (Apple
+clang 21, iPhoneSimulator 27.1 SDK) ran in the iOS 27.0 Simulator (iPhone 17)
+on the Mac M4 against A and B in colima. Both passed self-check, the replay of
+the cloud corpus, the three tiers and evil, with the same self-check and evil
+outcomes, and their step wires equal the cloud x86-64 run at 500 / 500 ticks
+in every tier. The library's CTest passed 129 / 129 in the simulator and its
+corpus matched the Linux reference. Client side, 10000-unit tier, p50
+(simulator numbers, not device numbers): a viewport is 15,072 B as a wire and
+6,372 B with zstd, decompressed in 43.6 us and verified in 6.1 us; a full
+scene is 321,288 B and 122,724 B with zstd, decompressed in 500 us and
+verified in 55 us. The client without exceptions measured 37.9 / 5.2 us and
+491 / 56 us in the same run; one sequential run does not resolve the 1.1x to
+1.3x verification difference of the interleaved replays above. Output:
+`mobile_sim_ios_out.tar.gz` in the project folder (sha256
+`daa917de3122e8a95fb3e84a0aa613d297856531f6112e24bc258c458a004c4b`), result
+table `out-ios3/ios/demo/E2E_RESULT.md`.
+
+Every planned run of this section has been done. The Android client without
+exceptions ran under qemu in the cloud (`noexc3`) but not in the Android
+emulator; real phones come later.
 
 ## 6. Scope
 

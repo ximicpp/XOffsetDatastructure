@@ -517,8 +517,8 @@ K7 的现状：
   Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）都读入服务端
   C++26 反射构建写出的参照语料并全部接受，写出的语料与它逐字节一致
   （[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
-- **边界**：只覆盖跑过上面检查的工具链。iOS（Apple clang + iOS SDK）还在等 Xcode，
-  尚未覆盖。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
+- **边界**：只覆盖跑过上面检查的工具链。iOS 只在模拟器上跑过（Xcode 27.1，iOS 27.0，
+  语料逐字节一致），真机尚未覆盖。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
   schema 导出签名、不一致时构建失败，并把 GCC 16 并入同一门禁（实现中）。
 
 K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
@@ -533,7 +533,8 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 （第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
 编译器），服务端照旧用 C++26 反射。现状（3.2，未发布）：字段表后端已合入；Android
 （NDK r29/r30）和 Windows（MSVC 19.44、clang-cl 19、MinGW）全量 CTest 都是 106/106，语料与
-服务端逐字节一致；iOS 等 Xcode。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
+服务端逐字节一致；iOS 模拟器（Xcode 27.1，部署目标 iOS 17.0）全量 CTest 129/129，
+语料同样逐字节一致，真机待测。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
 （iOS 含地址空间实测，并定下最低部署目标：系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17
 以下加载失败），跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致。详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
