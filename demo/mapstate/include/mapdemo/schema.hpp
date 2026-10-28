@@ -1,10 +1,21 @@
 // Map state demo: the wire schema shared by server A, server B and the client.
 // FROZEN INTERFACE (design doc demo/mapstate/INTERFACES.md). Changing a type
 // here changes every wire; coordinate with all demo threads first.
+//
+// This is version 2 of the schema. Version 1 is frozen in schema_v1.hpp
+// (tools: src/schema_freeze.cpp, lock file ../../schema.lock); A still serves
+// version-1 clients (schema_lineage.hpp), and mapdemo_client_v1 is such a
+// client, built from that snapshot (include_v1/mapdemo/schema.hpp). A change
+// to a root type's layout needs a new frozen version and a lineage entry;
+// `mapdemo_schema_freeze check` fails without them.
 #pragma once
 #include <cstddef>
 #include <cstdint>
 #include "xoffsetdatastructure.hpp"
+
+// The schema version these headers describe; code the version-1 client
+// does not have is under #if MAPDEMO_SCHEMA_VERSION >= 2.
+#define MAPDEMO_SCHEMA_VERSION 2
 
 namespace mapdemo {
 using namespace XOffsetDatastructure;
@@ -74,6 +85,8 @@ struct ViewSnapshot {
     std::uint32_t scene_id{};
     Rect rect;
     XVector<VisibleUnit> units;
+    std::uint32_t scene_units{};    // units in the scene at this tick (version 2)
+    std::uint32_t reserved0{};      // 0; fills the 8-byte record alignment
 };
 
 // A unit right after one of its events (rules: every kEventPeriodTicks ticks,
@@ -154,7 +167,7 @@ XOFFSET_RECORD(mapdemo::UnitState, id, scene_id, pos, speed, hp, behavior, next_
 XOFFSET_RECORD(mapdemo::UnitStateBatch, tick, reserved0, units)
 XOFFSET_RECORD(mapdemo::ViewRequest, request_id, scene_id, reserved0, rect)
 XOFFSET_RECORD(mapdemo::VisibleUnit, id, hp, pos, behavior, name)
-XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units)
+XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units, scene_units, reserved0)
 XOFFSET_RECORD(mapdemo::UnitEvent, tick, unit_id, hp, pos, behavior, next_waypoint, name, path)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
@@ -174,7 +187,7 @@ XOFFSET_REQUIRE_NO_PADDING(mapdemo::ViewSnapshot);
 XOFFSET_REQUIRE_NO_PADDING(mapdemo::UnitEvent);
 static_assert(sizeof(mapdemo::UnitState) == 56);
 static_assert(sizeof(mapdemo::VisibleUnit) == 32);
-static_assert(sizeof(mapdemo::ViewSnapshot) == 48);
+static_assert(sizeof(mapdemo::ViewSnapshot) == 56);
 static_assert(sizeof(mapdemo::UnitStateBatch) == 24);
 static_assert(sizeof(mapdemo::ViewRequest) == 32);
 static_assert(sizeof(mapdemo::UnitEvent) == 56);

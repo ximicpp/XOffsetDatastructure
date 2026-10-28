@@ -41,6 +41,9 @@ XBuffer build_sample(std::uint32_t units) {
     s.tick = 1234;
     s.scene_id = kSceneId;
     s.rect = Rect{{0.0f, 0.0f}, {kViewWidth, kViewHeight}};
+#if MAPDEMO_SCHEMA_VERSION >= 2
+    s.scene_units = units;
+#endif
     s.units.reserve(units);
     for (std::uint32_t i = 0; i < units; ++i) {
         VisibleUnit& v = s.units.emplace_back();

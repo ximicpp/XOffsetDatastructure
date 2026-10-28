@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Map state demo: self-test, the three tiers (1 / 100 / 10000 units x 500
-# steps, checks on) in both buffer modes, the --evil online failure-input
-# test in both modes, then summarize.py.
+# Map state demo: self-test, the schema lock check, the three tiers (1 / 100
+# / 10000 units x 500 steps, checks on) in both buffer modes, the --evil
+# online failure-input test in both modes, then summarize.py.
 #
 #   run_all_tiers.sh BIN_DIR [OUT_ROOT]
 #
@@ -13,11 +13,13 @@
 # MAPDEMO_COMPARE (another OUT_ROOT, e.g. a run with another compiler or on
 # another platform: its per-tick step wire digests must equal these),
 # MAPDEMO_CLIENT / MAPDEMO_CLIENT_ARGS (see run_tier.sh; the evil run adds
-# --evil to MAPDEMO_CLIENT_ARGS), MAPDEMO_SKIP_SELFTEST=1 (the self-test of
-# the servers already ran for these binaries).
+# --evil to MAPDEMO_CLIENT_ARGS), MAPDEMO_CLIENT2 / MAPDEMO_CLIENT2_ARGS (a
+# second client in every tier, at the same time; not in the evil run),
+# MAPDEMO_SKIP_SELFTEST=1 (the self-test and schema lock check of the
+# servers already ran for these binaries).
 #
-# OUT_ROOT (default ./mapdemo-results) gets selftest/, tier_<N>_<mode>/,
-# evil_<mode>/, RESULT_TABLES.md and summary.json. Exit 0 only when every run
+# OUT_ROOT (default ./mapdemo-results) gets selftest/, schema_check/,
+# tier_<N>_<mode>/, evil_<mode>/, RESULT_TABLES.md and summary.json. Exit 0 only when every run
 # and every check passed. Portable to macOS bash 3.2.
 set -u
 
@@ -47,6 +49,17 @@ if [ "${MAPDEMO_SKIP_SELFTEST:-0}" != 1 ]; then
     echo "selftest=$RC" > "$OUT_ROOT/selftest/exit_codes.txt"
     echo "selftest: exit $RC"
     [ "$RC" = 0 ] || FAILED=1
+
+    # The root types still match demo/mapstate/schema.lock, or changed with
+    # a lineage entry for the last frozen version (schema_freeze.cpp).
+    echo "== schema lock check"
+    mkdir -p "$OUT_ROOT/schema_check"
+    rm -f "$OUT_ROOT/schema_check"/*
+    "$BIN/mapdemo_schema_freeze" check "$HERE/../schema.lock" > "$OUT_ROOT/schema_check/check.log" 2>&1
+    RC=$?
+    echo "schema_check=$RC" > "$OUT_ROOT/schema_check/exit_codes.txt"
+    echo "schema lock check: exit $RC"
+    [ "$RC" = 0 ] || FAILED=1
 fi
 
 for units in $TIERS; do
@@ -59,14 +72,15 @@ for units in $TIERS; do
 done
 
 if [ "${MAPDEMO_SKIP_EVIL:-0}" != 1 ]; then
-    # Malformed requests against a running A (100 units, 200 steps): the evil
-    # client exits 0 only when all six were rejected and A still answers
-    # normal requests (also on the connection that sent a rejected one); A
-    # must keep running to its step limit and exit 0.
+    # Malformed requests, subscriptions and handshakes against a running A
+    # (100 units, 200 steps): the evil client exits 0 only when every one
+    # was rejected and A still answers normal requests (also on the
+    # connection that sent a rejected one); A must keep running to its step
+    # limit and exit 0.
     for mode in $MODES; do
         echo "== evil (online failure inputs), --buffers $mode"
         MAPDEMO_PORT_A=$PORT MAPDEMO_PORT_B=$(( PORT + 1 )) MAPDEMO_BUFFERS=$mode \
-            MAPDEMO_CLIENT_ARGS="--evil ${MAPDEMO_CLIENT_ARGS:-}" MAPDEMO_A_ARGS= \
+            MAPDEMO_CLIENT_ARGS="--evil ${MAPDEMO_CLIENT_ARGS:-}" MAPDEMO_A_ARGS= MAPDEMO_CLIENT2= \
             "$HERE/run_tier.sh" "$BIN" 100 "$OUT_ROOT/evil_$mode" 200 || FAILED=1
         PORT=$(( PORT + 2 ))
         REJECTED=$(grep -c '^rejected:' "$OUT_ROOT/evil_$mode/a.log" 2>/dev/null || true)
