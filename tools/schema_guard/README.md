@@ -205,3 +205,42 @@ If Docker Hub is unavailable, --registry-prefix mirror.gcr.io/library/ uses
 the same pinned image digests via that registry mirror.
 
 See VALIDATION_20261028.md for the recorded platform results and limitations.
+
+## Windows-hosted Android emulator relay
+
+A Mac gate can use an Android emulator on a Windows node without exposing ADB
+on the network. Start a separate Windows worker while the gate runs. It polls a
+private Mac queue through the configured nodecli connection, executes only
+pre-allowlisted local fixture binaries, and returns each fresh result and corpus.
+There is no fallback to a historical result. Each request has a unique id and
+the Mac runner checks the binary SHA-256 against the Windows worker allowlist.
+The queue must be an existing private directory with mode 0700. Restrict access
+to the queue and worker machine: anyone who can write the queue can cause an
+allowlisted fixture to run. Use a fresh queue for each worker session.
+
+Copy nodecli_wire_worker.py, adb_wire_runner.py and the exact Android binaries
+to the Windows node using nodecli copy. Verify that the binary hashes on both
+nodes match. Start the emulator with an explicit ADB serial, then on the Windows
+node run (PowerShell backticks indicate line continuation):
+
+    python nodecli_wire_worker.py --mac-cwd /absolute/mac/project --queue /absolute/mac/private-queue `
+        --adapter C:\path\adb_wire_runner.py --adb C:\path\adb.exe --serial emulator-5568 `
+        --android-fixture C:\path\android-x64.bin --android-fixture C:\path\android-arm64.bin
+
+The worker also accepts repeated --native-fixture paths for Windows executables.
+It does not build them. The worker calls nodecli and must be started from a
+directory whose nodecli project mapping can reach the Mac and local nodes.
+In the Mac runtime profiles add, for each target, an entry such as:
+
+    {"binary": "/absolute/mac/android-x64.bin",
+     "runner": ["python3", "/absolute/mac/project/tools/schema_guard/relay_wire_runner.py",
+                "--queue", "/absolute/mac/private-queue", "--"]}
+
+Pass the complete profiles file as XSG_WIRE_PROFILES or --wire-profiles to
+run_checked.py. The configured target binary on Mac and allowlisted Windows
+binary must be byte-identical. The normal matrix performs target identity,
+source fingerprint, exact corpus, both read directions and byte comparison.
+A stopped worker, missing device, wrong binary hash, failed transfer, or
+timeout fails the matrix. The worker does not make the remaining unavailable
+targets pass. The October 2026 live run used the Android x64 emulator with
+arm64 translation; it is not evidence of physical Android hardware.
