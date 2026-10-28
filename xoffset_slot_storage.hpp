@@ -53,6 +53,9 @@
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>
+#  if defined(XOFFSET_OWNER_MAP_SHARED)
+#    include <dlfcn.h>
+#  endif
 #else
 #  error "XOffset slot storage requires Windows, Linux, or macOS"
 #endif
@@ -163,23 +166,46 @@ struct OwnerMap {
     }
 };
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(XOFFSET_OWNER_MAP_SHARED)
 // A PE image stores zero-initialized COMDAT data in the file (MinGW GCC puts
 // this table in .data: a 64 MiB executable), so on Windows the table is
 // committed at the first registration. While it is null no region exists and
 // every lookup finds no owner. The pointer is set once and never changes; a
 // thread that holds a head in a region has synchronized with the region's
 // registration, so relaxed loads see it.
+//
+// XOFFSET_OWNER_MAP_SHARED (Linux, Apple): the same, for a process that loads
+// many shared libraries built with this header (the phone test host,
+// tools/test_host). Each library would map its own 64 MiB table, and about 50
+// fill an iPhone process's address space; with it they take the one table the
+// executable exports as xoffset_owner_map_shared(bytes), or else map their own.
 inline std::atomic<std::uint8_t*> owner_map_table{nullptr};
 
 inline bool OwnerMap::ready() noexcept {
     if (owner_map_table.load(std::memory_order_acquire)) return true;
+#if defined(_WIN32)
     auto* fresh = static_cast<std::uint8_t*>(
         ::VirtualAlloc(nullptr, entries, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
     if (!fresh) return false;
     std::uint8_t* expected = nullptr;
     if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel))
         ::VirtualFree(fresh, 0, MEM_RELEASE);
+#else
+    using Shared = std::uint8_t* (*)(std::size_t);
+    std::uint8_t* fresh = nullptr;
+    bool mapped = false;
+    if (auto shared = reinterpret_cast<Shared>(::dlsym(RTLD_DEFAULT, "xoffset_owner_map_shared"))) {
+        fresh = shared(entries);
+    } else {
+        void* p = ::mmap(nullptr, entries, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        fresh = p == MAP_FAILED ? nullptr : static_cast<std::uint8_t*>(p);
+        mapped = fresh != nullptr;
+    }
+    if (!fresh) return false;
+    std::uint8_t* expected = nullptr;
+    if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel) && mapped)
+        ::munmap(fresh, entries);
+#endif
     return true;
 }
 
@@ -225,7 +251,7 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const vo
 
 inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept {
     if (bytes == 0) return;
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(XOFFSET_OWNER_MAP_SHARED)
     std::uint8_t* const table = owner_map_table.load(std::memory_order_acquire);
     if (!table) return;  // entry 0 before any registration: nothing to clear
 #else

@@ -10,6 +10,7 @@
 #include <csetjmp>
 #include <csignal>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -26,6 +27,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -39,6 +41,18 @@
 #define XO_HOST_HAVE_OS_PROC 1
 #endif
 #endif
+
+// The owner map of every program library (xoffset_slot_storage.hpp, built with
+// XOFFSET_OWNER_MAP_SHARED by cmake/XOffsetTestHost.cmake): one table for the
+// process instead of 64 MiB of address space in each loaded library.
+extern "C" __attribute__((visibility("default"), used)) std::uint8_t* xoffset_owner_map_shared(std::size_t bytes) {
+    static const std::size_t size = bytes;
+    static std::uint8_t* const table = [] {
+        void* p = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        return p == MAP_FAILED ? nullptr : static_cast<std::uint8_t*>(p);
+    }();
+    return bytes == size ? table : nullptr;
+}
 
 namespace xoffset_test_host {
 namespace {
@@ -808,6 +822,16 @@ void* program_thread_main(void* p) {
     return nullptr;
 }
 
+bool address_space_headroom() {
+    const char* v = std::getenv("XO_HOST_HEADROOM_MIB");
+    const std::size_t mib = v && *v ? std::strtoull(v, nullptr, 10) : 2048;
+    if (mib == 0) return true;
+    void* p = ::mmap(nullptr, mib << 20, PROT_NONE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE, -1, 0);
+    if (p == MAP_FAILED) return false;
+    ::munmap(p, mib << 20);
+    return true;
+}
+
 // One request, as cmd_run, in this process; returns when the program has ended.
 void serve_one(const std::string& id, const Options& o, ProcessState& saved) {
     const std::string& root = o.root;
@@ -993,6 +1017,12 @@ void serve_one(const std::string& id, const Options& o, ProcessState& saved) {
     }
     save_ledger(o);
     if (req.program == "@quit") std::_Exit(0);
+    // Programs leave reservations behind (buffers alive at exit, storage pools, slot
+    // chunks); an iPhone process has ~3.4 GiB of address space. When the next program
+    // could not reserve XO_HOST_HEADROOM_MIB (2048: the largest single buffer an iPhone allows, as
+    // test_owner_map needs) in one piece, this process ends
+    // after its result is packed and the driver starts a new one.
+    if (!address_space_headroom()) std::_Exit(0);
 }
 
 [[noreturn]] void cmd_serve(const Options& o) {
