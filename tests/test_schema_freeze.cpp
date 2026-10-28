@@ -10,6 +10,7 @@
 #include "../xoffset_schema_freeze.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -115,6 +116,10 @@ int main(int argc, char** argv) {
     CHECK(detail::freeze::freeze<game1::Player>("v1", "game_v1", "tests/schema_freeze/game_v1.hpp", lock) == 0);
     CHECK(detail::freeze::freeze<game2::Player>("v2", "game_v2", "tests/schema_freeze/game_v2.hpp", lock) == 0);
     for (const char* f : {"game_v1.hpp", "game_v2.hpp", "schema.lock"}) {
+        // XOFFSET_UPDATE_GOLDEN=1: an intended change to the tool's output
+        // rewrites the checked-in copies (review their diff).
+        if (std::getenv("XOFFSET_UPDATE_GOLDEN"))
+            fs::copy_file(work / "tests" / "schema_freeze" / f, golden / f, fs::copy_options::overwrite_existing);
         const bool same = read_file(work / "tests" / "schema_freeze" / f) == read_file(golden / f);
         if (!same) std::fprintf(stderr, "%s differs from the checked-in copy\n", f);
         CHECK(same);

@@ -5333,7 +5333,7 @@ namespace XOffsetDatastructure {
 
         // Bitmap registration, kept out of line so that the validators the
         // cursor path inlines into stay small.
-        [[gnu::noinline]] inline vstatus register_owned_bitmap(std::size_t begin, std::size_t bytes,
+        XOFFSET_DETAIL_NOINLINE inline vstatus register_owned_bitmap(std::size_t begin, std::size_t bytes,
                                                                WireValidationContext& ctx) {
             auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;

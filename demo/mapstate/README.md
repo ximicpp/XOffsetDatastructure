@@ -43,6 +43,7 @@ folder (`slg-demo-20261022/MAP_DEMO_DESIGN_20261022.md`). Results:
 | `include/mapdemo/rules.hpp`, `rules_impl.hpp` | deterministic generation and step rules, one template for both models |
 | `include/mapdemo/net.hpp`, `src/net.cpp` | 24-byte frame header, per-type length caps checked before allocation, handshake, payload recycling; POSIX sockets and Winsock |
 | `include/mapdemo/codec.hpp`, `src/codec.cpp` | `ViewReq` flags (category + snapshot encoding), zstd compression and the guarded decompression |
+| `dict/unit_event_v1.xozd` | the event dictionary (id 1, 16 KB, bound to `UnitEvent`), compiled into every binary at configure time; codec uses `contrib/zstd_dict` |
 | `include/mapdemo/build_info.hpp` | the `build` line each process prints (compiler, platform, C++ standard, schema backend, zstd) |
 | `include/mapdemo/buffer_mode.hpp` | the `--buffers` option (`reuse`, `fresh`) |
 | `include/mapdemo/metrics.hpp`, `src/metrics.cpp` | samples, mean / p50 / p95 / max, CSV |
@@ -226,6 +227,28 @@ emulator or simulator is run through a wrapper command that starts it there
 and copies its `--csv-dir` back (A with `MAPDEMO_A_HOST=0.0.0.0`;
 the Android emulator reaches the host as 10.0.2.2). Timings under wine,
 qemu or an emulator are not device timings.
+
+### Event stream: small messages with a zstd dictionary
+
+`--events raw|zstd|zdict|batch|cycle` makes the client subscribe to A's unit
+events (INTERFACES.md sections 3 and 4): every 20 ticks, one `UnitEvent`
+wire of 144 to 168 bytes per unit with id % 100 == 0. Add it to a run with
+`MAPDEMO_CLIENT_ARGS="--events cycle"` (run_tier.sh, run_all_tiers.sh) or
+`MAPDEMO_EVENTS=cycle` (run_e2e.sh); the summary then requires A's and the
+client's event logs to agree per frame and every encoding to be sampled.
+Bytes per event on the network, 10000-unit tier: raw 146, zstd 152,
+dictionary 68, batch of 100 in one dictionary frame 52.
+
+To train a new dictionary: run A with `--events-dump DIR` for a few hundred
+steps, then
+
+```bash
+xoffset_zstd_dict train --id 2 --size 16384 --binding auto \
+    --out demo/mapstate/dict/unit_event_v1.xozd records:DIR/events.bin
+```
+
+(`contrib/zstd_dict`), and reconfigure. A new dictionary takes a new id:
+clients holding the old id are refused at Subscribe.
 
 ## Deterministic generation (design section 3)
 

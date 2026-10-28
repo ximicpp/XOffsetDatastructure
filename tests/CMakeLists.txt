@@ -169,6 +169,7 @@ target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
 # (xoffset_evolution.hpp, server side).
 set(EVOLUTION_TESTS
     test_schema_handshake
+    test_schema_snapshot   # a frozen snapshot used by a client (every build)
     test_schema_evolution
     test_schema_lineage
 )

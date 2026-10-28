@@ -45,6 +45,11 @@ struct Options {
     // zstd in turn (request id order).
     codec::Encoding encoding = codec::zstd_available() ? codec::Encoding::Zstd : codec::Encoding::Compact;
     bool cycle_encodings = false;
+    // --events: subscribe to A's event stream in this mode (codec::EventEncoding
+    // or codec::kEventCycle); kEventsOff (default) does not subscribe.
+    std::uint16_t events = kEventsOff;
+    std::string events_dict;        // --events-dict FILE; empty: the built-in dictionary
+    static constexpr std::uint16_t kEventsOff = 0xffff;
 
     bool check_on() const { return check.value_or(headless); }
 };
@@ -124,6 +129,9 @@ std::string join_path(const std::string& dir, const char* file);   // dir/file; 
 // client_snapshots.csv (INTERFACES.md section 6): one row per snapshot.
 // wire_bytes / wire_digest describe the XOffset wire that was verified;
 // net_bytes is the frame payload (smaller for zstd).
+inline constexpr const char* kEventsCsvHeader =
+    "tick,part,encoding,count,wire_bytes,net_bytes,digest,decode_us,verify_us,check_ok";
+
 inline constexpr const char* kSnapshotCsvHeader =
     "request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,"
     "encoding,net_bytes,wire_digest,decompress_us";
@@ -201,6 +209,8 @@ private:
     };
     void retire_current(double destroy_us);
     void check_snapshot(const net::Frame& frame);
+    Status subscribe();
+    Status on_events(net::Frame& frame);
 
     const Options& opt_;
     net::Conn conn_;
@@ -241,6 +251,17 @@ private:
     CheckLog checks_;
     metrics::CsvFile snap_csv_;
     bool snap_csv_open_ = false;
+
+    // event stream (--events)
+    codec::EventDecoder events_dec_;
+    codec::EventEncoder events_raw_;          // re-packs verified wires for the digest
+    std::vector<std::string_view> event_wires_;
+    std::string event_raw_;
+    std::optional<XBuffer> event_buf_;        // reuse: reloaded for every event
+    std::uint64_t event_frames_[codec::kEventEncodingCount] = {};
+    std::uint64_t events_ = 0, last_event_tick_ = 0, event_part_ = 0;
+    metrics::CsvFile events_csv_;
+    bool events_csv_open_ = false;
 };
 
 // Entry points (client_main.cpp dispatches). Return the process exit code
