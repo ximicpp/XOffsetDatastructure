@@ -46,3 +46,45 @@ Android compile sysroot used partial archive extraction without full archive
 SHA1 verification. Windows compilation used MinGW headers rather than MSVC
 STL, and no real Windows ARM64, iOS device, or usable iOS x64 simulator is
 established by this run.
+
+## Patched Wine compatibility follow-up
+
+A separate Wine 10 image with the upstream PAC-unwind fix and BTI dispatcher
+entries successfully ran the Windows ARM64 fixture against the macOS arm64
+reference in both directions. The matrix records PASS_WIRE_WINE, and its overall
+status remains FAIL because this is not native Windows.
+
+Report: /Users/netease/XOffsetDatastructure-20261027/results/schema-wine-patched-wire-20261028-v1/REPORT.md
+
+The isolated build and diagnostic logs are under
+/Users/netease/XOffsetDatastructure-20261027/results/schema-wine-fix-20261028-v1.
+The experiment uses the upstream Wine 10.0 release plus the Debian server
+temporary-directory patch, and a protocol header regenerated from the Debian
+source. The Debian and upstream protocol definitions were byte-identical; the
+generated headers differed only in their protocol version. This custom image
+is an experiment, not an official release or a production runtime.
+
+The GitHub-hosted Windows ARM64 workflow is prepared as a one-shot diagnostic
+but was not pushed or run. It does not replace the live native Windows gate.
+
+## Fresh complete gate after Wine fix
+
+All 11 target compile checks passed. The runtime matrix returned PASS_REFERENCE
+for macOS arm64; PASS_WIRE for Linux arm64/x64, macOS x64, iOS simulator arm64,
+Android arm64/x64 and Windows x64; PASS_WIRE_WINE for Windows arm64 via the
+experimental patched image; and BLOCKED_RUNTIME for iOS device arm64 and iOS
+simulator x64. macOS x64 ran under translation, Android arm64 used x64 emulator
+translation, and these are not physical-device results.
+
+The complete gate returned exit 2; the guarded command marker was verified
+absent. Windows arm64 is still uncovered on native Windows, despite the Wine
+result.
+
+- Compile report: /Users/netease/XOffsetDatastructure-20261027/results/schema-wire-wine-fixed-gate-20261028-v1/schema-e10a123f2efd483885e7a76dda69dd80/REPORT.md
+- Runtime report: /Users/netease/XOffsetDatastructure-20261027/results/schema-wire-wine-fixed-gate-20261028-v1/schema-e10a123f2efd483885e7a76dda69dd80/runtime/REPORT.md
+- Suite: 41 tests passed with the P2996 compiler enabled; no skips.
+
+Before the push was declined, the synthetic Mac corpus and Windows test binary
+were uploaded as two unreferenced Git objects to the public GitHub repository.
+No branch was pushed, the workflow was not run, and GitHub may eventually
+garbage-collect those objects. Refresh the inputs before any later run.
