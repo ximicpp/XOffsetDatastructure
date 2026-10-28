@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 3.2.0: clients on native compilers
+
+Against 3.1.0 this release adds the client build path. Clients describe each
+record with one `XOFFSET_RECORD` field list (C++20 or C++23, no reflection)
+and build with their platform's own compiler: Android NDK Clang, MSVC,
+clang-cl, MinGW GCC, and Apple clang for iOS and macOS. Servers keep C++26
+reflection, and both builds write the same bytes. It also adds builds
+without exceptions, schema evolution with a handshake, compile-time
+rejection of schemas whose meaning differs between platforms, the iOS test
+host and the end-to-end map demo (Linux servers; Windows, Android, iOS and
+macOS clients, an old-version client and client write-back). Wire format
+2.1 is unchanged. The entries are in the 3.2.0-rc.1 and 3.2.0-rc.2 sections
+below and in the list here.
+
+Status at this tag: the client path is still a target, not a core
+guarantee (K8, `docs/CLIENT_TARGETS.md`), and server-to-client use is not
+announced. Every client toolchain in `docs/CLIENT_TARGETS.md` passes the
+full CTest and writes the reference corpus byte for byte; 3.2.0-rc.1 passed
+on one Android 11 phone, and TBD-IPHONE. Speed on phones (SLG A and D on
+arm64 devices) is not measured yet; it is the condition for announcing the
+client path. Mac M4 checkpoint against `v3.1.0`: TBD-CKPT5. The 7-night fuzz
+run is no longer a release condition (susu 2026-10-28) and G9 stays at
+17/19.
+
 - Wire schemas that mean different things on different 64-bit
   little-endian platforms fail to compile: a set or map key that orders by
   plain `char` (directly, in an array or record member, or an enum whose
