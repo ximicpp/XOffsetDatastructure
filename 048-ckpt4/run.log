@@ -1,0 +1,4 @@
+== 2026-10-28T06:40:41Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+STOP: missing /Volumes/XOffsetCS/formal/R3-formal-mac-v1/FREEZE.json
+== 2026-10-28T06:41:00Z finish rc=2
