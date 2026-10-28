@@ -156,3 +156,5 @@ if(MAPDEMO_NOEXC_CLIENT)
     xoffset_disable_exceptions(mapdemo_client_noexc)
     message(STATUS "mapdemo: mapdemo_client_noexc builds without exceptions")
 endif()
+
+xoffset_test_host_modules()

@@ -189,6 +189,12 @@ XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address)
 }
 #else
 // Zero-initialized (BSS): pages the program never touches cost no memory.
+// Mach-O compilers put a weak (inline) zero-initialized variable in
+// __DATA,__data, which stores all 64 MiB in the executable; the zero-fill
+// section keeps it out of the file (the linker still merges the copies).
+#if defined(__APPLE__)
+__attribute__((section("__DATA,__bss")))
+#endif
 inline std::uint8_t owner_map_table[OwnerMap::entries];
 
 inline bool OwnerMap::ready() noexcept { return true; }
