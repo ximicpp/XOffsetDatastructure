@@ -31,6 +31,8 @@ bool refused(vstatus status, XErrc code, const char* message) {
 }
 } // namespace
 
+bool record_in_second_unit(); // test_vm_storage_noexc_tu2.cpp
+
 int main() {
     const std::string bytes(4096, 'x');
     {
@@ -69,6 +71,9 @@ int main() {
              "for_slot_v of a bad class");
         need(owner.empty(), "owner after refusals");
     }
+    need(refused(record_in_second_unit(), XErrc::invalid_argument,
+                 "recorded in the second translation unit"),
+         "a failure recorded in another translation unit");
     need(take_pending_error().code == XErrc::ok, "no pending error is left behind");
     if (failures) return 1;
     std::printf("test_vm_storage_noexc: ok\n");

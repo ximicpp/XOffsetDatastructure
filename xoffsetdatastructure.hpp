@@ -1480,7 +1480,7 @@ namespace XOffsetDatastructure {
         static detail::vstatus as_arena_failure(Step&& step) {
 #if XOFFSET_NO_EXCEPTIONS
             if (step()) return true;
-            const auto code = detail::pending_error.code;
+            const auto code = detail::pending_error().code;
             if (code == XErrc::host_allocation_failed || code == XErrc::length_error)
                 return detail::record_failure(XErrc::out_of_storage, "XOffset arena allocation failed");
             return false;
@@ -1500,7 +1500,7 @@ namespace XOffsetDatastructure {
         static detail::vstatus as_arena_alloc_failure(Step&& step) {
 #if XOFFSET_NO_EXCEPTIONS
             if (step()) return true;
-            if (detail::pending_error.code == XErrc::host_allocation_failed)
+            if (detail::pending_error().code == XErrc::host_allocation_failed)
                 return detail::record_failure(XErrc::out_of_storage, "XOffset arena allocation failed");
             return false;
 #else
