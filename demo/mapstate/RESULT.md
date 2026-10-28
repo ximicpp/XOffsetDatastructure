@@ -28,7 +28,8 @@ it. Both run the same validator and send the same bytes.
 | Final local validation (10-27) | rebased on next_cpp26 5af77d3 (field-list backend #149): `full3` (six targets) and `asan2` | both PASS; corpus of `full1` replayed 60 / 60 on every target, step wires equal to `full1` at 500 / 500 ticks in every tier and mode |
 | End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
 | Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
-| End to end, emulators (10-27) | Android emulator (arm64) and iOS Simulator on the Mac, A/B in a Linux VM there | pending (emulator thread, Mac queue) |
+| End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
+| End to end, iOS Simulator | Mac M4, A/B in colima | pending (Mac, waiting for Xcode) |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -190,6 +191,7 @@ next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 | windows-clang-cl | wine | clang-cl 19.1, MSVC STL, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | android-arm64 | qemu-aarch64 user mode | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
 | macos (Mac M4, separate run) | native; A/B in colima, Linux arm64 | Apple clang 21, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 
 What this shows:
 - Server to server across architectures: A and B built by GCC 16 for Linux
@@ -222,11 +224,25 @@ on), both buffer modes: self-check 23 / 23, replay 60 / 60, three tiers x two
 modes + evil x two, no sanitizer report (`asan1` 145 / 145 verdicts;
 `asan2` on next_cpp26 151 / 151, step wires equal to `full1`).
 
+Android emulator (10-28, next_cpp26 00b5d35): the client built with NDK r29
+ran inside the Android 15 emulator (API 35, google_apis arm64-v8a image
+with 16 KB pages) on the Mac M4 and reached A in colima through the
+emulator's host address 10.0.2.2. It passed self-check, the replay of the cloud corpus
+and the three tiers with evil; the library's CTest passed 91 / 91 on the
+same emulator and the 15 compile-failure tests passed with the same NDK in
+the cloud. Client side, 10000-unit tier, p50 (emulator numbers, not device
+numbers): a viewport is 15,072 B as a wire and 6,372 B with zstd, decoded in
+43.5 us and verified in 6.0 us; a full scene is 321,288 B and 122,724 B with
+zstd, decoded in 463 us and verified in 34 us. Output:
+`mobile_sim_android_out.tar.gz` in the project folder (sha256
+`dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
+table `out-android/android/demo/E2E_RESULT.md`.
+
 The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
 the Mac's screen was asleep); the client now exits 2 with "cannot open a
 window" instead (checked without a display and under Xvfb). Still open for
-this section: the Android emulator and iOS Simulator runs and the macOS
-window screenshots, on the Mac.
+this section: the iOS Simulator run (waiting for Xcode on the Mac) and the
+macOS window screenshots.
 
 ## 6. Scope
 
