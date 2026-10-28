@@ -1,0 +1,497 @@
+{
+ "schedule": [
+  "head",
+  "anch",
+  "anch",
+  "head",
+  "head",
+  "anch",
+  "anch",
+  "head",
+  "head",
+  "anch",
+  "anch",
+  "head"
+ ],
+ "env": {
+  "samples": 15,
+  "busy_samples": 0,
+  "busy_frac": 0.0,
+  "busy_by_process": {},
+  "max_pcpu": {
+   "WindowServer": 2.5,
+   "UURemoteServer": 0.0,
+   "parsecd": 0.0
+  },
+  "remote_active_samples": 0,
+  "screen_over_samples": 0,
+  "max_busy_frac": 0.05,
+  "invalid": false,
+  "decided_utc": "2026-10-28T20:09:30+00:00"
+ },
+ "pin_cpu": null,
+ "argv_by_label": {
+  "head": [
+   "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+   "--mode",
+   "bench",
+   "--scale",
+   "M",
+   "--cycles",
+   "41",
+   "--formats",
+   "xoffset,cereal,protobuf,flatbuffers"
+  ],
+  "anch": [
+   "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+   "--mode",
+   "bench",
+   "--scale",
+   "M",
+   "--cycles",
+   "41",
+   "--formats",
+   "xoffset,cereal,protobuf,flatbuffers"
+  ]
+ },
+ "binaries": {
+  "head": {
+   "path": "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+   "sha256": "ff454946684a14b24637f5172ab95db3c12264491021b457c88f0103db7a0216"
+  },
+  "anch": {
+   "path": "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+   "sha256": "d97b078c72258a3b44380b0785807d98963fb2506a8a40435761c2eb23494178"
+  }
+ },
+ "machine": {
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.9.6",
+  "cpus": 10,
+  "load": [
+   1.58740234375,
+   1.69580078125,
+   1.88232421875
+  ],
+  "sysctl": "Apple M4",
+  "uname": "Darwin ximideMac-mini.local 27.2.0 Darwin Kernel Version 27.2.0: Wed Oct 14 23:47:07 PDT 2026; root:xnu-13432.41.4~25/RELEASE_ARM64_T8132 arm64"
+ },
+ "started": 1793218117.777293,
+ "aborted": null,
+ "runs": [
+  {
+   "index": 0,
+   "label": "head",
+   "raw": "raw/000_head.jsonl",
+   "log": "log/000_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/000_head.jsonl"
+   ],
+   "start": 1793218117.778,
+   "end": 1793218123.908,
+   "wall_s": 6.13,
+   "load_before": [
+    1.58740234375,
+    1.69580078125,
+    1.88232421875
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.59,
+    "quiet_s": 241.1
+   },
+   "returncode": 0
+  },
+  {
+   "index": 1,
+   "label": "anch",
+   "raw": "raw/001_anch.jsonl",
+   "log": "log/001_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/001_anch.jsonl"
+   ],
+   "start": 1793218123.908,
+   "end": 1793218128.821,
+   "wall_s": 4.913,
+   "load_before": [
+    1.57666015625,
+    1.68896484375,
+    1.87744140625
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.58,
+    "quiet_s": 247.3
+   },
+   "returncode": 0
+  },
+  {
+   "index": 2,
+   "label": "anch",
+   "raw": "raw/002_anch.jsonl",
+   "log": "log/002_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/002_anch.jsonl"
+   ],
+   "start": 1793218128.822,
+   "end": 1793218132.946,
+   "wall_s": 4.124,
+   "load_before": [
+    1.6904296875,
+    1.71044921875,
+    1.8837890625
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.69,
+    "quiet_s": 252.2
+   },
+   "returncode": 0
+  },
+  {
+   "index": 3,
+   "label": "head",
+   "raw": "raw/003_head.jsonl",
+   "log": "log/003_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/003_head.jsonl"
+   ],
+   "start": 1793218132.946,
+   "end": 1793218137.054,
+   "wall_s": 4.107,
+   "load_before": [
+    1.6904296875,
+    1.71044921875,
+    1.8837890625
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.69,
+    "quiet_s": 256.3
+   },
+   "returncode": 0
+  },
+  {
+   "index": 4,
+   "label": "head",
+   "raw": "raw/004_head.jsonl",
+   "log": "log/004_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/004_head.jsonl"
+   ],
+   "start": 1793218137.054,
+   "end": 1793218141.238,
+   "wall_s": 4.184,
+   "load_before": [
+    1.71484375,
+    1.71484375,
+    1.88427734375
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.71,
+    "quiet_s": 260.4
+   },
+   "returncode": 0
+  },
+  {
+   "index": 5,
+   "label": "anch",
+   "raw": "raw/005_anch.jsonl",
+   "log": "log/005_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/005_anch.jsonl"
+   ],
+   "start": 1793218141.239,
+   "end": 1793218145.4,
+   "wall_s": 4.162,
+   "load_before": [
+    1.6572265625,
+    1.70263671875,
+    1.87890625
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.66,
+    "quiet_s": 264.6
+   },
+   "returncode": 0
+  },
+  {
+   "index": 6,
+   "label": "anch",
+   "raw": "raw/006_anch.jsonl",
+   "log": "log/006_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/006_anch.jsonl"
+   ],
+   "start": 1793218145.401,
+   "end": 1793218149.537,
+   "wall_s": 4.136,
+   "load_before": [
+    1.6845703125,
+    1.70751953125,
+    1.87939453125
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.68,
+    "quiet_s": 268.8
+   },
+   "returncode": 0
+  },
+  {
+   "index": 7,
+   "label": "head",
+   "raw": "raw/007_head.jsonl",
+   "log": "log/007_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/007_head.jsonl"
+   ],
+   "start": 1793218149.537,
+   "end": 1793218153.676,
+   "wall_s": 4.139,
+   "load_before": [
+    1.70947265625,
+    1.7119140625,
+    1.8798828125
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.71,
+    "quiet_s": 272.9
+   },
+   "returncode": 0
+  },
+  {
+   "index": 8,
+   "label": "head",
+   "raw": "raw/008_head.jsonl",
+   "log": "log/008_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/008_head.jsonl"
+   ],
+   "start": 1793218153.677,
+   "end": 1793218157.786,
+   "wall_s": 4.109,
+   "load_before": [
+    1.892578125,
+    1.74951171875,
+    1.89208984375
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.89,
+    "quiet_s": 277.0
+   },
+   "returncode": 0
+  },
+  {
+   "index": 9,
+   "label": "anch",
+   "raw": "raw/009_anch.jsonl",
+   "log": "log/009_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/009_anch.jsonl"
+   ],
+   "start": 1793218157.787,
+   "end": 1793218161.939,
+   "wall_s": 4.152,
+   "load_before": [
+    1.892578125,
+    1.74951171875,
+    1.89208984375
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.89,
+    "quiet_s": 281.1
+   },
+   "returncode": 0
+  },
+  {
+   "index": 10,
+   "label": "anch",
+   "raw": "raw/010_anch.jsonl",
+   "log": "log/010_anch.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_anch",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/010_anch.jsonl"
+   ],
+   "start": 1793218161.939,
+   "end": 1793218166.106,
+   "wall_s": 4.167,
+   "load_before": [
+    1.82080078125,
+    1.73681640625,
+    1.88671875
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.82,
+    "quiet_s": 285.3
+   },
+   "returncode": 0
+  },
+  {
+   "index": 11,
+   "label": "head",
+   "raw": "raw/011_head.jsonl",
+   "log": "log/011_head.log",
+   "argv": [
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/bin/slg_head",
+    "--mode",
+    "bench",
+    "--scale",
+    "M",
+    "--cycles",
+    "41",
+    "--formats",
+    "xoffset,cereal,protobuf,flatbuffers",
+    "--out",
+    "/Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0/slg/raw/011_head.jsonl"
+   ],
+   "start": 1793218166.107,
+   "end": 1793218170.277,
+   "wall_s": 4.17,
+   "load_before": [
+    1.7548828125,
+    1.72412109375,
+    1.88134765625
+   ],
+   "gate": {
+    "waited_s": 0.0,
+    "load1": 1.75,
+    "quiet_s": 289.5
+   },
+   "returncode": 0
+  }
+ ],
+ "finished": 1793218170.277813,
+ "smoke": false,
+ "cpu": {
+  "samples": 26,
+  "other_busy_samples": 6,
+  "compile_samples": 0,
+  "other_busy_top": {
+   "pairedsyncd": 2,
+   "(managedappdistri)": 1,
+   "Claude Helper (Renderer)": 1,
+   "mlhostd": 1,
+   "launchd": 1
+  },
+  "chrome_busy_mean": 0,
+  "chrome_busy_max": 0,
+  "load1_max": 1.89
+ }
+}

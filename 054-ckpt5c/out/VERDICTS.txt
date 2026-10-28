@@ -1,0 +1,5 @@
+CKPT5c slg exit 0; this run alone (report only): **SLG 判定：fail**（A、B、C 最大上界 1.0318）
+anchor 9ef5ce75 (v3.1.0; library identical to the INT4 head e913d22, INT4 pass)
+screen watcher: 5 calls (dark.log)
+formal: not run (CKPT5c is one SLG group; formal passed in CKPT5 and CKPT5b)
+binaries vs CKPT5: sc-head/sc_xoffset=CKPT5 sc-anc/sc_xoffset=CKPT5 slg-head/slg_bench=CKPT5 slg-anc/slg_bench=CKPT5

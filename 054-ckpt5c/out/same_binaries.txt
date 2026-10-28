@@ -1,0 +1,1 @@
+binaries vs CKPT5: sc-head/sc_xoffset=CKPT5 sc-anc/sc_xoffset=CKPT5 slg-head/slg_bench=CKPT5 slg-anc/slg_bench=CKPT5

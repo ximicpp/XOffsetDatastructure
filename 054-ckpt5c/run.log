@@ -1,0 +1,74 @@
+== 2026-10-28T20:02:48Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: 9ef5ce75 (v3.1.0; library identical to the INT4 head e913d22, INT4 pass)
+== 2026-10-28T20:03:07Z 1. export
+head 70a07a059cd82417bb0bb0a69ca9dea91c3b21ff tree 1fcf90357c114744114e582ba2d0d68f59d6f728 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc 9ef5ce75d72a172660a97d9fb4e188da3945f6c6 tree deb8af3b0cadbd09c4f51e7917da8c3496dc62b8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-10-28T20:03:08Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-10-28T20:03:53Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-10-28T20:03:53Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	70a07a059cd82417bb0bb0a69ca9dea91c3b21ff	6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051	ff454946684a14b24637f5172ab95db3c12264491021b457c88f0103db7a0216	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	9ef5ce75d72a172660a97d9fb4e188da3945f6c6	934e7624616d912885c1e0b1696aac122730776555ad6857937d119c5deb6a5c	d97b078c72258a3b44380b0785807d98963fb2506a8a40435761c2eb23494178	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-10-28T20:04:17Z 5. CKPT5c SLG
+binaries vs CKPT5: sc-head/sc_xoffset=CKPT5 sc-anc/sc_xoffset=CKPT5 slg-head/slg_bench=CKPT5 slg-anc/slg_bench=CKPT5
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0-smoke
+  head         6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  head_aa      6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  anchor       934e7624616d912885c1e0b1696aac122730776555ad6857937d119c5deb6a5c
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+== slg start 2026-10-28T20:04:18+00:00 {'waited_s': 10.1, 'load1': 1.97, 'quiet_s': 10.1, 'screen': {'WindowServer': 1.3, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 1.0 s rc=0
+run 2/12 anch: 1.2 s rc=0
+run 3/12 anch: 0.4 s rc=0
+run 4/12 head: 0.4 s rc=0
+run 5/12 head: 0.4 s rc=0
+run 6/12 anch: 0.4 s rc=0
+run 7/12 anch: 0.4 s rc=0
+run 8/12 head: 0.4 s rc=0
+run 9/12 head: 0.4 s rc=0
+run 10/12 anch: 0.4 s rc=0
+run 11/12 anch: 0.4 s rc=0
+run 12/12 head: 0.4 s rc=0
+slg: A 0.9802 [0.9525, 1.0087]  B 0.9943 [0.9740, 1.0151]  C 1.0200 [0.9872, 1.0540]  D 0.7207 [0.6943, 0.7482]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5c-70a07a0
+  head         6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  head_aa      6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  anchor       934e7624616d912885c1e0b1696aac122730776555ad6857937d119c5deb6a5c
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+== slg start 2026-10-28T20:04:36+00:00 {'waited_s': 241.1, 'load1': 1.59, 'quiet_s': 241.0, 'screen': {'WindowServer': 1.2, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 6.1 s rc=0
+run 2/12 anch: 4.9 s rc=0
+run 3/12 anch: 4.1 s rc=0
+run 4/12 head: 4.1 s rc=0
+run 5/12 head: 4.2 s rc=0
+run 6/12 anch: 4.2 s rc=0
+run 7/12 anch: 4.1 s rc=0
+run 8/12 head: 4.1 s rc=0
+run 9/12 head: 4.1 s rc=0
+run 10/12 anch: 4.2 s rc=0
+run 11/12 anch: 4.2 s rc=0
+run 12/12 head: 4.2 s rc=0
+slg: A 0.9955 [0.9794, 1.0119]  B 1.0006 [0.9849, 1.0164]  C 1.0070 [0.9827, 1.0318]  D 0.8057 [0.7943, 0.8172]  verdict fail (1 group(s) pooled)
+screen watcher: 5 calls (dark.log)
+== 2026-10-28T20:09:30Z finish rc=0
