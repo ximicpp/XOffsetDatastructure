@@ -19,9 +19,10 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   再存出与服务端相同的字节。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
   客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
-  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 未测；
-  步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
-- 客户端上没有任何性能数据，现有计时都来自 Apple M4。
+  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 15 Pro Max
+  （iOS 26.6.2）上 CTest、参照语料和两个 demo 客户端全部通过；步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
+- 客户端性能只有 iPhone 15 Pro Max 一台的 slg 数据（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节：A、B、C
+  场景 xoffset 用时是 FlatBuffers 的 0.18 到 0.31，D 战报只读 0.86），其余计时来自 Apple M4。
 
 ## 2. 同版本发布
 
@@ -186,7 +187,17 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 | --- | --- | --- |
 | 服务端接收客户端数据 | 默认 `maximum_capacity` 设为 **1 MiB**；读取 wire 前先检查长度，超过就丢弃 | 客户端上行消息多为 KB 级；按业务最大合法消息的 2 倍向上调整 |
 | 服务端之间 | 按该类状态的最大合法大小设上限（单块状态可以到数百 MB） | 服务端间数据视为已认证，但仍需防止异常数据拖垮进程 |
-| 客户端接收或构建 | 设较小的 `maximum_capacity`（按最大下发消息的 2 倍）；频繁创建、销毁 buffer 时用 `XBufferPool` 复用空闲预留 | 每个存活的 buffer 默认预留 64 MiB 地址空间，池只复用空闲预留、不减少存活 buffer 的预留；移动端地址空间有限，iOS 上的实际上限还没有实测 |
+| 客户端接收或构建 | 设较小的 `maximum_capacity`（按最大下发消息的 2 倍）；频繁创建、销毁 buffer 时用 `XBufferPool` 复用空闲预留；**iOS 上所有存活 buffer 的 `maximum_capacity` 之和控制在 3 GiB 以内** | 每个存活的 buffer 默认预留 64 MiB 地址空间，池只复用空闲预留、不减少存活 buffer 的预留。iPhone 实测见下 |
+
+iPhone 实测（iPhone 15 Pro Max，iOS 26.6.2，8 GB 内存，免费开发者账号签名，`xo_mem_probe`，2026-10-28）：
+
+- 一个进程能预留的地址空间约 3.4 GiB：64 MiB 一个的 buffer 最多 54 个（3.375 GiB），1 GiB 一个的最多 2 个；
+  单个 buffer 的 `maximum_capacity` 最大 2047 MiB。之后创建 buffer 抛 `XBadAlloc`，进程不会被杀。
+- 实际写入：单个 buffer 写到 1920 MiB 时分配失败，进程仍在，启动时 `os_proc_available_memory` 约 3.4 GiB。
+- 所以按默认 64 MiB，同时存活的 buffer 不能超过约 50 个。持有很多 buffer 的客户端要把每个的上限设小：
+  SLG 压测 M 规模（512 个玩家各一个 buffer）每个玩家、战斗、报告 buffer 用 2 MiB（`SLG_XOFFSET_CAP_MIB=2`），
+  地图分片 256 MiB；每个 256 MiB 时 S 规模（64 个玩家）就会失败。
+- Android（64 位 Linux 内核）和桌面系统的地址空间大得多，没有这个限制；它们的上限是实际写入的内存。
 
 另外：
 

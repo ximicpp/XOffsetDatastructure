@@ -51,7 +51,8 @@ xcodebuild -project "$W/stub-build/xo_stub.xcodeproj" -scheme xo_stub -configura
     -destination "id=$UDID" -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
     -derivedDataPath "$W/dd" build > "$W/stub-build.log" 2>&1 \
     || { say "stub build failed (Apple ID signed in to Xcode? phone connected, unlocked and trusted?):"; grep -E "error:|warning: .*[Pp]rovision" "$W/stub-build.log" | head -20; exit 1; }
-STUB=$(find "$W/dd" -type d -name 'xoffset_test_host.app' -path '*iphoneos*' | head -1)
+# a CMake Xcode project builds into stub-build/<config>-iphoneos whatever -derivedDataPath says
+STUB=$(find "$W/stub-build" "$W/dd" -type d -name 'xoffset_test_host.app' -path '*iphoneos*' 2>/dev/null | head -1)
 [ -f "$STUB/embedded.mobileprovision" ] || { say "the stub has no embedded.mobileprovision"; exit 1; }
 IDENTITY=$(codesign -dvv "$STUB" 2>&1 | sed -n 's/^Authority=//p' | head -1)
 codesign -d --entitlements - --xml "$STUB" > "$W/entitlements.plist" 2>/dev/null \
@@ -60,8 +61,9 @@ say "identity '$IDENTITY'; entitlements: $(plutil -convert json -o - "$W/entitle
 
 # 2. the real app: profile, libraries, then the app itself
 rm -rf "$OUT"
-cp -R "$APP" "$OUT"
-cp "$STUB/embedded.mobileprovision" "$OUT/embedded.mobileprovision"
+mkdir -p "$(dirname "$OUT")"
+cp -R "$APP" "$OUT" || { say "copying $APP to $OUT failed"; exit 1; }
+cp "$STUB/embedded.mobileprovision" "$OUT/embedded.mobileprovision" || { say "copying the profile failed"; exit 1; }
 rm -rf "$OUT/_CodeSignature"
 n=0
 for lib in "$OUT"/Frameworks/*.dylib; do
