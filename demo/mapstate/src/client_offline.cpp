@@ -4,7 +4,11 @@
 // snapshot built here is saved dense, compact and as a zstd frame; each
 // must verify and read back the same content (positive controls), and each
 // malformed variant must be refused by the codec (before allocation) or by
-// load_verified. Nothing malformed may be accepted.
+// load_verified. Nothing malformed may be accepted. The event stream gets
+// the same treatment: every event encoding round-trips, and bad dictionary
+// frames (another dictionary version, no id, no size, truncated, trailing
+// bytes, over the cap, forged batch counts and lengths), a corrupt or
+// foreign dictionary file and wrong wires are refused.
 //
 // --replay DIR: verifies every snapshot of a corpus that mapdemo_a
 // --corpus-dir wrote on another machine and checks that the verified wire
@@ -19,8 +23,13 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <span>
 #include <sstream>
 #include <utility>
+
+#if defined(MAPDEMO_WITH_ZSTD)
+#include "xoffset_zstd_dict.hpp"
+#endif
 
 namespace mapdemo::client {
 namespace {
@@ -116,6 +125,94 @@ std::string drop_last(std::string s) {
     return s;
 }
 
+
+// ---- event stream ------------------------------------------------------------
+
+// Sample UnitEvent wires like A's: ids 0, 100, 200, ..., short and long names.
+std::vector<std::string> build_events(std::uint32_t count, std::uint32_t path_points = 0,
+                                      XBuffer::MaximumCapacity max_bytes = cap_event()) {
+    std::vector<std::string> wires;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        XBuffer b = XBuffer::create<UnitEvent>(512, max_bytes);
+        UnitEvent& e = b.root<UnitEvent>();
+        e.tick = 1240;
+        e.unit_id = i * kEventIdModulo;
+        e.hp = std::int32_t(50 + (i * 7) % 51);
+        e.pos = Point{float((i * 37) % 4000) + 0.5f, float((i * 53) % 4000) + 0.25f};
+        e.behavior = static_cast<Behavior>(i % 3);
+        e.next_waypoint = i % 4;
+        const std::string name = i % 2 == 0 ? rules::short_name(e.unit_id) : rules::long_name(e.unit_id);
+        e.name = std::string_view(name);
+        const std::uint32_t points = path_points != 0 ? path_points : 4 + i % 3;
+        e.path.reserve(points);
+        for (std::uint32_t k = 0; k < points; ++k) e.path.push_back(Point{float((i * 11 + k * 97) % 4096), float((i * 13 + k * 89) % 4096)});
+        wires.push_back(b.save_compact<UnitEvent>(XCompactOptions{0}));
+    }
+    return wires;
+}
+
+std::vector<std::string_view> views_of(const std::vector<std::string>& v) {
+    return std::vector<std::string_view>(v.begin(), v.end());
+}
+
+// Decodes and verifies an Events payload; "" when every wire verified, else
+// how it was refused. *digest: the digest of the re-packed wires.
+std::string try_accept_events(codec::EventDecoder& dec, codec::EventEncoding e, std::string_view payload,
+                              std::uint64_t* digest = nullptr) {
+    std::vector<std::string_view> wires;
+    if (Status s = dec.decode(e, payload, wires); !s) return "codec: " + s.error().message;
+    for (std::string_view w : wires) {
+        XResult<XBuffer> b =
+            XBuffer::try_load_verified<UnitEvent>(std::as_bytes(std::span<const char>(w.data(), w.size())), cap_event());
+        if (!b) return "verify: " + b.error().message;
+    }
+    if (digest != nullptr) {
+        codec::EventEncoder raw;
+        std::string packed;
+        if (Status s = raw.encode(codec::EventEncoding::Raw, wires, packed); !s) return "repack: " + s.error().message;
+        *digest = checks::wire_digest(packed);
+    }
+    return std::string();
+}
+
+void expect_events_refused(CheckLog& log, codec::EventDecoder& dec, const char* name, codec::EventEncoding e,
+                           std::string_view payload) {
+    const std::string how = try_accept_events(dec, e, payload);
+    std::fprintf(stdout, "self-check: %-28s -> %s\n", name, how.empty() ? "ACCEPTED" : how.c_str());
+    if (how.empty()) {
+        log.fail(name, "accepted");
+    } else {
+        log.pass(name);
+        log.note(name, how.substr(0, 160));
+    }
+}
+
+void expect_refused_text(CheckLog& log, const char* name, const Status& s) {
+    std::fprintf(stdout, "self-check: %-28s -> %s\n", name, s ? "ACCEPTED" : s.error().message.c_str());
+    if (s) {
+        log.fail(name, "accepted");
+    } else {
+        log.pass(name);
+        log.note(name, s.error().message.substr(0, 160));
+    }
+}
+
+#if defined(MAPDEMO_WITH_ZSTD)
+// A one-event Dict payload with its frame changed by `f`.
+template <class F>
+std::string rewrite_dict_frame(const std::string& payload, F&& f) {
+    // count (1 byte: 1), length (1-2 bytes), the frame.
+    std::size_t pos = 1;
+    std::uint32_t len = 0;
+    if (!xoffset_zstd_dict::get_varint32(payload, pos, len)) return payload;
+    std::string frame = payload.substr(pos, len);
+    f(frame);
+    std::string out(1, '\x01');
+    xoffset_zstd_dict::put_varint(frame.size(), out);
+    return out + frame;
+}
+#endif
+
 bool write_results(const Options& opt, const CheckLog& log, const metrics::Recorder* rec) {
     if (opt.csv_dir.empty()) return true;
     if (!log.write_csv(join_path(opt.csv_dir, "client_checks.csv"))) return false;
@@ -146,6 +243,173 @@ std::optional<T> parse_uint(const std::string& text) {
     const auto [ptr, ec] = std::from_chars(text.data(), end, v);
     if (ec != std::errc() || ptr != end || text.empty()) return std::nullopt;
     return v;
+}
+
+
+// The event stream's positive and refusal cases (codec.hpp, events).
+void run_event_self_check(CheckLog& log, const std::string& wrong_schema_wire) {
+    std::uint32_t dict_id = 0;
+    Result<std::string> dict = codec::load_event_dictionary(std::string(), &dict_id);
+    if (!dict) {
+        log.fail("events_dictionary", dict.error().message);
+        return;
+    }
+    log.pass("events_dictionary");
+    log.note("events_dictionary", "id=" + std::to_string(dict_id) + " file_bytes=" + std::to_string(dict->size()));
+    codec::EventEncoder enc;
+    codec::EventDecoder dec;
+    if (Status s = enc.set_dictionary(*dict); !s) { log.fail("events_dictionary", s.error().message); return; }
+    if (Status s = dec.set_dictionary(*dict); !s) { log.fail("events_dictionary", s.error().message); return; }
+
+    const std::vector<std::string> wires = build_events(20);
+    const std::vector<std::string_view> views = views_of(wires);
+    std::size_t raw_bytes = 0;
+    for (const std::string& w : wires) raw_bytes += w.size();
+    std::string raw;
+    if (Status s = enc.encode(codec::EventEncoding::Raw, views, raw); !s) { log.fail("accept_events_raw", s.error().message); return; }
+    const std::uint64_t want = checks::wire_digest(raw);
+
+    // Positive controls: every encoding gives back the same wires.
+    std::size_t per_event[codec::kEventEncodingCount] = {};
+    std::string payloads[codec::kEventEncodingCount];
+    static const char* const kAccept[] = {"accept_events_raw", "accept_events_zstd", "accept_events_zdict",
+                                          "accept_events_batch"};
+    for (int i = 0; i < codec::kEventEncodingCount; ++i) {
+        const auto e = static_cast<codec::EventEncoding>(i);
+        std::string& p = payloads[i];
+        std::string why;
+        std::uint64_t got = 0;
+        if (Status s = enc.encode(e, views, p); !s) why = "encode: " + s.error().message;
+        else why = try_accept_events(dec, e, p, &got);
+        if (why.empty() && got != want) why = "wires differ after the round trip";
+        per_event[i] = p.size() / wires.size();
+        std::fprintf(stdout, "self-check: %-28s -> %s (%zu bytes, 20 events)\n", kAccept[i],
+                     why.empty() ? "verified, same wires" : why.c_str(), p.size());
+        if (why.empty()) {
+            log.pass(kAccept[i]);
+            log.note(kAccept[i], std::to_string(p.size()) + " bytes");
+        } else {
+            log.fail(kAccept[i], why);
+        }
+    }
+    {
+        const std::string detail = "bytes per event: wire=" + std::to_string(raw_bytes / wires.size()) +
+                                   " zstd=" + std::to_string(per_event[1]) + " zdict=" + std::to_string(per_event[2]) +
+                                   " batch=" + std::to_string(per_event[3]);
+        if (per_event[1] < raw_bytes / wires.size() && per_event[2] < per_event[1] && per_event[3] < per_event[2]) {
+            log.pass("events_sizes_shrink");
+            log.note("events_sizes_shrink", detail);
+        } else {
+            log.fail("events_sizes_shrink", detail);
+        }
+    }
+
+    // Raw layout and the wires inside.
+    using E = codec::EventEncoding;
+    expect_events_refused(log, dec, "events_raw_count_zero", E::Raw, std::string(1, '\0'));
+    expect_events_refused(log, dec, "events_raw_truncated", E::Raw, drop_last(payloads[0]));
+    expect_events_refused(log, dec, "events_raw_trailing_byte", E::Raw, payloads[0] + std::string(1, '\0'));
+    {
+        std::string wrong;
+        codec::EventEncoder plain;
+        const std::vector<std::string_view> one{wrong_schema_wire};
+        if (Status s = plain.encode(E::Raw, one, wrong); !s) log.fail("events_raw_wrong_schema", s.error().message);
+        else expect_events_refused(log, dec, "events_raw_wrong_schema", E::Raw, wrong);
+        const std::vector<std::string> trunc{drop_last(wires[3])};
+        if (Status s = enc.encode(E::Dict, views_of(trunc), wrong); !s) log.fail("events_zdict_truncated_wire", s.error().message);
+        else expect_events_refused(log, dec, "events_zdict_truncated_wire", E::Dict, wrong);
+    }
+#if defined(MAPDEMO_WITH_ZSTD)
+    namespace zd = xoffset_zstd_dict;
+    {   // zstd without a dictionary: the snapshot rules (content size required).
+        Result<std::string> unsized = codec::zstd_frame_without_size(wires[0]);
+        if (!unsized) log.fail("events_zstd_no_content_size", unsized.error().message);
+        else {
+            std::string p(1, '\x01');
+            zd::put_varint(unsized->size(), p);
+            expect_events_refused(log, dec, "events_zstd_no_content_size", E::Zstd, p + *unsized);
+        }
+    }
+    // Dictionary versions: frames from dictionary id+1 are refused.
+    {
+        Result<std::string> other = codec::relabel_dictionary(*dict, dict_id + 1);
+        codec::EventEncoder enc2;
+        Status set = other ? enc2.set_dictionary(*other) : Status(Error{other.error().message});
+        std::string p;
+        if (!set) {
+            log.fail("events_dict_version_mismatch", set.error().message);
+        } else {
+            if (Status s = enc2.encode(E::Dict, views, p); s) expect_events_refused(log, dec, "events_dict_version_mismatch", E::Dict, p);
+            if (Status s = enc2.encode(E::Batch, views, p); s) expect_events_refused(log, dec, "events_batch_version_mismatch", E::Batch, p);
+        }
+    }
+    // One lean frame, damaged.
+    std::string one;
+    const std::vector<std::string_view> first{views[0]};
+    if (Status s = enc.encode(E::Dict, first, one); !s) {
+        log.fail("events_dict_frame", s.error().message);
+    } else {
+        expect_events_refused(log, dec, "events_dict_no_id", E::Dict, rewrite_dict_frame(one, [](std::string& f) {
+            f[0] = static_cast<char>(static_cast<unsigned char>(f[0]) & ~3u);
+            f.erase(1, 1);
+        }));
+        expect_events_refused(log, dec, "events_dict_no_content_size", E::Dict, rewrite_dict_frame(one, [](std::string& f) {
+            const unsigned char fhd = static_cast<unsigned char>(f[0]);
+            f[0] = static_cast<char>(fhd & ~0xe0u);
+            f.erase(2, 1);
+            f.insert(1, 1, '\0');
+        }));
+        expect_events_refused(log, dec, "events_dict_truncated", E::Dict,
+                              rewrite_dict_frame(one, [](std::string& f) { f.pop_back(); }));
+        expect_events_refused(log, dec, "events_dict_trailing_byte", E::Dict,
+                              rewrite_dict_frame(one, [](std::string& f) { f.push_back('\0'); }));
+        expect_events_refused(log, dec, "events_dict_standard_frame", E::Dict,
+                              rewrite_dict_frame(one, [](std::string& f) { f.insert(0, "\x28\xb5\x2f\xfd", 4); }));
+    }
+    {   // A wire over kCapEvent: refused from the frame header, before decoding.
+        const std::vector<std::string> big = build_events(1, 600, XBuffer::maximum_capacity(2 * kCapEvent).with_growth(XGrowPolicy::Automatic));
+        std::string p;
+        if (Status s = enc.encode(E::Dict, views_of(big), p); !s) log.fail("events_dict_over_cap", s.error().message);
+        else expect_events_refused(log, dec, "events_dict_over_cap", E::Dict, p);
+    }
+    {   // Batch frames the encoder would not write.
+        zd::Dictionary d;
+        zd::Encoder zenc;
+        if (zd::Status s = zd::Dictionary::parse(*dict, d); !s || !zenc.set_dictionary(d)) {
+            log.fail("events_batch_over_count", "dictionary");
+        } else {
+            std::vector<std::string> many = build_events(std::uint32_t(kMaxEventsPerFrame) + 1);
+            std::string f;
+            if (zd::Status s = zenc.encode_batch(views_of(many), f); !s) log.fail("events_batch_over_count", s.message);
+            else expect_events_refused(log, dec, "events_batch_over_count", E::Batch, f);
+        }
+        Result<std::string> unbound = codec::unbind_dictionary(*dict);
+        zd::Dictionary u;
+        zd::Encoder forger;
+        if (!unbound || !zd::Dictionary::parse(*unbound, u) || !forger.set_dictionary(u)) {
+            log.fail("events_batch_forged_length", "unbound dictionary");
+        } else {
+            std::string f;
+            // Count 2, a first length that runs past the content.
+            if (zd::Status s = forger.encode(std::string("\x02\x30" "0123456789abcdef0123", 22), f); s)
+                expect_events_refused(log, dec, "events_batch_forged_length", E::Batch, f);
+            // Count 1, a message shorter than a wire header.
+            if (zd::Status s = forger.encode(std::string("\x01\x04" "abcd", 6), f); s)
+                expect_events_refused(log, dec, "events_batch_short_message", E::Batch, f);
+        }
+    }
+    // The dictionary file itself.
+    {
+        std::string bad = *dict;
+        bad[bad.size() / 2] = static_cast<char>(bad[bad.size() / 2] ^ 1);
+        codec::EventDecoder d2;
+        expect_refused_text(log, "events_dict_file_corrupt", d2.set_dictionary(bad));
+        Result<std::string> foreign =
+            codec::rebind_dictionary(*dict, wire_root_type_id_v<ViewSnapshot>(), wire_schema_hash_v<ViewSnapshot>());
+        if (!foreign) log.fail("events_dict_wrong_schema", foreign.error().message);
+        else expect_refused_text(log, "events_dict_wrong_schema", d2.set_dictionary(*foreign));
+    }
+#endif
 }
 
 }   // namespace
@@ -258,6 +522,8 @@ Result<int> run_self_check(const Options& opt) {
         MAPDEMO_TRY(zstd.compress(request_wire(), inner));
         expect_refused(log, unzstd, "zstd_of_wrong_schema", inner, true);
     }
+
+    run_event_self_check(log, request_wire());
 
     log.print(stdout);
     if (!write_results(opt, log, nullptr)) return Error{"cannot write client CSV files in " + opt.csv_dir};

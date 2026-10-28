@@ -23,7 +23,8 @@
 # MAPDEMO_STEPS, MAPDEMO_MODES (default "reuse"), MAPDEMO_PORT_BASE (47800;
 # each target gets its own range of 100 ports), MAPDEMO_LABEL (prefix of
 # every target's label), MAPDEMO_ENCODING (client --encoding, default
-# cycle), MAPDEMO_A_HOST (see run_tier.sh), MAPDEMO_COMPARE (an OUT_ROOT
+# cycle), MAPDEMO_EVENTS (client --events in the tiers: off, raw, zstd,
+# zdict, batch or cycle; default off, no event stream), MAPDEMO_A_HOST (see run_tier.sh), MAPDEMO_COMPARE (an OUT_ROOT
 # of run_all_tiers.sh: every target's step wires must equal it; default:
 # targets after the first compare with the first), MAPDEMO_RUNS_UNDER
 # ("NAME=TEXT;NAME=TEXT": what each client runs on, for the report, e.g.
@@ -45,6 +46,7 @@ PYTHON=${PYTHON:-python3}
 PORT=${MAPDEMO_PORT_BASE:-47800}
 MODES=${MAPDEMO_MODES:-reuse}
 ENCODING=${MAPDEMO_ENCODING:-cycle}
+EVENTS=${MAPDEMO_EVENTS:-off}
 LABEL=${MAPDEMO_LABEL:-}
 
 for t in "$@"; do
@@ -115,7 +117,7 @@ for t in "$@"; do
     client_offline "$NAME" "$CMD" "--replay $CORPUS" "$ROOT/replay"
     SKIP_SELFTEST=1
     [ "$I" = 0 ] && SKIP_SELFTEST=0
-    MAPDEMO_CLIENT="$CMD" MAPDEMO_CLIENT_ARGS="--encoding $ENCODING" MAPDEMO_MODES="$MODES" \
+    MAPDEMO_CLIENT="$CMD" MAPDEMO_CLIENT_ARGS="--encoding $ENCODING --events $EVENTS" MAPDEMO_MODES="$MODES" \
         MAPDEMO_SKIP_SELFTEST=$SKIP_SELFTEST MAPDEMO_COMPARE="$REF" \
         MAPDEMO_PORT_BASE=$(( PORT + 100 * (I + 1) )) \
         MAPDEMO_LABEL="${LABEL:+$LABEL; }client $NAME" \

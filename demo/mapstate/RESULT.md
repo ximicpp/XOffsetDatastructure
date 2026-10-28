@@ -32,6 +32,7 @@ it. Both run the same validator and send the same bytes.
 | End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
 | Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
 | End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
+| Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -334,7 +335,65 @@ Every planned run of this section has been done. The Android client without
 exceptions ran under qemu in the cloud (`noexc3`) but not in the Android
 emulator; real phones come later.
 
-## 6. Scope
+## 6. Event stream: small messages with a zstd dictionary (10-28)
+
+3.2 SC-11 part 2: make one small message cost no more than in FlatBuffers.
+The dictionary code is `contrib/zstd_dict` (outside the library); the demo
+adds an optional event stream that uses it (INTERFACES.md sections 3 to 6).
+Every 20 ticks A turns the rules' unit events (the units with id % 100 == 0)
+into `UnitEvent` wires of 144 to 168 bytes (`save_compact`,
+`XCompactOptions{0}`) and pushes them to subscribed clients, at most 128 per
+`Events` frame, in one of four encodings. The dictionary
+`dict/unit_event_v1.xozd` (id 1, 16 KB, bound to `UnitEvent`) was trained on
+10000 events of a seed 7 run (`mapdemo_a --events-dump`); measured on a seed 3
+run it gives 68.0 B per event alone and 46.7 B in batches of 128, against
+156.8 B raw.
+
+Bytes per event, 10000-unit tier, client side (`events_cycle`; every target
+logs the same bytes, times are p50 per frame of 100 events):
+
+| Encoding | Payload | Wire bytes | Bytes sent | Sent / wire | Decode (us), Linux GCC 16 | Decode (us), MSVC under wine | Verify (us), Linux GCC 16 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `raw` | count + lengths + wires | 144 | 146 | 1.01 | 2.0 | 2.8 | 7.7 |
+| `zstd` | one zstd-3 frame per wire, no dictionary | 167 | 152 | 0.91 | 298 | 285 | 8.9 |
+| `zdict` | one dictionary frame per wire | 144 | 68.3 | 0.47 | 107 | 118 | 8.4 |
+| `batch` | one dictionary frame for the frame's 100 wires | 168 | 52.5 | 0.31 | 58.8 | 57.3 | 8.0 |
+
+Wire sizes differ by encoding because `cycle` gives each encoding other
+ticks (names alternate between a short and a long form). Plain zstd does
+nothing for a message this small; the dictionary halves it; batching takes
+another quarter off. Decoding a 100-event frame takes about 0.6 to 1 us per
+event with the dictionary (cold caches: one frame every second).
+
+The same component on the SLG bench's battle report (D class: XOffset 197 B,
+FlatBuffers 158 B), same 16 KB dictionary size, framing and level 3 for every
+format: one message XOffset 56.2 B, FlatBuffers 56.3 B (1.00; target 1.1 or
+less); batches of 8 / 32 / 128 XOffset 40.4 / 37.2 / 34.5 B, FlatBuffers
+41.9 / 38.1 / 35.3 B (0.96 / 0.98 / 0.98; target 1.0 or less). Without a
+dictionary XOffset 135.9 B, FlatBuffers 114.0 B. Two choices got XOffset
+there: a bound dictionary leaves out the 24 wire header bytes its schema
+fixes, and the batch interleaves lengths and messages; before that the
+batches were 1.04 to 1.07 times FlatBuffers.
+
+Refusals, checked offline by `--self-check` on all 12 targets with the same
+texts: frames made with dictionary version 2 (single and batch: "frame uses
+dictionary 2, this end has 1"), dictionary frames without an id or a content
+size, truncated, with a trailing byte, in the standard format or declaring
+more than the 4 KiB event cap (refused before decoding), batches of 129
+events, forged lengths, short messages, a corrupt dictionary file and a
+dictionary bound to another schema. Online (`--evil`): a Subscribe with
+dictionary version 2, with another `UnitEvent` schema hash, or asking for
+encoding 7, each answered by `Error`; A logs nine `rejected:` lines.
+
+Without `--events` the client never subscribes: the `events_off` run has the
+verdict counts of `noexc3` (77 / 75 per target) and the same step wires.
+Output in the project folder `small-msg-dict-20261028/`
+(`mapdemo_e2e_events_{off,cycle}.tgz`, `mapdemo_asan_events.tgz`,
+`E2E_RESULT_events_{off,cycle}.md`, the dictionaries and the event dumps they
+were trained and measured on, `slg-d/` for the SLG measurements; sha256 in
+`SHA256SUMS`).
+
+## 7. Scope
 
 One arena per batch, per snapshot and for the catalog (kept and refilled in
 `reuse`, new per message in `fresh`); zstd is a transport encoding, the
