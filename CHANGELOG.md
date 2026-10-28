@@ -19,13 +19,27 @@ below and in the list here.
 Status at this tag: the client path is still a target, not a core
 guarantee (K8, `docs/CLIENT_TARGETS.md`), and server-to-client use is not
 announced. Every client toolchain in `docs/CLIENT_TARGETS.md` passes the
-full CTest and writes the reference corpus byte for byte; 3.2.0-rc.1 passed
-on one Android 11 phone, and TBD-IPHONE. Speed on phones (SLG A and D on
-arm64 devices) is not measured yet; it is the condition for announcing the
-client path. Mac M4 checkpoint against `v3.1.0`: TBD-CKPT5. The 7-night fuzz
+full CTest and writes the reference corpus byte for byte. Real devices: an
+iPhone 15 Pro Max (iOS 26.6.2, through the test host app) passed CTest
+138/138, the 24 reference wires and both demo clients, and measured SLG M
+against FlatBuffers 25.12.19 on the same phone at A 0.305, B 0.179, C 0.252,
+D 0.858 (`docs/DEVICE_TESTING.md` section 9); an Android 11 phone (Xiaomi
+M2102K1C) passed the functional checks with 3.2.0-rc.1, without timing.
+Android timing is the remaining condition for announcing the client path. Mac M4 checkpoint against `v3.1.0`: TBD-CKPT5. The 7-night fuzz
 run is no longer a release condition (susu 2026-10-28) and G9 stays at
 17/19.
 
+- `demo/mesh`: a cross-device data demo (off by default,
+  `XOFFSET_BUILD_MESH_DEMO`). Devices register at a hub that relays every
+  message; an object of one of six everyday types travels device to device
+  as its wire, and each device verifies it, compares it with a reference
+  model, edits it in place and sends it on. No library change.
+- iOS test host: `XO_HOST_SERVE=1` keeps the app up and runs the programs
+  one after another in its process (the default stays one launch per
+  program); iOS skips the tests' fork sections; `sign_ios_app.sh` finds the
+  stub app in its build directory. `bench/slg` takes `SLG_XOFFSET_CAP_MIB`
+  to reserve less address space for the player, battle and report buffers
+  (unset: 256 MiB, as before); the iPhone run uses 2 MiB.
 - Wire schemas that mean different things on different 64-bit
   little-endian platforms fail to compile: a set or map key that orders by
   plain `char` (directly, in an array or record member, or an enum whose

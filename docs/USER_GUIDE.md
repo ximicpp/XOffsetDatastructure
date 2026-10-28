@@ -531,7 +531,7 @@ K7 的现状：
   与它逐字节一致（[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。3.2.0 起，在不同平台上含义不同的
   schema（按普通 `char` 排序的键、没有固定底层类型的 enum）编译期就被拒绝（第 2.2 节）。
 - **边界**：只覆盖跑过上面检查的工具链。真机：3.2.0-rc.1 在一台 Android 11 手机上通过；
-  TBD-IPHONE-K7。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
+  一台 iPhone 15 Pro Max（iOS 26.6.2）上 CTest 和 24 个参照 wire 都通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节）。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
   schema 导出签名、不一致时构建失败，并把 GCC 16 并入同一门禁（实现中）。
 
 K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
@@ -547,8 +547,9 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 编译器），服务端照旧用 C++26 反射。现状（3.2.0）：Android（NDK r29/r30）、Windows（MSVC 19.44、
 clang-cl 19、MinGW）、macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 / iOS 17.0）的全量
 CTest 都通过，语料与服务端逐字节一致（逐目标的数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；
-3.2.0-rc.1 在一台 Android 11 手机上功能全部通过；TBD-IPHONE-K8。手机上的速度（arm64 真机上的
-SLG A、D）还没有测，测到之前客户端用法不对外宣传。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
+真机：iPhone 15 Pro Max（iOS 26.6.2）CTest 138/138、语料逐字节一致、demo 通过，同机 SLG M 对 FlatBuffers
+A 0.305、D 0.858；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过，没有计时。Android 手机上的速度测到之前，
+客户端用法不对外宣传。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
 （iOS 含地址空间实测，并定下最低部署目标：系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17
 以下加载失败），跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致。详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
