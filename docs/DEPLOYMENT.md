@@ -1,4 +1,4 @@
-# XOffsetDatastructure 部署指南（3.1.0）
+# XOffsetDatastructure 部署指南（3.2.0-rc.1）
 
 本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
 API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
@@ -10,13 +10,14 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，对外不宣传。3.1.0 的现状（详见
+服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0-rc.1 的现状（详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
-- Windows x64 客户端用 MinGW-w64 GCC 16 编译，全量测试通过，wire 与 Linux 服务端逐字节
-  一致；MSVC 和 clang-cl 编不了。
-- Android、iOS 客户端编译不了：NDK 和 Xcode 自带的 Clang 都没有反射。客户端的构建
-  方式在 3.2 里补。
+- 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
+  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）和 Android arm64
+  （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
+- 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
+  客户端都已跑通；**真机未测**，步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
 - 客户端上没有任何性能数据，现有计时都来自 Apple M4。
 
 ## 2. 同版本发布
@@ -31,7 +32,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   报错。可以把 `wire_schema_hash_v<T>()` 作为握手的一部分，在建立会话时比较。
 - 服务端之间滚动升级时，新旧版本不能混用同一类数据。可以分批切换（同一时间只让
   同版本的服务端互相通信），或在切换期间用旧版本程序导出、新版本程序导入。
-- schema 演进（新旧版本互通）在 3.2 加入（`next_cpp26`，未发布），见下面 2.1 节。
+- schema 演进（新旧版本互通）从 3.2.0-rc.1 起提供，见下面 2.1 节。
 
 ### 2.1 3.2 起：版本链与三条发版规则
 
@@ -56,11 +57,11 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 | --- | --- | --- |
 | 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
 | 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
-| 客户端 | Android、iOS | 3.1.0 无可用工具链 |
+| 客户端 | Android、iOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0-rc.1 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
   `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
-  MSVC、clang-cl 不支持。
+  MSVC、clang-cl 没有反射，只能用 C++20 字段表构建。
 - MinGW 和 MSVC 的 C++ ABI 不同：MinGW 编的 XOffset 模块只能通过 C 接口给 MSVC 编的
   引擎使用。
 - 同一可执行文件内，所有翻译单元的头文件版本、编译选项和依赖必须一致。

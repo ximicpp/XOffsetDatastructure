@@ -1,6 +1,9 @@
 include_guard(GLOBAL)
 
 function(xoffset_enable_test_assertions target_name)
+    # MSVC-style NDEBUG comes from the directory's compile definitions only for
+    # targets without this property (top-level CMakeLists.txt).
+    set_target_properties(${target_name} PROPERTIES XOFFSET_TEST_ASSERTIONS ON)
     if(MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
         target_compile_options(${target_name} PRIVATE /UNDEBUG)
     else()
@@ -57,6 +60,9 @@ endfunction()
 # SC-8: a target built without exceptions, as engine clients build
 # (-fno-exceptions; MSVC /EHs-c- with the standard library's exceptions off).
 function(xoffset_disable_exceptions target_name)
+    # MSVC-style /EHsc comes from the directory's compile options only for
+    # targets without this property (top-level CMakeLists.txt).
+    set_target_properties(${target_name} PROPERTIES XOFFSET_NO_EXCEPTIONS ON)
     if(MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
         target_compile_options(${target_name} PRIVATE /EHs-c-)
         target_compile_definitions(${target_name} PRIVATE _HAS_EXCEPTIONS=0)
