@@ -13,8 +13,7 @@
 #include <vector>
 
 #if defined(__APPLE__)
-#  include <mach/mach.h>
-#  include <mach/mach_vm.h>
+#  include <mach/mach.h>  // vm_region_64; the iOS SDKs have no mach_vm_region
 #endif
 
 using XOffsetDatastructure::detail::VirtualMemoryStorage;
@@ -62,13 +61,13 @@ PageAccess query_page_access(const void* pointer) {
     check(info.Protect == PAGE_READWRITE, "VirtualQuery reports PAGE_READWRITE");
     return PageAccess::ReadWrite;
 #elif defined(__APPLE__)
-    const auto target = reinterpret_cast<mach_vm_address_t>(pointer);
-    mach_vm_address_t region = target;
-    mach_vm_size_t length = 0;
+    const auto target = reinterpret_cast<vm_address_t>(pointer);
+    vm_address_t region = target;
+    vm_size_t length = 0;
     vm_region_basic_info_data_64_t info{};
     mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
     mach_port_t object = MACH_PORT_NULL;
-    const kern_return_t status = ::mach_vm_region(
+    const kern_return_t status = ::vm_region_64(
         ::mach_task_self(), &region, &length, VM_REGION_BASIC_INFO_64,
         reinterpret_cast<vm_region_info_t>(&info), &count, &object);
     if (object != MACH_PORT_NULL) ::mach_port_deallocate(::mach_task_self(), object);
@@ -76,11 +75,11 @@ PageAccess query_page_access(const void* pointer) {
         return PageAccess::Unmapped;
     }
     check(status == KERN_SUCCESS && target - region < length,
-          "mach_vm_region finds queried address");
+          "vm_region_64 finds queried address");
     if (info.protection == VM_PROT_NONE) return PageAccess::Inaccessible;
     check((info.protection & (VM_PROT_READ | VM_PROT_WRITE)) ==
               (VM_PROT_READ | VM_PROT_WRITE),
-          "mach_vm_region reports read/write permissions");
+          "vm_region_64 reports read/write permissions");
     return PageAccess::ReadWrite;
 #else
     std::ifstream maps("/proc/self/maps");

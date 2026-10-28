@@ -10,7 +10,7 @@
   会和反射逐项核对。
 
 K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺，实现中：字段表后端已合入（#149，3.2 未发布），
-下表 Android 和 Windows 各工具链已通过，iOS 等 Xcode。三个客户端目标都原生构建、CTest 通过（iOS 含
+下表 Android、Windows 和 iOS 模拟器各工具链已通过，iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
 地址空间实测并定下最低部署目标）、跨目标 wire 语料一致、签名与 `tools/sigs/` 基线一致之后，才升为
 核心承诺（[USER_GUIDE.md](USER_GUIDE.md) 第 8 节，测试对照见 [STABILITY_TESTS.md](STABILITY_TESTS.md)）。
 
@@ -36,7 +36,7 @@ C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序�
 | Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行（探索分支，wire 2.0） | 两种标准都是 101/101；语料逐字节一致 |
-| iOS 模拟器 | Apple clang + iOS SDK | C++20 | 工具链文件已写（`ios-simulator.cmake`，经 `simctl spawn` 跑） | **阻塞：需要 Xcode**，Mac 上只有 Command Line Tools |
+| iOS 模拟器 | Apple clang 21.0.0（Xcode 27.1，iPhoneSimulator 27.1 SDK），部署目标 iOS 17.0 | C++20 | M4 Mac 上的 iOS 27.0 模拟器（iPhone 17），`ios-simulator.cmake`，CTest 经 `simctl spawn` | 129/129；语料全部接受，逐字节一致。模拟器进程用的是 Mac 的地址空间，真机上的地址空间实测仍待做 |
 | Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
 
 各目标需要注意的地方：
