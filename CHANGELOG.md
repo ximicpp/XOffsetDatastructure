@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Builds without exceptions verify as fast as builds with them. Without
+  exceptions the string checks of member and element loops were no longer
+  inlined (GCC) or tested a status after every element (Clang, clang-cl);
+  an inline string is now checked in place there. The demo client's
+  receive took 1.09-1.44x as long without exceptions on normal views,
+  now 0.89-0.99x (GCC 16, GCC 13, MinGW, MSVC, clang-cl). Builds with
+  exceptions are unchanged.
+
 ## 3.2.0-rc.1: preview for device testing
 
 A preview of 3.2 for testing on real Android phones and iPhones; not a
