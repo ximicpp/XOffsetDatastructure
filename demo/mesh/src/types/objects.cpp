@@ -354,9 +354,9 @@ Result<EvilPart> make_evil(TypeId type, std::uint64_t seed, Scale scale, SaveMod
                 const std::size_t field = std::size_t(reinterpret_cast<const char*>(&root.trail) -
                                                       reinterpret_cast<const char*>(&root));
                 const std::size_t at = sizeof h + (h.root_offset - XWIRE_PAYLOAD_BEGIN) + field;
-                const std::int32_t far = 0x3ffffff0;
-                if (at + sizeof far > w->size()) return Error{"make_evil: trail head outside the wire"};
-                std::memcpy(w->data() + at, &far, sizeof far);
+                const std::int32_t outside = 0x3ffffff0;
+                if (at + sizeof outside > w->size()) return Error{"make_evil: trail head outside the wire"};
+                std::memcpy(w->data() + at, &outside, sizeof outside);
                 part.wire = std::move(*w);
                 return part;
             }
