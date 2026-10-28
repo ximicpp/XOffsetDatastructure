@@ -1,4 +1,4 @@
-# XOffsetDatastructure 部署指南（3.2.0-rc.1）
+# XOffsetDatastructure 部署指南（3.2.0-rc.2）
 
 本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
 API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
@@ -10,14 +10,16 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0-rc.1 的现状（详见
+服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0-rc.2 的现状（详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
 - 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
   反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）和 Android arm64
   （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
-  客户端都已跑通；**真机未测**，步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
+  客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
+  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 未测；
+  步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
 - 客户端上没有任何性能数据，现有计时都来自 Apple M4。
 
 ## 2. 同版本发布
