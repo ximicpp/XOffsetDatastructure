@@ -25,7 +25,9 @@ Backends (the app's data directory is <container>/Documents/xo):
   local   the command-line host (tools/test_host/host_cli.cpp) on this computer, with
           the data directory under --state: checks the same flow without a phone
 
-Serving (default, --serve 1 or XO_HOST_SERVE=1): the app is started once ("xoserve") and
+Serving (--serve 1 or XO_HOST_SERVE=1; not yet the default: on an iPhone every program
+library loaded into one process keeps its 64 MiB table, and about 50 of them fill the
+process's address space): the app is started once ("xoserve") and
 stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, and the app runs the
 programs one after another in its process (it shows the totals meanwhile). A state stamp
 keeps the serving process id; when it is gone (a crash, a reinstall, a timeout) the next
@@ -413,7 +415,8 @@ def run(a):
             if not ensure_serving(a, backend):
                 return 124
             ready = os.path.join(work, "ready")
-            open(ready, "wb").close()
+            with open(ready, "wb") as f:
+                f.write(b"1\n")   # devicectl failed on some empty files (iPhone run 6, CoreDeviceError 7000)
             backend.push(ready, "%sinbox/%s.ready" % (prefix, run_id))
         elif not backend.launch(["xorun", run_id]):
             return 124
@@ -498,8 +501,8 @@ def main():
                    help="seconds between two looks for the result (default 1 on a phone, 0.1 otherwise)")
     p.add_argument("--state", default=os.environ.get("XO_HOST_STATE", os.path.join(tempfile.gettempdir(), "xo-host-state")))
     p.add_argument("--status-file", help="also write the run's status lines here")
-    p.add_argument("--serve", type=int, choices=(0, 1), default=int(os.environ.get("XO_HOST_SERVE", "1")),
-                   help="1: run in the app that stays up (started when needed); 0: start the app for each run")
+    p.add_argument("--serve", type=int, choices=(0, 1), default=int(os.environ.get("XO_HOST_SERVE", "0")),
+                   help="1: run in the app that stays up (started when needed); 0 (default): start the app for each run")
     p.add_argument("--output-flags", default=os.environ.get("XO_HOST_OUTPUT_FLAGS", "--csv-dir,--write,--out"),
                    help="options whose path argument is an output even when it exists (a directory there gets "
                         "the run's files added)")

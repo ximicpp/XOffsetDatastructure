@@ -14,7 +14,7 @@
 #                        build   configure + build with -DXOFFSET_TEST_HOST=ON, sign (device:
 #                                sign_ios_app.sh with the Apple ID signed in to Xcode)
 #                        info    @info: model, iOS, memory, thermal state
-#                        ctest   the whole CTest suite, one program after another in the app
+#                        ctest   the whole CTest suite, one program per app launch
 #                        corpus  reference wire corpus (--ref): read, write, diff -r
 #                        slg     SC-6: slg_bench verify, then --slg-runs timed runs (A..D);
 #                                each run in a newly started app (as the memory probes)
@@ -36,9 +36,10 @@
 #   --mem-limit MIB    --commit probe limit (default 16384 device, 2048 simulator)
 #   -j N               build jobs
 #
-# The app is started once and runs the programs one after another, showing the totals
-# (XO_HOST_SERVE=0: one launch per program, as before); the timed slg runs and the memory
-# probes each get a newly started app. The totals start from zero for each call of this
+# One app launch per program. XO_HOST_SERVE=1: the app is started once and runs the programs
+# one after another, showing the totals; the timed slg runs and the memory probes each get a
+# newly started app (on an iPhone not yet usable for the whole suite: every loaded program
+# library keeps a 64 MiB table and about 50 fill the process's address space). The totals start from zero for each call of this
 # script (@reset).
 #
 # OUT gets RESULT.md (one row per step), the logs, slg/ (raw jsonl, analyze.py tables) and
@@ -177,7 +178,7 @@ step_info() {
     row info passed "$(grep -E '^(hw.machine|kern.osproductversion|hw.memsize|os_proc_available_memory|thermal_state|low_power_mode) ' "$OUT/info.txt" | tr '\n' ' ')"
 }
 step_ctest() {
-    log "ctest (one program after another in the app)"
+    log "ctest"
     local s e
     ctest --test-dir "$B" -j 1 --timeout 1800 --output-on-failure > "$OUT/ctest.log" 2>&1; e=$?
     s=$(grep -E 'tests passed|tests failed' "$OUT/ctest.log" | tail -1)
