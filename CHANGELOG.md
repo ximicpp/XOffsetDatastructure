@@ -25,9 +25,15 @@ iPhone 15 Pro Max (iOS 26.6.2, through the test host app) passed CTest
 against FlatBuffers 25.12.19 on the same phone at A 0.305, B 0.179, C 0.252,
 D 0.858 (`docs/DEVICE_TESTING.md` section 9); an Android 11 phone (Xiaomi
 M2102K1C) passed the functional checks with 3.2.0-rc.1, without timing.
-Android timing is the remaining condition for announcing the client path. Mac M4 checkpoint against `v3.1.0`: TBD-CKPT5. The 7-night fuzz
-run is no longer a release condition (susu 2026-10-28) and G9 stays at
-17/19.
+Android timing is the remaining condition for announcing the client path.
+
+Mac M4 checkpoint against `v3.1.0` (CKPT5, `docs/PERFORMANCE.md` section 4):
+D÷FlatBuffers 0.933 (upper bound 0.947; 3.1.0 was 1.117), SLG A/B/C
+0.994/1.003/1.004 and the formal harness within 1.013, G8 met, G9 17/19 as
+in 3.1.0. The four-format SLG step failed twice only on intervals widened by
+one outlier process (once on each side) and passes on the two runs pooled;
+it was accepted as an exception to the gate rule. The 7-night fuzz run is no
+longer a release condition (susu 2026-10-28).
 
 - `demo/mesh`: a cross-device data demo (off by default,
   `XOFFSET_BUILD_MESH_DEMO`). Devices register at a hub that relays every
