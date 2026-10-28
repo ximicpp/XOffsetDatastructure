@@ -1,4 +1,16 @@
 {
   "schema": "xoffset-perf-ledger-v1",
-  "entries": []
+  "entries": [
+    {
+      "id": "pr153-formal-load-gcc-regalloc",
+      "pr": 153,
+      "metric": "formal.load",
+      "compiler": "gcc16",
+      "max_ratio": 1.0077,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#153 把 XFixedVector 的迭代器从 T* 换成 fixed_detail::contiguous_iterator<T>。合并前把 next_cpp26 92404a27 并进来后，GCC 16 Ir 的 formal.load head÷base 是 1.0077（+63,887，警告，没到失败门槛）。多出来的全在两个函数的自身 Ir：validate_wire_value<Attr> +32,768、validate_wire_value<Record> +31,118，这两个函数 #153 没有改，原因是 GCC 的寄存器分配变了（校验循环每次调用多一两条指令）。P2996 Ir 的 formal.load 是 1.0000。和 3.1（wire V2.1 集成，#139 前后）那次 GCC formal.load 1.0039（validate_wire_value<Attr> 每次调用 +1 条指令，P2996 不变）是同一类。下一个检查点在正式口径上要专门看 formal.load。",
+      "evidence": "/mnt/project-files/d-vs-fb-20261027/LOCAL_VALIDATE_51b3db9f.md（Ir gate gcc16 函数差异表，base 92404a27 head 51b3db9f）；/mnt/project-files/d-vs-fb-20261027/ITERATOR_DECISION.md（GATE_D4，Mac 正式批次 A/B/C 上界 1.0197 通过）",
+      "approved_by": "「性能优化」（2026-10-28 01:31Z，只作记录）"
+    }
+  ]
 }
