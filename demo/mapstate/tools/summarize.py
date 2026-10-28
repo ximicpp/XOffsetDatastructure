@@ -25,7 +25,16 @@ Verdicts per tier:
   * a client run with --encoding cycle received every encoding;
   * normal, full and empty categories each sampled on both sides; every
     empty snapshot has visible == 0; every full-scene snapshot has
-    visible == units; check_ok all 1 on both sides.
+    visible == units; check_ok all 1 on both sides;
+  * write-back (clients run with --edits N): every client had edits
+    acknowledged; every edit A accepted (a_edits.csv) is its sender's row
+    (client_edits.csv) with equal units, wire bytes, wire digest and content
+    digest, and A's digest equals the one the client sent; every
+    acknowledged client row has A's row; every Forward A sent arrived at
+    the other client (client_forwards.csv) with the bytes A rebuilt (wire
+    digest) and the sender's content (digest), and passed its checks; with
+    two writing clients of one schema version, at least one edit was
+    forwarded.
 Across tiers: for each unit count run in both modes, the fresh and reuse
 runs sent byte-identical step wires (equal digests at every tick).
 --compare OTHER_ROOT: every tier here sent the same step wires, tick by tick,
@@ -33,9 +42,9 @@ as the tier of the same unit count in OTHER_ROOT (another compiler,
 platform or build), over at least --min-steps common ticks.
 Self-test: exit 0 and every selftest_checks.csv row "pass" (--no-selftest:
 not run for these binaries).
-Evil (each mode): a, b, client exited 0, A logged at least 12 "rejected:"
+Evil (each mode): a, b, client exited 0, A logged at least 15 "rejected:"
 lines (one per evil case A refuses: 6 requests, 3 subscriptions, 3
-handshakes) and every row of the evil client's
+handshakes, 3 write-backs) and every row of the evil client's
 client_checks.csv passes.
 Schema lock (schema_check/, run_all_tiers.sh): mapdemo_schema_freeze check
 exited 0, so no root type changed without a lineage entry.
@@ -99,7 +108,9 @@ VIEW_METRICS = (
 
 # Row names server A writes to a_checks.csv (INTERFACES.md section 6).
 A_CHECK_NAMES = ("batch_roundtrip", "reference_model", "modification_coverage",
-                 "view_snapshot", "snapshot_paths", "rejected_requests", "schema_versions")
+                 "view_snapshot", "snapshot_paths", "rejected_requests", "schema_versions",
+                 "client_edits")
+EVIL_MIN_REJECTED = 15
 
 # INTERFACES.md section 6; the headless client has no draw / present, and
 # with --buffers reuse nothing is destroyed per message.
@@ -327,6 +338,123 @@ def summarize_events(v, scope, d, meta):
     return {"mode": mode, "per_encoding": per, "frames": len(c_ev)}
 
 
+def edits_every(args):
+    """N of --edits N in a client's arguments (0: no write-back)."""
+    words = args.split()
+    if "--evil" in words or "--edits" not in words:
+        return 0
+    i = words.index("--edits")
+    try:
+        return int(words[i + 1])
+    except (IndexError, ValueError):
+        return 0
+
+
+def summarize_edits(v, scope, d, meta, clients):
+    """Write-back (INTERFACES.md section 3): each client's edits reached A
+    unchanged (digests), and A's rebuilds reached the other writers.
+    None when no client ran with --edits."""
+    writers = [(c[0], c[1], build_words(os.path.join(c[1], "client_build.txt")).get("schema_version", ""))
+               for c in clients if edits_every(meta.get(c[2], ""))]
+    if not writers:
+        return None
+    a_rows = read_csv(os.path.join(d, "a_edits.csv"))
+    v.add(scope, "a_edits.csv present", a_rows is not None, "ok" if a_rows is not None else "missing")
+    a_rows = a_rows or []
+    sent, fwd_in = {}, []
+    per_client = []
+    for cname, cdir, version in writers:
+        rows = read_csv(os.path.join(cdir, "client_edits.csv"))
+        frows = read_csv(os.path.join(cdir, "client_forwards.csv"))
+        v.add(scope, "{}: client_edits.csv and client_forwards.csv present".format(cname),
+              rows is not None and frows is not None, "")
+        rows = rows or []
+        frows = frows or []
+        acked = [r for r in rows if r.get("acked") == "1"]
+        unacked = [r for r in rows if r.get("acked") != "1"]
+        # Only the last edit may be unacknowledged (sent after A stopped reading).
+        v.add(scope, "{}: write-backs acknowledged".format(cname),
+              len(acked) > 0 and (not unacked or (len(unacked) == 1 and rows[-1] is unacked[0])),
+              "{} sent, {} acknowledged".format(len(rows), len(acked)))
+        for r in rows:
+            sent[r.get("edit_id")] = (cname, r)
+        for r in frows:
+            fwd_in.append((cname, r))
+        per_client.append({"client": cname, "schema_version": version or "-", "sent": len(rows),
+                           "acked": len(acked), "forwards_received": len(frows),
+                           "wire_bytes": stats([num(r.get("wire_bytes")) for r in rows]),
+                           "c.edit_us": stats([num(r.get("edit_us")) for r in rows]),
+                           "c.save_us": stats([num(r.get("save_us")) for r in rows]),
+                           "c.rtt_us": stats([num(r.get("rtt_us")) for r in acked]),
+                           "c.forward_load_us": stats([num(r.get("load_us")) for r in frows])})
+
+    # Edits: A's row against the sender's.
+    matched, bad = 0, []
+    a_by = {}
+    for ar in a_rows:
+        eid = ar.get("edit_id")
+        a_by[eid] = ar
+        got = sent.get(eid)
+        diffs = []
+        if got is None:
+            diffs.append("no sender row")
+        else:
+            cr = got[1]
+            diffs = ["{} A={} C={}".format(k, ar.get(k), cr.get(k))
+                     for k in ("units", "wire_bytes", "wire_digest", "digest") if ar.get(k) != cr.get(k)]
+        if ar.get("client_digest") != ar.get("digest"):
+            diffs.append("client_digest {} digest {}".format(ar.get("client_digest"), ar.get("digest")))
+        if ar.get("check_ok") != "1":
+            diffs.append("check_ok " + str(ar.get("check_ok")))
+        if diffs:
+            if len(bad) < 5:
+                bad.append("{}: {}".format(eid, ", ".join(diffs)))
+        else:
+            matched += 1
+    missing = [eid for eid, (_, r) in sent.items() if r.get("acked") == "1" and eid not in a_by]
+    v.add(scope, "write-back: A's edits equal the clients' (wire and content digest per edit)",
+          matched > 0 and not bad and not missing and len(a_by) == len(a_rows),
+          "matched {} of {} A rows; acknowledged without an A row {}; duplicates {}{}".format(
+              matched, len(a_rows), len(missing), len(a_rows) - len(a_by),
+              ("; " + "; ".join(bad)) if bad else ""))
+
+    # Forwards: what each other writer received against A's rebuild.
+    fwd_expected = sum(int(num(r.get("forwards")) or 0) for r in a_rows if not math.isnan(num(r.get("forwards"))))
+    fmatched, fbad = 0, []
+    for cname, fr in fwd_in:
+        eid = fr.get("edit_id")
+        ar = a_by.get(eid)
+        diffs = []
+        if ar is None:
+            diffs.append("no A row")
+        else:
+            if sent.get(eid, (None,))[0] == cname:
+                diffs.append("forwarded back to its sender")
+            want = {"digest": ar.get("digest"), "a_digest": ar.get("digest"),
+                    "wire_digest": ar.get("fwd_wire_digest"), "wire_bytes": ar.get("fwd_bytes"),
+                    "units": ar.get("units")}
+            diffs += ["{} {} != {}".format(k, fr.get(k), w) for k, w in want.items() if fr.get(k) != w]
+        if fr.get("check_ok") != "1":
+            diffs.append("check_ok " + str(fr.get("check_ok")))
+        if diffs:
+            if len(fbad) < 5:
+                fbad.append("{} at {}: {}".format(eid, cname, ", ".join(diffs)))
+        else:
+            fmatched += 1
+    same_version = len(writers) >= 2 and len(set(w[2] for w in writers)) < len(writers)
+    v.add(scope, "write-back: every Forward arrived with A's rebuilt bytes and the sender's content",
+          not fbad and fmatched == fwd_expected and (fmatched > 0 or not same_version),
+          "A sent {}, received {}, matched {}{}".format(
+              fwd_expected, len(fwd_in), fmatched, ("; " + "; ".join(fbad)) if fbad else ""))
+    forwarded = [r for r in a_rows if r.get("fwd_bytes")]
+    return {"clients": per_client, "a_rows": len(a_rows), "forwards": fwd_expected,
+            "forwarded_edits": len(forwarded),
+            "edit_wire_bytes": stats([num(r.get("wire_bytes")) for r in a_rows]),
+            "fwd_bytes": stats([num(r.get("fwd_bytes")) for r in forwarded]),
+            "a.load_us": stats([num(r.get("load_us")) for r in a_rows]),
+            "a.rebuild_us": stats([num(r.get("rebuild_us")) for r in forwarded])}
+
+
 def summarize_tier(root, name, min_steps):
     d = os.path.join(root, name)
     scope = name
@@ -464,6 +592,7 @@ def summarize_tier(root, name, min_steps):
                   ", ".join("{} {}".format(e, counts[e]) for e in ENCODINGS))
 
     events = summarize_events(v, scope, d, meta)
+    edits = summarize_edits(v, scope, d, meta, clients)
 
     per_cat = {}
     for cat in CATEGORIES:
@@ -519,7 +648,8 @@ def summarize_tier(root, name, min_steps):
         "metrics": metrics,
         "checks": {"a": a_checks or [], "client": c_checks or [], "client2": c2_checks or []},
         "schema_clients": schema_clients,
-        "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "events": events, "verdicts": v,
+        "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "events": events, "edits": edits,
+        "verdicts": v,
     }
 
 
@@ -647,6 +777,30 @@ def render_tier(lines, t):
         vrow("A encode per frame (us)", lambda c: mean_p95(c["a.encode_us"]))
         vrow("client decode per frame (us)", lambda c: mean_p95(c["c.decode_us"]))
         vrow("client verify per frame (us)", lambda c: mean_p95(c["c.verify_us"]))
+        lines.append("")
+    ed = t.get("edits")
+    if ed:
+        lines.append("### Write-back (--edits; per edit, mean / p95)")
+        lines.append("")
+        lines.append("A client changes a normal snapshot in its own buffer (hp and behavior, one unit erased, one "
+                     "added, a short name made long), sends it with save_verified; A verifies it at 1 MiB, compares "
+                     "digests, checks the fields, and forwards a save_compact (slack 0) rebuild to the other writers "
+                     "of the same schema version.")
+        lines.append("")
+        lines.append("| client | schema | sent / acknowledged | forwards received | edit wire (bytes) | "
+                     "change in place (us) | save_verified (us) | Edit -> EditAck (us) | verify a Forward (us) |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for c in ed["clients"]:
+            lines.append("| {} | {} | {} / {} | {} | {} | {} | {} | {} | {} |".format(
+                c["client"], c["schema_version"], c["sent"], c["acked"], c["forwards_received"],
+                mean_p95(c["wire_bytes"], "_bytes"), mean_p95(c["c.edit_us"]), mean_p95(c["c.save_us"]),
+                mean_p95(c["c.rtt_us"]), mean_p95(c["c.forward_load_us"])))
+        lines.append("")
+        lines.append("A: {} edits accepted, {} forwarded ({} Forward frames); A verify {} us; rebuild {} us; "
+                     "edit wire {} B, rebuilt wire {} B.".format(
+                         ed["a_rows"], ed["forwarded_edits"], ed["forwards"], mean_p95(ed["a.load_us"]),
+                         mean_p95(ed["a.rebuild_us"]), mean_p95(ed["edit_wire_bytes"], "_bytes"),
+                         mean_p95(ed["fwd_bytes"], "_bytes")))
         lines.append("")
     lines.append("### View path, whole run (process metrics)")
     lines.append("")
@@ -798,7 +952,8 @@ def main():
             ev = read_kv(os.path.join(root, n, "exit_codes.txt"))
             exit_code_verdicts(overall, n, ev, ("a", "b", "client"))
             rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
-            overall.add(n, "A logged >= 12 rejected inputs", rej >= 12, "{} line(s)".format(rej))
+            overall.add(n, "A logged >= {} rejected inputs".format(EVIL_MIN_REJECTED), rej >= EVIL_MIN_REJECTED,
+                        "{} line(s)".format(rej))
             check_rows(overall, n, "evil client_checks",
                        read_csv(os.path.join(root, n, "client_checks.csv")))
 

@@ -30,6 +30,15 @@
 // whose version A does not know, or whose field names differ from that
 // version's, gets the rejection and the connection is closed.
 //
+// Write-back (client --edits): a client changes a snapshot it received and
+// sends it back (Edit, save_verified wire, its digest in the frame header).
+// A verifies it with load_verified at net::kEditLimit (1 MiB), compares the
+// digest of what it read with the client's, applies the field rules
+// (checks::edit_sanity_of) and answers EditAck, or Error. It then rebuilds
+// the edit with save_compact (slack 0) and forwards it (Forward) to every
+// other client of the same schema version that writes back too; nothing
+// of the sender's wire but its object graph goes out (DEPLOYMENT.md 4.2).
+//
 // Each step: save(cur) -> StepReq to B -> StepRes -> verify into spare ->
 // (checks) -> spare becomes cur. At most one step is in flight; steps are
 // paced at 20 Hz and never bunched up when A falls behind. View requests are
@@ -208,6 +217,8 @@ struct Client {
     bool v1_snapshots = false;   // ViewSnapshots go out converted to version 1
     XBuffer req_buf;          // reuse: reloaded for every ViewReq
     bool req_ready = false;
+    std::uint64_t first_served = 0, last_served = 0;   // request ids of the snapshots sent
+    bool writes_back = false;   // sent an accepted Edit: receives the others' (Forward)
     bool subscribed = false;
     std::uint16_t event_mode = 0;   // codec::EventEncoding or codec::kEventCycle
 };
@@ -232,6 +243,9 @@ private:
     void on_client_readable(Client& c);
     void on_client_frame(Client& c, net::Frame frame);
     void serve_view(Client& c, net::Frame frame);
+    void on_edit(Client& c, const net::Frame& frame);
+    template <typename Snapshot>
+    void take_edit(Client& c, const net::Frame& frame);
     void subscribe(Client& c, const net::Frame& frame);
     void load_event_dictionary();
     void publish_events(std::uint64_t tick);
@@ -300,12 +314,14 @@ private:
     std::uint64_t clients_v2_ = 0;      // accepted Hellos per ViewSnapshot version
     std::uint64_t clients_v1_ = 0;
     std::uint64_t snaps_converted_ = 0;
+    std::uint64_t edits_ = 0, forwards_ = 0, writers_ = 0;
 
     bool csv_ = false;
     metrics::CsvFile steps_csv_;
     metrics::CsvFile snaps_csv_;
     metrics::CsvFile corpus_csv_;
     std::uint64_t corpus_written_ = 0;
+    metrics::CsvFile edits_csv_;
 
     // event stream
     codec::EventEncoder events_enc_;
@@ -340,6 +356,11 @@ void ServerA::open_csv() {
     const std::string events_path = opt_.csv_dir + "/a_events.csv";
     if (!events_csv_.open(events_path, "tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us"))
         throw Fatal{2, "cannot open " + events_path};
+    const std::string edits_path = opt_.csv_dir + "/a_edits.csv";
+    if (!edits_csv_.open(edits_path,
+            "edit_id,client,schema,units,wire_bytes,wire_digest,digest,client_digest,load_us,forwards,fwd_bytes,"
+            "fwd_wire_digest,rebuild_us,check_ok"))
+        throw Fatal{2, "cannot open " + edits_path};
 }
 
 void ServerA::build_catalog() {
@@ -563,7 +584,7 @@ void ServerA::on_client_readable(Client& c) {
     for (;;) {
         std::optional<net::Frame> f;
         try {
-            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq, MsgType::Subscribe});
+            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq, MsgType::Subscribe, MsgType::Edit});
         } catch (const net::PeerClosed&) {
             std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
             c.conn.close();
@@ -624,6 +645,10 @@ void ServerA::on_client_frame(Client& c, net::Frame frame) {
     if (!c.hello_done) { reject(c, std::string(net::type_name(frame.type)) + " before Hello", true); return; }
     if (frame.type == MsgType::Subscribe) {
         subscribe(c, frame);
+        return;
+    }
+    if (frame.type == MsgType::Edit) {
+        on_edit(c, frame);
         return;
     }
     serve_view(c, std::move(frame));
@@ -795,6 +820,8 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     if (opt_.check && v1) v1_wire = xwire;
     c.conn.enqueue(MsgType::ViewSnapshot, req.request_id, std::move(wire), frame.flags);
     c.conn.flush();
+    if (c.first_served == 0) c.first_served = req.request_id;
+    c.last_served = req.request_id;
 
     // Checks and digest stay outside the timed regions.
     const ViewSnapshot& snap = snap_buf.root();
@@ -881,6 +908,116 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         snaps_csv_.row(row);
     }
     if (!check_ok) throw Fatal{1, "snapshot check failed for request " + std::to_string(request_id)};
+}
+
+// ---------------------------------------------------------------- write-back
+
+void ServerA::on_edit(Client& c, const net::Frame& frame) {
+    // A client writes back in the schema version it works in; it is
+    // forwarded only to clients of that version.
+    if (c.v1_snapshots) take_edit<mapdemo_v1::ViewSnapshot>(c, frame);
+    else take_edit<ViewSnapshot>(c, frame);
+}
+
+template <typename Snapshot>
+void ServerA::take_edit(Client& c, const net::Frame& frame) {
+    if (frame.flags != 0) {
+        reject(c, "Edit: unknown flags " + std::to_string(frame.flags), false);
+        return;
+    }
+    // Everything from a peer is verified in full, with a cap.
+    metrics::Stopwatch sw;
+    XBuffer in;
+    try {
+        in = XBuffer::load_verified<Snapshot>(frame.payload, XBuffer::maximum_capacity(net::kEditLimit));
+    } catch (const std::exception& e) {
+        reject(c, std::string("Edit: bad wire: ") + e.what(), false);
+        return;
+    }
+    const double load_us = sw.us();
+    const Snapshot& s = in.root<Snapshot>();
+    const std::uint64_t edit_id = s.request_id;
+    const std::string tag = "Edit " + std::to_string(edit_id) + ": ";
+    // The structure is sound; the content is the client's. Its digest must
+    // be the one the client sent, and the fields must pass the rules.
+    const std::uint64_t digest = checks::snapshot_digest_of(s);
+    if (digest != frame.correlation) {
+        reject(c, tag + "content digest " + hex16(digest) + " is not the client's " + hex16(frame.correlation), false);
+        return;
+    }
+    if (c.last_served == 0 || edit_id < c.first_served || edit_id > c.last_served) {
+        reject(c, tag + "no snapshot of that id was sent to this client", false);
+        return;
+    }
+    if (const checks::Result r = checks::edit_sanity_of(s); !r.ok) {
+        reject(c, tag + r.detail, false);
+        return;
+    }
+    rec_.add("a.edit_load_us", load_us);
+    rec_.add("a.edit_bytes", double(frame.payload.size()));
+    c.conn.enqueue(MsgType::EditAck, edit_id, std::string());
+    c.conn.flush();
+    if (!c.writes_back) ++writers_;
+    c.writes_back = true;
+    ++edits_;
+
+    // Forward: rebuilt once with save_compact (no holes, no container
+    // slack, string tails cleared), the same bytes to every other writer
+    // of this schema version.
+    std::vector<Client*> to;
+    for (auto& o : clients_)
+        if (o.get() != &c && o->conn.is_open() && o->hello_done && !o->close_after_flush && o->writes_back &&
+            o->v1_snapshots == c.v1_snapshots)
+            to.push_back(o.get());
+    std::string fwd;
+    double rebuild_us = -1;
+    bool check_ok = true;
+    if (!to.empty()) {
+        sw.restart();
+        in.save_compact_into<Snapshot>(fwd, XCompactOptions{0});
+        rebuild_us = sw.us();
+        rec_.add("a.edit_rebuild_us", rebuild_us);
+        rec_.add("a.forward_bytes", double(fwd.size()));
+        if (opt_.check) {
+            // What the other client gets: verified, with the content A accepted.
+            XResult<XBuffer> back = XBuffer::try_load_verified<Snapshot>(fwd, XBuffer::maximum_capacity(net::kEditLimit));
+            std::string why;
+            if (!back) why = "rebuilt wire rejected: " + back.error().message;
+            else if (checks::snapshot_digest_of(back->root<Snapshot>()) != digest) why = "rebuilt content differs";
+            if (!why.empty()) {
+                check_ok = false;
+                fail_check("client_edits", tag + why);
+            }
+        }
+        for (Client* o : to) {
+            o->conn.enqueue(MsgType::Forward, digest, fwd);
+            try { o->conn.flush(); } catch (const std::exception&) { o->conn.close(); }
+            ++forwards_;
+        }
+    }
+    if (csv_) {
+        std::string row;
+        row.reserve(192);
+        row += std::to_string(edit_id); row += ',';
+        row += std::to_string(c.id); row += ',';
+        row += c.v1_snapshots ? '1' : char('0' + MAPDEMO_SCHEMA_VERSION); row += ',';
+        row += std::to_string(s.units.size()); row += ',';
+        row += std::to_string(frame.payload.size()); row += ',';
+        row += hex16(checks::wire_digest(frame.payload)); row += ',';
+        row += hex16(digest); row += ',';
+        row += hex16(frame.correlation); row += ',';
+        row += fmt_us(load_us); row += ',';
+        row += std::to_string(to.size()); row += ',';
+        if (!to.empty()) row += std::to_string(fwd.size());
+        row += ',';
+        if (!to.empty()) row += hex16(checks::wire_digest(fwd));
+        row += ',';
+        if (rebuild_us >= 0) row += fmt_us(rebuild_us);
+        row += ',';
+        row += check_ok ? '1' : '0';
+        edits_csv_.row(row);
+    }
+    if (!check_ok) throw Fatal{1, "write-back check failed for edit " + std::to_string(edit_id)};
 }
 
 // ---------------------------------------------------------------- events
@@ -1162,6 +1299,14 @@ void ServerA::write_results() {
     rows.push_back(CheckRow{"schema_versions", true,
         "clients_v" + std::to_string(MAPDEMO_SCHEMA_VERSION) + "=" + std::to_string(clients_v2_) +
         " clients_v1=" + std::to_string(clients_v1_) + " converted_snapshots=" + std::to_string(snaps_converted_)});
+    {   // With --check every rebuilt Forward is loaded back (take_edit).
+        const auto f = std::find_if(failures_.begin(), failures_.end(),
+                                    [](const CheckRow& r) { return r.check == "client_edits"; });
+        rows.push_back(CheckRow{"client_edits", f == failures_.end(),
+            f != failures_.end() ? f->detail
+                                 : "edits=" + std::to_string(edits_) + " writers=" + std::to_string(writers_) +
+                                       " forwards=" + std::to_string(forwards_)});
+    }
     rows.push_back(CheckRow{"event_stream", true,
         "subscribers=" + std::to_string(subscribers_) + " dictionary=" + std::to_string(event_dict_id_) +
         " event_ticks=" + std::to_string(event_ticks_) + " events=" + std::to_string(events_built_) +

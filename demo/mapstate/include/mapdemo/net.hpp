@@ -43,6 +43,13 @@ enum class MsgType : std::uint16_t {
     SubscribeOk = 11,  // A->client: empty; refused: Error
     Events = 12,       // A->client: one event tick (or a part of it); correlation = tick,
                        // flags = codec::EventEncoding of the payload
+    // Client write-back (10-28, optional; INTERFACES.md section 3):
+    Edit = 13,         // client->A: a ViewSnapshot it received and changed, save_verified
+                       // wire (<= 1 MiB); correlation = the client's snapshot_digest of it,
+                       // flags = 0. The edit id is the snapshot's own request_id.
+    EditAck = 14,      // A->client: empty; correlation = edit id. Refused: Error
+    Forward = 15,      // A->client: another client's accepted edit, rebuilt by A with
+                       // save_compact (slack 0); correlation = its snapshot_digest, flags = 0
 };
 
 // Test categories for view requests (headless sampling); GUI uses Normal.
@@ -224,5 +231,10 @@ std::uint64_t now_ns() noexcept;
 
 inline constexpr std::uint16_t kDefaultPortA = 47701;   // A listens for the client
 inline constexpr std::uint16_t kDefaultPortB = 47702;   // B listens for A
+
+// Edit and Forward payloads (a client's write-back): the frame limit, and
+// the maximum_capacity A and the receiving client load them with. Client
+// uploads are kilobytes (a viewport snapshot); DEPLOYMENT.md section 5.
+inline constexpr std::uint32_t kEditLimit = std::uint32_t(1) << 20;
 
 } // namespace mapdemo::net

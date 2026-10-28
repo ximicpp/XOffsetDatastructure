@@ -191,6 +191,27 @@ def target_summary(out_root, name, corpus_rows):
                     "rtt_p50": pct(col("rtt_us"), 0.5)}
         t["largest"] = {"name": big.get("name"), "units": big.get("units"), "cells": cells,
                         "events": big.get("events")}
+    # Write-back (client --edits; summarize.py checks every edit and Forward
+    # by digest): the target client's edits, the Forwards each client got.
+    wb = {"tiers": 0, "sent": 0, "acked": 0, "received": 0, "c2_received": 0, "c2_sent": 0, "forwards": 0}
+    for x in tiers:
+        ed = x.get("edits")
+        if not ed:
+            continue
+        wb["tiers"] += 1
+        wb["forwards"] += ed.get("forwards", 0)
+        for c in ed.get("clients", []):
+            if c.get("client") == "client":
+                wb["sent"] += c.get("sent", 0)
+                wb["acked"] += c.get("acked", 0)
+                wb["received"] += c.get("forwards_received", 0)
+            else:
+                wb["c2_sent"] += c.get("acked", 0)
+                wb["c2_received"] += c.get("forwards_received", 0)
+    t["writeback"] = wb if wb["tiers"] else None
+    c2cmd = (tiers[0].get("meta", {}).get("client2_cmd", "") if tiers else "") or ""
+    c2build = read_text(os.path.join(root, tiers[0].get("name", ""), "client2", "client_build.txt")) if tiers else ""
+    t["client2"] = "{}, `{}`".format(runner(c2cmd), c2build or "-") if c2cmd else "-"
     # Event stream (client --events): the digests of every Events frame the
     # client received, per tier; A's events depend on the seed only.
     t["event_digests"] = sorted(
@@ -227,6 +248,7 @@ def main():
     same_evil = bool(ref_evil) and all(t["evil_outcomes"] == ref_evil for t in targets)
     passed = bool(targets) and all(t["ok"] for t in targets) and same_everywhere and same_selfcheck
     with_events = [t for t in targets if t["event_digests"]]
+    with_writeback = [t for t in targets if t["writeback"]]
     same_events = bool(with_events) and len(with_events) == len(targets) and all(
         t["event_digests"] == with_events[0]["event_digests"] for t in with_events)
 
@@ -248,6 +270,13 @@ def main():
     if with_events:
         lines.append("- event stream on {} of {} target(s); same event frames and digests on every target: {}".format(
             len(with_events), len(targets), "yes" if same_events else "no"))
+    if with_writeback:
+        lines.append("- write-back on {} of {} target(s): each client changed snapshots in place and sent them back "
+                     "(save_verified); A verified them (1 MiB cap), compared digests and forwarded a save_compact "
+                     "rebuild to the other writer when it runs the same schema version ({} Forward frames); every "
+                     "edit and every Forward digest-equal: {}".format(
+                         len(with_writeback), len(targets), sum(t["writeback"]["forwards"] for t in with_writeback),
+                         "yes" if all(t["tiers_ok"] for t in with_writeback) else "NO (see the tiers' verdicts)"))
     lines.append("")
     lines.append("## Targets")
     lines.append("")
@@ -273,6 +302,21 @@ def main():
             lines.append("- {}: {}".format(name, p))
         lines.append("")
 
+    if with_writeback:
+        lines.append("## Write-back (all tiers)")
+        lines.append("")
+        lines.append("edits = the target client's write-backs A acknowledged / sent; forwarded = Forward frames A sent "
+                     "(to the second client and back); received = Forwards each client verified.")
+        lines.append("")
+        lines.append("| target | second client (runs under, build) | edits acknowledged / sent | second client's edits | "
+                     "Forward frames | received by the target | received by the second client |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        for t in with_writeback:
+            wb = t["writeback"]
+            lines.append("| {} | {} | {} / {} | {} | {} | {} | {} |".format(
+                t["name"], t["client2"], wb["acked"], wb["sent"], wb["c2_sent"], wb["forwards"], wb["received"],
+                wb["c2_received"]))
+        lines.append("")
     lines.append("## Snapshots by category and encoding (largest tier, client side)")
     lines.append("")
     lines.append("`normal` is a 1024x768 viewport, `full` the whole scene. Bytes are means; times are p50 "
