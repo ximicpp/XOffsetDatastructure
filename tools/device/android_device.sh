@@ -392,7 +392,8 @@ thermal() {  # thermal() FILE: thermal status, battery and power state before a 
     {
         echo "utc $(utc)"
         "$ADB" shell dumpsys thermalservice 2>/dev/null | tr -d '\r' | grep -m1 'Thermal Status' | sed 's/^ *Thermal Status: */thermal_status /'
-        "$ADB" shell dumpsys battery 2>/dev/null | tr -d '\r' | grep -E '^ *(level|temperature|AC powered|USB powered|status):' | sed 's/^ *//; s/: / /; s/ /_/'
+        "$ADB" shell dumpsys battery 2>/dev/null | tr -d '\r' | grep -E '^ *(level|temperature|AC powered|USB powered|status):' \
+        | awk -F': ' '{ k = $1; sub(/^ */, "", k); gsub(/ /, "_", k); print "battery_" k, $2 }'
         "$ADB" shell settings get global low_power 2>/dev/null | tr -d '\r' | sed 's/^/low_power /'
     } > "$1"
 }
@@ -415,6 +416,10 @@ slg_phone() {
     [ -f "$W/fb/flatc_version.txt" ] && cp "$W/fb/flatc_version.txt" "$d/" && echo "$(sha "$W/fb/slg_generated.h")  slg_generated.h" > "$d/slg_generated.sha256"
     row slg passed "verify ok; $runs runs scale $scale x $cycles cycles$([ -f "$W/fb/flatc_version.txt" ] && echo ', with FlatBuffers') (slg/ANALYSIS.md); thermal status before runs: $(cat "$d"/info_*.txt | sed -n 's/^thermal_status //p' | tr '\n' ' ')"
 }
+va_line() {  # the --va summary, or how far it got when the process was aborted
+    if grep -q '^va_stop ' "$1"; then grep -E '^(va_buffers|va_reserved_gib|va_stop) ' "$1" | tr '\n' ' '
+    else echo "aborted after $(sed -n 's/^va_progress //p' "$1" | tail -1) reservations: $(grep -m1 -iE 'error|abort|signal' "$1")"; fi
+}
 mem_phone() {
     local d=$XO_OUT/mem e MP=$W/android/bin/Release/xo_mem_probe RUN=$W/src/tools/device/adb_run.sh limit
     limit=${XO_MEM_LIMIT:-$(awk '/^MemTotal:/ {print int($2 / 1024)}' "$XO_OUT/device.txt")}
@@ -433,8 +438,8 @@ mem_phone() {
         echo "# memory probe (Android)"; echo
         echo "- phone: $(sed -n 's/^model=//p' "$XO_OUT/device.txt"), $(sed -n 's/^android=//p' "$XO_OUT/device.txt"), $(grep '^MemTotal:' "$XO_OUT/device.txt"), page size $(sed -n 's/^page_size=//p' "$XO_OUT/device.txt")"
         echo "- single buffer: $(grep -E '^(single_max_capacity_mib|available_mib) ' "$d/single.txt" | tr '\n' ' ')"
-        echo "- 1 GiB reservations: $(grep -E '^(va_buffers|va_reserved_gib|va_stop) ' "$d/va_1024.txt" | tr '\n' ' ')"
-        echo "- 64 MiB reservations: $(grep -E '^(va_buffers|va_reserved_gib|va_stop) ' "$d/va_64.txt" | tr '\n' ' ')"
+        echo "- 1 GiB reservations: $(va_line "$d/va_1024.txt")"
+        echo "- 64 MiB reservations: $(va_line "$d/va_64.txt")"
         echo "- commit 64 MiB steps up to $limit MiB: rc $e (137 = killed by the system); last progress line: $(tail -1 "$d/commit_progress.txt" 2>/dev/null)"
         echo "- low memory killer lines: mem/lmkd.txt"
     } > "$d/SUMMARY.md"
