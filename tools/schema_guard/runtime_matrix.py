@@ -47,6 +47,10 @@ def main():
         item=targets.get(name)
         if item is None: return None,"BLOCKED_RUNTIME","No runtime binary configured"
         if not isinstance(item,dict): return None,"BLOCKED_CONFIG","Target configuration must be an object"
+        kind=item.get("runtime_kind", "native" if not name.startswith("windows-") else None)
+        valid=("windows", "wine") if name.startswith("windows-") else ("native",)
+        if kind not in valid: return None,"BLOCKED_CONFIG","runtime_kind must be one of: " + ", ".join(valid)
+        if name==refname and kind=="wine": return None,"BLOCKED_CONFIG","Wine cannot be the native reference"
         binary=item.get("binary"); runner=item.get("runner",[])
         if not isinstance(binary,str) or not isinstance(runner,list) or not all(isinstance(v,str) for v in runner):
             return None,"BLOCKED_CONFIG","Expected binary path and runner argv list"
@@ -58,7 +62,7 @@ def main():
         expected=f"XSG_RUNTIME_V1 {name} 64 le {fingerprint}"
         if rc!=0: return None,"FAIL_RUNTIME","Identity process failed; see identity log"
         if stdout.strip()!=expected: return None,"FAIL_IDENTITY","Target identity or source fingerprint mismatch"
-        return {"binary":str(binary),"runner":runner,"sha256":verify.sha(binary),"identity":stdout.strip()},None,None
+        return {"binary":str(binary),"runner":runner,"sha256":verify.sha(binary),"identity":stdout.strip(),"runtime_kind":kind},None,None
 
     ref,code,detail=identify(refname)
     if ref:
@@ -91,8 +95,10 @@ def main():
             (out/(name+".matrix.log")).write_text(stdout+stderr)
             result=out/name/"result.json"
             ok=rc==0 and exchange_ok(result, "PASS")
-            statuses[name]={"status":"PASS_WIRE" if ok else "FAIL_WIRE","identity":target,
-                            "detail":"bidirectional read and byte comparison" if ok else "wire exchange failed; see logs"}
+            compat=target["runtime_kind"]=="wine"
+            status=("PASS_WIRE_WINE" if compat else "PASS_WIRE") if ok else "FAIL_WIRE"
+            detail=("bidirectional read and byte comparison via Wine; native Windows unverified" if compat else "bidirectional read and byte comparison") if ok else "wire exchange failed; see logs"
+            statuses[name]={"status":status,"identity":target,"detail":detail}
     record["targets"]={name:statuses[name] for name in verify.TARGETS}
     success=all(x["status"]==("PASS_REFERENCE" if name==refname else "PASS_WIRE")
                 for name,x in record["targets"].items())
