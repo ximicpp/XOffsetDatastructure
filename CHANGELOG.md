@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## 3.2.0-rc.1: preview for device testing
+
+A preview of 3.2 for testing on real Android phones and iPhones; not a
+release, not announced. Against 3.1.0 it adds the client build path (C++20/C++23
+field lists, Android NDK, MSVC, clang-cl, MinGW, Apple clang), builds without
+exceptions, schema evolution with a handshake, and the end-to-end map demo
+(Linux servers with C++26 reflection, clients on Windows, Android, iOS, macOS).
+Wire format 2.1 is unchanged.
+
+Status at this tag: real devices are untested (the reason for this
+preview; `docs/DEVICE_TESTING.md` is the procedure). The Android emulator (API 35
+arm64, Mac M4) and the iOS Simulator (iOS 27.0, Xcode 27.1, 129/129) passed the
+full CTest, the wire corpus and the demo. No Mac checkpoint ran on this commit; the last Mac
+gate (GATE_D4, for #153) measured D÷FlatBuffers 0.908 (upper bound 0.918), and
+the mainline checkpoint against 3.1.0 is still due. The 7-night fuzz is no longer a 3.2 condition (susu
+2026-10-28); the nightly runs are paused. G9 stays at 17/19. The iOS device
+procedure (test host app, signing) follows in the next preview.
+
+- Client build path, field-list backend: with C++20 or C++23 (no reflection)
+  each record lists its fields once with `XOFFSET_RECORD`; the library walks
+  records through the schema interface (`xoffset_schema.hpp`) in both
+  backends, and the C++26 reflection build checks every field list against
+  the reflected type. Both builds write the same wire bytes. Toolchain files
+  and `tools/native_targets.sh` for Android arm64 (NDK r29/r30), Windows x64
+  MSVC 19.44, clang-cl 19 and MinGW GCC, and the iOS Simulator
+  (`docs/CLIENT_TARGETS.md`, user guide 2.1).
+- Schema evolution: `xoffset_handshake.hpp` (schema hello/ack with a
+  field-name digest, `peek_wire_fingerprint`), `xoffset_evolution.hpp`
+  (server side, C++26 reflection: per-peer receive and send of older schema
+  versions), the schema freeze tool and lineage (`docs/SCHEMA_EVOLUTION.md`).
+  Clients need only the handshake.
+- Verified reload of a dense small message is faster: `root<T>()` returns
+  the root admitted by the last make or verified load while its epoch is
+  current, and the reload skips checks of bytes it just wrote.
+- End-to-end map demo (`demo/mapstate`): Linux servers A/B (GCC 16, C++26
+  reflection) send dense, compact and zstd snapshots to clients built with
+  C++20 field lists, with and without exceptions; recorded runs for Windows
+  (MinGW, MSVC, clang-cl), Android emulator, iOS Simulator and macOS in
+  `demo/mapstate/RESULT.md`.
 - SC-8: builds without exceptions (`-fno-exceptions`, MSVC `/EHs-c-`) for
   engine clients. Non-throwing receive entries `try_load_verified`,
   `try_load_verified_with_resource`, `try_reload_verified`,
