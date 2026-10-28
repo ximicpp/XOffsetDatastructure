@@ -277,10 +277,15 @@ Result<std::size_t> send_some(Socket fd, const FrameHeader& h, std::string_view 
 
 } // namespace
 
+// A Hello lists at most four root types (32 B each) and a label of at most
+// 256 bytes, its ack one entry per root type: well under 1 KiB. The
+// library's own receive limit is XSCHEMA_HELLO_MAX_BYTES (64 KiB).
+constexpr std::uint32_t kHandshakeLimit = 4096;
+
 std::uint32_t max_payload(MsgType type) noexcept {
     switch (type) {
-    case MsgType::Hello: return 32;
-    case MsgType::HelloOk: return 0;
+    case MsgType::Hello: return kHandshakeLimit;
+    case MsgType::HelloAck: return kHandshakeLimit;
     case MsgType::Catalog: return static_cast<std::uint32_t>(kCapCatalog);
     case MsgType::ViewReq: return static_cast<std::uint32_t>(kCapViewRequest);
     case MsgType::ViewSnapshot: return static_cast<std::uint32_t>(kCapSnapshot);
@@ -298,7 +303,7 @@ std::uint32_t max_payload(MsgType type) noexcept {
 const char* type_name(MsgType type) noexcept {
     switch (type) {
     case MsgType::Hello: return "Hello";
-    case MsgType::HelloOk: return "HelloOk";
+    case MsgType::HelloAck: return "HelloAck";
     case MsgType::Catalog: return "Catalog";
     case MsgType::ViewReq: return "ViewReq";
     case MsgType::ViewSnapshot: return "ViewSnapshot";
@@ -694,25 +699,7 @@ Result<int> try_poll(PollItem* items, std::size_t count, int timeout_ms) {
     return rc;
 }
 
-// ---- handshake and clock ------------------------------------------------------
-
-namespace {
-constexpr std::uint64_t kHelloHashes[4] = {
-    wire_schema_hash_v<MapCatalog>(),
-    wire_schema_hash_v<UnitStateBatch>(),
-    wire_schema_hash_v<ViewRequest>(),
-    wire_schema_hash_v<ViewSnapshot>(),
-};
-static_assert(sizeof kHelloHashes == 32);
-} // namespace
-
-std::string hello_payload() {
-    return std::string(reinterpret_cast<const char*>(kHelloHashes), sizeof kHelloHashes);
-}
-
-bool hello_matches(std::string_view payload) {
-    return payload.size() == sizeof kHelloHashes && std::memcmp(payload.data(), kHelloHashes, sizeof kHelloHashes) == 0;
-}
+// ---- clock ----------------------------------------------------------------------
 
 std::uint64_t now_ns() noexcept {
     return static_cast<std::uint64_t>(

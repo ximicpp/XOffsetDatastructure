@@ -41,25 +41,6 @@ std::string unit_tag(std::size_t index, std::uint32_t id) {
 
 Result fail(std::string detail) { return Result{false, std::move(detail)}; }
 
-// FNV-1a 64.
-struct Fnv {
-    std::uint64_t h = 0xcbf29ce484222325ull;
-    void bytes(const void* p, std::size_t n) noexcept {
-        const auto* b = static_cast<const unsigned char*>(p);
-        for (std::size_t i = 0; i < n; ++i) {
-            h ^= b[i];
-            h *= 0x100000001b3ull;
-        }
-    }
-    template <class T>
-    void le(T v) noexcept {   // integers, little endian
-        unsigned char b[sizeof(T)];
-        for (std::size_t i = 0; i < sizeof(T); ++i) b[i] = static_cast<unsigned char>(std::uint64_t(v) >> (8 * i));
-        bytes(b, sizeof b);
-    }
-    void f(float v) noexcept { le(bits(v)); }
-};
-
 } // namespace
 
 Result batch_invariants(const UnitStateBatch& batch, std::uint32_t expected_units, std::uint64_t expected_tick) {
@@ -161,11 +142,21 @@ Result compare_snapshot(const ViewSnapshot& snapshot, const ViewRequest& request
     if (snapshot.tick != ref.tick)
         return fail("snapshot tick " + std::to_string(snapshot.tick) + ", reference " + std::to_string(ref.tick));
 
-    std::size_t expected = 0;
-    for (const stdm::UnitState& r : ref.units)
-        if (r.scene_id == request.scene_id && rules::contains(request.rect, r.pos)) ++expected;
+    std::size_t expected = 0, in_scene = 0;
+    for (const stdm::UnitState& r : ref.units) {
+        if (r.scene_id != request.scene_id) continue;
+        ++in_scene;
+        if (rules::contains(request.rect, r.pos)) ++expected;
+    }
     if (snapshot.units.size() != expected)
         return fail("visible " + std::to_string(snapshot.units.size()) + ", reference " + std::to_string(expected));
+#if MAPDEMO_SCHEMA_VERSION >= 2
+    if (snapshot.scene_units != in_scene)
+        return fail("scene_units " + std::to_string(snapshot.scene_units) + ", reference " + std::to_string(in_scene));
+    if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0) + ", expected 0");
+#else
+    (void)in_scene;
+#endif
 
     std::vector<bool> seen(ref.units.size(), false);
     for (std::size_t i = 0; i < snapshot.units.size(); ++i) {
@@ -190,6 +181,12 @@ Result snapshot_sanity(const ViewSnapshot& snapshot, std::uint64_t request_id, c
     if (snapshot.request_id != request_id)
         return fail("request_id " + std::to_string(snapshot.request_id) + ", expected " + std::to_string(request_id));
     if (!same(snapshot.rect, requested)) return fail("rect not echoed");
+#if MAPDEMO_SCHEMA_VERSION >= 2
+    if (snapshot.units.size() > snapshot.scene_units)
+        return fail("visible " + std::to_string(snapshot.units.size()) + " > scene_units " +
+                    std::to_string(snapshot.scene_units));
+    if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0) + ", expected 0");
+#endif
     std::vector<std::uint32_t> ids;
     ids.reserve(snapshot.units.size());
     for (std::size_t i = 0; i < snapshot.units.size(); ++i) {
@@ -206,29 +203,7 @@ Result snapshot_sanity(const ViewSnapshot& snapshot, std::uint64_t request_id, c
     return Result{};
 }
 
-std::uint64_t snapshot_digest(const ViewSnapshot& snapshot) {
-    Fnv d;
-    d.le(snapshot.request_id);
-    d.le(snapshot.tick);
-    d.le(snapshot.scene_id);
-    d.f(snapshot.rect.min.x);
-    d.f(snapshot.rect.min.y);
-    d.f(snapshot.rect.max.x);
-    d.f(snapshot.rect.max.y);
-    d.le(std::uint64_t(snapshot.units.size()));
-    for (std::size_t i = 0; i < snapshot.units.size(); ++i) {
-        const VisibleUnit& v = snapshot.units[i];
-        d.le(v.id);
-        d.le(std::uint32_t(v.hp));
-        d.f(v.pos.x);
-        d.f(v.pos.y);
-        d.le(std::uint32_t(v.behavior));
-        const std::string_view name = v.name.view();
-        d.le(std::uint32_t(name.size()));
-        d.bytes(name.data(), name.size());
-    }
-    return d.h;
-}
+std::uint64_t snapshot_digest(const ViewSnapshot& snapshot) { return snapshot_digest_of(snapshot); }
 
 std::uint64_t wire_digest(std::string_view bytes) noexcept {
     // Little endian is enforced by the library, so word reads mean the same

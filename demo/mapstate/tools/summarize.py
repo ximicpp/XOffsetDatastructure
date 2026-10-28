@@ -7,17 +7,21 @@ from older runs is read too) and writes one Markdown report plus a JSON
 summary. Exit 0 only when every verdict passes.
 
 Verdicts per tier:
-  * a, b and client exited 0;
+  * a, b and client exited 0 (and client2, the second client of a run with
+    MAPDEMO_CLIENT2, e.g. the old-version client at the same time);
   * every metric name of INTERFACES.md section 6 recorded (headless: no draw;
     --buffers reuse: no per-message destroy);
   * a_steps.csv has at least --min-steps rows, ticks consecutive, check_ok all 1,
     and a request and result wire digest on every row;
-  * a_checks.csv and client_checks.csv exist, non-empty, every row "pass";
-    a_checks.csv has the six fixed row names;
-  * every snapshot request id logged by A was logged by the client and vice
+  * a_checks.csv and client_checks.csv (and client2/client_checks.csv)
+    exist, non-empty, every row "pass"; a_checks.csv has the seven fixed
+    row names;
+  * every snapshot request id logged by A was logged by a client and vice
     versa, with equal tick, category, visible, wire_bytes and digest, and
     (rows carrying them) equal encoding, net_bytes and wire_digest: the
     client verified the very bytes A wrote, in the encoding it asked for;
+  * A sent every client snapshots of the schema version it was built with
+    (a_snapshots.csv schema column against the client's client_build.txt);
   * a client run with --encoding cycle received every encoding;
   * normal, full and empty categories each sampled on both sides; every
     empty snapshot has visible == 0; every full-scene snapshot has
@@ -29,8 +33,12 @@ as the tier of the same unit count in OTHER_ROOT (another compiler,
 platform or build), over at least --min-steps common ticks.
 Self-test: exit 0 and every selftest_checks.csv row "pass" (--no-selftest:
 not run for these binaries).
-Evil (each mode): a, b, client exited 0, A logged at least 6 "rejected:"
-lines and every row of the evil client's client_checks.csv passes.
+Evil (each mode): a, b, client exited 0, A logged at least 12 "rejected:"
+lines (one per evil case A refuses: 6 requests, 3 subscriptions, 3
+handshakes) and every row of the evil client's
+client_checks.csv passes.
+Schema lock (schema_check/, run_all_tiers.sh): mapdemo_schema_freeze check
+exited 0, so no root type changed without a lineage entry.
 Client offline runs (run_e2e.sh), when present: selfcheck/ (client
 --self-check) and replay/ (client --replay of a corpus) exited 0 with every
 client_checks.csv row "pass".
@@ -74,6 +82,7 @@ VIEW_METRICS = (
     ("a.snap_bytes", "snapshot wire (A)"),
     ("a.snap_net_bytes", "snapshot frame payload (A; zstd: compressed)"),
     ("a.snap_compress_us", "A snapshot zstd compress"),
+    ("a.snap_convert_us", "A snapshot conversion to version 1 (old-version clients only)"),
     ("a.visible_count", "visible units (A)"),
     ("c.view_rtt_us", "client view round trip (ViewReq sent -> snapshot complete)"),
     ("c.load_us", "client verify snapshot (load / reload)"),
@@ -88,15 +97,16 @@ VIEW_METRICS = (
     ("c.catalog_load_us", "client catalog load_verified (once)"),
 )
 
-# Row names server A writes to a_checks.csv (INTERFACES.md, 85ac689).
+# Row names server A writes to a_checks.csv (INTERFACES.md section 6).
 A_CHECK_NAMES = ("batch_roundtrip", "reference_model", "modification_coverage",
-                 "view_snapshot", "snapshot_paths", "rejected_requests")
+                 "view_snapshot", "snapshot_paths", "rejected_requests", "schema_versions")
 
 # INTERFACES.md section 6; the headless client has no draw / present, and
 # with --buffers reuse nothing is destroyed per message.
 HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
-# Recorded only when a snapshot was zstd-compressed; checked per encoding.
-ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us")
+# Recorded only when a snapshot was zstd-compressed (checked per encoding),
+# or converted for a version-1 client (checked per client).
+ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us", "a.snap_convert_us")
 ENCODINGS = ("dense", "compact", "zstd")
 EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
 DESTROY_METRICS = ("a.destroy_us", "b.destroy_us", "a.snap_destroy_us", "c.destroy_us")
@@ -230,6 +240,18 @@ def exit_code_verdicts(v, scope, codes, names):
         v.add(scope, n + " exit 0", codes.get(n) == "0", "exit " + codes.get(n, "missing"))
 
 
+def build_words(path):
+    """client_build.txt: key=value words -> dict (empty when missing)."""
+    out = {}
+    if os.path.isfile(path):
+        with open(path) as f:
+            for word in f.read().split():
+                if "=" in word:
+                    k, v = word.split("=", 1)
+                    out[k] = v
+    return out
+
+
 def client_events_mode(meta):
     """The client's --events mode from meta.txt, or None when it did not subscribe."""
     words = meta.get("client_args", "").split()
@@ -313,7 +335,8 @@ def summarize_tier(root, name, min_steps):
     codes = read_kv(os.path.join(d, "exit_codes.txt"))
     units = int(meta.get("units", tier_key(name)[0]))
     mode = meta.get("buffers", "fresh")
-    exit_code_verdicts(v, scope, codes, ("a", "b", "client"))
+    second = "client2" in codes
+    exit_code_verdicts(v, scope, codes, ("a", "b", "client") + (("client2",) if second else ()))
 
     steps = read_csv(os.path.join(d, "a_steps.csv"))
     tick_info = {}
@@ -346,13 +369,23 @@ def summarize_tier(root, name, min_steps):
         v.add(scope, "a_checks has every fixed row", not absent,
               "missing: " + ", ".join(absent) if absent else ", ".join(A_CHECK_NAMES))
     check_rows(v, scope, "client_checks", c_checks)
+    c2_checks = None
+    if second:
+        c2_checks = read_csv(os.path.join(d, "client2", "client_checks.csv"))
+        check_rows(v, scope, "client2 client_checks", c2_checks)
 
     a_snap = read_csv(os.path.join(d, "a_snapshots.csv")) or []
     c_snap = read_csv(os.path.join(d, "client_snapshots.csv")) or []
+    # (name, directory, meta args key, snapshot rows) of every client.
+    clients = [("client", d, "client_args", c_snap)]
+    if second:
+        clients.append(("client2", os.path.join(d, "client2"), "client2_args",
+                        read_csv(os.path.join(d, "client2", "client_snapshots.csv")) or []))
+    c_all = [r for c in clients for r in c[3]]
     a_by = {r["request_id"]: r for r in a_snap}
-    c_by = {r["request_id"]: r for r in c_snap}
+    c_by = {r["request_id"]: r for r in c_all}
     dup_a = len(a_snap) - len(a_by)
-    dup_c = len(c_snap) - len(c_by)
+    dup_c = len(c_all) - len(c_by)
     matched = mismatched = 0
     mismatch_examples = []
     for rid, ar in a_by.items():
@@ -371,7 +404,7 @@ def summarize_tier(root, name, min_steps):
             matched += 1
     a_only = len(set(a_by) - set(c_by))
     c_only = len(set(c_by) - set(a_by))
-    digest = {"a_rows": len(a_snap), "client_rows": len(c_snap), "matched": matched,
+    digest = {"a_rows": len(a_snap), "client_rows": len(c_all), "matched": matched,
               "mismatched": mismatched, "a_only": a_only, "client_only": c_only,
               "dup_a": dup_a, "dup_client": dup_c}
     v.add(scope, "A and client snapshot logs agree (digest per request id)",
@@ -380,10 +413,31 @@ def summarize_tier(root, name, min_steps):
           "matched {} mismatched {} A-only {} client-only {} dup A/C {}/{}{}".format(
               matched, mismatched, a_only, c_only, dup_a, dup_c,
               ("; " + "; ".join(mismatch_examples)) if mismatch_examples else ""))
-    for side, rows in (("A", a_snap), ("client", c_snap)):
+    for side, rows in [("A", a_snap)] + [(c[0], c[3]) for c in clients]:
         bad = sum(1 for r in rows if r.get("check_ok") != "1")
         v.add(scope, side + " snapshot check_ok all 1", rows and bad == 0,
               "{} rows, {} with check_ok != 1".format(len(rows), bad))
+
+    # Each client got snapshots of its own schema version (A converts for
+    # an older client after the handshake).
+    schema_clients = []
+    if a_snap and "schema" in a_snap[0]:
+        wrong = []
+        for cname, cdir, _, rows in clients:
+            want = build_words(os.path.join(cdir, "client_build.txt")).get("schema_version", "")
+            got = [a_by[r["request_id"]].get("schema") for r in rows if r["request_id"] in a_by]
+            bad = sum(1 for g in got if g != want)
+            converted = [num(a_by[r["request_id"]].get("convert_us")) for r in rows
+                         if r["request_id"] in a_by and a_by[r["request_id"]].get("convert_us")]
+            schema_clients.append({"client": cname, "schema_version": want or "-", "rows": len(got),
+                                   "wrong": bad, "a.convert_us": stats(converted)})
+            if bad or not want:
+                wrong.append(cname)
+        v.add(scope, "A sent each client its schema version", not wrong and all(c["rows"] for c in schema_clients),
+              "; ".join("{} v{}: {} rows, {} other version{}".format(
+                  c["client"], c["schema_version"], c["rows"], c["wrong"],
+                  ", {} converted".format(c["a.convert_us"]["count"]) if c["a.convert_us"]["count"] else "")
+                  for c in schema_clients))
 
     per_enc = {}
     for enc in ENCODINGS:
@@ -403,6 +457,11 @@ def summarize_tier(root, name, min_steps):
         missing_enc = [e for e in ENCODINGS if not per_enc[e]["a_count"] or not per_enc[e]["client_count"]]
         v.add(scope, "every encoding sampled (--encoding cycle)", not missing_enc,
               ", ".join("{} {}/{}".format(e, per_enc[e]["a_count"], per_enc[e]["client_count"]) for e in ENCODINGS))
+    for cname, _, args_key, rows in clients[1:]:
+        if "--encoding cycle" in meta.get(args_key, ""):
+            counts = {e: sum(1 for r in rows if r.get("encoding") == e) for e in ENCODINGS}
+            v.add(scope, "{}: every encoding sampled (--encoding cycle)".format(cname), all(counts.values()),
+                  ", ".join("{} {}".format(e, counts[e]) for e in ENCODINGS))
 
     events = summarize_events(v, scope, d, meta)
 
@@ -429,11 +488,11 @@ def summarize_tier(root, name, min_steps):
         }
         v.add(scope, "category {} sampled".format(cat), len(ar) > 0 and len(cr) > 0,
               "A {} client {}".format(len(ar), len(cr)))
-    empty_nonzero = [r for r in a_snap + c_snap
+    empty_nonzero = [r for r in a_snap + c_all
                      if r.get("category") == "empty" and r.get("visible") != "0"]
     v.add(scope, "empty snapshots have 0 units", not empty_nonzero,
           "{} empty rows with visible != 0".format(len(empty_nonzero)))
-    full_wrong = [r for r in a_snap + c_snap
+    full_wrong = [r for r in a_snap + c_all
                   if r.get("category") == "full" and num(r.get("visible")) != units]
     v.add(scope, "full-scene snapshots have every unit", not full_wrong,
           "{} full rows with visible != {}".format(len(full_wrong), units))
@@ -458,7 +517,8 @@ def summarize_tier(root, name, min_steps):
                         ("req_bytes", "res_bytes", "ab_rtt_us", "save_us", "load_us",
                          "destroy_us", "free_blocks", "free_bytes")},
         "metrics": metrics,
-        "checks": {"a": a_checks or [], "client": c_checks or []},
+        "checks": {"a": a_checks or [], "client": c_checks or [], "client2": c2_checks or []},
+        "schema_clients": schema_clients,
         "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "events": events, "verdicts": v,
     }
 
@@ -499,6 +559,13 @@ def render_tier(lines, t):
         ti.get("steps", "-"), ti.get("first_tick", "-"), ti.get("last_tick", "-"),
         fmt(num(tps.get("mean"))) if tps else "missing"))
     lines.append("- exit codes: " + ", ".join("{}={}".format(k, v) for k, v in t["exit_codes"].items()))
+    if len(t.get("schema_clients") or []) > 1 or any(c["a.convert_us"]["count"] for c in t.get("schema_clients") or []):
+        lines.append("- clients at the same time: " + "; ".join(
+            "{} schema version {}, {} snapshots{}".format(
+                c["client"], c["schema_version"], c["rows"],
+                " (A converted each: mean / p95 {} us)".format(mean_p95(c["a.convert_us"]))
+                if c["a.convert_us"]["count"] else "")
+            for c in t["schema_clients"]))
     lines.append("- load average before / after: {} / {}".format(
         t["meta"].get("load_before", "-"), t["meta"].get("load_after", "-")))
     lines.append("")
@@ -711,6 +778,9 @@ def main():
         exit_code_verdicts(overall, "selftest", st_codes, ("selftest",))
         st_rows = read_csv(os.path.join(root, "selftest", "selftest_checks.csv"))
         check_rows(overall, "selftest", "selftest_checks", st_rows)
+        if os.path.isdir(os.path.join(root, "schema_check")):
+            exit_code_verdicts(overall, "schema lock", read_kv(os.path.join(root, "schema_check", "exit_codes.txt")),
+                               ("schema_check",))
 
     for offline in ("selfcheck", "replay"):
         d = os.path.join(root, offline)
@@ -728,7 +798,7 @@ def main():
             ev = read_kv(os.path.join(root, n, "exit_codes.txt"))
             exit_code_verdicts(overall, n, ev, ("a", "b", "client"))
             rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
-            overall.add(n, "A logged >= 6 rejected requests", rej >= 6, "{} line(s)".format(rej))
+            overall.add(n, "A logged >= 12 rejected inputs", rej >= 12, "{} line(s)".format(rej))
             check_rows(overall, n, "evil client_checks",
                        read_csv(os.path.join(root, n, "client_checks.csv")))
 

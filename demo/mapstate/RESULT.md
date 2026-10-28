@@ -33,6 +33,7 @@ it. Both run the same validator and send the same bytes.
 | Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
 | End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
 | Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
+| Old-version client (10-28) | cloud, branch `claude/mapdemo-old-client-20261028` on next_cpp26 964b2bc: A/B GCC 16 C++26 on schema version 2; `mapdemo_client_v1` (frozen version 1) on the six client builds, each tier with the same build's version-2 client on the same A at the same time; the 12 version-2 targets again with a new corpus; ASan+UBSan of both clients in both buffer modes | PASS: old client self-check 48 / 48, replay of the `full1` corpus 60 / 60, three tiers with both clients passing, evil (renamed fields refused with `reject_names`); version-2 targets 12 / 12; step wires equal to `full1` at 500 / 500 ticks everywhere; sanitizers 178 / 178, no report (section 7). macOS, Android emulator and iOS Simulator not rerun |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -393,7 +394,61 @@ Output in the project folder `small-msg-dict-20261028/`
 were trained and measured on, `slg-d/` for the SLG measurements; sha256 in
 `SHA256SUMS`).
 
-## 7. Scope
+## 7. Two schema versions on one A: the old-version client (10-28)
+
+3.2 plan M2 item 7 (SC-3, SC-13): a client that has not been updated keeps
+working after the servers' schema changed, next to updated clients.
+Version 1 is the schema as merged with the event stream (#166), frozen by
+`mapdemo_schema_freeze` into `include/mapdemo/schema_v1.hpp` and
+`schema.lock` (#163 added the field lists a C++20 client needs to compile the
+snapshot). Freezing again on next_cpp26 964b2bc gives both files byte for
+byte. Version 2 adds `scene_units` and `reserved0` to `ViewSnapshot` (48 to
+56 bytes; every snapshot wire grows by 8 bytes); the other four roots, the
+step wires and the event stream are unchanged. `mapdemo_client_v1` is the
+same client sources compiled against the frozen types.
+
+The client's Hello (the library handshake, `xoffset_handshake.hpp`) lists
+its root types. For a version-1 `ViewSnapshot` A answers `convert`, since
+version 1 is in its `XOFFSET_SCHEMA_LINEAGE`. A then builds the version-2
+snapshot as always, converts it into a version-1 buffer and saves that one
+in the encoding asked for. The client does no conversion and needs no
+change. With `--check` A loads every converted wire back as version 1 and
+compares its digest with that of the version-2 snapshot.
+
+| Run (cloud, A/B GCC 16 C++26) | Targets | Result |
+| --- | --- | --- |
+| `v1c` old-version clients | Linux GCC 16 C++26 and GCC 13 C++20, MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; in every tier the same build's version-2 client runs on the same A at the same time | PASS on all six: self-check 48 / 48; replay 60 / 60 of the `full1` corpus, which A wrote on 10-27 before version 2 existed (the version-2 client refuses it: "schema hash mismatch"); three tiers x 500 steps, 90 or 93 verdicts each, both clients passing and A sending each its own version (250 snapshots per client and tier); evil; step wires equal to `full1` at 500 / 500 ticks |
+| `v2c` version-2 clients | the 12 targets of `noexc3` (six builds with and without exceptions), a new corpus | PASS on all 12: self-check 48 / 48, replay 60 / 60, tiers and evil (78 or 81 verdicts), step wires equal to `full1`, the same self-check and evil outcomes and texts everywhere |
+| `asan_old2` | GCC 16 Debug ASan+UBSan: old-version client with the version-2 client, both buffer modes, evil, self-test, schema lock check | PASS: 178 / 178 verdicts, no sanitizer report |
+
+Refusals: in the evil run a Hello whose `ViewSnapshot` has the version-1
+layout with `hp` renamed to `health` gets a `HelloAck` with `reject_names`
+and a close; one with a field A does not know gets `reject_unknown` and a
+close; a Hello that is no XOffset wire gets `Error`. A logs 12 `rejected:`
+lines (six requests, three subscriptions, three handshakes), on every
+target, old and new. `run_all_tiers.sh` also runs `mapdemo_schema_freeze
+check`: it passes, reporting `ViewSnapshot` as the next version after v1
+and the other four roots equal to v1.
+
+Cost on A (GCC 16, 10000-unit tier, p50, `reuse`): converting a viewport
+snapshot (about 480 units) takes 9.4 us next to 11.7 us to build it; a full
+scene of 10000 units takes 168 us next to 165 us; the empty request right
+after a full scene takes 39 us (its buffer just held 10000 units). In
+`reuse` A converts with `evolve_into` into one kept buffer. The first
+version used `evolve<>`, which makes a new buffer per snapshot: about 55 us
+per snapshot whatever its size (`fresh` still does that; 40 us p50 in a
+200-step 10000-unit check). A version-1 snapshot is 8 bytes shorter
+(viewport 15,168 against 15,176 bytes dense; full scene 321,155 against
+321,163).
+
+Not rerun for this iteration: macOS, Android emulator and iOS Simulator; a
+Mac batch can add the old-version client. Output in the project folder
+`mapdemo-old-client-20261028/`: `mapdemo_old_client_v1.tgz` (`v1c`),
+`mapdemo_old_client_v2.tgz` (`v2c`, with its corpus),
+`mapdemo_old_client_asan.tgz`, `E2E_RESULT_old_client.md`,
+`E2E_RESULT_v2_clients.md`, `RESULT_TABLES_asan.md`; sha256 in `SHA256SUMS`.
+
+## 8. Scope
 
 One arena per batch, per snapshot and for the catalog (kept and refilled in
 `reuse`, new per message in `fresh`); zstd is a transport encoding, the
