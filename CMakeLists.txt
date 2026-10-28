@@ -46,6 +46,13 @@ if(MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     endforeach()
     add_compile_definitions("$<$<AND:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,$<NOT:$<BOOL:$<TARGET_PROPERTY:XOFFSET_TEST_ASSERTIONS>>>>:NDEBUG>")
 endif()
+# MSVC reads sources in the system code page unless told otherwise; the tests
+# and tools are UTF-8 (a non-ASCII literal broke the build on code page 936,
+# 3.2.0-rc.1 on Windows). Project-local: the public headers are ASCII and the
+# exported interface does not impose a source charset on consumers.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
 include(cmake/XOffsetBuildChecks.cmake)
 include(cmake/XOffsetTestInventory.cmake)
 find_package(Threads REQUIRED)

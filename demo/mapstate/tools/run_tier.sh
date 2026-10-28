@@ -94,9 +94,12 @@ wait_for() {
     echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "host=$(uname -srm)"
     echo "load_before=$(uptime | sed 's/.*load average[s]*: //')"
-    if command -v git >/dev/null 2>&1; then
-        echo "commit=$(git -C "$(dirname "$0")" rev-parse HEAD 2>/dev/null || echo unknown)"
-    fi
+    # An exported tree (tools/device/android_device.sh copies the source without
+    # .git) records its commit in .xo-commit at the root.
+    commit=$(git -C "$(dirname "$0")" rev-parse HEAD 2>/dev/null) \
+        || commit=$(tr -d ' \r\n' < "$(dirname "$0")/../../../.xo-commit" 2>/dev/null) \
+        || commit=unknown
+    echo "commit=${commit:-unknown}"
 } > "$OUT/meta.txt"
 
 "$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --buffers "$BUFFERS" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &

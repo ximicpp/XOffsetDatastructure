@@ -171,7 +171,11 @@ def target_summary(out_root, name, corpus_rows):
     if s is None:
         t["problems"].append("tiers: no summary.json")
     elif not t["tiers_ok"]:
-        t["problems"].append("tiers: {} of {} verdicts failed".format(t["verdicts_failed"], t["verdicts"]))
+        # summary.json holds every scope's verdicts (selftest, selfcheck,
+        # replay, tiers, evil, compare); name the ones that failed.
+        scopes = sorted({v.get("scope", "?") for v in verdicts if not v.get("ok")})
+        t["problems"].append("verdicts: {} of {} failed (scope {})".format(
+            t["verdicts_failed"], t["verdicts"], ", ".join(scopes) or "-"))
 
     # Snapshot sizes and client costs by category and encoding, largest
     # tier: within one category the encodings carry comparable content.
