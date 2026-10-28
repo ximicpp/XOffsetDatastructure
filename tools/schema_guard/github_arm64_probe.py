@@ -71,7 +71,10 @@ def main():
         for name in names:
             (ref / name).write_bytes(z.read(name))
     identity = run([str(binary), "--xsg-identify"]).strip()
-    expected = "XSG_RUNTIME_V1 windows-arm64 64 le " + data["fingerprint"]
+    compile_id=data.get("compile_id")
+    if not isinstance(compile_id,str) or not re.fullmatch(r"[0-9a-f]{64}",compile_id):
+        raise ValueError("refresh inputs with a V2 fixture and compile_id")
+    expected = "XSG_RUNTIME_V2 windows-arm64 64 le " + data["fingerprint"] + " windows " + compile_id
     if identity != expected:
         raise ValueError("target identity mismatch")
     read_log = run([str(binary), "--read", str(ref)])

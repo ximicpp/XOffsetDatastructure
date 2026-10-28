@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import build_evidence
 
 MAX_PAYLOAD = 4 * 1024 * 1024
 
@@ -78,8 +79,12 @@ def execute(request, binaries, adapter, adb, serial, work):
         if digest(binary) != binary_hash:
             raise ValueError("worker fixture changed after startup")
         operation = request.get("operation")
-        if operation not in ("--xsg-identify", "--read", "--write"):
+        if operation not in ("--xsg-identify", "--xsg-check-build", "--read", "--write"):
             raise ValueError("invalid operation")
+        if operation=="--xsg-check-build":
+            if kind!="native": raise ValueError("build check requires native fixture")
+            response.update(exit_code=0,stdout=build_evidence.check_link_inputs(str(binary)+".manifest.json",binary)+"\n")
+            return response
         corpus = work / "corpus"
         if operation == "--read":
             unpack(request.get("files"), corpus)
@@ -137,7 +142,6 @@ def main():
                 for name in sorted(pending):
                     if name in seen:
                         continue
-                    seen.add(name)
                     ident = name[:32]
                     with tempfile.TemporaryDirectory(prefix=ident + "-", dir=root) as directory:
                         work = Path(directory)
@@ -161,6 +165,7 @@ def main():
                         result = work / (ident + ".response.json")
                         result.write_bytes(raw)
                         transfer(a.nodecli, "local", result, a.mac_node, a.queue + "/" + result.name)
+                        seen.add(name)
                         print("Request", ident, request["operation"], response["exit_code"], flush=True)
             except (RuntimeError, OSError) as exc:
                 print("Worker polling error:", exc, file=sys.stderr, flush=True)

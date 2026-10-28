@@ -108,12 +108,35 @@ static_assert(xsg_semantic_count > 0, "schema guard semantic catalog must not be
 XSG_RECORD_FIELDS(XSG_CHECK_FIELDS)
 #undef XSG_CHECK_FIELDS
 
-// Every declared root must have a field-name list. Nested record completeness
-// remains the caller's responsibility and is explicitly reported.
+// Traverse container element/key/value types, arrays and every reflected record.
 template<class T> struct xsg_fields_covered : std::false_type {};
 #define XSG_DECLARE_FIELDS(T, NAMES) template<> struct xsg_fields_covered<T> : std::true_type {};
 XSG_RECORD_FIELDS(XSG_DECLARE_FIELDS)
 #undef XSG_DECLARE_FIELDS
-#define XSG_CHECK_ROOT_FIELDS(T, PIN, TYPE_PIN) static_assert(xsg_fields_covered<T>::value, "schema root field list missing");
-XSG_SCHEMA_ROOTS(XSG_CHECK_ROOT_FIELDS)
-#undef XSG_CHECK_ROOT_FIELDS
+template<class T> consteval bool xsg_complete_fields();
+template<class T, std::size_t I> consteval bool xsg_one_member_fields() {
+    using namespace std::meta;
+    constexpr auto member=nonstatic_data_members_of(^^T, access_context::unchecked())[I];
+    using M=[:type_of(member):];
+    return xsg_complete_fields<M>();
+}
+template<class T, std::size_t... I>
+consteval bool xsg_member_fields(std::index_sequence<I...>) {
+    return (xsg_one_member_fields<T,I>() && ...);
+}
+template<class T> consteval bool xsg_complete_fields() {
+    using U=std::remove_cv_t<T>;
+    namespace d=::XOffsetDatastructure::detail;
+    if constexpr (std::is_arithmetic_v<U> || std::is_enum_v<U> || std::is_same_v<U,std::byte> || d::is_fixed_string_v<U>) return true;
+    else if constexpr (std::is_array_v<U>) return xsg_complete_fields<std::remove_extent_t<U>>();
+    else if constexpr (d::is_fixed_flat_map_v<U>) return xsg_complete_fields<typename U::key_type>() && xsg_complete_fields<typename U::mapped_type>();
+    else if constexpr (d::is_fixed_flat_set_v<U> || d::is_fixed_vector_v<U>) return xsg_complete_fields<typename U::value_type>();
+    else if constexpr (requires { typename U::value_type; std::tuple_size<U>::value; }) return xsg_complete_fields<typename U::value_type>();
+    else {
+        static_assert(xsg_fields_covered<U>::value, "schema reachable record field list missing");
+        return xsg_member_fields<U>(std::make_index_sequence<d::reflected_member_count<U>()>{});
+    }
+}
+#define XSG_CHECK_ALL_FIELDS(T, PIN, TYPE_PIN) static_assert(xsg_complete_fields<T>());
+XSG_SCHEMA_ROOTS(XSG_CHECK_ALL_FIELDS)
+#undef XSG_CHECK_ALL_FIELDS

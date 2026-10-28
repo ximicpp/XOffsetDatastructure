@@ -45,10 +45,10 @@ def main():
     parser.add_argument("--queue", required=True, help="private Mac directory shared with worker")
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("binary")
-    parser.add_argument("operation", choices=["--xsg-identify", "--write", "--read"])
+    parser.add_argument("operation", choices=["--xsg-identify", "--xsg-check-build", "--write", "--read"])
     parser.add_argument("directory", nargs="?")
     a = parser.parse_args()
-    if a.operation != "--xsg-identify" and not a.directory:
+    if a.operation in ("--write", "--read") and not a.directory:
         parser.error("wire directory required")
     queue = Path(a.queue)
     if not queue.is_dir() or queue.is_symlink() or (queue.stat().st_mode & 0o077):

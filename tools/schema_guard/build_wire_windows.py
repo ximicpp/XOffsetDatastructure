@@ -7,6 +7,7 @@ import subprocess
 import sys
 import verify
 import wire_inputs
+import build_evidence
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -32,6 +33,10 @@ def main():
             cmd += ["-I", str(inc)]
         cmd += ["-S", "-emit-llvm", str(ROOT / "tools/schema_guard/wire_runtime.cpp"), "-o", str(ir)]
         stages = [cmd, ["xcrun", "clang++", "--target=" + triple, "-O1", "-c", str(ir), "-o", str(obj)]]
+        backend=subprocess.check_output(["xcrun","-f","clang++"],text=True).strip()
+        evidence=build_evidence.prepare(name,fingerprint,stages,
+            [*build_evidence.tool_inputs(cfg["compiler"]),Path(backend),*build_evidence.flag_inputs(cfg.get("flags",[]))])
+        stages[0].insert(1,'-DXSG_BUILD_ID="'+evidence["build_id"]+'"')
         log = []
         for stage in stages:
             try:
@@ -43,6 +48,7 @@ def main():
                 log.append({"command": stage, "exit_code": None, "stderr": str(exc)})
                 break
         passed = len(log) == len(stages) and log[-1]["exit_code"] == 0 and obj.is_file()
+        if passed: build_evidence.finish(evidence,obj,out/(name+".object.manifest.json"))
         result[name] = {"status": "PASS_BUILD" if passed else "FAIL_BUILD", "stages": log}
         print(name, result[name]["status"], flush=True)
     (out / "inputs.json").write_text(json.dumps({"fingerprint": fingerprint, "inputs": inputs}, indent=2) + "\n")

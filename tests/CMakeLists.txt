@@ -93,6 +93,7 @@ set(REFLECTION_TESTS
     test_allocator_failures
     test_v2_golden
     test_cross_compiler_wire
+    test_schema_guard_slg_values
     test_schema_pin
     test_stability_contract
     test_wire_hole_zeroing

@@ -53,6 +53,15 @@ class CompileGateTests(unittest.TestCase):
         p, r = self.gate("root_fields_bad", changed)
         self.assertNotEqual(p.returncode, 0)
         self.assertEqual(r["targets"]["macos-arm64"]["status"], "FAIL_SEMANTIC")
+    def test_nested_record_field_list_required(self):
+        changed=self.catalog.replace('    X(pin::Inner, "id|active|name")', '')
+        # Rebuild the macro without a trailing continuation after Root.
+        changed=changed.replace('X(pin::Root, "epoch|title|items|keys|attrs|kinds|weight|level") '+chr(92), 'X(pin::Root, "epoch|title|items|keys|attrs|kinds|weight|level")')
+        self.assertNotEqual(changed,self.catalog)
+        p,r=self.gate("nested_fields_bad",changed)
+        self.assertNotEqual(p.returncode,0)
+        self.assertEqual(r["targets"]["macos-arm64"]["status"],"FAIL_SEMANTIC")
+
     def test_empty_catalog_rejected(self):
         changed = self.catalog + "\n#undef XSG_SCHEMA_ROOTS\n#define XSG_SCHEMA_ROOTS(X)\n"
         p, r = self.gate("empty_bad", changed)

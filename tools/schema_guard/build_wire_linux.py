@@ -7,6 +7,7 @@ import subprocess
 import sys
 import verify
 import wire_inputs
+import build_evidence
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -37,6 +38,8 @@ def main():
         for inc in verify.includes(Path("/workspace")):
             cmd+=["-I",str(inc)]
         cmd += ["/workspace/tools/schema_guard/wire_runtime.cpp","-o","/xsg-out/"+target]
+        evidence=build_evidence.prepare(target,fingerprint,[cmd],images=[image])
+        cmd.insert(cmd.index("-O1"),'-DXSG_BUILD_ID="'+evidence["build_id"]+'"')
         try:
             result=subprocess.run(cmd,capture_output=True,text=True,errors="replace",timeout=1200)
             rc,log=result.returncode,result.stdout+result.stderr
@@ -47,8 +50,9 @@ def main():
         passed=rc==0 and binary.is_file()
         results[target]={"status":"PASS_BUILD" if passed else "FAIL_BUILD","exit_code":rc,"command":cmd}
         if passed:
+            binding=build_evidence.finish(evidence,binary,out/(target+".manifest.json"))
             targets[target]={"binary":str(binary),"runner":[sys.executable,str(HERE/"docker_wire_runner.py"),
-                               "--docker",a.docker,"--image",image,"--platform",platform,"--"]}
+                               "--docker",a.docker,"--image",image,"--platform",platform,"--"],**binding}
         else:
             targets.pop(target,None)
         print(target,results[target]["status"],flush=True)
