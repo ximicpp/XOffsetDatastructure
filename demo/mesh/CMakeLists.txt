@@ -53,6 +53,8 @@ if(XMESH_NOEXC_PEER)
     xoffset_disable_exceptions(xmesh_core_noexc)
     xmesh_executable(xo_peer_noexc xmesh_core_noexc src/peer_main.cpp)
     xoffset_disable_exceptions(xo_peer_noexc)
+    xmesh_executable(xmesh_selftest_noexc xmesh_core_noexc src/selftest.cpp)
+    xoffset_disable_exceptions(xmesh_selftest_noexc)
     message(STATUS "xmesh: xo_peer_noexc builds without exceptions")
 endif()
 

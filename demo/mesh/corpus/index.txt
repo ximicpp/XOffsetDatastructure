@@ -1,0 +1,349 @@
+# xmesh corpus v1: demo/mesh/corpus/README.md
+job Document-small-verified seed 000000005eed00d0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 70b96be7ee2e228c wire 369f531c8443d281 bytes 2424
+  hop 1 content bc154785c125397a wire 8cdb6080e8a4096d bytes 2440
+  hop 2 content 956ad2b7bd5a5841 wire 2ffa176a1132e9a5 bytes 3064
+  hop 3 content 95581582028c3275 wire c95e2350bbad4c83 bytes 3056
+  evil truncated claimed 70b96be7ee2e228c wire 2af3ff80dec71967 bytes 1212
+  evil bad_offset claimed 70b96be7ee2e228c wire 8ac5c4bd6468b706 bytes 2424
+  evil schema_hash claimed 70b96be7ee2e228c wire ea9a2ad0e4646c6c bytes 2424
+  evil wrong_type claimed 754ca71847dccc18 wire 645d328d1247f323 bytes 936
+  evil too_large claimed 23d41078bad7a9fb wire fe57f0100ae9ab83 bytes 69632
+  evil stale_digest claimed 70b96be7ee2e228c wire 2b9566b787a1dc5a bytes 2424
+  evil model_drift claimed bf90122f3dd7ccaf wire 2b9566b787a1dc5a bytes 2424
+job Document-small-compact seed 000000005eed00d0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 70b96be7ee2e228c wire 7d67631ed490b638 bytes 2328
+  hop 1 content bc154785c125397a wire b665f4e61818f892 bytes 2120
+  hop 2 content 956ad2b7bd5a5841 wire 71dde66919e86fb8 bytes 2520
+  hop 3 content 95581582028c3275 wire e60ae4efa69a0bc8 bytes 2464
+  evil truncated claimed 70b96be7ee2e228c wire d91a5cab2d76ba89 bytes 1164
+  evil bad_offset claimed 70b96be7ee2e228c wire 8cf5c45497f32d8f bytes 2328
+  evil schema_hash claimed 70b96be7ee2e228c wire 8bfd5ad8721cc971 bytes 2328
+  evil wrong_type claimed 754ca71847dccc18 wire 71a8acd2fd1e7e3f bytes 816
+  evil too_large claimed 9c6bc9a40e9ab21b wire e5a4ba4cae92316e bytes 69632
+  evil stale_digest claimed 70b96be7ee2e228c wire ee1a7d5704fe1433 bytes 2328
+  evil model_drift claimed bf90122f3dd7ccaf wire ee1a7d5704fe1433 bytes 2328
+job Document-medium-verified seed 000000005eed00d1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content e941deae1fe9b47d wire f2a35124950f84c2 bytes 63328
+  hop 1 content 5089bf2233442e9f wire 1c74d1d5d60fe378 bytes 63328
+  hop 2 content 0e55c46cc62a45bd wire a3bdbbdc20ca5e1d bytes 63344
+  hop 3 content 890dd952cfbec8ab wire f6162cd37ee49a9c bytes 70968
+  evil truncated claimed e941deae1fe9b47d wire c288d54e91a8b3c2 bytes 31664
+  evil bad_offset claimed e941deae1fe9b47d wire b641810e23baba31 bytes 63328
+  evil schema_hash claimed e941deae1fe9b47d wire 96834d7363a8c8a3 bytes 63328
+  evil wrong_type claimed 59401424eefc8efe wire f8ae86bbc36237c1 bytes 864
+  evil too_large claimed 34d37c57150a8d5e wire d34f1f86d151163a bytes 528416
+  evil stale_digest claimed e941deae1fe9b47d wire bbb55206a000c8d5 bytes 63328
+  evil model_drift claimed d3faafedcaa6387e wire bbb55206a000c8d5 bytes 63328
+job Document-medium-compact seed 000000005eed00d1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content e941deae1fe9b47d wire 9c500a6fcf10a896 bytes 62600
+  hop 1 content 5089bf2233442e9f wire d50039aa9237af9d bytes 62528
+  hop 2 content 0e55c46cc62a45bd wire 4acfccc25be34697 bytes 62648
+  hop 3 content 890dd952cfbec8ab wire aab5963f63d903e6 bytes 62736
+  evil truncated claimed e941deae1fe9b47d wire c37c1cc9e1be13c5 bytes 31300
+  evil bad_offset claimed e941deae1fe9b47d wire 18f56dd8d709e49c bytes 62600
+  evil schema_hash claimed e941deae1fe9b47d wire 8df86fbe691c4d6f bytes 62600
+  evil wrong_type claimed 59401424eefc8efe wire d16c2f044f010e14 bytes 816
+  evil too_large claimed 85bb36c3960b7057 wire a587c72bfa377ff6 bytes 528384
+  evil stale_digest claimed e941deae1fe9b47d wire 2c412eb5dd26dcb5 bytes 62600
+  evil model_drift claimed d3faafedcaa6387e wire 2c412eb5dd26dcb5 bytes 62600
+job Document-large-verified seed 000000005eed00d2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 2a1f3ac6f47f63a1 wire af058f9ffeae8e2d bytes 974072
+  hop 1 content 1f897c10d8570de9 wire f366443a5b782900 bytes 974392
+  hop 2 content 815cef42e14a670a wire c8987e38a9fbbc58 bytes 974456
+  hop 3 content 83c32095e7465e1f wire d0957fa358652482 bytes 974744
+job Document-large-compact seed 000000005eed00d2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 2a1f3ac6f47f63a1 wire b3e7d478845cd0d1 bytes 974344
+  hop 1 content 1f897c10d8570de9 wire 773a4629adf498be bytes 974480
+  hop 2 content 815cef42e14a670a wire a4b7f928e0a0989a bytes 974632
+  hop 3 content 83c32095e7465e1f wire 577491e2dc296945 bytes 974600
+job Order-small-verified seed 000000005eed00e0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 3c8413b2142e426a wire f28f792c249b0dad bytes 800
+  hop 1 content dd367834d369db95 wire d1ea794a987c0ee3 bytes 808
+  hop 2 content 1bb2ba083bcfd1a5 wire a826e263fa479700 bytes 840
+  hop 3 content 361ba0e83197222c wire 2b70645429d8afc2 bytes 976
+  evil truncated claimed 3c8413b2142e426a wire 4e86d8e6d639276b bytes 400
+  evil bad_offset claimed 3c8413b2142e426a wire 09a1d11eda2ded9c bytes 800
+  evil schema_hash claimed 3c8413b2142e426a wire 50c3158da3310fd4 bytes 800
+  evil wrong_type claimed a393f9b870647c05 wire c0c0f0d06d813a82 bytes 1680
+  evil too_large claimed 7df9a1b0c3075953 wire e1f56da4a1cfc80d bytes 69632
+  evil stale_digest claimed 3c8413b2142e426a wire 665ea97a0a7743ce bytes 800
+  evil model_drift claimed 826a1f2c4e186121 wire 665ea97a0a7743ce bytes 800
+job Order-small-compact seed 000000005eed00e0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 3c8413b2142e426a wire d7de931eb923771f bytes 752
+  hop 1 content dd367834d369db95 wire 42b94a1c3a1af470 bytes 704
+  hop 2 content 1bb2ba083bcfd1a5 wire df6f23c9d51231da bytes 752
+  hop 3 content 361ba0e83197222c wire 94afbc3fcc337f7f bytes 888
+  evil truncated claimed 3c8413b2142e426a wire 746d5cc36730c26a bytes 376
+  evil bad_offset claimed 3c8413b2142e426a wire 71b2eed425e5323a bytes 752
+  evil schema_hash claimed 3c8413b2142e426a wire 3667255ac7d8be8e bytes 752
+  evil wrong_type claimed a393f9b870647c05 wire d3da000c8f647310 bytes 1656
+  evil too_large claimed b07b7bb3f882c218 wire 115f732d009bee80 bytes 69632
+  evil stale_digest claimed 3c8413b2142e426a wire 6e3cc6e4bc37087c bytes 752
+  evil model_drift claimed 826a1f2c4e186121 wire 6e3cc6e4bc37087c bytes 752
+job Order-medium-verified seed 000000005eed00e1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 63975b9be68f67ac wire 0879e252c218edf0 bytes 63176
+  hop 1 content b2fc8af501214793 wire 904174a085e7c1b8 bytes 95376
+  hop 2 content 8fb4b56109df2cce wire 091e87913b1baa4f bytes 95408
+  hop 3 content 35330eeda4d1b51a wire 78bf2118de4420ef bytes 95448
+  evil truncated claimed 63975b9be68f67ac wire 7219b3e6eda29ed2 bytes 31588
+  evil bad_offset claimed 63975b9be68f67ac wire 844d08ddea6712e0 bytes 63176
+  evil schema_hash claimed 63975b9be68f67ac wire eca18b0e4496cbad bytes 63176
+  evil wrong_type claimed 99661c36700f0076 wire bd5b467554fd306a bytes 1512
+  evil too_large claimed 4ca0cf76dc590630 wire b408001c2bdc27aa bytes 528384
+  evil stale_digest claimed 63975b9be68f67ac wire 604357e5ec28bf4b bytes 63176
+  evil model_drift claimed ce1bc76eac76ca1f wire 604357e5ec28bf4b bytes 63176
+job Order-medium-compact seed 000000005eed00e1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 63975b9be68f67ac wire 2edf2073ef971b63 bytes 67168
+  hop 1 content b2fc8af501214793 wire 0f4ac12ce46f2549 bytes 67328
+  hop 2 content 8fb4b56109df2cce wire 0b2b43ae2293bf8f bytes 67352
+  hop 3 content 35330eeda4d1b51a wire 3bcd7863b475d243 bytes 67432
+  evil truncated claimed 63975b9be68f67ac wire 02c66262684b04d6 bytes 33584
+  evil bad_offset claimed 63975b9be68f67ac wire 7b61374a8044ee96 bytes 67168
+  evil schema_hash claimed 63975b9be68f67ac wire a342dc15f9974542 bytes 67168
+  evil wrong_type claimed 99661c36700f0076 wire 82f347846dd7b06a bytes 1472
+  evil too_large claimed d376f46c8cb92928 wire 1f84778a51bec81c bytes 528384
+  evil stale_digest claimed 63975b9be68f67ac wire 84bafcf37953d5e8 bytes 67168
+  evil model_drift claimed ce1bc76eac76ca1f wire 84bafcf37953d5e8 bytes 67168
+job Order-large-verified seed 000000005eed00e2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content d2f78411ccd7c71f wire 0c914266b4671c73 bytes 1030984
+  hop 1 content 6fe5bbf8ece3506d wire 69faaa889c071c14 bytes 1031008
+  hop 2 content f5e2cecfef383401 wire abf408099e6f2707 bytes 1551160
+  hop 3 content ff6f62c0b30ef9b0 wire 4763c8546b8da5fe bytes 1551176
+job Order-large-compact seed 000000005eed00e2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content d2f78411ccd7c71f wire b11bb0f409206b27 bytes 1095976
+  hop 1 content 6fe5bbf8ece3506d wire e8d7b35575fef532 bytes 1095984
+  hop 2 content f5e2cecfef383401 wire 99c954bb3e45813e bytes 1096208
+  hop 3 content ff6f62c0b30ef9b0 wire 55d705f3f4860197 bytes 1096152
+job SensorSeries-small-verified seed 000000005eed00f0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 17383f767e31cef3 wire b08ecbb0d86a420d bytes 2672
+  hop 1 content 1ae9fd41f0ff3d88 wire 2b08a7e560c21b79 bytes 2696
+  hop 2 content bb4a973e794ba23b wire dcf87ca6a7aeb44d bytes 2728
+  hop 3 content 1b3463a62d50bafc wire ed4ab87c078d0c89 bytes 2744
+  evil truncated claimed 17383f767e31cef3 wire 3ba76466eb170fe0 bytes 1336
+  evil bad_offset claimed 17383f767e31cef3 wire f1486eb910f0c611 bytes 2672
+  evil schema_hash claimed 17383f767e31cef3 wire 1a504013b58ae330 bytes 2672
+  evil wrong_type claimed 80d1ded537551422 wire 373a171e4d465654 bytes 936
+  evil too_large claimed 9b4f2eff3f47cd09 wire dd1ab594b06eb6be bytes 69632
+  evil stale_digest claimed 17383f767e31cef3 wire e0b3912e03e4622e bytes 2672
+  evil model_drift claimed b44df80e29ff4978 wire e0b3912e03e4622e bytes 2672
+job SensorSeries-small-compact seed 000000005eed00f0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 17383f767e31cef3 wire 5cc42f2da6e91e64 bytes 2944
+  hop 1 content 1ae9fd41f0ff3d88 wire 6775252e3756b4ba bytes 2976
+  hop 2 content bb4a973e794ba23b wire 9863194283a190ab bytes 3024
+  hop 3 content 1b3463a62d50bafc wire 86efee8483db4650 bytes 3056
+  evil truncated claimed 17383f767e31cef3 wire c49c4ddf46e86fbd bytes 1472
+  evil bad_offset claimed 17383f767e31cef3 wire 16e2f424d446fd79 bytes 2944
+  evil schema_hash claimed 17383f767e31cef3 wire 139cb641499988b1 bytes 2944
+  evil wrong_type claimed 80d1ded537551422 wire e69057213eac3948 bytes 816
+  evil too_large claimed fda911bb98c84612 wire 2d9859c2932188fc bytes 69632
+  evil stale_digest claimed 17383f767e31cef3 wire cb48698d578be5e7 bytes 2944
+  evil model_drift claimed b44df80e29ff4978 wire cb48698d578be5e7 bytes 2944
+job SensorSeries-medium-verified seed 000000005eed00f1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content cd4c856c2a1da3ee wire 61d69586d223dccc bytes 65192
+  hop 1 content 25f1560f8a88b8c5 wire be8a5295f22d1865 bytes 65456
+  hop 2 content b28ca8e814bb6a59 wire 0a9b8a32f496b366 bytes 65456
+  hop 3 content 0576c8727e7c7816 wire 78f66293a1ddb15d bytes 65456
+  evil truncated claimed cd4c856c2a1da3ee wire cc8bda64e268960c bytes 32596
+  evil bad_offset claimed cd4c856c2a1da3ee wire 9487d8549557c578 bytes 65192
+  evil schema_hash claimed cd4c856c2a1da3ee wire 786fd10667183cad bytes 65192
+  evil wrong_type claimed d62356503ca191e8 wire 4fde84975572d995 bytes 944
+  evil too_large claimed 552ae15dee058012 wire ee5de921f6e1764e bytes 528384
+  evil stale_digest claimed cd4c856c2a1da3ee wire 22969f5c2e2a4e8f bytes 65192
+  evil model_drift claimed e6ecd1faadc9ff2d wire 22969f5c2e2a4e8f bytes 65192
+job SensorSeries-medium-compact seed 000000005eed00f1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content cd4c856c2a1da3ee wire 98bf21c2f5125e74 bytes 73280
+  hop 1 content 25f1560f8a88b8c5 wire 099ab7ec8b992792 bytes 73320
+  hop 2 content b28ca8e814bb6a59 wire d0e1f3d48b161751 bytes 73368
+  hop 3 content 0576c8727e7c7816 wire 9ff0fb5ffcdf356c bytes 73392
+  evil truncated claimed cd4c856c2a1da3ee wire 9027c3181f4fe228 bytes 36640
+  evil bad_offset claimed cd4c856c2a1da3ee wire 3015f0839db6a971 bytes 73280
+  evil schema_hash claimed cd4c856c2a1da3ee wire c94c92cf63f4a419 bytes 73280
+  evil wrong_type claimed d62356503ca191e8 wire ad068a12dabb3db9 bytes 824
+  evil too_large claimed 62ed2b53c45869bf wire 7beaa803ab32021b bytes 528384
+  evil stale_digest claimed cd4c856c2a1da3ee wire ab4bda2ac0acb4b7 bytes 73280
+  evil model_drift claimed e6ecd1faadc9ff2d wire ab4bda2ac0acb4b7 bytes 73280
+job SensorSeries-large-verified seed 000000005eed00f2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 2ae51b29f0e69b44 wire d7844fc202282ac3 bytes 4176776
+  hop 1 content 2c4a95167bb9e643 wire 5bd14caed85d6509 bytes 4176800
+  hop 2 content b9fceca5f9a6f46a wire e64175b7391181ce bytes 4177832
+  hop 3 content 23a01d0392b9a5d8 wire 52f53226e4708d06 bytes 4177832
+job SensorSeries-large-compact seed 000000005eed00f2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 2ae51b29f0e69b44 wire 569b2d625a7d1ca3 bytes 4698824
+  hop 1 content 2c4a95167bb9e643 wire 78fc44d2314b46d6 bytes 4698864
+  hop 2 content b9fceca5f9a6f46a wire a2a8ab234e3954d7 bytes 4698912
+  hop 3 content 23a01d0392b9a5d8 wire 1f9f81ee6e8c2f6d bytes 4698944
+job KvConfig-small-verified seed 000000005eed0080 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 063bd2d13505eadf wire e6d52cbe7b0ac789 bytes 1824
+  hop 1 content 4041ac5b22d94210 wire e80c6f7a204ff4cf bytes 1856
+  hop 2 content 8e5435d2a4d76ee3 wire f3687d72c9b94d27 bytes 1888
+  hop 3 content 532a5f233f7cad3c wire 7523b15b2186ab3a bytes 2024
+  evil truncated claimed 063bd2d13505eadf wire a9b0efcedeb2f4ab bytes 912
+  evil bad_offset claimed 063bd2d13505eadf wire 39f6520d9df93d3c bytes 1824
+  evil schema_hash claimed 063bd2d13505eadf wire bb103a96cb3b70cc bytes 1824
+  evil wrong_type claimed f7bfdb9dba81e285 wire 85883165c10d6ee2 bytes 736
+  evil too_large claimed 5b27a941533af2d2 wire 71be1633f552587f bytes 69632
+  evil stale_digest claimed 063bd2d13505eadf wire ad952cdd721abab2 bytes 1824
+  evil model_drift claimed 628c85610158bcbc wire ad952cdd721abab2 bytes 1824
+job KvConfig-small-compact seed 000000005eed0080 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 063bd2d13505eadf wire e77afe022bb51621 bytes 1696
+  hop 1 content 4041ac5b22d94210 wire f2125b60127524eb bytes 1608
+  hop 2 content 8e5435d2a4d76ee3 wire 297190c977fa0e28 bytes 1592
+  hop 3 content 532a5f233f7cad3c wire b44f36e12b2a1e5f bytes 1784
+  evil truncated claimed 063bd2d13505eadf wire 04a6df85bab6c281 bytes 848
+  evil bad_offset claimed 063bd2d13505eadf wire 5e6ce87a2d00fdf4 bytes 1696
+  evil schema_hash claimed 063bd2d13505eadf wire 991288f06ba7e250 bytes 1696
+  evil wrong_type claimed f7bfdb9dba81e285 wire d753a4c14c13ae37 bytes 688
+  evil too_large claimed c94d30cc83e97d79 wire 7bf235317023393e bytes 69632
+  evil stale_digest claimed 063bd2d13505eadf wire f8002d19c533961a bytes 1696
+  evil model_drift claimed 628c85610158bcbc wire f8002d19c533961a bytes 1696
+job KvConfig-medium-verified seed 000000005eed0081 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 5aaf35f9c7585aca wire 21c5e46a8fefe38f bytes 76576
+  hop 1 content d91740c8a6f7a638 wire 406bd19993fad59f bytes 76584
+  hop 2 content 7b094c8f2fc3de71 wire 8e61c901d9890553 bytes 76592
+  hop 3 content b337b3d91a8a8755 wire 8d739e41fb351340 bytes 76584
+  evil truncated claimed 5aaf35f9c7585aca wire 863b1979cd45d7c2 bytes 38288
+  evil bad_offset claimed 5aaf35f9c7585aca wire 2c4666ce6ab990e2 bytes 76576
+  evil schema_hash claimed 5aaf35f9c7585aca wire 2d0f8d40d753eb22 bytes 76576
+  evil wrong_type claimed 934f0a644c825033 wire c784436bc601eccd bytes 856
+  evil too_large claimed ff3efc8233080328 wire f1680762624f90f1 bytes 528416
+  evil stale_digest claimed 5aaf35f9c7585aca wire b2fc9a4086938104 bytes 76576
+  evil model_drift claimed 6c2ac267455168d1 wire b2fc9a4086938104 bytes 76576
+job KvConfig-medium-compact seed 000000005eed0081 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 5aaf35f9c7585aca wire d238623c6ab0858c bytes 51216
+  hop 1 content d91740c8a6f7a638 wire 3c377de43d994145 bytes 51136
+  hop 2 content 7b094c8f2fc3de71 wire 786c2e83b3a8e1e1 bytes 51344
+  hop 3 content b337b3d91a8a8755 wire 42d723e28e330ca9 bytes 51560
+  evil truncated claimed 5aaf35f9c7585aca wire e20297fff5ef9e10 bytes 25608
+  evil bad_offset claimed 5aaf35f9c7585aca wire 52c301e1eb3d95ee bytes 51216
+  evil schema_hash claimed 5aaf35f9c7585aca wire addd1fb4b9498511 bytes 51216
+  evil wrong_type claimed 934f0a644c825033 wire 58027db3e4877c7e bytes 736
+  evil too_large claimed 9238823ed09cf1d1 wire efda28a0ec0fbf1c bytes 528384
+  evil stale_digest claimed 5aaf35f9c7585aca wire 3a8a646e392ee92f bytes 51216
+  evil model_drift claimed 6c2ac267455168d1 wire 3a8a646e392ee92f bytes 51216
+job KvConfig-large-verified seed 000000005eed0082 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content d11ed9b5fb2a6e84 wire 7de2098ae8e966ff bytes 1193008
+  hop 1 content 4ea7e54e092207d1 wire b84456f9f39e7f9c bytes 1193008
+  hop 2 content 3cebdba2f0c941db wire c9c4c881b4ab6133 bytes 1193016
+  hop 3 content 48e86037f706120a wire c2eb9301cf03a05d bytes 1193008
+job KvConfig-large-compact seed 000000005eed0082 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content d11ed9b5fb2a6e84 wire c2b218bca6bb6425 bytes 829992
+  hop 1 content 4ea7e54e092207d1 wire d0a7622fe1413aee bytes 830176
+  hop 2 content 3cebdba2f0c941db wire 6476d8b1e28e3d2d bytes 830336
+  hop 3 content 48e86037f706120a wire 6c535a2db511219b bytes 830344
+job SceneTree-small-verified seed 000000005eed0090 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 853cf3afd60df305 wire 4f90ddd1c8217d34 bytes 1872
+  hop 1 content e0856e95c9951a2e wire 29883b9fa096b8e1 bytes 1896
+  hop 2 content 1cb6c887943e94a3 wire b96575a976ea0c8c bytes 1928
+  hop 3 content 0a5f79a86fea679c wire bba49947d81684a5 bytes 3960
+  evil truncated claimed 853cf3afd60df305 wire b5e0b1b5d0a36fc8 bytes 936
+  evil bad_offset claimed 853cf3afd60df305 wire 5fd5377ee7924df4 bytes 1872
+  evil schema_hash claimed 853cf3afd60df305 wire facd50def5093ae9 bytes 1872
+  evil wrong_type claimed 6a027c0af0e50fe4 wire ae0ba19bb38533ae bytes 808
+  evil too_large claimed 2b7b57908cd545e0 wire c19a86ec384eabe7 bytes 69664
+  evil stale_digest claimed 853cf3afd60df305 wire d707199888c4d723 bytes 1872
+  evil model_drift claimed 67d8156920f61356 wire d707199888c4d723 bytes 1872
+job SceneTree-small-compact seed 000000005eed0090 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 853cf3afd60df305 wire bd5af920fbead67f bytes 1904
+  hop 1 content e0856e95c9951a2e wire 8400f966139d97f6 bytes 1944
+  hop 2 content 1cb6c887943e94a3 wire 2af09371ff37da71 bytes 1992
+  hop 3 content 0a5f79a86fea679c wire 31c40ae5e25c9ea9 bytes 2032
+  evil truncated claimed 853cf3afd60df305 wire 8919929d88074e17 bytes 952
+  evil bad_offset claimed 853cf3afd60df305 wire e9fafc28103ed4ce bytes 1904
+  evil schema_hash claimed 853cf3afd60df305 wire fc873e82337725b6 bytes 1904
+  evil wrong_type claimed 6a027c0af0e50fe4 wire bc23778ef2c76643 bytes 760
+  evil too_large claimed b57802d909937880 wire 0b0f0ad61caffe63 bytes 69632
+  evil stale_digest claimed 853cf3afd60df305 wire 7142bb2ba1cf2bdc bytes 1904
+  evil model_drift claimed 67d8156920f61356 wire 7142bb2ba1cf2bdc bytes 1904
+job SceneTree-medium-verified seed 000000005eed0091 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 413c7c59886ad963 wire d5ae2f86c26e578a bytes 58872
+  hop 1 content aeac25b75287eed8 wire 5f85c6b153b1c444 bytes 59008
+  hop 2 content 58f30431ebe0c15d wire e0eb4be042a5ee05 bytes 59056
+  hop 3 content 03b83716cfff0387 wire 1c7504eaeae4a46b bytes 59096
+  evil truncated claimed 413c7c59886ad963 wire ea74ee62a14e09cf bytes 29436
+  evil bad_offset claimed 413c7c59886ad963 wire 6edcc98a7287fe76 bytes 58872
+  evil schema_hash claimed 413c7c59886ad963 wire 9811b5f1ad810b47 bytes 58872
+  evil wrong_type claimed 6a5fe7b530cdaf00 wire 06e40f32873df474 bytes 952
+  evil too_large claimed a2a9e2c8e4d7bfa6 wire 19b25c1f76c1e85c bytes 528384
+  evil stale_digest claimed 413c7c59886ad963 wire c6b80c88f8145831 bytes 58872
+  evil model_drift claimed 53cc04bbff0c77f8 wire c6b80c88f8145831 bytes 58872
+job SceneTree-medium-compact seed 000000005eed0091 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 413c7c59886ad963 wire 38c52d7c68e015a2 bytes 60664
+  hop 1 content aeac25b75287eed8 wire 7fd3769b6abc1756 bytes 60144
+  hop 2 content 58f30431ebe0c15d wire 2e69259fc674d8d2 bytes 60048
+  hop 3 content 03b83716cfff0387 wire cccdb51fb03ace68 bytes 59616
+  evil truncated claimed 413c7c59886ad963 wire d0cb055af344d4a3 bytes 30332
+  evil bad_offset claimed 413c7c59886ad963 wire 42be820d2bc46d8d bytes 60664
+  evil schema_hash claimed 413c7c59886ad963 wire d39bd90e681da01f bytes 60664
+  evil wrong_type claimed 6a5fe7b530cdaf00 wire ea7a93de6b0e54e8 bytes 832
+  evil too_large claimed c135dcaa3c25e71d wire 7374b54e576009e9 bytes 528384
+  evil stale_digest claimed 413c7c59886ad963 wire 62be74f0399a98a9 bytes 60664
+  evil model_drift claimed 53cc04bbff0c77f8 wire 62be74f0399a98a9 bytes 60664
+job SceneTree-large-verified seed 000000005eed0092 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content bbdcaba20af860db wire facd41f3f190a517 bytes 974936
+  hop 1 content 0547eb9b13c1fb37 wire f297c35c9baa4610 bytes 974992
+  hop 2 content e2365e431e90f701 wire b829c3ebfd6eb0ef bytes 975104
+  hop 3 content fb14aaa1b902fa5e wire 135871bc7b76c252 bytes 975112
+job SceneTree-large-compact seed 000000005eed0092 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content bbdcaba20af860db wire c668db20179fea31 bytes 1007576
+  hop 1 content 0547eb9b13c1fb37 wire 30ef475780bb5caa bytes 1007200
+  hop 2 content e2365e431e90f701 wire 539a0322b132cf85 bytes 1007112
+  hop 3 content fb14aaa1b902fa5e wire c31909f5bb4ac2c8 bytes 1006992
+job ChatRoom-small-verified seed 000000005eed00a0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 170eb7071692ea57 wire 0c59ac17f361342a bytes 3024
+  hop 1 content f375cddef0361e62 wire bb6b6cd570ba4d70 bytes 3192
+  hop 2 content 965c7e13e3e6e804 wire dbf6a589f1220648 bytes 3216
+  hop 3 content 2995769b512b37f3 wire e4e9aa9a39ddb62c bytes 3248
+  evil truncated claimed 170eb7071692ea57 wire 886b616fdebf8f2b bytes 1512
+  evil bad_offset claimed 170eb7071692ea57 wire ab8c199f2c592fc0 bytes 3024
+  evil schema_hash claimed 170eb7071692ea57 wire d5eb341c2b5cacc7 bytes 3024
+  evil wrong_type claimed 15a48c001b9df8df wire cd6b3a4e8d343efd bytes 808
+  evil too_large claimed 0e826682ca21b8fe wire 738dba37c6eb87ca bytes 69632
+  evil stale_digest claimed 170eb7071692ea57 wire 46b6f10f4d041ed1 bytes 3024
+  evil model_drift claimed 18c15ebc3dc11d24 wire 46b6f10f4d041ed1 bytes 3024
+job ChatRoom-small-compact seed 000000005eed00a0 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 170eb7071692ea57 wire f838a5f3e1311097 bytes 2728
+  hop 1 content f375cddef0361e62 wire 7e91b0e5d344b437 bytes 2912
+  hop 2 content 965c7e13e3e6e804 wire 220634edd10e657f bytes 2288
+  hop 3 content 2995769b512b37f3 wire 87c67170b0b35e8e bytes 1872
+  evil truncated claimed 170eb7071692ea57 wire 0619e041f0968ae1 bytes 1364
+  evil bad_offset claimed 170eb7071692ea57 wire 28239725dce86902 bytes 2728
+  evil schema_hash claimed 170eb7071692ea57 wire 8a23da8fc55f00aa bytes 2728
+  evil wrong_type claimed 15a48c001b9df8df wire 820a3b27d37284fb bytes 688
+  evil too_large claimed 623ddcd9e16a66bd wire 451f2484d5bc7650 bytes 69632
+  evil stale_digest claimed 170eb7071692ea57 wire 90026c9369cc0f54 bytes 2728
+  evil model_drift claimed 18c15ebc3dc11d24 wire 90026c9369cc0f54 bytes 2728
+job ChatRoom-medium-verified seed 000000005eed00a1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 1484ec2d62cc9f62 wire 865c1bce864146a5 bytes 66264
+  hop 1 content 64835227486e70b0 wire c79d4d3a84d3c4e5 bytes 66272
+  hop 2 content a9269c46d2009227 wire 02dff82c2efc1432 bytes 66584
+  hop 3 content 1692459f3cb3619b wire d117a7725364ec05 bytes 66848
+  evil truncated claimed 1484ec2d62cc9f62 wire 8ff8da8219154335 bytes 33132
+  evil bad_offset claimed 1484ec2d62cc9f62 wire ae18ab9ba0778519 bytes 66264
+  evil schema_hash claimed 1484ec2d62cc9f62 wire 4a591acff9d7d93c bytes 66264
+  evil wrong_type claimed e96a30400fd697ba wire 2e9c7b418d496a23 bytes 760
+  evil too_large claimed e12f435e5f7213ca wire eea5c4f3dfbf9cd6 bytes 528384
+  evil stale_digest claimed 1484ec2d62cc9f62 wire 071305ca37c04066 bytes 66264
+  evil model_drift claimed d6d74e2486e69459 wire 071305ca37c04066 bytes 66264
+job ChatRoom-medium-compact seed 000000005eed00a1 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content 1484ec2d62cc9f62 wire 6343d7e1bb72bb24 bytes 64112
+  hop 1 content 64835227486e70b0 wire 8e3c64eb67ca93d5 bytes 63960
+  hop 2 content a9269c46d2009227 wire ae114432e8efb571 bytes 63744
+  hop 3 content 1692459f3cb3619b wire 4b73e6b44dcdf943 bytes 63664
+  evil truncated claimed 1484ec2d62cc9f62 wire f6410a1a754cfc15 bytes 32056
+  evil bad_offset claimed 1484ec2d62cc9f62 wire d607a0c5fcfbd414 bytes 64112
+  evil schema_hash claimed 1484ec2d62cc9f62 wire 6626dcec1d705045 bytes 64112
+  evil wrong_type claimed e96a30400fd697ba wire de6199a43a58e4bd bytes 712
+  evil too_large claimed 03bc3e62f46104ea wire 750fc985da4aab4e bytes 528384
+  evil stale_digest claimed 1484ec2d62cc9f62 wire 8e7378d6f3a42da7 bytes 64112
+  evil model_drift claimed d6d74e2486e69459 wire 8e7378d6f3a42da7 bytes 64112
+job ChatRoom-large-verified seed 000000005eed00a2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content de91d085db8d1a33 wire a905addca6a81b19 bytes 1061464
+  hop 1 content 070a56e6f216a9a6 wire 9a1339dc9cad37d9 bytes 1330392
+  hop 2 content 7eef32918c1876cd wire a3a632514e49dce2 bytes 1330400
+  hop 3 content ab93060656ad44b8 wire 936d406cc106ef96 bytes 1330656
+job ChatRoom-large-compact seed 000000005eed00a2 route linux-x86_64-gcc>windows-x86_64-msvc>android-arm64-clang-noexc>linux-arm64-gcc>ios-arm64-clang
+  hop 0 content de91d085db8d1a33 wire 311f0508a0b01c8c bytes 1022192
+  hop 1 content 070a56e6f216a9a6 wire 92c51e3bf8e07dea bytes 1022056
+  hop 2 content 7eef32918c1876cd wire dd61ae075b27e1da bytes 1022008
+  hop 3 content ab93060656ad44b8 wire b3b0fe2a53feabb3 bytes 1021992
