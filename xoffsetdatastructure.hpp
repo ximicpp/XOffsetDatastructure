@@ -2160,7 +2160,7 @@ namespace XOffsetDatastructure {
     // ========================================================================
     namespace detail {
 
-        // Container concepts — used by XCompactor for migration dispatch.
+        // Container concepts -- used by XCompactor for migration dispatch.
         template<typename T>
         concept SetLikeContainer = requires(T t) {
             { t.begin() } -> std::input_or_output_iterator;
@@ -6897,7 +6897,7 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // ── Reflection Transfer (move/copy with allocator injection) ──
+        // -- Reflection Transfer (move/copy with allocator injection) --
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all_impl(void* dst, Src&& src, Alloc alloc);
@@ -7256,7 +7256,7 @@ namespace XOffsetDatastructure {
         return line;
     }
 
-    // XHandle<T> — Epoch-cached handle. O(1) deref when address is stable.
+    // XHandle<T> -- Epoch-cached handle. O(1) deref when address is stable.
     // ========================================================================
     template <typename T>
     class XHandle {
@@ -7305,7 +7305,7 @@ namespace XOffsetDatastructure {
         resolver_type resolver_ = nullptr;
     };
 
-    // XBuffer — Single root object per buffer (make/root/has_root).
+    // XBuffer -- Single root object per buffer (make/root/has_root).
     // ========================================================================
     namespace detail {
         // Internal friend bridge; no Core/container/wire field is added.
@@ -8239,7 +8239,7 @@ namespace XOffsetDatastructure {
     };
 
     // ========================================================================
-    // TypedXBuffer<T> — Type-bound buffer with compile-time root type
+    // TypedXBuffer<T> -- Type-bound buffer with compile-time root type
     //
     // Wraps XBuffer and binds it to a specific root type T at compile time.
     // Eliminates the need to repeat <T> on every make/root/handle call.
@@ -8352,7 +8352,7 @@ namespace XOffsetDatastructure {
     };
 
     // ================================================================
-    // XCompactor — Memory compaction via C++26 reflection.
+    // XCompactor -- Memory compaction via C++26 reflection.
     // ================================================================
     class XCompactor {
     public:
@@ -8392,11 +8392,11 @@ namespace XOffsetDatastructure {
                     new_xbuf.shrink_to_fit();
                     return new_xbuf;
                 } XOFFSET_CATCH(const XBadAlloc&) {
-                    // Not enough headroom — try next multiplier
+                    // Not enough headroom -- try next multiplier
                     continue;
                 }
             }
-            // All multipliers exhausted — should not happen in practice
+            // All multipliers exhausted -- should not happen in practice
             XOFFSET_THROW(XException(XErrc::out_of_storage, "XCompactor::compact failed: insufficient memory even at 4x multiplier"));
         }
 
@@ -8570,7 +8570,7 @@ struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
 // Must be placed at global namespace scope.
 // ============================================================================
 
-// Namespace sentinel — detects accidental use inside a namespace block.
+// Namespace sentinel -- detects accidental use inside a namespace block.
 struct _XOffset_NS_Sentinel {};
 
 #define XOFFSET_CHECK_GLOBAL_NAMESPACE_(macro_name)                            \

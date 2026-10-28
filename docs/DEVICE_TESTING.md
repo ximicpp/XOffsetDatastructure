@@ -16,7 +16,7 @@
    15 个编译失败测试（编译期应当报错的用例）要用 NDK，在电脑上跑。
 2. **游戏 demo**（`demo/mapstate`）：Linux 服务端 A/B（GCC 16、C++26 反射）在电脑的 docker
    容器里运行；demo 客户端（开异常、关异常两个版本）在手机上运行，经 `adb reverse` 连到电脑
-   （手机上的 127.0.0.1:47800–48049 就是电脑）。每个客户端跑自检、回放 A 写的快照语料、
+   （手机上的 127.0.0.1:17800–18049 就是电脑）。每个客户端跑自检、回放 A 写的快照语料、
    1/100/10000 个单位各 500 步（dense、compact、zstd 三种快照轮换）、恶意输入。
 3. **slg 计时**（SC-6）：冻结的 `bench/slg` 在字段表构建上运行，带 FlatBuffers 25.12.19 对照。先 verify，
    再计时 3 次（规模 M、41 轮），每次前记录温控状态和电量。`XO_SLG_RUNS`、`XO_SLG_SCALE`、
@@ -40,6 +40,11 @@ colima start --cpu 4 --memory 6 --disk 40    # 或者用 Docker Desktop
 
 **Linux**：git、python3、unzip、ninja、docker（当前用户能运行 `docker info`），CMake 3.30 以上
 （发行版的太旧时：`pip3 install --user cmake`）。
+
+**Windows**：脚本不直接支持。3.2.0-rc.1 的真机结果是在 WSL2（Ubuntu 22.04）里跑脚本、经 Windows 的
+`adb.exe` 连手机得到的，为此另写了一个 adb 包装：把 WSL 路径用 `wslpath -w` 转成 Windows 路径，并保留
+目录末尾的 `/.`（丢了它，`adb push` 会把语料推进多一层的目录，demo 回放读不到 `corpus.csv`）。
+做法和包装脚本见 [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) 第 4 节。
 
 adb 和 NDK 不用自己装：没有时脚本从 dl.google.com 下载 platform-tools 和 NDK r29
 （约 1 GB，校验 SHA-1）到 `~/xo-device/sdk`。已经装了的话，`adb` 在 PATH 上或设 `ADB=`，
@@ -152,7 +157,17 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
   （Debian/Ubuntu）或 `android-udev-rules`（Arch），重新插线。
 - **容器写不了工作目录**：工作目录默认在 `~/xo-device`，Docker Desktop 和 colima 默认共享家目录；
   改了 `XO_WORK` 时要放在共享的目录下。
-- **端口被占用**：电脑上 127.0.0.1 的 47800–47849、47900–47949、48000–48049 要空着。
+- **端口被占用**：电脑上 127.0.0.1 的 17800–17849、17900–17949、18000–18049 要空着，手机上的同一组端口
+  也要空着（`adb reverse` 在手机上监听）。被占用时用 `XO_PORT_BASE=<另一个起点>` 换一组，起点要低于
+  32768：Android 的临时端口（一般 32768–60999，有的厂商 37000–50000）随时被手机自己的连接占用。
+  3.2.0-rc.1 的脚本固定用 47800 起，落在这个范围里，在一台小米手机上 `adb reverse tcp:48024` 失败过；
+  用 rc.1 测试时把脚本第 52 行 `PORTS` 和第 344 行 `MAPDEMO_PORT_BASE` 里的 47800 起改成 17800 起。
 - **只想重跑某一步**：`XO_SKIP="ctest corpus slg mem" bash tools/device/android_device.sh run` 只跑 demo。
 - **没有 docker 编 flatc**：用 Mac 上 `run_phone_mac.sh fb` 生成的 `slg_generated.h`，
   `XO_FB_GENERATED=<它所在的目录>`；`XO_NO_FB=1` 则 slg 不带 FlatBuffers。
+
+## 9. 已有结果
+
+| 版本 | 手机 | 电脑 | 结果 | 记录 |
+| --- | --- | --- | --- | --- |
+| 3.2.0-rc.1（39de636），2026-10-28 | Xiaomi M2102K1C，Android 11（API 30），arm64-v8a | Windows 11 + WSL2，服务端在 WSL2 Docker | 编译失败测试 15/15、手机 CTest 114/114、6 个参照 wire 逐字节一致、两个 demo 客户端 E2E PASSED（前两次分别因端口和 adb 路径未通过，记录保留） | [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) |
