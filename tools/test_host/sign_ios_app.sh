@@ -61,8 +61,9 @@ say "identity '$IDENTITY'; entitlements: $(plutil -convert json -o - "$W/entitle
 
 # 2. the real app: profile, libraries, then the app itself
 rm -rf "$OUT"
-cp -R "$APP" "$OUT"
-cp "$STUB/embedded.mobileprovision" "$OUT/embedded.mobileprovision"
+mkdir -p "$(dirname "$OUT")"
+cp -R "$APP" "$OUT" || { say "copying $APP to $OUT failed"; exit 1; }
+cp "$STUB/embedded.mobileprovision" "$OUT/embedded.mobileprovision" || { say "copying the profile failed"; exit 1; }
 rm -rf "$OUT/_CodeSignature"
 n=0
 for lib in "$OUT"/Frameworks/*.dylib; do
