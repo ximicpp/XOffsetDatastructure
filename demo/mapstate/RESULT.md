@@ -34,7 +34,7 @@ it. Both run the same validator and send the same bytes.
 | End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
 | Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
 | Old-version client (10-28) | cloud, branch `claude/mapdemo-old-client-20261028` on next_cpp26 964b2bc: A/B GCC 16 C++26 on schema version 2; `mapdemo_client_v1` (frozen version 1) on the six client builds, each tier with the same build's version-2 client on the same A at the same time; the 12 version-2 targets again with a new corpus; ASan+UBSan of both clients in both buffer modes | PASS: old client self-check 48 / 48, replay of the `full1` corpus 60 / 60, three tiers with both clients passing, evil (renamed fields refused with `reject_names`); version-2 targets 12 / 12; step wires equal to `full1` at 500 / 500 ticks everywhere; sanitizers 178 / 178, no report (section 7). macOS, Android emulator and iOS Simulator not rerun |
-| Write-back (10-28) | cloud, branch `claude/mapdemo-writeback-20261028` on next_cpp26 ed04500: A/B GCC 16 C++26; every tier with two writing clients (`--edits 10`): the 12 client targets, each with a client of another platform as the second (`wb12b`); the six old-version targets with the version-2 client (`v1wb`); ASan+UBSan of both C++26 clients in both buffer modes | PASS: `wb12b` 12 / 12 (self-check 49 / 49, replay 60 / 60, the same self-check and evil texts everywhere, step wires equal to `full1`; every edit A accepted equals its sender's, 1,384 `Forward` frames all with A's rebuilt bytes and the sender's content; three bad write-backs refused); `v1wb` 6 / 6; sanitizers 220 / 220, no report (section 8). macOS, Android emulator and iOS Simulator go to the next Mac batch |
+| Write-back (10-28) | cloud, branch `claude/mapdemo-writeback-20261028` on next_cpp26 ed04500: A/B GCC 16 C++26; every tier with two writing clients (`--edits 10`): the 12 client targets, each with a client of another platform as the second (`wb12b`); the six old-version targets with the version-2 client (`v1wb`); ASan+UBSan of both C++26 clients in both buffer modes; Mac M4: macOS, Android emulator and iOS Simulator clients, each platform's two clients writing back to each other | PASS: `wb12b` 12 / 12 (self-check 49 / 49, replay 60 / 60, the same self-check and evil texts everywhere, step wires equal to `full1`; every edit A accepted equals its sender's, 1,384 `Forward` frames all with A's rebuilt bytes and the sender's content; three bad write-backs refused); `v1wb` 6 / 6; sanitizers 220 / 220, no report; Mac: every client verdict passes in all three columns, step wires equal to the cloud run (section 8). Emulator and simulator numbers, not device numbers |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -517,9 +517,33 @@ wine and qemu are longer and are not device numbers):
 | `Edit` -> `EditAck` | client | 0.27 to 0.37 ms; 0.47 to 0.61 ms when the other client on A runs under wine |
 | verify a `Forward` | the other client | p50 6.8 to 8.1 us; mean 16 to 28 us, since the first two of a run take 100 to 200 us |
 
-Not covered here: macOS, Android emulator and iOS Simulator (the Mac batch
-script pairs each platform's two clients the same way; see the project
-folder). Output in the project folder `mapdemo-writeback-20261028/`.
+Mac M4 (10-28, pack of next_cpp26 c804992, demo only: no library change,
+so no library CTest on the emulator or simulator): A/B GCC 16 C++26 in a
+Linux arm64 VM (colima) on the Mac; in each column the platform's client
+with exceptions and the one without run on the same A and write back to
+each other.
+
+| Column | Clients | Result |
+| --- | --- | --- |
+| macOS | Apple clang 21 C++20, native | PASS (second run): both targets self-check 49 / 49, replay 60 / 60 of the cloud corpus, three tiers and evil (111 verdicts each), 224 `Forward` frames, every edit and every `Forward` digest-equal; the schema lock check passes on the Linux arm64 server |
+| Android emulator | Android 15 (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 | every client verdict passes on both targets (self-check 49 / 49, replay 60 / 60, tiers, evil, write-back), 220 `Forward` frames all digest-equal |
+| iOS Simulator | iOS 27.0, iPhone 17, Xcode 27.1 Apple clang 21 C++20 | as Android, 218 `Forward` frames |
+
+The first Mac run failed one verdict in each column, the same one: the
+batch script's server container had not built `mapdemo_schema_freeze`, so
+`run_all_tiers.sh`'s schema lock check could not start (exit 127). The
+check runs on the server only; with the script fixed, the macOS column was
+run again and passed, and the other two were not repeated. The step wires
+of all three columns equal those of the cloud x86-64 run (`wb12b`) at
+500 / 500 ticks in every tier. A client receives fewer `Forward` frames
+than the other one sent edits: A forwards only to a client that has
+already written back, so each tier's first edits reach no one.
+`Edit` -> `EditAck` through the VM's network: 0.9 to 1.9 ms from macOS and
+the iOS Simulator, 4.7 to 5.7 ms from the Android emulator (simulator and
+emulator numbers, not device numbers).
+
+Output in the project folder `mapdemo-writeback-20261028/` (cloud) and
+`writeback_sim_out.tar.gz`, `writeback_macos2_out.tar.gz` (Mac).
 
 ## 9. Scope
 
