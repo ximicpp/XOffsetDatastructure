@@ -156,7 +156,7 @@ for s in $STEPS; do
     case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step: $s" >&2; exit 2 ;; esac
     # The GCC 16 matrix columns report "not run" without docker; the classic steps need it.
     # The client columns need the GCC 16 image only for the reference corpus.
-    case $s in p2996*) need_p2996=1 ;; gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20|wire-matrix) want_gcc=1 ;;
+    case $s in p2996*) need_p2996=1 ;; meta|gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20|wire-matrix) want_gcc=1 ;;
         msvc-*|clang-cl-*|mingw-*|ndk*|client-*) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
 done
 
