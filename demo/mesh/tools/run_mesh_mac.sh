@@ -433,7 +433,7 @@ live_run() {
     kill $poll_pid 2>/dev/null
     wait 2> /dev/null
     for name in android-emu-arm64 android-emu-arm64-noexc; do
-        "$ADB" pull "$DEV/run/$name/." "$LIVE/devices/$name/" > /dev/null 2>&1
+        [ $OK_AND = 1 ] && "$ADB" exec-out "tar -cf - -C $DEV/run/$name ." 2>/dev/null | tar -xf - -C "$LIVE/devices/$name"
     done
     rm -rf "$XOQ_OUT/mesh/hub" "$XOQ_OUT/mesh/devices"
     cp -R "$LIVE/hub" "$XOQ_OUT/mesh/hub" 2>/dev/null
@@ -476,7 +476,7 @@ mb_device() {
             "$ADB" shell "rm -rf $DEV/mbox; mkdir -p $DEV/mbox/in $DEV/mbox/out" > /dev/null || return 1
             "$ADB" push "$tmp/in/." "$DEV/mbox/in/" > /dev/null || return 1
             "$ADB" shell "cd $DEV && ./bin/$p --mailbox $DEV/mbox/in $DEV/mbox/out --id $id --name $name" >> "$lg" 2>&1 || return 1
-            "$ADB" pull "$DEV/mbox/out/." "$tmp/out/" > /dev/null || return 1
+            "$ADB" exec-out "tar -cf - -C $DEV/mbox/out ." | tar -xf - -C "$tmp/out" || return 1
             cp "$tmp/out/"* "$MBOX/box/" 2>/dev/null
             rm -rf "$tmp" ;;
         colima-linux-arm64-gcc) docker exec "$RT" "$VMBIN/xo_peer" --mailbox "$MBOX/box" "$MBOX/box" --id "$id" --name "$name" >> "$lg" 2>&1 ;;
@@ -513,7 +513,9 @@ mailbox_run() {
     tar -czf "$XOQ_OUT/mailbox/outbox.tar.gz" -C "$MBOX" outbox
     cp "$W/mac_inbox/INBOX_INFO.txt" "$XOQ_OUT/mailbox/"
     { echo "inbox_files=$n_in"; echo "outbox_files=$n_out"; echo "rounds=$r"
+      # shellcheck disable=SC2010
       echo "reports=$(ls "$MBOX/outbox" | grep -c '\.xmrep$')"; echo "no_meta_errors=$(ls "$MBOX/outbox" | grep -c '\.xmerr$')"
+      # shellcheck disable=SC2010
       echo "hop_files_for_cloud=$(ls "$MBOX/outbox" | grep -c '_to[0-9]\{1,2\}\.xmhop$')"; } > "$XOQ_OUT/mailbox/OUTBOX_INFO.txt"
     local missing=""
     for name in $devs; do [ -f "$MBOX/outbox/build_$(id_of "$name").txt" ] || missing="$missing $name"; done

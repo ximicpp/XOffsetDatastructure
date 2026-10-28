@@ -192,9 +192,10 @@ post)
     RC=$?
     tail -6 "$OUT/score/hub/summary.txt"
     MAIN=${XMESH_CLOUD_RUN:-$REPO/build/mesh-run}
+    # devices are listed under the id of the first run that has them: cloud mesh, mailbox, Mac mesh
     ALSO=""
+    if [ -f "$MAIN/hub/summary.txt" ]; then ALSO="--also $OUT/score"; else MAIN=$OUT/score; fi
     [ -f "$M/mesh/hub/summary.txt" ] && ALSO="$ALSO --also $M/mesh"
-    if [ -f "$MAIN/hub/summary.txt" ]; then ALSO="$ALSO --also $OUT/score"; else MAIN=$OUT/score; fi
     # shellcheck disable=SC2086
     python3 "$HERE/mesh_report.py" "$MAIN" $ALSO > "$OUT/CROSS_RESULT.md" || RC=1
     head -3 "$OUT/CROSS_RESULT.md"
