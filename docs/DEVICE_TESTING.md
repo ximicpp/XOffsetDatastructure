@@ -8,7 +8,7 @@
 
 ## 1. 测什么
 
-`tools/device/android_device.sh` 在手机上做两件事，和 Android 模拟器上已经通过的检查相同：
+`tools/device/android_device.sh` 在手机上做四件事。前两件和 Android 模拟器上已经通过的检查相同，后两件是手机上的性能和内存：
 
 1. **库**：C++20 字段表构建（Android NDK r29，arm64-v8a）的全量 CTest，每个测试程序用 adb 推到
    手机的 `/data/local/tmp/xo` 运行；再做 wire 语料检查：手机读入 Linux 服务端构建（GCC 16、
@@ -18,6 +18,12 @@
    容器里运行；demo 客户端（开异常、关异常两个版本）在手机上运行，经 `adb reverse` 连到电脑
    （手机上的 127.0.0.1:47800–48049 就是电脑）。每个客户端跑自检、回放 A 写的快照语料、
    1/100/10000 个单位各 500 步（dense、compact、zstd 三种快照轮换）、恶意输入。
+3. **slg 计时**（SC-6）：冻结的 `bench/slg` 在字段表构建上运行，带 FlatBuffers 25.12.19 对照。先 verify，
+   再计时 3 次（规模 M、41 轮），每次前记录温控状态和电量。`XO_SLG_RUNS`、`XO_SLG_SCALE`、
+   `XO_SLG_CYCLES` 可以改。计时时插着充电器、关掉其他 app、屏幕常亮。
+4. **内存上限**（SC-12）：`xo_mem_probe` 测单个缓冲区最大的 `maximum_capacity`、能同时保留多少
+   地址空间，再以 64 MiB 一步提交内存，直到被系统杀掉（默认上限是手机的 MemTotal，`XO_MEM_LIMIT`
+   改）。这一步会让手机暂时很卡、后台 app 被关掉，属正常现象。
 
 ## 2. 准备电脑
 
@@ -66,8 +72,8 @@ git rev-parse HEAD           # 与发版记录里的提交一致
 bash tools/device/android_device.sh
 ```
 
-依次做 setup（检查工具，缺 adb/NDK 时下载）、build（Android 程序、docker 里的服务端和参照语料）、
-run（手机上的三步）。第一次大约 30–60 分钟，大部分在编译。可以分开跑：
+依次做 setup（检查工具，缺 adb/NDK 时下载）、build（docker 里的 flatc、Android 程序、docker 里的服务端和参照语料）、
+run（手机上的五步）。第一次大约 30–60 分钟，大部分在编译。可以分开跑：
 
 ```sh
 bash tools/device/android_device.sh setup
@@ -98,9 +104,11 @@ result: ~/xo-device/3.2.0-rc.2-<提交前 7 位>/out-<UTC 时间>/RESULT.md; sen
 | `ctest.log`、`host_compile_tests.txt` | 手机上的 CTest、电脑上的编译失败测试 |
 | `corpus-*.log`、`corpus.sha256` | wire 语料检查 |
 | `demo/E2E_RESULT.md` 和各目录 | demo 每个客户端的自检、回放、三档、恶意输入 |
+| `slg/ANALYSIS.md`、`slg/run_*.jsonl`、`slg/info_*.txt` | slg 计时表、原始数据、每次计时前的温控和电量 |
+| `mem/SUMMARY.md` 和各文件 | 内存探测结果、低内存杀进程的日志 |
 | `SHA256SUMS` | 以上文件的校验和 |
 
-通过的样子：RESULT.md 里 `library CTest (phone)`、`wire corpus`、`demo` 三行都是 passed，
+通过的样子：RESULT.md 里 `library CTest (phone)`、`wire corpus`、`slg`、`mem`、`demo` 五行都是 passed，
 编译失败测试一行显示全部通过。
 
 ## 7. iPhone
@@ -145,5 +153,6 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
 - **容器写不了工作目录**：工作目录默认在 `~/xo-device`，Docker Desktop 和 colima 默认共享家目录；
   改了 `XO_WORK` 时要放在共享的目录下。
 - **端口被占用**：电脑上 127.0.0.1 的 47800–47849、47900–47949、48000–48049 要空着。
-- **只想重跑某一步**：`XO_SKIP="ctest corpus" bash tools/device/android_device.sh run` 只跑 demo。
-- **手机上的性能和内存**：这一版不测。「在手机上实测性能和体积」会在同一脚本上加 `slg`、`mem` 子命令。
+- **只想重跑某一步**：`XO_SKIP="ctest corpus slg mem" bash tools/device/android_device.sh run` 只跑 demo。
+- **没有 docker 编 flatc**：用 Mac 上 `run_phone_mac.sh fb` 生成的 `slg_generated.h`，
+  `XO_FB_GENERATED=<它所在的目录>`；`XO_NO_FB=1` 则 slg 不带 FlatBuffers。

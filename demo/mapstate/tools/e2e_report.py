@@ -208,6 +208,10 @@ def target_summary(out_root, name, corpus_rows):
             else:
                 wb["c2_sent"] += c.get("acked", 0)
                 wb["c2_received"] += c.get("forwards_received", 0)
+    # Judged by the write-back verdicts alone: another failed verdict of the
+    # tiers is reported in the target's row, not as a write-back failure.
+    wbv = [v for v in verdicts if "write-back" in v.get("name", "") or "edits.csv" in v.get("name", "")]
+    wb["ok"] = bool(wbv) and all(v.get("ok") for v in wbv)
     t["writeback"] = wb if wb["tiers"] else None
     c2cmd = (tiers[0].get("meta", {}).get("client2_cmd", "") if tiers else "") or ""
     c2build = read_text(os.path.join(root, tiers[0].get("name", ""), "client2", "client_build.txt")) if tiers else ""
@@ -276,7 +280,7 @@ def main():
                      "rebuild to the other writer when it runs the same schema version ({} Forward frames); every "
                      "edit and every Forward digest-equal: {}".format(
                          len(with_writeback), len(targets), sum(t["writeback"]["forwards"] for t in with_writeback),
-                         "yes" if all(t["tiers_ok"] for t in with_writeback) else "NO (see the tiers' verdicts)"))
+                         "yes" if all(t["writeback"]["ok"] for t in with_writeback) else "NO (see the tiers' verdicts)"))
     lines.append("")
     lines.append("## Targets")
     lines.append("")
@@ -306,7 +310,9 @@ def main():
         lines.append("## Write-back (all tiers)")
         lines.append("")
         lines.append("edits = the target client's write-backs A acknowledged / sent; forwarded = Forward frames A sent "
-                     "(to the second client and back); received = Forwards each client verified.")
+                     "(to the second client and back); received = Forwards each client verified. A forwards an edit "
+                     "only to a client that has already written back and is still connected, so the edits a client "
+                     "sends before the other one's first reach no one.")
         lines.append("")
         lines.append("| target | second client (runs under, build) | edits acknowledged / sent | second client's edits | "
                      "Forward frames | received by the target | received by the second client |")

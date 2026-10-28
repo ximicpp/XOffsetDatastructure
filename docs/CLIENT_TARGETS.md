@@ -143,6 +143,8 @@ iOS 不能运行命令行程序，Android 真机也不方便逐个推送测试�
 `xo_host_run.py` 可以当 CTest 的 `CMAKE_CROSSCOMPILING_EMULATOR`（`ios-simulator.cmake` 在
 `XOFFSET_TEST_HOST=ON` 时就这样设，`ios-device.cmake` 用 `XO_HOST_DEVICE`），也可以给
 `demo/mapstate/tools/run_e2e.sh` 当客户端包装命令。它把输入文件和输出目录在电脑和设备之间来回拷贝，
-程序看到的路径和在电脑上一样；退出码是程序自己的，被信号杀掉时是 128+信号。
+程序看到的路径和在电脑上一样；退出码是程序自己的，被信号杀掉时是 128+信号。程序替换的 `operator new` / `delete`
+（分配计数、失败注入）经宿主转发，C++ 运行库内部的分配也会走到它们，和普通可执行文件一样
+（`test_host_new_forwarding` 检查这一点）。
 云端 Linux 上用 `local` backend 检查过：129/129 个 CTest 通过，演示端到端（自检 23/23、语料回放 60/60、
 三档压力和恶意输入）全部通过。

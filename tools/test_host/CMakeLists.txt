@@ -5,6 +5,7 @@
 #
 # Programs that exist only for phone measurements live here too:
 #   xo_mem_probe   SC-12: address space and memory a process may use (mem_probe.cpp)
+#   xo_host_selftest  (test_host_new_forwarding) the host serves a program's operator new
 #   xo_slg_bench   SC-6: bench/slg/bench/slg_bench.cpp on the field-list backend, with
 #                  FlatBuffers when -DXO_SLG_FLATBUFFERS_INCLUDE (flatbuffers headers) and
 #                  -DXO_SLG_GENERATED (directory with slg_generated.h from flatc) are given
@@ -28,6 +29,13 @@ if(XO_SLG_CEREAL_INCLUDE)
     target_include_directories(xo_slg_bench SYSTEM PRIVATE "${XO_SLG_CEREAL_INCLUDE}")
     target_compile_definitions(xo_slg_bench PRIVATE SLG_WITH_CEREAL=1)
 endif()
+if(XOFFSET_TEST_HOST)
+    add_executable(xo_host_selftest host_selftest.cpp)
+    target_compile_features(xo_host_selftest PRIVATE cxx_std_17)
+    set_target_properties(xo_host_selftest PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin/$<CONFIG>")
+    add_test(NAME test_host_new_forwarding COMMAND xo_host_selftest)
+    set_tests_properties(test_host_new_forwarding PROPERTIES LABELS "tooling")
+endif()
 xoffset_test_host_modules()
 if(NOT XOFFSET_TEST_HOST)
     return()
@@ -48,7 +56,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         OUTPUT_VARIABLE XO_HOST_SDK_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
     set(XO_HOST_MIN_OS "${CMAKE_OSX_DEPLOYMENT_TARGET}")
     configure_file(Info.plist.in "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" @ONLY)
-    add_executable(xoffset_test_host MACOSX_BUNDLE host_ios.mm host_core.cpp)
+    add_executable(xoffset_test_host MACOSX_BUNDLE host_ios.mm host_core.cpp host_new.cpp)
     set_target_properties(xoffset_test_host PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist"
         RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin/$<CONFIG>")
@@ -57,7 +65,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(xoffset_test_host PRIVATE "-framework UIKit" "-framework CoreGraphics" "-framework Foundation")
     set(frameworks "$<TARGET_BUNDLE_DIR:xoffset_test_host>/Frameworks")
 else()
-    add_executable(xoffset_test_host host_cli.cpp host_core.cpp)
+    add_executable(xoffset_test_host host_cli.cpp host_core.cpp host_new.cpp)
+    # the program libraries bind the host's operator new and delete (host_new.cpp)
+    set_target_properties(xoffset_test_host PROPERTIES ENABLE_EXPORTS ON)
     set_target_properties(xoffset_test_host PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin/$<CONFIG>")
     target_compile_features(xoffset_test_host PRIVATE cxx_std_17)
     find_package(Threads REQUIRED)
