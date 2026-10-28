@@ -14,8 +14,9 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
 - 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
-  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）和 Android arm64
-  （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
+  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）、Android arm64
+  （NDK r29/r30）和 macOS arm64（Apple clang）全量测试通过，读入服务端写出的参照语料，改过后
+  再存出与服务端相同的字节。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
   客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
   [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 未测；
@@ -59,7 +60,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 | --- | --- | --- |
 | 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
 | 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
-| 客户端 | Android、iOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0-rc.1 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| 客户端 | Android、iOS、macOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0-rc.1 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），macOS 用 Apple clang（Xcode 27.1，C++20、C++23 各 137/137），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
   `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
