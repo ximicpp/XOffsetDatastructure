@@ -40,6 +40,7 @@ endfunction()
 function(xmesh_executable name core)
     add_executable(${name} ${ARGN})
     target_link_libraries(${name} PRIVATE ${core})
+    target_include_directories(${name} PRIVATE src)
     set_target_properties(${name} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)
 endfunction()
@@ -59,7 +60,7 @@ if(XMESH_NOEXC_PEER)
 endif()
 
 if(NOT XMESH_PEER_ONLY)
-    xmesh_executable(xo_hub xmesh_core src/hub_main.cpp)
+    xmesh_executable(xo_hub xmesh_core src/hub_main.cpp src/hub/hub.cpp src/hub/http.cpp src/hub/qr.cpp)
     xmesh_executable(xmesh_schema_freeze xmesh_core src/schema_freeze.cpp)
 endif()
 
