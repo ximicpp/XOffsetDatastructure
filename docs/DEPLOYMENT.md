@@ -172,8 +172,35 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 - **客户端链路（尤其移动网络）建议在外层加 zstd 压缩**，或 lz4（更快、压缩率较低）。
   压缩在 `save_verified` 之后、`load_verified` 之前做，不影响库的校验。解压时同样
   要限制解压后的长度，防止压缩炸弹。
-- 压缩后的大小、压缩耗时没有测过，接入时按实际数据实测并选择压缩级别。
 - 数据只能整块发送，没有增量同步；需要增量时由上层协议拆分 schema。
+
+### 6.1 压缩怎么选
+
+压缩不在库里，库只管 wire 的生成和校验。按消息大小选：
+
+| 消息 | 选择 | 依据（云上 x86-64 实测） |
+| --- | --- | --- |
+| 大快照（KB 级以上：整场景、视野、全量状态） | **zstd level 3**，标准帧 | demo 整场景 321 KB → 123 KB（0.38），视野 15.1 KB → 6.4 KB（0.42）；`save_compact` + `XCompactOptions{0}` 再加 zstd-3，SLG A/B/C 比 FlatBuffers 原始大小小 7–9% |
+| 小消息（几十到几百字节：事件、战报、指令） | **zstd 字典**；同一时刻要发多条时**再批量**（多条一帧） | 不用字典时 zstd 对小消息几乎没用：SLG 战报（D 类，XOffset 197 B、FlatBuffers 158 B）压缩后 XOffset 135.9 B、FlatBuffers 114.0 B（1.19 倍）；用 16 KB 字典：单条 56.2 B 对 56.3 B（1.00），每批 8 / 32 / 128 条平均 40.4 / 37.2 / 34.5 B 对 41.9 / 38.1 / 35.3 B（0.96 / 0.98 / 0.98）。编码约 1.2–1.5 µs、解码约 0.5–0.7 µs 每条 |
+| CPU 紧张（低端手机、每帧预算很小） | **lz4** | 压缩率比 zstd 低、速度快；本项目没有测 lz4 的数字，接入时实测 |
+
+小消息的字典压缩用 `contrib/zstd_dict`（独立组件，C++17，要链接 zstd 1.5.x，不进库）：
+
+- **字典从服务端样本训练**：`xoffset_zstd_dict train --id N --binding auto INPUT...`，样本是真实的
+  XOffset wire（几千条以上）。训练是确定的，同样的样本得到同样的字典。
+- **两端都带字典版本**：字典 id 就是版本号，写在每一帧的帧头里。客户端订阅时报自己的字典 id，
+  服务端不一致就拒绝订阅；解码端遇到别的 id 的帧在解码前就拒绝（`dict_id_mismatch`）。
+  换字典 = 换 id，新旧字典同时在服务端保留到旧客户端升级完。
+- **字典绑定 schema**：`--binding auto` 把字典绑到样本 wire 头里的 schema 指纹，编码端拒绝别的
+  schema 的 wire；绑定后每帧省掉 wire 头里固定的 24 字节，解码端补回。改 schema 就要重训字典。
+- **限长**：解码前按帧头声明的长度和调用方给的上限拒绝，不先分配；批量帧限制条数和每条长度。
+  解出来的仍是未校验的 wire，照常走 `load_verified`。
+- 帧不带校验和，完整性交给传输层（TCP/TLS）和 `load_verified`。
+
+`demo/mapstate` 的事件流是完整例子：A 每 20 tick 推送一批 UnitEvent（每条 144–168 B），
+客户端按 `--events raw|zstd|zdict|batch` 订阅。10000 单位档每条平均网络字节：
+raw 146、zstd 152、字典 68、每帧 100 条批量 52。
+
 
 ## 7. 接入检查清单
 
@@ -188,4 +215,5 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 - [ ] 客户端用较小的 `maximum_capacity` 或 `XBufferPool`
 - [ ] 外层有认证（TLS 或签名）和业务字段检查
 - [ ] 限制了并发 buffer 数和总内存预算
-- [ ] 客户端链路评估过 zstd/lz4 压缩，并限制了解压后长度
+- [ ] 客户端链路按 6.1 节选了压缩（大快照 zstd-3，小消息字典或批量，CPU 紧张用 lz4），并限制了解压后长度
+- [ ] 用字典时：两端比较字典 id，字典绑定 schema，改 schema 时重训并换 id

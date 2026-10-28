@@ -8,7 +8,7 @@
 //   mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
 //             [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
 //             [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
-//             [--corpus-dir DIR [--corpus-max 60]]
+//             [--corpus-dir DIR [--corpus-max 60]] [--events-dict FILE] [--events-dump DIR]
 //
 // --host is the address A listens on for clients (0.0.0.0 inside a
 // container whose port the host forwards). Snapshots go out in the encoding
@@ -16,6 +16,12 @@
 // --corpus-dir keeps the first --corpus-max snapshot payloads exactly as
 // sent, with their digests (corpus.csv), for mapdemo_client --replay on
 // targets that cannot reach this server.
+// Event stream (codec.hpp): a client that sends Subscribe gets the UnitEvent
+// wires of every event tick in the encoding it names; dictionary encodings
+// use the built-in event dictionary, or --events-dict FILE, and a client
+// holding another dictionary version is refused. --events-dump DIR appends
+// every event wire to DIR/events.bin ([u64 length][wire] records) to train
+// a dictionary with contrib/zstd_dict.
 //
 // Each step: save(cur) -> StepReq to B -> StepRes -> verify into spare ->
 // (checks) -> spare becomes cur. At most one step is in flight; steps are
@@ -28,6 +34,7 @@
 //                    (cur/spare ping-pong), one request buffer per client,
 //                    one snapshot buffer refilled with reset<ViewSnapshot>().
 //                    Same validation and byte-identical wires.
+#include <algorithm>
 #include <csignal>
 #include <cerrno>
 #include <cinttypes>
@@ -79,6 +86,8 @@ struct Options {
     std::string csv_dir;
     std::string corpus_dir;
     std::uint64_t corpus_max = 60;
+    std::string events_dict;        // empty: the built-in event dictionary
+    std::string events_dump;
 };
 
 [[noreturn]] void usage_error(const std::string& what) {
@@ -87,7 +96,8 @@ struct Options {
         "usage: mapdemo_a [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]\n"
         "                 [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]\n"
         "                 [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]\n"
-        "                 [--corpus-dir DIR [--corpus-max 60]]\n", what.c_str());
+        "                 [--corpus-dir DIR [--corpus-max 60]] [--events-dict FILE] [--events-dump DIR]\n",
+        what.c_str());
     std::exit(2);
 }
 
@@ -133,6 +143,8 @@ Options parse(int argc, char** argv) {
         else if (a == "--csv-dir") o.csv_dir = value();
         else if (a == "--corpus-dir") o.corpus_dir = value();
         else if (a == "--corpus-max") o.corpus_max = parse_u64("--corpus-max", value(), 100000);
+        else if (a == "--events-dict") o.events_dict = value();
+        else if (a == "--events-dump") o.events_dump = value();
         else usage_error(std::string("unknown argument ") + argv[i]);
     }
     return o;
@@ -185,6 +197,8 @@ struct Client {
     bool close_after_flush = false;
     XBuffer req_buf;          // reuse: reloaded for every ViewReq
     bool req_ready = false;
+    bool subscribed = false;
+    std::uint16_t event_mode = 0;   // codec::EventEncoding or codec::kEventCycle
 };
 
 class ServerA {
@@ -207,6 +221,9 @@ private:
     void on_client_readable(Client& c);
     void on_client_frame(Client& c, net::Frame frame);
     void serve_view(Client& c, net::Frame frame);
+    void subscribe(Client& c, const net::Frame& frame);
+    void load_event_dictionary();
+    void publish_events(std::uint64_t tick);
     void reject(Client& c, const std::string& why, bool close_conn);
     void write_corpus(std::uint64_t request_id, std::uint16_t flags, const char* category, codec::Encoding enc,
                       const std::string& payload, std::size_t wire_bytes, std::uint64_t wire_digest,
@@ -271,6 +288,19 @@ private:
     metrics::CsvFile snaps_csv_;
     metrics::CsvFile corpus_csv_;
     std::uint64_t corpus_written_ = 0;
+
+    // event stream
+    codec::EventEncoder events_enc_;
+    std::uint32_t event_dict_id_ = 0;    // 0: no dictionary (raw and zstd only)
+    std::string event_dict_error_;       // why there is none
+    XBuffer event_buf_;                  // reuse: refilled for every event
+    bool event_buf_ready_ = false;
+    std::vector<std::string> event_wires_;
+    std::string event_payloads_[codec::kEventEncodingCount];
+    std::uint64_t event_frames_[codec::kEventEncodingCount] = {};
+    std::uint64_t event_ticks_ = 0, events_built_ = 0, subscribers_ = 0;
+    metrics::CsvFile events_csv_;
+    std::FILE* events_dump_ = nullptr;
 };
 
 // ---------------------------------------------------------------- setup
@@ -288,6 +318,9 @@ void ServerA::open_csv() {
             "request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,"
             "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us"))
         throw Fatal{2, "cannot open " + snaps_path};
+    const std::string events_path = opt_.csv_dir + "/a_events.csv";
+    if (!events_csv_.open(events_path, "tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us"))
+        throw Fatal{2, "cannot open " + events_path};
 }
 
 void ServerA::build_catalog() {
@@ -437,6 +470,7 @@ void ServerA::on_step_result(net::Frame frame) {
     inflight_ = false;
     ++steps_done_;
     last_done_ns_ = done_ns;
+    if (expect % kEventPeriodTicks == 0) publish_events(expect);
 
     if (csv_) {
         char line[320];
@@ -504,7 +538,7 @@ void ServerA::on_client_readable(Client& c) {
     for (;;) {
         std::optional<net::Frame> f;
         try {
-            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq});
+            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq, MsgType::Subscribe});
         } catch (const net::PeerClosed&) {
             std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
             c.conn.close();
@@ -536,7 +570,11 @@ void ServerA::on_client_frame(Client& c, net::Frame frame) {
         c.conn.flush();
         return;
     }
-    if (!c.hello_done) { reject(c, "ViewReq before Hello", true); return; }
+    if (!c.hello_done) { reject(c, std::string(net::type_name(frame.type)) + " before Hello", true); return; }
+    if (frame.type == MsgType::Subscribe) {
+        subscribe(c, frame);
+        return;
+    }
     serve_view(c, std::move(frame));
 }
 
@@ -740,6 +778,159 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     if (!check_ok) throw Fatal{1, "snapshot check failed for request " + std::to_string(request_id)};
 }
 
+// ---------------------------------------------------------------- events
+
+void ServerA::load_event_dictionary() {
+    std::uint32_t id = 0;
+    Result<std::string> file = codec::load_event_dictionary(opt_.events_dict, &id);
+    if (file) {
+        if (Status s = events_enc_.set_dictionary(*file); !s) throw Fatal{2, s.error().message};
+        event_dict_id_ = id;
+    } else if (!opt_.events_dict.empty()) {
+        throw Fatal{2, file.error().message};   // asked for one that does not load
+    } else {
+        event_dict_error_ = file.error().message;   // no built-in dictionary: raw and zstd only
+    }
+    if (!opt_.events_dump.empty()) {
+        const std::string path = opt_.events_dump + "/events.bin";
+        events_dump_ = std::fopen(path.c_str(), "wb");
+        if (events_dump_ == nullptr) throw Fatal{2, "cannot write " + path};
+    }
+}
+
+void ServerA::subscribe(Client& c, const net::Frame& frame) {
+    if (c.subscribed) { reject(c, "second Subscribe", true); return; }
+    Result<std::uint32_t> dict_id = codec::parse_subscribe(frame.payload);
+    if (!dict_id) { reject(c, dict_id.error().message, false); return; }
+    const std::uint16_t mode = frame.flags;
+    if (mode != codec::kEventCycle && !codec::parse_event_flags(mode)) {
+        reject(c, "subscribe: unknown event encoding " + std::to_string(mode), false);
+        return;
+    }
+    if (mode != static_cast<std::uint16_t>(codec::EventEncoding::Raw) && !codec::zstd_available()) {
+        reject(c, "subscribe: event encoding " + std::string(codec::event_mode_name(mode)) +
+                  " is not available (built without zstd)", false);
+        return;
+    }
+    if (codec::event_mode_uses_dictionary(mode)) {
+        if (event_dict_id_ == 0) {
+            reject(c, "subscribe: A has no event dictionary (" + event_dict_error_ + ")", false);
+            return;
+        }
+        if (*dict_id != event_dict_id_) {
+            reject(c, "subscribe: event dictionary " + std::to_string(*dict_id) + " does not match A's dictionary " +
+                      std::to_string(event_dict_id_), false);
+            return;
+        }
+    }
+    c.subscribed = true;
+    c.event_mode = mode;
+    ++subscribers_;
+    std::fprintf(stderr, "a: client %" PRIu64 " subscribed to events (%s, dictionary %u)\n", c.id,
+                 codec::event_mode_name(mode), unsigned(event_dict_id_));
+    c.conn.enqueue(MsgType::SubscribeOk, 0, std::string());
+    c.conn.flush();
+}
+
+// The UnitEvent wires of event tick `tick` (cur_ holds that tick), in id
+// order, split into frames of at most kMaxEventsPerFrame; each subscriber
+// gets them in its encoding (cycle: event number % 4). Not on a timed path
+// of the step loop's own metrics.
+void ServerA::publish_events(std::uint64_t tick) {
+    bool any = events_dump_ != nullptr;
+    for (const auto& c : clients_) any = any || (c->conn.is_open() && c->subscribed);
+    if (!any) return;
+    ++event_ticks_;
+    metrics::Stopwatch sw;
+    const auto& units = cur_root().units;
+    std::size_t n = 0;
+    try {
+        for (std::size_t i = 0; i < units.size(); ++i) {
+            const auto& u = units[i];
+            if (u.id % kEventIdModulo != 0) continue;
+            if (reuse() && event_buf_ready_) {
+                event_buf_.reset<UnitEvent>();
+            } else {
+                event_buf_ = XBuffer::create<UnitEvent>(512, cap_event());
+                event_buf_ready_ = true;
+            }
+            auto& e = event_buf_.root<UnitEvent>();
+            e.tick = tick;
+            e.unit_id = u.id;
+            e.hp = u.hp;
+            e.pos = u.pos;
+            e.behavior = u.behavior;
+            e.next_waypoint = u.next_waypoint;
+            e.name = u.name.view();
+            e.path.reserve(std::uint32_t(u.path.size()));
+            for (std::size_t k = 0; k < u.path.size(); ++k) e.path.push_back(u.path[k]);
+            if (event_wires_.size() <= n) event_wires_.emplace_back();
+            event_buf_.save_compact_into<UnitEvent>(event_wires_[n], XCompactOptions{0});
+            if (event_wires_[n].size() > kCapEvent) throw Fatal{2, "capacity: a UnitEvent wire exceeds 4 KiB"};
+            if (!reuse()) {
+                event_buf_ = XBuffer();
+                event_buf_ready_ = false;
+            }
+            ++n;
+        }
+    } catch (const XBadAlloc& e) {
+        throw Fatal{2, std::string("capacity: UnitEvent cap 4 KiB exceeded (") + e.what() + ")"};
+    }
+    rec_.add("a.event_build_us", sw.us());
+    if (n == 0) return;
+    events_built_ += n;
+    if (events_dump_ != nullptr) {
+        for (std::size_t i = 0; i < n; ++i) {
+            const std::uint64_t len = event_wires_[i].size();
+            unsigned char le[8];
+            for (int b = 0; b < 8; ++b) le[b] = static_cast<unsigned char>(len >> (8 * b));
+            if (std::fwrite(le, 1, 8, events_dump_) != 8 ||
+                std::fwrite(event_wires_[i].data(), 1, len, events_dump_) != len)
+                throw Fatal{2, "cannot write " + opt_.events_dump + "/events.bin"};
+        }
+    }
+    const std::uint16_t cycled = static_cast<std::uint16_t>((tick / kEventPeriodTicks) % codec::kEventEncodingCount);
+    std::vector<std::string_view> part;
+    for (std::size_t first = 0, index = 0; first < n; first += kMaxEventsPerFrame, ++index) {
+        const std::size_t last = std::min(n, first + kMaxEventsPerFrame);
+        part.assign(event_wires_.begin() + std::ptrdiff_t(first), event_wires_.begin() + std::ptrdiff_t(last));
+        bool done[codec::kEventEncodingCount] = {};
+        std::uint64_t digest = 0;
+        std::size_t wire_bytes = 0;
+        for (std::string_view w : part) wire_bytes += w.size();
+        for (auto& c : clients_) {
+            if (!c->conn.is_open() || !c->subscribed) continue;
+            const std::uint16_t enc = c->event_mode == codec::kEventCycle ? cycled : c->event_mode;
+            std::string& payload = event_payloads_[enc];
+            if (!done[enc]) {
+                metrics::Stopwatch ew;
+                if (Status st = events_enc_.encode(static_cast<codec::EventEncoding>(enc), part, payload); !st)
+                    throw Fatal{2, st.error().message};
+                const double encode_us = ew.us();
+                rec_.add(std::string("a.event_encode_us.") + codec::event_mode_name(enc), encode_us);
+                rec_.add(std::string("a.event_net_bytes_per_event.") + codec::event_mode_name(enc),
+                         double(payload.size()) / double(part.size()));
+                done[enc] = true;
+                ++event_frames_[enc];
+                if (digest == 0) {
+                    std::string raw;
+                    if (Status st = events_enc_.encode(codec::EventEncoding::Raw, part, raw); !st)
+                        throw Fatal{2, st.error().message};
+                    digest = checks::wire_digest(raw);
+                }
+                if (csv_) {
+                    events_csv_.row(std::to_string(tick) + "," + std::to_string(index) + "," +
+                                    codec::event_mode_name(enc) + "," + std::to_string(part.size()) + "," +
+                                    std::to_string(wire_bytes) + "," + std::to_string(payload.size()) + "," +
+                                    hex16(digest) + "," + fmt_us(encode_us));
+                }
+            }
+            c->conn.enqueue(MsgType::Events, tick, payload, enc);
+            c->conn.flush();
+        }
+    }
+}
+
 // ---------------------------------------------------------------- shutdown
 
 void ServerA::fail_check(const std::string& check, const std::string& detail) {
@@ -805,6 +996,10 @@ void ServerA::finish() {
         if (c->conn.is_open() && c->hello_done) c->conn.enqueue(MsgType::Bye, 0, std::string());
     flush_all_blocking(kByeFlushNs);
     close_clients(kByeFlushNs);
+    if (events_dump_ != nullptr) {
+        std::fclose(events_dump_);
+        events_dump_ = nullptr;
+    }
 }
 
 void ServerA::write_results() {
@@ -859,6 +1054,11 @@ void ServerA::write_results() {
             " category_mismatch=" + std::to_string(category_mismatch_)});
     }
     rows.push_back(CheckRow{"rejected_requests", true, "count=" + std::to_string(rejected_)});
+    rows.push_back(CheckRow{"event_stream", true,
+        "subscribers=" + std::to_string(subscribers_) + " dictionary=" + std::to_string(event_dict_id_) +
+        " event_ticks=" + std::to_string(event_ticks_) + " events=" + std::to_string(events_built_) +
+        " raw=" + std::to_string(event_frames_[0]) + " zstd=" + std::to_string(event_frames_[1]) +
+        " zdict=" + std::to_string(event_frames_[2]) + " batch=" + std::to_string(event_frames_[3])});
 
     for (const auto& r : rows)
         if (!r.ok) std::fprintf(stderr, "error: check %s: %s\n", r.check.c_str(), r.detail.c_str());
@@ -880,6 +1080,7 @@ void ServerA::write_results() {
 
 int ServerA::run() {
     open_csv();
+    load_event_dictionary();
     build_catalog();
     build_initial_batch();
     if (!failures_.empty()) throw Fatal{1, "initial batch failed its checks"};

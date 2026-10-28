@@ -38,12 +38,26 @@ codec returns `Status`; the client verifies with `try_load_verified` /
 sources without exceptions, and `e2e_report.py` requires the same
 self-check outcomes and texts on every target.
 
+Small-message iteration (10-28, branch `claude/small-msg-dict-20261028` from
+next_cpp26 af601ea, one thread, agreed with the demo thread): an optional
+event stream. A client that subscribes gets the rules' unit events (every
+20 ticks, the units with id % 100 == 0) as `UnitEvent` wires, raw, zstd,
+zstd with a dictionary, or batched in one dictionary frame. The dictionary
+code is `contrib/zstd_dict` (outside the library); the dictionary
+(`dict/unit_event_v1.xozd`, id 1, trained on A's events) is compiled into
+every binary at configure time. The Subscribe names the client's dictionary
+id and A refuses another. New: `MsgType` 10-12, `codec` event encoder and
+decoder, A `--events-dict` / `--events-dump`, client `--events`, three evil
+cases, 25 self-check cases (48 in all), `a_events.csv` / `client_events.csv`. Without
+`--events` (the default `off`) the client never subscribes and runs exactly
+as before.
+
 | Owner thread | Files |
 | --- | --- |
 | Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/codec.cpp`, `src/selftest.cpp` |
 | Servers | `src/server_a.cpp`, `src/server_b.cpp` (+ optional `src/server_*.hpp`) |
 | Client | `src/client_main.cpp`, `src/client_core.cpp`, `src/client_core.hpp`, `src/client_offline.cpp`, `src/client_gui.cpp` |
-| Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files |
+| Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files, `dict/*.xozd` |
 
 Frozen headers (`schema.hpp`, `std_model.hpp`, `rules.hpp`, `net.hpp`,
 `metrics.hpp`, `checks.hpp`, `codec.hpp`, `result.hpp`) change only with a note to every demo thread
@@ -67,7 +81,11 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
   reflection. The Hello schema hash is the same in both builds.
 - zstd 1.5.7 is built from its release tarball (SHA-256 pinned;
   `-DMAPDEMO_ZSTD_URL=<local copy>` builds offline; `-DMAPDEMO_WITH_ZSTD=OFF`
-  leaves dense and compact only).
+  leaves dense and compact only, and the raw event encoding).
+- With zstd, `contrib/zstd_dict/xoffset_zstd_dict.cpp` is compiled into the
+  common library, and configure turns `dict/unit_event_v1.xozd` into a C++
+  array (`file(READ ... HEX)`, no host tool, so cross builds need nothing
+  extra). Without that file the dictionary encodings are unavailable.
 - All demo code is built with `-ffp-contract=off` (set on `mapdemo_common`;
   MSVC does not contract by default).
 - Write conservative C++ for clang-p2996 d77eff1: explicit includes (`<span>`,
@@ -80,9 +98,10 @@ mapdemo_b      [--port 47702] [--seed 1] [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_a      [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
                [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
                [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
-               [--corpus-dir DIR [--corpus-max 60]]
+               [--corpus-dir DIR [--corpus-max 60]] [--events-dict FILE] [--events-dump DIR]
 mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check]
                [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]
+               [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]
                [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]
 mapdemo_client --self-check [--csv-dir DIR]
 mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]
@@ -96,10 +115,29 @@ mapdemo_selftest [--csv-dir DIR]
 - Client `--encoding` (default `zstd`, or `compact` without zstd): the
   snapshot encoding asked for in every `ViewReq`; `cycle` takes
   `request_id % 3` (dense, compact, zstd), so one run covers all three.
+- A `--events-dict FILE` / client `--events-dict FILE`: use this `.xozd`
+  file instead of the built-in dictionary (it must be bound to `UnitEvent`).
+  A `--events-dump DIR`: appends every event wire A builds to
+  `DIR/events.bin` (u64 little-endian length + wire), the training input of
+  `xoffset_zstd_dict train ... records:DIR/events.bin`.
+- Client `--events` (default `off`): after the `Catalog` the client sends
+  `Subscribe` with this mode and its dictionary id, waits for `SubscribeOk`,
+  then takes `Events` frames between snapshots. `cycle` lets A rotate the
+  encoding per event tick (`tick / 20 % 4`: raw, zstd, zdict, batch). A
+  refusal (`Error`) is an error: "A refused the event subscription: ...".
 - Client `--self-check`: no network; builds sample snapshots and checks that
   every encoding verifies and that the refusal cases are refused (truncated
   and bit-flipped wires, wrong schema, malformed zstd frames, over-cap
-  sizes). Exit 0 when all pass.
+  sizes). The event cases: the built-in dictionary parses; every event
+  encoding round trips 20 events to the same wires and shrinks them; and
+  these are refused: a count of 0, a truncated or trailing event, the wrong
+  schema, a truncated wire inside a dictionary frame, a zstd frame without
+  a content size, frames made with dictionary version 2 (single and batch),
+  dictionary frames without an id or a size, truncated, with a trailing
+  byte, in the standard (magic) format or declaring more than the event cap,
+  batches of 129 events, a forged length or a message shorter than a wire
+  header, a dictionary file with a bad checksum, and a dictionary bound to
+  another schema. Exit 0 when all pass.
 - Client `--replay DIR`: no network; verifies every corpus snapshot and
   compares wire bytes, wire digest, content digest, request id and visible
   count with A's row, so every platform shows it reads the same bytes the
@@ -146,6 +184,7 @@ mapdemo_selftest [--csv-dir DIR]
 | Client connects to A | client `Hello` → A `HelloOk`, then A `Catalog(MapCatalog wire)` |
 | View | client `ViewReq(corr = request_id, flags = codec::view_flags(category, encoding), ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot payload in that encoding)`; at most one outstanding per client |
 | Illegal / malformed request | A answers `Error(text)` (bad wire or illegal rect) or closes the connection (bad header, oversize length), logs `rejected: ...`, keeps running |
+| Events (optional) | client `Subscribe(flags = event mode, codec::subscribe_payload(dictionary id))` after the `Catalog` → A `SubscribeOk`, or `Error` for a second Subscribe, a bad payload (length, UnitEvent fingerprint, reserved field), an unknown mode, a build without zstd, or a dictionary mode while the ids differ ("subscribe: event dictionary X does not match A's dictionary Y"); then after each step whose tick % 20 == 0, A sends `Events(corr = tick, flags = event encoding, payload)` per 128 events, none after `Bye` |
 | End | A `Bye` to B and client |
 
 `net` behaviour (src/net.cpp):
@@ -181,6 +220,23 @@ was built without it. Encodings of the `ViewSnapshot` payload:
 | 0 `dense` | `save_verified` wire |
 | 1 `compact` | `save_compact` wire (`XCompactOptions{0}`: no spare capacity) |
 | 2 `zstd` | the compact wire as one zstd frame, level 3 |
+
+`Events` payload encodings (`codec::EventEncoding`, the frame's flags):
+
+| Encoding | Payload |
+| --- | --- |
+| 0 `raw` | varint count, then per event varint length + the `UnitEvent` wire (`save_compact`, `XCompactOptions{0}`) |
+| 1 `zstd` | varint count, then per event varint length + a zstd level 3 frame of the wire, no dictionary |
+| 2 `zdict` | varint count, then per event varint length + a lean dictionary frame (`contrib/zstd_dict`: magicless, dictionary id and content size, no checksum, the 24 bound header bytes left out) |
+| 3 `batch` | one lean dictionary frame holding all the events (varint count, then varint length + elided wire each) |
+
+The decoder checks before allocating: count 1..128, every part and every
+declared content size within `kCapEvent` (4 KiB per wire; the frame
+length limit is 1 MiB), the frame's dictionary id equal to its own,
+exactly one frame per part and nothing after the last event. Then the client
+verifies every wire with `try_load_verified<UnitEvent>` /
+`try_reload_verified` and checks its content (tick, id % 100, ascending ids,
+hp 50..100, behavior, name, path and waypoint, position in the scene).
 
 The client decodes a zstd payload only when it is exactly one standard zstd
 frame (no skippable frame, no trailing bytes) whose header declares a content
@@ -224,8 +280,11 @@ snapshot wire bytes differ from runs before 10-27.
   truncated one, another valid one (a rejected wire on a kept receive buffer
   must not break the next request on that connection); (5) a `ViewReq` asking
   for encoding 3; (6) a `ViewReq` with reserved flag bit 12 set. Expects
-  `Error` or a close for each bad request; exit 0 when all six were rejected
-  and A answered every valid request. A logs six `rejected:` lines.
+  `Error` or a close for each bad request; (7) a `Subscribe` holding
+  dictionary version 2, (8) a `Subscribe` with another `UnitEvent` schema
+  hash, (9) a `Subscribe` asking for event encoding 7, each answered by
+  `Error`. Exit 0 when all nine were rejected and A answered every valid
+  request. A logs nine `rejected:` lines.
 
 ## 6. Metrics (metrics.hpp names) and CSV files
 
@@ -252,11 +311,20 @@ Files in `--csv-dir` (comma separated, header row first):
 | `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,decompress_us` |
 | `corpus.csv` (A `--corpus-dir`) | `request_id,flags,category,encoding,file,net_bytes,wire_bytes,wire_digest,digest,visible` |
 | `client_replay.csv` (client `--replay`) | `request_id,category,encoding,net_bytes,wire_bytes,wire_digest,digest,decompress_us,load_us,result` |
+| `a_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us` (one row per `Events` frame) |
+| `client_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,decode_us,verify_us,check_ok` |
 | `client_build.txt` | one line: how the client was built |
 | `a_checks.csv`, `client_checks.csv`, `selftest_checks.csv` | `check,result,detail` (`result` is `pass` or `fail`; coverage counts go in `detail`) |
 
 `a_checks.csv` rows, in this order: `batch_roundtrip`, `reference_model`,
-`modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`.
+`modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`,
+`event_stream` (subscribers, dictionary id, frames per encoding; passes with
+no subscriber). A subscribed client adds `events_subscribed`,
+`events_received` and `event_content` to `client_checks.csv`.
+In the event files `wire_bytes` is the sum of the frame's UnitEvent wires,
+`net_bytes` the payload, and `digest` the `checks::wire_digest` of the raw
+encoding of the same wires, so A and the client must agree on all of them
+per (tick, part, encoding) whatever the encoding.
 
 `category` is `normal`, `full`, or `empty`; `digest` is 16 lowercase hex digits
 of `checks::snapshot_digest`; `check_ok` is `1` or `0`. `req_digest` and
