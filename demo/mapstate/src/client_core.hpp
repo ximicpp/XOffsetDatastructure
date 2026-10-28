@@ -45,6 +45,9 @@ struct Options {
     // zstd in turn (request id order).
     codec::Encoding encoding = codec::zstd_available() ? codec::Encoding::Zstd : codec::Encoding::Compact;
     bool cycle_encodings = false;
+    // Request ids start here (1): a second client on the same A takes
+    // another range, so A's log keeps one row per request id.
+    std::uint64_t first_request_id = 1;
     // --events: subscribe to A's event stream in this mode (codec::EventEncoding
     // or codec::kEventCycle); kEventsOff (default) does not subscribe.
     std::uint16_t events = kEventsOff;

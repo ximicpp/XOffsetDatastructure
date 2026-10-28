@@ -14,11 +14,16 @@
 # "wine64 /x/mapdemo_client.exe" or "qemu-aarch64-static /x/mapdemo_client"
 # for a client built for another platform), MAPDEMO_NO_CLIENT=1 (servers
 # only), MAPDEMO_A_LIMIT_S (A's wall-clock limit; default STEPS/5 + 60 s,
-# i.e. 4x slower than 20 Hz plus start-up).
+# i.e. 4x slower than 20 Hz plus start-up), MAPDEMO_CLIENT2 (a second
+# headless client on the same A at the same time, e.g. the client of the
+# other schema version; its requests are numbered from 3000001 so A's log
+# keeps one row per request id; CSV files in OUT_DIR/client2/) with
+# MAPDEMO_CLIENT2_ARGS (its extra arguments, default MAPDEMO_CLIENT_ARGS).
 #
-# Writes OUT_DIR/{a,b,client}.log, the CSV files of INTERFACES.md section 6,
-# OUT_DIR/meta.txt and OUT_DIR/exit_codes.txt. Exit 0 only when all three
-# processes exited 0. Portable to macOS bash 3.2 (no `timeout`, no `wait -n`).
+# Writes OUT_DIR/{a,b,client}.log (and client2.log), the CSV files of
+# INTERFACES.md section 6, OUT_DIR/meta.txt and OUT_DIR/exit_codes.txt. Exit
+# 0 only when every process exited 0. Portable to macOS bash 3.2 (no
+# `timeout`, no `wait -n`).
 set -u
 
 if [ $# -lt 3 ]; then
@@ -37,6 +42,8 @@ CLIENT_ARGS=${MAPDEMO_CLIENT_ARGS:-}
 A_ARGS=${MAPDEMO_A_ARGS:-}
 [ -n "${MAPDEMO_A_HOST:-}" ] && A_ARGS="--host $MAPDEMO_A_HOST $A_ARGS"
 CLIENT=${MAPDEMO_CLIENT:-$BIN/mapdemo_client}
+CLIENT2=${MAPDEMO_CLIENT2:-}
+CLIENT2_ARGS=${MAPDEMO_CLIENT2_ARGS-$CLIENT_ARGS}
 
 for exe in mapdemo_a mapdemo_b; do
     if [ ! -x "$BIN/$exe" ]; then
@@ -46,6 +53,7 @@ for exe in mapdemo_a mapdemo_b; do
 done
 mkdir -p "$OUT"
 rm -f "$OUT"/*.csv "$OUT"/*.log "$OUT"/exit_codes.txt "$OUT"/meta.txt
+rm -rf "$OUT/client2"
 
 A_LIMIT_S=${MAPDEMO_A_LIMIT_S:-$(( STEPS / 5 + 60 ))}
 TAIL_LIMIT_S=20
@@ -79,6 +87,10 @@ wait_for() {
     echo "buffers=$BUFFERS"
     echo "client_cmd=$CLIENT"
     echo "client_args=$CLIENT_ARGS"
+    if [ -n "$CLIENT2" ]; then
+        echo "client2_cmd=$CLIENT2"
+        echo "client2_args=$CLIENT2_ARGS --first-request-id 3000001"
+    fi
     echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "host=$(uname -srm)"
     echo "load_before=$(uptime | sed 's/.*load average[s]*: //')"
@@ -100,6 +112,14 @@ if [ "${MAPDEMO_NO_CLIENT:-0}" != 1 ]; then
         $CLIENT_ARGS > "$OUT/client.log" 2>&1 &
     C_PID=$!
 fi
+C2_PID=
+if [ -n "$CLIENT2" ]; then
+    mkdir -p "$OUT/client2"
+    # shellcheck disable=SC2086 # CLIENT2 and CLIENT2_ARGS are word lists on purpose
+    $CLIENT2 --headless --check --buffers "$BUFFERS" --port "$PORT_A" --csv-dir "$OUT/client2" \
+        $CLIENT2_ARGS --first-request-id 3000001 > "$OUT/client2.log" 2>&1 &
+    C2_PID=$!
+fi
 
 wait_for "$A_PID" "$A_LIMIT_S" mapdemo_a
 A_RC=$RC
@@ -108,6 +128,11 @@ if [ -n "$C_PID" ]; then
     wait_for "$C_PID" "$TAIL_LIMIT_S" mapdemo_client
     C_RC=$RC
 fi
+C2_RC=
+if [ -n "$C2_PID" ]; then
+    wait_for "$C2_PID" "$TAIL_LIMIT_S" "second client"
+    C2_RC=$RC
+fi
 wait_for "$B_PID" "$TAIL_LIMIT_S" mapdemo_b
 B_RC=$RC
 
@@ -115,16 +140,18 @@ B_RC=$RC
     echo "a=$A_RC"
     echo "b=$B_RC"
     echo "client=$C_RC"
+    [ -n "$C2_PID" ] && echo "client2=$C2_RC"
 } > "$OUT/exit_codes.txt"
 echo "load_after=$(uptime | sed 's/.*load average[s]*: //')" >> "$OUT/meta.txt"
 
-echo "tier units=$UNITS steps=$STEPS buffers=$BUFFERS: a=$A_RC b=$B_RC client=$C_RC (logs in $OUT)"
-for f in a b client; do
+echo "tier units=$UNITS steps=$STEPS buffers=$BUFFERS: a=$A_RC b=$B_RC client=$C_RC${C2_PID:+ client2=$C2_RC} (logs in $OUT)"
+for f in a b client client2; do
     if [ -f "$OUT/$f.log" ] && grep -q '^error:' "$OUT/$f.log"; then
         grep '^error:' "$OUT/$f.log" | sed "s/^/  $f: /" | head -n 5
     fi
 done
-if [ "$A_RC" = 0 ] && [ "$B_RC" = 0 ] && { [ "$C_RC" = 0 ] || [ "$C_RC" = skipped ]; }; then
+if [ "$A_RC" = 0 ] && [ "$B_RC" = 0 ] && { [ "$C_RC" = 0 ] || [ "$C_RC" = skipped ]; } &&
+    { [ -z "$C2_PID" ] || [ "$C2_RC" = 0 ]; }; then
     exit 0
 fi
 exit 1
