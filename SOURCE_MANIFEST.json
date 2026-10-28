@@ -37,9 +37,9 @@
       "sha256": "ceacf7217bdda0071d62a10a910ecb529f7468bfe4139765950f984469c1e69a"
     },
     "CMakeLists.txt": {
-      "bytes": 5098,
+      "bytes": 6237,
       "mode": 420,
-      "sha256": "9819336ae993747fe907656fdccb9bdfa45feb7e8537c4fcaffee2aa2b93c377"
+      "sha256": "1f3446b820323ae99bcd0283e7b154e3e732c18562dc810e918760ce6a4a5e9f"
     },
     "Dockerfile": {
       "bytes": 3862,
@@ -102,9 +102,9 @@
       "sha256": "3db57d916ee50ef63a6d41966082ffe923b5916f24a648d8af051df5497cf454"
     },
     "cmake/XOffsetBuildChecks.cmake": {
-      "bytes": 10290,
+      "bytes": 10731,
       "mode": 420,
-      "sha256": "fd4095e05ba6c9e77713a62eba2fe401afd2eb242ed6b78a3a72d7ecef5ced2f"
+      "sha256": "fd033dd4430e9d7acbf0bf8f5c6daf985aa8acfb4374878c07affab382449dc5"
     },
     "cmake/XOffsetDatastructureConfig.cmake.in": {
       "bytes": 2133,
