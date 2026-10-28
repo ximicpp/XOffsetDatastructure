@@ -49,6 +49,8 @@
 # error "schema guard: target identity must be selected"
 #endif
 #include "xoffsetdatastructure.hpp"
+// The core headers no longer include TypeLayout; the probe checks its pins.
+#include <boost/typelayout.hpp>
 #include XSG_CATALOG
 #ifdef XOFFSET_DISABLE_PLATFORM_CHECKS
 # error "schema guard refuses disabled platform checks"
@@ -87,7 +89,7 @@ consteval auto xsg_names(std::index_sequence<I...>) {
 template <class T>
 consteval bool xsg_fields_match(std::string_view expected) {
     constexpr auto names = xsg_names<T>(
-        std::make_index_sequence<::XOffsetDatastructure::detail::reflected_member_count<T>()>{});
+        std::make_index_sequence<::XOffsetDatastructure::schema::member_count_v<T>>{});
     std::size_t pos = 0;
     for (std::size_t i = 0; i < names.size(); ++i) {
         const auto end = expected.find('|', pos);
@@ -134,7 +136,7 @@ template<class T> consteval bool xsg_complete_fields() {
     else if constexpr (requires { typename U::value_type; std::tuple_size<U>::value; }) return xsg_complete_fields<typename U::value_type>();
     else {
         static_assert(xsg_fields_covered<U>::value, "schema reachable record field list missing");
-        return xsg_member_fields<U>(std::make_index_sequence<d::reflected_member_count<U>()>{});
+        return xsg_member_fields<U>(std::make_index_sequence<::XOffsetDatastructure::schema::member_count_v<U>>{});
     }
 }
 #define XSG_CHECK_ALL_FIELDS(T, PIN, TYPE_PIN) static_assert(xsg_complete_fields<T>());
