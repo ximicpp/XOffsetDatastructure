@@ -22,15 +22,6 @@
 
 namespace xmesh::hub {
 
-const char* kind_name(JobKind kind) noexcept {
-    switch (kind) {
-        case JobKind::Pairs: return "pairs";
-        case JobKind::Chain: return "chain";
-        case JobKind::Evil: return "evil";
-    }
-    return "?";
-}
-
 namespace {
 
 using protocol::MsgType;
@@ -55,29 +46,6 @@ std::string now_text() {
 void logf(const std::string& line) {
     std::fprintf(stderr, "[hub %s] %s\n", now_text().c_str(), line.c_str());
     std::fflush(stderr);
-}
-
-std::string csv_field(const std::string& s) {
-    if (s.find_first_of(",\"\n\r") == std::string::npos) return s;
-    std::string out = "\"";
-    for (char c : s) {
-        if (c == '"') out += "\"\"";
-        else if (c == '\n' || c == '\r') out += ' ';
-        else out += c;
-    }
-    return out + "\"";
-}
-
-std::string route_text(const JobSpec& spec) {
-    std::string s;
-    for (const auto& r : spec.route) s += (s.empty() ? "" : ">") + r.name;
-    return s;
-}
-
-std::string hex64(std::uint64_t v) {
-    char buf[24];
-    std::snprintf(buf, sizeof buf, "%016llx", static_cast<unsigned long long>(v));
-    return buf;
 }
 
 struct Csv {
@@ -191,10 +159,7 @@ bool Hub::open_outputs() {
         logf("error: cannot create " + (out_ / "archive").string() + ": " + ec.message());
         return false;
     }
-    return jobs_csv_.open(out_ / "jobs.csv", "job,kind,type,scale,save_mode,evil,route,result,reason,ms") &&
-           hops_csv_.open(out_ / "hops.csv",
-                          "job,hop,device,verdict,expected_reject,data_bytes,sent_bytes,grown_bytes,content_ok,"
-                          "wire_ok,verify_ns,check_ns,mutate_ns,save_ns,error");
+    return jobs_csv_.open(out_ / "jobs.csv", kJobsCsvHeader) && hops_csv_.open(out_ / "hops.csv", kHopsCsvHeader);
 }
 
 // ---- connections -------------------------------------------------------------------
@@ -423,7 +388,7 @@ void Hub::plan() {
                 }
             }
         }
-    std::size_t counts[3] = {};
+    std::size_t counts[kJobKinds] = {};
     for (const JobRun& j : s_.jobs) ++counts[std::size_t(j.kind)];
     logf("planned " + std::to_string(s_.jobs.size()) + " jobs for " + std::to_string(n) + " devices: " +
          std::to_string(counts[0]) + " pairs, " + std::to_string(counts[1]) + " chain, " + std::to_string(counts[2]) +
@@ -560,47 +525,8 @@ void Hub::on_report(Client& c, net::Frame& f) {
 }
 
 void Hub::evaluate(JobRun& j) {
-    const auto& route = j.spec.route;
-    auto failure = [&](std::size_t pos) {
-        const ReportRow& r = *j.reports[pos];
-        return route[pos].name + " (position " + std::to_string(pos) + "): " + protocol::verdict_name(r.verdict) +
-               (r.error.empty() ? std::string() : ": " + r.error);
-    };
-    if (j.kind == JobKind::Evil) {
-        if (j.reports[0] && j.reports[0]->verdict != protocol::HopVerdict::Ok) return finish(j, false, failure(0));
-        if (!j.reports[1]) return;
-        const ReportRow& r = *j.reports[1];
-        const protocol::HopVerdict want = protocol::expected_verdict(j.spec.evil);
-        if (r.verdict != want || !r.expected_reject)
-            return finish(j, false, route[1].name + " gave " + protocol::verdict_name(r.verdict) +
-                                        (r.expected_reject ? "" : " without expected_reject") + ", expected " +
-                                        protocol::verdict_name(want) + (r.error.empty() ? "" : " (" + r.error + ")"));
-        if (!j.reports[0]) return;
-        return finish(j, true, std::string("refused: ") + protocol::verdict_name(r.verdict));
-    }
-    for (std::size_t pos = 0; pos < route.size(); ++pos)
-        if (j.reports[pos] && j.reports[pos]->verdict != protocol::HopVerdict::Ok) return finish(j, false, failure(pos));
-    for (const auto& r : j.reports)
-        if (!r) return;
-    const std::size_t last = route.size() - 1;
-    for (std::size_t pos = 0; pos <= last; ++pos) {
-        const ReportRow& r = *j.reports[pos];
-        const HopExpect& got_from = j.expect[pos == 0 ? 0 : pos - 1];
-        if (r.content_digest != got_from.content_digest)
-            return finish(j, false, route[pos].name + " (position " + std::to_string(pos) + "): content digest " +
-                                        hex64(r.content_digest) + ", replay " + hex64(got_from.content_digest));
-        if (pos < last) {
-            const HopExpect& sent = j.expect[pos];
-            if (r.sent_wire_digest != sent.wire_digest || r.sent_bytes != sent.bytes)
-                return finish(j, false, route[pos].name + " (position " + std::to_string(pos) + ") sent " +
-                                            std::to_string(r.sent_bytes) + " bytes, wire " + hex64(r.sent_wire_digest) +
-                                            "; replay " + std::to_string(sent.bytes) + " bytes, wire " +
-                                            hex64(sent.wire_digest));
-        } else if (r.sent_wire_digest != 0 || r.sent_bytes != 0) {
-            return finish(j, false, route[pos].name + " sent on after the last stop");
-        }
-    }
-    finish(j, true, "");
+    const Judgement v = judge(j);
+    if (v.done) finish(j, v.passed, v.reason);
 }
 
 void Hub::finish(JobRun& j, bool passed, const std::string& reason) {
@@ -618,7 +544,7 @@ void Hub::finish(JobRun& j, bool passed, const std::string& reason) {
         ++d.jobs;
         if (passed) ++d.jobs_passed;
     }
-    if (j.kind == JobKind::Pairs) {
+    if (j.kind == JobKind::Pairs || j.kind == JobKind::Cross) {
         auto& cell = s_.matrix[{j.spec.route[0].device_id, j.spec.route[1].device_id}];
         ++cell.first;
         if (passed) ++cell.second;
@@ -627,35 +553,15 @@ void Hub::finish(JobRun& j, bool passed, const std::string& reason) {
                       " " + route_text(j.spec) + " FAILED: " + reason);
 
     // jobs.csv and hops.csv
-    const std::string evil = j.kind == JobKind::Evil ? evil_name(j.spec.evil) : "";
-    jobs_csv_.row(std::to_string(j.spec.job) + "," + kind_name(j.kind) + "," + type_name(j.spec.type) + "," +
-                  scale_name(j.spec.scale) + "," + save_mode_name(j.spec.save_mode) + "," + evil + "," +
-                  csv_field(route_text(j.spec)) + "," + (passed ? "pass" : "fail") + "," + csv_field(reason) + "," +
-                  std::to_string(j.end_ms - j.start_ms));
-    const std::size_t last = j.spec.route.size() - 1;
-    for (std::size_t pos = 0; pos < j.reports.size(); ++pos) {
-        if (!j.reports[pos]) continue;
-        const ReportRow& r = *j.reports[pos];
-        std::string content_ok, wire_ok;
-        if (j.kind != JobKind::Evil && !j.expect.empty()) {
-            content_ok = r.content_digest == j.expect[pos == 0 ? 0 : pos - 1].content_digest ? "1" : "0";
-            wire_ok = pos < last ? (r.sent_wire_digest == j.expect[pos].wire_digest ? "1" : "0")
-                                 : (r.sent_wire_digest == 0 ? "1" : "0");
-        }
-        hops_csv_.row(std::to_string(j.spec.job) + "," + std::to_string(pos) + "," + csv_field(j.spec.route[pos].name) +
-                      "," + protocol::verdict_name(r.verdict) + "," + (r.expected_reject ? "1" : "0") + "," +
-                      std::to_string(r.data_bytes) + "," + std::to_string(r.sent_bytes) + "," +
-                      std::to_string(r.grown_bytes) + "," + content_ok + "," + wire_ok + "," +
-                      std::to_string(r.verify_ns) + "," + std::to_string(r.check_ns) + "," +
-                      std::to_string(r.mutate_ns) + "," + std::to_string(r.save_ns) + "," + csv_field(r.error));
-    }
+    jobs_csv_.row(job_csv_row(j, std::to_string(j.end_ms - j.start_ms)));
+    for (const std::string& row : hop_csv_rows(j)) hops_csv_.row(row);
 
     // The dashboard's recent list: the object as the last stop received it.
     Recent rec;
     rec.job = j.spec.job;
     rec.passed = passed;
     rec.text = std::string(kind_name(j.kind)) + " " + type_name(j.spec.type) + " " + scale_name(j.spec.scale) + " " +
-               save_mode_name(j.spec.save_mode) + (j.kind == JobKind::Evil ? std::string(" ") + evil : "") + ": " +
+               save_mode_name(j.spec.save_mode) + (j.kind == JobKind::Evil ? std::string(" ") + evil_name(j.spec.evil) : "") + ": " +
                route_text(j.spec) + " -> " + (passed ? "pass" : "FAIL") + (reason.empty() ? "" : " (" + reason + ")");
     if (passed && !j.last_payload.empty()) {
         if (Result<protocol::HopParts> parts = protocol::unpack_hop(j.last_payload)) {
@@ -801,14 +707,16 @@ void Hub::write_final_files() {
                std::to_string(d.reports) + ", mean us verify " + avg_us(d.verify_ns) + " check " + avg_us(d.check_ns) +
                " mutate " + avg_us(d.mutate_ns) + " save " + avg_us(d.save_ns) + " | " + d.build + "\n";
     }
-    std::size_t by_kind[3][2] = {};
+    std::size_t by_kind[kJobKinds][2] = {};
     for (const JobRun& j : s_.jobs) {
         if (j.state == JobState::Passed) ++by_kind[std::size_t(j.kind)][0];
         if (j.state != JobState::Pending && j.state != JobState::Running) ++by_kind[std::size_t(j.kind)][1];
     }
-    for (int k = 0; k < 3; ++k)
+    for (std::size_t k = 0; k < kJobKinds; ++k) {
+        if (by_kind[k][1] == 0 && JobKind(k) == JobKind::Cross) continue;
         sum += std::string("kind ") + kind_name(JobKind(k)) + ": " + std::to_string(by_kind[k][0]) + "/" +
                std::to_string(by_kind[k][1]) + " passed\n";
+    }
     const std::size_t unfinished = s_.jobs.size() - s_.passed - s_.failed;
     sum += "jobs " + std::to_string(s_.jobs.size()) + ", passed " + std::to_string(s_.passed) + ", failed " +
            std::to_string(s_.failed) + ", not finished " + std::to_string(unfinished) + "\n";
