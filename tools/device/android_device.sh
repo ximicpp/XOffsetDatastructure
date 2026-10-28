@@ -8,7 +8,11 @@
 #      this host; the demo clients (with and without exceptions) run on the phone and
 #      reach A through `adb reverse` (the phone's 127.0.0.1:17800-18049 is this host).
 #      demo/mapstate/tools/run_e2e.sh: self-check, replay, 1/100/10000 units x 500 steps
-#      with dense/compact/zstd snapshots, evil.
+#      with dense/compact/zstd snapshots, evil;
+#   3. SC-6 slg (bench/slg on the field-list backend, with FlatBuffers 25.12.19 built from
+#      source): verify, then $XO_SLG_RUNS timed runs, thermal status before each;
+#   4. SC-12 memory probe: the largest single maximum_capacity, live reservations, and
+#      committed memory in 64 MiB steps until the system kills the program.
 #
 #   tools/device/android_device.sh [all|setup|build|run|clean]     (default all)
 #
@@ -28,7 +32,13 @@
 #   ADB            adb to use (default: adb on PATH, else the downloaded platform-tools)
 #   ANDROID_NDK    NDK root (default: NDK r29 downloaded into $XO_WORK/sdk)
 #   XO_JOBS        build jobs (default: CPU count)
-#   XO_SKIP        space-separated steps to skip: ctest corpus demo
+#   XO_SKIP        space-separated steps to skip: ctest corpus slg mem demo
+#   XO_SLG_RUNS    timed slg runs (default 3); XO_SLG_SCALE S|M|L (M), XO_SLG_CYCLES (41)
+#   XO_MEM_LIMIT   MiB the commit probe stops at if the system has not killed it (default:
+#                  the phone's MemTotal)
+#   XO_NO_FB=1     slg without FlatBuffers (no flatbuffers clone and flatc build)
+#   XO_FB_GENERATED  directory with an slg_generated.h from flatc 25.12.19 (e.g. the Mac's
+#                  run_phone_mac.sh fb): used instead of building flatc
 #   XO_STATIC=1    fully static programs (cloud dry run with a qemu adb stand-in only)
 #   XO_CMAKE_TOOL  a CMake root from tools/prepare_vm_cmake.py for the container (instead of downloading)
 #   XO_PORT_BASE   first demo port (default 17800; the demo uses base+0..49, +100..149, +200..249
@@ -58,6 +68,7 @@ case $PB in *[!0-9]*|"") echo "XO_PORT_BASE must be a number" >&2; exit 2 ;; esa
 PORTS="$PB-$((PB + 49)) $((PB + 100))-$((PB + 149)) $((PB + 200))-$((PB + 249))"  # run_e2e.sh MAPDEMO_PORT_BASE=$PB: the corpus run $PB+, target I $PB+100*(I+1)+
 SKIP=" ${XO_SKIP:-} "
 case "$(uname -s)" in Darwin) HOSTOS=macosx; JOBS=${XO_JOBS:-$(sysctl -n hw.ncpu)} ;; *) HOSTOS=linux; JOBS=${XO_JOBS:-$(nproc)} ;; esac
+FB_TAG=v25.12.19; FB_COMMIT=7e163021e59cca4f8e1e35a7c828b5c6b7915953   # flatc for bench/slg, as on the Mac runs
 BOOST_LIBS="assert config container container_hash core intrusive move predef static_assert throw_exception type_traits winapi"
 
 utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
@@ -165,10 +176,15 @@ srv_start() {  # the server container: $W mounted at the same path, ports publis
     docker run -d --name "$RT" $user -e HOME=$W/home $pub -v "$W:$W" "$img" sleep infinity > /dev/null || die "container $RT did not start"
     vm "touch $W/.mount-probe" && [ -f "$W/.mount-probe" ] || die "the container cannot write $W (docker must share this directory: Docker Desktop / colima share the home directory)"
 }
+srv_cmake() {  # CMake for the container; XO_CMAKE_TOOL: one prepared with prepare_vm_cmake.py (offline hosts)
+    [ -n "${XO_CMAKE_TOOL:-}" ] && [ ! -x "$W/cmake-tool/root/bin/cmake" ] && { rm -rf "$W/cmake-tool"; cp -R "$XO_CMAKE_TOOL" "$W/cmake-tool"; }
+    [ -x "$W/cmake-tool/root/bin/cmake" ] || vm "rm -rf $W/cmake-tool; cd $W/src && python3 tools/prepare_vm_cmake.py --platform linux-\$(uname -m) --out $W/cmake-tool" > "$W/logs/srv_cmake.log" 2>&1 \
+        || die "CMake for the container failed ($W/logs/srv_cmake.log)"
+}
 cmd_build() {
     find_ndk || die "no NDK: run setup first (or set ANDROID_NDK)"
     mkdir -p "$W"; local L=$W/logs; mkdir -p "$L"
-    log "build 1/3: source of $SHA7 with the header-only submodules -> $W/src"
+    log "build 1/4: source of $SHA7 with the header-only submodules -> $W/src"
     git -C "$REPO" submodule update --init --depth 1 external/typelayout external/boost > "$L/submodules.log" 2>&1 || die "git submodule update failed ($L/submodules.log)"
     local l
     for l in $BOOST_LIBS; do
@@ -181,7 +197,32 @@ cmd_build() {
         || python3 -c "import sys,urllib.request; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz "$W/zstd-1.5.7.tar.gz" \
         || die "zstd 1.5.7 download failed"
 
-    log "build 2/3: Android arm64-v8a, NDK $(sed -n 's/^Pkg.Revision *= *//p' "$ANDROID_NDK/source.properties"), C++20 field lists -> $W/android"
+    local fb=""
+    if [ "${XO_NO_FB:-0}" != 1 ]; then
+        log "build 2/4: FlatBuffers $FB_TAG: headers, slg_generated.h (flatc built in docker unless XO_FB_GENERATED) -> $W/fb"
+        if [ "$(git -C "$W/flatbuffers" rev-parse HEAD 2>/dev/null)" != $FB_COMMIT ]; then
+            rm -rf "$W/flatbuffers"
+            git clone -q --depth 1 --branch $FB_TAG https://github.com/google/flatbuffers.git "$W/flatbuffers" > "$L/fb_clone.log" 2>&1 \
+                || die "git clone of flatbuffers $FB_TAG failed ($L/fb_clone.log)"
+            [ "$(git -C "$W/flatbuffers" rev-parse HEAD)" = $FB_COMMIT ] || die "flatbuffers $FB_TAG is not commit $FB_COMMIT"
+        fi
+        if [ -n "${XO_FB_GENERATED:-}" ]; then
+            [ -f "$XO_FB_GENERATED/slg_generated.h" ] || die "no slg_generated.h in XO_FB_GENERATED=$XO_FB_GENERATED"
+            rm -rf "$W/fb"; mkdir -p "$W/fb"; cp "$XO_FB_GENERATED/slg_generated.h" "$W/fb/"
+            grep -m1 'FLATBUFFERS_VERSION_MAJOR == 25' "$W/fb/slg_generated.h" > /dev/null || die "$XO_FB_GENERATED/slg_generated.h is not from flatc 25"
+            echo "slg_generated.h given by XO_FB_GENERATED (not built here)" > "$W/fb/flatc_version.txt"
+        else
+            srv_start; srv_cmake
+            vm "export PATH=$W/cmake-tool/root/bin:\$PATH; rm -rf $W/fb;
+                { [ -x $W/flatc-build/flatc ] || { cmake -S $W/flatbuffers -B $W/flatc-build -DCMAKE_BUILD_TYPE=Release -DFLATBUFFERS_BUILD_TESTS=OFF \
+                      -DFLATBUFFERS_BUILD_FLATLIB=OFF -DFLATBUFFERS_BUILD_FLATHASH=OFF && cmake --build $W/flatc-build -j $JOBS --target flatc; }; } \
+                && $W/flatc-build/flatc --cpp -o $W/fb $W/src/bench/slg/schema/slg.fbs && $W/flatc-build/flatc --version > $W/fb/flatc_version.txt" \
+                > "$L/fb_build.log" 2>&1 || die "flatc build or slg_generated.h failed ($L/fb_build.log)"
+        fi
+        fb="-DXO_SLG_FLATBUFFERS_INCLUDE=$W/flatbuffers/include -DXO_SLG_GENERATED=$W/fb"
+    fi
+
+    log "build 3/4: Android arm64-v8a, NDK $(sed -n 's/^Pkg.Revision *= *//p' "$ANDROID_NDK/source.properties"), C++20 field lists -> $W/android"
     local B=$W/android st=""
     [ "${XO_STATIC:-0}" = 1 ] && st="-DCMAKE_EXE_LINKER_FLAGS=-static"
     rm -rf "$B"
@@ -190,18 +231,15 @@ cmd_build() {
         -DCMAKE_TOOLCHAIN_FILE="$W/src/cmake/toolchains/android-arm64.cmake" -DANDROID_NDK="$ANDROID_NDK" \
         -DCMAKE_CROSSCOMPILING_EMULATOR="$W/src/tools/device/adb_run.sh" -DCMAKE_MAKE_PROGRAM="$(command -v ninja)" \
         -DXOFFSET_BUILD_DEMOS=ON -DMAPDEMO_CLIENT_ONLY=ON -DMAPDEMO_ZSTD_URL="$W/zstd-1.5.7.tar.gz" $st \
+        -DXOFFSET_PHONE_PROGRAMS=ON $fb \
         > "$L/android_configure.log" 2>&1 || die "Android configure failed ($L/android_configure.log)"
     cmake --build "$B" --parallel "$JOBS" > "$L/android_build.log" 2>&1 || die "Android build failed ($L/android_build.log)"
     # tests whose command is cmake (compile-fail tests) need the NDK: they run here, not on the phone
     ctest --test-dir "$B" -N -V | awk '/Test command:/ {cmd=$0} /^ *Test *#[0-9]+:/ {name=$3; if (cmd ~ /cmake/) print name; cmd=""}' > "$B/compile_tests.txt"
     ctest --test-dir "$B" -R "^($(paste -sd'|' - < "$B/compile_tests.txt"))\$" --output-on-failure > "$B/host_compile_tests.txt" 2>&1 || true
 
-    log "build 3/3: Linux servers A/B and the reference corpus (GCC 16, C++26 reflection) in docker -> $W/srv"
-    srv_start
-    # XO_CMAKE_TOOL: a CMake prepared with prepare_vm_cmake.py for the container's platform (offline hosts)
-    [ -n "${XO_CMAKE_TOOL:-}" ] && [ ! -x "$W/cmake-tool/root/bin/cmake" ] && { rm -rf "$W/cmake-tool"; cp -R "$XO_CMAKE_TOOL" "$W/cmake-tool"; }
-    [ -x "$W/cmake-tool/root/bin/cmake" ] || vm "rm -rf $W/cmake-tool; cd $W/src && python3 tools/prepare_vm_cmake.py --platform linux-\$(uname -m) --out $W/cmake-tool" > "$L/srv_cmake.log" 2>&1 \
-        || die "CMake for the container failed ($L/srv_cmake.log)"
+    log "build 4/4: Linux servers A/B and the reference corpus (GCC 16, C++26 reflection) in docker -> $W/srv"
+    srv_start; srv_cmake
     vm "export PATH=$W/cmake-tool/root/bin:\$PATH; rm -rf $W/srv $W/ref-corpus;
         cmake -S $W/src -B $W/srv -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DMAPDEMO_ZSTD_URL=$W/zstd-1.5.7.tar.gz \
             -DXOFFSET_BUILD_DEMOS=ON -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF \
@@ -272,13 +310,13 @@ cmd_run() {
     row "compile-fail tests (host, same NDK)" "see detail" "$(grep -E 'tests passed|tests failed' "$W/android/host_compile_tests.txt" | tail -1)"
     local B=$W/android e s
     if ! skip ctest; then
-        log "run 1/3: CTest on the phone (each test program pushed and run with adb)"
+        log "run 1/5: CTest on the phone (each test program pushed and run with adb)"
         ( cd "$B" && ctest --test-dir "$B" -E "^($(paste -sd'|' - < "$B/compile_tests.txt"))\$" --output-on-failure --timeout 1800 ) > "$XO_OUT/ctest.log" 2>&1; e=$?
         s=$(grep -E 'tests passed|tests failed' "$XO_OUT/ctest.log" | tail -1)
         if [ $e = 0 ]; then row "library CTest (phone)" passed "$s"; else row "library CTest (phone)" "**failed** (rc $e)" "$s (ctest.log)"; fail; fi
     fi
     if ! skip corpus; then
-        log "run 2/3: wire corpus"
+        log "run 2/5: wire corpus"
         local CW=$B/bin/Release/test_cross_compiler_wire
         rm -rf "$W/corpus-phone"
         "$W/src/tools/device/adb_run.sh" "$CW" --write "$W/corpus-phone" > "$XO_OUT/corpus-write.log" 2>&1 \
@@ -288,11 +326,13 @@ cmd_run() {
         if [ $e = 0 ]; then row "wire corpus" passed "$(ls "$W/ref-corpus" | wc -l | tr -d ' ') reference wires (Linux GCC 16 C++26) read, written bytes identical"
         else row "wire corpus" "**failed** (rc $e)" "corpus-*.log"; fail; fi
     fi
+    skip slg || slg_phone
+    skip mem || mem_phone
     skip demo || demo_phone
     finish $RC
 }
 demo_phone() {
-    log "run 3/3: demo, servers in docker, clients on the phone through adb reverse"
+    log "run 5/5: demo, servers in docker, clients on the phone through adb reverse"
     docker rm -f "$RT" > /dev/null 2>&1; srv_start   # a fresh container publishes the current $PORTS
     local r p lo hi CB=$W/bin-phone c targets="" unders="" names="" model e
     for r in $PORTS; do
@@ -356,6 +396,63 @@ WRAP
     if [ $e = 0 ]; then row demo passed "targets$names: self-check, replay, 1/100/10000 units x 500 steps (dense/compact/zstd), evil: E2E PASSED (demo/E2E_RESULT.md)"
     else row demo "**failed** (rc $e)" "targets$names: demo_run.log, demo/E2E_RESULT.md"; fail; fi
 }
+thermal() {  # thermal() FILE: thermal status, battery and power state before a timed run
+    {
+        echo "utc $(utc)"
+        "$ADB" shell dumpsys thermalservice 2>/dev/null | tr -d '\r' | grep -m1 'Thermal Status' | sed 's/^ *Thermal Status: */thermal_status /'
+        "$ADB" shell dumpsys battery 2>/dev/null | tr -d '\r' | grep -E '^ *(level|temperature|AC powered|USB powered|status):' \
+        | awk -F': ' '{ k = $1; sub(/^ */, "", k); gsub(/ /, "_", k); print "battery_" k, $2 }'
+        "$ADB" shell settings get global low_power 2>/dev/null | tr -d '\r' | sed 's/^/low_power /'
+    } > "$1"
+}
+slg_phone() {
+    local B=$W/android d=$XO_OUT/slg i e runs=${XO_SLG_RUNS:-3} scale=${XO_SLG_SCALE:-M} cycles=${XO_SLG_CYCLES:-41}
+    local SLG=$B/bin/Release/xo_slg_bench RUN=$W/src/tools/device/adb_run.sh
+    log "run 3/5: slg (SC-6): verify, $runs runs scale $scale x $cycles cycles"
+    mkdir -p "$d"
+    [ -f "$SLG" ] || { row slg "**not run**" "no xo_slg_bench in $B"; fail; return; }
+    "$RUN" "$SLG" --mode verify --scale S > "$d/verify.log" 2>&1 || { row slg "**failed**" "verify (slg/verify.log)"; fail; return; }
+    for i in $(seq 1 "$runs"); do
+        thermal "$d/info_$i.txt"
+        rm -f "$d/run_$i.jsonl"
+        SLG_REUSE=1 "$RUN" "$SLG" --mode bench --scale "$scale" --cycles "$cycles" --out "$d/run_$i.jsonl" > "$d/run_$i.log" 2>&1; e=$?
+        [ $e = 0 ] || { row slg "**failed**" "run $i rc $e (slg/run_$i.log)"; fail; return; }
+        python3 "$W/src/bench/slg/tools/analyze.py" "$d/run_$i.jsonl" > "$d/run_$i.md" 2>&1
+    done
+    cat "$d"/run_*.jsonl > "$d/all.jsonl"
+    python3 "$W/src/bench/slg/tools/analyze.py" "$d/all.jsonl" > "$d/ANALYSIS.md" 2>&1
+    [ -f "$W/fb/flatc_version.txt" ] && cp "$W/fb/flatc_version.txt" "$d/" && echo "$(sha "$W/fb/slg_generated.h")  slg_generated.h" > "$d/slg_generated.sha256"
+    row slg passed "verify ok; $runs runs scale $scale x $cycles cycles$([ -f "$W/fb/flatc_version.txt" ] && echo ', with FlatBuffers') (slg/ANALYSIS.md); thermal status before runs: $(cat "$d"/info_*.txt | sed -n 's/^thermal_status //p' | tr '\n' ' ')"
+}
+va_line() {  # the --va summary, or how far it got when the process was aborted
+    if grep -q '^va_stop ' "$1"; then grep -E '^(va_buffers|va_reserved_gib|va_stop) ' "$1" | tr '\n' ' '
+    else echo "aborted after $(sed -n 's/^va_progress //p' "$1" | tail -1) reservations: $(grep -m1 -iE 'error|abort|signal' "$1")"; fi
+}
+mem_phone() {
+    local d=$XO_OUT/mem e MP=$W/android/bin/Release/xo_mem_probe RUN=$W/src/tools/device/adb_run.sh limit
+    limit=${XO_MEM_LIMIT:-$(awk '/^MemTotal:/ {print int($2 / 1024)}' "$XO_OUT/device.txt")}
+    log "run 4/5: memory probe (SC-12), commit up to $limit MiB or until killed"
+    mkdir -p "$d"
+    [ -f "$MP" ] || { row mem "**not run**" "no xo_mem_probe in $W/android"; fail; return; }
+    "$RUN" "$MP" --single > "$d/single.txt" 2>&1 || { row mem "**failed**" "--single (mem/single.txt)"; fail; return; }
+    "$RUN" "$MP" --va 1024 > "$d/va_1024.txt" 2>&1
+    "$RUN" "$MP" --va 64 > "$d/va_64.txt" 2>&1
+    "$ADB" shell cat /proc/meminfo 2>/dev/null | tr -d '\r' > "$d/meminfo_before.txt"
+    rm -rf "$W/mem-progress"
+    "$RUN" "$MP" --commit 64 "$limit" "$W/mem-progress/commit_progress.txt" > "$d/commit.txt" 2>&1; e=$?
+    cp "$W/mem-progress/commit_progress.txt" "$d/" 2>/dev/null
+    "$ADB" logcat -d -b main,system,events 2>/dev/null | tr -d '\r' | grep -iE 'lowmemorykiller|lmkd|xo_mem_probe' | tail -40 > "$d/lmkd.txt"
+    {
+        echo "# memory probe (Android)"; echo
+        echo "- phone: $(sed -n 's/^model=//p' "$XO_OUT/device.txt"), $(sed -n 's/^android=//p' "$XO_OUT/device.txt"), $(grep '^MemTotal:' "$XO_OUT/device.txt"), page size $(sed -n 's/^page_size=//p' "$XO_OUT/device.txt")"
+        echo "- single buffer: $(grep -E '^(single_max_capacity_mib|available_mib) ' "$d/single.txt" | tr '\n' ' ')"
+        echo "- 1 GiB reservations: $(va_line "$d/va_1024.txt")"
+        echo "- 64 MiB reservations: $(va_line "$d/va_64.txt")"
+        echo "- commit 64 MiB steps up to $limit MiB: rc $e (137 = killed by the system); last progress line: $(tail -1 "$d/commit_progress.txt" 2>/dev/null)"
+        echo "- low memory killer lines: mem/lmkd.txt"
+    } > "$d/SUMMARY.md"
+    row mem passed "mem/SUMMARY.md (commit probe rc $e: 137 = killed by the system at the limit)"
+}
 cmd_clean() {
     docker rm -f "$RT" > /dev/null 2>&1
     find_adb && { "$ADB" reverse --remove-all > /dev/null 2>&1; "$ADB" shell "rm -rf $DEV" > /dev/null 2>&1; }
@@ -364,7 +461,7 @@ cmd_clean() {
 cmd_all() { cmd_setup && cmd_build && cmd_run; }
 
 # ---------------------------------------------------------------- dispatch
-case "$CMD" in -h|--help|help) sed -n '2,36p' "$0"; exit 0 ;; esac
+case "$CMD" in -h|--help|help) sed -n '2,44p' "$0"; exit 0 ;; esac
 type "cmd_$CMD" > /dev/null 2>&1 || { echo "usage: $0 [all|setup|build|run|clean]" >&2; exit 2; }
 if [ "$CMD" != setup ] && [ "$CMD" != all ]; then find_adb; find_ndk; fi
 "cmd_$CMD"
