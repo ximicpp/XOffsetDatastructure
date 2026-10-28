@@ -296,6 +296,21 @@ foreach(fuzz_target ${XOFFSET_REPLAY_TARGETS})
     set_tests_properties(${replay}_seeds PROPERTIES FIXTURES_SETUP ${replay}_seeds)
     set_tests_properties(${replay}_corpus PROPERTIES FIXTURES_REQUIRED ${replay}_seeds)
 endforeach()
+# The same replays without exceptions (SC-8): fuzz_<target>_replay_noexc. The
+# nightly (tools/fuzz_outcome_diff.sh) also compares their outcome lines with
+# the build with exceptions.
+foreach(fuzz_target v2_wire wire_schemas)
+    set(replay fuzz_${fuzz_target}_replay_noexc)
+    add_executable(${replay} fuzz/fuzz_${fuzz_target}.cpp fuzz/replay_main.cpp)
+    configure_xoffset_target(${replay})
+    xoffset_enable_test_assertions(${replay})
+    xoffset_disable_exceptions(${replay})
+    add_test(NAME ${replay}
+        COMMAND ${replay} "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/${fuzz_target}")
+    add_test(NAME ${replay}_corpus COMMAND ${replay} "${CMAKE_CURRENT_BINARY_DIR}/replay-seeds/${fuzz_target}")
+    set_tests_properties(${replay} ${replay}_corpus PROPERTIES LABELS "reflection;replay;no-exceptions")
+    set_tests_properties(${replay}_corpus PROPERTIES FIXTURES_REQUIRED fuzz_${fuzz_target}_replay_seeds)
+endforeach()
 
 # test_v2_fuzz --replay reruns one case alone; it must match the full run.
 add_test(NAME test_v2_fuzz_replay COMMAND test_v2_fuzz --replay 20261021 17)
