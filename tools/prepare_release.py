@@ -80,8 +80,8 @@ REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATU
 FORBIDDEN_PARTS = {".git", ".svn", "build", "dist", "__pycache__", ".pytest_cache"}
 GENERATED_HEADERS = {"check_compat_baselines.hpp"}
 # Developer-only subdirectories behind options that default to OFF (XOFFSET_BUILD_DEMOS,
-# XOFFSET_TEST_HOST / XOFFSET_PHONE_PROGRAMS).
-UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate", "tools/test_host"}
+# XOFFSET_BUILD_MESH_DEMO, XOFFSET_TEST_HOST / XOFFSET_PHONE_PROGRAMS).
+UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate", "demo/mesh", "tools/test_host"}
 SCOPE = {
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "included_python_tests": list(TOOL_TESTS),

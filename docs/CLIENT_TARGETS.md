@@ -11,7 +11,7 @@
 
 K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺，实现中：字段表后端已合入（#149，3.2.0 起），
 下表 Android、Windows、macOS 和 iOS 模拟器各工具链已通过；3.2.0-rc.1 在 Android 真机、Windows 和 macOS 实机上
-也已通过（下一节），iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
+也已通过（下一节）；iPhone 15 Pro Max（iOS 26.6.2）上 CTest 138/138、参照语料和 demo 通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节）。三个客户端目标都原生构建、CTest 通过（iOS 含
 地址空间实测并定下最低部署目标）、跨目标 wire 语料一致、签名与 `tools/sigs/` 基线一致之后，才升为
 核心承诺（[USER_GUIDE.md](USER_GUIDE.md) 第 8 节，测试对照见 [STABILITY_TESTS.md](STABILITY_TESTS.md)）。
 

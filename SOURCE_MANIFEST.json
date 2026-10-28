@@ -1,5 +1,5 @@
 {
-  "archive_root": "xoffsetdatastructure-3.2.0-rc.2",
+  "archive_root": "xoffsetdatastructure-3.2.0",
   "dependency_lock": {
     "include_trees": {
       "external/boost/libs/config/include": "1840c63a8e130b742d6f8148acaf9706a566ccf1791d2afd6eb9462465c2aaf8",
@@ -32,14 +32,14 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 45934,
+      "bytes": 49350,
       "mode": 420,
-      "sha256": "8334c238464890c7847f053a01aefbb16b1d338bbc4fe11b7234c31b5877bf84"
+      "sha256": "e28a102a61b3c72036bb69c4da397285d8100e16b5e0aaed4b8d76ac44c88f73"
     },
     "CMakeLists.txt": {
-      "bytes": 6901,
+      "bytes": 7058,
       "mode": 420,
-      "sha256": "abc5e1cd39bd26dbcd1913a50097472f17d0a65949f2e69c2d5f8147ab2f02dd"
+      "sha256": "612c180cb35c8f949237a9be938a305dc9eae99b94a8a7c0b3c8c4a99a774523"
     },
     "Dockerfile": {
       "bytes": 3862,
@@ -52,14 +52,14 @@
       "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973"
     },
     "README.md": {
-      "bytes": 14696,
+      "bytes": 14585,
       "mode": 420,
-      "sha256": "fad3bc38ec2d77549b163f27eac2f562932c8de9aa14a72893af989761d52183"
+      "sha256": "9afecce438de36dcc73afefd00e81f325e71c11b5ddfc076338cdd7583076027"
     },
     "XOFFSET_VERSION": {
-      "bytes": 11,
+      "bytes": 6,
       "mode": 420,
-      "sha256": "7cfd8f536bd9a4498a16cc7b38b1620893f44692d09eef87d303838e134371cd"
+      "sha256": "33bdaf9e2d6bcbde2e4e613e865e403f8fe21fc621078d34c30b0bdc7f68d903"
     },
     "bench/slg/include/slg/cista_free.hpp": {
       "bytes": 1520,
@@ -217,9 +217,9 @@
       "sha256": "ed65d8b3a3303d8f4f2b2dc2611986eafbb8d38e60b959e11045e009708ff861"
     },
     "docs/ALPHA_COMPATIBILITY.md": {
-      "bytes": 8295,
+      "bytes": 8275,
       "mode": 420,
-      "sha256": "27cc955fafbed2258adfd1359e300196a0ea156851aa5d8f51e1c5c06b16d0ba"
+      "sha256": "fdf53cffb9f22e8b18a94e93b1deb26d15bae048d6f6e97183a0ece343770747"
     },
     "docs/PACKAGING.md": {
       "bytes": 18425,
@@ -4557,9 +4557,9 @@
       "sha256": "1208ff468efddeacc86d4e7f5880f106307a4dd348ff4e7ff2883806d509a79b"
     },
     "tests/CMakeLists.txt": {
-      "bytes": 19502,
+      "bytes": 20936,
       "mode": 420,
-      "sha256": "7d2db6ca461678d56bd7f12ec982d9c0dfbebd0c41e12c6a4b20e3f495e79a5e"
+      "sha256": "bd47a5326c0dfdb7fc22fd42c39bcbbaa26cd79afb1b5d9b37a5a234761f1042"
     },
     "tests/allocator_model_support.hpp": {
       "bytes": 11224,
@@ -4685,6 +4685,11 @@
       "bytes": 354,
       "mode": 420,
       "sha256": "d290cb25af8405d5bf2340462e22f8a664f0bc76a038616162bc85cfd763a3f5"
+    },
+    "tests/portable_schema/key_fail.cpp": {
+      "bytes": 2827,
+      "mode": 420,
+      "sha256": "8458c1297e8dcea4f760a014cc865e7783b8507b795550f73f3a51018cca0f90"
     },
     "tests/receive_custom_future_examples.hpp": {
       "bytes": 14656,
@@ -4867,9 +4872,9 @@
       "sha256": "384716cfaf37df11dd4e0373d7090155243204c0fa2a3d0f8b17184e66927bc7"
     },
     "tests/test_cross_compiler_wire.cpp": {
-      "bytes": 10994,
+      "bytes": 16597,
       "mode": 420,
-      "sha256": "48bd73a0afbcb378f859bcfdfd6192437543ac72a05aec0a8d5b9c1481a95b54"
+      "sha256": "f9a805a5ed944780d0da82c56021eec3b3ad77514aa977666167bbc610f8d9f0"
     },
     "tests/test_custom_future_lifetime.cpp": {
       "bytes": 8743,
@@ -4997,9 +5002,9 @@
       "sha256": "32fc5012abca84f4406d6eb87ec330aa072df209566d9f1324f990e7c35083d3"
     },
     "tests/test_receive_raw.cpp": {
-      "bytes": 47130,
+      "bytes": 44535,
       "mode": 420,
-      "sha256": "a3563811022900c188f8d8659e3b191351db6a2e64e69af3dd73a74ab54d33ee"
+      "sha256": "328ab2abd53da56d45d8993eb6a5365e9bb41d5d572ba8a796ac49c5abcaa9ca"
     },
     "tests/test_reflection_advanced.cpp": {
       "bytes": 9167,
@@ -5192,9 +5197,9 @@
       "sha256": "95944df65a3b3f44ee7b167256627e52c795502c978b41966a55824c744e5fcf"
     },
     "tests/test_verified_receive.cpp": {
-      "bytes": 46481,
+      "bytes": 46847,
       "mode": 420,
-      "sha256": "4a5edbf4c00346fddf8919136e1b632faf711d1d85b396fe41b3450c8dfd46a4"
+      "sha256": "35cd5c6e048b28d1ec41956493d92beaa2f5fab3448eccbb615e01fba3d4a94a"
     },
     "tests/test_virtual_memory_storage.cpp": {
       "bytes": 40234,
@@ -5337,9 +5342,9 @@
       "sha256": "16ff5122ae75f5a16cf3648836d1e5b2264f74224003297193c1fe7d0d53696a"
     },
     "tools/prepare_release.py": {
-      "bytes": 34668,
+      "bytes": 34706,
       "mode": 493,
-      "sha256": "016a69f65c40d86851726380248e06897f63a3b71f50cfd79b891a46cdacba7f"
+      "sha256": "71b14c894681e184d3401c6c32698cec47319c3b7c9bfbcc95b2801c3901c4bf"
     },
     "tools/prepare_vm_cmake.py": {
       "bytes": 2823,
@@ -5522,9 +5527,9 @@
       "sha256": "fbfb1142914b225d4ad11d1a5f52b30a9614fad4ac2ddde21738ea27db9036ba"
     },
     "xoffsetdatastructure.hpp": {
-      "bytes": 434586,
+      "bytes": 437433,
       "mode": 420,
-      "sha256": "626b8ee9500c403aa8fd63940c636e8f7f3d83afe3ad88964069086605f23f01"
+      "sha256": "f8c29ea68941ea3d40a15cf9b3af78e9fbb28c27db288566bed92996b358627e"
     }
   },
   "schema": "xoffset-source/v1",
@@ -5538,5 +5543,5 @@
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "validation_limits": "validate_vm.py native full/storage are supported entry points; historical wire bundles and full developer-test discovery are outside this distribution"
   },
-  "version": "3.2.0-rc.2"
+  "version": "3.2.0"
 }
