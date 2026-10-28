@@ -637,7 +637,16 @@ void custom_future_lifetimes(){
 #endif
 #endif
 }
-#if !defined(_WIN32)
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+// iOS apps cannot fork (the call fails), so the fork stage runs on desktops and Android.
+#if !defined(_WIN32) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
+#define XO_TEST_FORK 1
+#else
+#define XO_TEST_FORK 0
+#endif
+#if XO_TEST_FORK
 // Fork policy (registry and VM pool have no atfork handlers): with no other
 // thread inside the library at fork time, a child can load ordinary buffers,
 // receive, and read buffers received before the fork; the parent's buffer is
@@ -682,8 +691,10 @@ int main(int argc,char**argv){try{
 #if XOFFSET_TEST_CUSTOM_LIFETIMES
     stage="custom-future";custom_future_lifetimes();
 #endif
-#if !defined(_WIN32)
+#if XO_TEST_FORK
     stage="fork";fork_after_receive();
+#else
+    std::cout<<"verified receive: fork stage skipped (no fork on this platform)\n";
 #endif
     std::cout<<"verified receive: seven groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V2 hole table/sparse passed\n";
 #else

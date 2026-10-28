@@ -169,4 +169,8 @@ void set_new_functions(const void* const* program_functions) {
     }
 }
 
+void reset_new_functions() noexcept {
+    for (auto& f : g_program) f.store(nullptr, std::memory_order_release);
+}
+
 }  // namespace xoffset_test_host
