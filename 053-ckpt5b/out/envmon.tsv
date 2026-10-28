@@ -1,0 +1,168 @@
+epoch	utc	load1	pmset_therm	top6_pcpu	background_pcpu_ge1
+1793211858	2026-10-28T18:24:18Z	1.84	none	diskimages-helper:7.5,Claude Helper:2.6,WindowServer:2.2,VeeePlus:1.3,fseventsd:1.3,mds:1.1	Claude Helper:2.6,Claude Helper (Renderer):1.1
+1793211868	2026-10-28T18:24:28Z	1.94	none	Claude Helper:9.1,WindowServer:3.8,Claude Helper (Renderer):3.8,claude:1.8,VeeePlus:1.7,ChatGPT:1.3	Claude Helper:9.1,Claude Helper (Renderer):3.8,claude:1.2
+1793211878	2026-10-28T18:24:38Z	1.79	none	Claude Helper:10.4,WindowServer:4.0,Claude Helper (Renderer):3.5,trustd:2.2,networkserviceproxy:2.0,VeeePlus:1.8	trustd:2.2,Claude Helper:10.4,Claude Helper (Renderer):3.5
+1793211888	2026-10-28T18:24:48Z	1.67	none	ANECompilerService:99.4,Claude Helper:14.5,Claude Helper (Renderer):7.4,dasd:5.4,WindowServer:4.4,cloudd:3.6	cloudd:3.6,Codex (Service):1.0,Claude Helper:14.5,Claude Helper (Renderer):7.4,claude:1.2
+1793211898	2026-10-28T18:24:58Z	1.95	none	Claude Helper:10.1,WindowServer:4.0,Claude Helper (Renderer):3.6,sysmond:3.4,VeeePlus:1.8,claude:1.3	Claude Helper:10.1,Claude Helper (Renderer):3.6,claude:1.3
+1793211908	2026-10-28T18:25:08Z	2.03	none	Claude Helper:11.3,sysmond:6.4,Claude Helper (Renderer):4.2,WindowServer:4.1,VeeePlus:2.0,Codex (Renderer):2.0	Codex (Renderer):2.0,Claude Helper:11.3,Claude Helper (Renderer):4.2,mediaanalysisd:1.3
+1793211918	2026-10-28T18:25:18Z	2.76	none	sysmond:15.6,Claude Helper:7.4,claude:4.4,WindowServer:3.8,Claude Helper (Renderer):3.1,VeeePlus:1.9	Claude Helper:7.4,Claude Helper (Renderer):3.1,claude:4.4
+1793211928	2026-10-28T18:25:28Z	2.64	none	Claude Helper:8.9,WindowServer:3.5,Claude Helper (Renderer):2.9,ChatGPT:1.8,VeeePlus:1.6,com.apple.DriverKit-AppleBCMWLAN:1.6	cloudd:6.5,Claude Helper:9.6,Claude Helper (Renderer):3.4
+1793211938	2026-10-28T18:25:38Z	2.46	none	Claude Helper:7.9,Claude Helper (Renderer):4.3,WindowServer:3.4,VeeePlus:1.5,Python:1.0,apsd:0.7	Claude Helper:7.9,Claude Helper (Renderer):4.3
+1793211949	2026-10-28T18:25:49Z	2.08	none	Claude Helper:10.2,WindowServer:4.0,Claude Helper (Renderer):3.5,ChatGPT:2.5,com.apple.DriverKit-AppleBCMWLAN:2.3,VeeePlus:1.7	Codex (Service):1.3,Claude Helper:10.2,Claude Helper (Renderer):3.5
+1793211959	2026-10-28T18:25:59Z	1.92	none	Claude Helper:10.9,apsd:4.6,WindowServer:3.9,Claude Helper (Renderer):3.5,VeeePlus:1.7,com.apple.DriverKit-AppleBCMWLAN:1.6	Claude Helper:10.1,Claude Helper (Renderer):3.2
+1793211969	2026-10-28T18:26:09Z	2.01	none	Claude Helper:10.7,WindowServer:4.2,com.apple.DriverKit-AppleBCMWLAN:4.1,Claude Helper (Renderer):3.7,PacketTunnel:3.4,ChatGPT:2.0	Claude Helper:10.7,Claude Helper (Renderer):3.7
+1793211979	2026-10-28T18:26:19Z	2.08	none	Claude Helper:8.4,claude:5.9,WindowServer:3.5,Claude Helper (Renderer):2.5,apsd:1.8,VeeePlus:1.5	Claude Helper:8.4,Claude Helper (Renderer):2.5,claude:5.9
+1793211989	2026-10-28T18:26:29Z	2.06	none	Claude Helper:10.5,Claude Helper (Renderer):4.3,WindowServer:4.1,VeeePlus:1.7,ChatGPT:1.3,claude:0.8	Claude Helper:10.5,Claude Helper (Renderer):4.3
+1793211999	2026-10-28T18:26:39Z	2.05	none	Claude Helper:10.2,WindowServer:4.0,cloudd:3.8,Claude Helper (Renderer):3.3,VeeePlus:1.7,cloudphotod:1.1	cloudd:3.8,Claude Helper:10.2,Claude Helper (Renderer):3.3
+1793212009	2026-10-28T18:26:49Z	1.96	none	Claude Helper:9.6,WindowServer:3.9,Claude Helper (Renderer):2.8,VeeePlus:1.6,claude:0.5,com.apple.DriverKit-AppleBCMWLAN:0.3	Claude Helper:9.1,Claude Helper (Renderer):4.4
+1793212019	2026-10-28T18:26:59Z	1.89	none	Claude Helper:8.6,WindowServer:3.5,claude:3.2,Claude Helper (Renderer):2.9,VeeePlus:1.5,cfprefsd:1.3	Claude Helper:8.6,Claude Helper (Renderer):2.9,claude:3.2
+1793212029	2026-10-28T18:27:09Z	1.76	none	Claude Helper:9.1,trustd:4.8,nsurlsessiond:4.0,WindowServer:3.7,Claude Helper (Renderer):3.0,VeeePlus:1.5	cloudd:1.1,trustd:4.8,Claude Helper:9.1,Claude Helper (Renderer):3.0
+1793212039	2026-10-28T18:27:19Z	2.02	none	Claude Helper:7.5,Claude Helper (Renderer):3.4,WindowServer:3.3,VeeePlus:1.4,Python:0.7,com.apple.DriverKit-AppleBCMWLAN:0.5	Claude Helper:7.5,Claude Helper (Renderer):3.4
+1793212049	2026-10-28T18:27:29Z	2.02	none	Claude Helper:8.9,WindowServer:3.8,Claude Helper (Renderer):3.2,Python:2.0,VeeePlus:1.7,claude:0.4	Claude Helper:8.9,Claude Helper (Renderer):3.2
+1793212060	2026-10-28T18:27:40Z	1.86	none	Claude Helper:9.8,Claude Helper (Renderer):4.6,WindowServer:4.0,VeeePlus:1.7,com.apple.DriverKit-AppleBCMWLAN:0.7,bluetoothd:0.6	Claude Helper:9.8,Claude Helper (Renderer):4.6
+1793212070	2026-10-28T18:27:50Z	1.95	none	Claude Helper:9.7,WindowServer:3.9,Claude Helper (Renderer):3.3,VeeePlus:1.6,cloudd:1.6,ChatGPT:0.7	cloudd:1.6,Claude Helper:9.7,Claude Helper (Renderer):3.3
+1793212080	2026-10-28T18:28:00Z	2.13	none	Claude Helper (Renderer):14.1,loginwindow:11.2,Claude Helper:8.4,WindowServer:4.5,VeeePlus:1.6,ControlCenter:1.1	Claude Helper:8.4,Claude Helper (Renderer):14.1
+1793212090	2026-10-28T18:28:10Z	2.11	none	Claude Helper:10.3,WindowServer:4.2,Claude Helper (Renderer):3.9,VeeePlus:1.6,cfprefsd:0.7,runningboardd:0.6	Claude Helper:9.4,Claude Helper (Renderer):3.4
+1793212100	2026-10-28T18:28:20Z	2.02	none	syspolicyd:4.7,tccd:2.3,Claude Helper:2.2,WindowServer:2.1,trustd:1.5,trustd:1.4	syspolicyd:4.7,trustd:1.5,trustd:1.4,Claude Helper:2.2
+1793212110	2026-10-28T18:28:30Z	2.17	none	Claude Helper:4.7,syspolicyd:3.9,trustd:3.8,VeeePlus:2.7,WindowServer:2.6,Claude Helper (Renderer):1.9	syspolicyd:3.7,trustd:2.4,Claude Helper:3.5,Claude Helper (Renderer):1.6
+1793212120	2026-10-28T18:28:40Z	2.14	none	diskimages-helper:2.5,WindowServer:1.9,Claude Helper:1.7,VeeePlus:1.1,Python:1.0,r3fz0:0.9	Claude Helper:1.7
+1793212130	2026-10-28T18:28:50Z	2.27	none	r3fz1:40.3,WindowServer:2.0,diskimages-helper:2.0,Claude Helper:1.8,VeeePlus:1.2,apsd:1.2	Claude Helper:1.8
+1793212140	2026-10-28T18:29:00Z	2.46	none	PerfPowerServices:8.7,loginwindow:8.2,runningboardd:7.0,WindowServer:3.7,diskimages-helper:1.8,cloudd:1.7	cloudd:1.7,Claude Helper:1.7,Claude Helper (Renderer):1.6
+1793212150	2026-10-28T18:29:10Z	2.31	none	WindowServer:1.9,Claude Helper:1.9,VeeePlus:1.2,diskimages-helper:0.9,Claude Helper (Renderer):0.7,cfprefsd:0.6	Claude Helper:2.1
+1793212160	2026-10-28T18:29:20Z	2.55	none	AddressBookSourceSync:27.8,UsageTrackingAgent:23.7,capn1:13.0,accountsd:2.8,dasd:2.5,BiomeAgent:2.4	Claude Helper:1.8
+1793212170	2026-10-28T18:29:30Z	2.39	none	anch0:15.2,trustd:2.5,diskimages-helper:2.2,WindowServer:2.0,nsurlsessiond:1.8,Claude Helper:1.8	trustd:2.5,Claude Helper:1.8
+1793212180	2026-10-28T18:29:40Z	2.17	none	contactsd:45.5,(cist1):41.6,IMDPersistenceAgent:3.8,CMFSyncAgent:3.8,facetimemessagestored:3.6,duetexpertd:2.6	Claude Helper:2.1,photoanalysisd:1.2,communicationtrustd:1.3
+1793212191	2026-10-28T18:29:51Z	2.23	none	WindowServer:1.9,Claude Helper:1.9,diskimages-helper:1.8,runningboardd:1.2,VeeePlus:1.2,Claude Helper (Renderer):0.9	Claude Helper:1.9
+1793212201	2026-10-28T18:30:01Z	2.35	none	loginwindow:8.3,head2:4.6,WindowServer:4.0,diskimages-helper:2.9,Claude Helper:1.8,VeeePlus:1.3	Claude Helper:1.8
+1793212211	2026-10-28T18:30:11Z	2.22	none	cist1:18.3,diskimages-helper:2.2,WindowServer:1.9,Claude Helper:1.8,Python:1.4,VeeePlus:1.2	Claude Helper:1.8
+1793212221	2026-10-28T18:30:21Z	2.18	none	(anch0):33.2,diskimages-helper:2.0,WindowServer:1.9,Claude Helper:1.8,claude:1.2,VeeePlus:1.1	Claude Helper:2.1,claude:1.2
+1793212231	2026-10-28T18:30:31Z	2.15	none	head1:44.8,WindowServer:2.1,Claude Helper:1.8,trustd:1.5,diskimages-helper:1.3,nsurlsessiond:1.2	trustd:1.5,Claude Helper:1.8
+1793212241	2026-10-28T18:30:41Z	2.05	none	r3fz0:10.3,diskimages-helper:2.3,Claude Helper:2.0,WindowServer:1.9,Claude Helper (Renderer):1.2,VeeePlus:1.1	Claude Helper:2.0,Claude Helper (Renderer):1.2
+1793212251	2026-10-28T18:30:51Z	1.97	none	WindowServer:1.9,Claude Helper:1.8,runningboardd:1.3,diskimages-helper:1.2,VeeePlus:1.1,Finder:0.9	Claude Helper:1.8
+1793212261	2026-10-28T18:31:01Z	1.90	none	r3fz1:31.7,loginwindow:6.8,WindowServer:3.5,diskimages-helper:1.9,Claude Helper:1.8,VeeePlus:1.3	Codex (Renderer):1.8,Claude Helper:2.1
+1793212271	2026-10-28T18:31:11Z	1.91	none	flat2:20.8,cloudd:2.9,WindowServer:2.0,Claude Helper:1.8,diskimages-helper:1.7,VeeePlus:1.2	cloudd:2.9,Claude Helper:1.8
+1793212281	2026-10-28T18:31:21Z	1.93	none	(cere1):47.8,apsd:2.9,WindowServer:1.9,Claude Helper:1.9,diskimages-helper:1.3,VeeePlus:1.2	Claude Helper:1.9
+1793212291	2026-10-28T18:31:31Z	1.94	none	flat0:3.1,diskimages-helper:2.5,WindowServer:1.9,Claude Helper:1.7,VeeePlus:1.2,Claude Helper (Renderer):1.0	Claude Helper:1.7,Claude Helper (Renderer):1.0
+1793212301	2026-10-28T18:31:41Z	2.10	none	WindowServer:1.9,Claude Helper:1.7,diskimages-helper:1.3,VeeePlus:1.2,Claude Helper (Renderer):0.7,trustd:0.6	cloudd:1.9,trustd:3.9,Claude Helper:2.1
+1793212311	2026-10-28T18:31:51Z	2.00	none	spindump:36.4,anch0:32.0,WindowServer:1.9,diskimages-helper:1.9,Claude Helper:1.8,VeeePlus:1.2	Claude Helper:1.8
+1793212321	2026-10-28T18:32:01Z	2.09	none	spindump:93.6,cist2:19.8,loginwindow:8.0,nehelper:5.5,WindowServer:4.5,trustd:3.4	Claude Helper:2.9,Claude Helper (Renderer):1.8,trustd:3.4
+1793212331	2026-10-28T18:32:11Z	2.30	none	spindump:50.2,Claude Helper:2.9,WindowServer:2.3,VeeePlus:1.5,Claude Helper (Renderer):1.5,diskimages-helper:1.3	Claude Helper:2.9,Claude Helper (Renderer):1.5
+1793212342	2026-10-28T18:32:22Z	2.40	none	capn2:64.5,Claude Helper:2.7,WindowServer:2.0,backgroundtaskmanagementd:1.7,cloudd:1.5,Claude Helper (Renderer):1.5	cloudd:1.5,Claude Helper:2.7,Claude Helper (Renderer):1.5
+1793212352	2026-10-28T18:32:32Z	2.30	none	Claude Helper:2.8,diskimages-helper:2.5,backgroundtaskmanagementd:2.5,WindowServer:2.1,Claude Helper (Renderer):1.9,VeeePlus:1.3	Claude Helper:2.8,Claude Helper (Renderer):1.9,claude:1.1
+1793212362	2026-10-28T18:32:42Z	2.17	none	Claude Helper:2.7,diskimages-helper:2.4,WindowServer:2.1,Claude Helper (Renderer):2.0,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:0.6	Claude Helper:2.7,Claude Helper (Renderer):2.0
+1793212372	2026-10-28T18:32:52Z	2.07	none	Claude Helper:2.8,WindowServer:1.9,Claude Helper (Renderer):1.6,diskimages-helper:1.5,VeeePlus:1.2,claude:0.7	Claude Helper:2.8,Claude Helper (Renderer):1.6
+1793212382	2026-10-28T18:33:02Z	1.99	none	flat0:17.8,loginwindow:5.9,WindowServer:3.1,diskimages-helper:2.6,Claude Helper:2.4,cloudd:1.6	cloudd:5.6,Claude Helper:2.8,Claude Helper (Renderer):1.5
+1793212392	2026-10-28T18:33:12Z	1.92	none	r3fz1:9.3,Claude Helper:2.6,WindowServer:2.0,diskimages-helper:1.7,Claude Helper (Renderer):1.3,VeeePlus:1.2	Claude Helper:2.6,Claude Helper (Renderer):1.3
+1793212402	2026-10-28T18:33:22Z	1.85	none	Claude Helper:2.8,WindowServer:1.9,Claude Helper (Renderer):1.6,claude:1.5,diskimages-helper:1.3,VeeePlus:1.1	Claude Helper:2.8,Claude Helper (Renderer):1.6,claude:1.5
+1793212412	2026-10-28T18:33:32Z	1.87	none	cist2:40.9,diskimages-helper:1.3,VeeePlus:1.2,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,PacketTunnel:0.7	
+1793212422	2026-10-28T18:33:42Z	1.66	none	flat0:39.1,claude:1.7,diskimages-helper:1.5,VeeePlus:1.0,WindowServer:0.9,Python:0.9	claude:1.7
+1793212432	2026-10-28T18:33:52Z	1.56	none	apsd:3.1,launchd:1.9,diskimages-helper:1.5,VeeePlus:1.2,WindowServer:1.1,ChatGPT:0.8	
+1793212442	2026-10-28T18:34:02Z	1.47	none	capn2:18.1,runningboardd:2.4,diskimages-helper:1.8,WindowServer:1.3,Python:1.3,VeeePlus:1.2	
+1793212452	2026-10-28T18:34:12Z	1.47	none	cloudd:5.8,diskimages-helper:1.6,VeeePlus:1.3,WindowServer:1.1,cloudphotod:0.7,secd:0.7	cloudd:5.8
+1793212462	2026-10-28T18:34:22Z	1.48	none	hdaa0:41.2,launchd:20.5,VeeePlus:1.3,WindowServer:1.2,diskimages-helper:1.2,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793212472	2026-10-28T18:34:32Z	1.40	none	cere1:15.1,airportd:2.7,diskimages-helper:2.5,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3,WindowServer:1.2	
+1793212482	2026-10-28T18:34:42Z	1.49	none	(flat2):52.2,trustd:3.3,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.2,WindowServer:1.2,diskimages-helper:1.1	trustd:3.3
+1793212493	2026-10-28T18:34:53Z	1.57	none	capn0:30.1,launchd:8.7,ChatGPT:2.0,diskimages-helper:1.6,sysmond:1.3,VeeePlus:1.3	Codex (Service):1.0
+1793212503	2026-10-28T18:35:03Z	1.64	none	sysmond:3.4,diskimages-helper:1.3,VeeePlus:1.2,WindowServer:1.1,ChatGPT:0.7,claude:0.6	
+1793212513	2026-10-28T18:35:13Z	1.78	none	sysmond:5.2,diskimages-helper:2.2,VeeePlus:1.3,WindowServer:1.2,ChatGPT:0.9,opendirectoryd:0.8	
+1793212523	2026-10-28T18:35:23Z	1.58	none	sysmond:13.9,launchd:6.9,opendirectoryd:1.6,VeeePlus:1.5,WindowServer:1.3,diskimages-helper:1.1	claude:1.0
+1793212533	2026-10-28T18:35:33Z	2.08	none	zsh:2.3,diskimages-helper:1.9,VeeePlus:1.2,WindowServer:1.2,launchd:1.0,ChatGPT:0.9	
+1793212543	2026-10-28T18:35:43Z	2.15	none	diskimages-helper:1.3,VeeePlus:1.1,claude:1.0,WindowServer:0.9,Python:0.5,ChatGPT:0.4	
+1793212553	2026-10-28T18:35:53Z	1.96	none	capn1:17.9,diskimages-helper:1.9,launchd:1.8,VeeePlus:1.1,ChatGPT:1.1,WindowServer:1.0	
+1793212563	2026-10-28T18:36:03Z	1.81	none	flat2:52.2,cloudd:5.1,VeeePlus:1.2,WindowServer:1.0,diskimages-helper:1.0,cloudphotod:0.9	cloudd:5.1
+1793212573	2026-10-28T18:36:13Z	1.84	none	VeeePlus:1.2,WindowServer:1.1,ChatGPT:0.9,PacketTunnel:0.6,com.apple.DriverKit-AppleBCMWLAN:0.6,Codex (Service):0.6	
+1793212583	2026-10-28T18:36:23Z	1.79	none	launchd:2.2,ChatGPT:1.4,VeeePlus:1.3,WindowServer:1.2,Codex (Renderer):1.1,apsd:1.0	Codex (Renderer):1.1
+1793212593	2026-10-28T18:36:33Z	1.51	none	claude:2.0,ChatGPT:1.7,VeeePlus:1.2,WindowServer:1.1,Codex (Service):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	claude:2.0
+1793212603	2026-10-28T18:36:43Z	1.43	none	networkserviceproxy:3.6,airportd:3.1,apsd:1.5,VeeePlus:1.3,WindowServer:1.1,symptomsd:0.9	
+1793212613	2026-10-28T18:36:53Z	1.40	none	networkserviceproxy:3.5,airportd:3.1,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3,launchd:1.2,WindowServer:1.2	Codex (Service):1.9,Codex (Renderer):5.1
+1793212624	2026-10-28T18:37:04Z	1.48	none	apsd:1.8,trustd:1.4,VeeePlus:1.2,WindowServer:1.2,runningboardd:0.7,mDNSResponder:0.6	trustd:1.4
+1793212634	2026-10-28T18:37:14Z	1.57	none	cloudd:10.8,Codex (Renderer):4.7,ChatGPT:2.9,Codex (Service):2.2,secd:1.5,VeeePlus:1.5	cloudd:6.6,Codex (Service):2.0,Codex (Renderer):2.9,codex:1.1
+1793212644	2026-10-28T18:37:24Z	1.56	none	apsd:3.5,VeeePlus:1.3,mDNSResponder:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:0.8,networkserviceproxy:0.7	
+1793212654	2026-10-28T18:37:34Z	1.47	none	Codex (Renderer):2.8,ChatGPT:2.0,Python:1.9,Codex (Service):1.8,VeeePlus:1.4,WindowServer:1.2	Codex (Service):1.8,Codex (Renderer):1.8
+1793212664	2026-10-28T18:37:44Z	1.33	none	trustd:4.3,cloudd:2.7,nsurlsessiond:2.5,dasd:1.9,VeeePlus:1.3,WindowServer:1.3	cloudd:2.7,trustd:4.3
+1793212674	2026-10-28T18:37:54Z	1.52	none	Codex (Renderer):7.6,ChatGPT:6.2,Codex (Service):3.7,cloudd:3.6,VeeePlus:1.5,WindowServer:1.3	cloudd:2.1,Codex (Service):2.8,Codex (Renderer):7.5
+1793212684	2026-10-28T18:38:04Z	1.44	none	VeeePlus:1.2,WindowServer:1.1,bash:0.6,notifyd:0.3,PacketTunnel:0.3,claude:0.3	
+1793212694	2026-10-28T18:38:14Z	1.37	none	Codex (Renderer):7.3,ChatGPT:3.5,VeeePlus:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.1,Codex (Service):1.0	Codex (Service):1.0,Codex (Renderer):7.3
+1793212704	2026-10-28T18:38:24Z	1.31	none	nsurlsessiond:1.3,dasd:1.3,VeeePlus:1.1,cfprefsd:1.0,WindowServer:1.0,cloudd:1.0	Claude Helper (Renderer):2.8
+1793212714	2026-10-28T18:38:34Z	1.34	none	claude:3.8,Codex (Renderer):1.9,ChatGPT:1.5,VeeePlus:1.2,WindowServer:1.2,Codex (Service):0.9	Codex (Renderer):1.9,claude:3.8
+1793212725	2026-10-28T18:38:45Z	1.69	none	Claude Helper (Renderer):2.4,VeeePlus:1.2,WindowServer:1.0,ChatGPT:0.5,PerfPowerServices:0.4,claude:0.2	Claude Helper (Renderer):2.4
+1793212735	2026-10-28T18:38:55Z	1.58	none	Codex (Renderer):2.5,ChatGPT:2.0,VeeePlus:1.3,WindowServer:1.2,Codex (Service):1.0,claude:0.5	Codex (Service):1.0,Codex (Renderer):2.5
+1793212745	2026-10-28T18:39:05Z	1.49	none	spindump:96.9,cloudd:3.2,VeeePlus:1.6,lsd:1.5,WindowServer:1.4,trustd:0.7	cloudd:3.2
+1793212755	2026-10-28T18:39:15Z	1.89	none	spindump:99.7,ChatGPT:5.9,Codex (Renderer):4.4,apsd:3.8,VeeePlus:1.8,WindowServer:1.6	Codex (Service):1.3,Codex (Renderer):3.1
+1793212765	2026-10-28T18:39:25Z	1.90	none	Python:1.9,VeeePlus:1.2,WindowServer:1.1,PerfPowerServices:0.7,dasd:0.5,runningboardd:0.4	
+1793212775	2026-10-28T18:39:35Z	1.84	none	ChatGPT:2.2,VeeePlus:1.3,WindowServer:1.3,nsurlsessiond:1.0,Codex (Service):1.0,Codex (Renderer):0.9	Codex (Service):1.0
+1793212785	2026-10-28T18:39:45Z	1.71	none	VeeePlus:1.2,WindowServer:1.1,notifyd:0.3,launchd:0.3,clocksyncd:0.2,claude:0.2	
+1793212795	2026-10-28T18:39:55Z	1.52	none	ChatGPT:3.8,Codex (Renderer):1.5,VeeePlus:1.2,clocksyncd:1.1,WindowServer:1.0,Codex (Service):0.7	Codex (Renderer):1.5
+1793212805	2026-10-28T18:40:05Z	1.60	none	VeeePlus:1.2,WindowServer:1.1,PacketTunnel:0.5,claude:0.5,com.apple.DriverKit-AppleBCMWLAN:0.5,Codex (Service):0.4	
+1793212815	2026-10-28T18:40:15Z	1.58	none	capn0:21.1,apsd:6.7,nsurlsessiond:2.1,cloudd:2.0,diskimages-helper:1.8,ChatGPT:1.6	cloudd:1.1
+1793212825	2026-10-28T18:40:25Z	1.57	none	anch1:3.2,diskimages-helper:1.7,VeeePlus:1.0,WindowServer:1.0,Python:0.7,fseventsd:0.2	
+1793212835	2026-10-28T18:40:35Z	1.55	none	diskimages-helper:1.7,VeeePlus:1.1,WindowServer:1.1,ChatGPT:1.0,Codex (Renderer):0.6,Finder:0.4	Codex (Renderer):1.0
+1793212846	2026-10-28T18:40:46Z	1.62	none	capn0:45.0,cfprefsd:1.5,diskimages-helper:1.3,VeeePlus:1.0,WindowServer:0.9,dasd:0.8	
+1793212856	2026-10-28T18:40:56Z	1.68	none	hdaa0:16.0,cloudd:5.5,diskimages-helper:1.9,cloudphotod:1.5,VeeePlus:1.3,WindowServer:1.2	cloudd:5.5
+1793212866	2026-10-28T18:41:06Z	1.73	none	ChatGPT:1.3,VeeePlus:1.0,WindowServer:1.0,diskimages-helper:0.8,Codex (Service):0.7,Python:0.4	
+1793212876	2026-10-28T18:41:16Z	1.92	none	flat2:24.1,ChatGPT:3.8,diskimages-helper:1.8,VeeePlus:1.2,WindowServer:1.1,Python:0.7	
+1793212886	2026-10-28T18:41:26Z	1.94	none	hdaa0:27.1,trustd:4.5,nsurlsessiond:3.4,diskimages-helper:1.2,VeeePlus:1.1,WindowServer:1.0	cloudd:1.0,trustd:4.5
+1793212896	2026-10-28T18:41:36Z	1.86	none	VeeePlus:1.2,backgroundtaskmanagementd:1.2,WindowServer:1.1,diskimages-helper:1.1,ChatGPT:0.9,opendirectoryd:0.6	
+1793212906	2026-10-28T18:41:46Z	2.13	none	backgroundtaskmanagementd:3.0,ChatGPT:1.4,diskimages-helper:1.2,VeeePlus:1.0,WindowServer:0.9,Python:0.7	
+1793212916	2026-10-28T18:41:56Z	2.11	none	VeeePlus:1.2,diskimages-helper:1.2,WindowServer:1.0,Python:0.8,cloudd:0.5,ChatGPT:0.4	
+1793212926	2026-10-28T18:42:06Z	2.01	none	cist1:41.8,cloudd:3.3,diskimages-helper:1.3,VeeePlus:1.2,WindowServer:1.1,apsd:0.8	cloudd:3.3
+1793212936	2026-10-28T18:42:16Z	1.93	none	r3fz0:12.1,diskimages-helper:2.2,Python:1.4,VeeePlus:1.0,WindowServer:0.9,fseventsd:0.2	
+1793212946	2026-10-28T18:42:26Z	1.86	none	diskimages-helper:1.3,apsd:1.3,VeeePlus:1.1,WindowServer:1.0,timed:0.6,Python:0.4	
+1793212956	2026-10-28T18:42:36Z	1.88	none	trustd:1.6,diskimages-helper:1.2,VeeePlus:1.1,WindowServer:1.0,nsurlsessiond:0.7,cloudd:0.6	trustd:1.6
+1793212966	2026-10-28T18:42:46Z	1.97	none	head2:30.1,diskimages-helper:2.1,apsd:2.1,VeeePlus:1.2,WindowServer:1.1,cloudd:1.0	cloudd:1.0
+1793212976	2026-10-28T18:42:56Z	1.83	none	diskimages-helper:1.2,VeeePlus:1.0,WindowServer:0.9,Python:0.4,claude:0.2,bluetoothd:0.1	
+1793212986	2026-10-28T18:43:06Z	1.85	none	(hdaa0):30.1,apsd:2.8,diskimages-helper:2.1,VeeePlus:1.2,WindowServer:1.1,mDNSResponder:1.0	
+1793212997	2026-10-28T18:43:17Z	1.88	none	(cere1):54.0,diskimages-helper:1.5,VeeePlus:1.2,Finder:1.2,WindowServer:1.0,ChatGPT:0.6	
+1793213007	2026-10-28T18:43:27Z	1.81	none	cere0:11.4,diskimages-helper:2.1,Finder:1.8,VeeePlus:1.0,WindowServer:1.0,Python:0.7	
+1793213017	2026-10-28T18:43:37Z	1.92	none	r3fz2:21.1,diskimages-helper:2.2,VeeePlus:1.0,WindowServer:1.0,Python:0.7,Finder:0.6	
+1793213027	2026-10-28T18:43:47Z	2.17	none	capn1:66.9,VeeePlus:1.1,WindowServer:1.0,diskimages-helper:0.8,Claude Helper (Renderer):0.7,Finder:0.6	
+1793213037	2026-10-28T18:43:57Z	2.22	none	cist2:24.1,diskimages-helper:2.9,cloudd:1.1,VeeePlus:1.0,WindowServer:1.0,Python:0.7	cloudd:1.1
+1793213047	2026-10-28T18:44:07Z	2.03	none	diskimages-helper:2.1,VeeePlus:1.0,WindowServer:1.0,Finder:0.7,sysmond:0.4,Python:0.3	
+1793213057	2026-10-28T18:44:17Z	2.02	none	anch0:21.2,diskimages-helper:2.2,sysmond:1.2,VeeePlus:1.1,WindowServer:1.0,Codex (Renderer):0.8	
+1793213067	2026-10-28T18:44:27Z	2.10	none	hdaa1:12.1,sysmond:2.1,diskimages-helper:1.8,VeeePlus:1.2,WindowServer:1.2,Python:0.7	trustd:4.3
+1793213077	2026-10-28T18:44:37Z	2.24	none	sysmond:4.9,diskimages-helper:1.3,VeeePlus:1.2,WindowServer:1.1,opendirectoryd:0.6,notifyd:0.5	
+1793213087	2026-10-28T18:44:47Z	2.37	none	sysmond:5.4,VeeePlus:1.3,WindowServer:1.2,diskimages-helper:0.8,notifyd:0.7,opendirectoryd:0.7	
+1793213097	2026-10-28T18:44:57Z	2.31	none	flat1:54.0,sysmond:11.3,VeeePlus:2.1,opendirectoryd:1.6,launchd:1.5,trustd:1.4	trustd:1.4
+1793213107	2026-10-28T18:45:07Z	2.33	none	cist2:27.1,diskimages-helper:2.7,cloudd:2.6,zsh:2.0,launchd:1.2,VeeePlus:1.2	cloudd:2.6
+1793213117	2026-10-28T18:45:17Z	2.21	none	cere1:3.1,diskimages-helper:2.3,apsd:2.0,VeeePlus:1.1,WindowServer:1.0,Python:0.8	
+1793213127	2026-10-28T18:45:27Z	2.26	none	(r3fz0):39.3,diskimages-helper:1.2,ChatGPT:1.2,VeeePlus:1.1,WindowServer:1.0,Python:0.5	
+1793213137	2026-10-28T18:45:37Z	2.14	none	diskimages-helper:2.1,trustd:1.5,VeeePlus:1.1,WindowServer:1.0,apsd:1.0,nsurlsessiond:0.8	
+1793213148	2026-10-28T18:45:48Z	2.19	none	capn0:27.1,diskimages-helper:2.1,VeeePlus:1.2,Python:1.2,WindowServer:1.1,ChatGPT:1.1	
+1793213158	2026-10-28T18:45:58Z	2.16	none	capn2:27.1,diskimages-helper:2.0,VeeePlus:1.7,Python:1.3,WindowServer:1.0,Codex (Service):0.4	
+1793213168	2026-10-28T18:46:08Z	2.06	none	cere1:9.1,diskimages-helper:2.1,Python:1.2,VeeePlus:1.1,claude:1.0,WindowServer:1.0	claude:1.0
+1793213178	2026-10-28T18:46:18Z	1.98	none	apsd:2.3,diskimages-helper:1.6,VeeePlus:1.1,WindowServer:1.0,identityservicesd:0.4,Python:0.4	
+1793213188	2026-10-28T18:46:28Z	1.98	none	flat1:43.5,diskimages-helper:1.3,VeeePlus:1.0,WindowServer:1.0,ChatGPT:0.7,Codex (Service):0.5	
+1793213198	2026-10-28T18:46:38Z	1.91	none	diskimages-helper:1.4,VeeePlus:1.0,WindowServer:1.0,mdworker_shared:0.6,Claude Helper (Renderer):0.6,mds:0.5	
+1793213208	2026-10-28T18:46:48Z	1.92	none	head1:30.1,diskimages-helper:2.0,VeeePlus:1.2,WindowServer:1.0,ChatGPT:1.0,Python:0.7	
+1793213218	2026-10-28T18:46:58Z	1.93	none	cloudd:4.7,VeeePlus:1.2,WindowServer:1.1,cloudphotod:0.8,diskimages-helper:0.8,adid:0.5	cloudd:2.7
+1793213228	2026-10-28T18:47:08Z	1.79	none	(r3fz2):51.4,diskimages-helper:1.4,VeeePlus:1.1,WindowServer:1.0,ChatGPT:0.6,Python:0.4	
+1793213238	2026-10-28T18:47:18Z	1.98	none	flat0:34.8,diskimages-helper:1.5,VeeePlus:1.0,WindowServer:1.0,Python:0.6,Claude Helper (Renderer):0.6	
+1793213248	2026-10-28T18:47:28Z	1.83	none	trustd:1.8,nsurlsessiond:1.6,ChatGPT:1.4,VeeePlus:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.2	trustd:1.8
+1793213258	2026-10-28T18:47:38Z	1.70	none	Claude Helper (Renderer):1.7,VeeePlus:1.2,WindowServer:1.1,airportd:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,UURemoteServer:0.5	Claude Helper (Renderer):1.7
+1793213268	2026-10-28T18:47:48Z	1.67	none	ChatGPT:1.7,VeeePlus:1.3,WindowServer:1.2,Codex (Service):1.0,com.apple.DriverKit-AppleBCMWLAN:0.6,Codex (Renderer):0.6	
+1793213279	2026-10-28T18:47:59Z	1.56	none	VeeePlus:1.2,WindowServer:1.1,cloudd:0.6,Finder:0.5,claude:0.4,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793213289	2026-10-28T18:48:09Z	1.48	none	mdworker_shared:4.8,ChatGPT:3.9,cloudd:3.7,apsd:2.5,Codex (Service):1.9,VeeePlus:1.5	cloudd:3.7,Codex (Service):1.9,Codex (Renderer):1.4,mdworker_shared:2.9
+1793213299	2026-10-28T18:48:19Z	1.48	none	Python:1.6,VeeePlus:1.2,WindowServer:1.1,Codex (Service):0.4,claude:0.3,ChatGPT:0.3	
+1793213309	2026-10-28T18:48:29Z	1.48	none	ChatGPT:3.7,bluetoothd:2.3,Codex (Service):1.5,VeeePlus:1.3,WindowServer:1.3,Codex (Renderer):1.1	Codex (Service):1.0
+1793213319	2026-10-28T18:48:39Z	1.33	none	trustd:1.8,nsurlsessiond:1.5,VeeePlus:1.2,WindowServer:1.1,ChatGPT:1.0,PacketTunnel:0.7	trustd:1.8
+1793213329	2026-10-28T18:48:49Z	1.43	none	ChatGPT:1.8,Codex (Renderer):1.4,VeeePlus:1.3,WindowServer:1.2,Codex (Service):1.2,com.apple.DriverKit-AppleBCMWLAN:0.7	Codex (Service):1.2,Codex (Renderer):1.4
+1793213339	2026-10-28T18:48:59Z	1.28	none	VeeePlus:1.1,WindowServer:1.1,PerfPowerServices:1.0,bash:0.6,ChatGPT:0.3,claude:0.2	
+1793213349	2026-10-28T18:49:09Z	1.24	none	Codex (Renderer):2.8,ChatGPT:2.3,Codex (Service):1.6,VeeePlus:1.2,WindowServer:1.1,apsd:0.8	Codex (Service):1.6,Codex (Renderer):2.8
+1793213359	2026-10-28T18:49:19Z	1.28	none	cloudd:4.8,cloudphotod:3.4,nsurlsessiond:2.1,dasd:2.0,VeeePlus:1.3,WindowServer:1.2	cloudd:4.8
+1793213369	2026-10-28T18:49:29Z	1.31	none	VeeePlus:1.2,WindowServer:1.0,ChatGPT:0.9,networkserviceproxy:0.7,airportd:0.5,claude:0.4	
+1793213379	2026-10-28T18:49:39Z	1.26	none	claude:5.8,VeeePlus:1.1,WindowServer:1.0,Python:0.6,clocksyncd:0.1,ControlCenter:0.1	claude:3.8
+1793213390	2026-10-28T18:49:50Z	1.37	none	VeeePlus:1.3,claude:1.3,WindowServer:1.2,Python:1.2,ChatGPT:1.2,nsurlsessiond:0.7	Codex (Service):1.6,Codex (Renderer):1.4,claude:1.0
+1793213400	2026-10-28T18:50:00Z	1.38	none	Claude Helper (Renderer):13.2,loginwindow:11.0,cloudd:6.8,WindowServer:2.2,VeeePlus:1.5,cloudphotod:1.1	cloudd:6.8,Claude Helper (Renderer):13.2
+1793213410	2026-10-28T18:50:10Z	1.32	none	claude:3.5,ChatGPT:2.3,Codex (Service):1.5,VeeePlus:1.2,WindowServer:1.2,Codex (Renderer):1.1	Codex (Service):1.5,Codex (Renderer):1.1,claude:3.5
+1793213420	2026-10-28T18:50:20Z	1.27	none	VeeePlus:1.1,WindowServer:1.1,ChatGPT:0.3,Codex (Service):0.3,distnoted:0.1,distnoted:0.1	
+1793213430	2026-10-28T18:50:30Z	1.23	none	ChatGPT:2.5,Codex (Service):1.9,claude:1.7,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3,WindowServer:1.2	Codex (Service):1.9,Codex (Renderer):1.0,claude:1.7
+1793213440	2026-10-28T18:50:40Z	1.19	none	VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif):0.8,mDNSResponder:0.5,Google Chrome:0.5,bash:0.4	
+1793213450	2026-10-28T18:50:50Z	1.08	none	ChatGPT:2.6,Codex (Renderer):2.5,Codex (Service):1.8,VeeePlus:1.3,WindowServer:1.3,com.apple.DriverKit-AppleBCMWLAN:1.0	Codex (Service):2.0,Codex (Renderer):2.1
+1793213460	2026-10-28T18:51:00Z	1.30	none	Claude Helper (Renderer):24.4,loginwindow:8.3,WindowServer:3.3,VeeePlus:1.5,apsd:1.1,runningboardd:0.6	Claude Helper (Renderer):24.4
+1793213470	2026-10-28T18:51:10Z	1.25	none	cloudd:1.7,backgroundtaskmanagementd:1.4,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.2,claude:0.4	cloudd:7.0,Codex (Service):1.0,Codex (Renderer):1.4
+1793213480	2026-10-28T18:51:20Z	1.37	none	backgroundtaskmanagementd:2.2,WindowServer:1.7,VeeePlus:1.3,tccd:1.1,syspolicyd:0.8,apsd:0.8	
+1793213491	2026-10-28T18:51:31Z	1.39	none	syspolicyd:1.6,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.1,Python:0.5,Codex (Service):0.5	syspolicyd:1.0
+1793213501	2026-10-28T18:51:41Z	1.56	none	slg_head:98.3,trustd:4.2,nsurlsessiond:3.1,Finder:1.6,VeeePlus:1.2,WindowServer:1.0	trustd:4.2
+1793213511	2026-10-28T18:51:51Z	1.63	none	slg_anch:99.1,VeeePlus:1.0,Finder:1.0,ChatGPT:1.0,claude:0.9,WindowServer:0.9	
+1793213521	2026-10-28T18:52:01Z	1.61	none	slg_head:95.8,loginwindow:6.1,WindowServer:2.8,VeeePlus:1.3,Finder:1.1,apsd:0.7	
+1793213531	2026-10-28T18:52:11Z	1.67	none	slg_anch:99.0,runningboardd:4.1,claude:1.3,ChatGPT:1.2,Finder:1.1,VeeePlus:1.0	claude:1.3

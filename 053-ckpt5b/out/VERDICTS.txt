@@ -1,0 +1,5 @@
+CKPT5b 1
+anchor 9ef5ce75 (v3.1.0; library identical to the INT4 head e913d22, INT4 pass)
+screen watcher: 28 calls (dark.log)
+formal extra batch: not judged
+binaries vs CKPT5: sc-head/sc_xoffset=CKPT5 sc-anc/sc_xoffset=CKPT5 slg-head/slg_bench=CKPT5 slg-anc/slg_bench=CKPT5

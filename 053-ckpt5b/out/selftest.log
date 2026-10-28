@@ -1,0 +1,492 @@
+RESULT.json / RESULT.md written: verdict fail
+ok   pooled mutate head/anchor near 1.03
+ok   pooled read_sum head/anchor near 1.00
+ok   +3% mutate -> fail
+ok   A/A valid
+ok   head/r3 load near 1/0.98
+ok   old protocol counts 12 items
+ok   cereal:mutate head/rival near 1.03/0.95
+ok   legacy norm equals head/anchor mutate geo
+ok   legacy norm fails at +3%
+ok   SLG B head/anchor near 1.03
+ok   SLG A head/anchor near 1.00
+ok   SLG B fails the gate
+ok   overall verdict fail
+| 2026-10-22-selftest | hhhhhhh | aaaaaaa | fail | 2 | 6 6 | 1.002 / 1.040 / 1.004 | 有效 | 0.996≤1.006 / 1.030≤1.041 / 0.999≤1.008 / 0.998≤1.003 | 0.534 / 0.443 / 0.371 | selftest |
+ok   trend row written
+RESULT.json / RESULT.md written: verdict pass
+ok   null -> pass
+RESULT.json / RESULT.md written: verdict invalid
+ok   A/A offset 2% -> invalid
+RESULT.json / RESULT.md written: verdict pending
+ok   +1.8% emit_after -> pending (geo 1.0144 ub 1.0219)
+RESULT.json / RESULT.md written: verdict fail
+ok   3 batches, +2.2% mutate -> fail, and the pooled row says fail (verdict fail)
+RESULT.json / RESULT.md written: verdict incomplete
+ok   one batch -> incomplete
+RESULT.json / RESULT.md written: verdict pending
+ok   3% gap between batches -> pending, not pooled
+RESULT.json / RESULT.md written: verdict incomplete
+ok   excluding a batch leaves one -> incomplete
+RESULT.json / RESULT.md written: verdict pending
+ok   SLG +1.6% -> pending after one group (max UB 1.0271), overall pending
+RESULT.json / RESULT.md written: verdict fail
+ok   two groups pooled, +1.6% -> fail (max UB 1.0234)
+ok   no third group: the rule allows 2
+RESULT.json / RESULT.md written: verdict pass
+ok   extra group refused when the first group passed
+ok   trend-adjusted fit reported (A 1.0044)
+ok   A/A detail: round sd near 0.07 (0.069), 3 copies
+ok   screen limits where gated (runs frozen 04:23Z-16:33Z): remote recorded only, WindowServer gates
+ok   screen recorded only by default (susu 16:33Z), XO_GATE_SCREEN restores it
+ok   runs frozen before 16:33Z keep the screen gate
+ok   runs frozen before 2026-10-26 keep the remote gate
+ok   screen_load parses ps
+ok   env: 3/40 busy -> invalid, 2/40 (exactly 5%) -> valid, no samples -> invalid
+ok   screen sampler writes samples
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict pass
+ok   aborted batch skipped, two pooled (pass)
+RESULT.json / RESULT.md written: verdict invalid
+ok   a second aborted batch -> invalid, stop
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict invalid
+ok   env-invalid batch, not yet replaced -> invalid, still reported
+ok   replacement allowed for an env-invalid batch
+ok   no replacement when frozen without the rule
+ok   no replacement for a valid batch
+RESULT.json / RESULT.md written: verdict pass
+ok   replaced -> batches 2+3 pooled as two (pass)
+ok   second replacement refused
+RESULT.json / RESULT.md written: verdict invalid
+ok   invalid replacement -> invalid, stop
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict invalid
+ok   env-invalid SLG group -> invalid
+RESULT.json / RESULT.md written: verdict pass
+ok   SLG replacement counts as group 1 (pass, groups ['slg-r'])
+ok   second SLG replacement refused
+ok   invalid SLG replacement -> invalid, stop
+ok   not retroactive: --replace refused on a run frozen before the rule
+ok   ABBA paired reported, 3 blocks per group (A 1.0044)
+RESULT.json / RESULT.md written: verdict pass
+RESULT.json / RESULT.md written: verdict pass
+ok   identical SLG binaries -> SLG n/a, formal decides (pass)
+ok   slg refused when the SLG binaries are identical
+| 2026-10-22-selftest | hhhhhhh | aaaaaaa | pass | 2 | 6 6 | 1.002 / 1.010 / 1.004 | 有效 | 不适用（二进制相同） |  |  |
+ok   trend row for an n/a SLG part
+RESULT.json / RESULT.md written: verdict n/a (identical binaries)
+ok   both pairs identical -> n/a overall
+ok   formal refused when the formal binaries are identical
+RESULT.json / RESULT.md written: verdict pass
+ok   identical-binary rule not retroactive
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_fvk_m3ya/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   checkpoint bisection finds c3 in 2 timed steps (culprit)
+ok   commits with identical binaries collapse to the earliest
+ok   SLG part never timed in a step (identical SLG binaries)
+ok   BISECT.md names the culprit
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-2
+  head         239fd09dd1c48679b74cec2120cd5e448b002c728c05e9b10f2c19f298fbdd57
+  head_aa      239fd09dd1c48679b74cec2120cd5e448b002c728c05e9b10f2c19f298fbdd57
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#83 c4 c4c4c4c4c4c4): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-3
+  head         5ba2c833c5d65e649e4b4fa4d426223f3300650f874e32c4451d9346ce6469e2
+  head_aa      5ba2c833c5d65e649e4b4fa4d426223f3300650f874e32c4451d9346ce6469e2
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 3 (#84 c5 c5c5c5c5c5c5): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt/bisect-3 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ppwl4_hh/ckpt
+DONE culprit hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh head
+ok   regression in the head merge itself -> culprit head (head)
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_2ggiicf8/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   a half-size step effect is reported as possibly spread
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_xsjt6b3x/ckpt
+DONE non-monotone: formal:mutate in (aaaaaaaaaaaa, c3c3c3c3c3c3]; f ends at c3c3c3c3c3c3 #82 c3
+ok   over-shooting step -> non-monotone, no single culprit (non_monotone, {'formal:mutate': {'own': 3.106524925995479, 'lo': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'hi': 'c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3'}})
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   non-monotone rule not retroactive: a freeze without it names a culprit (culprit)
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mhxt05xq/int
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           b012cf7cbf51f55fc15b6e9e92453cfba687ff52deec1307e3023823030fb84b
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 +G9: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+ok   reference build in the r3 slot, max steps 2
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: deferred (built when the bisection reaches it)
+  bisect c2c2c2c2c2c2 #81 c2: deferred (built when the bisection reaches it)
+  bisect c3c3c3c3c3c3 #82 c3: deferred (built when the bisection reaches it)
+  bisect c4c4c4c4c4c4 #83 c4: deferred (built when the bisection reaches it)
+  bisect c5c5c5c5c5c5 #84 c5: deferred (built when the bisection reaches it)
+RESULT.json / RESULT.md written: verdict fail
+BUILD c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+supplied c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+BUILD c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 #80 c1; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+supplied c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+BUILD c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 #81 c2; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+supplied c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-3
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 3 (#81 c2 c2c2c2c2c2c2): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt/bisect-3 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_qsnn9ee7/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   deferred points: nothing built at freeze, bisection builds ['c3', 'c1', 'c2'] and finds c3 in 3 timed steps
+ok   deferred points never collapse
+ok   supplied hashes recorded, FREEZE.json unchanged
+ok   a second supply with other binaries is refused
+ok   supply refused for a frozen (not deferred) point
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_zj72zr5i/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict pass
+ok   bisect refused on a checkpoint that passed
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c4c4c4c4c4c4 #83 c4: formal 239fd09dd1c4 slg 77a3c94a8ebb wire 50e721e49c01
+  bisect c5c5c5c5c5c5 #84 c5: formal 5ba2c833c5d6 slg 77a3c94a8ebb wire 50e721e49c01
+RESULT.json / RESULT.md written: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+AUTO /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt: verdict fail
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_dv9tbrzy/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+AUTO bisect: culprit -> c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   auto: env-invalid formal-1 replaced by formal-2, formal-3 pooled, fail -> bisected to c3 (rc 10)
+ok   auto: steps time formal only (SLG identical)
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+  head         b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  head_aa      b5180223165af3583fd0724209986caf2a62692654b74c525027dda592404330
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+  bisect c1c1c1c1c1c1 #80 c1: deferred (built when the bisection reaches it)
+  bisect c2c2c2c2c2c2 #81 c2: deferred (built when the bisection reaches it)
+  bisect c3c3c3c3c3c3 #82 c3: deferred (built when the bisection reaches it)
+  bisect c4c4c4c4c4c4 #83 c4: deferred (built when the bisection reaches it)
+  bisect c5c5c5c5c5c5 #84 c5: deferred (built when the bisection reaches it)
+RESULT.json / RESULT.md written: verdict fail
+BUILD c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+supplied c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+BUILD c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 #80 c1; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+supplied c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+BUILD c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 #81 c2; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+supplied c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-3
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 3 (#81 c2 c2c2c2c2c2c2): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-3 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+AUTO /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt: verdict fail
+BUILD c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+AUTO bisect: build -> build c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3
+supplied c3c3c3c3c3c3 #82 c3: formal 0cd20d37dbaa slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-1
+  head         0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  head_aa      0cd20d37dbaa799d1d2f6f04adbab0b9e958b083f38e06512cdefadd20863f98
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 1 (#82 c3 c3c3c3c3c3c3): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-1 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+BUILD c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 #80 c1; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+AUTO bisect: build -> build c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1
+supplied c1c1c1c1c1c1 #80 c1: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-2
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 2 (#80 c1 c1c1c1c1c1c1): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-2 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+BUILD c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 #81 c2; then: bisect-supply /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2 SC WIRE SLG; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+AUTO bisect: build -> build c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2
+supplied c2c2c2c2c2c2 #81 c2: formal 5b950e77941d slg 77a3c94a8ebb wire 50e721e49c01
+FREEZE.json written: /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-3
+  head         5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  head_aa      5b950e77941d01cdf246d00b1ece546bc95234b77d98b44c9187e2733afa696a
+  anchor       9f447758a9f69ef948ca1a191e24e73a45b5892c31aadd285419edd3de5b4b8c
+  r3           84abf9c3b7666fa0a27f502e001360f021385988b743fbe1c07686fd2f5f817d
+  cista        00fb6e40461883443d6a667ce2eac6f05e014f5038d3a7f10c1920ea1966fc3a
+  flatbuffers  e3c82e6c6bf71c090ee235f26b43aee9b40f120eb4652d8626c7cd714bead4fc
+  capnproto    5b35d8169d8b9aab16d2c0b5f8673fe02e3d184b3fd1735a3f9617325acc4c62
+  cereal       38c09b54483898f2aea7e6c0939e3513a74aa80cf05098ecf92c493b4e34ffbf
+NEXT bisection step 3 (#81 c2 c2c2c2c2c2c2): formal /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt/bisect-3 --batch <下一个>（环境失效就 --replaces N）; then: bisect /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_mq1fe3pb/ckpt
+DONE culprit c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+AUTO bisect: culprit -> c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3 #82 c3
+ok   auto, deferred points: exit 15 per build, then 10 with the culprit (rcs [15, 15, 15, 10])
+selftest dir /var/folders/zx/s8xtvxrs0rj0c5ry3m194nrr0000gn/T/mac_gate_selftest_ahd4exj8

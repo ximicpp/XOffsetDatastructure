@@ -1,0 +1,4 @@
+3a06f38e2a65dbf663a42df135ed1830e1bd644d|#162 S owner_map_table in explicit __DATA,__bss (effective on Apple); the first range holds everything from v3.1.0 to it (CKPT4 af601ea, #167)
+ed0450094ad52ef34629aeb01918f554318affc6|#169 S no-exceptions receive string check (exceptions build expected unchanged)
+ffef6f32f134a58785a1811cfd2052fc4a4e0bbf|#172 S comments and evolution path markers only (the range also holds #173 #174 #175 #171, class 0)
+1108193d372e73acdcc5883fa7aa889fc6ecc003|#177 S portable schema: plain char keys / enum rejected at compile time (the range also holds #176, class 0; the last range is #179, docs)
