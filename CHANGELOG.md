@@ -7,6 +7,7 @@
 The second preview of 3.2 for device testing; not a release, not announced.
 Against 3.2.0-rc.1 it adds the iPhone procedure (a test host app that runs
 the library tests, the wire corpus, SLG timing and the memory probe on iOS),
+SLG timing and the memory probe in the Android phone script,
 the Apple fix that kept a 64 MiB zero table in every Mach-O executable, the
 schema and wire gate (`tools/schema_guard`), small-message compression, an
 old-version client in the map demo, and no-exceptions receive at the speed of
@@ -28,6 +29,20 @@ this commit; the last one (CKPT4, 2026-10-28) measured D÷FlatBuffers 0.933.
   `xo_mem_probe` (SC-12: largest capacity, live reservations, committed
   memory until the system stops it). Client size (SC-14,
   `tools/client_size/`, numbers in `docs/PACKAGING.md`).
+- The test host forwards `operator new` (host API version 2): each hosted
+  library registers its replacement forms when it loads, so allocations the
+  C++ runtime makes for a program reach the program's replacement; the
+  host's own threads keep the default forms. New CTest
+  `test_host_new_forwarding`. iOS client size (Xcode 27.1, arm64 `-Os`,
+  stripped): library +58,200 B (+57,520 B without exceptions), +9,601 /
+  +7,251 B per extra schema (`docs/PACKAGING.md`).
+- `tools/device/android_device.sh` adds the steps `slg` (verify, then
+  timed runs against FlatBuffers 25.12.19, with thermal and battery state
+  before each) and `mem` (`xo_mem_probe`); `docs/DEVICE_TESTING.md`
+  describes both and the iPhone procedure (section 7).
+- C++20/C++23 builds: `test_schema_guard_slg_values` (added with the schema
+  gate) is built only with C++26 reflection; it had broken the field-list
+  configure.
 - Apple: `owner_map_table` (64 MiB, zero-initialized) is placed in
   `__DATA,__bss` explicitly. As a weak zero-initialized variable Mach-O put
   it in `__DATA,__data`, so every executable carried 64 MiB on disk (iOS
@@ -51,7 +66,9 @@ this commit; the last one (CKPT4, 2026-10-28) measured D÷FlatBuffers 0.933.
   client edits a received snapshot in place in its own verified buffer and
   sends it with `save_verified`; A verifies it with a 1 MiB cap, checks the
   digest and field rules, and forwards a compacted rebuild to the other
-  clients of the same schema version, which verify it again.
+  clients of the same schema version, which verify it again. It passed on
+  the cloud Linux run and on the Mac (macOS, Android emulator, iOS
+  Simulator; `demo/mapstate/RESULT.md` section 8).
 - MSVC: no warning C5030 from `register_owned_bitmap` (it used
   `[[gnu::noinline]]`; now `XOFFSET_DETAIL_NOINLINE`).
 - Builds without exceptions verify as fast as builds with them. Without
