@@ -46,7 +46,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 
 | 检查 | 测的是什么 | 现状（3.2，未发布） |
 |---|---|---|
-| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Android arm64（NDK r29/r30）、Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）都是 106/106；iOS 等 Xcode |
+| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Android arm64（NDK r29/r30）、Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）都是 106/106；iOS 模拟器（Xcode 27.1，iOS 27.0）129/129；iOS 真机待测 |
 | 读参照语料 | 服务端 C++26 反射构建写出的 6 个语料，目标全部 `load_verified` 接受 | 上述目标全部接受 |
 | 写语料 `diff -r` | 目标写出的语料与参照逐字节一致 | 上述目标逐字节一致 |
 
