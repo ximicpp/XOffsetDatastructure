@@ -195,17 +195,18 @@ built with `-ffp-contract=off`, so the bytes are expected to be identical).
 
 `summarize.py` verdicts per tier: exit codes; at least 500 steps with
 consecutive ticks, every step check passing and a wire digest on every step
-row; every row of `a_checks.csv` and `client_checks.csv` passing (A's seven
+row; every row of `a_checks.csv` and `client_checks.csv` passing (A's eight
 fixed rows present); A's and the client's snapshot logs identical per request
 id (tick, category, visible count, wire bytes, digest), and each client sent
 snapshots of its own schema version (with `MAPDEMO_CLIENT2` the same for the
 second client); normal, full-scene and
 empty requests all sampled, empty ones with 0 units and full-scene ones with
 every unit; every metric name of INTERFACES.md section 6 present (no destroy
-metrics in `reuse`). Across tiers: `fresh` and `reuse` with the same unit
+metrics in `reuse`); write-back (below): every edit and every forward equal
+by digest. Across tiers: `fresh` and `reuse` with the same unit
 count send identical step wires over at least 500 common ticks; with
 `--compare`, every tier matches the other run. Self-test: exit 0, every row
-passing; the schema lock check exits 0. Evil: all three processes exit 0, A logged at least twelve `rejected:`
+passing; the schema lock check exits 0. Evil: all three processes exit 0, A logged at least fifteen `rejected:`
 lines and every row of the evil client's `client_checks.csv` passes. Snapshot
 rows also agree on encoding, bytes sent and wire digest; a client run with
 `--encoding cycle` must have received every encoding.
@@ -238,6 +239,31 @@ emulator or simulator is run through a wrapper command that starts it there
 and copies its `--csv-dir` back (A with `MAPDEMO_A_HOST=0.0.0.0`;
 the Android emulator reaches the host as 10.0.2.2). Timings under wine,
 qemu or an emulator are not device timings.
+
+### Write-back: change a received snapshot and send it on
+
+`--edits N` (default in `run_tier.sh`: `MAPDEMO_EDITS=10`, so every tier
+runs it) makes the headless client change every Nth normal snapshot in its
+own buffer, the one it verified and reads from: one unit erased, the first
+one's hp and behavior changed, one unit added, a short name made long. No
+copy and no decode: the buffer grows in place (a compact snapshot has no
+spare room), and the client sends it with `save_verified`. A verifies the
+upload with `load_verified` and a 1 MiB cap, computes the content digest
+and compares it with the one in the frame header, checks the fields (units
+inside the rect, hp, behavior, name length, unique ids) and acknowledges.
+It then rebuilds the edit with `save_compact` (slack 0) and forwards it to
+the other clients of the same schema version that write back (with
+`MAPDEMO_CLIENT2`, the second client), which verify it again
+(INTERFACES.md section 4; the rules in `docs/DEPLOYMENT.md` 4.3). The
+summary matches every edit A logged with its sender's row and every
+forward with A's rebuild, by digest. The evil run sends three bad
+write-backs (truncated, a wrong digest, a unit outside its rect); A refuses
+each with `Error` and accepts the sound one after them on the same
+connection.
+
+With `run_e2e.sh`, `MAPDEMO_CLIENT2_OF="NAME=<a client of another
+platform>"` makes the two writers different platforms, so A forwards, for
+example, a Windows client's edit to an Android client and back.
 
 ### Event stream: small messages with a zstd dictionary
 
