@@ -21,13 +21,20 @@ K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺�
 读入参照 wire（必须全部接受），再与参照语料 `diff -r`。参照语料由 Linux x86-64 GCC 16 C++26
 （反射）写出，共 6 个：elided、empty、medium_holes、reloaded_mutated、small、sparse。
 
+防止回退：`tools/local_validate.sh` 带这些列（`msvc-c++20`、`msvc-c++23`、`clang-cl-c++20`、
+`mingw-c++20`、`ndk29-c++20`、`ndk30-c++20`），参照语料由同一提交的 GCC 16 C++26 构建现写。
+CTest 里包括关异常的 `*_noexc` 程序。默认运行里的 `client-c++20` 步骤保证每个 PR 至少跑一个
+C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序取本机能跑的第一个；一个都跑不了
+时这一步失败。`--clients` 和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
+`tools/msvc-wine/fetch_msvc.py /opt/msvc`（再跑 `tools/msvc-wine/case_links.py /opt/msvc` 给 clang-cl 用）。
+
 | 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
 | --- | --- | --- | --- | --- |
-| Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | 106/106；语料全部接受，逐字节一致 |
-| Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | 106/106；语料全部接受，逐字节一致 |
-| Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | 两种标准都是 106/106；语料全部接受，逐字节一致 |
-| Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 106/106；语料全部接受，逐字节一致 |
-| Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 106/106；语料全部接受，逐字节一致 |
+| Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | 两种标准都是 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行（探索分支，wire 2.0） | 两种标准都是 101/101；语料逐字节一致 |
 | iOS 模拟器 | Apple clang + iOS SDK | C++20 | 工具链文件已写（`ios-simulator.cmake`，经 `simctl spawn` 跑） | **阻塞：需要 Xcode**，Mac 上只有 Command Line Tools |
 | Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
