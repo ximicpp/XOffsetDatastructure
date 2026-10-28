@@ -6,11 +6,14 @@
 // buffer (design section 5). The holder is replaced only at a frame
 // boundary, so no reference outlives its buffer. A compressed snapshot is
 // decompressed first (codec.hpp) and then verified like any other wire.
+//
+// Nothing here throws: failures come back as an Error (result.hpp), and
+// snapshots are verified with try_load_verified / try_reload_verified, so
+// the same sources build with and without exceptions.
 #pragma once
 #include <cstdint>
 #include <map>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -19,16 +22,14 @@
 #include "mapdemo/codec.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
+#include "mapdemo/result.hpp"
 #include "mapdemo/rules.hpp"
 #include "mapdemo/schema.hpp"
 
 namespace mapdemo::client {
 
-struct UsageError : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
 struct Options {
+    bool help = false;              // --help: print usage_text() and exit 0
     std::string host = "127.0.0.1";
     std::uint16_t port = net::kDefaultPortA;
     bool headless = false;
@@ -48,9 +49,13 @@ struct Options {
     bool check_on() const { return check.value_or(headless); }
 };
 
-// Throws UsageError.
-Options parse_options(int argc, char** argv);
+// An Error names the bad option.
+Result<Options> parse_options(int argc, char** argv);
 const char* usage_text();
+
+// The XOffset receive path's error as the client reports it: its message,
+// the text load_verified throws in a build with exceptions.
+inline Error xoffset_error(const XError& e) { return Error{e.message}; }
 
 // Owns the current snapshot buffer. view() is valid until the next replace();
 // callers replace only at the start of a frame and never keep references
@@ -65,13 +70,14 @@ public:
     // `next`.
     double replace(XBuffer&& next);
     // --buffers reuse: verifies `wire` into the held buffer in place
-    // (reload_verified; load_verified the first time). Everything read from
-    // the old content dies here. On a rejected wire the holder is empty and
-    // the next reload starts from that empty buffer.
-    void reload(const std::string& wire);
+    // (try_reload_verified; try_load_verified the first time). Everything
+    // read from the old content dies here. On a rejected wire the holder is
+    // empty and the next reload starts from that empty buffer.
+    Status reload(const std::string& wire);
     // Either of the two above, by mode; returns the verify time in us
-    // (fresh: *destroy_us gets the old buffer's destroy time).
-    double install(const std::string& wire, BufferMode mode, double* destroy_us);
+    // (fresh: *destroy_us gets the old buffer's destroy time). A rejected
+    // wire leaves a fresh holder as it was.
+    Result<double> install(const std::string& wire, BufferMode mode, double* destroy_us);
     double clear();
 
 private:
@@ -132,25 +138,26 @@ public:
     Session(const Session&) = delete;
     Session& operator=(const Session&) = delete;
 
-    // Connect, Hello/HelloOk, receive and verify the catalog. Throws.
-    void connect();
+    // Connect, Hello/HelloOk, receive and verify the catalog.
+    Status connect();
 
     const MapCatalog& catalog() const noexcept { return *catalog_root_; }
     const Rect& scene() const noexcept { return scene_; }
 
     bool can_request() const noexcept { return !inflight_ && !bye_; }
     // Encoding: --encoding, or the next one in turn with --encoding cycle.
-    void send_view(const Rect& rect, net::ViewCategory category);
+    Status send_view(const Rect& rect, net::ViewCategory category);
 
     // Waits up to timeout_ms for the socket, writes pending bytes, reads every
     // complete frame. A snapshot frame becomes pending; Bye sets bye().
-    void pump(int timeout_ms);
+    Status pump(int timeout_ms);
     bool bye() const noexcept { return bye_; }
     bool has_pending() const noexcept { return pending_.has_value(); }
 
     // Frame start: decode (zstd) and verify the pending snapshot into the
-    // holder. Returns false when nothing was pending.
-    bool install_pending();
+    // holder. False when nothing was pending; an error for a snapshot that
+    // does not decode or verify.
+    Result<bool> install_pending();
     const SnapshotHolder& holder() const noexcept { return holder_; }
     net::ViewCategory holder_category() const noexcept { return cur_.category; }
     const Rect& holder_request_rect() const noexcept { return cur_.rect; }
@@ -171,9 +178,9 @@ public:
     metrics::Recorder& recorder() noexcept { return rec_; }
     CheckLog& checks() noexcept { return checks_; }
 
-    // Destroys the last snapshot, writes CSV files (when --csv-dir) and
-    // returns true when every check passed.
-    bool finish();
+    // Destroys the last snapshot, writes CSV files (when --csv-dir); true
+    // when every check passed, an error when a CSV file cannot be written.
+    Result<bool> finish();
 
 private:
     struct Record {
@@ -236,13 +243,15 @@ private:
     bool snap_csv_open_ = false;
 };
 
-// Entry points (client_main.cpp dispatches). Return the process exit code.
-int run_headless(const Options& options);
-int run_evil(const Options& options);
-int run_self_check(const Options& options);   // client_offline.cpp
-int run_replay(const Options& options);       // client_offline.cpp
+// Entry points (client_main.cpp dispatches). Return the process exit code
+// (0 every check passed, 1 a check failed), or an Error that stopped the run
+// (exit 2).
+Result<int> run_headless(const Options& options);
+Result<int> run_evil(const Options& options);
+Result<int> run_self_check(const Options& options);   // client_offline.cpp
+Result<int> run_replay(const Options& options);       // client_offline.cpp
 #if defined(MAPDEMO_WITH_GUI)
-int run_gui(const Options& options);   // client_gui.cpp
+Result<int> run_gui(const Options& options);   // client_gui.cpp
 #endif
 
 } // namespace mapdemo::client
