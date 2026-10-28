@@ -25,9 +25,11 @@ ROOT=/Volumes/XOffsetCS/mesh
 P=$ROOT/mesh-$TAG
 rm -rf "$P"; mkdir -p "$P/src" "$P/android/bin"
 git -C "$REPO" archive "$FULL" | tar -x -C "$P/src"
-for sm in external/typelayout; do git -C "$REPO/$sm" archive HEAD | tar -x -C "$P/src/$sm"; done
-# only the boost libs the library uses (a full --recursive checkout has ~160)
-BOOST_LIBS=${BOOST_LIBS:-"assert config container container_hash core intrusive move predef static_assert throw_exception type_traits winapi"}
+git -C "$REPO/external/typelayout" archive HEAD | tar -x -C "$P/src/external/typelayout"
+# only the boost libs the library uses (cmake/XOffsetDependencyLock.cmake checks their trees and
+# the licence file; a full --recursive checkout has ~160)
+BOOST_LIBS=$(sed -n 's#.*"external/boost/libs/\([a-z_]*\)/include|.*#\1#p' "$P/src/cmake/XOffsetDependencyLock.cmake")
+cp "$REPO/external/boost/LICENSE_1_0.txt" "$P/src/external/boost/"
 for l in $BOOST_LIBS; do
     d="$REPO/external/boost/libs/$l"; [ -e "$d/include" ] || { echo "missing boost lib $l" >&2; exit 1; }
     mkdir -p "$P/src/external/boost/libs/$l"; git -C "$d" archive HEAD | tar -x -C "$P/src/external/boost/libs/$l"
