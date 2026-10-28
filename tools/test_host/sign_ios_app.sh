@@ -42,7 +42,7 @@ set_target_properties(xo_stub PROPERTIES
     XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
     XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
 target_compile_features(xo_stub PRIVATE cxx_std_17)
-target_link_libraries(xo_stub PRIVATE "-framework UIKit" "-framework Foundation")
+target_link_libraries(xo_stub PRIVATE "-framework UIKit" "-framework CoreGraphics" "-framework Foundation")
 EOF
 cmake -S "$W/stub" -B "$W/stub-build" -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_OS" \
     -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_XCODE_GENERATE_SCHEME=ON > "$W/stub-configure.log" 2>&1 \
