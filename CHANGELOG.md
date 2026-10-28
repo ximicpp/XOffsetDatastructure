@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Device and platform results for 3.2.0-rc.1 (commit 39de636 only): an
+  Android 11 phone, Windows and macOS machines, a remote Linux VM and WSL2
+  (`docs/validation/2026-10-28-rc1-platform/README.md`). Functional only; no
+  iPhone, no bare-metal Linux, no performance.
+- MSVC builds of this project compile its sources as UTF-8 (`/utf-8`); a
+  test failed to build on code page 936. The public headers are ASCII
+  (comments, and the path marker of `xoffset_evolution.hpp`), so consumers
+  need no source charset option.
+- `tools/device/android_device.sh`: the demo ports start at 17800 (were
+  47800, inside Android's ephemeral range, where `adb reverse` can fail) and
+  `XO_PORT_BASE` picks another start; `device.txt` records the board when
+  `ro.soc.*` is missing (before Android 12).
+- Result pages of `tools/platform_matrix.sh`, `tools/native_targets.sh` and
+  the map demo read the commit from `.xo-commit` in an exported source tree;
+  `native_targets.sh` also records the machine.
+- Builds without exceptions verify as fast as builds with them. Without
+  exceptions the string checks of member and element loops were no longer
+  inlined (GCC) or tested a status after every element (Clang, clang-cl);
+  an inline string is now checked in place there. The demo client's
+  receive took 1.09-1.44x as long without exceptions on normal views,
+  now 0.89-0.99x (GCC 16, GCC 13, MinGW, MSVC, clang-cl). Builds with
+  exceptions are unchanged.
+
 ## 3.2.0-rc.1: preview for device testing
 
 A preview of 3.2 for testing on real Android phones and iPhones; not a

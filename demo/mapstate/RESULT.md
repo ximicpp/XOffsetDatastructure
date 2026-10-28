@@ -34,6 +34,7 @@ it. Both run the same validator and send the same bytes.
 | End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
 | Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
 | Old-version client (10-28) | cloud, branch `claude/mapdemo-old-client-20261028` on next_cpp26 964b2bc: A/B GCC 16 C++26 on schema version 2; `mapdemo_client_v1` (frozen version 1) on the six client builds, each tier with the same build's version-2 client on the same A at the same time; the 12 version-2 targets again with a new corpus; ASan+UBSan of both clients in both buffer modes | PASS: old client self-check 48 / 48, replay of the `full1` corpus 60 / 60, three tiers with both clients passing, evil (renamed fields refused with `reject_names`); version-2 targets 12 / 12; step wires equal to `full1` at 500 / 500 ticks everywhere; sanitizers 178 / 178, no report (section 7). macOS, Android emulator and iOS Simulator not rerun |
+| Write-back (10-28) | cloud, branch `claude/mapdemo-writeback-20261028` on next_cpp26 ed04500: A/B GCC 16 C++26; every tier with two writing clients (`--edits 10`): the 12 client targets, each with a client of another platform as the second (`wb12b`); the six old-version targets with the version-2 client (`v1wb`); ASan+UBSan of both C++26 clients in both buffer modes; Mac M4: macOS, Android emulator and iOS Simulator clients, each platform's two clients writing back to each other | PASS: `wb12b` 12 / 12 (self-check 49 / 49, replay 60 / 60, the same self-check and evil texts everywhere, step wires equal to `full1`; every edit A accepted equals its sender's, 1,384 `Forward` frames all with A's rebuilt bytes and the sender's content; three bad write-backs refused); `v1wb` 6 / 6; sanitizers 220 / 220, no report; Mac: every client verdict passes in all three columns, step wires equal to the cloud run (section 8). Emulator and simulator numbers, not device numbers |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -198,6 +199,8 @@ next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 | android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios (Mac M4, separate run, 10-28) | iOS 27.0 Simulator (iPhone 17), arm64; A/B in colima, Linux arm64 | Apple clang 21, iPhoneSimulator 27.1 SDK, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the cloud x86-64 run |
+| android (Xiaomi M2102K1C, separate run, 10-28, v3.2.0-rc.1 39de636) | Android 11 phone (API 30), arm64-v8a, USB `adb reverse`; A/B in WSL2 Docker, Linux x86-64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | - |
+| android-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the reference host of that run |
 
 What this shows:
 - Server to server across architectures: A and B built by GCC 16 for Linux
@@ -243,6 +246,18 @@ zstd, decoded in 463 us and verified in 34 us. Output:
 `mobile_sim_android_out.tar.gz` in the project folder (sha256
 `dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
 table `out-android/android/demo/E2E_RESULT.md`.
+
+Android phone (10-28, v3.2.0-rc.1, commit 39de636 only): a Xiaomi
+M2102K1C on Android 11 ran both clients against A/B built by GCC 16.2 (C++26
+reflection) in WSL2 Docker, through Windows adb with `adb reverse`; on the
+same phone the library's CTest passed 114 / 114 and the 15 compile-failure
+tests passed on the host with the same NDK. Two earlier attempts are kept as
+they were: the first did not run the demo (`adb reverse tcp:48024` failed,
+the port lay in the phone's ephemeral range; the device script now starts at
+17800), the second failed only the replay (the Windows adb wrapper dropped the
+trailing `/.` and the corpus landed one directory too deep). Phone timings are
+one functional run, not device performance. Record and evidence index:
+`docs/validation/2026-10-28-rc1-platform/README.md`.
 
 Clients without exceptions (10-28): every client build also makes
 `mapdemo_client_noexc` from the same sources (`-fno-exceptions`; MSVC and
@@ -448,7 +463,103 @@ Mac batch can add the old-version client. Output in the project folder
 `mapdemo_old_client_asan.tgz`, `E2E_RESULT_old_client.md`,
 `E2E_RESULT_v2_clients.md`, `RESULT_TABLES_asan.md`; sha256 in `SHA256SUMS`.
 
-## 8. Scope
+## 8. Write-back: change a received snapshot and send it on (10-28)
+
+3.2 plan M2 item 11: on the 64-bit little-endian machines of the project
+(Linux servers; Windows, Android, iOS and macOS clients) a client changes
+the data it received, in the buffer it received it in, and sends it on
+without a serialisation step; every receiver verifies before it reads.
+
+What runs (`--edits 10` on both clients of every tier, `run_tier.sh`
+default):
+
+- The client changes every tenth normal snapshot in its own verified
+  buffer: the middle unit erased (`stable_erase_if`), hp and behavior of
+  the first unit changed, a unit added (`emplace_back`, a 20-byte name),
+  the first name shorter than 16 bytes made 18 bytes longer. The buffer
+  grows in place up to its cap (a compact wire leaves no spare room). It
+  sends the buffer with `save_verified` in an `Edit` frame whose header
+  carries the snapshot's content digest.
+- A loads it with `load_verified` and `maximum_capacity(1 MiB)`, computes
+  the digest and compares it with the header's, checks that it sent a
+  snapshot of that id to this client and applies the field rules
+  (`checks::edit_sanity_of`: rect, positions inside it, hp 50..100,
+  behavior, name 1..64 bytes, unique ids, version 2 also `scene_units` and
+  `reserved0`). It answers `EditAck`, or `Error` and keeps the connection.
+- A rebuilds the accepted edit with `save_compact` (slack 0) and forwards
+  that wire to every other client of the same schema version that writes
+  back. The receiver verifies it at 1 MiB, compares the digest and applies
+  the same rules. With `--check` A also loads its own rebuild back.
+- A does not merge the edits into its world: the demo shows the transport
+  path (receive, change, send on, verify again), not conflict handling.
+
+The digest is an application check that the content arrived as sent; it
+is not authentication, and nothing here is tamper-proof. The rules for
+real deployments are in `docs/DEPLOYMENT.md` 4.3: verify everything from a
+peer in full, rebuild before forwarding, connect clients directly only
+when they run the same schema version, and leave clients built without
+exceptions headroom in `maximum_capacity` (growth past the cap aborts).
+
+| Run (cloud, A/B GCC 16 C++26) | Targets | Result |
+| --- | --- | --- |
+| `wb12b` | the 12 client targets of `noexc3` (Linux GCC 16 C++26 and GCC 13 C++20, MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu, each with and without exceptions); in every tier the second client is the target five places further on (`MAPDEMO_CLIENT2_OF`), so edits go between, for example, Linux and Windows, Windows and Android; a new corpus | PASS on all 12: self-check 49 / 49, replay 60 / 60, three tiers and evil (111 verdicts, 114 on the first target with self-test and schema lock), step wires equal to `full1`; the same self-check and evil outcomes and texts everywhere; 54 to 60 edits per client acknowledged, 111 to 117 `Forward` frames per target; every edit A logged equals its sender's row (wire digest and content digest) and every `Forward` arrived with A's rebuilt bytes and the sender's content |
+| `asan_wb` | GCC 16 Debug ASan+UBSan: C++26 client with the no-exceptions client as second client, both buffer modes, evil, self-test, schema lock check | PASS: 220 / 220 verdicts (write-back and forwards digest-equal in all six tiers, A refused the three bad write-backs in both modes), no sanitizer report |
+| `v1wb` | the six old-version (`mapdemo_client_v1`) targets of section 7, each with the same build's version-2 client; both write back, A takes version-1 edits and forwards nothing across versions | PASS on all six: self-check 49 / 49, replay 60 / 60 of the `full1` corpus, tiers and evil (111 or 114 verdicts); A accepted the old clients' edits as version 1 (53 to 60 per target; under qemu the last edit of one tier went out after A stopped reading and is logged unacknowledged, which the summary allows) and the version-2 clients' as version 2, with no `Forward` between the two versions |
+
+Refusals (`--evil`, on one connection after a sound snapshot request):
+a truncated edit ("bad wire: load_verified<T>(): used size mismatch"), the
+sound edit with a wrong digest in the header ("content digest ... is not
+the client's ..."), and the edit with a unit moved outside its rect
+("unit[0] id 1: position outside the rect"); then the sound edit is
+acknowledged on the same connection. A logs 15 `rejected:` lines, three
+more than before, on every target. `mapdemo_selftest` `writeback` writes
+bytes into a vector's spare capacity after the edit: the upload passes
+`load_verified` (the bytes lie in slack, not in the object graph) and
+A's `save_compact` rebuild no longer contains them. That is why A forwards
+its rebuild and not the client's bytes.
+
+Cost (10000-unit tier, `reuse`, means; native Linux clients; times under
+wine and qemu are longer and are not device numbers):
+
+| Step | Where | Cost |
+| --- | --- | --- |
+| change in place (erase, scalars, add, lengthen) | client | 6.5 to 11.4 us |
+| `save_verified` of the changed buffer | client | 3.4 to 5.8 us |
+| edit wire / A's rebuilt wire | - | 15.2 KB / 15.2 KB (about 500 units; the dense wire skips zero runs, so the rebuild is not smaller) |
+| `load_verified` at 1 MiB, digest, rules | A | 11.4 to 17.0 us (all 12 runs) |
+| `save_compact` rebuild | A | 10.7 to 14.0 us (all 12 runs) |
+| `Edit` -> `EditAck` | client | 0.27 to 0.37 ms; 0.47 to 0.61 ms when the other client on A runs under wine |
+| verify a `Forward` | the other client | p50 6.8 to 8.1 us; mean 16 to 28 us, since the first two of a run take 100 to 200 us |
+
+Mac M4 (10-28, pack of next_cpp26 c804992, demo only: no library change,
+so no library CTest on the emulator or simulator): A/B GCC 16 C++26 in a
+Linux arm64 VM (colima) on the Mac; in each column the platform's client
+with exceptions and the one without run on the same A and write back to
+each other.
+
+| Column | Clients | Result |
+| --- | --- | --- |
+| macOS | Apple clang 21 C++20, native | PASS (second run): both targets self-check 49 / 49, replay 60 / 60 of the cloud corpus, three tiers and evil (111 verdicts each), 224 `Forward` frames, every edit and every `Forward` digest-equal; the schema lock check passes on the Linux arm64 server |
+| Android emulator | Android 15 (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 | every client verdict passes on both targets (self-check 49 / 49, replay 60 / 60, tiers, evil, write-back), 220 `Forward` frames all digest-equal |
+| iOS Simulator | iOS 27.0, iPhone 17, Xcode 27.1 Apple clang 21 C++20 | as Android, 218 `Forward` frames |
+
+The first Mac run failed one verdict in each column, the same one: the
+batch script's server container had not built `mapdemo_schema_freeze`, so
+`run_all_tiers.sh`'s schema lock check could not start (exit 127). The
+check runs on the server only; with the script fixed, the macOS column was
+run again and passed, and the other two were not repeated. The step wires
+of all three columns equal those of the cloud x86-64 run (`wb12b`) at
+500 / 500 ticks in every tier. A client receives fewer `Forward` frames
+than the other one sent edits: A forwards only to a client that has
+already written back, so each tier's first edits reach no one.
+`Edit` -> `EditAck` through the VM's network: 0.9 to 1.9 ms from macOS and
+the iOS Simulator, 4.7 to 5.7 ms from the Android emulator (simulator and
+emulator numbers, not device numbers).
+
+Output in the project folder `mapdemo-writeback-20261028/` (cloud) and
+`writeback_sim_out.tar.gz`, `writeback_macos2_out.tar.gz` (Mac).
+
+## 9. Scope
 
 One arena per batch, per snapshot and for the catalog (kept and refilled in
 `reuse`, new per message in `fresh`); zstd is a transport encoding, the

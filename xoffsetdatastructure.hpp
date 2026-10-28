@@ -2160,7 +2160,7 @@ namespace XOffsetDatastructure {
     // ========================================================================
     namespace detail {
 
-        // Container concepts — used by XCompactor for migration dispatch.
+        // Container concepts -- used by XCompactor for migration dispatch.
         template<typename T>
         concept SetLikeContainer = requires(T t) {
             { t.begin() } -> std::input_or_output_iterator;
@@ -5430,8 +5430,6 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
-#undef XOFFSET_DETAIL_V4_INLINE
-
         // V2: a block has no header. Its extent is derived from its owner:
         // 8-byte aligned, length rounded up to a multiple of 8.
         inline vstatus register_allocation(const void* ptr, std::size_t bytes,
@@ -5556,7 +5554,14 @@ namespace XOffsetDatastructure {
         }();
 
         // I1: head bytes 0..11 of an inline string (byte 11 = 0x80 | length).
-        inline vstatus validate_inline_string_bytes(const char* head) {
+        // Without exceptions the inline-string check is forced inline (see
+        // validate_wire_element); with them the compiler's choice stands.
+#if XOFFSET_NO_EXCEPTIONS
+#define XOFFSET_DETAIL_STRING_INLINE XOFFSET_DETAIL_V4_INLINE
+#else
+#define XOFFSET_DETAIL_STRING_INLINE inline
+#endif
+        XOFFSET_DETAIL_STRING_INLINE vstatus validate_inline_string_bytes(const char* head) {
             std::uint64_t low;   // head bytes 0..7
             std::uint32_t high;  // head bytes 8..11
             std::memcpy(&low, head, sizeof(low));
@@ -5604,6 +5609,28 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
+        // A member, array element or vector element. Without exceptions the
+        // reject paths return a status instead of ending in a noreturn call,
+        // and the compilers then stopped inlining the string checks into the
+        // per-element loops (GCC: the demo's views spent 1.7x as long), so
+        // there an inline string is checked in place and only a string with
+        // a payload block calls the overload above.
+        template <typename T>
+        XOFFSET_DETAIL_V4_INLINE vstatus validate_wire_element(const T& value, WireValidationContext& ctx) {
+#if XOFFSET_NO_EXCEPTIONS
+            if constexpr (is_fixed_string_v<std::remove_cv_t<T>>) {
+                const XFixedString& string = value;
+                if (string.is_inline())
+                    return validate_inline_string_bytes(reinterpret_cast<const char*>(&string));
+                return validate_wire_value(string, ctx);
+            } else
+#endif
+                return validate_wire_value(value, ctx);
+        }
+
+#undef XOFFSET_DETAIL_STRING_INLINE
+#undef XOFFSET_DETAIL_V4_INLINE
+
         template <typename T>
         vstatus validate_wire_value(const XFixedVector<T>& value,
                                     WireValidationContext& ctx) {
@@ -5634,7 +5661,7 @@ namespace XOffsetDatastructure {
             if constexpr (wire_value_needs_validation_v<T>) {
                 for (std::uint32_t i = 0; i < value.size_; ++i) {
                     /* XV4: checked-element-visited */
-                    XOFFSET_VTRY(validate_wire_value(data[i], ctx));
+                    XOFFSET_VTRY(validate_wire_element(data[i], ctx));
                 }
             } else {
                 /* XV4: no-op-elements-elided */
@@ -5654,7 +5681,7 @@ namespace XOffsetDatastructure {
             using member = schema::member_t<T, N>;
             using Member = typename member::type;
             if constexpr (wire_value_needs_validation_v<Member>)
-                return validate_wire_value(member::get(value), ctx);
+                return validate_wire_element(member::get(value), ctx);
             else
                 return vok();
         }
@@ -5668,7 +5695,7 @@ namespace XOffsetDatastructure {
                 if (bits > 1) return wire_reject("wire validation: invalid bool representation");
             } else if constexpr (std::is_array_v<CleanT>) {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
-                    for (const auto& elem : value) XOFFSET_VTRY(validate_wire_value(elem, ctx));
+                    for (const auto& elem : value) XOFFSET_VTRY(validate_wire_element(elem, ctx));
             } else if constexpr (is_fixed_string_v<CleanT>) {
                 return validate_wire_value(static_cast<const XFixedString&>(value), ctx);
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
@@ -6925,7 +6952,7 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // ── Reflection Transfer (move/copy with allocator injection) ──
+        // -- Reflection Transfer (move/copy with allocator injection) --
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all_impl(void* dst, Src&& src, Alloc alloc);
@@ -7284,7 +7311,7 @@ namespace XOffsetDatastructure {
         return line;
     }
 
-    // XHandle<T> — Epoch-cached handle. O(1) deref when address is stable.
+    // XHandle<T> -- Epoch-cached handle. O(1) deref when address is stable.
     // ========================================================================
     template <typename T>
     class XHandle {
@@ -7333,7 +7360,7 @@ namespace XOffsetDatastructure {
         resolver_type resolver_ = nullptr;
     };
 
-    // XBuffer — Single root object per buffer (make/root/has_root).
+    // XBuffer -- Single root object per buffer (make/root/has_root).
     // ========================================================================
     namespace detail {
         // Internal friend bridge; no Core/container/wire field is added.
@@ -8267,7 +8294,7 @@ namespace XOffsetDatastructure {
     };
 
     // ========================================================================
-    // TypedXBuffer<T> — Type-bound buffer with compile-time root type
+    // TypedXBuffer<T> -- Type-bound buffer with compile-time root type
     //
     // Wraps XBuffer and binds it to a specific root type T at compile time.
     // Eliminates the need to repeat <T> on every make/root/handle call.
@@ -8380,7 +8407,7 @@ namespace XOffsetDatastructure {
     };
 
     // ================================================================
-    // XCompactor — Memory compaction via C++26 reflection.
+    // XCompactor -- Memory compaction via C++26 reflection.
     // ================================================================
     class XCompactor {
     public:
@@ -8420,11 +8447,11 @@ namespace XOffsetDatastructure {
                     new_xbuf.shrink_to_fit();
                     return new_xbuf;
                 } XOFFSET_CATCH(const XBadAlloc&) {
-                    // Not enough headroom — try next multiplier
+                    // Not enough headroom -- try next multiplier
                     continue;
                 }
             }
-            // All multipliers exhausted — should not happen in practice
+            // All multipliers exhausted -- should not happen in practice
             XOFFSET_THROW(XException(XErrc::out_of_storage, "XCompactor::compact failed: insufficient memory even at 4x multiplier"));
         }
 
@@ -8598,7 +8625,7 @@ struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
 // Must be placed at global namespace scope.
 // ============================================================================
 
-// Namespace sentinel — detects accidental use inside a namespace block.
+// Namespace sentinel -- detects accidental use inside a namespace block.
 struct _XOffset_NS_Sentinel {};
 
 #define XOFFSET_CHECK_GLOBAL_NAMESPACE_(macro_name)                            \

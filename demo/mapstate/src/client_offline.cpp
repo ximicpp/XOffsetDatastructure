@@ -4,7 +4,11 @@
 // snapshot built here is saved dense, compact and as a zstd frame; each
 // must verify and read back the same content (positive controls), and each
 // malformed variant must be refused by the codec (before allocation) or by
-// load_verified. Nothing malformed may be accepted. The event stream gets
+// load_verified. Nothing malformed may be accepted. The write-back path
+// runs once on this platform: a compact snapshot changed in place
+// (apply_client_edit, as --edits does), saved with save_verified, verified
+// again at the Edit limit and rebuilt with save_compact as A forwards it,
+// with the same content digest throughout. The event stream gets
 // the same treatment: every event encoding round-trips, and bad dictionary
 // frames (another dictionary version, no id, no size, truncated, trailing
 // bytes, over the cap, forged batch counts and lengths), a corrupt or
@@ -476,6 +480,41 @@ Result<int> run_self_check(const Options& opt) {
         }
         if (why.empty()) log.pass("reload_across_encodings");
         else log.fail("reload_across_encodings", why);
+    }
+    {   // Write-back. The names are made non-empty first: a write-back must
+        // pass the rules A applies (checks::edit_sanity_of).
+        XBuffer named = build_sample(50);
+        for (VisibleUnit& u : named.root<ViewSnapshot>().units)
+            if (u.name.view().empty()) u.name = std::string_view("u" + std::to_string(u.id));
+        const std::string base = named.save_compact<ViewSnapshot>(XCompactOptions{0});
+        SnapshotHolder h;
+        std::string why, up, fwd;
+        if (Status loaded = h.reload(base); !loaded) {
+            why = "compact wire refused: " + loaded.error().message;
+        } else {
+            apply_client_edit(h.edit(), 1);
+            h.edited();
+            const std::uint64_t edited = checks::snapshot_digest(h.view());
+            const checks::Result rules_ok = checks::edit_sanity_of(h.view());
+            h.save_verified_into(up);
+            XResult<XBuffer> in = XBuffer::try_load_verified<ViewSnapshot>(up, XBuffer::maximum_capacity(net::kEditLimit));
+            if (!rules_ok.ok) why = "edit_sanity_of: " + rules_ok.detail;
+            else if (!in) why = "write-back wire refused: " + in.error().message;
+            else if (checks::snapshot_digest(in->root<ViewSnapshot>()) != edited) why = "digest differs at A";
+            else {
+                fwd = in->save_compact<ViewSnapshot>(XCompactOptions{0});
+                XResult<XBuffer> out = XBuffer::try_load_verified<ViewSnapshot>(fwd, XBuffer::maximum_capacity(net::kEditLimit));
+                if (!out) why = "rebuilt wire refused: " + out.error().message;
+                else if (checks::snapshot_digest(out->root<ViewSnapshot>()) != edited) why = "digest differs after the rebuild";
+            }
+        }
+        if (why.empty()) {
+            log.pass("edit_round_trip");
+            log.note("edit_round_trip", "compact " + std::to_string(base.size()) + " B -> edited, save_verified " +
+                                            std::to_string(up.size()) + " B -> rebuilt " + std::to_string(fwd.size()) + " B");
+        } else {
+            log.fail("edit_round_trip", why);
+        }
     }
 
     // The XOffset wire: truncation, every header byte, the wrong schema.

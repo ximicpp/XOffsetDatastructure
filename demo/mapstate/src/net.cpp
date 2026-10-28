@@ -158,7 +158,7 @@ Result<FrameHeader> make_header(MsgType type, std::uint64_t correlation, std::si
 }
 
 bool is_known(std::uint16_t raw) noexcept {
-    return raw >= static_cast<std::uint16_t>(MsgType::Hello) && raw <= static_cast<std::uint16_t>(MsgType::Events);
+    return raw >= static_cast<std::uint16_t>(MsgType::Hello) && raw <= static_cast<std::uint16_t>(MsgType::Forward);
 }
 
 Error peer_closed(std::string message) { return Error{std::move(message), true}; }
@@ -296,6 +296,9 @@ std::uint32_t max_payload(MsgType type) noexcept {
     case MsgType::Subscribe: return 24;
     case MsgType::SubscribeOk: return 0;
     case MsgType::Events: return std::uint32_t(1) << 20;
+    case MsgType::Edit: return kEditLimit;
+    case MsgType::EditAck: return 0;
+    case MsgType::Forward: return kEditLimit;
     }
     return 0;
 }
@@ -314,6 +317,9 @@ const char* type_name(MsgType type) noexcept {
     case MsgType::Subscribe: return "Subscribe";
     case MsgType::SubscribeOk: return "SubscribeOk";
     case MsgType::Events: return "Events";
+    case MsgType::Edit: return "Edit";
+    case MsgType::EditAck: return "EditAck";
+    case MsgType::Forward: return "Forward";
     }
     return "?";
 }
