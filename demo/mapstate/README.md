@@ -132,7 +132,10 @@ snapshots go through `try_load_verified` / `try_reload_verified`, which run
 the same checks and report the same texts as `load_verified` /
 `reload_verified`. A library failure that cannot be returned (an arena that
 runs out while a request is built) reaches the fatal handler, which prints
-`error:` and exits 2. `-DMAPDEMO_NOEXC_CLIENT=OFF` skips the second client.
+`error:` and exits 2; a standard library failure (`std::bad_alloc`,
+`std::length_error`) ends the process, as in any build without exceptions.
+Verification is about 1.1x to 1.3x slower in this build (RESULT.md section
+5). `-DMAPDEMO_NOEXC_CLIENT=OFF` skips the second client.
 
 zstd 1.5.7 is built from its release tarball, checked by SHA-256; offline,
 pass `-DMAPDEMO_ZSTD_URL=<local zstd-1.5.7.tar.gz>`. `-DMAPDEMO_WITH_ZSTD=OFF`
