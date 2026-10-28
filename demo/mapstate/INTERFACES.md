@@ -137,7 +137,7 @@ mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check]
                [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]
                [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]
                [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]
-               [--first-request-id 1]
+               [--first-request-id 1] [--edits 0]
 mapdemo_client --self-check [--csv-dir DIR]
 mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_client_v1 (the same options; schema version 1)
@@ -148,6 +148,17 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
 - Client `--first-request-id` (default 1): the first `ViewRequest` id, so a
   second client on the same A logs other ids (`run_tier.sh` gives it
   3000001).
+- Client `--edits N` (default 0 = off; headless; added 10-28): write-back.
+  After the checks of every Nth `Normal` snapshot (one edit outstanding at
+  a time), the client changes the snapshot in its own buffer
+  (`apply_client_edit`: the middle unit erased; the first remaining unit's
+  hp, kept in 50..100, and behavior changed; a unit added at the rect
+  centre with id `0x80000000 + n` and a 20-byte name; the first short,
+  inline name made long; an empty view only gets the added unit), checks it with `checks::edit_sanity_of` and sends it to A with
+  `save_verified` as an `Edit`. It accepts `EditAck` and `Forward` frames
+  (section 4). The buffer grows as needed: a compact snapshot leaves no
+  free space. `run_tier.sh` passes `--edits 10` to both clients
+  (`MAPDEMO_EDITS`, 0 = off).
 
 - A `--host`: the address A listens on for clients (`0.0.0.0` when the client
   is in an emulator or another machine; B stays on 127.0.0.1).
@@ -169,7 +180,9 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
 - Client `--self-check`: no network; builds sample snapshots and checks that
   every encoding verifies and that the refusal cases are refused (truncated
   and bit-flipped wires, wrong schema, malformed zstd frames, over-cap
-  sizes). The event cases: the built-in dictionary parses; every event
+  sizes). `edit_round_trip`: a compact snapshot changed with
+  `apply_client_edit`, saved with `save_verified`, verified at the Edit
+  limit and rebuilt with `save_compact` keeps its content digest. The event cases: the built-in dictionary parses; every event
   encoding round trips 20 events to the same wires and shrinks them; and
   these are refused: a count of 0, a truncated or trailing event, the wrong
   schema, a truncated wire inside a dictionary frame, a zstd frame without
@@ -226,6 +239,7 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
 | View | client `ViewReq(corr = request_id, flags = codec::view_flags(category, encoding), ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot payload in that encoding)`; at most one outstanding per client |
 | Illegal / malformed request | A answers `Error(text)` (bad wire or illegal rect) or closes the connection (bad header, oversize length), logs `rejected: ...`, keeps running |
 | Events (optional) | client `Subscribe(flags = event mode, codec::subscribe_payload(dictionary id))` after the `Catalog` → A `SubscribeOk`, or `Error` for a second Subscribe, a bad payload (length, UnitEvent fingerprint, reserved field), an unknown mode, a build without zstd, or a dictionary mode while the ids differ ("subscribe: event dictionary X does not match A's dictionary Y"); then after each step whose tick % 20 == 0, A sends `Events(corr = tick, flags = event encoding, payload)` per 128 events, none after `Bye` |
+| Write-back (optional, client `--edits`) | client `Edit(corr = checks::snapshot_digest of the changed snapshot, flags 0, save_verified wire of a ViewSnapshot it received, at most net::kEditLimit = 1 MiB)`; the edit id is the snapshot's own `request_id`. A loads it with `load_verified` and `maximum_capacity(1 MiB)` in the schema version the client works in, computes the digest and compares it with `corr`, requires a snapshot of that id to have been sent to this client, checks the fields (`checks::edit_sanity_of`) and answers `EditAck(corr = edit id)`, or `Error` (connection kept). A client with an accepted edit is a writer: A rebuilds each accepted edit once with `save_compact(XCompactOptions{0})` and sends it as `Forward(corr = digest, flags 0)` to every other writer of the same schema version, which verifies it at 1 MiB, compares the digest and checks the fields |
 | End | A `Bye` to B and client |
 
 `net` behaviour (src/net.cpp):
@@ -345,9 +359,14 @@ wires are unchanged.
   `hp` renamed to `health` (`schema_probes.hpp`), answered by a `HelloAck`
   with `reject_names` and a close; (11) a Hello whose `ViewSnapshot` has
   one more field than version 2, answered with `reject_unknown` and a
-  close; (12) a Hello payload that is no XOffset wire, answered by `Error`.
-  Exit 0 when all twelve were rejected and A answered every valid request.
-  A logs twelve `rejected:` lines.
+  close; (12) a Hello payload that is no XOffset wire, answered by `Error`;
+  on one connection, a snapshot it requested and changed like `--edits`
+  does, sent back as (13) a truncated `Edit` wire, (14) an `Edit` whose
+  header digest is not its content's, (15) an `Edit` with a unit moved
+  outside its rect (sound wire, matching digest: the field rules refuse
+  it), each answered by `Error`, then as it is, answered by `EditAck`.
+  Exit 0 when all fifteen were rejected and A answered every valid request.
+  A logs fifteen `rejected:` lines.
 
 ## 6. Metrics (metrics.hpp names) and CSV files
 
@@ -355,9 +374,9 @@ Units: `_us` microseconds (process-local steady clock), `_bytes`, `_count`.
 
 | Process | Metric names |
 | --- | --- |
-| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes` (XOffset wire), `a.snap_net_bytes` (payload sent), `a.snap_compress_us` (zstd only), `a.snap_convert_us` (version-1 clients only), `a.visible_count`, `a.check_us` |
+| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes` (XOffset wire), `a.snap_net_bytes` (payload sent), `a.snap_compress_us` (zstd only), `a.snap_convert_us` (version-1 clients only), `a.visible_count`, `a.check_us`; write-back only: `a.edit_load_us`, `a.edit_bytes`, `a.edit_rebuild_us`, `a.forward_bytes` |
 | B | `b.load_us`, `b.modify_us`, `b.save_us`, `b.send_us`, `b.destroy_us`, `b.in_bytes`, `b.out_bytes` |
-| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes` (XOffset wire), `c.snap_net_bytes` (payload received), `c.decompress_us` (zstd only), `c.visible_count`, `c.catalog_load_us` |
+| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes` (XOffset wire), `c.snap_net_bytes` (payload received), `c.decompress_us` (zstd only), `c.visible_count`, `c.catalog_load_us`; `--edits` only: `c.edit_us` (change in place), `c.edit_save_us`, `c.edit_bytes`, `c.edit_rtt_us` (Edit sent → EditAck), `c.forward_load_us` |
 
 The four destroy metrics (`a.destroy_us`, `a.snap_destroy_us`, `b.destroy_us`,
 `c.destroy_us`) exist only with `--buffers fresh`; `reuse` destroys nothing per
@@ -376,6 +395,9 @@ Files in `--csv-dir` (comma separated, header row first):
 | `client_replay.csv` (client `--replay`) | `request_id,category,encoding,net_bytes,wire_bytes,wire_digest,digest,decompress_us,load_us,result` |
 | `a_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us` (one row per `Events` frame) |
 | `client_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,decode_us,verify_us,check_ok` |
+| `a_edits.csv` | `edit_id,client,schema,units,wire_bytes,wire_digest,digest,client_digest,load_us,forwards,fwd_bytes,fwd_wire_digest,rebuild_us,check_ok` (one row per accepted `Edit`; `digest` A's, `client_digest` the frame's; `forwards` the number of `Forward` frames, `fwd_*` the rebuilt wire, empty without one) |
+| `client_edits.csv` (`--edits`) | `edit_id,units,wire_bytes,digest,wire_digest,edit_us,save_us,rtt_us,acked,erased_id,changed_id,added_id,renamed_id` (one row per `Edit` sent; `acked` 0 only for one sent after A stopped reading; an id cell is empty when the snapshot had no such unit) |
+| `client_forwards.csv` (`--edits`) | `edit_id,units,wire_bytes,digest,a_digest,wire_digest,load_us,check_ok` (one row per `Forward`; `digest` the client's, `a_digest` the frame's) |
 | `client_build.txt` | one line: how the client was built |
 | `a_checks.csv`, `client_checks.csv`, `selftest_checks.csv` | `check,result,detail` (`result` is `pass` or `fail`; coverage counts go in `detail`) |
 
@@ -383,10 +405,14 @@ Files in `--csv-dir` (comma separated, header row first):
 `modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`,
 `schema_versions` (clients per snapshot version, snapshots converted; with
 `--check` every converted wire is loaded back as version 1 and must have
-the digest of the snapshot it came from),
+the digest of the snapshot it came from), `client_edits` (accepted edits,
+writers, Forward frames; with `--check` every rebuilt wire is loaded back
+and must have the edit's digest),
 `event_stream` (subscribers, dictionary id, frames per encoding; passes with
 no subscriber). A subscribed client adds `events_subscribed`,
-`events_received` and `event_content` to `client_checks.csv`.
+`events_received` and `event_content` to `client_checks.csv`; a client
+with `--edits` adds `edit_sanity`, `edit_acked`, `edits` (at least one
+acknowledged) and, when it received any, `forward_received`.
 In the event files `wire_bytes` is the sum of the frame's UnitEvent wires,
 `net_bytes` the payload, and `digest` the `checks::wire_digest` of the raw
 encoding of the same wires, so A and the client must agree on all of them
@@ -412,5 +438,6 @@ them per request id.
 | Servers | A and B run 500 steps at 1 / 100 / 10000 units with `--check` all passing, with the headless client attached |
 | Client | headless sampling and `--evil` pass against A; window client builds on the Mac and shows units moving, state changes and other areas after a drag (screenshots) |
 | Integration | `tools/run_all_tiers.sh` runs the three tiers + `--evil` and `tools/summarize.py` writes the result tables; local validation (GitHub CI is not used); Mac step file; `RESULT.md`; PR to next_cpp26 |
+| Write-back (10-28) | with `--edits 10` on both clients of every tier: each client's edits are acknowledged, A's `a_edits.csv` equals the senders' rows (wire bytes, wire digest, content digest), every `Forward` arrives at the other client with A's rebuilt bytes and the sender's content; `--evil` refuses the three bad write-backs; `mapdemo_selftest` `writeback` and client `--self-check` `edit_round_trip` pass |
 | Old-version client (10-28) | `mapdemo_client_v1` passes the three tiers on every client target while the version-2 client of the same target is connected to the same A (`MAPDEMO_CLIENT2_OF`), both PASS; it replays a version-1 corpus; its evil run refuses the renamed and unknown schemas; `mapdemo_schema_freeze check` passes |
 | End to end (10-27) | `tools/run_e2e.sh` passes for every client target (Linux, Windows MinGW and MSVC, Android emulator, iOS Simulator): self-check, replay of one corpus, the three tiers with `--encoding cycle`, evil; `tools/e2e_report.py` writes `E2E_RESULT.md` |

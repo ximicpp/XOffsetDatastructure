@@ -145,6 +145,7 @@ set(REFLECTION_TESTS
     test_allocator_failures
     test_v2_golden
     test_cross_compiler_wire
+    test_schema_guard_slg_values
     test_schema_pin
     test_stability_contract
     test_wire_hole_zeroing
@@ -440,5 +441,6 @@ endif()
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")
 # These are mandatory configure-time checks, not runtime test programs.
 xoffset_check_polymorphic_rejection()
+xoffset_test_host_modules()
 xoffset_write_test_inventory()
 

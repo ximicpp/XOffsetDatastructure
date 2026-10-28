@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <span>
 #include <thread>
@@ -27,7 +28,7 @@ const char* usage_text() {
            "                      [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]\n"
            "                      [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]\n"
            "                      [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]\n"
-           "                      [--first-request-id N]\n"
+           "                      [--first-request-id N] [--edits N]\n"
            "       mapdemo_client --self-check [--csv-dir DIR]\n"
            "       mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]\n";
 }
@@ -47,7 +48,7 @@ static std::optional<long> parse_long(const char* text, long lo, long hi) {
 Result<Options> parse_options(int argc, char** argv) {
     static constexpr std::string_view kWithValue[] = {"--host",     "--port",   "--csv-dir",       "--replay",
                                                       "--encoding", "--buffers", "--screenshot-at", "--events",
-                                                      "--events-dict", "--first-request-id"};
+                                                      "--events-dict", "--first-request-id", "--edits"};
     Options o;
     for (int i = 1; i < argc; ++i) {
         std::string_view a = argv[i];
@@ -94,6 +95,11 @@ Result<Options> parse_options(int argc, char** argv) {
             const auto id = parse_long(v, 1, 1000000000);
             if (!id) return bad_value(a, v);
             o.first_request_id = static_cast<std::uint64_t>(*id);
+        }
+        else if (a == "--edits") {
+            const auto n = parse_long(v, 0, 1000000);
+            if (!n) return bad_value(a, v);
+            o.edits = static_cast<std::uint32_t>(*n);
         }
         else if (a == "--buffers") {
             const auto m = parse_buffer_mode(v);
@@ -213,6 +219,45 @@ Rect clamp_view(Rect r, const Rect& scene) noexcept {
     r.max.x = r.min.x + w;
     r.max.y = r.min.y + h;
     return r;
+}
+
+// ---- write-back ------------------------------------------------------------------
+
+EditSummary apply_client_edit(ViewSnapshot& s, std::uint64_t seq) {
+    EditSummary e;
+    // Remove an element from the middle (order of the others kept).
+    if (s.units.size() != 0) {
+        e.erased_id = s.units[s.units.size() / 2].id;
+        s.units.stable_erase_if([&](const VisibleUnit& u) { return u.id == e.erased_id; });
+    }
+    // Scalars: hp stays in 50..100, behavior goes round 0..2.
+    if (s.units.size() != 0) {
+        VisibleUnit& first = s.units[0];
+        first.hp = first.hp >= 100 ? 50 : first.hp + 1;
+        first.behavior = static_cast<Behavior>((static_cast<std::uint32_t>(first.behavior) + 1) % 3);
+        e.changed_id = first.id;
+    }
+    // Add one: an id no server unit has, at the rect centre, with a name
+    // too long to be stored inline.
+    e.added_id = kEditIdBase + static_cast<std::uint32_t>(seq % kEditIdBase);
+    char name[48];
+    const int n = std::snprintf(name, sizeof name, "client-edit-%08" PRIu64, seq);
+    VisibleUnit& added = s.units.emplace_back();
+    added.id = e.added_id;
+    added.hp = 75;
+    added.pos = Point{s.rect.min.x + (s.rect.max.x - s.rect.min.x) * 0.5f,
+                      s.rect.min.y + (s.rect.max.y - s.rect.min.y) * 0.5f};
+    added.behavior = static_cast<Behavior>(seq % 3);
+    added.name = std::string_view(name, std::size_t(n));
+    // A short (inline) name made long: the string moves into the arena.
+    for (VisibleUnit& u : s.units) {
+        if (u.name.view().size() >= 16) continue;
+        const std::string longer = std::string(u.name.view()) + "-renamed-by-client";
+        u.name = std::string_view(longer);
+        e.renamed_id = u.id;
+        break;
+    }
+    return e;
 }
 
 // ---- CheckLog ----------------------------------------------------------------------
@@ -354,6 +399,11 @@ Status Session::connect() {
             events_csv_open_ = events_csv_.open(join_path(opt_.csv_dir, "client_events.csv"), kEventsCsvHeader);
             if (!events_csv_open_) return Error{"cannot write client_events.csv in " + opt_.csv_dir};
         }
+        if (opt_.edits != 0) {
+            edits_csv_open_ = edits_csv_.open(join_path(opt_.csv_dir, "client_edits.csv"), kEditsCsvHeader) &&
+                              forwards_csv_.open(join_path(opt_.csv_dir, "client_forwards.csv"), kForwardsCsvHeader);
+            if (!edits_csv_open_) return Error{"cannot write client_edits.csv / client_forwards.csv in " + opt_.csv_dir};
+        }
     }
     return {};
 }
@@ -490,7 +540,10 @@ Status Session::pump(int timeout_ms) {
     if (!p.readable) return {};
     while (!bye_) {
         Result<std::optional<net::Frame>> got =
-            conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Events, net::MsgType::Bye, net::MsgType::Error});
+            opt_.edits != 0 ? conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Events, net::MsgType::EditAck,
+                                                     net::MsgType::Forward, net::MsgType::Bye, net::MsgType::Error})
+                            : conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Events, net::MsgType::Bye,
+                                                     net::MsgType::Error});
         if (!got) return std::move(got).error();
         std::optional<net::Frame>& f = *got;
         if (!f) break;
@@ -498,8 +551,13 @@ Status Session::pump(int timeout_ms) {
             bye_ = true;
         } else if (f->type == net::MsgType::Events) {
             MAPDEMO_TRY(on_events(*f));
+        } else if (f->type == net::MsgType::EditAck) {
+            on_edit_ack(*f);
+        } else if (f->type == net::MsgType::Forward) {
+            MAPDEMO_TRY(on_forward(*f));
         } else if (f->type == net::MsgType::Error) {
-            return Error{"A rejected a view request: " + f->payload};
+            return Error{std::string(edit_inflight_ ? "A rejected a view request or the write-back: "
+                                                    : "A rejected a view request: ") + f->payload};
         } else {
             double rtt = double(net::now_ns() - sent_ns_) / 1000.0;
             if (!inflight_) return Error{"ViewSnapshot without an outstanding request"};
@@ -604,6 +662,122 @@ void Session::check_snapshot(const net::Frame& frame) {
     }
 }
 
+// Write-back. The snapshot was checked as received (check_snapshot); the
+// client then changes it in its own buffer, which grows as needed (a
+// compact wire leaves no free space), and sends it with save_verified. A
+// verifies it, compares the digest it computes with the one in the frame
+// header, checks the fields and answers EditAck (or Error).
+Status Session::maybe_edit() {
+    if (opt_.edits == 0 || edit_inflight_ || holder_.empty() || cur_.category != net::ViewCategory::Normal) return {};
+    if (++edit_counter_ % opt_.edits != 0) return {};
+
+    EditRecord r;
+    metrics::Stopwatch sw;
+    r.what = apply_client_edit(holder_.edit(), edits_sent_ + 1);
+    holder_.edited();
+    r.edit_us = sw.us();
+    const bool reuse = opt_.buffers == BufferMode::Reuse;
+    std::string wire = reuse ? conn_.take_tx_buffer() : std::string();
+    sw.restart();
+    holder_.save_verified_into(wire);
+    r.save_us = sw.us();
+    const ViewSnapshot& edited = holder_.view();
+    r.edit_id = edited.request_id;
+    r.units = edited.units.size();
+    r.wire_bytes = wire.size();
+    r.digest = checks::snapshot_digest(edited);
+    r.wire_digest = checks::wire_digest(wire);
+    if (opt_.check_on()) {
+        // The client holds itself to the rules A applies to a write-back.
+        const checks::Result ok = checks::edit_sanity_of(edited);
+        if (ok.ok) checks_.pass("edit_sanity");
+        else checks_.fail("edit_sanity", "edit " + std::to_string(r.edit_id) + ": " + ok.detail);
+    }
+    if (wire.size() > net::kEditLimit)
+        return Error{"write-back of " + std::to_string(wire.size()) + " bytes exceeds the Edit limit"};
+    rec_.add("c.edit_us", r.edit_us);
+    rec_.add("c.edit_save_us", r.save_us);
+    rec_.add("c.edit_bytes", double(r.wire_bytes));
+    edit_ = r;
+    edit_inflight_ = true;
+    edit_sent_ns_ = net::now_ns();
+    ++edits_sent_;
+    MAPDEMO_TRY(conn_.try_enqueue(net::MsgType::Edit, r.digest, std::move(wire), 0));
+    MAPDEMO_TRY(conn_.try_flush());
+    return {};
+}
+
+void Session::write_edit_row(bool acked, double rtt_us) {
+    if (!edits_csv_open_) return;
+    char rtt[32] = "";
+    if (acked) std::snprintf(rtt, sizeof rtt, "%.3f", rtt_us);
+    auto id = [](std::uint32_t v, char (&out)[16]) -> const char* {
+        out[0] = '\0';
+        if (v != EditSummary::kNone) std::snprintf(out, sizeof out, "%u", v);
+        return out;
+    };
+    char erased[16], changed[16], renamed[16];
+    char line[384];
+    std::snprintf(line, sizeof line, "%" PRIu64 ",%zu,%zu,%016" PRIx64 ",%016" PRIx64 ",%.3f,%.3f,%s,%d,%s,%s,%u,%s",
+                  edit_.edit_id, edit_.units, edit_.wire_bytes, edit_.digest, edit_.wire_digest, edit_.edit_us,
+                  edit_.save_us, rtt, acked ? 1 : 0, id(edit_.what.erased_id, erased),
+                  id(edit_.what.changed_id, changed), edit_.what.added_id, id(edit_.what.renamed_id, renamed));
+    edits_csv_.row(line);
+}
+
+void Session::on_edit_ack(const net::Frame& frame) {
+    if (!edit_inflight_ || frame.correlation != edit_.edit_id) {
+        checks_.fail("edit_acked", "EditAck for " + std::to_string(frame.correlation) +
+                                       (edit_inflight_ ? ", sent " + std::to_string(edit_.edit_id) : ", none sent"));
+        return;
+    }
+    const double rtt = double(net::now_ns() - edit_sent_ns_) / 1000.0;
+    rec_.add("c.edit_rtt_us", rtt);
+    write_edit_row(true, rtt);
+    edit_inflight_ = false;
+    ++edits_acked_;
+    checks_.pass("edit_acked");
+}
+
+// Another client's write-back, rebuilt by A: verified at the Edit limit,
+// its digest compared with the one A put in the frame header, its fields
+// checked with the rules A applied.
+Status Session::on_forward(net::Frame& frame) {
+    if (frame.flags != 0) return Error{"Forward frame with flags " + std::to_string(frame.flags)};
+    const bool reuse = opt_.buffers == BufferMode::Reuse;
+    metrics::Stopwatch sw;
+    if (reuse && fwd_buf_) {
+        XStatus r = fwd_buf_->try_reload_verified<ViewSnapshot>(frame.payload);
+        if (!r) return Error{"forward: " + r.error().message};
+    } else {
+        XResult<XBuffer> b = XBuffer::try_load_verified<ViewSnapshot>(frame.payload, XBuffer::maximum_capacity(net::kEditLimit));
+        if (!b) return Error{"forward: " + b.error().message};
+        fwd_buf_.emplace(std::move(*b));
+    }
+    const double load_us = sw.us();
+    rec_.add("c.forward_load_us", load_us);
+    const ViewSnapshot& s = fwd_buf_->root<ViewSnapshot>();
+    const std::uint64_t digest = checks::snapshot_digest(s);
+    std::string why;
+    if (digest != frame.correlation) why = "digest differs from A's";
+    else if (checks::Result r = checks::edit_sanity_of(s); !r.ok) why = r.detail;
+    if (opt_.check_on()) {
+        if (why.empty()) checks_.pass("forward_received");
+        else checks_.fail("forward_received", "edit " + std::to_string(s.request_id) + ": " + why);
+    }
+    ++forwards_;
+    if (edits_csv_open_) {
+        char line[256];
+        std::snprintf(line, sizeof line, "%" PRIu64 ",%zu,%zu,%016" PRIx64 ",%016" PRIx64 ",%016" PRIx64 ",%.3f,%d",
+                      std::uint64_t(s.request_id), std::size_t(s.units.size()), frame.payload.size(), digest,
+                      frame.correlation, checks::wire_digest(frame.payload), load_us, why.empty() ? 1 : 0);
+        forwards_csv_.row(line);
+    }
+    if (!reuse) fwd_buf_.reset();
+    else conn_.recycle_rx(std::move(frame.payload));
+    return {};
+}
+
 void Session::note_read_present(double us) {
     rec_.add("c.read_present_us", us);
     cur_.read_present_sum += us;
@@ -664,6 +838,10 @@ Result<bool> Session::finish() {
         const double destroy_us = holder_.clear();
         retire_current(opt_.buffers == BufferMode::Reuse ? -1.0 : destroy_us);
     }
+    if (edit_inflight_) {   // sent after A stopped reading: logged unacknowledged
+        write_edit_row(false, 0);
+        edit_inflight_ = false;
+    }
     if (opt_.check_on()) {
         if (snapshots_ == 0) checks_.fail("snapshots_received", "no snapshot received");
         else {
@@ -672,6 +850,15 @@ Result<bool> Session::finish() {
                                                    " dense=" + std::to_string(by_encoding_[0]) +
                                                    " compact=" + std::to_string(by_encoding_[1]) +
                                                    " zstd=" + std::to_string(by_encoding_[2]));
+        }
+        if (opt_.edits != 0) {
+            const std::string detail = "sent=" + std::to_string(edits_sent_) + " acked=" + std::to_string(edits_acked_) +
+                                       " forwards_received=" + std::to_string(forwards_);
+            if (edits_acked_ == 0) checks_.fail("edits", "no write-back acknowledged (" + detail + ")");
+            else {
+                checks_.pass("edits", edits_acked_);
+                checks_.note("edits", detail);
+            }
         }
         if (opt_.events != Options::kEventsOff) {
             const std::string detail = "frames raw=" + std::to_string(event_frames_[0]) + " zstd=" +
@@ -747,6 +934,7 @@ Result<int> run_headless(const Options& opt) {
                 if (u.id % kEventIdModulo == 0) sink += u.name.view().size() + std::uint64_t(u.hp);
             s.note_read_present(sw.us());
             if (opt.check_on()) s.verify_direct_read();
+            MAPDEMO_TRY(s.maybe_edit());
         }
         if (s.bye()) break;
 
@@ -791,6 +979,8 @@ Result<int> run_headless(const Options& opt) {
     if (!ok) return std::move(ok).error();
     s.recorder().print_line(stdout, {"c.view_rtt_us", "c.load_us", "c.decompress_us", "c.read_present_us",
                                      "c.destroy_us", "c.snap_bytes", "c.snap_net_bytes", "c.visible_count"});
+    if (opt.edits != 0)
+        s.recorder().print_line(stdout, {"c.edit_us", "c.edit_save_us", "c.edit_bytes", "c.edit_rtt_us", "c.forward_load_us"});
     s.checks().print(stdout);
     std::fprintf(stdout, "client: Bye received after %" PRIu64 " snapshots (%" PRIu64 ")\n", s.snapshots(), sink % 2);
     return *ok ? 0 : 1;
@@ -818,7 +1008,7 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
             if (c.want_write()) MAPDEMO_TRY(c.try_flush());
             Result<std::optional<net::Frame>> f = c.try_recv_nowait(
                 {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloAck,
-                 net::MsgType::SubscribeOk, net::MsgType::Events});
+                 net::MsgType::SubscribeOk, net::MsgType::Events, net::MsgType::EditAck, net::MsgType::Forward});
             if (!f) return std::move(f).error();
             if (*f) {
                 a.outcome = Outcome::Frame;
@@ -858,7 +1048,10 @@ std::string view_request_wire(std::uint64_t id, const Rect& r) {
 }
 
 // Expect A to answer Error or to close the connection; anything else fails.
-bool expect_rejected(CheckLog& log, const char* name, const char* what, net::Conn& c) {
+// masks: digests written as "<digest>" in the note (a snapshot's digest
+// depends on the tick A served it at; notes are compared across targets).
+bool expect_rejected(CheckLog& log, const char* name, const char* what, net::Conn& c,
+                     std::initializer_list<std::uint64_t> masks = {}) {
     Awaited a = await_frame(c, 5000);
     std::string result;
     bool ok = false;
@@ -875,6 +1068,11 @@ bool expect_rejected(CheckLog& log, const char* name, const char* what, net::Con
     }
     std::fprintf(stdout, "evil: %-40s -> %s %s\n", what, ok ? "rejected," : "NOT rejected,", result.c_str());
     if (ok) {
+        for (const std::uint64_t m : masks) {
+            char hex[17];
+            std::snprintf(hex, sizeof hex, "%016" PRIx64, m);
+            for (std::size_t at; (at = result.find(hex)) != std::string::npos;) result.replace(at, 16, "<digest>");
+        }
         log.pass(name);
         log.note(name, result);
     } else {
@@ -1022,6 +1220,59 @@ Result<int> run_evil(const Options& opt) {
         log_outcome(log, "evil_hello_junk", "Hello: not a schema hello", ok,
                     !answer ? "no answer: " + answer.error().message
                             : std::string(net::type_name(answer->type)) + ": " + answer->payload);
+    }
+    {   // (13) to (15): write-back. One connection: a snapshot is requested
+        // and changed like a normal --edits client does, then sent back
+        // three ways A must refuse with Error (the structure, the digest in
+        // the frame header, the field rules), then once as it is: A must
+        // still accept it on the same connection.
+        net::Conn c;
+        MAPDEMO_TRY(handshake(c, opt));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 10, view_request_wire(10, normal),
+                               static_cast<std::uint16_t>(net::ViewCategory::Normal)));
+        Awaited a = await_frame(c, 5000);
+        std::string why;
+        std::optional<XBuffer> snap;
+        if (a.outcome != Outcome::Frame) why = a.outcome == Outcome::Closed ? "closed: " + a.detail : "no snapshot within 5 s";
+        else if (a.frame.type != net::MsgType::ViewSnapshot) why = std::string("got ") + net::type_name(a.frame.type);
+        else {
+            XResult<XBuffer> b = XBuffer::try_load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
+            if (!b) why = "load_verified: " + b.error().message;
+            else snap.emplace(std::move(*b));
+        }
+        if (!why.empty()) {
+            log.fail("evil_edit_setup", why);
+        } else {
+            apply_client_edit(snap->root<ViewSnapshot>(), 1);
+            const std::string good = snap->save_verified<ViewSnapshot>();
+            const std::uint64_t digest = checks::snapshot_digest(snap->root<ViewSnapshot>());
+            std::string truncated = good;
+            truncated.pop_back();
+            MAPDEMO_TRY(c.try_send(net::MsgType::Edit, digest, truncated, 0));
+            expect_rejected(log, "evil_edit_truncated", "Edit: truncated wire (-1 byte)", c);
+            MAPDEMO_TRY(c.try_send(net::MsgType::Edit, digest ^ 1u, good, 0));
+            expect_rejected(log, "evil_edit_digest", "Edit: header digest is not its content's", c, {digest, digest ^ 1u});
+            // A sound wire with its own digest, but a unit outside the rect.
+            XResult<XBuffer> moved = XBuffer::try_load_verified<ViewSnapshot>(good, cap_snapshot());
+            if (!moved) return Error{"evil: reload of the edit: " + moved.error().message};
+            ViewSnapshot& m = moved->root<ViewSnapshot>();
+            m.units[0].pos = Point{m.rect.max.x + 1.0f, m.rect.min.y};
+            MAPDEMO_TRY(c.try_send(net::MsgType::Edit, checks::snapshot_digest(m), moved->save_verified<ViewSnapshot>(), 0));
+            expect_rejected(log, "evil_edit_outside", "Edit: a unit moved outside its rect", c);
+            MAPDEMO_TRY(c.try_send(net::MsgType::Edit, digest, good, 0));
+            Awaited ack = await_frame(c, 5000);
+            if (ack.outcome != Outcome::Frame) why = ack.outcome == Outcome::Closed ? "closed: " + ack.detail : "no answer within 5 s";
+            else if (ack.frame.type != net::MsgType::EditAck) why = std::string("got ") + net::type_name(ack.frame.type) + " " + ack.frame.payload;
+            else if (ack.frame.correlation != 10) why = "EditAck for " + std::to_string(ack.frame.correlation);
+            std::fprintf(stdout, "evil: %-40s -> %s\n", "same connection: the sound write-back", why.empty() ? "acknowledged" : why.c_str());
+            if (why.empty()) {
+                log.pass("evil_edit_recovers");
+                log.note("evil_edit_recovers", "edit of snapshot 10 acknowledged");
+                std::fprintf(stdout, "evil: %-40s -> acknowledged (%zu B)\n", "Edit: the same edit, unchanged", good.size());
+            } else {
+                log.fail("evil_edit_recovers", why);
+            }
+        }
     }
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty

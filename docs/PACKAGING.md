@@ -237,3 +237,39 @@ WSL 或 Docker 可用于后续 Linux 性能工作，不要求独立物理机作�
 
 本版本不承诺 N7 三项 I/O 扩展、生产异步 transport 或业务网络整合。当前已验
 网络范围是同步 TCP 回环参考与独立生命周期模型；缺少真实业务前提仍保留 F。
+
+## 客户端体积与编译时间（SC-14）
+
+客户端引入 XOffset 后安装包变大多少，每多一个根 schema 再大多少，单个翻译单元编译多久。
+测量程序是 `tools/client_size/size_client.cpp`：收到一条消息后 `try_load_verified`、读字段、改一个字段、
+`save_compact`，按第一个字节分派到 N 个根 schema（`Msg1`..`MsgN`，每个含 `XString`、两个 `XVector`
+和一个定长数组，`XOFFSET_RECORD` 字段表）。N=0 的基线是同一个程序但不含 XOffset。
+构建方式与正式 App 相同：`MinSizeRel`（`-Os`）、`-ffunction-sections -fdata-sections` 加
+`--gc-sections`（Apple 用 `-dead_strip`）、strip 后的字节数。
+
+```sh
+tools/client_size/measure.sh android-arm64 OUT [--std 20|23]   # 需要 ANDROID_NDK
+tools/client_size/measure.sh ios-device OUT                      # Mac，Xcode
+```
+
+Android arm64-v8a，NDK r29 Clang 21.0.0，API 28，`c++_static`，C++20 字段表构建，提交 af601ea（字节）：
+
+| 异常 | 基线（无 XOffset） | 1 个 schema | 库本身（1 个 schema 减基线） | 2 | 4 | 8 | 每多一个 schema |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 开 | 193,416 | 261,248 | **+67,832** | 273,312 | 297,456 | 348,144 | **+12,414** |
+| 关（`-fno-exceptions`） | 193,320 | 258,040 | **+64,720** | 267,752 | 287,176 | 327,752 | **+9,959** |
+
+演示客户端（`demo/mapstate` 的 `mapdemo_client`，含网络、握手、三种编码和全部校验）：
+
+| 构建 | 带 zstd 1.5.7 | 不带 zstd |
+| --- | ---: | ---: |
+| 开异常 | 1,006,176 | 639,792 |
+| 关异常 | 973,368 | 607,720 |
+
+- 库本身约 65 KB，每个根 schema 约 10–12 KB（关异常时小约 2.5 KB）。C++23 构建的结果相差 0.5% 以内
+  （+67,960 / +12,745，关异常 +64,864 / +10,279）。
+- 演示客户端里 zstd 占约 366 KB；不压缩的客户端去掉它。
+- 单个翻译单元编译时间（3 次取中位数，云端 Xeon，`-Os`）：不含 XOffset 的程序 0.56 s，1 个 schema 2.64 s，
+  8 个 schema 5.09 s，演示的 `client_core.cpp` 5.15 s。头文件解析约 2 s，之后每个 schema 约 0.35 s；
+  把收发代码集中在少数几个翻译单元里，不要在每个文件里都包含 schema。
+- iOS arm64（`ios-device`）的数字在 Mac 上测，测完补在这里。
