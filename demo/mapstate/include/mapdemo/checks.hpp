@@ -3,11 +3,14 @@
 // and checks_impl.hpp, owned by the common-library thread. Check code never
 // runs inside a timed region of the measured paths.
 #pragma once
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
+#include "mapdemo/rules.hpp"
 #include "mapdemo/schema.hpp"
 #include "mapdemo/std_model.hpp"
 
@@ -65,6 +68,16 @@ std::uint64_t snapshot_digest(const ViewSnapshot& snapshot);
 // version-1 snapshots it converts with it; snapshot_digest calls it).
 template <typename Snapshot>
 std::uint64_t snapshot_digest_of(const Snapshot& snapshot);
+
+// A: the business rules for a client's write-back (an Edit), of either
+// schema version. load_verified has already proved the structure; these are
+// the field values A accepts from a client: scene kSceneId, a legal rect,
+// every unit inside it at a finite position, hp 50..100, behavior 0..2, a
+// name of 1..kMaxEditName bytes, no duplicate ids; schema version 2: no
+// more units than scene_units, reserved0 == 0.
+inline constexpr std::size_t kMaxEditName = 64;
+template <typename Snapshot>
+Result edit_sanity_of(const Snapshot& snapshot);
 
 // Digest of a whole wire (or any byte string): 64-bit words mixed in order,
 // then the tail bytes and the length. A logs it per step (a_steps.csv) so
@@ -124,6 +137,39 @@ std::uint64_t snapshot_digest_of(const Snapshot& snapshot) {
         d.bytes(name.data(), name.size());
     }
     return d.h;
+}
+
+template <typename Snapshot>
+Result edit_sanity_of(const Snapshot& snapshot) {
+    auto fail = [](std::string why) { return Result{false, std::move(why)}; };
+    const Rect rect{{snapshot.rect.min.x, snapshot.rect.min.y}, {snapshot.rect.max.x, snapshot.rect.max.y}};
+    if (snapshot.scene_id != kSceneId) return fail("scene_id " + std::to_string(snapshot.scene_id));
+    if (!rules::rect_is_legal(rect, scene_bounds())) return fail("rect not legal in the scene");
+    if constexpr (requires { snapshot.scene_units; }) {
+        if (snapshot.units.size() > snapshot.scene_units)
+            return fail("units " + std::to_string(snapshot.units.size()) + " > scene_units " +
+                        std::to_string(snapshot.scene_units));
+        if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0));
+    }
+    std::vector<std::uint32_t> ids;
+    ids.reserve(snapshot.units.size());
+    std::size_t i = 0;
+    for (const auto& v : snapshot.units) {
+        const Point pos{v.pos.x, v.pos.y};
+        const std::string tag = "unit[" + std::to_string(i) + "] id " + std::to_string(v.id) + ": ";
+        if (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !rules::contains(rect, pos))
+            return fail(tag + "position outside the rect");
+        if (v.hp < 50 || v.hp > 100) return fail(tag + "hp " + std::to_string(v.hp) + " out of 50..100");
+        if (static_cast<std::uint32_t>(v.behavior) > 2u) return fail(tag + "behavior out of range");
+        const std::size_t name = v.name.view().size();
+        if (name == 0 || name > kMaxEditName) return fail(tag + "name of " + std::to_string(name) + " bytes");
+        ids.push_back(v.id);
+        ++i;
+    }
+    std::sort(ids.begin(), ids.end());
+    const auto dup = std::adjacent_find(ids.begin(), ids.end());
+    if (dup != ids.end()) return fail("duplicate id " + std::to_string(*dup));
+    return Result{};
 }
 
 } // namespace mapdemo::checks

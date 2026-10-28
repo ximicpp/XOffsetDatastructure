@@ -46,3 +46,13 @@ FAIL_SEMANTIC on every catalog.
 
 The full release gate therefore does not pass on this host, as intended:
 missing targets never count as passed.
+
+## Regression after merge (#170)
+
+This validation ran only the C++26 (P2996) build. tests/test_schema_guard_slg_values.cpp
+uses std::meta through wire_runtime.cpp, but it was added to REFLECTION_TESTS
+only and not to XOFFSET_CXX26_ONLY_TESTS, so after #170 the C++20/C++23
+field-list builds of next_cpp26 failed to compile (client builds, the matrix
+columns, ios_device.sh local). The one-line fix, listing the test in
+XOFFSET_CXX26_ONLY_TESTS, is in #171. Before merging a change that adds a test
+or touches tests/CMakeLists.txt, also run the C++20 matrix column.
