@@ -14,6 +14,7 @@ BUILD_TYPE="Release"
 VERBOSE=0
 USER_COMPILER="${CXX:-}"
 USER_SDK=""
+SCHEMA_GATE="local"
 
 detect_platform() {
     case "${OSTYPE:-unknown}" in
@@ -43,14 +44,18 @@ Options:
   --compiler PATH   Use a specific Clang P2996 compiler
   --build-dir PATH  Use an explicit build directory (default: build)
   --sdk PATH        Use an explicit macOS SDK instead of xcrun's default
+  --schema-gate MODE  local (default) or full cross-platform gate
   --debug           Configure a Debug build
   --verbose, -v     Print invoked commands and verbose CTest output
   -j N              Use N parallel build jobs
   --help, -h        Show this help
 
-The script configures the project with CMake, builds it, runs CTest,
-exports the exact signature target matrix into tools/sigs/, validates the
-matrix inventory, and runs the compatibility self-check.
+The default runs this platform's build, CTest and signature checks.
+Use --schema-gate full for the release entry point; it requires the complete
+cross-platform compile and runtime/wire matrices before CTest. Configure
+the schema gate with XSG_PROFILES, XSG_WIRE_PROFILES, XSG_NDK, XSG_CATALOG,
+XSG_REPORTS, and XSG_PULL=1 when Docker images may be pulled. See
+tools/schema_guard/README.md.
 EOF
 }
 
@@ -175,6 +180,12 @@ while [[ $# -gt 0 ]]; do
             USER_COMPILER="$2"
             shift 2
             ;;
+        --schema-gate)
+            [[ $# -ge 2 ]] || die "--schema-gate requires local or full"
+            SCHEMA_GATE="$2"
+            [[ "$SCHEMA_GATE" == local || "$SCHEMA_GATE" == full ]] || die "invalid schema gate mode"
+            shift 2
+            ;;
         --debug)
             BUILD_TYPE="Debug"
             shift
@@ -288,7 +299,18 @@ if [[ "$VERBOSE" -eq 1 ]]; then
     ctest_args+=(-V)
 fi
 
-run_cmd ctest "${ctest_args[@]}"
+# Fresh full-target compile and runtime/wire checks must pass before CTest.
+# run_checked.py intentionally offers no target-selection or skip option.
+schema_gate_args=(--clang "$CXX_COMPILER" --reports "${XSG_REPORTS:-$BUILD_DIR/schema-guard-runs}")
+if [[ "${XSG_PULL:-0}" == "1" ]]; then
+    schema_gate_args+=(--pull)
+fi
+if [[ "$SCHEMA_GATE" == full ]]; then
+    run_cmd python3 tools/schema_guard/run_checked.py "${schema_gate_args[@]}" -- ctest "${ctest_args[@]}"
+else
+    echo "Platform checks only; the full cross-platform release gate was not requested."
+    run_cmd ctest "${ctest_args[@]}"
+fi
 
 section "Signature Tools"
 
