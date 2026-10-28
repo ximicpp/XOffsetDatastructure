@@ -19,6 +19,7 @@ import os
 import sys
 
 ENCODINGS = ("dense", "compact", "zstd")
+EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
 
 
 def read_csv(path):
@@ -177,7 +178,14 @@ def target_summary(out_root, name, corpus_rows):
                     "count": len(sel), "wire_bytes": mean(col("wire_bytes")), "net_bytes": mean(col("net_bytes")),
                     "decompress_p50": pct(col("decompress_us"), 0.5), "load_p50": pct(col("load_us"), 0.5),
                     "rtt_p50": pct(col("rtt_us"), 0.5)}
-        t["largest"] = {"name": big.get("name"), "units": big.get("units"), "cells": cells}
+        t["largest"] = {"name": big.get("name"), "units": big.get("units"), "cells": cells,
+                        "events": big.get("events")}
+    # Event stream (client --events): the digests of every Events frame the
+    # client received, per tier; A's events depend on the seed only.
+    t["event_digests"] = sorted(
+        (x.get("name"), r.get("tick"), r.get("part"), r.get("encoding"), r.get("digest"))
+        for x in tiers if x.get("events")
+        for r in read_csv(os.path.join(root, x.get("name", ""), "client_events.csv")) or [])
     t["ok"] = not t["problems"]
     return t
 
@@ -207,6 +215,9 @@ def main():
     ref_evil = targets[0]["evil_outcomes"] if targets else []
     same_evil = bool(ref_evil) and all(t["evil_outcomes"] == ref_evil for t in targets)
     passed = bool(targets) and all(t["ok"] for t in targets) and same_everywhere and same_selfcheck
+    with_events = [t for t in targets if t["event_digests"]]
+    same_events = bool(with_events) and len(with_events) == len(targets) and all(
+        t["event_digests"] == with_events[0]["event_digests"] for t in with_events)
 
     lines = ["# Map state demo: end-to-end result", ""]
     lines.append("- label: {}".format(args.label or "-"))
@@ -223,6 +234,9 @@ def main():
         "yes" if same_selfcheck else "NO"))
     lines.append("- same evil outcomes and texts on every target: {}".format(
         "yes" if same_evil else "no (see each target's evil_*/client_checks.csv)"))
+    if with_events:
+        lines.append("- event stream on {} of {} target(s); same event frames and digests on every target: {}".format(
+            len(with_events), len(targets), "yes" if same_events else "no"))
     lines.append("")
     lines.append("## Targets")
     lines.append("")
@@ -267,6 +281,26 @@ def main():
                 t["name"], cat, e, c["count"], fmt(wire), fmt(net), fmt(ratio, 3),
                 fmt(c["decompress_p50"]) if e == "zstd" else "-", fmt(c["load_p50"]), fmt(c["rtt_p50"])))
     lines.append("")
+    if with_events:
+        lines.append("## Event stream (largest tier, client side)")
+        lines.append("")
+        lines.append("Bytes per event (UnitEvent wire and payload on the network); times per Events frame, p50 "
+                     "in microseconds, from summary.json.")
+        lines.append("")
+        lines.append("| target | encoding | frames | events | wire bytes | bytes sent | sent / wire | decode | verify |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for t in with_events:
+            ev = (t["largest"] or {}).get("events") or {}
+            for e in EVENT_ENCODINGS:
+                c = (ev.get("per_encoding") or {}).get(e)
+                if not c or not c.get("frames"):
+                    continue
+                wire, net = c.get("wire_per_event"), c.get("net_per_event")
+                ratio = net / wire if wire and net else float("nan")
+                lines.append("| {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
+                    t["name"], e, c["frames"], c["events"], fmt(wire), fmt(net), fmt(ratio, 3),
+                    fmt((c.get("c.decode_us") or {}).get("p50")), fmt((c.get("c.verify_us") or {}).get("p50"))))
+        lines.append("")
     lines.append("Per-target detail: `<target>/RESULT_TABLES.md`; offline runs: `<target>/selfcheck/`, "
                  "`<target>/replay/client_replay.csv`.")
 
@@ -274,8 +308,10 @@ def main():
         f.write("\n".join(lines) + "\n")
     js = {"label": args.label, "passed": passed, "same_replay_digests": same_everywhere,
           "same_selfcheck_outcomes": same_selfcheck, "same_evil_outcomes": same_evil,
+          "same_event_digests": same_events if with_events else None,
           "corpus": {"dir": args.corpus, "rows": len(corpus_rows), "bytes": corpus_bytes, "meta": corpus_meta},
-          "targets": [{k: v for k, v in t.items() if k not in ("replay_digests", "selfcheck_outcomes", "evil_outcomes")}
+          "targets": [{k: v for k, v in t.items() if k not in ("replay_digests", "selfcheck_outcomes", "evil_outcomes",
+                                                                 "event_digests")}
                       for t in targets]}
     with open(os.path.join(args.root, "e2e_summary.json"), "w") as f:
         json.dump(js, f, indent=1, sort_keys=True, default=str)

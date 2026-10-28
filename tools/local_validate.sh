@@ -3,11 +3,13 @@
 # for good (susu 2026-10-23), so this is the merge evidence: it validates the checked-out
 # working tree (HEAD) against a base commit and writes REPORT.md for the PR description.
 #
-#   tools/local_validate.sh [--base REV] [--steps LIST | --release] [--work DIR] [-j N] [--columns K] [--fail-fast]
+#   tools/local_validate.sh [--base REV] [--steps LIST | --release] [--clients] [--work DIR] [-j N]
+#                           [--columns K] [--fail-fast]
 #
-# Steps, in this order (default: every step the host can run except tsan; --release adds it;
-# LIST may also name the groups "classic" = the steps up to asm and "matrix" = the
-# C++20/C++23 columns):
+# Steps, in this order (default: every step the host can run except tsan and the client
+# columns, plus client-c++20; --release adds tsan and every client column; --clients adds
+# every client column; LIST may also name the groups "classic" = the steps up to asm,
+# "matrix" = the C++20/C++23 columns and "clients" = the client columns):
 #   meta      the library's own files (top-level *.hpp, *.cpp) use reflection (std::meta, ^^)
 #             only in xoffset_schema_reflect.hpp; every other walk goes through the schema
 #             interface (xoffset_schema.hpp), so the field-list builds see the same code
@@ -41,6 +43,21 @@
 #                        build (the reference, built if missing), the C++26 P2996 build if
 #                        present and every non-ASan column: each writes the cross-compiler
 #                        corpus, each loads every other's, all corpora the same bytes
+# The native client columns (tools/native_targets.sh: full CTest, the no-exceptions
+# programs *_noexc among them, and the wire corpus read and diffed against the corpus the
+# GCC 16 C++26 build of HEAD writes):
+#   msvc-c++20, msvc-c++23  MSVC (cl, link) under wine, $XOFFSET_MSVC_ROOT (default /opt/msvc,
+#                           made by tools/msvc-wine/fetch_msvc.py)
+#   clang-cl-c++20          clang-cl + lld-link with the same MSVC STL and SDK, under wine
+#                           (also tools/msvc-wine/case_links.py once)
+#   mingw-c++20             MinGW-w64 GCC (g++-mingw-w64-x86-64-posix) under wine
+#   ndk29-c++20, ndk30-c++20  Android NDK r29 / r30 ($XOFFSET_NDK_R29, $XOFFSET_NDK_R30, default
+#                           /opt/android-ndk-r29, -r30), static arm64 programs under qemu-aarch64
+#   client-c++20            the rule that every PR runs at least one C++20 client column: the
+#                           first of msvc-c++20, clang-cl-c++20, ndk29-c++20, ndk30-c++20,
+#                           mingw-c++20 that the host can run, unless one of them is selected
+#                           anyway; FAILS when the host can run none (apt-get install wine
+#                           g++-mingw-w64-x86-64-posix is the quickest way to one)
 # The matrix columns run in parallel after the other steps, at most K at a time (--columns,
 # default min(4, columns)), each with -j max(1, N/K). A column whose compiler, sanitizer
 # runtime or image is missing, or a tree without the C++20 build, is reported as "not run".
@@ -68,22 +85,34 @@ CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
 CLASSIC_STEPS="meta gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm"
 ASM_STRICT=0
-MATRIX_STEPS="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 gcc16-c++26d p2996-c++20 diff-c++20 wire-matrix"
-ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS"
-DEFAULT_STEPS="${ALL_STEPS/ tsan / }"
+CLIENT_STEPS="msvc-c++20 msvc-c++23 clang-cl-c++20 mingw-c++20 ndk29-c++20 ndk30-c++20"
+# client-c++20 picks the first of these the host can run.
+CLIENT_CXX20_ORDER="msvc-c++20 clang-cl-c++20 ndk29-c++20 ndk30-c++20 mingw-c++20"
+MATRIX_GROUP="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc16-c++20 gcc16-c++23 gcc16-c++26d p2996-c++20 diff-c++20"
+MATRIX_STEPS="$MATRIX_GROUP $CLIENT_STEPS wire-matrix"
+ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS client-c++20"
+RELEASE_STEPS="${ALL_STEPS/ client-c++20/}"
+DEFAULT_STEPS="${RELEASE_STEPS/ tsan / }"
+for c in $CLIENT_STEPS; do DEFAULT_STEPS=${DEFAULT_STEPS/ $c / }; done
+DEFAULT_STEPS="$DEFAULT_STEPS client-c++20"
+CLIENTS=0
+MSVC_ROOT=${XOFFSET_MSVC_ROOT:-/opt/msvc}
+NDK_R29=${XOFFSET_NDK_R29:-/opt/android-ndk-r29}
+NDK_R30=${XOFFSET_NDK_R30:-/opt/android-ndk-r30}
 COLUMNS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base) BASE_REV=$2; shift 2 ;;
         --steps) STEPS=${2//,/ }; shift 2 ;;
-        --release) STEPS=$ALL_STEPS; shift ;;
+        --release) STEPS=$RELEASE_STEPS; shift ;;
+        --clients) CLIENTS=1; shift ;;
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
         --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
         --asm-strict) ASM_STRICT=1; shift ;;
-        -h|--help) sed -n '2,54p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,71p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -100,7 +129,9 @@ WORK=$(cd "$WORK" && pwd)
 STEPS=${STEPS:-$DEFAULT_STEPS}
 STEPS=" $STEPS "
 STEPS=${STEPS// classic / $CLASSIC_STEPS }
-STEPS=${STEPS// matrix / $MATRIX_STEPS }
+STEPS=${STEPS// matrix / $MATRIX_GROUP wire-matrix }
+STEPS=${STEPS// clients / $CLIENT_STEPS }
+(( CLIENTS )) && STEPS="$STEPS$CLIENT_STEPS "
 DIRTY=$(git status --porcelain --untracked-files=no | wc -l)
 RESULTS="$WORK/results.tsv"
 : > "$RESULTS"
@@ -124,7 +155,9 @@ need_gcc=0; need_p2996=0; want_gcc=0
 for s in $STEPS; do
     case " $ALL_STEPS " in *" $s "*) ;; *) echo "unknown step: $s" >&2; exit 2 ;; esac
     # The GCC 16 matrix columns report "not run" without docker; the classic steps need it.
-    case $s in p2996*) need_p2996=1 ;; gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20|wire-matrix) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
+    # The client columns need the GCC 16 image only for the reference corpus.
+    case $s in p2996*) need_p2996=1 ;; meta|gcc13-*|clang18-*) ;; gcc16-c++*|diff-c++20|wire-matrix) want_gcc=1 ;;
+        msvc-*|clang-cl-*|mingw-*|ndk*|client-*) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
 done
 
 log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, work $WORK"
@@ -330,8 +363,46 @@ matrix_blocker() {
                     echo "$cxx has no ASan/UBSan runtime (for clang 18: apt-get install libclang-rt-18-dev)"
             fi ;;
         p2996-*) (( P2996_OK )) || echo "no P2996 toolchain at $P2996_ROOT (and no $P2996_TARBALL)" ;;
+        msvc-*|clang-cl-*|mingw-*)
+            command -v wine >/dev/null || { echo "no wine"; return; }
+            case $s in
+                msvc-*|clang-cl-*)
+                    compgen -G "$MSVC_ROOT/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe" >/dev/null ||
+                        { echo "no MSVC at $MSVC_ROOT (tools/msvc-wine/fetch_msvc.py $MSVC_ROOT)"; return; }
+                    [[ $s == clang-cl-* ]] && ! compgen -c clang-cl | grep -qE '^clang-cl(-[0-9]+)?$' &&
+                        { echo "no clang-cl (a clang-cl link to clang, e.g. /usr/lib/llvm-19/bin/clang)"; return; } ;;
+                mingw-*) command -v x86_64-w64-mingw32-g++-posix >/dev/null || command -v x86_64-w64-mingw32-g++ >/dev/null ||
+                        { echo "no MinGW-w64 g++ (apt-get install g++-mingw-w64-x86-64-posix)"; return; } ;;
+            esac
+            (( GCC_OK )) || echo "no GCC 16 image for the reference corpus (docker or $IMG unavailable)" ;;
+        ndk*)
+            local ndk=$NDK_R29; [[ $s == ndk30-* ]] && ndk=$NDK_R30
+            [[ -f $ndk/build/cmake/android.toolchain.cmake ]] || { echo "no NDK at $ndk"; return; }
+            command -v qemu-aarch64-static >/dev/null || command -v qemu-aarch64 >/dev/null ||
+                { echo "no qemu-aarch64 (apt-get install qemu-user-static)"; return; }
+            (( GCC_OK )) || echo "no GCC 16 image for the reference corpus (docker or $IMG unavailable)" ;;
         *) (( GCC_OK )) || echo "no GCC 16 image (docker or $IMG unavailable)" ;;
     esac
+}
+
+# The corpus the client columns read and must write byte for byte: written by the GCC 16
+# C++26 build of HEAD (the wire-matrix reference build, built here if missing).
+client_reference() {
+    local bin
+    if [[ -z $(find "$WORK/gcc" -name test_cross_compiler_wire -type f -perm -u+x 2>/dev/null) ]]; then
+        in_gcc "cmake -S . -B '$WORK/gcc' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ &&
+            cmake --build '$WORK/gcc' --target test_cross_compiler_wire --parallel $JOBS" || return 1
+    fi
+    bin=$(find "$WORK/gcc" -name test_cross_compiler_wire -type f -perm -u+x | head -n 1)
+    rm -rf "$WORK/client-ref"
+    docker run --rm -v "$WORK:$WORK" "$IMG" "$bin" --write "$WORK/client-ref"
+}
+
+# A native client column: tools/native_targets.sh <target> --std <std> against the reference.
+client_column() {
+    local dir=$1 target=$2 std=$3 ndk=${4:-}
+    env ${ndk:+ANDROID_NDK=$ndk} XOFFSET_MSVC_ROOT="$MSVC_ROOT" WINEDEBUG=-all PATH="$CMAKE_BIN:$PATH" \
+        tools/native_targets.sh "$target" --std "$std" --build "$dir" --ref "$WORK/client-ref" -j "$COL_JOBS"
 }
 
 # Configure, build and CTest one column on the host: <dir> <cxx> <std> <type> <cxxflags> <ldflags>.
@@ -366,6 +437,12 @@ step_matrix() {
         gcc16-c++26d) gcc16_column "$dir" 26 -DXOFFSET_SCHEMA_BACKEND=describe ;;
         p2996-c++20) host_column "$dir" "$P2996_ROOT/bin/clang++" 20 Release "-stdlib=libc++" \
                          "-stdlib=libc++ -Wl,-rpath,$lib" ;;
+        msvc-c++20) client_column "$WORK/c-$s" msvc-x64 20 ;;
+        msvc-c++23) client_column "$WORK/c-$s" msvc-x64 23 ;;
+        clang-cl-c++20) client_column "$WORK/c-$s" clang-cl-x64 20 ;;
+        mingw-c++20) client_column "$WORK/c-$s" mingw-x64 20 ;;
+        ndk29-c++20) client_column "$WORK/c-$s" android-arm64 20 "$NDK_R29" ;;
+        ndk30-c++20) client_column "$WORK/c-$s" android-arm64 20 "$NDK_R30" ;;
         diff-c++20)
             in_gcc "XOFFSET_DIFF_OUT='$dir' XOFFSET_DIFF_BASE_FLAGS='-std=c++26 -freflection' \
                 XOFFSET_DIFF_FLAGS='-std=c++20' XOFFSET_DIFF_SAME_INPUTS=1 \
@@ -404,6 +481,15 @@ detail_of() {
         gcc|asan|tsan) ctest_line "$f" ;;
         diff-c++20) grep -E '^seed [0-9]+:' "$f" | sed 's/^/C++26 vs C++20 /' | paste -sd ';' ;;
         wire-matrix) grep -E '^wire matrix:' "$f" | tail -n 1 ;;
+        msvc-*|clang-cl-*|mingw-*|ndk*)
+            { if grep -qE "tests passed|tests failed" "$WORK/c-$s/native-logs/ctest.log" 2>/dev/null; then
+                  ctest_line "$WORK/c-$s/native-logs/ctest.log"
+                  echo "$(grep -cE 'Test +#[0-9]+: [A-Za-z0-9_]+_noexc[A-Za-z0-9_]* .*Passed' "$WORK/c-$s/native-logs/ctest.log") no-exceptions tests passed"
+              else grep -m1 -E '\*\*failed\*\*' "$WORK/c-$s/NATIVE_RESULT.md" 2>/dev/null | cut -d'|' -f2,3 | sed 's/^ *//'; fi
+              if grep -q '^| corpus diff -r against reference | passed' "$WORK/c-$s/NATIVE_RESULT.md" 2>/dev/null &&
+                 grep -q '^| corpus read (reference wires accepted, same bytes) | passed' "$WORK/c-$s/NATIVE_RESULT.md"; then
+                  echo "corpus read and same bytes as the GCC 16 C++26 build"
+              else echo "corpus check FAILED or not run"; fi; } | paste -sd ';' ;;
         gcc13-*|clang18-*|gcc16-c++*|p2996-c++*)
             { if grep -qE "tests passed|tests failed" "$f"; then ctest_line "$f"
               elif grep -q '^CMake Error' "$f"; then grep -m1 -A1 -E '^CMake Error' "$f" | tail -n 1 | sed 's/^ */configure: /'
@@ -451,6 +537,28 @@ for s in $CLASSIC_STEPS; do
     if (( rc != 0 && FAIL_FAST )); then stopped=1; break; fi
 done
 
+# client-c++20: one C++20 client column runs on every PR (the rule), so a client compiler
+# never regresses unseen. A selected C++20 client column satisfies it; otherwise the first
+# one the host can run is added; none at all fails the run.
+CLIENT_RULE="" CLIENT_PICK=""
+if [[ $STEPS == *" client-c++20 "* ]] && (( ! stopped )); then
+    STEPS=${STEPS// client-c++20 / }
+    for c in $CLIENT_CXX20_ORDER; do [[ $STEPS == *" $c "* ]] && { CLIENT_PICK=$c; CLIENT_RULE="met by $c (selected)"; break; }; done
+    if [[ -z $CLIENT_RULE ]]; then
+        whys=()
+        for c in $CLIENT_CXX20_ORDER; do
+            why=$(matrix_blocker "$c")
+            if [[ -z $why ]]; then STEPS="$STEPS$c "; CLIENT_PICK=$c; CLIENT_RULE="met by $c"; break; fi
+            whys+=("$c: $why")
+        done
+        if [[ -z $CLIENT_RULE ]]; then
+            CLIENT_RULE="no C++20 client column can run here ($(IFS=';'; echo "${whys[*]}"))"
+            overall=1
+        fi
+    fi
+    log "client-c++20: $CLIENT_RULE"
+fi
+
 # The matrix columns, in parallel: at most COLUMNS at a time, results in canonical order.
 cols=()
 for s in $MATRIX_STEPS; do
@@ -464,6 +572,25 @@ for s in $MATRIX_STEPS; do
     else
         cols+=("$s")
     fi
+done
+# The client columns' reference corpus, once, before they start.
+for s in "${cols[@]}"; do
+    case $s in msvc-*|clang-cl-*|mingw-*|ndk*) ;; *) continue ;; esac
+    log "client reference corpus: start"
+    if ! client_reference > "$WORK/logs/client-reference.log" 2>&1; then
+        log "client reference corpus: FAILED (logs/client-reference.log)"
+        keep=()
+        for c in "${cols[@]}"; do
+            case $c in
+                msvc-*|clang-cl-*|mingw-*|ndk*)
+                    printf '%s\tFAIL\t0\t%s\n' "$c" "the reference corpus could not be written (logs/client-reference.log)" > "$WORK/col-$c.tsv"
+                    overall=1 ;;
+                *) keep+=("$c") ;;
+            esac
+        done
+        cols=(${keep[@]+"${keep[@]}"})
+    fi
+    break
 done
 if (( ${#cols[@]} )); then
     (( COLUMNS > 0 )) || COLUMNS=$(( ${#cols[@]} < 4 ? ${#cols[@]} : 4 ))
@@ -500,6 +627,14 @@ for s in $MATRIX_STEPS; do
         record "$s" "$rc" "$mins"
     fi
 done
+# The rule holds when the column that meets it ran and passed.
+if [[ -n $CLIENT_RULE ]]; then
+    res=FAIL
+    [[ -n $CLIENT_PICK ]] && [[ $(awk -F'\t' -v s="$CLIENT_PICK" '$1 == s { print $2 }' "$RESULTS") == pass ]] && res=pass
+    [[ $res == FAIL && -n $CLIENT_PICK ]] && CLIENT_RULE="$CLIENT_RULE, which did not pass"
+    [[ $res == FAIL ]] && overall=1
+    printf 'client-c++20\t%s\t0\t%s\n' "$res" "$CLIENT_RULE" >> "$RESULTS"
+fi
 
 {
     echo "### Local validation (tools/local_validate.sh)"
