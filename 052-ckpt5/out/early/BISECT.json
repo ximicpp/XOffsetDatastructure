@@ -1,0 +1,79 @@
+{
+ "checkpoint": "2026-10-28-ckpt5-70a07a0",
+ "failed_metrics": {
+  "slg:B": 1.004073090324241,
+  "slg:C": 1.0137922136559547
+ },
+ "points": [
+  {
+   "commit": "9ef5ce75d72a172660a97d9fb4e188da3945f6c6",
+   "label": "anchor",
+   "role": "anchor"
+  },
+  {
+   "commit": "af601ea0372e17333ff8a6d64cce0a409d815f7a",
+   "label": "CKPT5 head (M2 gate pass 10-28 07:53Z): everything from v3.1.0 to CKPT5",
+   "role": "commit"
+  },
+  {
+   "commit": "32ab499d177ce40c3880f607305d31e4c1947354",
+   "label": "#167 S MSVC noinline macro (the range also holds #160 #161 #165 #164 #166 #163, class 0)",
+   "role": "commit"
+  },
+  {
+   "commit": "3a06f38e2a65dbf663a42df135ed1830e1bd644d",
+   "label": "#162 S owner_map_table in explicit __DATA,__bss (effective on Apple) (the range also holds #168 #170, class 0)",
+   "role": "commit"
+  },
+  {
+   "commit": "ed0450094ad52ef34629aeb01918f554318affc6",
+   "label": "#169 S no-exceptions receive string check (exceptions build expected unchanged)",
+   "role": "commit"
+  },
+  {
+   "commit": "ffef6f32f134a58785a1811cfd2052fc4a4e0bbf",
+   "label": "#172 S comments and evolution path markers only (the range also holds #173 #174 #175 #171, class 0)",
+   "role": "commit"
+  },
+  {
+   "commit": "1108193d372e73acdcc5883fa7aa889fc6ecc003",
+   "label": "#177 S portable schema: plain char keys / enum rejected at compile time (the range also holds #176, class 0; the last range is #179, docs)",
+   "role": "commit"
+  },
+  {
+   "commit": "70a07a059cd82417bb0bb0a69ca9dea91c3b21ff",
+   "label": "head",
+   "role": "head"
+  }
+ ],
+ "steps": [
+  {
+   "step": null,
+   "dir": null,
+   "point": "3a06f38e2a65dbf663a42df135ed1830e1bd644d",
+   "label": "#162 S owner_map_table in explicit __DATA,__bss (effective on Apple) (the range also holds #168 #170, class 0)",
+   "build": "3a06f38e2a65dbf663a42df135ed1830e1bd644d",
+   "waiting": [
+    "build 3a06f38e2a65dbf663a42df135ed1830e1bd644d, then bisect-supply /Volumes/XOffsetCS/perf-gate/runs/2026-10-28-ckpt5-70a07a0 3a06f38e2a65dbf663a42df135ed1830e1bd644d SC WIRE SLG"
+   ]
+  }
+ ],
+ "range": {
+  "lo": "9ef5ce75d72a172660a97d9fb4e188da3945f6c6",
+  "hi": "70a07a059cd82417bb0bb0a69ca9dea91c3b21ff",
+  "lo_label": "anchor",
+  "hi_label": "head"
+ },
+ "status": "build",
+ "rules": {
+  "rule": "merge rules v2 (\u6027\u80fd\u4f18\u5316 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze the binaries of every first-parent commit between them are built and stored (--bisect), so a failing checkpoint is bisected in the same session",
+  "points": "anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are identical collapse into the earliest one (a point identical to the anchor or the head takes its value without timing)",
+  "step": "the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> (head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch and/or one SLG group, under the same start, environment and replacement rules",
+  "decision": "failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]",
+  "spread": "a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges",
+  "deferred": "\u6027\u80fd\u4f18\u5316 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head still give its value without timing, so a build costs no timed step",
+  "max_steps": 3,
+  "result": "hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported",
+  "non_monotone": "\u6027\u80fd\u4f18\u5316 2026-10-26 19:31Z (INT2: D5 regressed B, P4 recovered B and added C; f followed C and named P4): a step is non-monotone when a failed metric has its own m/r above 1.5 or below -0.5, or when the failed metrics fall on both sides of 0.5 and their m/r differ by 1 or more. The bisection still follows f, but a bisection with a non-monotone step names no single culprit: status non_monotone, every failed metric with its own side at the first such step, and the point f ends at; \u6027\u80fd\u4f18\u5316 decides"
+ }
+}

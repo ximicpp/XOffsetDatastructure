@@ -1,0 +1,34 @@
+{
+ "schema": "xoffset-mac-formal-ref-v1",
+ "name": "R3V3-formal-mac-v1",
+ "replaces": "R3-formal-mac-v1 (r3 df876f6c; deleted by the Mac cleanup on 2026-10-28; the old r3 series ends at INT4/CKPT3, not comparable)",
+ "candidate": "r3v3 = v3.0.0 e383aef51d6983a753d86f6840308c01c45b5a2e (release tag), meta-r3 harness, formal build flags",
+ "binaries": {
+  "xoffset_cand": "328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9",
+  "cista": "1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c",
+  "flatbuffers": "51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7",
+  "capnproto": "e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc",
+  "cereal": "4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f"
+ },
+ "input_wires": {
+  "xoffset_cand": "2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4",
+  "cista": "1d54344941e86b63bd3525b694971a0593a009d022052f440c89db20c2d9b84a",
+  "flatbuffers": "d53fb8e89a71eef77efd47f680c1c37bd0e187a5bb93fc2243eb7fa59a05987f",
+  "capnproto": "cc27816e0af6bc816624fa50840117bd5cf79071ab44e2e2ad84d2158420167b",
+  "cereal": "aba30c823a57f80470a928cfd15c94d6103ec1f7226ebb6f5868bfd5281cedfb"
+ },
+ "rival_origin": {
+  "cista": "rebuilt from meta-r3 (binary differs from R3, wire identical to R3)",
+  "flatbuffers": "rebuilt from meta-r3 (binary differs from R3, wire identical to R3)",
+  "capnproto": "rebuilt from meta-r3 (binary differs from R3, wire identical to R3)",
+  "cereal": "rebuilt from meta-r3 (binary differs from R3, wire identical to R3)"
+ },
+ "r3h_cmakelists_sha256": "bf762507a29dc95d4035f897f3c0439b6a598a316406a563e112dc72d22ce559",
+ "sc_flags_psha": "22cf427d",
+ "toolchain": "/Volumes/XOffsetCS/toolchain/p2996-d77eff1",
+ "sdk": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
+ "canonical": "/Volumes/XOffsetCS/mac-validation/runs/w9a-functional-normal/prepared/M/input.canonical.bin",
+ "canonical_sha256": "36f19927b3b728414212d2fb3004e221bb074e44228687f7a6405a142ea89209",
+ "built_utc": "2026-10-28T07:00:48+00:00",
+ "built_by": "run_ckpt4.sh step 3c"
+}

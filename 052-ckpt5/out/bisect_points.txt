@@ -1,0 +1,6 @@
+af601ea0372e17333ff8a6d64cce0a409d815f7a|CKPT5 head (M2 gate pass 10-28 07:53Z): everything from v3.1.0 to CKPT5
+32ab499d177ce40c3880f607305d31e4c1947354|#167 S MSVC noinline macro (the range also holds #160 #161 #165 #164 #166 #163, class 0)
+3a06f38e2a65dbf663a42df135ed1830e1bd644d|#162 S owner_map_table in explicit __DATA,__bss (effective on Apple) (the range also holds #168 #170, class 0)
+ed0450094ad52ef34629aeb01918f554318affc6|#169 S no-exceptions receive string check (exceptions build expected unchanged)
+ffef6f32f134a58785a1811cfd2052fc4a4e0bbf|#172 S comments and evolution path markers only (the range also holds #173 #174 #175 #171, class 0)
+1108193d372e73acdcc5883fa7aa889fc6ecc003|#177 S portable schema: plain char keys / enum rejected at compile time (the range also holds #176, class 0; the last range is #179, docs)
