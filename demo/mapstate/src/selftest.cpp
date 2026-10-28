@@ -456,7 +456,7 @@ std::string frame_case(Expect& ex, const char* what, net::FrameHeader h, bool no
     try {
         if (nonblocking) {
             std::optional<net::Frame> f;
-            for (int i = 0; i < 100 && !f; ++i) f = rx.try_recv(allowed);
+            for (int i = 0; i < 100 && !f; ++i) f = rx.recv_nowait(allowed);
         } else {
             (void)rx.recv(allowed);
         }
@@ -737,7 +737,7 @@ void test_net_two_process() {
                 pollfd p{int(c.fd()), short(POLLIN | (c.want_write() ? POLLOUT : 0)), 0};
                 ::poll(&p, 1, 5000);
                 if (c.want_write()) c.flush();
-                f = c.try_recv({net::MsgType::StepRes});
+                f = c.recv_nowait({net::MsgType::StepRes});
             }
             ex(f->correlation == t + 1, "StepRes correlation is not tick + 1");
             XB next = XB::load_verified<UnitStateBatch>(f->payload, cap_batch());

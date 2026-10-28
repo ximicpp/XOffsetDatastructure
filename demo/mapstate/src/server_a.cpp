@@ -39,6 +39,7 @@
 #include <exception>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -502,7 +503,7 @@ void ServerA::on_client_readable(Client& c) {
     for (;;) {
         std::optional<net::Frame> f;
         try {
-            f = c.conn.try_recv({MsgType::Hello, MsgType::ViewReq});
+            f = c.conn.recv_nowait({MsgType::Hello, MsgType::ViewReq});
         } catch (const net::PeerClosed&) {
             std::fprintf(stderr, "a: client %" PRIu64 " disconnected\n", c.id);
             c.conn.close();
@@ -643,7 +644,7 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     double compress_us = -1;
     if (enc == codec::Encoding::Zstd) {
         sw.restart();
-        zstd_.compress(xwire, wire);
+        if (Status z = zstd_.compress(xwire, wire); !z) throw std::runtime_error(z.error().message);
         compress_us = sw.us();
         rec_.add("a.snap_compress_us", compress_us);
     }
@@ -900,7 +901,7 @@ int ServerA::run() {
             if (fds[1].writable) b_.flush();
             if (fds[1].readable) {
                 for (;;) {
-                    std::optional<net::Frame> f = b_.try_recv({MsgType::StepRes, MsgType::Error});
+                    std::optional<net::Frame> f = b_.recv_nowait({MsgType::StepRes, MsgType::Error});
                     if (!f) break;
                     on_step_result(std::move(*f));
                 }

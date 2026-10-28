@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
+#include <iterator>
 #include <span>
 #include <thread>
 #include <utility>
@@ -26,65 +26,76 @@ const char* usage_text() {
            "       mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]\n";
 }
 
-static long parse_long(std::string_view flag, const char* text, long lo, long hi) {
+static Error bad_value(std::string_view flag, const char* text) {
+    return Error{std::string(flag) + ": bad value '" + text + "'"};
+}
+
+static std::optional<long> parse_long(const char* text, long lo, long hi) {
     char* end = nullptr;
     errno = 0;
     long v = std::strtol(text, &end, 10);
-    if (errno != 0 || end == text || *end != '\0' || v < lo || v > hi)
-        throw UsageError(std::string(flag) + ": bad value '" + text + "'");
+    if (errno != 0 || end == text || *end != '\0' || v < lo || v > hi) return std::nullopt;
     return v;
 }
 
-Options parse_options(int argc, char** argv) {
+Result<Options> parse_options(int argc, char** argv) {
+    static constexpr std::string_view kWithValue[] = {"--host",     "--port",     "--csv-dir",      "--replay",
+                                                      "--encoding", "--buffers", "--screenshot-at"};
     Options o;
     for (int i = 1; i < argc; ++i) {
         std::string_view a = argv[i];
-        auto value = [&]() -> const char* {
-            if (i + 1 >= argc) throw UsageError(std::string(a) + " needs a value");
-            return argv[++i];
-        };
-        if (a == "--host") o.host = value();
-        else if (a == "--port") o.port = static_cast<std::uint16_t>(parse_long(a, value(), 1, 65535));
+        const char* v = nullptr;
+        if (std::find(std::begin(kWithValue), std::end(kWithValue), a) != std::end(kWithValue)) {
+            if (i + 1 >= argc) return Error{std::string(a) + " needs a value"};
+            v = argv[++i];
+        }
+        if (a == "--host") o.host = v;
+        else if (a == "--port") {
+            const auto port = parse_long(v, 1, 65535);
+            if (!port) return bad_value(a, v);
+            o.port = static_cast<std::uint16_t>(*port);
+        }
         else if (a == "--headless") o.headless = true;
         else if (a == "--check") o.check = true;
         else if (a == "--no-check") o.check = false;
-        else if (a == "--csv-dir") o.csv_dir = value();
+        else if (a == "--csv-dir") o.csv_dir = v;
         else if (a == "--auto-drag") o.auto_drag = true;
         else if (a == "--evil") o.evil = true;
         else if (a == "--self-check") o.self_check = true;
-        else if (a == "--replay") o.replay_dir = value();
+        else if (a == "--replay") o.replay_dir = v;
         else if (a == "--encoding") {
-            const char* t = value();
-            if (std::string_view(t) == "cycle") {
+            if (std::string_view(v) == "cycle") {
                 o.cycle_encodings = true;
             } else {
-                const auto e = codec::parse_encoding(t);
-                if (!e) throw UsageError(std::string(a) + ": bad value '" + t + "'");
+                const auto e = codec::parse_encoding(v);
+                if (!e) return bad_value(a, v);
                 o.encoding = *e;
                 o.cycle_encodings = false;
             }
         }
         else if (a == "--buffers") {
-            const char* t = value();
-            const auto m = parse_buffer_mode(t);
-            if (!m) throw UsageError(std::string(a) + ": bad value '" + t + "'");
+            const auto m = parse_buffer_mode(v);
+            if (!m) return bad_value(a, v);
             o.buffers = *m;
         }
         else if (a == "--screenshot-at") {
-            std::string list = value();
+            std::string list = v;
             std::size_t start = 0;
             while (start <= list.size()) {
                 std::size_t comma = list.find(',', start);
                 std::string item = list.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
-                o.screenshot_at.push_back(static_cast<int>(parse_long(a, item.c_str(), 0, 10000000)));
+                const auto frame = parse_long(item.c_str(), 0, 10000000);
+                if (!frame) return bad_value(a, item.c_str());
+                o.screenshot_at.push_back(static_cast<int>(*frame));
                 if (comma == std::string::npos) break;
                 start = comma + 1;
             }
             std::sort(o.screenshot_at.begin(), o.screenshot_at.end());
         } else if (a == "--help" || a == "-h") {
-            throw UsageError("help");
+            o.help = true;
+            return o;
         } else {
-            throw UsageError("unknown option " + std::string(a));
+            return Error{"unknown option " + std::string(a)};
         }
     }
     return o;
@@ -99,22 +110,30 @@ double SnapshotHolder::replace(XBuffer&& next) {
     return destroy_us;
 }
 
-void SnapshotHolder::reload(const std::string& wire) {
+Status SnapshotHolder::reload(const std::string& wire) {
     root_ = nullptr;
-    if (buf_) buf_->reload_verified<ViewSnapshot>(wire);
-    else buf_.emplace(XBuffer::load_verified<ViewSnapshot>(wire, cap_snapshot()));
+    if (buf_) {
+        XStatus reloaded = buf_->try_reload_verified<ViewSnapshot>(wire);
+        if (!reloaded) return xoffset_error(reloaded.error());
+    } else {
+        XResult<XBuffer> loaded = XBuffer::try_load_verified<ViewSnapshot>(wire, cap_snapshot());
+        if (!loaded) return xoffset_error(loaded.error());
+        buf_.emplace(std::move(*loaded));
+    }
     root_ = &buf_->root<ViewSnapshot>();
+    return {};
 }
 
-double SnapshotHolder::install(const std::string& wire, BufferMode mode, double* destroy_us) {
+Result<double> SnapshotHolder::install(const std::string& wire, BufferMode mode, double* destroy_us) {
     metrics::Stopwatch sw;
     if (mode == BufferMode::Reuse) {
-        reload(wire);
+        MAPDEMO_TRY(reload(wire));
         return sw.us();
     }
-    XBuffer next = XBuffer::load_verified<ViewSnapshot>(wire, cap_snapshot());
+    XResult<XBuffer> next = XBuffer::try_load_verified<ViewSnapshot>(wire, cap_snapshot());
+    if (!next) return xoffset_error(next.error());
     const double load_us = sw.us();
-    const double d = replace(std::move(next));
+    const double d = replace(std::move(*next));
     if (destroy_us != nullptr) *destroy_us = d;
     return load_us;
 }
@@ -230,16 +249,15 @@ std::string join_path(const std::string& dir, const char* file) {
 // forwarder (docker -p, a VM's or an emulator's) can accept the connection
 // before A listens and then close it, so a close before any answer is retried
 // like a refused connect, for up to 5 s.
-static net::Frame connect_hello(net::Conn& c, const Options& opt) {
+static Result<net::Frame> connect_hello(net::Conn& c, const Options& opt) {
     const std::uint64_t give_up = net::now_ns() + 5000000000ull;
     for (;;) {
-        c = net::Conn::connect(opt.host, opt.port);
-        try {
-            c.send(net::MsgType::Hello, 0, net::hello_payload());
-            return c.recv({net::MsgType::HelloOk, net::MsgType::Error});
-        } catch (const net::PeerClosed&) {
-            if (net::now_ns() >= give_up) throw;
-        }
+        Result<net::Conn> opened = net::Conn::try_connect(opt.host, opt.port);
+        if (!opened) return std::move(opened).error();
+        c = std::move(*opened);
+        MAPDEMO_TRY(c.try_send(net::MsgType::Hello, 0, net::hello_payload()));
+        Result<net::Frame> answer = c.try_recv({net::MsgType::HelloOk, net::MsgType::Error});
+        if (answer || !answer.error().peer_closed || net::now_ns() >= give_up) return answer;
         c.close();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -249,18 +267,20 @@ Session::Session(const Options& options) : opt_(options) {}
 
 Session::~Session() = default;
 
-void Session::connect() {
-    net::Frame ok = connect_hello(conn_, opt_);
-    if (ok.type == net::MsgType::Error)
-        throw net::ProtocolError("A refused the handshake: " + ok.payload);
+Status Session::connect() {
+    Result<net::Frame> ok = connect_hello(conn_, opt_);
+    if (!ok) return std::move(ok).error();
+    if (ok->type == net::MsgType::Error) return Error{"A refused the handshake: " + ok->payload};
     checks_.pass("handshake");
 
-    net::Frame cat = conn_.recv({net::MsgType::Catalog, net::MsgType::Error});
-    if (cat.type == net::MsgType::Error) throw net::ProtocolError("A sent Error instead of Catalog: " + cat.payload);
+    Result<net::Frame> cat = conn_.try_recv({net::MsgType::Catalog, net::MsgType::Error});
+    if (!cat) return std::move(cat).error();
+    if (cat->type == net::MsgType::Error) return Error{"A sent Error instead of Catalog: " + cat->payload};
     metrics::Stopwatch sw;
-    XBuffer buf = XBuffer::load_verified<MapCatalog>(cat.payload, cap_catalog());
+    XResult<XBuffer> buf = XBuffer::try_load_verified<MapCatalog>(cat->payload, cap_catalog());
+    if (!buf) return xoffset_error(buf.error());
     rec_.add("c.catalog_load_us", sw.us());
-    catalog_.emplace(std::move(buf));
+    catalog_.emplace(std::move(*buf));
     catalog_root_ = &catalog_->root<MapCatalog>();
 
     // Catalog content (structure is already verified; these are business checks).
@@ -281,19 +301,20 @@ void Session::connect() {
     if (why.empty()) {
         scene_ = c.scenes[0].bounds;
         checks_.pass("catalog");
-        checks_.note("catalog", "scenes=1 sites=" + std::to_string(c.sites.size()) + " wire_bytes=" + std::to_string(cat.payload.size()));
+        checks_.note("catalog", "scenes=1 sites=" + std::to_string(c.sites.size()) + " wire_bytes=" + std::to_string(cat->payload.size()));
     } else {
         checks_.fail("catalog", why);
     }
 
-    conn_.set_nonblocking(true);
+    MAPDEMO_TRY(conn_.try_set_nonblocking(true));
     if (!opt_.csv_dir.empty()) {
         snap_csv_open_ = snap_csv_.open(join_path(opt_.csv_dir, "client_snapshots.csv"), kSnapshotCsvHeader);
-        if (!snap_csv_open_) throw std::runtime_error("cannot write client_snapshots.csv in " + opt_.csv_dir);
+        if (!snap_csv_open_) return Error{"cannot write client_snapshots.csv in " + opt_.csv_dir};
     }
+    return {};
 }
 
-void Session::send_view(const Rect& rect, net::ViewCategory category) {
+Status Session::send_view(const Rect& rect, net::ViewCategory category) {
     const bool reuse = opt_.buffers == BufferMode::Reuse;
     std::optional<XBuffer> fresh;
     std::optional<XBuffer>& req = reuse ? req_buf_ : fresh;
@@ -317,29 +338,35 @@ void Session::send_view(const Rect& rect, net::ViewCategory category) {
     sent_rect_ = rect;
     inflight_ = true;
     sent_ns_ = net::now_ns();
-    conn_.enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire), codec::view_flags(category, sent_encoding_));
-    conn_.flush();
+    MAPDEMO_TRY(conn_.try_enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire),
+                                  codec::view_flags(category, sent_encoding_)));
+    MAPDEMO_TRY(conn_.try_flush());
+    return {};
 }
 
-void Session::pump(int timeout_ms) {
+Status Session::pump(int timeout_ms) {
     net::PollItem p;
     p.fd = conn_.fd();
     p.want_read = true;
     p.want_write = conn_.want_write();
-    if (net::poll(&p, 1, std::max(timeout_ms, 0)) <= 0) return;
-    if (conn_.want_write()) conn_.flush();
-    if (!p.readable) return;
+    Result<int> ready = net::try_poll(&p, 1, std::max(timeout_ms, 0));
+    if (!ready) return std::move(ready).error();
+    if (*ready <= 0) return {};
+    if (conn_.want_write()) MAPDEMO_TRY(conn_.try_flush());
+    if (!p.readable) return {};
     while (!bye_) {
-        std::optional<net::Frame> f =
-            conn_.try_recv({net::MsgType::ViewSnapshot, net::MsgType::Bye, net::MsgType::Error});
+        Result<std::optional<net::Frame>> got =
+            conn_.try_recv_nowait({net::MsgType::ViewSnapshot, net::MsgType::Bye, net::MsgType::Error});
+        if (!got) return std::move(got).error();
+        std::optional<net::Frame>& f = *got;
         if (!f) break;
         if (f->type == net::MsgType::Bye) {
             bye_ = true;
         } else if (f->type == net::MsgType::Error) {
-            throw net::ProtocolError("A rejected a view request: " + f->payload);
+            return Error{"A rejected a view request: " + f->payload};
         } else {
             double rtt = double(net::now_ns() - sent_ns_) / 1000.0;
-            if (!inflight_) throw net::ProtocolError("ViewSnapshot without an outstanding request");
+            if (!inflight_) return Error{"ViewSnapshot without an outstanding request"};
             if (f->correlation != sent_request_id_ || f->flags != codec::view_flags(sent_category_, sent_encoding_)) {
                 checks_.fail("correlation", "frame corr " + std::to_string(f->correlation) + " flags " +
                                                 std::to_string(f->flags) + " for request " + std::to_string(sent_request_id_));
@@ -353,9 +380,10 @@ void Session::pump(int timeout_ms) {
             pending_.emplace(Pending{std::move(*f), rtt, sent_category_, sent_encoding_, sent_rect_});
         }
     }
+    return {};
 }
 
-bool Session::install_pending() {
+Result<bool> Session::install_pending() {
     if (!pending_) return false;
     Pending p = std::move(*pending_);
     pending_.reset();
@@ -367,12 +395,14 @@ bool Session::install_pending() {
     const std::string* wire = &p.frame.payload;
     if (p.encoding == codec::Encoding::Zstd) {
         metrics::Stopwatch zw;
-        unzstd_.decompress(p.frame.payload, kCapSnapshot, plain_);
+        MAPDEMO_TRY(unzstd_.decompress(p.frame.payload, kCapSnapshot, plain_));
         decompress_us = zw.us();
         wire = &plain_;
     }
     double destroy_us = -1;   // reuse: nothing is destroyed per snapshot
-    const double load_us = holder_.install(*wire, opt_.buffers, &destroy_us);
+    Result<double> loaded = holder_.install(*wire, opt_.buffers, &destroy_us);
+    if (!loaded) return std::move(loaded).error();
+    const double load_us = *loaded;
     if (cur_.live) retire_current(destroy_us);
 
     rec_.add("c.load_us", load_us);
@@ -493,7 +523,7 @@ void Session::retire_current(double destroy_us) {
     cur_.live = false;
 }
 
-bool Session::finish() {
+Result<bool> Session::finish() {
     if (cur_.live) {
         const double destroy_us = holder_.clear();
         retire_current(opt_.buffers == BufferMode::Reuse ? -1.0 : destroy_us);
@@ -511,9 +541,9 @@ bool Session::finish() {
     bool ok = checks_.all_ok();
     if (!opt_.csv_dir.empty()) {
         if (!rec_.write_csv(join_path(opt_.csv_dir, "client_metrics.csv")))
-            throw std::runtime_error("cannot write client_metrics.csv in " + opt_.csv_dir);
+            return Error{"cannot write client_metrics.csv in " + opt_.csv_dir};
         if (!checks_.write_csv(join_path(opt_.csv_dir, "client_checks.csv")))
-            throw std::runtime_error("cannot write client_checks.csv in " + opt_.csv_dir);
+            return Error{"cannot write client_checks.csv in " + opt_.csv_dir};
     }
     return ok;
 }
@@ -537,9 +567,9 @@ static Rect route_rect(std::uint64_t k, const Rect& scene) {
     return clamp_view(r, scene);
 }
 
-int run_headless(const Options& opt) {
+Result<int> run_headless(const Options& opt) {
     Session s(opt);
-    s.connect();
+    MAPDEMO_TRY(s.connect());
     std::fprintf(stdout, "client: connected to %s:%u, catalog %u sites, sampling at %.0f Hz (8 normal / 1 full / 1 empty), "
                          "encoding %s\n",
                  opt.host.c_str(), unsigned(opt.port), unsigned(s.catalog().sites.size()), kViewRequestHz,
@@ -558,9 +588,11 @@ int run_headless(const Options& opt) {
         std::uint64_t now = net::now_ns();
         int timeout_ms = 100;
         if (s.can_request()) timeout_ms = now >= next_due ? 0 : int((next_due - now) / 1000000) + 1;
-        s.pump(timeout_ms);
+        MAPDEMO_TRY(s.pump(timeout_ms));
 
-        if (s.install_pending()) {
+        Result<bool> installed = s.install_pending();
+        if (!installed) return std::move(installed).error();
+        if (*installed) {
             const Rect cam = s.holder_request_rect();
             metrics::Stopwatch sw;
             build_draw_items(s.holder().view(), cam, items);
@@ -582,7 +614,7 @@ int run_headless(const Options& opt) {
                    : cat == net::ViewCategory::FullScene ? s.scene()
                                                           : empty_probe_rect();
             ++per_cat[static_cast<int>(cat)];
-            s.send_view(r, cat);
+            MAPDEMO_TRY(s.send_view(r, cat));
             next_due += period_ns;
             if (next_due < now) next_due = now + period_ns;   // behind: do not burst
         }
@@ -609,12 +641,13 @@ int run_headless(const Options& opt) {
             s.checks().fail("categories_sampled", detail);
         }
     }
-    bool ok = s.finish();
+    Result<bool> ok = s.finish();
+    if (!ok) return std::move(ok).error();
     s.recorder().print_line(stdout, {"c.view_rtt_us", "c.load_us", "c.decompress_us", "c.read_present_us",
                                      "c.destroy_us", "c.snap_bytes", "c.snap_net_bytes", "c.visible_count"});
     s.checks().print(stdout);
     std::fprintf(stdout, "client: Bye received after %" PRIu64 " snapshots (%" PRIu64 ")\n", s.snapshots(), sink % 2);
-    return ok ? 0 : 1;
+    return *ok ? 0 : 1;
 }
 
 // ---- --evil probe -------------------------------------------------------------
@@ -629,38 +662,43 @@ struct Awaited {
     std::string detail;
 };
 
+// A frame, or Closed with the error that ended the connection, or Timeout.
 Awaited await_frame(net::Conn& c, int timeout_ms) {
     Awaited a;
     std::uint64_t deadline = net::now_ns() + std::uint64_t(timeout_ms) * 1000000ull;
-    try {
-        c.set_nonblocking(true);
+    Status read = [&]() -> Status {
+        MAPDEMO_TRY(c.try_set_nonblocking(true));
         for (;;) {
-            if (c.want_write()) c.flush();
-            std::optional<net::Frame> f = c.try_recv(
+            if (c.want_write()) MAPDEMO_TRY(c.try_flush());
+            Result<std::optional<net::Frame>> f = c.try_recv_nowait(
                 {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloOk});
-            if (f) {
+            if (!f) return std::move(f).error();
+            if (*f) {
                 a.outcome = Outcome::Frame;
-                a.frame = std::move(*f);
-                return a;
+                a.frame = std::move(**f);
+                return {};
             }
             std::uint64_t now = net::now_ns();
-            if (now >= deadline) return a;
+            if (now >= deadline) return {};
             net::PollItem p;
             p.fd = c.fd();
             p.want_read = true;
-            net::poll(&p, 1, int((deadline - now) / 1000000) + 1);
+            MAPDEMO_TRY(net::try_poll(&p, 1, int((deadline - now) / 1000000) + 1));
         }
-    } catch (const std::exception& e) {
+    }();
+    if (!read) {
         a.outcome = Outcome::Closed;
-        a.detail = e.what();
+        a.detail = read.error().message;
     }
     return a;
 }
 
-void handshake(net::Conn& c, const Options& opt) {
-    net::Frame ok = connect_hello(c, opt);
-    if (ok.type != net::MsgType::HelloOk) throw net::ProtocolError("handshake refused: " + ok.payload);
-    (void)c.recv({net::MsgType::Catalog});
+Status handshake(net::Conn& c, const Options& opt) {
+    Result<net::Frame> ok = connect_hello(c, opt);
+    if (!ok) return std::move(ok).error();
+    if (ok->type != net::MsgType::HelloOk) return Error{"handshake refused: " + ok->payload};
+    MAPDEMO_TRY(c.try_recv({net::MsgType::Catalog}));
+    return {};
 }
 
 std::string view_request_wire(std::uint64_t id, const Rect& r) {
@@ -700,7 +738,7 @@ bool expect_rejected(CheckLog& log, const char* name, const char* what, net::Con
 
 } // namespace
 
-int run_evil(const Options& opt) {
+Result<int> run_evil(const Options& opt) {
     CheckLog log;
     metrics::Recorder rec("c");
     std::string snap_row;
@@ -708,27 +746,27 @@ int run_evil(const Options& opt) {
 
     {   // (1) truncated ViewRequest wire
         net::Conn c;
-        handshake(c, opt);
+        MAPDEMO_TRY(handshake(c, opt));
         std::string wire = view_request_wire(1, normal);
         wire.pop_back();
-        c.send(net::MsgType::ViewReq, 1, wire, static_cast<std::uint16_t>(net::ViewCategory::Normal));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 1, wire, static_cast<std::uint16_t>(net::ViewCategory::Normal)));
         expect_rejected(log, "evil_truncated", "truncated ViewRequest wire (-1 byte)", c);
     }
     {   // (2) wrong schema: a ViewSnapshot wire sent as ViewReq
         net::Conn c;
-        handshake(c, opt);
+        MAPDEMO_TRY(handshake(c, opt));
         XBuffer snap = XBuffer::create<ViewSnapshot>(512, cap_snapshot());
         ViewSnapshot& v = snap.root<ViewSnapshot>();
         v.request_id = 2;
         v.scene_id = kSceneId;
         v.rect = normal;
         std::string wire = snap.save_verified<ViewSnapshot>();
-        c.send(net::MsgType::ViewReq, 2, wire, static_cast<std::uint16_t>(net::ViewCategory::Normal));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 2, wire, static_cast<std::uint16_t>(net::ViewCategory::Normal)));
         expect_rejected(log, "evil_wrong_schema", "ViewSnapshot wire sent as ViewReq", c);
     }
     {   // (3) header declaring a 1 GiB ViewReq payload, no payload follows
         net::Conn c;
-        handshake(c, opt);
+        MAPDEMO_TRY(handshake(c, opt));
         net::FrameHeader h{};
         h.magic = net::kMagic;
         h.type = static_cast<std::uint16_t>(net::MsgType::ViewReq);
@@ -736,65 +774,70 @@ int run_evil(const Options& opt) {
         h.length = std::uint32_t(1) << 30;
         h.reserved = 0;
         h.correlation = 3;
-        c.send_raw(std::string_view(reinterpret_cast<const char*>(&h), sizeof h));
+        MAPDEMO_TRY(c.try_send_raw(std::string_view(reinterpret_cast<const char*>(&h), sizeof h)));
         expect_rejected(log, "evil_oversize_header", "header declaring a 1 GiB ViewReq", c);
     }
     {   // (5) an encoding A does not know (3 is reserved)
         net::Conn c;
-        handshake(c, opt);
-        c.send(net::MsgType::ViewReq, 8, view_request_wire(8, normal),
-               static_cast<std::uint16_t>(static_cast<unsigned>(net::ViewCategory::Normal) | (3u << 8)));
+        MAPDEMO_TRY(handshake(c, opt));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 8, view_request_wire(8, normal),
+                               static_cast<std::uint16_t>(static_cast<unsigned>(net::ViewCategory::Normal) | (3u << 8))));
         expect_rejected(log, "evil_unknown_encoding", "ViewReq asking for encoding 3", c);
     }
     {   // (6) a reserved flag bit
         net::Conn c;
-        handshake(c, opt);
-        c.send(net::MsgType::ViewReq, 9, view_request_wire(9, normal),
-               static_cast<std::uint16_t>(codec::view_flags(net::ViewCategory::Normal, codec::Encoding::Compact) | 0x1000u));
+        MAPDEMO_TRY(handshake(c, opt));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 9, view_request_wire(9, normal),
+                               static_cast<std::uint16_t>(codec::view_flags(net::ViewCategory::Normal, codec::Encoding::Compact) | 0x1000u)));
         expect_rejected(log, "evil_reserved_flag", "ViewReq with reserved flag bit 12", c);
     }
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty
         // by the rejected reload and must be refilled by the next one.
         net::Conn c;
-        handshake(c, opt);
-        auto served = [&](std::uint64_t id) -> std::string {
-            c.send(net::MsgType::ViewReq, id, view_request_wire(id, normal), static_cast<std::uint16_t>(net::ViewCategory::Normal));
+        MAPDEMO_TRY(handshake(c, opt));
+        // "" when A answered with a sound snapshot, else what went wrong.
+        auto served = [&](std::uint64_t id) -> Result<std::string> {
+            MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, id, view_request_wire(id, normal),
+                                   static_cast<std::uint16_t>(net::ViewCategory::Normal)));
             Awaited a = await_frame(c, 5000);
-            if (a.outcome != Outcome::Frame) return a.outcome == Outcome::Closed ? "closed: " + a.detail : "no answer within 5 s";
+            if (a.outcome != Outcome::Frame)
+                return std::string(a.outcome == Outcome::Closed ? "closed: " + a.detail : "no answer within 5 s");
             if (a.frame.type != net::MsgType::ViewSnapshot) return std::string("got ") + net::type_name(a.frame.type) + " " + a.frame.payload;
             if (a.frame.correlation != id) return "correlation " + std::to_string(a.frame.correlation);
-            try {
-                XBuffer b = XBuffer::load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
-                checks::Result r = checks::snapshot_sanity(b.root<ViewSnapshot>(), id, normal);
-                return r.ok ? std::string() : r.detail;
-            } catch (const std::exception& e) {
-                return std::string("load_verified: ") + e.what();
-            }
+            XResult<XBuffer> b = XBuffer::try_load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
+            if (!b) return "load_verified: " + b.error().message;
+            checks::Result r = checks::snapshot_sanity(b->root<ViewSnapshot>(), id, normal);
+            return r.ok ? std::string() : r.detail;
         };
-        std::string why = served(5);
-        if (why.empty()) {
+        Result<std::string> why = served(5);
+        if (!why) return std::move(why).error();
+        if (why->empty()) {
             std::string bad = view_request_wire(6, normal);
             bad.pop_back();
-            c.send(net::MsgType::ViewReq, 6, bad, static_cast<std::uint16_t>(net::ViewCategory::Normal));
-            if (!expect_rejected(log, "evil_same_conn_rejected", "same connection: truncated wire", c)) why = "not rejected";
+            MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 6, bad, static_cast<std::uint16_t>(net::ViewCategory::Normal)));
+            if (!expect_rejected(log, "evil_same_conn_rejected", "same connection: truncated wire", c)) *why = "not rejected";
         }
-        if (why.empty()) why = served(7);
+        if (why->empty()) {
+            why = served(7);
+            if (!why) return std::move(why).error();
+        }
         std::fprintf(stdout, "evil: %-40s -> %s\n", "same connection: valid request after it",
-                     why.empty() ? "answered" : why.c_str());
-        if (why.empty()) {
+                     why->empty() ? "answered" : why->c_str());
+        if (why->empty()) {
             log.pass("evil_same_conn_recovers");
             log.note("evil_same_conn_recovers", "requests 5 and 7 answered around rejected 6");
         } else {
-            log.fail("evil_same_conn_recovers", why);
+            log.fail("evil_same_conn_recovers", *why);
         }
     }
     {   // A still serves a normal client. Its snapshot is logged like any other
         // (client_snapshots.csv) so it can be matched with A's a_snapshots.csv.
         net::Conn c;
-        handshake(c, opt);
+        MAPDEMO_TRY(handshake(c, opt));
         const std::uint64_t sent = net::now_ns();
-        c.send(net::MsgType::ViewReq, 4, view_request_wire(4, normal), static_cast<std::uint16_t>(net::ViewCategory::Normal));
+        MAPDEMO_TRY(c.try_send(net::MsgType::ViewReq, 4, view_request_wire(4, normal),
+                               static_cast<std::uint16_t>(net::ViewCategory::Normal)));
         Awaited a = await_frame(c, 5000);
         const double rtt_us = double(net::now_ns() - sent) / 1000.0;
         std::string why;
@@ -802,11 +845,13 @@ int run_evil(const Options& opt) {
         else if (a.frame.type != net::MsgType::ViewSnapshot) why = std::string("got ") + net::type_name(a.frame.type) + " " + a.frame.payload;
         else if (a.frame.correlation != 4) why = "correlation " + std::to_string(a.frame.correlation);
         else {
-            try {
-                metrics::Stopwatch sw;
-                XBuffer b = XBuffer::load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
-                const double load_us = sw.us();
-                const ViewSnapshot& v = b.root<ViewSnapshot>();
+            metrics::Stopwatch sw;
+            XResult<XBuffer> b = XBuffer::try_load_verified<ViewSnapshot>(a.frame.payload, cap_snapshot());
+            const double load_us = sw.us();
+            if (!b) {
+                why = "load_verified: " + b.error().message;
+            } else {
+                const ViewSnapshot& v = b->root<ViewSnapshot>();
                 checks::Result r = checks::snapshot_sanity(v, 4, normal);
                 if (!r.ok) why = r.detail;
                 rec.add("c.view_rtt_us", rtt_us);
@@ -820,8 +865,6 @@ int run_evil(const Options& opt) {
                               a.frame.payload.size(), checks::snapshot_digest(v), rtt_us, load_us, r.ok ? 1 : 0,
                               a.frame.payload.size(), checks::wire_digest(a.frame.payload));
                 snap_row = line;
-            } catch (const std::exception& e) {
-                why = std::string("load_verified: ") + e.what();
             }
         }
         std::fprintf(stdout, "evil: %-40s -> %s\n", "normal request afterwards", why.empty() ? "answered" : why.c_str());
@@ -838,7 +881,7 @@ int run_evil(const Options& opt) {
         if (ok && !snap_row.empty()) snaps.row(snap_row);
         if (!ok || !log.write_csv(join_path(opt.csv_dir, "client_checks.csv")) ||
             !rec.write_csv(join_path(opt.csv_dir, "client_metrics.csv")))
-            throw std::runtime_error("cannot write client CSV files in " + opt.csv_dir);
+            return Error{"cannot write client CSV files in " + opt.csv_dir};
     }
     log.print(stdout);
     return log.all_ok() ? 0 : 1;

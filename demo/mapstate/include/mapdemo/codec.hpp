@@ -6,14 +6,15 @@
 // that way and echoes the flags. Every encoding ends in the same check on
 // the client: the XOffset wire goes through load_verified / reload_verified
 // in full. zstd only carries the bytes; it never replaces validation.
+// Nothing here throws (result.hpp).
 #pragma once
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include "mapdemo/net.hpp"
+#include "mapdemo/result.hpp"
 
 namespace mapdemo::codec {
 
@@ -42,10 +43,6 @@ std::optional<Encoding> parse_encoding(std::string_view text) noexcept;
 // True when built with zstd (MAPDEMO_WITH_ZSTD).
 bool zstd_available() noexcept;
 
-struct DecodeError : std::runtime_error {
-    using std::runtime_error::runtime_error;
-};
-
 // One zstd frame of `wire` into `out` (previous content replaced, capacity
 // kept). The frame header records the content size. One context, reused.
 class Compressor {
@@ -54,8 +51,8 @@ public:
     ~Compressor();
     Compressor(const Compressor&) = delete;
     Compressor& operator=(const Compressor&) = delete;
-    // Throws std::runtime_error when built without zstd or on a zstd error.
-    void compress(std::string_view wire, std::string& out);
+    // An error when built without zstd or on a zstd error.
+    Status compress(std::string_view wire, std::string& out);
 
 private:
     void* ctx_ = nullptr;
@@ -65,14 +62,14 @@ private:
 // is exactly one zstd frame (zstd magic, no skippable frame, no trailing
 // bytes) and declares a content size of at most `cap`. Afterwards the
 // produced length equals that size. `out` then holds the XOffset wire, still
-// unverified. Throws DecodeError (also when built without zstd).
+// unverified. An error otherwise (also when built without zstd).
 class Decompressor {
 public:
     Decompressor();
     ~Decompressor();
     Decompressor(const Decompressor&) = delete;
     Decompressor& operator=(const Decompressor&) = delete;
-    void decompress(std::string_view frame, std::size_t cap, std::string& out);
+    Status decompress(std::string_view frame, std::size_t cap, std::string& out);
 
 private:
     void* ctx_ = nullptr;
@@ -80,7 +77,7 @@ private:
 
 // Malformed-input builders for mapdemo_client --self-check.
 // A zstd frame of `bytes` whose header leaves out the content size.
-std::string zstd_frame_without_size(std::string_view bytes);
+Result<std::string> zstd_frame_without_size(std::string_view bytes);
 // A skippable frame (magic 0x184D2A50) carrying `bytes`; needs no zstd.
 std::string skippable_frame(std::string_view bytes);
 

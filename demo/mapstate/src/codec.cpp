@@ -44,61 +44,63 @@ constexpr int kWindowLogMax = 24;
 
 bool zstd_available() noexcept { return true; }
 
-Compressor::Compressor() : ctx_(ZSTD_createCCtx()) {
-    if (ctx_ == nullptr) throw std::runtime_error("ZSTD_createCCtx failed");
-}
+// A context that could not be created (out of memory) fails its first use.
+Compressor::Compressor() : ctx_(ZSTD_createCCtx()) {}
 
 Compressor::~Compressor() { ZSTD_freeCCtx(static_cast<ZSTD_CCtx*>(ctx_)); }
 
-void Compressor::compress(std::string_view wire, std::string& out) {
+Status Compressor::compress(std::string_view wire, std::string& out) {
+    if (ctx_ == nullptr) return Error{"ZSTD_createCCtx failed"};
     out.resize(ZSTD_compressBound(wire.size()));
     const std::size_t n = ZSTD_compressCCtx(static_cast<ZSTD_CCtx*>(ctx_), out.data(), out.size(), wire.data(),
                                             wire.size(), kLevel);
-    if (ZSTD_isError(n)) throw std::runtime_error(std::string("zstd compress: ") + ZSTD_getErrorName(n));
+    if (ZSTD_isError(n)) return Error{std::string("zstd compress: ") + ZSTD_getErrorName(n)};
     out.resize(n);
+    return {};
 }
 
 Decompressor::Decompressor() : ctx_(ZSTD_createDCtx()) {
-    if (ctx_ == nullptr) throw std::runtime_error("ZSTD_createDCtx failed");
-    ZSTD_DCtx_setParameter(static_cast<ZSTD_DCtx*>(ctx_), ZSTD_d_windowLogMax, kWindowLogMax);
+    if (ctx_ != nullptr) ZSTD_DCtx_setParameter(static_cast<ZSTD_DCtx*>(ctx_), ZSTD_d_windowLogMax, kWindowLogMax);
 }
 
 Decompressor::~Decompressor() { ZSTD_freeDCtx(static_cast<ZSTD_DCtx*>(ctx_)); }
 
-void Decompressor::decompress(std::string_view frame, std::size_t cap, std::string& out) {
+Status Decompressor::decompress(std::string_view frame, std::size_t cap, std::string& out) {
+    if (ctx_ == nullptr) return Error{"ZSTD_createDCtx failed"};
     // 1. A zstd frame (not a skippable one), and only that frame.
     std::uint32_t magic = 0;
-    if (frame.size() < sizeof magic) throw DecodeError("zstd: payload of " + std::to_string(frame.size()) + " bytes");
+    if (frame.size() < sizeof magic) return Error{"zstd: payload of " + std::to_string(frame.size()) + " bytes"};
     std::memcpy(&magic, frame.data(), sizeof magic);
-    if (magic != ZSTD_MAGICNUMBER) throw DecodeError("zstd: not a zstd frame");
+    if (magic != ZSTD_MAGICNUMBER) return Error{"zstd: not a zstd frame"};
     const std::size_t frame_bytes = ZSTD_findFrameCompressedSize(frame.data(), frame.size());
-    if (ZSTD_isError(frame_bytes)) throw DecodeError(std::string("zstd: bad frame: ") + ZSTD_getErrorName(frame_bytes));
+    if (ZSTD_isError(frame_bytes)) return Error{std::string("zstd: bad frame: ") + ZSTD_getErrorName(frame_bytes)};
     if (frame_bytes != frame.size())
-        throw DecodeError("zstd: " + std::to_string(frame.size() - frame_bytes) + " bytes after the frame");
+        return Error{"zstd: " + std::to_string(frame.size() - frame_bytes) + " bytes after the frame"};
     // 2. Declared content size, known and within the cap, before allocating.
     const unsigned long long declared = ZSTD_getFrameContentSize(frame.data(), frame.size());
-    if (declared == ZSTD_CONTENTSIZE_ERROR) throw DecodeError("zstd: bad frame header");
-    if (declared == ZSTD_CONTENTSIZE_UNKNOWN) throw DecodeError("zstd: frame does not declare its content size");
+    if (declared == ZSTD_CONTENTSIZE_ERROR) return Error{"zstd: bad frame header"};
+    if (declared == ZSTD_CONTENTSIZE_UNKNOWN) return Error{"zstd: frame does not declare its content size"};
     if (declared > cap)
-        throw DecodeError("zstd: declared content of " + std::to_string(declared) + " bytes exceeds the cap of " +
-                          std::to_string(cap));
+        return Error{"zstd: declared content of " + std::to_string(declared) + " bytes exceeds the cap of " +
+                     std::to_string(cap)};
     // 3. Exactly the declared bytes.
     out.resize(static_cast<std::size_t>(declared));
     const std::size_t n =
         ZSTD_decompressDCtx(static_cast<ZSTD_DCtx*>(ctx_), out.data(), out.size(), frame.data(), frame.size());
     if (ZSTD_isError(n)) {
         out.clear();
-        throw DecodeError(std::string("zstd: ") + ZSTD_getErrorName(n));
+        return Error{std::string("zstd: ") + ZSTD_getErrorName(n)};
     }
     if (n != declared) {
         out.clear();
-        throw DecodeError("zstd: produced " + std::to_string(n) + " bytes, declared " + std::to_string(declared));
+        return Error{"zstd: produced " + std::to_string(n) + " bytes, declared " + std::to_string(declared)};
     }
+    return {};
 }
 
-std::string zstd_frame_without_size(std::string_view bytes) {
+Result<std::string> zstd_frame_without_size(std::string_view bytes) {
     ZSTD_CCtx* c = ZSTD_createCCtx();
-    if (c == nullptr) throw std::runtime_error("ZSTD_createCCtx failed");
+    if (c == nullptr) return Error{"ZSTD_createCCtx failed"};
     std::string out(ZSTD_compressBound(bytes.size()), '\0');
     ZSTD_CCtx_setParameter(c, ZSTD_c_compressionLevel, kLevel);
     ZSTD_CCtx_setParameter(c, ZSTD_c_contentSizeFlag, 0);
@@ -107,30 +109,28 @@ std::string zstd_frame_without_size(std::string_view bytes) {
     ZSTD_inBuffer i{bytes.data(), bytes.size(), 0};
     const std::size_t rc = ZSTD_compressStream2(c, &o, &i, ZSTD_e_end);
     ZSTD_freeCCtx(c);
-    if (ZSTD_isError(rc) || rc != 0) throw std::runtime_error("zstd stream compress failed");
+    if (ZSTD_isError(rc) || rc != 0) return Error{"zstd stream compress failed"};
     out.resize(o.pos);
     return out;
 }
 
 #else   // built without zstd
 
-std::string zstd_frame_without_size(std::string_view) {
-    throw std::runtime_error("built without zstd (MAPDEMO_WITH_ZSTD=OFF)");
-}
+namespace {
+Error no_zstd() { return Error{"built without zstd (MAPDEMO_WITH_ZSTD=OFF)"}; }
+}   // namespace
+
+Result<std::string> zstd_frame_without_size(std::string_view) { return no_zstd(); }
 
 bool zstd_available() noexcept { return false; }
 
 Compressor::Compressor() = default;
 Compressor::~Compressor() = default;
-void Compressor::compress(std::string_view, std::string&) {
-    throw std::runtime_error("built without zstd (MAPDEMO_WITH_ZSTD=OFF)");
-}
+Status Compressor::compress(std::string_view, std::string&) { return no_zstd(); }
 
 Decompressor::Decompressor() = default;
 Decompressor::~Decompressor() = default;
-void Decompressor::decompress(std::string_view, std::size_t, std::string&) {
-    throw DecodeError("built without zstd (MAPDEMO_WITH_ZSTD=OFF)");
-}
+Status Decompressor::decompress(std::string_view, std::size_t, std::string&) { return no_zstd(); }
 
 #endif
 

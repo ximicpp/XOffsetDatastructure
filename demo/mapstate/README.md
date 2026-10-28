@@ -14,7 +14,10 @@ XOffset paths with real processes and real TCP:
    snapshot buffer**. The client builds as C++20 for Windows (MinGW, MSVC),
    Android and iOS from the same sources, with no game engine; it asks for
    the snapshot dense, compact (`save_compact`) or compact + zstd, and
-   verifies it the same way after decompression.
+   verifies it the same way after decompression. The client code never
+   throws, so the same sources also build without exceptions
+   (`mapdemo_client_noexc`, `-fno-exceptions` / MSVC `/EHs-c-`), as engine
+   clients are usually built.
 
 Every process takes `--buffers reuse|fresh`. `reuse` (the default) keeps one
 buffer per role and refills it in place (`reload_verified`, `reset`,
@@ -117,8 +120,19 @@ cmake -S . -B build/client-msvc -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/to
 cmake -S . -B build/client-clang-cl -G Ninja $COMMON -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/clang-cl-x86_64.cmake
 # Windows, MSVC on Windows (Developer Command Prompt)
 cmake -S . -B build/client-msvc %COMMON%
-cmake --build <dir> --target mapdemo_client
+cmake --build <dir> --target mapdemo_client mapdemo_client_noexc
 ```
+
+Every build also makes `mapdemo_client_noexc`: the same client compiled
+without exceptions (`-fno-exceptions`; MSVC and clang-cl `/EHs-c-
+/D_HAS_EXCEPTIONS=0`). The client reports every failure as a value
+(`include/mapdemo/result.hpp`): the network calls it uses are the
+non-throwing `try_*` forms of `net.hpp`, the codec returns a status, and
+snapshots go through `try_load_verified` / `try_reload_verified`, which run
+the same checks and report the same texts as `load_verified` /
+`reload_verified`. A library failure that cannot be returned (an arena that
+runs out while a request is built) reaches the fatal handler, which prints
+`error:` and exits 2. `-DMAPDEMO_NOEXC_CLIENT=OFF` skips the second client.
 
 zstd 1.5.7 is built from its release tarball, checked by SHA-256; offline,
 pass `-DMAPDEMO_ZSTD_URL=<local zstd-1.5.7.tar.gz>`. `-DMAPDEMO_WITH_ZSTD=OFF`
@@ -200,7 +214,11 @@ client and `--encoding cycle` (dense, compact and zstd snapshots in turn) in
 first compare their step wires with the first. `tools/e2e_report.py` writes
 `OUT_ROOT/E2E_RESULT.md`: per target the client build line, self-check,
 replay (same digests as A for every corpus snapshot, and the same on every
-target), tiers, evil, and snapshot sizes per encoding. A client in an
+target), tiers, evil, and snapshot sizes per encoding. It also requires the
+same self-check outcomes and refusal texts on every target, which is how a
+client without exceptions shows it refuses exactly what the one with
+exceptions refuses (give both as targets, e.g.
+`linux-noexc=build/client-linux/bin/Release/mapdemo_client_noexc`). A client in an
 emulator or simulator is run through a wrapper command that starts it there
 and copies its `--csv-dir` back (A with `MAPDEMO_A_HOST=0.0.0.0`;
 the Android emulator reaches the host as 10.0.2.2). Timings under wine,
