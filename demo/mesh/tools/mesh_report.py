@@ -74,9 +74,11 @@ def main():
         hop_by_dev[h["device"]].append(h)
     selftests = {}
     for c in a.columns.split():
-        t = read_text(os.path.join(out, "selftest", f"{c}.txt"))
-        tail = [ln for ln in t.splitlines() if ln.strip()]
-        selftests[c] = tail[-2] if len(tail) >= 2 else (tail[-1] if tail else "")
+        for tag in (c, c + "-noexc"):
+            t = read_text(os.path.join(out, "selftest", f"{tag}.txt"))
+            res = [ln for ln in t.splitlines() if ln.startswith("RESULT")]
+            ext = [ln for ln in t.splitlines() if ln.startswith("exit ")]
+            selftests[tag] = ((res[-1] if res else "no RESULT line"), (ext[-1] if ext else "exit ?"))
     p.append("## Devices")
     p.append("")
     p.append("| id | device | jobs passed | hops ok | exit | median us verify / check / mutate / save | build |")
@@ -97,12 +99,17 @@ def main():
                  f"`{d['build']}` |")
     p.append("")
     if selftests:
-        p.append("Self-tests (`xmesh_selftest`, last line before the exit status):")
+        p.append("Self-tests (`xmesh_selftest`, `xmesh_selftest_noexc` on each column):")
         p.append("")
-        for c, line in selftests.items():
-            rc = read_text(os.path.join(out, "selftest", f"{c}.txt")).splitlines()[-1:] or ["?"]
-            p.append(f"- {c}: {rc[0]}; {line}")
+        p.append("| device | result | exit |")
+        p.append("| --- | --- | --- |")
+        for tag, (res, ext) in selftests.items():
+            p.append(f"| {tag} | {res} | {ext.split()[-1]} |")
         p.append("")
+        bad_self = [t for t, (r, e) in selftests.items() if not r.startswith("RESULT PASS") or e != "exit 0"]
+        if bad_self:
+            ok = False
+            p[2] = p[2].replace("**PASS**", "**FAIL**") + f" Self-test failed: {', '.join(bad_self)}."
 
     # Matrix
     names = [d["name"] for d in devices]

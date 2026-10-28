@@ -18,8 +18,9 @@
 #   android-x64        NDK x86_64, static, run natively
 # Each column gives two devices, NAME and NAME-noexc (xo_peer_noexc).
 #
-# Before the mesh, every column's xmesh_selftest runs (selftest.txt); a
-# failing self-test is reported but the device still joins.
+# Before the mesh, every column's xmesh_selftest and xmesh_selftest_noexc
+# run (selftest/<device>.txt); a failing self-test is reported but the
+# device still joins.
 #
 # Environment: XMESH_BUILD_ROOT (build trees, default <repo>/build/mesh),
 # XMESH_HUB_CMAKE (extra cmake arguments for the hub build, e.g. a C++26
@@ -159,12 +160,16 @@ have wine && { wineserver -p >/dev/null 2>&1 || true; }
 
 echo "== self-tests"
 for c in $COLUMNS; do
-    bin=$BUILD_ROOT/$c/bin/Release/xmesh_selftest$(exe "$c")
-    if [ ! -f "$bin" ]; then echo "$c: no xmesh_selftest" > "$OUT/selftest/$c.txt"; continue; fi
-    # shellcheck disable=SC2046
-    $(runner "$c") "$bin" > "$OUT/selftest/$c.txt" 2>&1
-    echo "exit $?" >> "$OUT/selftest/$c.txt"
-    echo "$c: $(tail -1 "$OUT/selftest/$c.txt")"
+    for st in xmesh_selftest xmesh_selftest_noexc; do
+        tag=$c
+        [ $st = xmesh_selftest_noexc ] && tag=$c-noexc
+        bin=$BUILD_ROOT/$c/bin/Release/$st$(exe "$c")
+        if [ ! -f "$bin" ]; then echo "exit 127 (no $st)" > "$OUT/selftest/$tag.txt"; continue; fi
+        # shellcheck disable=SC2046
+        $(runner "$c") "$bin" --corpus-check "$(path_for "$c" "$REPO/demo/mesh/corpus")" > "$OUT/selftest/$tag.txt" 2>&1
+        echo "exit $?" >> "$OUT/selftest/$tag.txt"
+        echo "$tag: $(grep -E '^RESULT' "$OUT/selftest/$tag.txt" | tail -1) ($(tail -1 "$OUT/selftest/$tag.txt"))"
+    done
 done
 
 N=0

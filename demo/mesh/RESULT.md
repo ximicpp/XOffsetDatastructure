@@ -79,3 +79,124 @@ large: its 13,000-line vector doubles). `mutate` refuses to start with less
 than the headroom left under the object's capacity, so a device built
 without exceptions never reaches the fatal arena-exhausted path; the
 self-test checks the refusal.
+
+
+## 2. Cloud mesh: hub and devices (network thread)
+
+Run `cloud-full1`, 10-28 16:08Z: `demo/mesh/tools/run_mesh.sh` on one cloud
+host, built from 00be24c (types code 23db369). One hub (g++-13, C++20 field
+lists) and 16 devices, every column with exceptions and without
+(`xo_peer_noexc`), all on loopback through the hub (pure relay): Linux
+x86-64 g++-13 and clang++-18, Linux arm64 g++-13 static under
+qemu-aarch64, Windows MinGW-w64 g++ 13, MSVC 19.44 and clang-cl 19 under
+wine, Android NDK r29 arm64 under qemu-aarch64 and x86-64 natively (both
+static, android-28). Every device took evil jobs.
+
+**Result: PASS.** 7,452 jobs, 7,452 passed, in 84 s: 5,760 pair jobs (every
+ordered pair of the 16 devices x 6 types x small, medium x save_verified,
+save_compact), 12 chains (each type and scale once through all 16 devices
+and back, 17 stops), 1,680 evil jobs (every ordered pair x 7 cases). For
+every normal job the hub replayed the job itself and every device's
+received content digest, sent wire digest and sent length matched the
+replay, so each device sent byte-identical data. All 16 devices exited 0
+after Bye; all 16 self-tests passed (59 checks; the corpus check is in
+section 1).
+
+### Devices
+
+Median per-hop times in microseconds over the device's ok hops. Columns
+under wine run at near native speed; qemu columns are emulated (Android
+arm64's model check is the slowest step there), so their times are not
+device timings.
+
+| id | device | jobs passed | hops ok | exit | median us verify / check / mutate / save |
+| --- | --- | --- | --- | --- | --- |
+| 1 | linux-x64-gcc | 942/942 | 1197/1302 | 0 | 6.1 / 38.6 / 13.3 / 3.8 |
+| 2 | linux-x64-gcc-noexc | 942/942 | 1198/1303 | 0 | 6.2 / 38.6 / 13.0 / 3.9 |
+| 3 | linux-x64-clang | 942/942 | 1199/1304 | 0 | 5.4 / 38.2 / 11.6 / 3.8 |
+| 4 | linux-x64-clang-noexc | 942/942 | 1198/1303 | 0 | 5.9 / 39.1 / 11.6 / 3.3 |
+| 5 | android-x64 | 942/942 | 1197/1302 | 0 | 7.3 / 46.1 / 13.2 / 3.9 |
+| 6 | android-x64-noexc | 942/942 | 1198/1303 | 0 | 7.2 / 43.9 / 13.7 / 3.5 |
+| 7 | linux-arm64-gcc | 942/942 | 1197/1302 | 0 | 52.4 / 736.3 / 152.7 / 37.4 |
+| 8 | linux-arm64-gcc-noexc | 942/942 | 1198/1303 | 0 | 58.7 / 726.6 / 157.3 / 38.9 |
+| 9 | android-arm64 | 942/942 | 1198/1303 | 0 | 78.2 / 5076.3 / 307.7 / 47.4 |
+| 10 | windows-mingw | 942/942 | 1198/1303 | 0 | 7.3 / 50.4 / 17.5 / 4.3 |
+| 11 | android-arm64-noexc | 942/942 | 1197/1302 | 0 | 85.3 / 5108.9 / 330.7 / 47.3 |
+| 12 | windows-mingw-noexc | 942/942 | 1198/1303 | 0 | 7.2 / 49.6 / 17.0 / 4.3 |
+| 13 | windows-clang-cl-noexc | 942/942 | 1198/1303 | 0 | 5.9 / 42.1 / 12.3 / 3.8 |
+| 14 | windows-msvc | 942/942 | 1198/1303 | 0 | 7.3 / 45.2 / 14.3 / 3.9 |
+| 15 | windows-clang-cl | 942/942 | 1198/1303 | 0 | 5.1 / 41.4 / 12.5 / 3.7 |
+| 16 | windows-msvc-noexc | 942/942 | 1197/1302 | 0 | 9.4 / 44.6 / 15.0 / 3.8 |
+
+### Pairs: sender (row) to receiver (column), passed/jobs
+
+Sender makes state 0, receiver loads, checks, changes and sends it back,
+sender checks again. 24 jobs per ordered pair: 6 types x 2 scales x 2 save
+modes.
+
+| sender \ receiver | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 linux-x64-gcc | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 2 linux-x64-gcc-noexc | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 3 linux-x64-clang | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 4 linux-x64-clang-noexc | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 5 android-x64 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 6 android-x64-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 7 linux-arm64-gcc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 8 linux-arm64-gcc-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 9 android-arm64 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 10 windows-mingw | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 11 android-arm64-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 |
+| 12 windows-mingw-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 | 24/24 |
+| 13 windows-clang-cl-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 | 24/24 |
+| 14 windows-msvc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 | 24/24 |
+| 15 windows-clang-cl | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - | 24/24 |
+| 16 windows-msvc-noexc | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | 24/24 | - |
+
+### Pairs by type, scale and save mode
+
+| type | small verified | small compact | medium verified | medium compact |
+| --- | --- | --- | --- | --- |
+| ChatRoom | 240/240 | 240/240 | 240/240 | 240/240 |
+| Document | 240/240 | 240/240 | 240/240 | 240/240 |
+| KvConfig | 240/240 | 240/240 | 240/240 | 240/240 |
+| Order | 240/240 | 240/240 | 240/240 | 240/240 |
+| SceneTree | 240/240 | 240/240 | 240/240 | 240/240 |
+| SensorSeries | 240/240 | 240/240 | 240/240 | 240/240 |
+
+### Chains
+
+| job | type | scale | save mode | stops | result | ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| 5761 | Document | small | verified | 17 | pass | 47 |
+| 5763 | Order | small | verified | 17 | pass | 44 |
+| 5762 | Document | medium | compact | 17 | pass | 454 |
+| 5764 | Order | medium | compact | 17 | pass | 457 |
+| 5765 | SensorSeries | small | verified | 17 | pass | 74 |
+| 5767 | KvConfig | small | verified | 17 | pass | 253 |
+| 5766 | SensorSeries | medium | compact | 17 | pass | 653 |
+| 5769 | SceneTree | small | verified | 17 | pass | 232 |
+| 5768 | KvConfig | medium | compact | 17 | pass | 642 |
+| 5771 | ChatRoom | small | verified | 17 | pass | 229 |
+| 5770 | SceneTree | medium | compact | 17 | pass | 468 |
+| 5772 | ChatRoom | medium | compact | 17 | pass | 445 |
+
+### Evil cases
+
+Route[0] sends a bad data part; the first receiver must refuse it with
+`expected_verdict` and send nothing on.
+
+| case | refused as expected | receivers' verdicts |
+| --- | --- | --- |
+| bad_offset | 240/240 | load_rejected |
+| model_drift | 240/240 | model_mismatch |
+| schema_hash | 240/240 | load_rejected |
+| stale_digest | 240/240 | content_digest |
+| too_large | 240/240 | too_large |
+| truncated | 240/240 | load_rejected |
+| wrong_type | 240/240 | load_rejected |
+
+Files: `/mnt/project-files/cross-device-demo-20261028/mesh-full1/`
+(`MESH_RESULT.md`; `mesh-full1.tgz` sha256 `acb5eee06c0f0395581f225b35ccf2027d736606b09e3bf7efd7f18283e58f9a`
+with the hub's CSV files, summary, logs, every device's log and self-test
+output; the 424 MB hop archive is not kept).
