@@ -61,7 +61,7 @@ foreach(test_name ${STORAGE_TESTS})
 endforeach()
 
 # SC-8: the OS layer without exceptions (C++17, every platform).
-add_executable(test_vm_storage_noexc test_vm_storage_noexc.cpp)
+add_executable(test_vm_storage_noexc test_vm_storage_noexc.cpp test_vm_storage_noexc_tu2.cpp)
 set_target_properties(test_vm_storage_noexc PROPERTIES
     CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO
     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<CONFIG>)

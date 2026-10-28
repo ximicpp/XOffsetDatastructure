@@ -208,7 +208,7 @@ namespace detail {
 // Receive-path status. With exceptions every failure throws and a function
 // returning vstatus returns void (the code is what it was without this
 // type). Without them it returns false after recording the failure in
-// pending_error, and XOFFSET_VTRY passes a false up.
+// pending_error(), and XOFFSET_VTRY passes a false up.
 #if XOFFSET_NO_EXCEPTIONS
 struct [[nodiscard]] vstatus {
     bool ok;
@@ -221,8 +221,15 @@ using vstatus = void;
 constexpr void vok() noexcept {}
 #endif
 
-// The first failure of the current receive call (no-exceptions builds).
-inline thread_local XError pending_error;
+// The first failure of the current receive call (no-exceptions builds). A
+// function-local thread_local: for a namespace-scope inline thread_local of a
+// type with a destructor, MinGW GCC emits the TLS init function as a strong
+// symbol in every translation unit, so a program with two translation units
+// that include this header fails to link.
+inline XError& pending_error() noexcept {
+    static thread_local XError error;
+    return error;
+}
 
 [[noreturn]] inline void unreachable_rethrow() noexcept { std::abort(); }
 
@@ -230,13 +237,13 @@ inline thread_local XError pending_error;
 [[gnu::cold, gnu::noinline]]
 #endif
 inline bool record_failure(XErrc code, std::string message) {
-    pending_error.code = code;
-    pending_error.message = std::move(message);
+    pending_error().code = code;
+    pending_error().message = std::move(message);
     return false;
 }
 
 [[noreturn]] inline void fatal_pending() noexcept {
-    fatal(pending_error.code, pending_error.message.c_str());
+    fatal(pending_error().code, pending_error().message.c_str());
 }
 
 #if !XOFFSET_NO_EXCEPTIONS
@@ -261,9 +268,9 @@ inline XError current_exception_error() {
 
 // The pending failure, moved out (no-exceptions builds).
 inline XError take_pending_error() noexcept {
-    XError error = std::move(pending_error);
-    pending_error.code = XErrc::ok;
-    pending_error.message.clear();
+    XError error = std::move(pending_error());
+    pending_error().code = XErrc::ok;
+    pending_error().message.clear();
     return error;
 }
 } // namespace detail

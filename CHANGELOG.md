@@ -23,6 +23,11 @@
   schema_evolution), and the GCC 16 replay in `tools/fuzz_nightly.sh` replays
   `tests/fuzz/regressions/schema_evolution/` and its seed corpus through
   `fuzz_schema_evolution_replay`.
+- MinGW GCC: a program with two translation units that include
+  `xoffset_error.hpp` failed to link (`multiple definition of TLS init
+  function for ...pending_error`), with or without exceptions. The pending
+  error is now a function-local `thread_local`; `test_vm_storage_noexc` is
+  built from two translation units.
 
 ### Public API change: container iterators are a class, not `T*`
 
