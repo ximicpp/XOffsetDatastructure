@@ -143,8 +143,8 @@ step_build() {
         ${TC:+-DCMAKE_TOOLCHAIN_FILE="$REPO/cmake/toolchains/$TC"} "$DEVOPT" -DXOFFSET_TEST_HOST=ON \
         -DXOFFSET_BUILD_DEMOS=ON -DMAPDEMO_CLIENT_ONLY=ON ${ZSTD:+-DMAPDEMO_ZSTD_URL=$ZSTD} \
         ${fb[@]+"${fb[@]}"} ${EXTRA[@]+"${EXTRA[@]}"} > "$OUT/configure.log" 2>&1 \
-        && cmake --build "$B" -j "$JOBS" > "$OUT/build.log" 2>&1 \
-        || { bad build "configure.log, build.log"; return 1; }
+        && cmake --build "$B" -j "$JOBS" -- -k 0 > "$OUT/build.log" 2>&1 \
+        || { bad build "configure.log, build.log ($(grep -c '^FAILED:' "$OUT/build.log" 2>/dev/null) targets failed; -k 0 builds the rest)"; return 1; }
     local fw=$APP/Frameworks lib n
     [ "$MODE" = local ] && fw=$(dirname "$APP")/hosted
     n=$(ls "$fw" | grep -c '^libxoh_')
