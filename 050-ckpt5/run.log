@@ -1,0 +1,26 @@
+== 2026-10-28T16:12:54Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: 9ef5ce75 (v3.1.0; library identical to the INT4 head e913d22, INT4 pass)
+== 2026-10-28T16:13:12Z 1. export
+head 70a07a059cd82417bb0bb0a69ca9dea91c3b21ff tree 1fcf90357c114744114e582ba2d0d68f59d6f728 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc 9ef5ce75d72a172660a97d9fb4e188da3945f6c6 tree deb8af3b0cadbd09c4f51e7917da8c3496dc62b8 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-10-28T16:13:22Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-10-28T16:14:09Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-10-28T16:14:09Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	70a07a059cd82417bb0bb0a69ca9dea91c3b21ff	6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051	ff454946684a14b24637f5172ab95db3c12264491021b457c88f0103db7a0216	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	9ef5ce75d72a172660a97d9fb4e188da3945f6c6	934e7624616d912885c1e0b1696aac122730776555ad6857937d119c5deb6a5c	d97b078c72258a3b44380b0785807d98963fb2506a8a40435761c2eb23494178	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-10-28T16:14:34Z 4b. prebuild the bisection points
+caf601ea af601ea0372e17333ff8a6d64cce0a409d815f7a tree 85696b57beb6e821f5acb4ca678e415f0f8384f9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
