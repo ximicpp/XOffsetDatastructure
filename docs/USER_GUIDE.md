@@ -66,8 +66,8 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺�
   所有基类和成员的析构（或赋值）都平凡、记录本身却不平凡，就是用户提供的，判为不普通；有成员
   本身不平凡（例如 `XString`）时查不出来，仍是承诺。C++26 构建会完整检查。
   不能作这个承诺的记录用 `XOFFSET_RECORD_DERIVED(T, (), 成员...)`：只给字段表，不声明普通记录。
-- 没有反射时，直接接收（raw receive）用到的枚举必须有固定底层类型（`enum class`，或
-  `enum E : std::uint8_t {...}`），否则编译报错并给出改法。
+- wire 里的枚举必须有固定底层类型（`enum class`，或 `enum E : std::uint8_t {...}`），否则编译报错
+  并给出改法（第 2.2 节）。
 - `XString`、`XVector`、`XSet`、`XMap`、`XKeyValue` 和 `std::array` 由库自带字段表。
 - 联合体和非聚合体类（`std::string`、带虚函数或构造函数的类）写不了字段表。没有反射时库把它们
   当作不透明类型：不准入（`is_byte_copy_safe_v` 为 false），也不报“缺字段表”。
@@ -75,6 +75,18 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺�
   所有可达记录的这几行（`bench/slg` 的 13 行就是它的输出，`describe_dump_slg` 测试保持一致）。
   写不了的类型（非聚合体、重叠的 `[[no_unique_address]]` 成员等）印成一行注释说明原因。
 - 发布前至少用一个 C++26 编译器把 schema 编一次，让反射核对字段表和承诺。
+
+### 2.2 可移植标量
+
+要在 Linux、Windows、Android、iOS、macOS 之间互传（都是 64 位小端），schema 里只用左列的类型。
+
+| 用 | 不用 | 不用的原因 |
+| --- | --- | --- |
+| `std::int8_t` … `std::int64_t`、`std::uint8_t` … `std::uint64_t` | `long`、`unsigned long`、`std::size_t`、`std::ptrdiff_t`、`std::intptr_t`、`std::time_t` | 宽度或底层类型随平台变：`long` 在 Windows 上 32 位，`std::size_t` 在 Linux 上是 `unsigned long`、在 Windows 上是 `unsigned long long`。在某个平台上它们恰好就是 `std::int64_t` 或 `std::uint64_t`，编译能过；换个平台就编译失败（例如 `long` 在 Windows 和苹果平台，`std::size_t` 在苹果平台）。库在 Linux 上拦不下，因为在那里它们和定宽整数是同一个类型 |
+| `float`、`double` | `long double` | Linux x86-64 和 MinGW 上 16 字节，MSVC 和苹果平台上 8 字节；编译期拒绝 |
+| `bool`、`std::byte` | `wchar_t`、`char16_t`、`char32_t` | `wchar_t` 在 Windows 上 2 字节、别处 4 字节；这几种都编译期拒绝 |
+| 普通字段用 `char`；集合、映射的键用 `std::int8_t`、`std::uint8_t` 或 `XString` | 以 `char` 排序的键：`XSet<char>`、`XMap<char, V>`，以及键里含 `char` 的数组、记录成员，底层类型是 `char` 的枚举 | `char` 在 x86-64、苹果和 Windows 上有符号，在 Linux 和 Android 的 arm64 上无符号，两边给键排出的顺序不同，互相拒收对方的 wire，而 schema 哈希相同、握手发现不了；编译期拒绝。`XString` 在各平台都按无符号字节比较，可以做键 |
+| 写明底层类型的枚举：`enum class E { ... }`、`enum E : std::uint32_t { ... }` | 没写底层类型的 `enum E { ... }` | 底层类型由编译器选：MSVC 是 `int`，GCC 和 Clang 在没有负值时是 `unsigned int`，两边 schema 不同；编译期拒绝 |
 
 ## 3. 构建与修改
 

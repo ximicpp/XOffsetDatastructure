@@ -6634,6 +6634,58 @@ namespace XOffsetDatastructure {
         template <typename T>
         consteval auto wire_abi_signature();
 
+        // Does a set or map key order by plain char? char is signed on x86-64,
+        // Apple arm64 and Windows and unsigned on Linux and Android arm64, so
+        // the two sides sort such keys differently and each rejects the other's
+        // wire while the schema hash is the same. XString compares as unsigned
+        // char everywhere and is portable.
+        template <typename T>
+        consteval bool key_orders_by_plain_char();
+
+        template <typename T, std::size_t... Is>
+        consteval bool record_orders_by_plain_char(std::index_sequence<Is...>) {
+            return (false || ... || key_orders_by_plain_char<typename schema::member_t<T, Is>::type>());
+        }
+
+        template <typename T>
+        consteval bool key_orders_by_plain_char() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_same_v<U, char>) {
+                return true;
+            } else if constexpr (std::is_enum_v<U>) {
+                return std::is_same_v<std::underlying_type_t<U>, char>;
+            } else if constexpr (std::is_array_v<U>) {
+                return key_orders_by_plain_char<std::remove_extent_t<U>>();
+            } else if constexpr (is_fixed_string_v<U> || is_fixed_flat_map_v<U> ||
+                                 is_fixed_flat_set_v<U> || is_fixed_vector_v<U> ||
+                                 is_xkeyvalue_v<U>) {
+                return false;
+            } else if constexpr (std::is_class_v<U>) {
+                return record_orders_by_plain_char<U>(
+                    std::make_index_sequence<schema::member_count_v<U>>{});
+            } else {
+                return false;
+            }
+        }
+
+        template <typename K>
+        consteval void require_portable_key() {
+            static_assert(!key_orders_by_plain_char<K>(),
+                "XOffset wire schema: a set or map key orders by plain char, which is signed "
+                "on x86-64, Apple and Windows and unsigned on Linux and Android arm64, so the "
+                "two sides sort the keys differently and reject each other's wires. Use "
+                "std::int8_t or std::uint8_t (XString for text).");
+        }
+
+        template <typename E>
+        consteval void require_fixed_enum() {
+            static_assert(requires { E{std::underlying_type_t<E>{}}; },
+                "XOffset wire schema: an enum without a fixed underlying type has a "
+                "compiler-chosen representation (int on MSVC, unsigned int on GCC and Clang "
+                "when no value is negative), so its schema differs between platforms. Give it "
+                "one: enum E : std::uint32_t { ... } or enum class E { ... }.");
+        }
+
         template <typename T>
         consteval auto wire_scalar_signature() {
             using U = std::remove_cv_t<T>;
@@ -6734,6 +6786,7 @@ namespace XOffsetDatastructure {
             if constexpr (detail::fixed_size_scalar<U>) {
                 return wire_scalar_signature<U>();
             } else if constexpr (std::is_enum_v<U>) {
+                require_fixed_enum<U>();
                 return ft::FixedString{"enum<"} +
                        wire_abi_signature<std::underlying_type_t<U>>() +
                        ft::FixedString{">"};
@@ -6747,6 +6800,7 @@ namespace XOffsetDatastructure {
                 return fixed_sequence_header_signature<U>(ft::FixedString{"xstring"}) +
                        ft::FixedString{"{inline:10}"};
             } else if constexpr (is_fixed_flat_map_v<U>) {
+                require_portable_key<typename U::key_type>();
                 return fixed_sequence_header_signature<U>(ft::FixedString{"xflatmap"}) +
                        ft::FixedString{"<"} +
                        wire_abi_signature<typename U::key_type>() +
@@ -6754,6 +6808,7 @@ namespace XOffsetDatastructure {
                        wire_abi_signature<typename U::mapped_type>() +
                        ft::FixedString{">"};
             } else if constexpr (is_fixed_flat_set_v<U>) {
+                require_portable_key<typename U::value_type>();
                 return fixed_sequence_header_signature<U>(ft::FixedString{"xflatset"}) +
                        ft::FixedString{"<"} +
                        wire_abi_signature<typename U::value_type>() +
