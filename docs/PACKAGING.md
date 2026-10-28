@@ -23,12 +23,15 @@ full/storage 及 package 验证，历史 wire fixture、日期专用 Windows/net
 | 目标 | 最低要求 |
 | --- | --- |
 | `XOffset::storage` | C++17，CMake 3.13+，Linux/macOS/Windows VM API，线程支持 |
-| `XOffset::xoffset` | P2996 Clang、配套 libc++、CMake 3.30+，64-bit little-endian |
+| `XOffset::xoffset` | GCC 16+（libstdc++），或 P2996 Clang（配套 libc++）；CMake 3.30+；64-bit little-endian |
 | 维护的 Python 验证入口及其测试 | Python 3.10+；storage 的 JUnit 验证需要 CMake/CTest 3.21+，full 需要 3.30+；C++ 库没有 Python 运行依赖 |
 
-完整目标传播 `cxx_std_26`、reflection、expansion statements、libc++ 与 Threads。
-消费项目自行设置 C++17 不会覆盖完整目标的要求；普通 C++26 编译器也不能替代 P2996。
-Windows 当前只对原生 storage 宣称已验证，完整 P2996 不在本版本的已验证支持范围。
+完整目标传播 `cxx_std_26`、reflection 与 Threads；用 Clang 时另外传播 expansion
+statements 和 libc++，用 GCC 时用 libstdc++。消费项目自行设置 C++17 不会覆盖完整目标的
+要求；没有 P2996 反射的 C++26 编译器（例如 NDK、Xcode、MSVC 自带的版本）不能替代。
+Windows x64 上完整库用 MinGW-w64 GCC 16 验证过（本地平台矩阵，全量 CTest 与 wire 语料，
+见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；MSVC 和 clang-cl 只有 V1 时期的 storage
+记录，完整库不支持。
 
 ## Fixed inputs
 
@@ -214,7 +217,7 @@ Windows runner。可指定 `--source-dir`、`--sdk`、`--generator`、`--jobs`�
 并核对源码/安装包前后不变。它不代替 full、sanitizer、TSan 或 wire 验证。
 共享库、动态插件、跨 CRT、混合工具链或混合头版本未获此验收。
 
-以下为 0.1.0-alpha.1（V1 格式）时期的已记录基线，不代表 V2；V2 的验证记录见 README 的 Validation scope 与 CI。归档自身的验收另行报告，不从基线自动继承：
+以下为 0.1.0-alpha.1（V1 格式）时期的已记录基线，不代表 V2；V2 的验证记录见 README 的 Validation scope（GitHub CI 自 2026-10-23 停用，之后以 `tools/local_validate.sh` 和 `tools/platform_matrix.sh` 的本地验证为准）。归档自身的验收另行报告，不从基线自动继承：
 
 | 环境/配置 | 已记录结果 | 口径 |
 | --- | --- | --- |
@@ -225,8 +228,8 @@ Windows runner。可指定 `--source-dir`、`--sdk`、`--generator`、`--jobs`�
 | 历史 macOS arm64，固定 P2996/AppleClang storage | full 48/48；full 与 storage 各 installed 3/3、subproject 3/3 | 以前记录，非本机新跑 |
 | 历史 Linux x86_64 固定 Docker 镜像 | full 安装与源码消费各 3 项 | 在 arm64 宿主模拟执行，仅功能证据 |
 
-`docs/VM_FINAL_DELIVERY.md` 保留上述证据与身份（Windows/Linux 当期结果文件已不在仓库中），
-精简源码包不含这些研究记录。
+上述证据与身份原在 `docs/VM_FINAL_DELIVERY.md`，2026-10-27 已移出源码树，取回方法见
+[ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)；精简源码包不含这些研究记录。
 WSL 或 Docker 可用于后续 Linux 性能工作，不要求独立物理机作为当前准入条件；
 仍须注明虚拟化类别并先取得噪声资格。本次 WSL 唯一 78 进程 F/F 校准的四指标均未通过
 局部 anchor 和 drift 门槛，未建立 2% 比较能力，没有 D/F、ablation 或 adoption 结论。

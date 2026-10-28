@@ -25,6 +25,8 @@ struct ResetRoot {
     XVector<Item> items;
     XVector<std::uint64_t> wides;
 };
+XOFFSET_RECORD_DERIVED(Item, (), id, value)
+XOFFSET_RECORD_DERIVED(ResetRoot, (), id, name, names, items, wides)
 XOFFSET_REGISTER_SCHEMA_NAME(ResetRoot, "test.ResetUsedRange")
 
 namespace {

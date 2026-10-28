@@ -72,12 +72,14 @@ struct HiddenRawOnly { xo::XVector<RawOnly> later; };
 // An empty HiddenRawOnly::later is still future-negative: domain checking is
 // over types, not only the values present in the first received fixture.
 } // namespace receive_custom_v2_examples
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::RawOnly, (), value)
+XOFFSET_RECORD_DERIVED(receive_custom_v2_examples::HiddenRawOnly, (), later)
 
 // These two application-defined policies are separate from the library's
 // admission algorithm. Their layout/representation and complete ownership
 // graph are audited in the explicit wire/future contracts below. A raw-only
 // or arbitrary user-destructor type does not gain admission automatically.
-namespace boost::typelayout::v1 {
+namespace XOffsetDatastructure {
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Word> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::Owned> : std::true_type {};
 template<> struct is_byte_copy_safe<::receive_custom_v2_examples::RawOnly> : std::true_type {};

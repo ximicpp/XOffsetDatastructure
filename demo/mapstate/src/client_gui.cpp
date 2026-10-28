@@ -1,7 +1,7 @@
 // Map state demo: raylib window front end. OWNER: client thread.
 //
 // One frame: pump the socket; at frame start install a pending snapshot
-// (--buffers reuse: reload_verified into the held buffer; fresh:
+// (--buffers reuse: try_reload_verified into the held buffer; fresh:
 // SnapshotHolder::replace destroys the old buffer); request the current
 // camera rect when nothing is outstanding and 100 ms have passed; read the
 // live snapshot into presentation data (DrawItem: screen position + colour);
@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,8 +22,28 @@
 #include "raylib.h"
 #include "rlgl.h"
 
+// GLFW as bundled in the desktop raylib library. raylib 5.5's InitWindow goes on
+// to set up OpenGL even when GLFW found no display or monitor, and crashes there,
+// so the window client asks GLFW itself first.
+extern "C" {
+struct GLFWmonitor;
+int glfwInit(void);
+void glfwTerminate(void);
+GLFWmonitor** glfwGetMonitors(int* count);
+}
+
 namespace mapdemo::client {
 namespace {
+
+// Empty when a window can be opened; otherwise why not.
+std::string window_unavailable() {
+    if (glfwInit() == 0) return "GLFW cannot start (no display)";
+    int monitors = 0;
+    glfwGetMonitors(&monitors);
+    glfwTerminate();
+    if (monitors == 0) return "no monitor (screen asleep or locked?)";
+    return {};
+}
 
 constexpr int kWinW = int(kViewWidth);
 constexpr int kWinH = int(kViewHeight);
@@ -90,12 +111,21 @@ void draw_sites(const MapCatalog& catalog, const Rect& cam) {
 
 } // namespace
 
-int run_gui(const Options& opt) {
+Result<int> run_gui(const Options& opt) {
     Session s(opt);
-    s.connect();
+    MAPDEMO_TRY(s.connect());
 
     SetTraceLogLevel(LOG_WARNING);
+    const std::string no_window = window_unavailable();
+    if (!no_window.empty()) {
+        std::fprintf(stderr, "error: cannot open a window: %s; use --headless\n", no_window.c_str());
+        return 2;
+    }
     InitWindow(kWinW, kWinH, "XOffset map state demo");
+    if (!IsWindowReady()) {
+        std::fprintf(stderr, "error: cannot open a window: raylib InitWindow failed; use --headless\n");
+        return 2;
+    }
     SetTargetFPS(60);
 
     const Rect scene = s.scene();
@@ -110,15 +140,24 @@ int run_gui(const Options& opt) {
     std::vector<DrawItem> items;
     int frame = 0;
     bool server_gone = false;
+    std::optional<Error> stopped;   // what ended the run early, reported after the window closes
 
     while (!WindowShouldClose()) {
-        s.pump(0);
+        if (Status pumped = s.pump(0); !pumped) {
+            stopped = std::move(pumped).error();
+            break;
+        }
         if (s.bye()) {
             server_gone = true;
             break;
         }
         // ---- frame start: replace the snapshot only here
-        if (s.install_pending() && opt.check_on()) s.verify_direct_read();
+        Result<bool> installed = s.install_pending();
+        if (!installed) {
+            stopped = std::move(installed).error();
+            break;
+        }
+        if (*installed && opt.check_on()) s.verify_direct_read();
 
         // ---- camera: mouse drag or scripted drag
         if (opt.auto_drag) {
@@ -136,7 +175,10 @@ int run_gui(const Options& opt) {
         // ---- request the latest camera rect (one outstanding, 10 Hz)
         std::uint64_t now = net::now_ns();
         if (s.can_request() && now - last_request_ns >= request_period_ns) {
-            s.send_view(cam, net::ViewCategory::Normal);
+            if (Status sent = s.send_view(cam, net::ViewCategory::Normal); !sent) {
+                stopped = std::move(sent).error();
+                break;
+            }
             last_request_ns = now;
         }
 
@@ -201,8 +243,9 @@ int run_gui(const Options& opt) {
         DrawRectangle(8, 8, 520, 122, Color{20, 20, 20, 200});
         if (have) {
             const ViewSnapshot& v = s.holder().view();
-            DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B", std::uint64_t(v.tick),
-                                unsigned(v.units.size()), unsigned(s.last_wire_bytes())),
+            DrawText(TextFormat("tick %" PRIu64 "   visible %u   snapshot %u B (%s, %u B sent)", std::uint64_t(v.tick),
+                                unsigned(v.units.size()), unsigned(s.last_wire_bytes()),
+                                codec::encoding_name(s.last_encoding()), unsigned(s.last_net_bytes())),
                      16, 14, 16, RAYWHITE);
         } else {
             DrawText("waiting for the first snapshot...", 16, 14, 16, RAYWHITE);
@@ -242,22 +285,25 @@ int run_gui(const Options& opt) {
 
         // Read a snapshot that arrived while drawing (it is installed at the next
         // frame start), so the window's view rtt is not padded by the vsync wait.
-        s.pump(0);
+        if (Status pumped = s.pump(0); !pumped) stopped = std::move(pumped).error();
 
         metrics::Stopwatch present_sw;
         EndDrawing();
         s.recorder().add("c.present_us", present_sw.us());
+        if (stopped) break;
 
         ++frame;
         if (!opt.screenshot_at.empty() && next_shot >= opt.screenshot_at.size()) break;   // scripted run done
     }
     CloseWindow();
+    if (stopped) return std::move(*stopped);
     if (server_gone) std::fprintf(stdout, "client: server said Bye\n");
-    bool ok = s.finish();
+    Result<bool> ok = s.finish();
+    if (!ok) return std::move(ok).error();
     s.recorder().print_line(stdout, {"c.view_rtt_us", "c.load_us", "c.read_present_us", "c.draw_us", "c.present_us",
                                      "c.snap_bytes", "c.visible_count"});
     if (opt.check_on()) s.checks().print(stdout);
-    return ok ? 0 : 1;
+    return *ok ? 0 : 1;
 }
 
 } // namespace mapdemo::client

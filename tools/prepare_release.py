@@ -51,11 +51,11 @@ DEPENDENCY_LICENSES = ("external/boost/LICENSE_1_0.txt", "external/typelayout/LI
                        "external/typelayout/LICENSE_1_0.txt")
 EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
                       "typelayout": "fe295929d0a5bfa7809fb737a6eb3db279599346"}
-FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp')
+FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp')
 OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-              "Dockerfile", "docker-compose.yml", ".dockerignore")
+              "xoffset_error.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
 DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/PACKAGING.md", "docs/VALIDATION_RUNNER.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
 TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_signatures.cpp",
@@ -65,12 +65,14 @@ TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_s
               "tools/signature_type_list.hpp", "tools/signature_type_names.hpp",
               "tools/validate_vm.py", "tools/validate_vm_package.py", "tools/prepare_vm_cmake.py",
               "tools/prepare_vm_linux_current.py", "tools/check_vm_toolchain.py",
-              "tools/prepare_release.py")
+              "tools/prepare_release.py", "tools/describe_dump.cpp", "tools/describe_dump.hpp")
 SIGNATURE_FILES = tuple("tools/sigs/" + name + ".sig.hpp" for name in (
     "arm64_android_clang", "arm64_ios_clang", "x86_64_linux_clang", "x86_64_windows_clang"))
 TOOL_TESTS = ("tools/tests/test_validate_vm_package.py", "tools/tests/test_prepare_vm_cmake.py",
               "tools/tests/test_prepare_release.py")
-COPIED_TREES = ("cmake", "tests", "examples", "include")
+COPIED_TREES = ("cmake", "tests", "examples", "include", "bench/slg/include")
+# bench/slg/include: the SLG model headers that a test and describe_dump_slg include
+OPTIONAL_TREES = ("include", "bench/slg/include")
 OPTIONAL_FILES = ("toolchains/build_tools.cmake",)
 ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES) + OPTIONAL_RUNTIME_SOURCES
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
@@ -302,7 +304,7 @@ def collect_source(source):
         if (source / name).exists() or (source / name).is_symlink():
             add(name)
     for tree in COPIED_TREES + DEPENDENCY_TREES:
-        if tree == "include" and not (source / tree).exists() and not (source / tree).is_symlink():
+        if tree in OPTIONAL_TREES and not (source / tree).exists() and not (source / tree).is_symlink():
             continue
         walk(tree)
     lock = validate_payload(payload)
@@ -373,7 +375,7 @@ def create(source, out):
 def install_required(component):
     if component not in ("full", "storage"):
         raise ValueError("install component must be full or storage")
-    base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp",
+    base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp", "include/xoffset_error.hpp",
             "share/XOffsetDatastructure/licenses/LICENSE",
             "share/XOffsetDatastructure/VERSION", "share/XOffsetDatastructure/CHANGELOG.md",
             "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md"}

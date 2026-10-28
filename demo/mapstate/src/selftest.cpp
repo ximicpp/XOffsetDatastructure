@@ -456,7 +456,7 @@ std::string frame_case(Expect& ex, const char* what, net::FrameHeader h, bool no
     try {
         if (nonblocking) {
             std::optional<net::Frame> f;
-            for (int i = 0; i < 100 && !f; ++i) f = rx.try_recv(allowed);
+            for (int i = 0; i < 100 && !f; ++i) f = rx.recv_nowait(allowed);
         } else {
             (void)rx.recv(allowed);
         }
@@ -486,7 +486,8 @@ void test_frame_limits() {
            net::max_payload(MsgType::StepReq) == kCapBatch && net::max_payload(MsgType::StepRes) == kCapBatch &&
            net::max_payload(MsgType::Catalog) == kCapCatalog && net::max_payload(MsgType::Hello) == 32 &&
            net::max_payload(MsgType::HelloOk) == 0 && net::max_payload(MsgType::Bye) == 0 &&
-           net::max_payload(MsgType::Error) == 4096,
+           net::max_payload(MsgType::Error) == 4096 && net::max_payload(MsgType::Subscribe) == 24 &&
+           net::max_payload(MsgType::SubscribeOk) == 0 && net::max_payload(MsgType::Events) == (1u << 20),
        "max_payload table differs from INTERFACES section 4");
     for (bool nb : {false, true}) {
         detail += nb ? "nonblocking: " : "blocking: ";
@@ -496,6 +497,8 @@ void test_frame_limits() {
         detail += frame_case(ex, "bad_magic", hdr(MsgType::ViewReq, 16, 0x12345678u), nb, {MsgType::ViewReq}) + " ";
         detail += frame_case(ex, "unexpected_type", hdr(MsgType::StepReq, 16), nb, {MsgType::ViewReq}) + " ";
         detail += frame_case(ex, "unknown_type", hdr(MsgType(77), 16), nb, {MsgType::ViewReq}) + " ";
+        detail += frame_case(ex, "events_1GiB", hdr(MsgType::Events, 1u << 30), nb, {MsgType::Events}) + " ";
+        detail += frame_case(ex, "subscribe_25B", hdr(MsgType::Subscribe, 25), nb, {MsgType::Subscribe}) + " ";
     }
     // Exactly-at-limit and an Error frame from the peer.
     {
@@ -734,10 +737,10 @@ void test_net_two_process() {
             c.enqueue(net::MsgType::StepReq, t, cur.save_verified<UnitStateBatch>());
             std::optional<net::Frame> f;
             while (!f) {
-                pollfd p{c.fd(), short(POLLIN | (c.want_write() ? POLLOUT : 0)), 0};
+                pollfd p{int(c.fd()), short(POLLIN | (c.want_write() ? POLLOUT : 0)), 0};
                 ::poll(&p, 1, 5000);
                 if (c.want_write()) c.flush();
-                f = c.try_recv({net::MsgType::StepRes});
+                f = c.recv_nowait({net::MsgType::StepRes});
             }
             ex(f->correlation == t + 1, "StepRes correlation is not tick + 1");
             XB next = XB::load_verified<UnitStateBatch>(f->payload, cap_batch());
@@ -748,7 +751,7 @@ void test_net_two_process() {
         }
         c.enqueue(net::MsgType::Bye, 0, {});
         while (!c.flush()) {
-            pollfd p{c.fd(), POLLOUT, 0};
+            pollfd p{int(c.fd()), POLLOUT, 0};
             ::poll(&p, 1, 5000);
         }
         detail = fmt("units=%u steps=%llu bytes_sent=%llu bytes_received=%llu", units, (unsigned long long)steps,

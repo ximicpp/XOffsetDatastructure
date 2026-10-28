@@ -13,6 +13,8 @@ struct RetryRoot {
     XMap<int32_t, RetryRecord> map;
     XSet<XString> set;
 };
+XOFFSET_RECORD_DERIVED(RetryRecord, (), first, second)
+XOFFSET_RECORD_DERIVED(RetryRoot, (), source, rows, other_rows, map, set)
 XOFFSET_REGISTER_SCHEMA_NAME(RetryRoot, "test.RetryRoot")
 
 std::string snapshot(const RetryRoot& r) {

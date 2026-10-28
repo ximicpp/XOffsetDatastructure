@@ -14,10 +14,26 @@
 #include <vector>
 
 #if defined(_WIN32)
+// The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
+// shellapi.h behind a client's back. Both macros are set only for this include; a
+// client that needs more includes those headers itself (or <windows.h> first).
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#    define XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#  endif
 #  ifndef NOMINMAX
 #    define NOMINMAX
+#    define XOFFSET_DETAIL_UNDEF_NOMINMAX
 #  endif
 #  include <windows.h>
+#  ifdef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#    undef WIN32_LEAN_AND_MEAN
+#    undef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
+#  endif
+#  ifdef XOFFSET_DETAIL_UNDEF_NOMINMAX
+#    undef NOMINMAX
+#    undef XOFFSET_DETAIL_UNDEF_NOMINMAX
+#  endif
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>
@@ -25,6 +41,7 @@
 #  error "XOffset virtual memory storage requires Windows, Linux, or macOS"
 #endif
 
+#include "xoffset_error.hpp"
 #include "xoffset_slot_storage.hpp"
 
 namespace XOffsetDatastructure {
@@ -150,32 +167,43 @@ private:
     // Only a fresh copied load exposing the entire reservation can combine
     // reservation and page enabling. Pooled owners retain their normal path.
     VirtualMemoryStorage(std::size_t logical_bytes, std::size_t maximum_capacity,
-                         const VmStoragePool& pool, [[maybe_unused]] bool full_copy) {
+                         const VmStoragePool& pool, bool full_copy) {
+        XOFFSET_VREQUIRE(reserve_v(logical_bytes, maximum_capacity, pool, full_copy));
+    }
+
+    // The constructor's work on an empty owner. Functions named *_v report a
+    // failure as detail::vstatus: they throw when exceptions are on and
+    // return false (the failure recorded) when they are off. A failed
+    // reserve_v leaves an owner that its destructor releases.
+    vstatus reserve_v(std::size_t logical_bytes, std::size_t maximum_capacity,
+                      const VmStoragePool& pool, [[maybe_unused]] bool full_copy) {
         if (logical_bytes > maximum_capacity) {
-            throw std::invalid_argument("VM initial length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM initial length exceeds maximum capacity");
         }
         if (maximum_capacity > static_cast<std::size_t>(
                 (std::numeric_limits<std::ptrdiff_t>::max)())) {
-            throw std::length_error("VM capacity exceeds pointer difference range");
+            XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error,
+                              "VM capacity exceeds pointer difference range");
         }
-        query_page_geometry();
+        XOFFSET_VTRY(query_page_geometry());
         std::size_t reserved = 0;
         if (!checked_vm_round_up(maximum_capacity, page_size_, reserved) ||
             reserved > static_cast<std::size_t>(
                 (std::numeric_limits<std::ptrdiff_t>::max)())) {
-            throw std::length_error("VM reservation page rounding overflows");
+            XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
         }
         maximum_capacity_ = maximum_capacity;
-        if (reserved == 0) return;
+        if (reserved == 0) return vok();
         // This failure models acquisition, including a cache hit. It is checked
         // before removing an idle owner, so a rejected acquisition keeps the cache.
-        if (consume_vm_failure(VmOperation::Reserve)) throw std::bad_alloc();
+        if (consume_vm_failure(VmOperation::Reserve)) XOFFSET_VFAIL_BAD_ALLOC();
         pool_ = pool;
         if (!acquire_from_pool()) {
             const std::size_t prefix = page_size_;
             if (reserved > static_cast<std::size_t>(
                     (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
-                throw std::length_error("VM reservation page rounding overflows");
+                XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
             // V2.1 owner lookup: the payload starts at a 2^k boundary,
             // k = max(22, ceil(log2 span)), and the mapping covers whole 4 MiB
             // granules, so OwnerMap finds the payload from any address inside
@@ -183,10 +211,11 @@ private:
             // just below the payload, in the granule before it.
             const std::size_t span =
                 (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-            if (span < reserved) throw std::length_error("VM reservation page rounding overflows");
+            if (span < reserved)
+                XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
             std::size_t shift = slot_log2(span);
             if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
-            if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) throw std::bad_alloc();
+            if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
 #if defined(_WIN32)
             // A reservation starts on an allocation-granularity boundary, so
@@ -198,7 +227,7 @@ private:
             for (int attempt = 0; attempt < 8 && !mapping; ++attempt) {
                 auto* probe = static_cast<char*>(::VirtualAlloc(
                     nullptr, win_prefix + span + align, MEM_RESERVE, PAGE_NOACCESS));
-                if (!probe) throw std::bad_alloc();
+                if (!probe) XOFFSET_VFAIL_BAD_ALLOC();
                 const auto payload = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
                                      ~std::uintptr_t(align - 1);
                 ::VirtualFree(probe, 0, MEM_RELEASE);
@@ -209,19 +238,19 @@ private:
                     mapping = nullptr;
                 }
             }
-            if (!mapping) throw std::bad_alloc();
+            if (!mapping) XOFFSET_VFAIL_BAD_ALLOC();
             if (!OwnerMap::reachable(mapping, win_prefix + span) ||
                 !::VirtualAlloc(mapping + win_prefix - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
                 ::VirtualFree(mapping, 0, MEM_RELEASE);
-                throw std::bad_alloc();
+                XOFFSET_VFAIL_BAD_ALLOC();
             }
             base_ = mapping + win_prefix;
 #else
-            if (full_copy && consume_vm_failure(VmOperation::Enable)) throw std::bad_alloc();
+            if (full_copy && consume_vm_failure(VmOperation::Enable)) XOFFSET_VFAIL_BAD_ALLOC();
             // Over-map PROT_NONE, then trim both ends.
             const std::size_t total = span + prefix + align;
             void* raw = ::mmap(nullptr, total, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-            if (raw == MAP_FAILED) throw std::bad_alloc();
+            if (raw == MAP_FAILED) XOFFSET_VFAIL_BAD_ALLOC();
             const auto start = reinterpret_cast<std::uintptr_t>(raw);
             const auto payload = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
             if (payload - prefix != start) ::munmap(raw, payload - prefix - start);
@@ -231,7 +260,7 @@ private:
             if (!OwnerMap::reachable(mapping, span + prefix) ||
                 ::mprotect(mapping, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
                 ::munmap(mapping, span + prefix);
-                throw std::bad_alloc();
+                XOFFSET_VFAIL_BAD_ALLOC();
             }
             base_ = mapping + prefix;
             if (full_copy) accessible_bytes_ = reserved;
@@ -244,11 +273,18 @@ private:
         // A throwing constructor does not run this object's destructor.
         if (!grow_to(logical_bytes)) {
             release();
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
+        return vok();
     }
 
 public:
+    // The public constructor into an empty owner.
+    static vstatus create_v(VirtualMemoryStorage& owner, std::size_t logical_bytes,
+                            std::size_t maximum_capacity, const VmStoragePool& pool = {}) {
+        return owner.reserve_v(logical_bytes, maximum_capacity, pool, false);
+    }
+
     // Internal direct-receive owner. All explicit maximum bytes are made
     // accessible before beginning one byte-array lifetime. This commits virtual
     // backing/accounting up front, but does not initialize/touch the whole max.
@@ -260,12 +296,19 @@ public:
     static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
                                             std::size_t maximum_capacity,
                                             const VmStoragePool& pool = {}) {
+        VirtualMemoryStorage owner;
+        XOFFSET_VREQUIRE(for_receive_v(owner, logical_bytes, maximum_capacity, pool));
+        return owner;
+    }
+    static vstatus for_receive_v(VirtualMemoryStorage& owner, std::size_t logical_bytes,
+                                 std::size_t maximum_capacity, const VmStoragePool& pool = {}) {
         if (logical_bytes > maximum_capacity)
-            throw std::invalid_argument("VM receive length exceeds maximum capacity");
-        VirtualMemoryStorage owner(0, maximum_capacity, pool);
-        if (!maximum_capacity) return owner;
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM receive length exceeds maximum capacity");
+        XOFFSET_VTRY(owner.reserve_v(0, maximum_capacity, pool, false));
+        if (!maximum_capacity) return vok();
         if (!owner.enable_prefix(maximum_capacity) || consume_vm_failure(VmOperation::Prepare))
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         // Standard non-allocating placement array new, with no initializer:
         // no cookie, value initialization, payload transfer or user constructor.
         auto* bytes = ::new (static_cast<void*>(owner.base_)) std::byte[maximum_capacity];
@@ -277,8 +320,8 @@ public:
         // exposed bytes. (A G1 build without this line -- the early G1-only
         // diagnostic variant -- is not shippable.)
         owner.zero_from_ = maximum_capacity;
-        if (!owner.grow_to(logical_bytes)) throw std::bad_alloc();
-        return owner;
+        if (!owner.grow_to(logical_bytes)) XOFFSET_VFAIL_BAD_ALLOC();
+        return vok();
     }
 
     // Internal fresh-owner load path. A complete copy initializes every logical
@@ -292,22 +335,31 @@ public:
     static VirtualMemoryStorage from_bytes(const char* bytes, std::size_t length,
                                            std::size_t maximum_capacity,
                                            const VmStoragePool& pool, std::size_t at = 0) {
+        VirtualMemoryStorage owner;
+        XOFFSET_VREQUIRE(from_bytes_v(owner, bytes, length, maximum_capacity, pool, at));
+        return owner;
+    }
+    // from_bytes into an empty owner.
+    static vstatus from_bytes_v(VirtualMemoryStorage& owner, const char* bytes, std::size_t length,
+                                std::size_t maximum_capacity,
+                                const VmStoragePool& pool, std::size_t at = 0) {
         if (length > maximum_capacity || at > length) {
-            throw std::invalid_argument("VM input length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM input length exceeds maximum capacity");
         }
         if (length != at && bytes == nullptr) {
-            throw std::invalid_argument("VM input is null");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "VM input is null");
         }
-        VirtualMemoryStorage owner(0, maximum_capacity, pool,
-            length != 0 && length == maximum_capacity && !pool.enabled());
-        if (length == 0) return owner;
+        XOFFSET_VTRY(owner.reserve_v(0, maximum_capacity, pool,
+            length != 0 && length == maximum_capacity && !pool.enabled()));
+        if (length == 0) return vok();
         if (!owner.enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
         std::memcpy(owner.base_ + at, bytes, length - at);
         owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
-        return owner;
+        return vok();
     }
 
     // V2 sparse load: `stored` holds the concatenated extents; extent i is
@@ -319,13 +371,23 @@ public:
                                              std::size_t count, std::size_t length,
                                              std::size_t maximum_capacity,
                                              const VmStoragePool& pool = {}) {
+        VirtualMemoryStorage owner;
+        XOFFSET_VREQUIRE(from_extents_v(owner, stored, extents, count, length, maximum_capacity, pool));
+        return owner;
+    }
+    // from_extents into an empty owner.
+    static vstatus from_extents_v(VirtualMemoryStorage& owner, const char* stored, const void* extents,
+                                  std::size_t count, std::size_t length,
+                                  std::size_t maximum_capacity,
+                                  const VmStoragePool& pool = {}) {
         if (length > maximum_capacity) {
-            throw std::invalid_argument("VM input length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM input length exceeds maximum capacity");
         }
-        VirtualMemoryStorage owner(0, maximum_capacity, pool, false);
-        if (length == 0) return owner;
+        XOFFSET_VTRY(owner.reserve_v(0, maximum_capacity, pool, false));
+        if (length == 0) return vok();
         if (!owner.enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
         std::size_t cursor = 0;
         auto clear = [&](std::size_t begin, std::size_t end) {
@@ -343,7 +405,7 @@ public:
         clear(cursor, length);
         owner.logical_bytes_ = length;
         if (owner.zero_from_ < length) owner.zero_from_ = length;
-        return owner;
+        return vok();
     }
 
     // Slot owner (R1): an empty owner on a slot of class `cls`. The slot's
@@ -352,14 +414,21 @@ public:
     // relocation. A slot has no OS step, so the owner never fails to grow
     // inside it except by failure injection.
     static VirtualMemoryStorage for_slot(std::size_t cls, std::size_t maximum_capacity, bool movable) {
-        if (cls >= SlotGeometry::classes)
-            throw std::invalid_argument("slot class out of range");
-        if (!movable && maximum_capacity > SlotGeometry::payload_bytes(cls))
-            throw std::invalid_argument("pinned slot smaller than maximum capacity");
-        if (consume_vm_failure(VmOperation::Reserve)) throw std::bad_alloc();
-        SlotHeader* slot = SlotSlab::acquire(cls);
-        if (!slot) throw std::bad_alloc();
         VirtualMemoryStorage owner;
+        XOFFSET_VREQUIRE(for_slot_v(owner, cls, maximum_capacity, movable));
+        return owner;
+    }
+    // for_slot into an empty owner.
+    static vstatus for_slot_v(VirtualMemoryStorage& owner, std::size_t cls, std::size_t maximum_capacity,
+                              bool movable) {
+        if (cls >= SlotGeometry::classes)
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "slot class out of range");
+        if (!movable && maximum_capacity > SlotGeometry::payload_bytes(cls))
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "pinned slot smaller than maximum capacity");
+        if (consume_vm_failure(VmOperation::Reserve)) XOFFSET_VFAIL_BAD_ALLOC();
+        SlotHeader* slot = SlotSlab::acquire(cls);
+        if (!slot) XOFFSET_VFAIL_BAD_ALLOC();
         owner.base_ = slot->payload();
         owner.reserved_bytes_ = SlotGeometry::slot_bytes(cls);
         owner.accessible_bytes_ = SlotGeometry::payload_bytes(cls);
@@ -369,7 +438,7 @@ public:
         owner.slot_class_ = static_cast<std::uint8_t>(cls);
         owner.movable_ = movable;
         owner.set_host_owner(nullptr);
-        return owner;
+        return vok();
     }
 
     // In-place reload: replace the logical content of this owner with
@@ -379,19 +448,24 @@ public:
     // leaves the old bytes and length unchanged.
     // `at` as in from_bytes.
     void assign_bytes(const char* bytes, std::size_t length, std::size_t at = 0) {
+        XOFFSET_VREQUIRE(assign_bytes_v(bytes, length, at));
+    }
+    vstatus assign_bytes_v(const char* bytes, std::size_t length, std::size_t at = 0) {
         if (length > maximum_capacity_ || at > length) {
-            throw std::invalid_argument("VM input length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM input length exceeds maximum capacity");
         }
         if (length != at && bytes == nullptr) {
-            throw std::invalid_argument("VM input is null");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "VM input is null");
         }
-        if (length == 0) { logical_bytes_ = 0; return; }
+        if (length == 0) { logical_bytes_ = 0; return vok(); }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
         std::memcpy(base_ + at, bytes, length - at);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
+        return vok();
     }
 
     // assign_bytes for a length that the accessible prefix already holds
@@ -412,12 +486,17 @@ public:
     // cleared wherever the old content may have left them dirty.
     void assign_extents(const char* stored, const void* extents, std::size_t count,
                         std::size_t length) {
+        XOFFSET_VREQUIRE(assign_extents_v(stored, extents, count, length));
+    }
+    vstatus assign_extents_v(const char* stored, const void* extents, std::size_t count,
+                             std::size_t length) {
         if (length > maximum_capacity_) {
-            throw std::invalid_argument("VM input length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM input length exceeds maximum capacity");
         }
-        if (length == 0) { logical_bytes_ = 0; return; }
+        if (length == 0) { logical_bytes_ = 0; return vok(); }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
         std::size_t cursor = 0;
         auto clear = [&](std::size_t begin, std::size_t end) {
@@ -435,6 +514,7 @@ public:
         clear(cursor, length);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
+        return vok();
     }
 
     // In-place direct receive: makes [0, length) the logical content for a
@@ -443,16 +523,22 @@ public:
     // beyond it are still zero, so a writer that skips ranges (sparse gaps)
     // clears only below it. A failure leaves the old bytes and length.
     std::size_t expose_for_overwrite(std::size_t length) {
+        std::size_t clean_from = 0;
+        XOFFSET_VREQUIRE(expose_for_overwrite_v(length, clean_from));
+        return clean_from;
+    }
+    vstatus expose_for_overwrite_v(std::size_t length, std::size_t& clean_from) {
         if (length > maximum_capacity_) {
-            throw std::invalid_argument("VM input length exceeds maximum capacity");
+            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                              "VM input length exceeds maximum capacity");
         }
         if (!base_ || !enable_prefix(length) || consume_vm_failure(VmOperation::Prepare)) {
-            throw std::bad_alloc();
+            XOFFSET_VFAIL_BAD_ALLOC();
         }
-        const auto clean_from = zero_from_;
+        clean_from = zero_from_;
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
-        return clean_from;
+        return vok();
     }
 
     ~VirtualMemoryStorage() { release(); }
@@ -523,12 +609,12 @@ public:
     // zeroes the newly exposed range even when it lies in previously used pages.
     void resize_logical(std::size_t new_logical_bytes) {
         if (new_logical_bytes > maximum_capacity_) {
-            throw std::length_error("VM length exceeds maximum capacity");
+            XOFFSET_THROW(std::length_error("VM length exceeds maximum capacity"));
         }
         if (new_logical_bytes <= logical_bytes_) {
             logical_bytes_ = new_logical_bytes;
         } else if (!grow_to(new_logical_bytes)) {
-            throw std::bad_alloc();
+            XOFFSET_THROW(std::bad_alloc());
         }
     }
 
@@ -632,7 +718,7 @@ private:
         }
         return true;
     }
-    void query_page_geometry() {
+    vstatus query_page_geometry() {
 #if defined(_WIN32)
         SYSTEM_INFO info{};
         ::GetSystemInfo(&info);
@@ -640,11 +726,12 @@ private:
         reservation_granularity_ = static_cast<std::size_t>(info.dwAllocationGranularity);
 #else
         const long page = ::sysconf(_SC_PAGESIZE);
-        if (page <= 0) throw std::bad_alloc();
+        if (page <= 0) XOFFSET_VFAIL_BAD_ALLOC();
         page_size_ = static_cast<std::size_t>(page);
         reservation_granularity_ = page_size_;
 #endif
-        if (page_size_ == 0 || reservation_granularity_ == 0) throw std::bad_alloc();
+        if (page_size_ == 0 || reservation_granularity_ == 0) XOFFSET_VFAIL_BAD_ALLOC();
+        return vok();
     }
 
     void release_slot() noexcept {

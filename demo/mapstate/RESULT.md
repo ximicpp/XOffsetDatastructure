@@ -23,6 +23,20 @@ it. Both run the same validator and send the same bytes.
 | Same bytes across compiler and platform | Apple M4 Mac, clang-p2996 d77eff1, arm64, against the cloud GCC 16 x86-64 run (`MAPDEMO_COMPARE`) | deferred (Mac queue, 10-26): Mac step file `slg-demo-20261022/review-20261024/MAC_STEPS_DEMO_REVIEW.md`, not yet queued |
 | Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | deferred (Mac queue, 10-26): same Mac step file |
 | Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
+| End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all six targets PASS (section 5) |
+| End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 151 / 151 verdicts (with step wires equal to `full1`), no sanitizer report |
+| Final local validation (10-27) | rebased on next_cpp26 5af77d3 (field-list backend #149): `full3` (six targets) and `asan2` | both PASS; corpus of `full1` replayed 60 / 60 on every target, step wires equal to `full1` at 500 / 500 ticks in every tier and mode |
+| End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
+| Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
+| End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
+| End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
+| Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
+| End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
+| Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
+
+Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
+wire, filler fields removed) changes the step and snapshot bytes, so their
+digests and byte counts are historical; section 5 is the current run.
 
 Cloud numbers are smoke numbers on a shared VM: they show the shape of the
 costs, not formal timings. Every timing is a process-local steady-clock
@@ -156,10 +170,234 @@ Formal Mac timing (Apple M4, clang-p2996 d77eff1): deferred (Mac queue), see the
   buffer (`direct_read` row); the headless client also ran under ASan+UBSan in
   both modes.
 
-## 5. Scope
+## 5. End to end: Linux servers, clients on other platforms (10-27)
+
+Branch `claude/mapdemo-e2e-20261027`, `tools/run_e2e.sh`. A and B: GCC
+16.2, C++26 reflection, statically linked so they run on the VM next to the
+clients. Each client target ran `--self-check`, `--replay` of one corpus,
+the three tiers with `--encoding cycle` (`reuse`) and `--evil`. Two runs:
+`full1` (four targets, on the field-list branch 83c21b9) wrote the corpus;
+`full2` (six targets, rebased on c8fc851 with the MSVC toolchains and
+next_cpp26 431a7ee) replayed that corpus and compared its step wires with
+`full1`: 500 / 500 ticks equal in every tier, so the rebase changed no byte.
+`full3` and `asan2` repeat this on next_cpp26 5af77d3 with the same result
+(the table below is `full3`). Output in the project folder
+`slg-demo-20261022/e2e-20261027/` (`mapdemo_e2e_cloud_full{1,2,3}.tgz`,
+`mapdemo_e2e_cloud_asan{1,2}.tgz`, `E2E_RESULT_cloud_full{1,2,3}.md`).
+
+| Client target (`full3`) | Runs under | Client build | Self-check | Replay (60 snapshots) | Tiers + evil | Step wires vs first target |
+| --- | --- | --- | --- | --- | --- | --- |
+| linux-gcc16-cxx26 | native | GCC 16.2, C++26, reflection | 23 / 23 | 60 / 60 same digests | 77 / 77 verdicts (with server self-test) | 3 / 3 equal to `full1` |
+| linux-gcc13-cxx20 | native | GCC 13.3, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 tiers equal |
+| windows-mingw | wine | MinGW GCC 16.2, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| windows-msvc | wine | MSVC 19.44, `/MT`, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| windows-clang-cl | wine | clang-cl 19.1, MSVC STL, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| android-arm64 | qemu-aarch64 user mode | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 |
+| macos (Mac M4, separate run) | native; A/B in colima, Linux arm64 | Apple clang 21, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| ios (Mac M4, separate run, 10-28) | iOS 27.0 Simulator (iPhone 17), arm64; A/B in colima, Linux arm64 | Apple clang 21, iPhoneSimulator 27.1 SDK, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
+| ios-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the cloud x86-64 run |
+
+What this shows:
+- Server to server across architectures: A and B built by GCC 16 for Linux
+  arm64 (colima on the Mac) sent the same step wires as the cloud x86-64
+  build at every one of 500 ticks in all three tiers.
+- C++26 reflection servers and C++20 field-list clients agree on the layout:
+  the Hello schema hash matches, and per request A and every client log the
+  same encoding, bytes sent, wire digest and content digest.
+- The same 60 snapshot payloads (20 per encoding) verify on every platform
+  to the same wire and content digests as A recorded; every self-check
+  refusal case (truncated or bit-flipped wires, wrong schema, malformed or
+  oversized zstd frames) is refused on every platform.
+- Bytes per snapshot, 10000-unit tier (client side, means): a 1024x768
+  viewport is about 15.1 KB as an XOffset wire and 6.4 KB with zstd (0.42); a
+  full-scene snapshot of 10000 units is about 321 KB and 123 KB with zstd
+  (0.38). A builds its snapshots with exact reservations, so the compact
+  wire is about the size of the dense one here.
+- Costs on A (cloud VM, p50, 10000-unit tier): saving a full-scene snapshot
+  takes 48 us dense and 235 us compact (`save_compact` walks the arena; it
+  gains nothing on these tightly built snapshots), zstd level 3 adds about
+  3.6 ms (0.17 ms for a viewport). The client's decompression is about
+  0.5 ms per full scene (3.8 ms under qemu) and verification about 0.06 ms
+  native. zstd therefore pays off on links slower than roughly 40 to 50 MB/s
+  (mobile networks are well below that); over loopback it only adds time.
+  Wine and qemu timings are not device timings.
+
+Sanitizers: the same run with GCC 16 Debug ASan+UBSan (A, B and a C++26
+client; `UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1`, leak detection
+on), both buffer modes: self-check 23 / 23, replay 60 / 60, three tiers x two
+modes + evil x two, no sanitizer report (`asan1` 145 / 145 verdicts;
+`asan2` on next_cpp26 151 / 151, step wires equal to `full1`).
+
+Android emulator (10-28, next_cpp26 00b5d35): the client built with NDK r29
+ran inside the Android 15 emulator (API 35, google_apis arm64-v8a image
+with 16 KB pages) on the Mac M4 and reached A in colima through the
+emulator's host address 10.0.2.2. It passed self-check, the replay of the cloud corpus
+and the three tiers with evil; the library's CTest passed 91 / 91 on the
+same emulator and the 15 compile-failure tests passed with the same NDK in
+the cloud. Client side, 10000-unit tier, p50 (emulator numbers, not device
+numbers): a viewport is 15,072 B as a wire and 6,372 B with zstd, decoded in
+43.5 us and verified in 6.0 us; a full scene is 321,288 B and 122,724 B with
+zstd, decoded in 463 us and verified in 34 us. Output:
+`mobile_sim_android_out.tar.gz` in the project folder (sha256
+`dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
+table `out-android/android/demo/E2E_RESULT.md`.
+
+Clients without exceptions (10-28): every client build also makes
+`mapdemo_client_noexc` from the same sources (`-fno-exceptions`; MSVC and
+clang-cl `/EHs-c- /D_HAS_EXCEPTIONS=0`). Its failures are values
+(`include/mapdemo/result.hpp`), and snapshots go through `try_load_verified` /
+`try_reload_verified` (SC-8, #148). Each run covered the six targets of
+`full3`, each with and without exceptions, against the corpus and step wires
+of `full1`. The final run `noexc3` (next_cpp26 c928334 with the MinGW fix
+#155, and A's close below) passed on all 12 targets: self-check 23 / 23,
+replay 60 / 60, the three tiers and evil, and step wires equal at 500 / 500
+ticks. `e2e_report.py` found the same self-check outcomes and refusal texts,
+and the same evil outcomes, on all 12 targets. Further runs on the same tree:
+- ASan+UBSan, both GCC 16 C++26 clients in both buffer modes (`noexc_asan2`):
+  151 / 151 and 149 / 149 verdicts, no sanitizer report.
+- The window client without exceptions under Xvfb: 10000 units, all three
+  encodings, `direct_read` 68 / 68.
+- `noexc1` (next_cpp26 579ca44 with the same MinGW fix) also passed on all 12
+  targets.
+
+The Linux client without exceptions references none of `__cxa_throw`,
+`__cxa_begin_catch` and `__gxx_personality_v0`.
+
+MinGW needed a library fix. With two translation units that include
+`xoffset_error.hpp`, MinGW GCC 16 failed to link. `detail::pending_error`
+was a namespace-scope `inline thread_local`; #155 makes it function-local.
+
+End of a session on Windows. In `noexc2` (before A's close changed) the
+clang-cl client with exceptions failed at the end of the 10000-unit tier:
+"recv: Connection reset by peer", and A's last snapshot never logged. A had
+closed the connection with one request still unread, so the close sent a
+reset. Windows drops received data that the program has not read yet, the
+last snapshot and the `Bye` included; Linux keeps it readable. A two-file
+probe shows both behaviours (`reset_probe/`: the Linux client reads `BYE`,
+the same client under wine gets WSA 10054). A now shuts down its sending side
+after the `Bye` and reads each client until the client closes, 2 s at most,
+before closing (INTERFACES.md). With that change `noexc3` passed, and so did
+30 short runs of the clang-cl client (all client exits 0).
+
+Cost: verification without exceptions is slower. In that build the
+library's receive path returns a status from every check (`XOFFSET_VTRY`).
+On `noexc1`'s binaries, the two clients replayed the 60-snapshot corpus in
+alternation (28 rounds each on Linux, 18 under wine). Per-snapshot medians,
+summed, give this ratio without / with exceptions (full scenes, then
+viewports):
+
+| Build | Full scenes | Viewports |
+| --- | --- | --- |
+| GCC 16 | 1.10x | 1.17x |
+| GCC 13 | 1.24x | 1.29x |
+| MSVC | 1.08x | 1.08x |
+| clang-cl | 1.10x | 1.15x |
+| MinGW | 1.16x | 1.09x |
+
+That is at most about 10 us more per full scene and under 1 us per viewport.
+Output in the project folder `mapdemo-noexc-20261028/`:
+`mapdemo_e2e_cloud_noexc{1,2,3}.tgz`, `mapdemo_e2e_cloud_noexc_asan{1,2}.tgz`,
+`mapdemo_noexc_ab_replay.tgz`, `mapdemo_noexc_xvfb_shots{,2}.tgz` (the window
+runs with their screenshots), `reset_probe/` and the `E2E_RESULT_*.md`
+files, with sha256 in `SHA256SUMS`.
+
+The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
+the Mac's screen was asleep); the client now exits 2 with "cannot open a
+window" instead (checked without a display and under Xvfb). With the screen
+awake (10-28, next_cpp26 00b5d35) the window client ran on the Mac M4 against
+A and B in colima: exit 0, three screenshots, `direct_read` 71 / 71. The frame
+420 status bar reads tick 270, 474 units visible, a 15,376 B snapshot sent as
+6,666 B of zstd, view round trip 17 ms (frame-paced), `reload_verified` 8.0
+us, 59 fps. Output: `mobile_sim_macos_window_out.tar.gz` in the project folder
+(sha256 `0f71e100757c95f10ed2b62e04cb956763c75ec3cf208ce0a2e4e9af7dc87043`),
+screenshots under `out-macos-window/macos/shots/`.
+
+iOS Simulator (10-28): the pack was next_cpp26 af601ea plus #160, which
+changes only tests. The clients built with and without exceptions (Apple
+clang 21, iPhoneSimulator 27.1 SDK) ran in the iOS 27.0 Simulator (iPhone 17)
+on the Mac M4 against A and B in colima. Both passed self-check, the replay of
+the cloud corpus, the three tiers and evil, with the same self-check and evil
+outcomes, and their step wires equal the cloud x86-64 run at 500 / 500 ticks
+in every tier. The library's CTest passed 129 / 129 in the simulator and its
+corpus matched the Linux reference. Client side, 10000-unit tier, p50
+(simulator numbers, not device numbers): a viewport is 15,072 B as a wire and
+6,372 B with zstd, decompressed in 43.6 us and verified in 6.1 us; a full
+scene is 321,288 B and 122,724 B with zstd, decompressed in 500 us and
+verified in 55 us. The client without exceptions measured 37.9 / 5.2 us and
+491 / 56 us in the same run; one sequential run does not resolve the 1.1x to
+1.3x verification difference of the interleaved replays above. Output:
+`mobile_sim_ios_out.tar.gz` in the project folder (sha256
+`daa917de3122e8a95fb3e84a0aa613d297856531f6112e24bc258c458a004c4b`), result
+table `out-ios3/ios/demo/E2E_RESULT.md`.
+
+Every planned run of this section has been done. The Android client without
+exceptions ran under qemu in the cloud (`noexc3`) but not in the Android
+emulator; real phones come later.
+
+## 6. Event stream: small messages with a zstd dictionary (10-28)
+
+3.2 SC-11 part 2: make one small message cost no more than in FlatBuffers.
+The dictionary code is `contrib/zstd_dict` (outside the library); the demo
+adds an optional event stream that uses it (INTERFACES.md sections 3 to 6).
+Every 20 ticks A turns the rules' unit events (the units with id % 100 == 0)
+into `UnitEvent` wires of 144 to 168 bytes (`save_compact`,
+`XCompactOptions{0}`) and pushes them to subscribed clients, at most 128 per
+`Events` frame, in one of four encodings. The dictionary
+`dict/unit_event_v1.xozd` (id 1, 16 KB, bound to `UnitEvent`) was trained on
+10000 events of a seed 7 run (`mapdemo_a --events-dump`); measured on a seed 3
+run it gives 68.0 B per event alone and 46.7 B in batches of 128, against
+156.8 B raw.
+
+Bytes per event, 10000-unit tier, client side (`events_cycle`; every target
+logs the same bytes, times are p50 per frame of 100 events):
+
+| Encoding | Payload | Wire bytes | Bytes sent | Sent / wire | Decode (us), Linux GCC 16 | Decode (us), MSVC under wine | Verify (us), Linux GCC 16 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `raw` | count + lengths + wires | 144 | 146 | 1.01 | 2.0 | 2.8 | 7.7 |
+| `zstd` | one zstd-3 frame per wire, no dictionary | 167 | 152 | 0.91 | 298 | 285 | 8.9 |
+| `zdict` | one dictionary frame per wire | 144 | 68.3 | 0.47 | 107 | 118 | 8.4 |
+| `batch` | one dictionary frame for the frame's 100 wires | 168 | 52.5 | 0.31 | 58.8 | 57.3 | 8.0 |
+
+Wire sizes differ by encoding because `cycle` gives each encoding other
+ticks (names alternate between a short and a long form). Plain zstd does
+nothing for a message this small; the dictionary halves it; batching takes
+another quarter off. Decoding a 100-event frame takes about 0.6 to 1 us per
+event with the dictionary (cold caches: one frame every second).
+
+The same component on the SLG bench's battle report (D class: XOffset 197 B,
+FlatBuffers 158 B), same 16 KB dictionary size, framing and level 3 for every
+format: one message XOffset 56.2 B, FlatBuffers 56.3 B (1.00; target 1.1 or
+less); batches of 8 / 32 / 128 XOffset 40.4 / 37.2 / 34.5 B, FlatBuffers
+41.9 / 38.1 / 35.3 B (0.96 / 0.98 / 0.98; target 1.0 or less). Without a
+dictionary XOffset 135.9 B, FlatBuffers 114.0 B. Two choices got XOffset
+there: a bound dictionary leaves out the 24 wire header bytes its schema
+fixes, and the batch interleaves lengths and messages; before that the
+batches were 1.04 to 1.07 times FlatBuffers.
+
+Refusals, checked offline by `--self-check` on all 12 targets with the same
+texts: frames made with dictionary version 2 (single and batch: "frame uses
+dictionary 2, this end has 1"), dictionary frames without an id or a content
+size, truncated, with a trailing byte, in the standard format or declaring
+more than the 4 KiB event cap (refused before decoding), batches of 129
+events, forged lengths, short messages, a corrupt dictionary file and a
+dictionary bound to another schema. Online (`--evil`): a Subscribe with
+dictionary version 2, with another `UnitEvent` schema hash, or asking for
+encoding 7, each answered by `Error`; A logs nine `rejected:` lines.
+
+Without `--events` the client never subscribes: the `events_off` run has the
+verdict counts of `noexc3` (77 / 75 per target) and the same step wires.
+Output in the project folder `small-msg-dict-20261028/`
+(`mapdemo_e2e_events_{off,cycle}.tgz`, `mapdemo_asan_events.tgz`,
+`E2E_RESULT_events_{off,cycle}.md`, the dictionaries and the event dumps they
+were trained and measured on, `slg-d/` for the SLG measurements; sha256 in
+`SHA256SUMS`).
+
+## 7. Scope
 
 One arena per batch, per snapshot and for the catalog (kept and refilled in
-`reuse`, new per message in `fresh`); no `XBufferPool`, compression,
+`reuse`, new per message in `fresh`); zstd is a transport encoding, the
+decompressed wire is verified like any other; no `XBufferPool`,
 incremental sync, LOD or gameplay; validation never disabled. Structural
 validation is not authentication or tamper-proofing. The full-batch round trip
 every step is a validation workload, not a production architecture, and these

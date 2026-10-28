@@ -15,6 +15,7 @@ struct FutureRoot {
     xo::XVector<ex::Word> words;
     xo::XVector<ex::Owned> owned;
 };
+XOFFSET_RECORD_DERIVED(FutureRoot, (), early0, early1, words, owned)
 namespace XOffsetDatastructure {
 template<> struct wire_record_layout<FutureRoot> { static constexpr bool ordinary_members=true; };
 }

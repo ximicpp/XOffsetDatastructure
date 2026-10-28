@@ -15,18 +15,52 @@ force-push. The skeleton builds at every commit: replace stubs, do not delete th
 Review iteration (10-24, branch `claude/demo-review-20261024` from next_cpp26
 d58781e, one thread): adds `--buffers reuse|fresh` to every process, step wire
 digests in `a_steps.csv`, `net::PeerClosed`, payload recycling in `net::Conn`,
-a fourth `--evil` case and cross-run digest comparison. The sections below
-describe the result.
+a fourth `--evil` case and cross-run digest comparison.
+
+End-to-end iteration (10-27, branch `claude/mapdemo-e2e-20261027` from
+next_cpp26 83c21b9, one thread): Linux A and B serve clients built for other
+platforms. The schema drops its filler fields for the V2.1 wire and is
+declared with `XOFFSET_RECORD` field lists, so the client builds as C++20
+(MinGW, MSVC, Android NDK, iOS Simulator) while A and B keep C++26
+reflection; the network layer runs on Winsock too; snapshots travel dense,
+compact or zstd-compressed (`codec.hpp`); the client gains `--self-check`
+and `--replay`; `tools/run_e2e.sh` runs every client target. The sections
+below describe the result.
+
+No-exceptions iteration (10-28, branch `claude/mapdemo-noexc-20261028` from
+next_cpp26 92404a2, one thread, after the library's non-throwing receive
+entries, #148): the client side never throws. `result.hpp` adds `Error`,
+`Result<T>` and `Status`; every `net` call gets a non-throwing `try_*` form
+(the throwing forms remain for A, B and the self-test, in builds with
+exceptions; the old non-blocking `try_recv` is now `recv_nowait`); the
+codec returns `Status`; the client verifies with `try_load_verified` /
+`try_reload_verified`. CMake builds `mapdemo_client_noexc` from the same
+sources without exceptions, and `e2e_report.py` requires the same
+self-check outcomes and texts on every target.
+
+Small-message iteration (10-28, branch `claude/small-msg-dict-20261028` from
+next_cpp26 af601ea, one thread, agreed with the demo thread): an optional
+event stream. A client that subscribes gets the rules' unit events (every
+20 ticks, the units with id % 100 == 0) as `UnitEvent` wires, raw, zstd,
+zstd with a dictionary, or batched in one dictionary frame. The dictionary
+code is `contrib/zstd_dict` (outside the library); the dictionary
+(`dict/unit_event_v1.xozd`, id 1, trained on A's events) is compiled into
+every binary at configure time. The Subscribe names the client's dictionary
+id and A refuses another. New: `MsgType` 10-12, `codec` event encoder and
+decoder, A `--events-dict` / `--events-dump`, client `--events`, three evil
+cases, 25 self-check cases (48 in all), `a_events.csv` / `client_events.csv`. Without
+`--events` (the default `off`) the client never subscribes and runs exactly
+as before.
 
 | Owner thread | Files |
 | --- | --- |
-| Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/selftest.cpp` |
+| Common library | `include/mapdemo/rules_impl.hpp`, `src/net.cpp`, `src/metrics.cpp`, `src/checks.cpp` (+ optional `include/mapdemo/checks_impl.hpp`), `src/codec.cpp`, `src/selftest.cpp` |
 | Servers | `src/server_a.cpp`, `src/server_b.cpp` (+ optional `src/server_*.hpp`) |
-| Client | `src/client_main.cpp`, `src/client_core.cpp`, `src/client_core.hpp`, `src/client_gui.cpp` |
-| Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files |
+| Client | `src/client_main.cpp`, `src/client_core.cpp`, `src/client_core.hpp`, `src/client_offline.cpp`, `src/client_gui.cpp` |
+| Integration | `CMakeLists.txt`, top-level `CMakeLists.txt` hook, `README.md`, `tools/*`, `.github/workflows/*` demo job, `RESULT.md`, Mac step files, `dict/*.xozd` |
 
 Frozen headers (`schema.hpp`, `std_model.hpp`, `rules.hpp`, `net.hpp`,
-`metrics.hpp`, `checks.hpp`) change only with a note to every demo thread
+`metrics.hpp`, `checks.hpp`, `codec.hpp`, `result.hpp`) change only with a note to every demo thread
 (through the coordinator); additive helpers are fine.
 
 Priority for the common-library thread: `src/net.cpp` first (everything else
@@ -40,7 +74,20 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
   Binaries land in `<build>/bin/<Config>/` and must run inside the container.
 - Mac: clang-p2996 d77eff1, same options, plus `-DCMAKE_PREFIX_PATH=<raylib 5.5 prefix>`
   for the window client (design section 9).
-- All demo code is built with `-ffp-contract=off` (set on `mapdemo_common`).
+- Client targets: `-DMAPDEMO_CLIENT_ONLY=ON -DXOFFSET_CXX_STANDARD=20` with a
+  toolchain file from `cmake/toolchains/` (MinGW-w64, Android arm64, iOS
+  Simulator) or a native compiler (MSVC, Apple Clang); the schema then comes
+  from the `XOFFSET_RECORD` field lists, which C++26 builds check against
+  reflection. The Hello schema hash is the same in both builds.
+- zstd 1.5.7 is built from its release tarball (SHA-256 pinned;
+  `-DMAPDEMO_ZSTD_URL=<local copy>` builds offline; `-DMAPDEMO_WITH_ZSTD=OFF`
+  leaves dense and compact only, and the raw event encoding).
+- With zstd, `contrib/zstd_dict/xoffset_zstd_dict.cpp` is compiled into the
+  common library, and configure turns `dict/unit_event_v1.xozd` into a C++
+  array (`file(READ ... HEX)`, no host tool, so cross builds need nothing
+  extra). Without that file the dictionary encodings are unavailable.
+- All demo code is built with `-ffp-contract=off` (set on `mapdemo_common`;
+  MSVC does not contract by default).
 - Write conservative C++ for clang-p2996 d77eff1: explicit includes (`<span>`,
   `<optional>`, ...), no deduced return types used before their definition.
 
@@ -49,13 +96,60 @@ needs it to run), then `rules_impl.hpp`, `metrics.cpp`, `checks.cpp`, `selftest.
 ```
 mapdemo_b      [--port 47702] [--seed 1] [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_a      [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
-               [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
+               [--host 127.0.0.1] [--port 47701] [--b-host 127.0.0.1] [--b-port 47702]
                [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
+               [--corpus-dir DIR [--corpus-max 60]] [--events-dict FILE] [--events-dump DIR]
 mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check]
-               [--buffers reuse|fresh] [--csv-dir DIR] [--auto-drag]
-               [--screenshot-at F1,F2,...] [--evil]
+               [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]
+               [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]
+               [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]
+mapdemo_client --self-check [--csv-dir DIR]
+mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]
 mapdemo_selftest [--csv-dir DIR]
 ```
+
+- A `--host`: the address A listens on for clients (`0.0.0.0` when the client
+  is in an emulator or another machine; B stays on 127.0.0.1).
+- A `--corpus-dir`: keeps the first `--corpus-max` snapshot payloads exactly
+  as sent (`snap_<request_id>.<encoding>`) and `corpus.csv` with A's digests.
+- Client `--encoding` (default `zstd`, or `compact` without zstd): the
+  snapshot encoding asked for in every `ViewReq`; `cycle` takes
+  `request_id % 3` (dense, compact, zstd), so one run covers all three.
+- A `--events-dict FILE` / client `--events-dict FILE`: use this `.xozd`
+  file instead of the built-in dictionary (it must be bound to `UnitEvent`).
+  A `--events-dump DIR`: appends every event wire A builds to
+  `DIR/events.bin` (u64 little-endian length + wire), the training input of
+  `xoffset_zstd_dict train ... records:DIR/events.bin`.
+- Client `--events` (default `off`): after the `Catalog` the client sends
+  `Subscribe` with this mode and its dictionary id, waits for `SubscribeOk`,
+  then takes `Events` frames between snapshots. `cycle` lets A rotate the
+  encoding per event tick (`tick / 20 % 4`: raw, zstd, zdict, batch). A
+  refusal (`Error`) is an error: "A refused the event subscription: ...".
+- Client `--self-check`: no network; builds sample snapshots and checks that
+  every encoding verifies and that the refusal cases are refused (truncated
+  and bit-flipped wires, wrong schema, malformed zstd frames, over-cap
+  sizes). The event cases: the built-in dictionary parses; every event
+  encoding round trips 20 events to the same wires and shrinks them; and
+  these are refused: a count of 0, a truncated or trailing event, the wrong
+  schema, a truncated wire inside a dictionary frame, a zstd frame without
+  a content size, frames made with dictionary version 2 (single and batch),
+  dictionary frames without an id or a size, truncated, with a trailing
+  byte, in the standard (magic) format or declaring more than the event cap,
+  batches of 129 events, a forged length or a message shorter than a wire
+  header, a dictionary file with a bad checksum, and a dictionary bound to
+  another schema. Exit 0 when all pass.
+- Client `--replay DIR`: no network; verifies every corpus snapshot and
+  compares wire bytes, wire digest, content digest, request id and visible
+  count with A's row, so every platform shows it reads the same bytes the
+  same way. Exit 0 when all match.
+- Every client run prints `client: build <compiler, os, arch, C++ standard,
+  schema backend, exceptions on|off, zstd>` and writes it to
+  `client_build.txt` in `--csv-dir`; A and B print the same line for
+  themselves.
+- `mapdemo_client_noexc` takes the same options and behaves the same; it is
+  built without exceptions. A library failure it cannot get back as a value
+  (outside the receive path, e.g. an arena exhausted while building a
+  request) goes to the fatal handler: one `error:` line, exit 2.
 
 - `--buffers` (default `reuse`, `include/mapdemo/buffer_mode.hpp`):
   - `fresh`: every received batch, request and snapshot is a new `XBuffer`
@@ -71,6 +165,10 @@ mapdemo_selftest [--csv-dir DIR]
   03:19Z 10-22); a mismatch shows up as a `reference_model` check failure on A.
 - `--steps 0` and `--duration-s 0` mean unlimited. A stops after whichever limit
   is reached, sends `Bye` to B and the client, writes its CSV files, exits.
+  After the `Bye` A shuts down its sending side and reads each client
+  connection until the client closes (2 s at most) before closing it: a
+  request still unread at close would reset the connection, and a Windows
+  client then drops the snapshot and `Bye` it has not read yet (10-28).
 - `--check` defaults: on for A and the headless client, off for the window client.
 - Exit codes: 0 success, 1 a check failed, 2 usage / protocol / IO / capacity error.
   Every error prints one line starting with `error:` to stderr.
@@ -84,15 +182,26 @@ mapdemo_selftest [--csv-dir DIR]
 | A connects to B | A `Hello(hello_payload())` → B `HelloOk` (mismatch: `Error`, exit 2) |
 | Each step | A `StepReq(corr = tick T, UnitStateBatch wire)` → B `StepRes(corr = T+1, wire)`; at most one in flight |
 | Client connects to A | client `Hello` → A `HelloOk`, then A `Catalog(MapCatalog wire)` |
-| View | client `ViewReq(corr = request_id, flags = ViewCategory, ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot wire)`; at most one outstanding per client |
+| View | client `ViewReq(corr = request_id, flags = codec::view_flags(category, encoding), ViewRequest wire)` → A `ViewSnapshot(corr = request_id, flags echoed, ViewSnapshot payload in that encoding)`; at most one outstanding per client |
 | Illegal / malformed request | A answers `Error(text)` (bad wire or illegal rect) or closes the connection (bad header, oversize length), logs `rejected: ...`, keeps running |
+| Events (optional) | client `Subscribe(flags = event mode, codec::subscribe_payload(dictionary id))` after the `Catalog` → A `SubscribeOk`, or `Error` for a second Subscribe, a bad payload (length, UnitEvent fingerprint, reserved field), an unknown mode, a build without zstd, or a dictionary mode while the ids differ ("subscribe: event dictionary X does not match A's dictionary Y"); then after each step whose tick % 20 == 0, A sends `Events(corr = tick, flags = event encoding, payload)` per 128 events, none after `Bye` |
 | End | A `Bye` to B and client |
 
 `net` behaviour (src/net.cpp):
-- `recv` / `try_recv` return an `Error` frame only when `Error` is in `allowed`;
-  otherwise an `Error` frame throws `ProtocolError("peer error: <text>")`.
-- A clean close or a reset between frames throws `PeerClosed` (derived from
-  `ProtocolError`); a close in the middle of a frame stays a `ProtocolError`.
+- Every call has a non-throwing form returning `Result<T>` / `Status`
+  (`result.hpp`): `Conn::try_connect`, `try_send`, `try_recv`,
+  `try_send_raw`, `try_set_nonblocking`, `try_enqueue`, `try_flush`,
+  `try_recv_nowait`, `Listener::try_bind`, `try_accept`, `net::try_poll`.
+  The client uses only these. In builds with exceptions the throwing forms
+  (`connect`, `send`, `recv`, `send_raw`, `set_nonblocking`, `enqueue`,
+  `flush`, `recv_nowait`, `bind`, `accept`, `poll`) wrap them and throw
+  `ProtocolError` with the same text, or `PeerClosed` where the `Error` has
+  `peer_closed` set.
+- `recv` / `recv_nowait` return an `Error` frame only when `Error` is in
+  `allowed`; otherwise an `Error` frame fails with `"peer error: <text>"`.
+- A clean close or a reset between frames is `PeerClosed` (`peer_closed`,
+  derived from `ProtocolError`); a close in the middle of a frame stays a
+  plain `ProtocolError`.
 - `Listener::bind` sets `SO_REUSEADDR`. On a non-blocking listener `accept()`
   returns a `Conn` that is not open when nobody is waiting; check `is_open()`.
 - Payload recycling (used by `--buffers reuse`): `recycle_rx(std::move(s))`
@@ -101,13 +210,52 @@ mapdemo_selftest [--csv-dir DIR]
   fully written `enqueue()`, cleared, to save the next message into. Lengths
   are still checked against the per-type limit before any allocation.
 
+`ViewReq` flags (`codec.hpp`): bits 0-7 the `ViewCategory`, bits 8-11 the
+snapshot encoding, bits 12-15 zero. A refuses an unknown category, an
+unknown encoding (3 is reserved for lz4), a set reserved bit, or zstd when it
+was built without it. Encodings of the `ViewSnapshot` payload:
+
+| Encoding | Payload |
+| --- | --- |
+| 0 `dense` | `save_verified` wire |
+| 1 `compact` | `save_compact` wire (`XCompactOptions{0}`: no spare capacity) |
+| 2 `zstd` | the compact wire as one zstd frame, level 3 |
+
+`Events` payload encodings (`codec::EventEncoding`, the frame's flags):
+
+| Encoding | Payload |
+| --- | --- |
+| 0 `raw` | varint count, then per event varint length + the `UnitEvent` wire (`save_compact`, `XCompactOptions{0}`) |
+| 1 `zstd` | varint count, then per event varint length + a zstd level 3 frame of the wire, no dictionary |
+| 2 `zdict` | varint count, then per event varint length + a lean dictionary frame (`contrib/zstd_dict`: magicless, dictionary id and content size, no checksum, the 24 bound header bytes left out) |
+| 3 `batch` | one lean dictionary frame holding all the events (varint count, then varint length + elided wire each) |
+
+The decoder checks before allocating: count 1..128, every part and every
+declared content size within `kCapEvent` (4 KiB per wire; the frame
+length limit is 1 MiB), the frame's dictionary id equal to its own,
+exactly one frame per part and nothing after the last event. Then the client
+verifies every wire with `try_load_verified<UnitEvent>` /
+`try_reload_verified` and checks its content (tick, id % 100, ascending ids,
+hp 50..100, behavior, name, path and waypoint, position in the scene).
+
+The client decodes a zstd payload only when it is exactly one standard zstd
+frame (no skippable frame, no trailing bytes) whose header declares a content
+size no larger than the snapshot cap (16 MiB), with a 16 MiB window limit,
+and the output has exactly that size; then it verifies the wire like any
+other (`load_verified` / `reload_verified`). zstd removes no check.
+
 Receivers verify every wire with the caps in `schema.hpp`: `load_verified<T>(payload,
 cap_*())` in `fresh` mode, `reload_verified<T>(payload)` on a buffer created with
-the same cap in `reuse` mode. There is no `XBufferPool`.
+the same cap in `reuse` mode. The client uses the non-throwing forms
+`try_load_verified` / `try_reload_verified` (same checks, same failure texts).
+There is no `XBufferPool`.
 
-Every schema struct is declared an ordinary record with `XOFFSET_ORDINARY_RECORDS`
-(`USER_GUIDE.md` section 3.1): the declaration does not change a wire byte (the
-self-test digests equal those of d58781e, which had no declaration).
+Every schema struct is declared with `XOFFSET_RECORD(Type, fields...)` in
+declaration order: C++20 builds take the layout from these lists, C++26
+builds check them against reflection. The V2.1 wire (12-byte container heads)
+left padding in the old layouts, so the filler fields went: `UnitState` is
+56 bytes, `VisibleUnit` 32, `ViewSnapshot` 48, all without padding. Step and
+snapshot wire bytes differ from runs before 10-27.
 
 ## 5. Behaviour fixed for all threads
 
@@ -130,9 +278,13 @@ self-test digests equal those of d58781e, which had no declaration).
   `ViewRequest` wire, a `ViewSnapshot` wire as `ViewReq` (wrong schema), a header
   declaring a 1 GiB `ViewReq`; (4) on one connection: a valid request, a
   truncated one, another valid one (a rejected wire on a kept receive buffer
-  must not break the next request on that connection). Expects `Error` or a
-  close for each bad request; exit 0 when all four were rejected and A answered
-  every valid request. A logs four `rejected:` lines.
+  must not break the next request on that connection); (5) a `ViewReq` asking
+  for encoding 3; (6) a `ViewReq` with reserved flag bit 12 set. Expects
+  `Error` or a close for each bad request; (7) a `Subscribe` holding
+  dictionary version 2, (8) a `Subscribe` with another `UnitEvent` schema
+  hash, (9) a `Subscribe` asking for event encoding 7, each answered by
+  `Error`. Exit 0 when all nine were rejected and A answered every valid
+  request. A logs nine `rejected:` lines.
 
 ## 6. Metrics (metrics.hpp names) and CSV files
 
@@ -140,9 +292,9 @@ Units: `_us` microseconds (process-local steady clock), `_bytes`, `_count`.
 
 | Process | Metric names |
 | --- | --- |
-| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes`, `a.visible_count`, `a.check_us` |
+| A | `a.units_count`, `a.ticks_per_s`, `a.ab_rtt_us` (send start → StepRes complete), `a.step_req_bytes`, `a.step_res_bytes`, `a.save_us`, `a.load_us` (load or reload), `a.destroy_us`, `a.req_load_us`, `a.filter_us`, `a.snap_build_us`, `a.snap_save_us`, `a.snap_destroy_us`, `a.snap_bytes` (XOffset wire), `a.snap_net_bytes` (payload sent), `a.snap_compress_us` (zstd only), `a.visible_count`, `a.check_us` |
 | B | `b.load_us`, `b.modify_us`, `b.save_us`, `b.send_us`, `b.destroy_us`, `b.in_bytes`, `b.out_bytes` |
-| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes`, `c.visible_count`, `c.catalog_load_us` |
+| Client | `c.view_rtt_us` (ViewReq sent → ViewSnapshot complete), `c.load_us`, `c.read_present_us` (field read + presentation data, MERGED), `c.draw_us`, `c.present_us`, `c.destroy_us`, `c.snap_bytes` (XOffset wire), `c.snap_net_bytes` (payload received), `c.decompress_us` (zstd only), `c.visible_count`, `c.catalog_load_us` |
 
 The four destroy metrics (`a.destroy_us`, `a.snap_destroy_us`, `b.destroy_us`,
 `c.destroy_us`) exist only with `--buffers fresh`; `reuse` destroys nothing per
@@ -155,19 +307,34 @@ Files in `--csv-dir` (comma separated, header row first):
 | --- | --- |
 | `a_metrics.csv`, `b_metrics.csv`, `client_metrics.csv` | `role,metric,count,mean,p50,p95,max` |
 | `a_steps.csv` | `tick,req_bytes,res_bytes,ab_rtt_us,save_us,load_us,destroy_us,free_blocks,free_bytes,check_ok,req_digest,res_digest` |
-| `a_snapshots.csv` | `request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,req_load_us,filter_us,build_us,save_us,destroy_us,check_ok` |
-| `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok` |
+| `a_snapshots.csv` | `request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us` |
+| `client_snapshots.csv` | `request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,decompress_us` |
+| `corpus.csv` (A `--corpus-dir`) | `request_id,flags,category,encoding,file,net_bytes,wire_bytes,wire_digest,digest,visible` |
+| `client_replay.csv` (client `--replay`) | `request_id,category,encoding,net_bytes,wire_bytes,wire_digest,digest,decompress_us,load_us,result` |
+| `a_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us` (one row per `Events` frame) |
+| `client_events.csv` | `tick,part,encoding,count,wire_bytes,net_bytes,digest,decode_us,verify_us,check_ok` |
+| `client_build.txt` | one line: how the client was built |
 | `a_checks.csv`, `client_checks.csv`, `selftest_checks.csv` | `check,result,detail` (`result` is `pass` or `fail`; coverage counts go in `detail`) |
 
 `a_checks.csv` rows, in this order: `batch_roundtrip`, `reference_model`,
-`modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`.
+`modification_coverage`, `view_snapshot`, `snapshot_paths`, `rejected_requests`,
+`event_stream` (subscribers, dictionary id, frames per encoding; passes with
+no subscriber). A subscribed client adds `events_subscribed`,
+`events_received` and `event_content` to `client_checks.csv`.
+In the event files `wire_bytes` is the sum of the frame's UnitEvent wires,
+`net_bytes` the payload, and `digest` the `checks::wire_digest` of the raw
+encoding of the same wires, so A and the client must agree on all of them
+per (tick, part, encoding) whatever the encoding.
 
 `category` is `normal`, `full`, or `empty`; `digest` is 16 lowercase hex digits
 of `checks::snapshot_digest`; `check_ok` is `1` or `0`. `req_digest` and
 `res_digest` are 16 lowercase hex digits of `checks::wire_digest` over the exact
 `StepReq` / `StepRes` payload bytes (empty without `--check`): equal digests per
 tick across runs mean the same bytes, whatever the buffer mode, compiler or
-platform that produced them.
+platform that produced them. In the snapshot files `wire_bytes` and
+`wire_digest` describe the XOffset wire after any decompression and
+`net_bytes` the payload on the network; A and the client must agree on all of
+them per request id.
 
 ## 7. Done criteria per thread
 
@@ -177,3 +344,4 @@ platform that produced them.
 | Servers | A and B run 500 steps at 1 / 100 / 10000 units with `--check` all passing, with the headless client attached |
 | Client | headless sampling and `--evil` pass against A; window client builds on the Mac and shows units moving, state changes and other areas after a drag (screenshots) |
 | Integration | `tools/run_all_tiers.sh` runs the three tiers + `--evil` and `tools/summarize.py` writes the result tables; local validation (GitHub CI is not used); Mac step file; `RESULT.md`; PR to next_cpp26 |
+| End to end (10-27) | `tools/run_e2e.sh` passes for every client target (Linux, Windows MinGW and MSVC, Android emulator, iOS Simulator): self-check, replay of one corpus, the three tiers with `--encoding cycle`, evil; `tools/e2e_report.py` writes `E2E_RESULT.md` |

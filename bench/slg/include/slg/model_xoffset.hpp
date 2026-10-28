@@ -80,7 +80,26 @@ struct alignas(8) ShardState {
 // then relocate by SHIFT on erase/reserve, and the shard ticks remove arrived
 // marches with stable_erase_if. Before 2026-10-22 only March was declared
 // (StableEraseOrdinaryMembers); see bench/slg/MANIFEST.
-#ifdef XOFFSET_ORDINARY_RECORDS
+//
+// XOFFSET_RECORD carries the same declaration plus the field list a build
+// without reflection needs; a C++26 build checks each line against reflection.
+// The lines are tools/describe_dump's output for the three roots, verbatim
+// (the describe_dump_slg test keeps it that way).
+#if defined(XOFFSET_RECORD)
+XOFFSET_RECORD(slg::xm::City, city_id, level, buildings, resources)
+XOFFSET_RECORD(slg::xm::Skill, id, level)
+XOFFSET_RECORD(slg::xm::Buff, id, stacks, expire_ms)
+XOFFSET_RECORD(slg::xm::Hero, id, level, star, name, skills, buffs)
+XOFFSET_RECORD(slg::xm::Troop, type, count, wounded)
+XOFFSET_RECORD(slg::xm::Army, army_id, owner_id, x, y, heroes, troops, buffs)
+XOFFSET_RECORD(slg::xm::PlayerState, player_id, name, city, armies, heroes, research, items)
+XOFFSET_RECORD(slg::xm::Event, round, hero_id, skill_id, target, damage)
+XOFFSET_RECORD(slg::xm::Report, battle_id, summary, events)
+XOFFSET_RECORD(slg::xm::BattleMsg, battle_id, seed, winner, attacker, defender, report)
+XOFFSET_RECORD(slg::xm::Tile, x, y, terrain, level, owner)
+XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta, troops)
+XOFFSET_RECORD(slg::xm::ShardState, shard_id, tick, width, tiles, cities, marches)
+#elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
                          slg::xm::City, slg::xm::PlayerState, slg::xm::Event, slg::xm::Report,
                          slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState)
