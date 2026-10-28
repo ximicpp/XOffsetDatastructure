@@ -9,8 +9,11 @@ const xoffset_test_host_api* host_api = nullptr;
 
 extern "C" {
 
+void xoffset_hosted_install_new(const xoffset_test_host_api* api);  // hosted_new_shim.cpp
+
 __attribute__((visibility("default"))) void xoffset_hosted_set_api(const xoffset_test_host_api* api) {
     host_api = api;
+    xoffset_hosted_install_new(api);
 }
 
 __attribute__((visibility("hidden"), noreturn)) void exit(int code) {
