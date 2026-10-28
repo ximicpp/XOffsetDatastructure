@@ -1117,7 +1117,10 @@ void start_command_thread(int argc, char** argv, const Options& options) {
     auto* a = new ThreadArgs{argc, argv, options};
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    pthread_attr_setstacksize(&attr, std::size_t(64) << 20);
+    // xoserve runs each program on a thread of its own: its loop needs little stack (an
+    // iPhone process has ~3.4 GiB of address space)
+    const bool serve = argc > 0 && std::string(argv[0]) == "xoserve";
+    pthread_attr_setstacksize(&attr, serve ? std::size_t(1) << 20 : std::size_t(64) << 20);
     pthread_t t;
     if (pthread_create(&t, &attr, thread_main, a) != 0) run_command(argc, argv, options);
     pthread_attr_destroy(&attr);
