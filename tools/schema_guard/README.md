@@ -277,3 +277,41 @@ Windows ARM64 needs a real matching Windows runtime; an unverified compatibility
 layer must not be reported as a native Windows pass.
 
 See VALIDATION_WINDOWS_20261028.md for the latest run and limitations.
+
+## iOS simulator x64
+
+build_wire_apple.py accepts --include-simulator-x64 to emit an additional x64
+simulator executable and profile entry. Its x86_64 LLVM IR is linked with the
+iOS simulator SDK using the Apple compiler backend. Building it does not prove
+the simulator runtime can execute it: run runtime_matrix.py on a Mac with a
+compatible simulator and inspect the identity and wire report.
+
+On the tested Apple Silicon Mac, the only installed iOS 26.4 runtime reports
+arm64 support. An x64 fixture linked successfully but simctl spawn aborted
+because dyld_sim did not support the executable architecture. The matrix
+correctly marked that target FAIL_RUNTIME. The iOS arm64 simulator passed
+separately; neither simulator result is an iOS physical-device result.
+
+Windows ARM64 real-OS testing can use a suitably licensed Windows ARM64
+virtual machine on Apple Silicon. The current environment has no such guest.
+Microsoft also provides a time-limited evaluation that requires registration
+and acceptance of its terms. Wine on a Linux container remains a separate
+compatibility implementation and must not be labeled native Windows.
+
+## Windows VM shared-directory worker
+
+For a Windows VM guest that can access a private Mac queue as a shared folder,
+copy shared_wire_worker.py, nodecli_wire_worker.py and the target fixture into
+the guest. Start only one worker per queue and restrict the share to the test
+account; queue writers can cause an allowlisted executable to run. Configure
+the share and guest authentication outside this tool.
+
+    python shared_wire_worker.py --queue Z:\private-xsg-queue `
+        --native-fixture C:\path\windows-arm64.exe
+
+The Mac side uses relay_wire_runner.py with the corresponding Mac queue path,
+and the fixture file on each side must have the same SHA-256. The worker
+performs fresh identity, write and read operations. Its shared-directory
+transport has been exercised locally on Windows x64, but has not yet been
+tested against a Windows ARM64 VM or a network-mounted share. The target stays
+blocked until the complete live matrix actually passes on a suitable guest.
