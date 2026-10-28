@@ -2,6 +2,78 @@
 
 ## Unreleased
 
+## 3.2.0-rc.2: preview with iPhone steps
+
+The second preview of 3.2 for device testing; not a release, not announced.
+Against 3.2.0-rc.1 it adds the iPhone procedure (a test host app that runs
+the library tests, the wire corpus, SLG timing and the memory probe on iOS),
+SLG timing and the memory probe in the Android phone script,
+the Apple fix that kept a 64 MiB zero table in every Mach-O executable, the
+schema and wire gate (`tools/schema_guard`), small-message compression, an
+old-version client in the map demo, and no-exceptions receive at the speed of
+builds with exceptions. Wire format 2.1 is unchanged.
+
+Status at this tag: 3.2.0-rc.1 passed on one Android phone (Android 11,
+CTest 114/114, wire corpus, both demo clients) and on Windows, macOS and
+Linux machines (record below). The iPhone steps (`docs/DEVICE_TESTING.md`
+section 7) passed on the iOS Simulator through the test host and have not
+run on an iPhone; further device testing is paused (susu 2026-10-28). No
+Mac checkpoint ran on this commit; the last one (CKPT4, 2026-10-28)
+measured D÷FlatBuffers 0.933.
+
+- iOS test host (`-DXOFFSET_TEST_HOST=ON`, default OFF, `tools/test_host/`):
+  every executable is also built as a library that a UIKit host app loads
+  one per launch; `tools/test_host/xo_host_run.py` drives it as the CTest
+  emulator for `ios-device.cmake` and `ios-simulator.cmake`, and
+  `tools/device/ios_device.sh sim|device|local` runs the steps build, info,
+  net, ctest, corpus, slg, mem and clients. Phone programs
+  (`-DXOFFSET_PHONE_PROGRAMS=ON`): `xo_slg_bench` (SC-6, the frozen SLG
+  workload on the field-list backend, optionally against FlatBuffers) and
+  `xo_mem_probe` (SC-12: largest capacity, live reservations, committed
+  memory until the system stops it). Client size (SC-14,
+  `tools/client_size/`, numbers in `docs/PACKAGING.md`).
+- The test host forwards `operator new` (host API version 2): each hosted
+  library registers its replacement forms when it loads, so allocations the
+  C++ runtime makes for a program reach the program's replacement; the
+  host's own threads keep the default forms. New CTest
+  `test_host_new_forwarding`. iOS client size (Xcode 27.1, arm64 `-Os`,
+  stripped): library +58,200 B (+57,520 B without exceptions), +9,601 /
+  +7,251 B per extra schema (`docs/PACKAGING.md`).
+- `tools/device/android_device.sh` adds the steps `slg` (verify, then
+  timed runs against FlatBuffers 25.12.19, with thermal and battery state
+  before each) and `mem` (`xo_mem_probe`); `docs/DEVICE_TESTING.md`
+  describes both and the iPhone procedure (section 7).
+- C++20/C++23 builds: `test_schema_guard_slg_values` (added with the schema
+  gate) is built only with C++26 reflection; it had broken the field-list
+  configure.
+- Apple: `owner_map_table` (64 MiB, zero-initialized) is placed in
+  `__DATA,__bss` explicitly. As a weak zero-initialized variable Mach-O put
+  it in `__DATA,__data`, so every executable carried 64 MiB on disk (iOS
+  clients measured 67 MB). Code and access path are unchanged.
+- `tools/schema_guard`: a cross-platform schema and wire gate. It compiles
+  a probe of each schema on every target, compares layouts and the wire
+  each target writes, and `build.sh --schema-gate full` /
+  `run_checked.py` require the complete matrix (`--schema-gate local`, the
+  default, keeps the platform build and CTest).
+- Small messages: `contrib/zstd_dict`, a standalone C++17 component for
+  zstd dictionaries bound to one schema (frames leave out the fixed wire
+  header; checks before decoding and allocation; batching), and an
+  optional unit event stream in the map demo with raw, zstd, dictionary and
+  batch encodings. A single event is now the size of FlatBuffers' (1.00x),
+  a batch 0.96-0.98x. The library headers are unchanged.
+- Map demo: an old-version client. Schema version 1 is frozen
+  (`include/mapdemo/schema_v1.hpp`, `schema.lock`); version 2 adds a field.
+  The demo uses the library handshake, and A converts snapshots for
+  `mapdemo_client_v1` while serving version-2 clients on the same server.
+- Map demo: client write-back. With `--edits N` (on in every tier) a
+  client edits a received snapshot in place in its own verified buffer and
+  sends it with `save_verified`; A verifies it with a 1 MiB cap, checks the
+  digest and field rules, and forwards a compacted rebuild to the other
+  clients of the same schema version, which verify it again. It passed on
+  the cloud Linux run and on the Mac (macOS, Android emulator, iOS
+  Simulator; `demo/mapstate/RESULT.md` section 8).
+- MSVC: no warning C5030 from `register_owned_bitmap` (it used
+  `[[gnu::noinline]]`; now `XOFFSET_DETAIL_NOINLINE`).
 - Device and platform results for 3.2.0-rc.1 (commit 39de636 only): an
   Android 11 phone, Windows and macOS machines, a remote Linux VM and WSL2
   (`docs/validation/2026-10-28-rc1-platform/README.md`). Functional only; no

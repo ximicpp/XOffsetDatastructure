@@ -65,7 +65,8 @@ TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_s
               "tools/signature_type_list.hpp", "tools/signature_type_names.hpp",
               "tools/validate_vm.py", "tools/validate_vm_package.py", "tools/prepare_vm_cmake.py",
               "tools/prepare_vm_linux_current.py", "tools/check_vm_toolchain.py",
-              "tools/prepare_release.py", "tools/describe_dump.cpp", "tools/describe_dump.hpp")
+              "tools/prepare_release.py", "tools/describe_dump.cpp", "tools/describe_dump.hpp",
+              "tools/schema_guard/wire_runtime.cpp")
 SIGNATURE_FILES = tuple("tools/sigs/" + name + ".sig.hpp" for name in (
     "arm64_android_clang", "arm64_ios_clang", "x86_64_linux_clang", "x86_64_windows_clang"))
 TOOL_TESTS = ("tools/tests/test_validate_vm_package.py", "tools/tests/test_prepare_vm_cmake.py",
@@ -78,8 +79,9 @@ ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FIL
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
 FORBIDDEN_PARTS = {".git", ".svn", "build", "dist", "__pycache__", ".pytest_cache"}
 GENERATED_HEADERS = {"check_compat_baselines.hpp"}
-# Developer-only subdirectories behind options that default to OFF (XOFFSET_BUILD_DEMOS).
-UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate"}
+# Developer-only subdirectories behind options that default to OFF (XOFFSET_BUILD_DEMOS,
+# XOFFSET_TEST_HOST / XOFFSET_PHONE_PROGRAMS).
+UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate", "tools/test_host"}
 SCOPE = {
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "included_python_tests": list(TOOL_TESTS),
