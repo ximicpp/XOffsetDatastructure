@@ -143,6 +143,36 @@ std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<Chat
 
 只读的转发可以传 `XCompactOptions{.slack_div = 0}`，wire 最小；B 会接着修改时用默认余量。
 
+### 4.3 收到、修改、再发出：互传规则
+
+64 位小端机之间，wire 就是 buffer 本身：接收方 `load_verified` 之后直接在 buffer 里读写，不逐字段
+解码；改完 `save_verified` 发出，下一跳再 `load_verified`。`demo/mapstate` 的客户端 `--edits` 跑的就是
+这条链：客户端收到快照后在自己的 buffer 里删一个单位、改 hp 和行为、加一个单位、把一个短名字改长，
+`save_verified` 上行；服务端 A 收下、核对，用 `save_compact` 重建后转给另一个客户端，对方再校验。
+规则有四条。
+
+1. **从对端收，一律完整校验，并设上限。** 上行数据用 `load_verified` 加 `maximum_capacity`（demo 用
+   1 MiB，见第 5 节）。校验只证明结构安全，内容是对端写的，要另外查：
+   - 业务字段按普通输入检查。demo 的 `checks::edit_sanity_of` 查坐标在视野内、hp 和行为的取值范围、
+     名字长度、id 不重复。
+   - 要确认收到的就是对端想发的，就在协议里带一个应用层摘要。demo 的帧头带客户端算的内容摘要，
+     A 收下后自己算一遍再比。这只检查传输和实现错误：摘要和数据走同一条通道，对端要改可以一起改，
+     **不防篡改**。来源认证和防篡改仍然交给 TLS 或签名（第 4 节）。
+2. **转发前重建。** 服务端把一个客户端的数据转给别人之前，先用 `save_compact` 重建（4.2 节）。不要
+   原样转发收到的 wire，也不要 `load_verified` 之后直接 `save_verified`。demo 自测
+   （`mapdemo_selftest` 的 `writeback`）实测过：客户端写在容器余量里的字节，`load_verified` 照样接受，
+   `save_compact` 重建后就没有了。
+3. **客户端之间直连，只限同版本。** 两个客户端直接互传、中间没有服务端时，没有一方负责版本转换，
+   握手（`XSchemaHello`，2.1 节）的结论必须是 `same`，否则拒绝。经服务端中转时，服务端可以按 2.1 节
+   替旧版本的客户端转换下发的数据。demo 的转发只发给同版本的客户端：A 按握手时的版本给客户端分组。
+4. **关异常的客户端，给 `maximum_capacity` 留余量。** 在收到的 buffer 上修改会让它增长。compact
+   wire 没有空余，插入一个元素、把短字符串改长都要增长。增长超过 `maximum_capacity` 时，开异常的
+   构建抛 `XBadAlloc`，可以捕获后放弃这次修改。关异常的构建（`-fno-exceptions`、`/EHs-c-`）只能进致命
+   错误处理，进程终止。所以关异常的客户端，凡是要修改的 buffer，上限都要按「最大合法消息 + 一次
+   修改最多增加的量」再留余量，并在修改前自己检查规模。demo 的快照上限是 16 MiB；视野快照约 15 KB，
+   一次修改增加不到 1 KB。只读的 buffer 不增长，不受这条影响。`mapdemo_selftest` 的 `writeback` 用一个
+   上限只比 wire 大 256 字节的 buffer 验证了：插入时抛 `XBadAlloc`。
+
 ## 5. 容量与资源上限
 
 `maximum_capacity` 同时决定每个 buffer 预留的虚拟地址空间。默认 64 MiB（或初始
@@ -213,6 +243,7 @@ raw 146、zstd 152、字典 68、每帧 100 条批量 52。
 - [ ] 下发给客户端的 schema 没有隐式填充（`XOFFSET_REQUIRE_NO_PADDING` 或 `XOFFSET_REJECT_IMPLICIT_PADDING`），下发 buffer 只含客户端可见的数据
 - [ ] 服务端接收客户端数据时有 wire 长度上限（建议起点 1 MiB）
 - [ ] 转发客户端上行数据前用 `save_compact` 重建，转发的类型没有隐式填充（4.2 节）
+- [ ] 收到的数据改完再发出时：收端完整校验加业务检查（需要时加应用层摘要），客户端直连只限同版本，关异常的客户端给要修改的 buffer 留上限余量（4.3 节）
 - [ ] 客户端用较小的 `maximum_capacity` 或 `XBufferPool`
 - [ ] 外层有认证（TLS 或签名）和业务字段检查
 - [ ] 限制了并发 buffer 数和总内存预算
