@@ -16,10 +16,18 @@ def main():
     p.add_argument("--clang", required=True)
     p.add_argument("--libcxx-include", required=True)
     p.add_argument("--resource-dir", required=True)
-    p.add_argument("--simulator", required=True, help="booted simulator UDID")
+    p.add_argument("--simulator", help="booted simulator UDID (required unless --skip-ios-simulator)")
     p.add_argument("--include-simulator-x64", action="store_true", help="also build an x64 iOS simulator fixture; running it requires a compatible simulator runtime")
+    p.add_argument("--macos-sdk", help="macOS SDK path (default: xcrun --sdk macosx)")
+    p.add_argument("--iphonesimulator-sdk", help="iOS simulator SDK path (default: xcrun --sdk iphonesimulator)")
+    p.add_argument("--skip-ios-simulator", action="store_true",
+                   help="build macOS fixtures only, e.g. when no simulator SDK fits the compiler")
     p.add_argument("--out", required=True, help="new artifact directory")
     a = p.parse_args()
+    if not a.skip_ios_simulator and not a.simulator:
+        p.error("--simulator is required unless --skip-ios-simulator")
+    if a.skip_ios_simulator and (a.include_simulator_x64 or a.iphonesimulator_sdk):
+        p.error("--skip-ios-simulator excludes simulator options")
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=False)
     fingerprint, inputs = wire_inputs.fingerprint()
@@ -28,7 +36,8 @@ def main():
     linker=subprocess.check_output(["xcrun","-f","ld"],text=True).strip()
     compiler_inputs += [Path(backend), Path(linker), Path(a.libcxx_include), Path(a.resource_dir)]
     sdk = lambda name: subprocess.check_output(["xcrun","--sdk",name,"--show-sdk-path"],text=True).strip()
-    mac, ios = sdk("macosx"), sdk("iphonesimulator")
+    mac = a.macos_sdk or sdk("macosx")
+    ios = None if a.skip_ios_simulator else (a.iphonesimulator_sdk or sdk("iphonesimulator"))
     common = [a.clang, "-std=c++26", "-freflection", "-fexpansion-statements", "-nostdinc++",
               "-isystem", a.libcxx_include, "-resource-dir", a.resource_dir, "-O1", "-stdlib=libc++",
               '-DXSG_WIRE_INPUT_HASH="' + fingerprint + '"']
@@ -37,7 +46,9 @@ def main():
     items = [("macos-arm64", "arm64-apple-macos11", mac),
              ("macos-x64", "x86_64-apple-macos11", mac),
              ("ios-simulator-arm64", "arm64-apple-ios15.0-simulator", ios)]
-    if a.include_simulator_x64:
+    if a.skip_ios_simulator:
+        items = items[:2]
+    elif a.include_simulator_x64:
         items.append(("ios-simulator-x64", "x86_64-apple-ios15.0-simulator", ios))
     def build(item):
         name,triple,sysroot=item

@@ -31,5 +31,24 @@ class AppleBuildTests(unittest.TestCase):
             self.assertIn("x86_64-apple-ios15.0-simulator", log[1]["command"])
             self.assertIn("/sdk/iphonesimulator", log[1]["command"])
 
+    def test_explicit_macos_sdk_without_simulator(self):
+        with tempfile.TemporaryDirectory(prefix="xsg-apple-build-") as tmp:
+            out = Path(tmp) / "out"
+            args = ["build_wire_apple.py", "--clang", "clang", "--libcxx-include", "/headers",
+                    "--resource-dir", "/resource", "--macos-sdk", "/chosen/MacOSX26.5.sdk",
+                    "--skip-ios-simulator", "--out", str(out)]
+            def run(cmd, **kwargs):
+                Path(cmd[cmd.index("-o")+1]).write_text("fake")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            def check_output(cmd, **kwargs):
+                if "--sdk" in cmd: self.fail("explicit SDK must not be looked up")
+                return "/tools/" + cmd[-1]
+            with mock.patch.object(sys, "argv", args), mock.patch.object(build_wire_apple.wire_inputs, "fingerprint", return_value=("f"*64, {})), mock.patch.object(build_wire_apple.build_evidence, "tool_inputs", return_value=[]), mock.patch.object(build_wire_apple.build_evidence, "prepare", return_value={"format":1,"build_id":"b"*64,"spec":{}}) as prepare, mock.patch.object(build_wire_apple.verify, "includes", return_value=[]), mock.patch.object(build_wire_apple.subprocess, "check_output", side_effect=check_output), mock.patch.object(build_wire_apple.subprocess, "run", side_effect=run), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(build_wire_apple.main(), 0)
+            profiles = json.loads((out / "profiles.json").read_text())
+            self.assertEqual(set(profiles["targets"]), {"macos-arm64", "macos-x64"})
+            for call in prepare.call_args_list:
+                self.assertIn(Path("/chosen/MacOSX26.5.sdk"), call.args[3])
+
 if __name__ == "__main__":
     unittest.main()

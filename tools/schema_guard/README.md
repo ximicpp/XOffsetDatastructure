@@ -158,6 +158,12 @@ and a booted arm64 iOS simulator, create new runnable test binaries with:
         --simulator SIMULATOR-UDID --out /path/to/new/apple-wire-build
 
 The output profiles.json contains macOS arm64/x64 and iOS simulator arm64.
+--macos-sdk and --iphonesimulator-sdk choose SDKs explicitly instead of
+xcrun's current default; --skip-ios-simulator builds the macOS fixtures only.
+On the October 28 Mac, the P2996 d77eff1 Clang 21 headers do not work with
+the Xcode 27 SDKs (math.h asks Clang's float.h for INFINITY, which Clang 21
+lacks), so the macOS fixtures used the Command Line Tools MacOSX26.5 SDK and
+no iOS simulator fixture could be built.
 The x64 build uses reflection Clang to emit target-specific LLVM IR and Apple's
 Clang x64 backend to compile and link it. This profile is incomplete: merge
 entries for every remaining target into a new JSON file before using it as

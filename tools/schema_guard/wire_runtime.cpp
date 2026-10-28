@@ -112,7 +112,7 @@ template<class T> bool values_equal(const T& a, const T& b) {
         auto i=a.begin(), j=b.begin();
         for(;i!=a.end();++i,++j) if(!values_equal(*i,*j)) return false;
         return true;
-    } else return fields_equal(a,b,std::make_index_sequence<d::reflected_member_count<T>()>{});
+    } else return fields_equal(a,b,std::make_index_sequence<xo::schema::member_count_v<T>>{});
 }
 template<class T> void run(const std::filesystem::path& dir, const char* name, bool write) {
     using Buffer=xo::TypedXBuffer<T>;
