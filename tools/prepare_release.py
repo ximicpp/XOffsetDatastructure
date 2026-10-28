@@ -65,12 +65,14 @@ TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_s
               "tools/signature_type_list.hpp", "tools/signature_type_names.hpp",
               "tools/validate_vm.py", "tools/validate_vm_package.py", "tools/prepare_vm_cmake.py",
               "tools/prepare_vm_linux_current.py", "tools/check_vm_toolchain.py",
-              "tools/prepare_release.py")
+              "tools/prepare_release.py", "tools/describe_dump.cpp", "tools/describe_dump.hpp")
 SIGNATURE_FILES = tuple("tools/sigs/" + name + ".sig.hpp" for name in (
     "arm64_android_clang", "arm64_ios_clang", "x86_64_linux_clang", "x86_64_windows_clang"))
 TOOL_TESTS = ("tools/tests/test_validate_vm_package.py", "tools/tests/test_prepare_vm_cmake.py",
               "tools/tests/test_prepare_release.py")
-COPIED_TREES = ("cmake", "tests", "examples", "include")
+COPIED_TREES = ("cmake", "tests", "examples", "include", "bench/slg/include")
+# bench/slg/include: the SLG model headers that a test and describe_dump_slg include
+OPTIONAL_TREES = ("include", "bench/slg/include")
 OPTIONAL_FILES = ("toolchains/build_tools.cmake",)
 ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES) + OPTIONAL_RUNTIME_SOURCES
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
@@ -302,7 +304,7 @@ def collect_source(source):
         if (source / name).exists() or (source / name).is_symlink():
             add(name)
     for tree in COPIED_TREES + DEPENDENCY_TREES:
-        if tree == "include" and not (source / tree).exists() and not (source / tree).is_symlink():
+        if tree in OPTIONAL_TREES and not (source / tree).exists() and not (source / tree).is_symlink():
             continue
         walk(tree)
     lock = validate_payload(payload)
