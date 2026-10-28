@@ -12,9 +12,14 @@
 # default, and mapdemo_client_noexc without exceptions (-fno-exceptions;
 # MSVC /EHs-c- with _HAS_EXCEPTIONS=0), the way engine clients build. Both
 # come from the same sources, which report failures as values (result.hpp).
+#
+# mapdemo_client_v1 is the client of the previous release, schema version 1:
+# the same sources built against include_v1/ (the frozen snapshot that A
+# lists in its lineage), so A has an old-version client to convert for.
 
-option(MAPDEMO_CLIENT_ONLY "Build only mapdemo_client (and mapdemo_client_noexc)" OFF)
+option(MAPDEMO_CLIENT_ONLY "Build only the clients (mapdemo_client, _noexc, _v1)" OFF)
 option(MAPDEMO_NOEXC_CLIENT "Also build mapdemo_client_noexc, the client without exceptions" ON)
+option(MAPDEMO_V1_CLIENT "Also build mapdemo_client_v1, the client of schema version 1" ON)
 option(MAPDEMO_WITH_ZSTD "zstd snapshot encoding (zstd 1.5.7, built from source)" ON)
 set(MAPDEMO_ZSTD_URL "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
     CACHE STRING "zstd 1.5.7 release tarball: URL or local path (SHA-256 checked)")
@@ -112,6 +117,8 @@ if(NOT MAPDEMO_CLIENT_ONLY)
     mapdemo_executable(mapdemo_b mapdemo_common src/server_b.cpp)
     mapdemo_executable(mapdemo_a mapdemo_common src/server_a.cpp)
     mapdemo_executable(mapdemo_selftest mapdemo_common src/selftest.cpp)
+    # Server side only (reflection): freeze a schema version, check the lock.
+    mapdemo_executable(mapdemo_schema_freeze mapdemo_common src/schema_freeze.cpp)
 endif()
 
 # Window client: raylib 5.5 (commit c1ab645ca298a2801097931d1079b10ff7eb9df8),
@@ -136,6 +143,12 @@ function(mapdemo_client_target name common)
 endfunction()
 
 mapdemo_client_target(mapdemo_client mapdemo_common)
+if(MAPDEMO_V1_CLIENT)
+    mapdemo_common_library(mapdemo_common_v1)
+    target_include_directories(mapdemo_common_v1 BEFORE PUBLIC include_v1)
+    mapdemo_client_target(mapdemo_client_v1 mapdemo_common_v1)
+    message(STATUS "mapdemo: mapdemo_client_v1 builds the schema version 1 client")
+endif()
 if(MAPDEMO_NOEXC_CLIENT)
     mapdemo_common_library(mapdemo_common_noexc)
     xoffset_disable_exceptions(mapdemo_common_noexc)
