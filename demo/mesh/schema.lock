@@ -1,0 +1,14 @@
+# demo/mesh/schema.lock: xmesh_schema_freeze write (INTERFACES.md section 3)
+version 1
+# root sizeof alignof wire_schema_hash schema_name_digest
+root Document 80 8 87787a9f1767d50c 65e21ba4d06b5172
+root Order 160 8 39adf9e08cc953b8 0173d7de2c384d78
+root SensorSeries 104 8 465895f95425a12f 316b9a0cc3d526df
+root KvConfig 64 8 ec54cd6bd56be812 a8d471d4e8efa750
+root SceneTree 56 8 087476c9f00da0d7 433d8f17c9332544
+root ChatRoom 88 8 9c8bd9ae5c45da97 6c00d8b7c16cde24
+root PeerInfo 32 4 6b91e1726bb9acc8 4442a4259c239a62
+root Welcome 32 4 8267cae10f66a5e5 4b8c42b30eb9a7a1
+root Roster 24 8 e3261a05c9ff8a97 e0095f48fdcff559
+root HopMeta 56 8 564e0bf1979abbcc 4911e6cf9a2e8e79
+root HopReport 88 8 3572ca1a55546563 7fccbae2e9b0458e
