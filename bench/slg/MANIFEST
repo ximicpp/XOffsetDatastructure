@@ -37,6 +37,11 @@
 #                        places extents relative to the start of payload_bytes(), which is
 #                        payload offset 48 for 2.1 and 0 before; read from the token, so the
 #                        runner builds against both (origin 1331a091dad6203f7ed4b89069b4e8724040799878013d1af1458dbd830f3d94)
+#   bench/xoffset_runner.hpp  2026-10-28: SLG_XOFFSET_CAP_MIB=N reserves N MiB (instead of
+#                        256) for each player, battle and report buffer; the shard keeps 256 MiB.
+#                        Unset: same machine code under GCC 16 and P2996 (asm_equal). An iPhone
+#                        process gets ~3.4 GiB of address space, less than scale S needs at 256 MiB
+#                        (origin 278a2c98ab068aae8b167fcf29146196b6509cf6fae2a1900d5e45156c9ed84b)
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -58,7 +63,7 @@ ca78dc903b3c6665bc3c56515456cc917a3447117aba40483742b7a1cc44f3bc  bench/runner.h
 63505e708ed84a8ffa1d6136fef17af72f6d807b00f009b206f145e7c9497a74  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 371cd935d934ed2fb94781381ab86332d05fee833bd19857f20fb11e77faeb07  bench/std_runner.hpp
-278a2c98ab068aae8b167fcf29146196b6509cf6fae2a1900d5e45156c9ed84b  bench/xoffset_runner.hpp
+444d3baa1459ac6855dbfb39392f8bc7d71c33cabe48804c4aad7fcfc5c7d519  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
