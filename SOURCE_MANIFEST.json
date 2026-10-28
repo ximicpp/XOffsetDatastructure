@@ -32,14 +32,14 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 44780,
+      "bytes": 45934,
       "mode": 420,
-      "sha256": "cc129049ebdaff7ee4294b0e0c2631c75df22ffb686a9ed5e94da1683f8540f5"
+      "sha256": "8334c238464890c7847f053a01aefbb16b1d338bbc4fe11b7234c31b5877bf84"
     },
     "CMakeLists.txt": {
-      "bytes": 6551,
+      "bytes": 6901,
       "mode": 420,
-      "sha256": "1babab07008f2be7a76b1568ba39e3121cbe1908befc15a84050520e35f2260f"
+      "sha256": "abc5e1cd39bd26dbcd1913a50097472f17d0a65949f2e69c2d5f8147ab2f02dd"
     },
     "Dockerfile": {
       "bytes": 3862,
@@ -52,9 +52,9 @@
       "sha256": "42964684966b12367bd8e5cb72e8ffdcaff9ef2428211dbcef5c286832981973"
     },
     "README.md": {
-      "bytes": 14591,
+      "bytes": 14696,
       "mode": 420,
-      "sha256": "f8a9d43a458fd8ce34298993a5313862a352426d56332abd8225e1bbd09730b5"
+      "sha256": "fad3bc38ec2d77549b163f27eac2f562932c8de9aa14a72893af989761d52183"
     },
     "XOFFSET_VERSION": {
       "bytes": 11,
@@ -5447,9 +5447,9 @@
       "sha256": "d37bb8e0c43eaa0b8208e27bcba43ab53d3796112260eb268ce2ff78b50b6424"
     },
     "xoffset_evolution.hpp": {
-      "bytes": 57786,
+      "bytes": 57785,
       "mode": 420,
-      "sha256": "0f4bff80498a4fdfb8534ae2ab826dcd5e2098aba2e1b44f958b3f14fb0a212e"
+      "sha256": "f2feefb60ff9e35599153c9b472b099c4cf3a01a5d85f390c94c5bd7d72de949"
     },
     "xoffset_fixed_string.hpp": {
       "bytes": 4134,
@@ -5522,9 +5522,9 @@
       "sha256": "fbfb1142914b225d4ad11d1a5f52b30a9614fad4ac2ddde21738ea27db9036ba"
     },
     "xoffsetdatastructure.hpp": {
-      "bytes": 434602,
+      "bytes": 434586,
       "mode": 420,
-      "sha256": "1e485764eab07f9ef9a3aacc8ea64a8321274c9f84f26a4daa89259d5685755f"
+      "sha256": "626b8ee9500c403aa8fd63940c636e8f7f3d83afe3ad88964069086605f23f01"
     }
   },
   "schema": "xoffset-source/v1",
