@@ -33,7 +33,7 @@ cp "$APP/Info.plist" "$W/stub/Info.plist"
 cat > "$W/stub/CMakeLists.txt" <<EOF
 cmake_minimum_required(VERSION 3.20)
 project(xo_stub LANGUAGES CXX OBJCXX)
-add_executable(xo_stub MACOSX_BUNDLE "$REPO/tools/test_host/host_ios.mm" "$REPO/tools/test_host/host_core.cpp")
+add_executable(xo_stub MACOSX_BUNDLE "$REPO/tools/test_host/host_ios.mm" "$REPO/tools/test_host/host_core.cpp" "$REPO/tools/test_host/host_new.cpp")
 set_target_properties(xo_stub PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "$W/stub/Info.plist" OUTPUT_NAME xoffset_test_host
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "$BUNDLE_ID"

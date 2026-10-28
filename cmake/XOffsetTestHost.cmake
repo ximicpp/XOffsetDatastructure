@@ -2,7 +2,8 @@ include_guard(GLOBAL)
 
 # Test host for phones (tools/test_host): an iPhone runs no command-line programs, so
 # each test, the demo client and the benchmarks are built a second time as a shared
-# library libxoh_<program> (same sources and settings, plus hosted_shim.cpp) and one
+# library libxoh_<program> (same sources and settings, plus hosted_shim.cpp and
+# hosted_new_shim.cpp) and one
 # app loads one of them per launch. On Linux and macOS the same libraries run under
 # the command-line host, which checks the whole flow without a phone.
 option(XOFFSET_TEST_HOST "Also build every program as a library for the test host (tools/test_host)" OFF)
@@ -25,7 +26,8 @@ function(xoffset_test_host_module target)
             list(APPEND absolute_sources "${source_dir}/${source}")
         endif()
     endforeach()
-    add_library(${module} SHARED ${absolute_sources} "${XOFFSET_TEST_HOST_DIR}/hosted_shim.cpp")
+    add_library(${module} SHARED ${absolute_sources} "${XOFFSET_TEST_HOST_DIR}/hosted_shim.cpp"
+        "${XOFFSET_TEST_HOST_DIR}/hosted_new_shim.cpp")
     set_source_files_properties("${XOFFSET_TEST_HOST_DIR}/hosted_shim.cpp" TARGET_DIRECTORY ${module}
         PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU>:-Wno-attributes>")
     foreach(property COMPILE_DEFINITIONS COMPILE_OPTIONS COMPILE_FEATURES INCLUDE_DIRECTORIES
