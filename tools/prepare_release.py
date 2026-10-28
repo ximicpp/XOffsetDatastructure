@@ -55,7 +55,7 @@ FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_r
 OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-              "Dockerfile", "docker-compose.yml", ".dockerignore")
+              "xoffset_error.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
 DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/PACKAGING.md", "docs/VALIDATION_RUNNER.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
 TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_signatures.cpp",
@@ -373,7 +373,7 @@ def create(source, out):
 def install_required(component):
     if component not in ("full", "storage"):
         raise ValueError("install component must be full or storage")
-    base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp",
+    base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp", "include/xoffset_error.hpp",
             "share/XOffsetDatastructure/licenses/LICENSE",
             "share/XOffsetDatastructure/VERSION", "share/XOffsetDatastructure/CHANGELOG.md",
             "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md"}

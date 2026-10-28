@@ -1,9 +1,11 @@
 // Map state demo: client network, SnapshotHolder, sampling script. OWNER: client thread.
 //
-// Shared by the headless sampler, the --evil probe and the raylib window
-// client. Every snapshot is its own verified XBuffer held by SnapshotHolder;
-// all field reads go to that live buffer (design section 5). The holder is
-// replaced only at a frame boundary, so no reference outlives its buffer.
+// Shared by the headless sampler, the --evil probe, the offline --self-check
+// and --replay modes and the raylib window client. Every snapshot is its own
+// verified XBuffer held by SnapshotHolder; all field reads go to that live
+// buffer (design section 5). The holder is replaced only at a frame
+// boundary, so no reference outlives its buffer. A compressed snapshot is
+// decompressed first (codec.hpp) and then verified like any other wire.
 #pragma once
 #include <cstdint>
 #include <map>
@@ -14,6 +16,7 @@
 #include <vector>
 #include "mapdemo/buffer_mode.hpp"
 #include "mapdemo/checks.hpp"
+#include "mapdemo/codec.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
@@ -34,7 +37,13 @@ struct Options {
     bool auto_drag = false;
     std::vector<int> screenshot_at; // frame numbers (window client)
     bool evil = false;
+    bool self_check = false;
+    std::string replay_dir;         // --replay: verify a corpus written by mapdemo_a --corpus-dir
     BufferMode buffers = kDefaultBufferMode;
+    // Snapshot encoding requested from A; cycle_encodings: dense, compact,
+    // zstd in turn (request id order).
+    codec::Encoding encoding = codec::zstd_available() ? codec::Encoding::Zstd : codec::Encoding::Compact;
+    bool cycle_encodings = false;
 
     bool check_on() const { return check.value_or(headless); }
 };
@@ -60,6 +69,9 @@ public:
     // the old content dies here. On a rejected wire the holder is empty and
     // the next reload starts from that empty buffer.
     void reload(const std::string& wire);
+    // Either of the two above, by mode; returns the verify time in us
+    // (fresh: *destroy_us gets the old buffer's destroy time).
+    double install(const std::string& wire, BufferMode mode, double* destroy_us);
     double clear();
 
 private:
@@ -101,6 +113,14 @@ private:
 };
 
 const char* category_name(net::ViewCategory c) noexcept;
+std::string join_path(const std::string& dir, const char* file);   // dir/file; file alone when dir is empty
+
+// client_snapshots.csv (INTERFACES.md section 6): one row per snapshot.
+// wire_bytes / wire_digest describe the XOffset wire that was verified;
+// net_bytes is the frame payload (smaller for zstd).
+inline constexpr const char* kSnapshotCsvHeader =
+    "request_id,tick,category,visible,wire_bytes,digest,rtt_us,load_us,read_present_us,destroy_us,check_ok,"
+    "encoding,net_bytes,wire_digest,decompress_us";
 Rect clamp_view(Rect r, const Rect& scene) noexcept;
 
 // One connection to server A: handshake, catalog, at most one outstanding
@@ -119,6 +139,7 @@ public:
     const Rect& scene() const noexcept { return scene_; }
 
     bool can_request() const noexcept { return !inflight_ && !bye_; }
+    // Encoding: --encoding, or the next one in turn with --encoding cycle.
     void send_view(const Rect& rect, net::ViewCategory category);
 
     // Waits up to timeout_ms for the socket, writes pending bytes, reads every
@@ -127,8 +148,8 @@ public:
     bool bye() const noexcept { return bye_; }
     bool has_pending() const noexcept { return pending_.has_value(); }
 
-    // Frame start: load_verified the pending snapshot and replace the holder.
-    // Returns false when nothing was pending.
+    // Frame start: decode (zstd) and verify the pending snapshot into the
+    // holder. Returns false when nothing was pending.
     bool install_pending();
     const SnapshotHolder& holder() const noexcept { return holder_; }
     net::ViewCategory holder_category() const noexcept { return cur_.category; }
@@ -143,6 +164,8 @@ public:
     double last_rtt_us() const noexcept { return last_rtt_us_; }
     double last_load_us() const noexcept { return last_load_us_; }
     std::size_t last_wire_bytes() const noexcept { return cur_.wire_bytes; }
+    std::size_t last_net_bytes() const noexcept { return cur_.net_bytes; }
+    codec::Encoding last_encoding() const noexcept { return cur_.encoding; }
     std::uint64_t snapshots() const noexcept { return snapshots_; }
 
     metrics::Recorder& recorder() noexcept { return rec_; }
@@ -160,9 +183,12 @@ private:
         net::ViewCategory category = net::ViewCategory::Normal;
         Rect rect{};
         std::size_t visible = 0;
-        std::size_t wire_bytes = 0;
+        std::size_t wire_bytes = 0;      // the XOffset wire (after decompression)
+        std::size_t net_bytes = 0;       // the frame payload
+        codec::Encoding encoding = codec::Encoding::Dense;
         std::uint64_t digest = 0;
-        double rtt_us = 0, load_us = 0, read_present_sum = 0;
+        std::uint64_t wire_digest = 0;
+        double rtt_us = 0, load_us = 0, decompress_us = -1, read_present_sum = 0;
         std::uint64_t read_present_n = 0;
         bool check_ok = true;
     };
@@ -181,6 +207,7 @@ private:
     std::uint64_t next_request_id_ = 1;
     std::uint64_t sent_request_id_ = 0;
     net::ViewCategory sent_category_ = net::ViewCategory::Normal;
+    codec::Encoding sent_encoding_ = codec::Encoding::Dense;
     Rect sent_rect_{};
     std::uint64_t sent_ns_ = 0;
 
@@ -188,14 +215,18 @@ private:
         net::Frame frame;
         double rtt_us;
         net::ViewCategory category;
+        codec::Encoding encoding;
         Rect rect;
     };
     std::optional<Pending> pending_;
+    codec::Decompressor unzstd_;
+    std::string plain_;                // zstd: the decompressed wire, capacity kept
 
     SnapshotHolder holder_;
     Record cur_;
     double last_rtt_us_ = 0, last_load_us_ = 0;
     std::uint64_t snapshots_ = 0;
+    std::uint64_t by_encoding_[codec::kEncodingCount] = {};
     std::optional<std::size_t> full_scene_visible_;
     std::uint64_t direct_units_ = 0, direct_names_ = 0;
 
@@ -208,6 +239,8 @@ private:
 // Entry points (client_main.cpp dispatches). Return the process exit code.
 int run_headless(const Options& options);
 int run_evil(const Options& options);
+int run_self_check(const Options& options);   // client_offline.cpp
+int run_replay(const Options& options);       // client_offline.cpp
 #if defined(MAPDEMO_WITH_GUI)
 int run_gui(const Options& options);   // client_gui.cpp
 #endif

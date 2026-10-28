@@ -16,7 +16,8 @@
 #             (no exclusions): build + full CTest
 #   tsan      GCC 16 RelWithDebInfo, -fsanitize=thread: build + full CTest (release candidates)
 #   fuzz      test_v2_fuzz 200k cases x seeds 1, 2 (Release) and 20k x seed 7 (ASan+UBSan)
-#   diff      tools/validation_differential.sh base vs head, 200000 cases, seeds 1 2
+#   diff      tools/validation_differential.sh base vs head, 200000 cases, seeds 1 2, and
+#             tools/no_exceptions_differential.sh (head with exceptions on vs off)
 #   smoke     bench/ci_smoke.sh with g++ 16 (frozen benchmark trees, formal M wire)
 #   ir        tools/perf_gate with GCC 16: instruction counts of anchor/base/head
 #   p2996     P2996 Clang + libc++ Release via ./build.sh: build, CTest, signature
@@ -82,7 +83,7 @@ while [[ $# -gt 0 ]]; do
         --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
         --asm-strict) ASM_STRICT=1; shift ;;
-        -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,54p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -241,7 +242,8 @@ step_diff() {
     rm -rf "$WORK/base"
     mkdir -p "$WORK/base"
     git archive "$BASE_SHA" | tar -x -C "$WORK/base"
-    in_gcc "XOFFSET_DIFF_OUT='$WORK/diff' tools/validation_differential.sh '$WORK/base' '$REPO' 200000 1 2"
+    in_gcc "XOFFSET_DIFF_OUT='$WORK/diff' tools/validation_differential.sh '$WORK/base' '$REPO' 200000 1 2 &&
+        XOFFSET_DIFF_OUT='$WORK/diff-noexc' tools/no_exceptions_differential.sh '$REPO' 200000 1 2"
 }
 
 step_smoke() {

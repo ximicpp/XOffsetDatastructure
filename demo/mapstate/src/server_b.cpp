@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include "mapdemo/buffer_mode.hpp"
+#include "mapdemo/build_info.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
@@ -86,7 +87,7 @@ void send_error(net::Conn& conn, const std::string& text) {
 int run(const Options& opt) {
     metrics::Recorder rec("b");
     net::Listener listener = net::Listener::bind("127.0.0.1", opt.port);
-    std::fprintf(stderr, "b: listening on 127.0.0.1:%u\n", unsigned(opt.port));
+    std::fprintf(stderr, "b: listening on 127.0.0.1:%u\nb: build %s\n", unsigned(opt.port), build_info().c_str());
     net::Conn conn = listener.accept();
 
     {

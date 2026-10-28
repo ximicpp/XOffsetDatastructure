@@ -304,6 +304,7 @@ std::string_view who = r.name.view();
   违反规则或超过 wire 上限时抛 `XException`，`out` 为空串。
 - 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
   「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
+  不想用异常时调用 `try_load_verified`，见第 6.1 节。
 - 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。
 - `load_unverified` 跳过校验，只适合调用方已经信任的数据。
 - 直接把数据收进最终 arena 的接收接口是 `begin_verified_receive<T>` /
@@ -414,7 +415,51 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 ## 6. 错误处理
 
 - 所有库错误都是 `XException`（派生自 `std::runtime_error`）；空间不足是它的子类
-  `XBadAlloc`。
+  `XBadAlloc`。每个 `XException` 都带错误码：`e.code()` 返回 `XErrc`
+  （`xoffset_error.hpp`，例如 `bad_magic`、`schema_mismatch`、`invalid_payload`、
+  `capacity_exceeded`，`to_string(code)` 给出名字）。
+
+### 6.1 不抛异常的接收入口
+
+接收入口都有一个不抛异常的版本，返回 `XResult<T>`（值或 `XError{code, message}`）或
+`XStatus`。校验与抛出版本完全相同；失败时的错误码和错误文字就是抛出版本会抛的那个，
+buffer 留下的状态也相同（reload 失败后为空、无根）。
+
+```cpp
+auto in = XBuffer::try_load_verified<Profile>(wire, cap);     // XResult<XBuffer>
+if (!in) { log(to_string(in.code()), in.error().message); return; }
+const Profile& r = in->root<Profile>();
+
+if (auto s = buf.try_reload_verified<Profile>(wire); !s) drop(s.error());
+
+auto token = buf.try_begin_verified_reload<Profile>(used, holes, extents);
+// ... 写入 token->header_bytes() / payload_bytes() / hole_bytes()，complete(...)
+XStatus done = token ? token->try_finish() : XStatus(token.error());
+```
+
+还有 `try_load_verified_with_resource`、`try_reload_verified_with_resource` 和
+`TypedXBuffer<T>::try_load_verified / try_reload_verified`。`XResult::value()` 在没有值时
+抛出（关异常构建里调用致命处理器）；`*r` / `r->` 不检查。
+
+### 6.2 关异常构建（`-fno-exceptions`、MSVC `/EHs-c-`）
+
+整个库可以在关异常的编译选项下使用，面向不开异常的客户端引擎。检测
+`__cpp_exceptions` / `_CPPUNWIND`，也可以用 `-DXOFFSET_NO_EXCEPTIONS=1` 强制。不需要 RTTI。
+
+- 接收路径（wire 头、extent 表、容量检查、OS 存储预留与拷贝、owner 登记、整图校验、
+  空闲表装载）沿调用链返回第一个失败，由上面的 `try_*` 入口交给调用方。同一条 wire 在
+  开、关异常两种构建里得到同样的结果和同样的错误文字（`tools/no_exceptions_differential.sh`
+  对 20 万条变异 wire 逐条比对）。
+- 其他失败（修改时 arena 空间不足、`root<T>()` 没有根、保存时超过 wire 上限、调用抛出版本
+  的接收入口被拒等）没有调用方可以返回，调用致命处理器后 `abort()`。引擎用
+  `set_fatal_handler(fn)` 接入自己的崩溃上报；`fn(XErrc, const char*)` 不能返回。
+- 宿主 `operator new` 失败按标准库在关异常下的行为终止。
+- 开异常时会从 `XBadAlloc` 恢复的两处，关异常时也是致命的：容器拷贝赋值的整块拷贝
+  （开异常时退回逐元素拷贝）和 `XCompactor::compact` 的倍数重试（2 倍已用空间足够时不会
+  走到）。客户端只接收、读取、做少量修改时不受影响。
+- `receive_raw::validate` 和 `begin_verified_receive` / `finish_verified` 还没有不抛出的
+  版本，关异常时它们的拒绝是致命的；客户端请用 `try_load_verified`、
+  `try_reload_verified` 或 `try_begin_verified_reload`。
 - 库容器的修改在分配失败时保留原有逻辑内容，但容量和分配器记账不一定回滚。多步
   业务操作不是事务。
 
@@ -442,8 +487,8 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 
 | # | 承诺 | 接口 / 机制 |
 | --- | --- | --- |
-| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（`is_byte_copy_safe_v`：沿用 TypeLayout 的规则，按字段接口递归，凡含裸指针、成员指针、引用和虚表的类型一律拒绝）；容器头只存相对偏移，根用基址偏移 |
-| K1 | 用普通 C++ 聚合体定义 schema，反射自动得出布局和指纹，不用 IDL | `XOFFSET_REGISTER_SCHEMA_NAME`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
+| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（`is_byte_copy_safe_v`：XOffset 沿用 TypeLayout 的规则，按字段接口递归，凡含裸指针、成员指针、引用和虚表的类型一律拒绝）。两条路径规则相同：服务端的 C++26 构建从反射拿字段，并与 TypeLayout 的判定交叉核对；客户端的 C++20/C++23 构建从 `XOFFSET_RECORD` 字段表拿字段，写不了字段表的联合体和非聚合体类一律不准入。容器头只存相对偏移，根用基址偏移 |
+| K1 | 用普通 C++ 聚合体定义 schema，不用 IDL：服务端（C++26）由反射自动得出布局和指纹，不写样板；客户端（C++20/C++23）每个记录加一行字段表，由编译器证明列全（偏移严格递增 + 聚合初始化元数相符），C++26 构建同时用反射核对字段表，两种构建的 wire 字节相同（第 2.1 节） | `XOFFSET_REGISTER_SCHEMA_NAME`、`XOFFSET_RECORD`、`XOFFSET_RECORD_DERIVED`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
 | K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `load_verified<T>`、`XException` |
@@ -459,16 +504,22 @@ buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输
 K7 的现状：
 
 - **用户 schema**：`XOFFSET_PIN_SCHEMA` 把类型的 wire 布局固定成一段签名文本，每个包含
-  固定文件的构建都由它自己的编译器求值，不一致就编译失败，GCC 16 和 P2996 Clang 都一样
-  （[SCHEMA_PINS.md](SCHEMA_PINS.md)，CTest `schema_pin_mismatch` 确认确实会失败）。
+  固定文件的构建都由它自己的编译器求值，不一致就编译失败（[SCHEMA_PINS.md](SCHEMA_PINS.md)，
+  CTest `schema_pin_mismatch` 确认确实会失败）。服务端的 GCC 16、P2996 Clang 如此；客户端的
+  字段表构建不需要反射，同一份 pin 也由原生编译器求值，NDK r29/r30 Clang、MSVC 19.44、
+  clang-cl 19 和 MinGW GCC 13 的全量 CTest 都包含这项检查。Apple clang 上要等 iOS 构建跑通。
 - **库自带类型**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标的签名
   基线在 `tools/sigs/`，在 CTest 里核对（`check_compat`、
   `check_signature_regeneration`）。
 - **跨编译器 wire**：3.1.0 RC 的本地平台矩阵里，Linux x86-64（GCC 16、P2996）、
   Linux arm64（GCC 16、P2996）和 Windows x64（MinGW-w64 GCC 16）写出的 2.1 语料逐字节
-  一致，互相接受（[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
-- **边界**：只覆盖能编译本库的工具链。3.1.0 下 Android、iOS 和 MSVC 编不了，K7 在这些
-  目标上无从谈起。
+  一致，互相接受。字段表构建合入后（3.2，未发布），Android arm64（NDK r29/r30）和
+  Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）都读入服务端
+  C++26 反射构建写出的参照语料并全部接受，写出的语料与它逐字节一致
+  （[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
+- **边界**：只覆盖跑过上面检查的工具链。iOS（Apple clang + iOS SDK）还在等 Xcode，
+  尚未覆盖。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
+  schema 导出签名、不一致时构建失败，并把 GCC 16 并入同一门禁（实现中）。
 
 K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
 （约 2 GiB）的数据，让接收方复制并做全图校验，造成资源耗尽。默认上限建议见
@@ -477,12 +528,15 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 校验的承诺边界：对不可信输入保证内存安全和 schema 一致，**不保证内容完整性**。
 只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
 
-**目标（尚未承诺）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
-库、同一份 schema，客户端能接收、读写、校验、再发。3.1.0 的现状：Windows x64 用
-MinGW-w64 GCC 16 已通过全量测试、wire 与服务端一致；Android 和 iOS 没有能编译本库的
-工具链（NDK 和 Xcode 自带的 Clang 都没有反射），MSVC 也编不了。客户端的构建方式在
-3.2 里补，不在 3.1.0 中。三个客户端目标都原生编译跑通、跨目标 wire 一致、有真机数据
-之后，再加入核心承诺。详见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
+**目标（尚未承诺，实现中）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
+库、同一份 schema 和同一 wire，客户端能接收、读写、校验、再发。客户端用字段表后端
+（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
+编译器），服务端照旧用 C++26 反射。现状（3.2，未发布）：字段表后端已合入；Android
+（NDK r29/r30）和 Windows（MSVC 19.44、clang-cl 19、MinGW）全量 CTest 都是 106/106，语料与
+服务端逐字节一致；iOS 等 Xcode。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
+（iOS 含地址空间实测，并定下最低部署目标：系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17
+以下加载失败），跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致。详见
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)。3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
 
 以下接口提供但属于可选或实验性质，可能在后续版本中改变：
 
