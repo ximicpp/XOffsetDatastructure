@@ -17,7 +17,9 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）和 Android arm64
   （NDK r29/r30）全量测试通过，读入服务端写出的参照语料并写出相同字节。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
-  客户端都已跑通；**真机未测**，步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
+  客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
+  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 未测；
+  步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
 - 客户端上没有任何性能数据，现有计时都来自 Apple M4。
 
 ## 2. 同版本发布

@@ -13,10 +13,13 @@ schema and wire gate (`tools/schema_guard`), small-message compression, an
 old-version client in the map demo, and no-exceptions receive at the speed of
 builds with exceptions. Wire format 2.1 is unchanged.
 
-Status at this tag: the iPhone steps (`docs/DEVICE_TESTING.md` section 7)
-passed on the iOS Simulator through the test host and have not run on an
-iPhone; device testing is paused (susu 2026-10-28). No Mac checkpoint ran on
-this commit; the last one (CKPT4, 2026-10-28) measured D÷FlatBuffers 0.933.
+Status at this tag: 3.2.0-rc.1 passed on one Android phone (Android 11,
+CTest 114/114, wire corpus, both demo clients) and on Windows, macOS and
+Linux machines (record below). The iPhone steps (`docs/DEVICE_TESTING.md`
+section 7) passed on the iOS Simulator through the test host and have not
+run on an iPhone; further device testing is paused (susu 2026-10-28). No
+Mac checkpoint ran on this commit; the last one (CKPT4, 2026-10-28)
+measured D÷FlatBuffers 0.933.
 
 - iOS test host (`-DXOFFSET_TEST_HOST=ON`, default OFF, `tools/test_host/`):
   every executable is also built as a library that a UIKit host app loads
@@ -71,6 +74,21 @@ this commit; the last one (CKPT4, 2026-10-28) measured D÷FlatBuffers 0.933.
   Simulator; `demo/mapstate/RESULT.md` section 8).
 - MSVC: no warning C5030 from `register_owned_bitmap` (it used
   `[[gnu::noinline]]`; now `XOFFSET_DETAIL_NOINLINE`).
+- Device and platform results for 3.2.0-rc.1 (commit 39de636 only): an
+  Android 11 phone, Windows and macOS machines, a remote Linux VM and WSL2
+  (`docs/validation/2026-10-28-rc1-platform/README.md`). Functional only; no
+  iPhone, no bare-metal Linux, no performance.
+- MSVC builds of this project compile its sources as UTF-8 (`/utf-8`); a
+  test failed to build on code page 936. The public headers are ASCII
+  (comments, and the path marker of `xoffset_evolution.hpp`), so consumers
+  need no source charset option.
+- `tools/device/android_device.sh`: the demo ports start at 17800 (were
+  47800, inside Android's ephemeral range, where `adb reverse` can fail) and
+  `XO_PORT_BASE` picks another start; `device.txt` records the board when
+  `ro.soc.*` is missing (before Android 12).
+- Result pages of `tools/platform_matrix.sh`, `tools/native_targets.sh` and
+  the map demo read the commit from `.xo-commit` in an exported source tree;
+  `native_targets.sh` also records the machine.
 - Builds without exceptions verify as fast as builds with them. Without
   exceptions the string checks of member and element loops were no longer
   inlined (GCC) or tested a status after every element (Clang, clang-cl);
