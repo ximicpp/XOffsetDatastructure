@@ -38,6 +38,11 @@ enum class MsgType : std::uint16_t {
     StepRes = 7,       // B->A: UnitStateBatch wire; correlation = new tick
     Error = 8,         // any direction: UTF-8 text
     Bye = 9,           // A->B, A->client: empty; receiver finishes and exits 0
+    // Event stream (10-28, optional; codec.hpp):
+    Subscribe = 10,    // client->A: codec::subscribe_payload() (24 B); flags = codec::EventMode
+    SubscribeOk = 11,  // A->client: empty; refused: Error
+    Events = 12,       // A->client: one event tick (or a part of it); correlation = tick,
+                       // flags = codec::EventEncoding of the payload
 };
 
 // Test categories for view requests (headless sampling); GUI uses Normal.
@@ -61,7 +66,8 @@ struct FrameHeader {
 static_assert(sizeof(FrameHeader) == 24);
 
 // Per-type receive limit: Catalog 1 MiB, ViewReq 4 KiB, ViewSnapshot 16 MiB,
-// StepReq/StepRes 64 MiB, Hello 32 B, Error 4 KiB, HelloOk/Bye 0.
+// StepReq/StepRes 64 MiB, Hello 32 B, Error 4 KiB, HelloOk/Bye 0,
+// Subscribe 24 B, SubscribeOk 0, Events 1 MiB.
 std::uint32_t max_payload(MsgType type) noexcept;
 const char* type_name(MsgType type) noexcept;
 
