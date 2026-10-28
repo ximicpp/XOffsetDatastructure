@@ -200,3 +200,33 @@ Files: `/mnt/project-files/cross-device-demo-20261028/mesh-full1/`
 (`MESH_RESULT.md`; `mesh-full1.tgz` sha256 `acb5eee06c0f0395581f225b35ccf2027d736606b09e3bf7efd7f18283e58f9a`
 with the hub's CSV files, summary, logs, every device's log and self-test
 output; the 424 MB hop archive is not kept).
+
+## 3. Cross-site mailbox: cloud dry run (network thread)
+
+The Mac run (phases 3 and 4, `tools/run_mesh_mac.sh`) is still to come;
+this is the whole flow in the cloud with the Mac's eight devices played by
+the linux-x64-gcc programs (`run_mailbox.sh fake-mac`), 10-28 16:4xZ.
+
+`xo_hub --mailbox-plan` for the 16 cloud devices (ids 1-16) and the 8 Mac
+devices of `tools/mac_devices.txt` (ids 101-108): 2,054 jobs. 1,536 `cross`
+jobs, for every (cloud, Mac) pair and every type both [cloud, Mac, another
+cloud] and [Mac, cloud, another cloud], one (scale, save mode) per pair in
+rotation (each combination 64 times); 6 chains, one per type, [cloud, all 8
+Mac devices shuffled, another cloud] (10 stops); 512 evil jobs, two cases
+per pair in each direction (every receiver meets every case).
+
+Flow: the cloud devices answer the 1,030 Job files of jobs that start in
+the cloud (`pre`, 1 round); the 2,054 files for the Mac (28.9 MB,
+`mac_inbox.tar.gz` 7.8 MB) are what the Mac gets; the Mac side answers in 7
+rounds (the chains need one round per Mac stop) and returns 3,944 files
+(`outbox.tar.gz` 15.8 MB); the cloud devices finish in 3 rounds (`post`) and
+`xo_hub --mailbox-score` judges every job from the reports and checks every
+hop file's data part against the replay (length and wire digest).
+
+**Result: PASS.** 2,054 jobs, 2,054 passed (cross 1,536, chain 6, evil
+512; each evil case refused as expected 312-314 times). Merged with the
+cloud mesh of section 2 (`mesh_report.py --also`): 24 devices, 9,506 jobs,
+all passed; each cloud-Mac cell of the matrix has 6/6 jobs in each
+direction. A changed byte in a hop file's data part after the receiver
+reported fails the job (`data part ... wire ...; replay ...`), and a
+missing report fails it as `no report from <device>`.

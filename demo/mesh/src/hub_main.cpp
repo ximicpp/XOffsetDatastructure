@@ -6,6 +6,11 @@
 //          [--types all|Document,Order,...] [--scales small,medium] [--save-modes verified,compact]
 //          [--seed 1] [--max-inflight 8] [--max-per-device 2] [--job-timeout-s 60]
 //          [--advertise HOST] [--linger] [--no-archive]
+//   xo_hub --mailbox-plan DIR --devices FILE [--plan cross,chain,evil] [--types ...]
+//          [--scales ...] [--save-modes ...] [--seed 1] [--run LABEL]
+//   xo_hub --mailbox-score DIR --out OUT [--run LABEL]
+//
+// The mailbox modes plan and score cross-site jobs offline (src/hub/mailbox.cpp).
 //
 // Exit 0 only when every planned job passed; 1 otherwise; 2 on a usage error.
 #include <cstdio>
@@ -27,7 +32,11 @@ void usage() {
                  "              [--save-modes verified,compact] [--seed 1] [--max-inflight 8]\n"
                  "              [--max-per-device 2] [--job-timeout-s 60] [--advertise HOST]\n"
                  "              [--linger] [--no-archive]\n"
-                 "  --http-port 0 turns the dashboard off; --advertise sets the host in the join link.\n");
+                 "       xo_hub --mailbox-plan DIR --devices FILE [--plan cross,chain,evil] [--types ...]\n"
+                 "              [--scales ...] [--save-modes ...] [--seed 1] [--run LABEL]\n"
+                 "       xo_hub --mailbox-score DIR --out OUT [--run LABEL]\n"
+                 "  --http-port 0 turns the dashboard off; --advertise sets the host in the join link.\n"
+                 "  --devices: lines \"ID NAME SITE\" (two sites; the first one named is site 1).\n");
 }
 
 std::vector<std::string_view> split(std::string_view s) {
@@ -64,7 +73,11 @@ bool parse_list(const char* text, std::vector<E>& out, Parse parse) {
     return !out.empty();
 }
 
-int parse_args(int argc, char** argv, hub::Options& o) {
+struct Mode {
+    std::string plan_dir, score_dir, devices;
+};
+
+int parse_args(int argc, char** argv, hub::Options& o, Mode& mode) {
     bool have_out = false;
     for (int i = 1; i < argc; ++i) {
         const std::string_view a = argv[i];
@@ -99,9 +112,10 @@ int parse_args(int argc, char** argv, hub::Options& o) {
             o.wait_s = int(n);
         } else if (a == "--plan") {
             if (!need()) return 2;
-            o.plan_pairs = o.plan_chain = o.plan_evil = false;
+            o.plan_pairs = o.plan_chain = o.plan_evil = o.plan_cross = false;
             for (std::string_view k : split(v)) {
                 if (k == "pairs") o.plan_pairs = true;
+                else if (k == "cross") o.plan_cross = true;
                 else if (k == "chain") o.plan_chain = true;
                 else if (k == "evil") o.plan_evil = true;
                 else return 2;
@@ -133,6 +147,15 @@ int parse_args(int argc, char** argv, hub::Options& o) {
             o.linger = true;
         } else if (a == "--no-archive") {
             o.archive = false;
+        } else if (a == "--mailbox-plan") {
+            if (!need()) return 2;
+            mode.plan_dir = v;
+        } else if (a == "--mailbox-score") {
+            if (!need()) return 2;
+            mode.score_dir = v;
+        } else if (a == "--devices") {
+            if (!need()) return 2;
+            mode.devices = v;
         } else if (a == "-h" || a == "--help") {
             usage();
             std::exit(0);
@@ -140,6 +163,13 @@ int parse_args(int argc, char** argv, hub::Options& o) {
             std::fprintf(stderr, "error: unknown argument %s\n", argv[i]);
             return 2;
         }
+    }
+    if (!mode.plan_dir.empty()) {
+        if (!mode.score_dir.empty() || mode.devices.empty()) {
+            std::fprintf(stderr, "error: --mailbox-plan DIR needs --devices FILE (and no --mailbox-score)\n");
+            return 2;
+        }
+        return 0;
     }
     if (!have_out) {
         std::fprintf(stderr, "error: --out DIR is required\n");
@@ -152,9 +182,12 @@ int parse_args(int argc, char** argv, hub::Options& o) {
 
 int main(int argc, char** argv) {
     hub::Options opt;
-    if (parse_args(argc, argv, opt) != 0) {
+    Mode mode;
+    if (parse_args(argc, argv, opt, mode) != 0) {
         usage();
         return 2;
     }
+    if (!mode.plan_dir.empty()) return hub::mailbox_plan(opt, mode.plan_dir, mode.devices);
+    if (!mode.score_dir.empty()) return hub::mailbox_score(opt, mode.score_dir);
     return hub::run(opt);
 }
