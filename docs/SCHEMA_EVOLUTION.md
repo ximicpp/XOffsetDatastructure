@@ -145,7 +145,10 @@ int main(int argc, char** argv) {
 
 - `schema_freeze freeze <label> <namespace> <header> <lock>`：发版时运行，写出快照头文件
   （带 schema 名称注册和 `XOFFSET_PIN_SCHEMA`，改动冻结的类型会编译失败），并在锁文件
-  末尾追加这个版本。
+  末尾追加这个版本。快照里新定义的每个记录都有一行 `XOFFSET_RECORD`，所以没有反射的
+  客户端（C++20 字段表构建）可以直接包含快照，按那个版本收发；C++26 构建会用反射核对
+  这些行。`tests/test_schema_snapshot.cpp` 在所有构建里检查这一点，并核对客户端算出的
+  `schema_hash` 和字段名摘要与锁文件一致。
 - `schema_freeze check <lock>`：放进 CTest，每次构建都跑。布局与某个冻结版本相同但字段名
   不同（且没有别名）时失败；布局变了而上一个冻结版本不在版本链里时失败。
 

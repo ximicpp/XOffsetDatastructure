@@ -23,6 +23,8 @@ struct alignas(8) Player {
 };
 } // namespace game_v2
 
+XOFFSET_RECORD(game_v2::Player, name, level, slots, items, notes, seen, blob)
+
 XOFFSET_REGISTER_SCHEMA_NAME(game_v2::Player, "test.freeze.Player")
 XOFFSET_PIN_SCHEMA(game_v2::Player, "record[s:96,a:8]{@0:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@16:i64,@24:array[2]<array[3]<i32>>,@48:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:20,a:4]{@0:i32,@4:enum<u8char>,@5:array[3]<u8char>,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@60:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}>,@72:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<enum<u8char>>,@84:xblob[s:12,a:4]{data:rel32,size:u32,capacity:u32}}");
 
